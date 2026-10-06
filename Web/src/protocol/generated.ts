@@ -247,6 +247,7 @@ export interface AppViewCall {
   result?: JSONValue;
   state: AppViewCallState;
   reason?: string;
+  pinnable?: boolean;
 }
 
 export type AppViewCallState = "running" | "done" | "cancelled";
@@ -1057,7 +1058,7 @@ export interface PinArrangeSessionsRequest {
   agentIDs: UUID[];
 }
 
-export type PinKind = "markdown" | "html";
+export type PinKind = "markdown" | "html" | "view";
 
 export interface PinPathRequest {
   folder: URLString;
@@ -1074,6 +1075,7 @@ export interface PinRequest {
   folder: URLString;
   path: string;
   title?: string;
+  view?: ViewPin;
 }
 
 export interface PinSessionRequest {
@@ -1087,6 +1089,8 @@ export interface PinView {
   kind: PinKind;
   missing: boolean;
   pinnedBy: PinnerView;
+  view?: ViewPin;
+  missingReason?: string;
 }
 
 export interface PinWriteRequest {
@@ -1729,6 +1733,7 @@ export interface ViewCallRequest {
   viewID: UUID;
   name: string;
   arguments?: JSONValue;
+  feed?: boolean;
 }
 
 export interface ViewContextRequest {
@@ -1744,6 +1749,13 @@ export interface ViewLogRequest {
   viewID: UUID;
   level?: string;
   data?: JSONValue;
+}
+
+export interface ViewPin {
+  server: string;
+  uri: string;
+  tool: string;
+  arguments?: JSONValue;
 }
 
 export interface ViewReadRequest {
@@ -2230,7 +2242,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AnswerElicitationRequest: { required: ["requestID", "action", "content"], optional: ["sendID"] },
   AnswerRequest: { required: ["permissionID", "optionID"], optional: ["sendID"] },
   AnswerSandboxRequest: { required: ["agentID", "carryOn"], optional: [] },
-  AppViewCall: { required: ["id", "server", "tool", "resourceUri", "state"], optional: ["arguments", "result", "reason"] },
+  AppViewCall: { required: ["id", "server", "tool", "resourceUri", "state"], optional: ["arguments", "result", "reason", "pinnable"] },
   AppViewPolicy: { required: ["connectDomains", "resourceDomains", "frameDomains", "baseUriDomains", "refused"], optional: [] },
   ArrangeRequest: { required: ["folder", "order"], optional: [] },
   ArtifactWriteRequest: { required: ["agentID", "path", "text"], optional: [] },
@@ -2327,9 +2339,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PinArrangeSessionsRequest: { required: ["folder", "agentIDs"], optional: [] },
   PinPathRequest: { required: ["folder", "path"], optional: [] },
   PinReadRequest: { required: ["folder", "path"], optional: ["knownStamp"] },
-  PinRequest: { required: ["folder", "path"], optional: ["title"] },
+  PinRequest: { required: ["folder", "path"], optional: ["title", "view"] },
   PinSessionRequest: { required: ["folder", "agentID"], optional: [] },
-  PinView: { required: ["path", "title", "kind", "missing", "pinnedBy"], optional: [] },
+  PinView: { required: ["path", "title", "kind", "missing", "pinnedBy"], optional: ["view", "missingReason"] },
   PinWriteRequest: { required: ["folder", "path", "text"], optional: [] },
   PinnerView: { required: ["kind", "id", "name"], optional: [] },
   PinsChangedNotification: { required: ["folder", "pins"], optional: ["sessions"] },
@@ -2401,9 +2413,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   TurnsRequest: { required: ["agentID", "limit"], optional: ["before"] },
   UnqueueRequest: { required: ["agentID", "promptID"], optional: [] },
   Usage: { required: ["used", "size", "at"], optional: ["cost"] },
-  ViewCallRequest: { required: ["agentID", "viewID", "name"], optional: ["project", "arguments"] },
+  ViewCallRequest: { required: ["agentID", "viewID", "name"], optional: ["project", "arguments", "feed"] },
   ViewContextRequest: { required: ["agentID", "viewID"], optional: ["uri", "content", "structuredContent"] },
   ViewLogRequest: { required: ["agentID", "viewID"], optional: ["level", "data"] },
+  ViewPin: { required: ["server", "uri", "tool"], optional: ["arguments"] },
   ViewReadRequest: { required: ["agentID", "uri"], optional: [] },
   ViewResource: { required: ["uri", "mimeType", "html", "policy", "variables"], optional: ["prefersBorder"] },
   Wait: { required: ["agentID", "nameAtReport"], optional: ["ending"] },

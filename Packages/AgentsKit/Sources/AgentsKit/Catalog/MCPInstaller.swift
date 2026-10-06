@@ -97,6 +97,42 @@ struct MCPInstaller: Sendable {
                                           addedAt: addedAt, destination: destination)
     }
 
+    /// Write a server typed on the sheet, as Verify connected to it (#305). Its secrets go to
+    /// `secrets.env` first, as a registry add's do; the name has to still be free.
+    func addByHand(_ built: MCPHandEntry, destination: DaemonAPI.SkillDestination,
+                   personalHome: URL?) throws -> DaemonAPI.ManagedMCPServer {
+        guard let home = personalHome else { throw DaemonAPI.MCPCatalogError.noPersonalHome }
+        let url = try mcpURL(destination, personalHome: home)
+        let name = built.stored.name
+        do {
+            if try MCPJSONFile.entry(named: name, at: url) != nil { throw DaemonAPI.MCPCatalogError.nameTaken(name: name) }
+        } catch is MCPJSONFile.Problem {
+            throw DaemonAPI.MCPCatalogError.mcpUnreadable(path: url.path)
+        }
+        if !built.newSecrets.isEmpty {
+            var env = try Self.secretsForChange(home: home)
+            for (key, value) in built.newSecrets { env.set(key, value: value) }
+            try env.save(to: SecretsEnv.url(home: home))
+        }
+        do {
+            try MCPJSONFile.upsert(name: name, entry: built.entry, at: url)
+        } catch is MCPJSONFile.Problem {
+            throw DaemonAPI.MCPCatalogError.mcpUnreadable(path: url.path)
+        }
+        var side = MCPCatalogSidecar.load(from: sidecarURL)
+        let addedAt = Date()
+        side.upsert(destination: destination, name: name,
+                    record: .init(registryName: "", version: "", run: built.run.rawValue, addedAt: addedAt, byHand: true))
+        try side.save(to: sidecarURL)
+        if case .project(let path) = destination {
+            var records = MCPApprovalStore(file: approvalsURL).load()
+            records.recordAdded(folder: URL(filePath: path), name: name, entry: built.entry)
+            try MCPApprovalStore(file: approvalsURL).save(records, replacing: true)
+        }
+        return DaemonAPI.ManagedMCPServer(name: name, registryName: "", version: "", run: built.run,
+                                          addedAt: addedAt, destination: destination, byHand: true)
+    }
+
     /// The person's `secrets.env` to change, or the refusal that keeps an unreadable one.
     static func secretsForChange(home: URL) throws -> SecretsEnv {
         do {

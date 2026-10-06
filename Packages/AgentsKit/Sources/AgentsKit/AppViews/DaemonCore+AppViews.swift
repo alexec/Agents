@@ -22,7 +22,8 @@ extension DaemonCore {
               let uri = tool.resourceURI else {
             throw JSONRPCError(code: DaemonAPI.Failure.viewRefused, message: "No tool called \(request.name).")
         }
-        var call = AppViewCall(tool: tool.name, resourceURI: uri, arguments: request.arguments)
+        var call = AppViewCall(tool: tool.name, resourceURI: uri, arguments: request.arguments,
+                               pinnable: AppViewCatalog.pinnable(tool: tool.name, uri: uri, testView: offersTestView) ? true : nil)
         runningViews[agentID, default: [:]][call.id] = call
         await record(.appView(call), for: agentID)
 
@@ -41,6 +42,9 @@ extension DaemonCore {
         await record(.appView(call), for: agentID)
         return result
     }
+
+    /// Offer the test view to pins, as `AGENTS_TEST_VIEWS=1` does: for tests.
+    func offerTestView(_ on: Bool) { offersTestView = on }
 
     /// Every view of `agentID` still waiting for its answer, said to be cancelled.
     func cancelViews(for agentID: UUID, reason: String) async {
@@ -127,6 +131,12 @@ extension DaemonCore {
             DaemonLog.shared.write("view \(request.viewID) asked for \(request.name), which no view may call")
             throw JSONRPCError(code: DaemonAPI.Failure.viewRefused,
                                message: "A view may not call \(request.name).")
+        }
+        // A pin's feeding call (#189): opening a pin must never change anything.
+        if request.feed == true, !tool.feedsPins {
+            DaemonLog.shared.write("pinned view \(request.viewID) asked to be fed by \(request.name), which is not read-only")
+            throw JSONRPCError(code: DaemonAPI.Failure.viewRefused,
+                               message: "\(request.name) can't feed a pinned view: it is not marked read-only.")
         }
         if tool.name == "dashboard_action" {
             return try await dashboardViewAction(request.arguments, project: project)
@@ -243,7 +253,10 @@ extension DaemonCore {
     /// with the person's next message, before their words (`takeViewContext`).
     func keepViewContext(_ request: DaemonAPI.ViewContextRequest) throws {
         guard agents[request.agentID] != nil else {
-            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
+            // A project's page (the Dashboard, a pin) has no agent to tell (#189).
+            DaemonLog.shared.write("view \(request.viewID) on a project page asked to update the model's context: refused")
+            throw JSONRPCError(code: DaemonAPI.Failure.viewRefused,
+                               message: "A view on a project's page has no agent to tell.")
         }
         let title = request.uri.flatMap { AppViewCatalog.resource($0)?.title } ?? "a view"
         let preface = AppViewBridge.contextPreface(viewTitle: title, content: request.content,

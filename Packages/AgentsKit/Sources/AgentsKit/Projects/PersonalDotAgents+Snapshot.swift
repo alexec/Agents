@@ -198,6 +198,7 @@ extension PersonalDotAgents {
         var seen: Set<String> = [appName]
         var sseLeftOut: [String: [String]] = [:]
         let secretFile = SecretsEnv.load(from: SecretsEnv.url(home: home))
+        let signIns = (try? MCPSignInFile.load(from: MCPSignInFile.url(home: home))) ?? MCPSignInFile()
         for server in mine {
             var reach: [String: Reach] = [:]
             var clash: [String: String] = [:]
@@ -238,6 +239,10 @@ extension PersonalDotAgents {
                 for rule in present { reach[rule.runtimeID] = .leftOut(why) }
                 looks.append(.init(kind: .leftOut, page: .mcp, item: server.name,
                                    text: "\(why), so agents start without \(server.name)."))
+            } else if Self.needsSignIn(server, secrets: secretFile, signIns: signIns) {
+                for rule in present { reach[rule.runtimeID] = .leftOut("needs sign-in") }
+                looks.append(.init(kind: .leftOut, page: .mcp, item: server.name,
+                                   text: "\(server.name) needs sign-in, so agents start without it."))
             }
             result.servers.append(serverRow(server, clash: clash, reach: reach))
         }
@@ -253,6 +258,13 @@ extension PersonalDotAgents {
             }
         }
         return result
+    }
+
+    /// An http server that asked for a sign-in and has none (#306).
+    private static func needsSignIn(_ server: MCPServer, secrets: SecretsEnv, signIns: MCPSignInFile) -> Bool {
+        guard case .http(let url, let headers)? = secrets.filled(server)?.transport,
+              !MCPSignIns.bringsOwnAuthorization(headers), let key = MCPOAuth.canonical(url) else { return false }
+        return signIns.grants[key] == nil && signIns.needsSignIn[key] != nil
     }
 
     /// `${NAME}` in the entry that `secrets.env` does not have. Names only.
@@ -381,7 +393,7 @@ extension PersonalDotAgents {
                 files += inside.map { .init(path: "\(personas)/\($0)", kind: .persona) }
             case ".git":
                 files.append(.init(path: name, kind: .git))
-            case ".skill-lock.json":
+            case ".skill-lock.json", MCPSignInFile.fileName:
                 files.append(.init(path: name, kind: .managed))
             default:
                 files.append(.init(path: name, kind: .unused))

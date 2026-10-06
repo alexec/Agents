@@ -26,7 +26,7 @@ Paths are relative to the repo root. `AK` is `Packages/AgentsKit/Sources/AgentsK
 
 - [ ] T004 Add `ViewPlace` (`agent(UUID)` | `project(folder:)`) to `AKC/AppViews/AppViewsWire.swift`. `ViewReadRequest`, `ViewCallRequest`, `ViewLogRequest` and `ViewContextRequest` keep `agentID` and gain an optional `project` (exactly one set) and an optional `feed: Bool` on `ViewCallRequest`. Regenerate `Web/src/protocol/generated.ts`
 - [ ] T005 [P] Spike, no app change: in a scratch HTML under `/tmp`, check whether an `<iframe sandbox="" srcdoc>` child draws under a parent CSP of `frame-src 'none'` in WKWebView (Mac) and in Chrome. Write the answer in `specs/188-mcp-apps-rest/research.md` (decides the page-tile path in T016)
-- [ ] T006 [P] Make `PinsFile` decoding in `AKC/Pins/Pins.swift` skip an entry it cannot read, and keep that entry's raw JSON on rewrite. Test in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/PinsTests.swift`: a file with an unknown `{"view":…}` entry keeps it and lists the others. Ships a wave before T030
+- [x] T006 [P] Make `PinsFile` decoding in `AKC/Pins/Pins.swift` skip an entry it cannot read, and keep that entry's raw JSON on rewrite. Test in `Packages/AgentsKit/Tests/AgentsKitTests/Unit/PinsTests.swift`: a file with an unknown `{"view":…}` entry keeps it and lists the others. Ships a wave before T030
 - [ ] T007 In `AK/AppViews/DaemonCore+AppViews.swift`, resolve a project place:
   - `readView` and `callFromView` accept `project` and check the caller's grant for the folder;
   - `keepViewContext` and `ui/message` from a project place are refused with `viewRefused` and logged;
@@ -88,14 +88,14 @@ actions and live updates.
 
 **Independent test**: spec.md US2.
 
-- [ ] T024 [US2] Add a `view` entry to `AKC/Pins/Pins.swift`: `{server, uri, tool, arguments ≤ 2 KB}`, with exactly one of `path`/`view`, "at most 10 pins a project, both kinds counted", and a title of at most 60 characters. `PinView` gains `view` and the missing reasons "server not set up here", "waiting for approval" and "no such view"
-- [ ] T025 [US2] Make `pin_page`, `unpin_page` and `move_pin` take `view` in `AK/ACP/Serve/AppService+Dashboard.swift` (schemas) and `AK/Pins/DaemonCore+Pins.swift`. Refuse a tool that is not `app`-visible or lacks `readOnlyHint`, and refuse `ui://agents/dashboard`. `pinsWords` names view pins
-- [ ] T026 [P] [US2] Add tests in `Tests/AgentsKitTests/Unit/PinsTests.swift`: a view pin round-trips, the 11th pin is refused, a non-read-only tool is refused, the Dashboard pin is refused, a missing server is reported
-- [ ] T027 [US2] Open a view pin on the Mac: draw it in `App/Sources/Projects/PinnedPageRows.swift`, and open it with a project-place host for the pin's call from `App/Sources/Dashboard/PinnedPage.swift`
-- [ ] T028 [P] [US2] Do the same on the Remote: `Remote/Sources/Dashboard/PinnedPage.swift` (`PinnedPageCards`, `PinnedPage`)
-- [ ] T029 [P] [US2] Do the same on the web: `Web/src/views/Pins.tsx` and `ViewPage`
-- [ ] T030 [US2] Add **Pin** to the view caption's menu, inline and full screen, when the call's tool can feed a pin: `Shared/UI/AppView/AppViewRow.swift` and `Web/src/views/chat/AppView.tsx`, sending `pins/pin` with the view. Requires T006 to be live
-- [ ] T031 [US2] Add "Pinning a view (our extension of SEP-1865)" to `docs/explanation/views.md`, and the pin row to `specs/071-web-remote/walks/parity.md`
+- [x] T024 [US2] Add a `view` entry to `AKC/Pins/Pins.swift`: `{server, uri, tool, arguments ≤ 2 KB}`, with exactly one of `path`/`view`, "at most 10 pins a project, both kinds counted", and a title of at most 60 characters. `PinView` gains `view` and the missing reasons "server not set up here", "waiting for approval" and "no such view"
+- [x] T025 [US2] Make `pin_page`, `unpin_page` and `move_pin` take `view` in `AK/ACP/Serve/AppService+Dashboard.swift` (schemas) and `AK/Pins/DaemonCore+Pins.swift`. Refuse a tool that is not `app`-visible or lacks `readOnlyHint`, and refuse `ui://agents/dashboard`. `pinsWords` names view pins
+- [x] T026 [P] [US2] Add tests in `Tests/AgentsKitTests/Unit/PinsTests.swift`: a view pin round-trips, the 11th pin is refused, a non-read-only tool is refused, the Dashboard pin is refused, a missing server is reported
+- [x] T027 [US2] Open a view pin on the Mac: draw it in `App/Sources/Projects/PinnedPageRows.swift`, and open it with a project-place host for the pin's call from `App/Sources/Dashboard/PinnedPage.swift`
+- [x] T028 [P] [US2] Do the same on the Remote: `Remote/Sources/Dashboard/PinnedPage.swift` (`PinnedPageCards`, `PinnedPage`)
+- [x] T029 [P] [US2] Do the same on the web: `Web/src/views/Pins.tsx` and `ViewPage`
+- [x] T030 [US2] Add **Pin** to the view caption's menu, inline and full screen, when the call's tool can feed a pin: `Shared/UI/AppView/AppViewRow.swift` and `Web/src/views/chat/AppView.tsx`, sending `pins/pin` with the view. Requires T006 to be live
+- [x] T031 [US2] Add "Pinning a view (our extension of SEP-1865)" to `docs/explanation/views.md`, and the pin row to `specs/071-web-remote/walks/parity.md`
 - [ ] T032 [US2] Walk it: pin the test view from a chat, open it on the Mac, the Remote and the web, see it missing on a root without the test view, and unpin it
 
 ---
@@ -126,8 +126,8 @@ recorded as met.** It can run beside Phase 4.
 
 T041–T046 are daemon-only groundwork. They can start early in a lane of their own.
 
-- [ ] T041 [P] [US4] Move `RouteProcess`'s spawning out of `AK/MCP/MCPBridge.swift` into a portable `AK/MCP/MCPStdioProcess.swift` (Linux too: no `Network`), with the same scrubbed `RuntimeEnvironment.forRuntimes()`, the server's env, cwd and stderr discarded. `MCPBridge` uses it
-- [ ] T042 [US4] Add `AK/MCP/MCPClient.swift` with stdio (through `MCPStdioProcess`) and streamable HTTP (`URLSession`, its own `Mcp-Session-Id`, the configured headers). `initialize` advertises `extensions["io.modelcontextprotocol/ui"] = {mimeTypes: ["text/html;profile=mcp-app"]}`; then `tools/list`, `resources/list`, `resources/read` and `tools/call` (60 s timeout). `-32601` on optional methods is tolerated. sse is refused for views
+- [x] T041 [P] [US4] Move `RouteProcess`'s spawning out of `AK/MCP/MCPBridge.swift` into a portable `AK/MCP/MCPStdioProcess.swift` (Linux too: no `Network`), with the same scrubbed `RuntimeEnvironment.forRuntimes()`, the server's env, cwd and stderr discarded. `MCPBridge` uses it
+- [x] T042 [US4] Add `AK/MCP/MCPClient.swift` with stdio (through `MCPStdioProcess`) and streamable HTTP (`URLSession`, its own `Mcp-Session-Id`, the configured headers). `initialize` advertises `extensions["io.modelcontextprotocol/ui"] = {mimeTypes: ["text/html;profile=mcp-app"]}`; then `tools/list`, `resources/list`, `resources/read` and `tools/call` (60 s timeout). `-32601` on optional methods is tolerated. sse is refused for views
 - [ ] T043 [US4] Add `AK/MCP/MCPClientPool.swift`, on the host that runs the project:
   - at most 4 clients a host, least recently used ended first;
   - one start in flight per server;
@@ -142,7 +142,7 @@ T041–T046 are daemon-only groundwork. They can start early in a lane of their 
   - the result from `rawOutput.result`, from `rawOutput.structuredContent`/`contents`, or from a JSON-string `rawOutput`.
 
   Tests in `Tests/AgentsKitTests/Unit/ACPToolShapeTests.swift`, built from the #186 wire logs in `specs/research/186-mcp-apps-acp-probe/`
-- [ ] T046 [P] [US4] Add a sentinel test in `Tests/AgentsKitTests/Unit/MCPClientLoggingTests.swift`: a server whose command, args, env, headers and URL hold a sentinel, driven through connect, read, call and end, leaves no sentinel in the daemon log (054 FR-023)
+- [x] T046 [P] [US4] Add a sentinel test in `Tests/AgentsKitTests/Unit/MCPClientLoggingTests.swift`: a server whose command, args, env, headers and URL hold a sentinel, driven through connect, read, call and end, leaves no sentinel in the daemon log (054 FR-023)
 - [ ] T047 [US4] Review the template: hash each server's `ui://` resources (uri, mimeType, text, `_meta.ui`) into a `views` section of `<root>/mcp-approvals.json`, in `AK/Catalog/MCPApprovals.swift`. A new or changed hash makes `views/read` answer "needs Show" until the person answers. Personal servers are included (Q6)
 - [ ] T048 [US4] Give `views/read`, `views/call` and `views/log` a `server` in `AKC/AppViews/AppViewsWire.swift` and `AK/AppViews/DaemonCore+AppViews.swift`. `views/call` is passed through only when the server is the held `AppViewCall.server` and the catalog says `app`; a cross-server or `agents` tool from a third-party view is refused and logged. `resources/read` is same-server only. Each policy is logged on read
 - [ ] T049 [US4] Write `appView` entries for third-party calls in the ACP update path (`AK/ACP/ACPSession.swift`, the tool_call and tool_call_update handling) through `ACPToolShape`, only when the catalog says the tool has a view. A text-only result is pinned only (Q7). A model's tool is never called again

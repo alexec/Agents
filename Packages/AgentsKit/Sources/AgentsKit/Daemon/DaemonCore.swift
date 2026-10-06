@@ -157,6 +157,8 @@ public actor DaemonCore {
     var runningViews: [UUID: [UUID: AppViewCall]] = [:]
     /// The test view's count, by agent (#187).
     var viewCounts: [UUID: Int] = [:]
+    /// Whether the test view can be pinned (#189): the daemon's environment, or a test's say.
+    var offersTestView = AppViewCatalog.offersTestView
     /// What each view last asked the agent to know (`ui/update-model-context`), by agent
     /// and view, as the words told with the person's next message. Memory only.
     var viewContexts: [UUID: [UUID: String]] = [:]
@@ -632,7 +634,21 @@ public actor DaemonCore {
     var mcpRegistrySession: URLSession = .shared
     var mcpRegistryEndpoints = MCPRegistryEndpoints.from(environment: ProcessInfo.processInfo.environment)
     lazy var mcpPreviewStore = MCPPreviewStore()
+    /// Servers added by hand that answered Verify, until added (#305).
+    lazy var mcpVerifiedStore = MCPVerifiedStore()
+    /// How long Verify waits for a server's answers (#305). A test makes it short.
+    var mcpVerifyTimeout: Duration = .seconds(20)
+    /// What Verify sends http through. A test stands a server in.
+    var mcpVerifyHTTP: MCPClient.HTTPSend?
+    /// Sign-ins under way, by id, until the window has read how they ended (#306).
+    var mcpSignInFlows: [UUID: MCPSignInFlow] = [:]
+    /// How long one `mcp/sign-in/wait` holds before it answers "waiting".
+    var mcpSignInWaitLimit: Duration = .seconds(25)
+    /// How long a list waits on a server it asks whether it wants a sign-in.
+    var mcpSignInProbeTimeout: Duration = .seconds(5)
     #endif
+    /// The person's MCP sign-ins: rows' state, and the bearer each agent starts with (#306).
+    lazy var mcpSignIns = MCPSignIns(home: locations.personalHome)
     /// The single ticker. One for the daemon, not one per workflow: see
     /// `tickWorkflows` for why it reads the wall clock rather than sleeping until due.
     var workflowTicker: Task<Void, Never>?

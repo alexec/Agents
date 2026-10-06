@@ -60,12 +60,17 @@ the new value is not shown again.
 
 ## Take a server out
 
-**Remove…** is offered only for a server the app added. It shows **registry** and the
-version it was added at. Confirming takes the entry out of `mcp.json`. The secret stays in
+**Remove…** is offered only for a server the app added. One from the registry shows
+**registry** and the version it was added at; one added on the sheet by hand shows
+**added by hand** (see [Add an MCP server by hand](add-an-mcp-server-by-hand.md)). Confirming takes the entry out of `mcp.json`. The secret stays in
 `secrets.env` unless nothing else names it, in which case you can tick **Also forget** that
 name. If another server still names it, the secret stays and the sheet says so.
 
-A server you wrote by hand has no **Remove**. If its name is the one you wanted to add, the
-app leaves it alone.
+A server you wrote into `mcp.json` yourself has no **Remove**. If its name is the one you
+wanted to add, the app leaves it alone.
+
+A server that is not on the registry can be added from the same sheet with **Add by
+hand…**, which connects to it before anything is written: see
+[Add an MCP server by hand](add-an-mcp-server-by-hand.md).
 
 If `mcp.json` cannot be read, Add is refused and the file is not written.

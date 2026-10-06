@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Add an MCP server from the registry (060, frames B and C).
+/// Add an MCP server from the registry (060, frames B and C), or by hand (#305).
 struct AddMCPSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -19,12 +19,16 @@ struct AddMCPSheet: View {
     @State private var secretValues: [String: String] = [:]
     @State private var adding = false
     @State private var addError: String?
+    @State private var byHand = false
 
     static let size = CGSize(width: 720, height: 540)
 
     var body: some View {
         VStack(spacing: 0) {
-            if let preview {
+            if byHand {
+                AddMCPByHandPane(destination: destination, onBack: { byHand = false },
+                                 onCancel: { dismiss() }, onAdded: { onAdded(); dismiss() })
+            } else if let preview {
                 detailPane(preview)
             } else {
                 searchPane
@@ -94,6 +98,7 @@ struct AddMCPSheet: View {
                 Text("From registry.modelcontextprotocol.io. Choose one to see exactly what would run before adding.")
                     .appText(.fine).foregroundStyle(.secondary)
                 Spacer()
+                Button("Add by hand…") { byHand = true }.buttonStyle(.paper)
                 Button("Cancel") { dismiss() }.buttonStyle(.paper).keyboardShortcut(.cancelAction)
             }
         }

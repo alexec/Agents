@@ -1031,6 +1031,21 @@ final class AppModel {
         }
     }
 
+    /// Pin a view under a project (#189), from its menu in a chat. Why it was not, or nil.
+    func pinView(_ view: ViewPin, in key: ProjectKey) async -> String? {
+        do {
+            let pins = try await client(for: key.host).call(DaemonAPI.Method.pinsPin,
+                                                            DaemonAPI.PinRequest(folder: key.folder, view: view),
+                                                            returning: [PinView].self)
+            work.setPins(pins, in: key.folder)
+            return nil
+        } catch let error as JSONRPCError {
+            return error.message
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
     func unpin(_ path: String, in key: ProjectKey) async {
         work.setPins(pins(in: key.folder).filter { $0.path != path }, in: key.folder)
         if openPin == path, selectedProjectKey == key { showProject(key) }
@@ -2621,6 +2636,69 @@ final class AppModel {
             return .failure(answer.error ?? .failed("no server"))
         } catch {
             return .failure(Self.mcpError(error))
+        }
+    }
+
+    /// Connect to a server typed on the sheet; nothing is written (#305).
+    func mcpVerify(_ server: DaemonAPI.MCPHandServer,
+                   for destination: DaemonAPI.SkillDestination) async -> DaemonAPI.MCPVerifyAnswer {
+        do {
+            return try await client.call(DaemonAPI.Method.mcpVerify,
+                                         DaemonAPI.MCPVerifyRequest(destination: destination, server: server),
+                                         returning: DaemonAPI.MCPVerifyAnswer.self)
+        } catch {
+            return .init(error: Self.mcpError(error))
+        }
+    }
+
+    func mcpAddByHand(_ verifyID: UUID, to destination: DaemonAPI.SkillDestination)
+        async -> Result<DaemonAPI.ManagedMCPServer, DaemonAPI.MCPCatalogError> {
+        do {
+            let answer = try await client.call(DaemonAPI.Method.mcpAddByHand,
+                                               DaemonAPI.MCPAddByHandRequest(verifyID: verifyID, destination: destination),
+                                               returning: DaemonAPI.MCPAddAnswer.self)
+            if let server = answer.server { return .success(server) }
+            return .failure(answer.error ?? .failed("no server"))
+        } catch {
+            return .failure(Self.mcpError(error))
+        }
+    }
+
+    /// Start signing in to a server that asks for OAuth (#306): the page to open, or the
+    /// client the person has to give first.
+    func mcpSignIn(_ target: DaemonAPI.MCPSignInTarget,
+                   client: DaemonAPI.MCPSignInClient? = nil) async -> DaemonAPI.MCPSignInAnswer {
+        do {
+            return try await self.client.call(DaemonAPI.Method.mcpSignIn,
+                                              DaemonAPI.MCPSignInRequest(target: target, client: client),
+                                              returning: DaemonAPI.MCPSignInAnswer.self)
+        } catch {
+            return .init(error: "The sign-in couldn't start: the app could not reach its host.")
+        }
+    }
+
+    /// Wait on a sign-in, a while at a time: `waiting` means ask again.
+    func mcpSignInWait(_ flowID: UUID) async -> DaemonAPI.MCPSignInStatus {
+        do {
+            return try await client.call(DaemonAPI.Method.mcpSignInWait, DaemonAPI.MCPSignInFlowRequest(flowID: flowID),
+                                         returning: DaemonAPI.MCPSignInWaitAnswer.self).status
+        } catch {
+            return .failed("The app lost touch with its host while waiting.")
+        }
+    }
+
+    func mcpSignInCancel(_ flowID: UUID) async {
+        _ = try? await client.call(DaemonAPI.Method.mcpSignInCancel, DaemonAPI.MCPSignInFlowRequest(flowID: flowID),
+                                   returning: DaemonAPI.MCPSignInWaitAnswer.self)
+    }
+
+    /// Forget a server's sign-in. Nil, or why it could not.
+    func mcpSignOut(_ target: DaemonAPI.MCPSignInTarget) async -> String? {
+        do {
+            return try await client.call(DaemonAPI.Method.mcpSignOut, DaemonAPI.MCPSignOutRequest(target: target),
+                                         returning: DaemonAPI.MCPSignOutAnswer.self).error
+        } catch {
+            return "It couldn't be signed out: the app could not reach its host."
         }
     }
 

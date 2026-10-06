@@ -8,6 +8,8 @@
 #                  whatever came back for that request
 #   anything else  echoed back as the result
 # Every answer carries "pid", so a test can tell one process from the next.
+# tools/list lists the one tool, echo; resources/list is not a method here (-32601), for
+# MCPClientTests.
 import json, os, sys, threading, time
 
 out = threading.Lock()
@@ -48,6 +50,10 @@ for line in sys.stdin:
     elif method == "initialize":
         send({"jsonrpc": "2.0", "id": id, "result": {"protocolVersion": "2025-06-18", "capabilities": {"tools": {}},
                                                      "serverInfo": {"name": "echo", "version": "1"}}})
+    elif method == "tools/list":
+        send({"jsonrpc": "2.0", "id": id, "result": {"tools": [{"name": "echo", "description": "Says it back."}]}})
+    elif method == "resources/list":
+        send({"jsonrpc": "2.0", "id": id, "error": {"code": -32601, "message": "Method not found"}})
     elif method == "tools/call":
         threading.Thread(target=call, args=(id, message.get("params", {}).get("arguments", {})), daemon=True).start()
     elif id is not None:

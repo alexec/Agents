@@ -101,7 +101,7 @@ struct PinnedPage: View {
             .padding(24)
         } else if let text, loadedPath == path {
             switch kind {
-            case .markdown:
+            case .markdown, .view:
                 LivePage(text: text, url: url, line: nil, folderEvent: revision)
                     .environment(\.pageActions, actions)
             case .html where showsSource:

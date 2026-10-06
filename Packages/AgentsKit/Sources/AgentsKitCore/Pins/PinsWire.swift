@@ -45,14 +45,24 @@ public extension DaemonAPI.Failure {
 public extension DaemonAPI {
     struct PinRequest: Codable, Sendable, Hashable {
         public var folder: URL
-        /// Relative to the project folder, or absolute inside it.
+        /// Relative to the project folder, or absolute inside it. A view pin's `ui://`
+        /// address, so a host from before #189 refuses it as no file of the project's.
         public var path: String
         public var title: String?
+        /// A view to pin, and the call that feeds it (#189).
+        public var view: ViewPin?
 
         public init(folder: URL, path: String, title: String? = nil) {
             self.folder = folder
             self.path = path
             self.title = title
+        }
+
+        public init(folder: URL, view: ViewPin, title: String? = nil) {
+            self.folder = folder
+            self.path = view.uri
+            self.title = title
+            self.view = view
         }
     }
 

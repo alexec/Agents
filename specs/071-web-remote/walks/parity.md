@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 208 rows: **122 same**, **37 by design**, **49 delta** (after #188, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 210 rows: **124 same**, **37 by design**, **49 delta** (after #188, #189, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -34,7 +34,7 @@ Of 208 rows: **122 same**, **37 by design**, **49 delta** (after #188, #221, #23
 | Notifications and badges | 3 | 0 | 1 |
 | Disk strip | 2 | 1 | 0 |
 | Hosts, connection and pairing | 3 | 3 | 0 |
-| MCP Apps views | 2 | 0 | 0 |
+| MCP Apps views | 4 | 0 | 0 |
 
 The deltas are tracked by 29 issues:
 - **Already open:** #226 (the Remote's one sidebar) and #235 (the page's one sidebar at phone width).
@@ -265,7 +265,8 @@ The deltas are tracked by 29 issues:
 |---|---|---|---|---|
 | Settings (General, Appearance, Agent Runtimes, Shared, Limits, Resources, Control plane) | `A/Settings/SettingsWindow.swift` | None | None | **by design** (the Mac's) |
 | Project Settings (helper limits, disk lines, MCP, plugins, skills, worktrees; #64, #97, #126, #195) | `A/Projects/ProjectSettingsSheet.swift` | None | None | **by design** |
-| Add an MCP server, a skill, plugins (059) | `A/Catalog/` | None | None | **by design** |
+| Add an MCP server (from the registry, or by hand with Verify, #305), a skill, plugins (059) | `A/Catalog/` | None | None | **by design** |
+| Sign in to an MCP server with OAuth, **needs sign-in** on its row, Sign out (#306) | `A/Catalog/MCPSignInSheet.swift`, `A/Projects/ProjectMCPSection.swift` | None | None | **by design** (the server rows and the browser sign-in are the window's; neither client lists MCP servers, and the grant never leaves the host) |
 | Light and dark | System / Light / Dark: `A/Settings/AppearanceSettingsView.swift` | The system's | `prefers-color-scheme`: `W/theme/paper.css:48` | **by design** (a setting) |
 | The accent (#156) | AccentColor | AccentColor | `--accent`, the same values | **same** |
 | What agents call you (#121) | Settings ▸ General | None | None | **by design** |
@@ -331,6 +332,8 @@ The deltas are tracked by 29 issues:
 | A tool's `ui://` view in a chat (#187) | WebKit host `S/AppView/AppViewHost.swift`, from `A/Chat/ChatView.swift` | The same host, from `R/Chat/RemoteChatView.swift` | The sandbox proxy `W/views/chat/viewLayer.ts` | **same** |
 | The project Dashboard row opens `ui://agents/dashboard` (#188) | `ProjectDashboardView` through that host, in place of the native page: `A/ContentView.swift` | The same view for `RemoteRoute.dashboard`: `R/RemoteApp.swift` | `DashboardAppView` through the page's view host: `W/views/Columns.tsx` | **same** |
 | Dashboard view actions and six tile kinds (#329) | `ProjectDashboardView` supplies project identity and navigation to `AppViewHost`; the shared view serves actions and tile HTML from `AppViewCatalog.swift` | The same shared view and project context via `R/RemoteApp.swift` | The sandbox view host passes project context and navigation via `W/views/DashboardAppView.tsx`; the same served HTML | **same**; app-only actions: Update now, Hide, Show, Remove, Move, Open Keeper, Details; number, status, table, note, link, page |
+| A pinned `ui://` view (#189): a row with the pages, opened full page and fed afresh by its pin's read-only call; missing with why; Unpin | `PinnedViewPage` through `AppViewHost`, from `A/ContentView.swift`; row in `A/Projects/PinnedPageRows.swift`; walked on a scratch window 2026-10-06 (`specs/188-mcp-apps-rest/walks/mac-189-*.png`): pinned from a real Claude chat's test view, opened fed afresh, unpinned | The same view for `RemoteRoute.page`: `R/RemoteApp.swift`; row in `R/Sidebar/SidebarRows.swift` | `W/views/PinnedViewPage.tsx`, from `W/views/Pins.tsx`; walked in headless Chrome (`Web/test/walk/pins189.mjs`, `specs/188-mcp-apps-rest/walks/web-189-pinned-view.png`) | **same** |
+| **Pin to Project** for a view whose call can feed a pin (#189), inline and full screen | The view's ··· menu: `S/AppView/AppViewRow.swift` | The same, shared | A Pin button in the caption and the full-screen bar: `W/views/chat/AppView.tsx`, `W/views/chat/viewLayer.ts` | **same** |
 
 ## Live sync
 

@@ -123,3 +123,32 @@ test("a view is drawn once, where its call began, with its latest state, at ever
   assert.equal(items[1].entry.kind.appView._0.state, "done");
   assert.ok(turns.isOutcome(items[1]));
 });
+
+// Pins (#189): Pin is offered for a call the host says can feed one, once it has answered, and a
+// pinned view's page makes its own call, as the host's, then hands the view its answer.
+test("Pin is offered only for a pinnable call that has answered", () => {
+  const call = { id: "A", server: "agents", tool: "show_test_view", resourceUri: "ui://agents/test-view", arguments: { note: "x" }, state: "done" };
+  assert.equal(bridge.canPin({ ...call, pinnable: true }), true);
+  assert.equal(bridge.canPin(call), false);
+  assert.equal(bridge.canPin({ ...call, pinnable: false }), false);
+  assert.equal(bridge.canPin({ ...call, pinnable: true, state: "running" }), false);
+  assert.equal(bridge.canPin({ ...call, pinnable: true, state: "cancelled" }), false);
+  assert.deepEqual(bridge.viewPin(call), { server: "agents", uri: "ui://agents/test-view", tool: "show_test_view", arguments: { note: "x" } });
+  assert.deepEqual(bridge.viewPin({ ...call, arguments: undefined }), { server: "agents", uri: "ui://agents/test-view", tool: "show_test_view" });
+});
+
+test("a pinned view is fed by the host's own call: input first, then its answer", () => {
+  const view = { server: "agents", uri: "ui://agents/test-view", tool: "show_test_view", arguments: { note: "pinned" } };
+  assert.deepEqual(bridge.feedParams("P", "file:///p", view),
+    { agentID: "P", viewID: "P", name: "show_test_view", project: "file:///p", feed: true, arguments: { note: "pinned" } });
+  const running = bridge.pinnedViewCall("P", view);
+  assert.deepEqual(running, { id: "P", server: "agents", tool: "show_test_view", resourceUri: "ui://agents/test-view",
+    arguments: { note: "pinned" }, state: "running" });
+  const answer = { content: [{ type: "text", text: "Shown." }] };
+  const done = bridge.pinnedViewCall("P", view, answer);
+  assert.equal(done.state, "done");
+  assert.deepEqual(done.result, answer);
+  const feed = new bridge.Feed();
+  assert.deepEqual(feed.viewInitialized(running).map((m) => m.method), ["ui/notifications/tool-input"]);
+  assert.deepEqual(feed.due(done), [{ jsonrpc: "2.0", method: "ui/notifications/tool-result", params: answer }]);
+});

@@ -71,6 +71,10 @@ something particular done.
 - [Add an MCP server from the registry](add-an-mcp-server-from-the-registry.md): search the
   MCP Registry, see what would run, and add it for yourself or to a project. Secrets stay
   in your own `secrets.env`.
+- [Add an MCP server by hand](add-an-mcp-server-by-hand.md): a local command or a remote
+  URL that is not on the registry, verified to answer before anything is written.
+- [Sign in to an MCP server](sign-in-to-an-mcp-server.md): a remote server that asks for
+  OAuth, such as GitHub's, signed in to in your browser so agents start with it.
 - [Keep going when a runtime runs out](keep-going-when-a-runtime-runs-out.md): see which
   runtimes are out, and continue a chat's work in a new chat on another.
 - [Limit what agents spend](limit-spending.md): the Spending page, and a limit per agent

@@ -11,10 +11,12 @@ public enum MCPCatalogWords {
         case .missingSecret(let name): "\(name) is required."
         case .staleDigest: "That server has changed. Open it again."
         case .secretStillInUse(let name): "\(name) is still named by another server."
-        case .previewExpired: "That preview has expired. Open the server again."
+        case .previewExpired: "That has expired. Open the server, or verify it, again."
         case .noRunnableWay: "There is no way to run this server on this Mac."
         case .replaceMismatch: "The server there has changed. Open it again."
         case .notAProject(let path): "\(path) is not a project on this Mac."
+        case .nameTaken(let name): "There is already a server called \(name) there."
+        case .invalid(let why): why
         case .failed(let why): "It could not be added: \(why)."
         }
     }

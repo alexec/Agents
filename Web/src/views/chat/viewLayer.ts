@@ -12,17 +12,20 @@ import { signal } from "@preact/signals";
 import type { AppViewCall, AppViewPolicy, JSONValue, ViewResource } from "../../protocol/generated";
 import { encodeDomains } from "../../sandbox/policy";
 import {
-  type Context, contextChanges, error as rpcError, Feed, initializeResult, notification, policyWire, read, request,
-  result, viewTitle,
+  canPin, type Context, contextChanges, error as rpcError, Feed, initializeResult, noAgentWords, notification, policyWire,
+  read, request, result, viewTitle,
 } from "./appViewBridge";
 
 export interface ViewActions {
   agentID: string;
+  /** Set for a view in a project's place (the Dashboard, a pin): there is no agent to reach. */
   project?: string;
   openDashboardTarget?(kind: string, id: string): void;
   call(method: "views/read" | "views/call" | "views/log" | "views/context", params: Record<string, unknown>): Promise<unknown>;
   /** A ui/message the person said yes to, sent as their prompt. */
   send(text: string): Promise<boolean>;
+  /** Pins the call's view to the chat's project (#189); answers whether it was pinned. */
+  pin?(call: AppViewCall): Promise<boolean>;
 }
 
 export const maxInlineHeight = 640;
@@ -38,9 +41,13 @@ export class HostedView {
   readonly failure = signal("");
   readonly askedMessage = signal<string | null>(null);
   readonly contextLine = signal<string | null>(null);
+  /** Pinned from here (#189): the caption says so instead of offering Pin. */
+  readonly pinned = signal(false);
   readonly title: string;
-  /** The project's Dashboard fills the page: no "Back to the chat" bar (#188). */
+  /** A view in a project's place (the Dashboard, a pin) fills the page: no "Back to the chat" bar (#188). */
   readonly fillsPage: boolean;
+  private pinButton: HTMLButtonElement | null = null;
+  private pinnedLabel: HTMLSpanElement | null = null;
   readonly box: HTMLDivElement;
   private frame: HTMLIFrameElement | null = null;
   private feed = new Feed();
@@ -54,7 +61,7 @@ export class HostedView {
 
   constructor(public call: AppViewCall, public actions: ViewActions, private layer: ViewLayer) {
     this.title = viewTitle(call.tool);
-    this.fillsPage = call.resourceUri === "ui://agents/dashboard";
+    this.fillsPage = !!actions.project;
     this.box = document.createElement("div");
     this.box.className = "view-box";
     this.box.hidden = true;
@@ -66,8 +73,17 @@ export class HostedView {
       const back = document.createElement("button");
       back.textContent = "Back to the chat";
       back.onclick = () => this.layer.setFullscreen(null);
-      bar.append(name, back);
+      const pin = document.createElement("button");
+      pin.textContent = "Pin";
+      pin.title = "Pin this view under the project";
+      pin.onclick = () => void this.pin();
+      const pinned = document.createElement("span");
+      pinned.textContent = "Pinned";
+      this.pinButton = pin;
+      this.pinnedLabel = pinned;
+      bar.append(name, pin, pinned, back);
       this.box.append(bar);
+      this.drawBar();
     }
     this.context = {
       theme: dark() ? "dark" : "light", displayMode: "inline", width: 600, maxHeight: maxInlineHeight,
@@ -115,7 +131,21 @@ export class HostedView {
   update(call: AppViewCall): void {
     if (JSON.stringify(call) === JSON.stringify(this.call)) return;
     this.call = call;
+    this.drawBar();
     for (const message of this.feed.due(call)) this.post(message);
+  }
+
+  /** Pin, in the caption's menu, inline or full screen (#189). */
+  async pin(): Promise<void> {
+    if (!this.actions.pin || !canPin(this.call) || this.pinned.value) return;
+    if (await this.actions.pin(this.call)) this.pinned.value = true;
+    this.drawBar();
+  }
+
+  /** The full screen bar's Pin, offered as the inline caption offers it. */
+  private drawBar(): void {
+    if (this.pinButton) this.pinButton.hidden = !this.actions.pin || !canPin(this.call) || this.pinned.value;
+    if (this.pinnedLabel) this.pinnedLabel.hidden = !this.pinned.value;
   }
 
   /** The space it has and the look: told to the view when either changes. */
@@ -208,12 +238,14 @@ export class HostedView {
         this.post(result(ask.id));
         break;
       case "message":
+        if (this.actions.project) { this.refuse(ask.id, "ui/message"); break; }
         // Never sent on the view's say-so: the person is asked, under the view.
         if (this.messageID !== null) this.post(rpcError(this.messageID, -32000, "Another message replaced it."));
         this.messageID = ask.id;
         this.askedMessage.value = ask.text;
         break;
       case "updateContext": {
+        if (this.actions.project) { this.refuse(ask.id, "ui/update-model-context"); break; }
         const words = Array.isArray(ask.content)
           ? (ask.content as { text?: unknown }[]).flatMap((b) => (typeof b?.text === "string" ? [b.text] : [])).join(" ")
           : "";
@@ -250,6 +282,13 @@ export class HostedView {
       case "ignored":
         break;
     }
+  }
+
+  /** What only a chat's view may do, asked from a project's place: refused, and logged (#189). */
+  private refuse(id: string | number, method: string): void {
+    this.post(rpcError(id, -32000, noAgentWords));
+    void this.actions.call("views/log", { agentID: this.actions.agentID, viewID: this.call.id, level: "warning",
+      data: `${method} refused: ${noAgentWords}` }).catch(() => {});
   }
 
   private relay(id: string | number, method: "views/call" | "views/context", params: Record<string, unknown>,

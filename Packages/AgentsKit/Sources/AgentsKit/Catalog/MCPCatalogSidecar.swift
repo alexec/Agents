@@ -1,7 +1,7 @@
 import Foundation
 import AgentsKitCore
 
-/// Which servers the app added from the registry (060, contracts/mcp-json.md). In the
+/// Which servers the app added, from the registry or by hand (060, #305, contracts/mcp-json.md). In the
 /// daemon's root, so a scratch root has its own.
 struct MCPCatalogSidecar: Codable, Equatable, Sendable {
     struct Record: Codable, Equatable, Sendable {
@@ -9,6 +9,8 @@ struct MCPCatalogSidecar: Codable, Equatable, Sendable {
         var version: String
         var run: String
         var addedAt: Date
+        /// Added on the sheet by hand (#305); absent for a registry add.
+        var byHand: Bool?
     }
 
     var version = 1

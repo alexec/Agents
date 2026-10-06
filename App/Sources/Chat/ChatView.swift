@@ -86,7 +86,10 @@ struct ChatView: View {
             agentID: agent.id,
             call: { [model] method, params in try await model.viewCall(agent.id, method, params) },
             send: { [model] text in await model.send(text) },
-            openLink: { [openURL] url in openURL(url) })
+            openLink: { [openURL] url in openURL(url) },
+            pin: { [model] view in
+                await model.pinView(view, in: ProjectKey(host: agent.host, folder: agent.projectFolder))
+            })
     }
 
     /// What the shared chat rows mean on a Mac (033).

@@ -114,10 +114,17 @@ struct ContentView: View {
             }
             .paperGround()
         } else if let path = model.openPin, let key = model.selectedProjectKey, let summary = model.selectedProjectSummary {
-            // One of the project's pinned pages (#159), live, where the chat would be.
+            // One of the project's pinned pages (#159), live, where the chat would be; or a
+            // pinned view (#189), fed afresh.
             VStack(spacing: 0) {
                 OfflineStrip(host: summary.host)
-                PinnedPage(project: key, path: path)
+                if let pin = model.pins(in: key.folder).first(where: { $0.path == path }), let view = pin.view {
+                    PinnedViewPage(folder: key.folder, pin: pin, view: view,
+                                   call: { method, params in try await model.client(for: key.host).call(method, params) },
+                                   unpin: { await model.unpin(path, in: key) })
+                } else {
+                    PinnedPage(project: key, path: path)
+                }
             }
             .paperGround()
         } else if let id = model.selection, model.selectedAgent == nil, let gone = model.retiredTombstone(id) {
