@@ -229,9 +229,9 @@ The deltas are tracked by 29 issues:
 | Tile detail, its History row (#127) | `A/Dashboard/DashboardPage.swift:343-383` | Details… in the tile's long-press menu; same detail and History rows: `R/Dashboard/DashboardPage.swift` | All rows, including *Greyed after*: `W/views/Dashboard.tsx` | **same** |
 | Hide, Show, Remove, Show Hidden Tiles | `A/Dashboard/DashboardPage.swift:86-93, 283-289` | Toggle above tiles; Hide, Show and Remove in the long-press menu: `R/Dashboard/DashboardPage.swift` | `W/views/Dashboard.tsx:75-79, 241-244` | **same** |
 | Order: drag, Move items (#147) | Drag and every Move item: `A/Dashboard/DashboardPage.swift:174-187, 292-316` | Tile Move items and section heading's Move Section Up / Down; no drag: `R/Dashboard/DashboardPage.swift` | Drag and every Move item: `W/views/Dashboard.tsx:99-204` | **same** (no drag on the Remote: **by design**) |
-| Update now (#146) | In the toolbar, beside the view: `S/Dashboard/ProjectDashboardView.swift` | The same toolbar item | In the page head, beside the view: `W/views/DashboardAppView.tsx` | **same** |
+| Update now (#146, #329) | In the hosted Dashboard view | The same hosted view | The same hosted view | **same** |
 | *‹project› · updated …* | `A/Dashboard/DashboardPage.swift:81, 138-146` | Under the update line: `R/Dashboard/DashboardPage.swift` | `W/views/Dashboard.tsx:87-88` | **same** |
-| A store file set aside, said (#171); the footer sentence (#127) | `A/Dashboard/DashboardPage.swift:24-29, 47-50` | `R/Dashboard/DashboardPage.swift:65-69, 88-92` | `W/views/Dashboard.tsx:90, 129` | **same** |
+| A store file set aside, said (#171); the footer sentence (#127) | In the hosted Dashboard view | The same hosted view | The same hosted view | **same** |
 | Pinned page rows (#159) | Drag; Open, Move Up / Down, Unpin: `A/Projects/PinnedPageRows.swift` | Long press: `R/Dashboard/PinnedPage.swift:8-60` | Drag and the menu: `W/views/Pins.tsx:17-73` | **same** (no drag on the Remote: **by design**) |
 | A pinned Markdown page, live | `A/Dashboard/PinnedPage.swift:104-106` | `R/Dashboard/PinnedPage.swift:100-131` | `W/views/Pins.tsx:111-133` | **same** |
 | A pinned HTML page | Page / Source: `A/Dashboard/PinnedPage.swift:54-61` | Page / Source: `R/Dashboard/PinnedPage.swift` | Source: `W/views/Pins.tsx:139-142` | Web: **by design** (Trusted Types) |
@@ -330,6 +330,7 @@ The deltas are tracked by 29 issues:
 |---|---|---|---|---|
 | A tool's `ui://` view in a chat (#187) | WebKit host `S/AppView/AppViewHost.swift`, from `A/Chat/ChatView.swift` | The same host, from `R/Chat/RemoteChatView.swift` | The sandbox proxy `W/views/chat/viewLayer.ts` | **same** |
 | The project Dashboard row opens `ui://agents/dashboard` (#188) | `ProjectDashboardView` through that host, in place of the native page: `A/ContentView.swift` | The same view for `RemoteRoute.dashboard`: `R/RemoteApp.swift` | `DashboardAppView` through the page's view host: `W/views/Columns.tsx` | **same** |
+| Dashboard view actions and six tile kinds (#329) | `ProjectDashboardView` supplies project identity and navigation to `AppViewHost`; the shared view serves actions and tile HTML from `AppViewCatalog.swift` | The same shared view and project context via `R/RemoteApp.swift` | The sandbox view host passes project context and navigation via `W/views/DashboardAppView.tsx`; the same served HTML | **same**; app-only actions: Update now, Hide, Show, Remove, Move, Open Keeper, Details; number, status, table, note, link, page |
 
 ## Live sync
 

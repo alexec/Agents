@@ -1724,6 +1724,7 @@ export interface Usage {
 
 export interface ViewCallRequest {
   agentID: UUID;
+  project?: URLString;
   viewID: UUID;
   name: string;
   arguments?: JSONValue;
@@ -2399,7 +2400,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   TurnsRequest: { required: ["agentID", "limit"], optional: ["before"] },
   UnqueueRequest: { required: ["agentID", "promptID"], optional: [] },
   Usage: { required: ["used", "size", "at"], optional: ["cost"] },
-  ViewCallRequest: { required: ["agentID", "viewID", "name"], optional: ["arguments"] },
+  ViewCallRequest: { required: ["agentID", "viewID", "name"], optional: ["project", "arguments"] },
   ViewContextRequest: { required: ["agentID", "viewID"], optional: ["uri", "content", "structuredContent"] },
   ViewLogRequest: { required: ["agentID", "viewID"], optional: ["level", "data"] },
   ViewReadRequest: { required: ["agentID", "uri"], optional: [] },

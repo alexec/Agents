@@ -8,12 +8,13 @@ import SwiftUI
 /// destination. Update now, the file note and the footer stay on the page, around the view.
 /// Tile files, keepers and `take_over` are untouched.
 struct ProjectDashboardView: View {
+    let folder: URL
     let snapshot: DashboardSnapshot?
     /// Bumps when the host says the Dashboard changed, so the page asks again.
     var revision: Int
     var call: @MainActor (String, JSONValue) async throws -> JSONValue
     var refresh: @MainActor () async -> Void
-    var update: @MainActor () async -> Void
+    var openTarget: @MainActor (String, String) -> Void
 
     @Environment(\.openURL) private var openURL
     @State private var store = AppViewStore()
@@ -24,65 +25,16 @@ struct ProjectDashboardView: View {
     var body: some View {
         let actions = AppViewActions(
             agentID: place,
+            project: folder,
             call: call,
             send: { _ in false },
-            openLink: { openURL($0) })
+            openLink: { openURL($0) },
+            openDashboardTarget: openTarget)
         VStack(alignment: .leading, spacing: 0) {
-            heading
             AppViewPage(host: store.host(for: dashboardCall, actions: actions))
-            Text(DashboardModel.filesSentence + ".")
-                .appText(.fine)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
         }
         .task(id: revision) { await refresh() }
         .onDisappear { store.tearDownAll(reason: "The Dashboard was closed.") }
-        .toolbar { updateButton }
-    }
-
-    @ViewBuilder
-    private var heading: some View {
-        if snapshot?.update != nil || snapshot?.note != nil {
-            VStack(alignment: .leading, spacing: 4) {
-                if let update = snapshot?.update {
-                    TimelineView(.periodic(from: .now, by: 15)) { context in
-                        if let line = update.line(now: context.date) {
-                            Text(line).appText(.fine).foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                if let note = snapshot?.note {
-                    Label(note, systemImage: "exclamationmark.triangle")
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    @ToolbarContentBuilder
-    private var updateButton: some ToolbarContent {
-        if let update = snapshot?.update {
-            ToolbarItem(placement: .primaryAction) {
-                TimelineView(.periodic(from: .now, by: 15)) { context in
-                    Button {
-                        Task { await self.update() }
-                    } label: {
-                        if update.isRunning {
-                            ProgressView()
-                        } else {
-                            Label("Update now", systemImage: "arrow.clockwise")
-                        }
-                    }
-                    .disabled(!update.canPress(now: context.date))
-                    .help(update.line(now: context.date) ?? "Update now")
-                }
-            }
-        }
     }
 
     /// The host-made call. Its result is the snapshot the page already holds, said again

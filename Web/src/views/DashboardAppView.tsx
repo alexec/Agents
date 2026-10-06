@@ -4,11 +4,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import type { Store } from "../model/store";
 import { folderKey } from "../model/groups";
-import { filesSentence } from "../model/dashboard";
 import type { AppViewCall, DashboardSnapshot, JSONValue, UUID } from "../protocol/generated";
 import { go } from "../route";
 import { BackToList } from "./BackToList";
-import { UpdateLine, UpdateNow } from "./Dashboard";
 import { ViewLayer, type ViewActions } from "./chat/viewLayer";
 
 const dashboardURI = "ui://agents/dashboard";
@@ -38,6 +36,12 @@ export function DashboardAppView({ store, host, folder, down }: {
   const id = useMemo(() => crypto.randomUUID() as UUID, [place]);
   const actions = useMemo<ViewActions>(() => ({
     agentID: id,
+    project: folder,
+    openDashboardTarget: (kind, target) => {
+      if (kind === "agent") go({ host, project: folder, session: target });
+      if (kind === "workflow") go({ host, project: folder, workflow: target });
+      if (kind === "page") go({ host, project: folder, page: target });
+    },
     call: (method, params) => store.link.call(method, params as never, host) as Promise<unknown>,
     send: async () => false,
   }), [id, host, store]);
@@ -59,17 +63,13 @@ export function DashboardAppView({ store, host, folder, down }: {
         <BackToList />
         <h1>Dashboard</h1>
         <span class="actions">
-          {snapshot?.update && <UpdateNow store={store} host={host} folder={folder} update={snapshot.update} down={down} />}
           <button class="icon" aria-label="New session" title="Start a new session in this project" disabled={down}
             onClick={() => go({ host, project: folder, compose: true })}>✎</button>
         </span>
       </header>
-      {snapshot?.update && <UpdateLine host={host} folder={folder} update={snapshot.update} />}
-      {snapshot?.note && <p class="quiet small dashboard-note">⚠︎ {snapshot.note}</p>}
       <div class="scroll dashboard-host" ref={frame}>
         <div class="view-layer" ref={(el) => { layer.element = el; }} />
       </div>
-      <p class="quiet small dashboard-files">{filesSentence}.</p>
     </section>
   );
 }

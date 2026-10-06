@@ -7,12 +7,14 @@ import WebKit
 struct AppViewActions {
     /// The conversation the views are in.
     var agentID: UUID
+    var project: URL? = nil
     /// One of `views/*`, to the host the conversation is on.
     var call: @MainActor (String, JSONValue) async throws -> JSONValue
     /// A `ui/message` the person said yes to, sent as their prompt.
     var send: @MainActor (String) async -> Bool
     /// A `ui/open-link`, in the default browser.
     var openLink: @MainActor (URL) -> Void
+    var openDashboardTarget: @MainActor (String, String) -> Void = { _, _ in }
 }
 
 /// The views open in one chat, kept by call so a view keeps what it is showing while it is
@@ -298,7 +300,15 @@ final class AppViewHost {
             send(AppViewBridge.result(id))
         case .callTool(let id, let name, let arguments):
             relay(id, DaemonAPI.Method.viewsCall,
-                  DaemonAPI.ViewCallRequest(agentID: actions.agentID, viewID: call.id, name: name, arguments: arguments))
+                  DaemonAPI.ViewCallRequest(agentID: actions.agentID, viewID: call.id, name: name,
+                                            arguments: arguments, project: actions.project),
+                  answer: { [weak self] value in
+                      if let target = value["structuredContent"]?["open"],
+                         let kind = target["kind"]?.stringValue, let id = target["id"]?.stringValue {
+                          self?.actions.openDashboardTarget(kind, id)
+                      }
+                      return value
+                  })
         case .readResource(let id, let uri):
             Task {
                 do {

@@ -24,7 +24,7 @@ The Dashboard changes as agents set tiles. You don't need to reload it.
 
 ## Bring it up to date now
 
-**Update now**, at the top of the Dashboard (on the phone, the ↻ in the toolbar), asks an agent to
+**Update now**, at the top of the Dashboard on every device, asks an agent to
 set the tiles again there and then, rather than waiting for their keepers:
 
 - If the project has a workflow labelled `dashboard`, such as the nightly **Update the
@@ -48,10 +48,10 @@ Each tile has a title, its value and a foot naming who keeps it and how old it i
 | Table | Up to 6 columns. The phone shows the first 5 rows; tap for all of them. |
 | Note | A short piece of Markdown. |
 | Link | A web page, a session, a workflow or a file in the project. |
-| Page | A document or an HTML page from the project, live: its top, with **Open** for the rest. Never grey. See [Pin a page to a project](pin-a-page-to-a-project.md). |
+| Page | A document or HTML source from the project, read live in the view, with **Open** for the full page. Scripts in HTML files do not run inside the Dashboard. Never grey. See [Pin a page to a project](pin-a-page-to-a-project.md). |
 
-Click the keeper's name in a tile's foot to open its session or workflow. On the Mac, double-click a tile, or pick **Details…** from its **···**
-menu, for where its value came from, who has kept it, whether its file was changed outside
+Choose **Keeper** to open the session or workflow that keeps a tile. Choose **Details**
+for where its value came from, who has kept it, whether its file was changed outside
 Agents, and its last 10 values.
 
 **A grey tile is out of date.** Every tile has its own time, a day unless its keeper said
@@ -61,10 +61,10 @@ well. Grey tiles don't count towards the row's line or its red dot.
 
 ## Decide what stays
 
-From a tile's **···** menu (or its context menu on the Mac, a long press on the phone):
+Use a tile's action buttons on the Dashboard:
 
 - **Hide** takes a tile off the Dashboard on every device. Its keeper goes on updating it.
-  **Show Hidden Tiles** in the Dashboard's menu (the web page's check box) shows hidden
+  **Show hidden** at the top of the Dashboard shows hidden
   tiles, and **Show** puts one back. Use it for a tile that is right but not interesting.
 - **Remove** deletes the tile and its history. If its keeper sets it again, it comes back,
   and the keeper is told you removed it, and when. Use it for a tile nobody keeps any more, or

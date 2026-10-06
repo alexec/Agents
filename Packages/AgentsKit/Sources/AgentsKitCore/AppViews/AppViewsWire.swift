@@ -66,13 +66,17 @@ public extension DaemonAPI {
     /// A view's `tools/call`.
     struct ViewCallRequest: Codable, Sendable, Hashable {
         public var agentID: UUID
+        /// A standalone project view has no agent. The host supplies its project.
+        public var project: URL?
         /// The call whose view it is.
         public var viewID: UUID
         public var name: String
         public var arguments: JSONValue?
 
-        public init(agentID: UUID, viewID: UUID, name: String, arguments: JSONValue? = nil) {
+        public init(agentID: UUID, viewID: UUID, name: String, arguments: JSONValue? = nil,
+                    project: URL? = nil) {
             self.agentID = agentID
+            self.project = project
             self.viewID = viewID
             self.name = name
             self.arguments = arguments

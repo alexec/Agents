@@ -111,8 +111,16 @@ extension DaemonCore {
 
     /// A view's `tools/call`: only a tool of this server that a view may call.
     func callFromView(_ request: DaemonAPI.ViewCallRequest) async throws -> JSONValue {
-        guard agents[request.agentID] != nil else {
-            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
+        let project: URL
+        if let agent = agents[request.agentID] {
+            project = Project.standardize(agent.projectFolder)
+            if let claimed = request.project, Project.standardize(claimed) != project {
+                throw JSONRPCError(code: DaemonAPI.Failure.viewRefused, message: "That view is outside its project.")
+            }
+        } else if let claimed = request.project, isProject(Project.standardize(claimed)) {
+            project = Project.standardize(claimed)
+        } else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That view has no project.")
         }
         // The exact name: a view names the server's own tool, never a runtime's spelling.
         guard let tool = AppViewCatalog.tools().first(where: { $0.name == request.name }), tool.forApp else {
@@ -120,7 +128,101 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.viewRefused,
                                message: "A view may not call \(request.name).")
         }
+        if tool.name == "dashboard_action" {
+            return try await dashboardViewAction(request.arguments, project: project)
+        }
         return await answer(tool.name, arguments: request.arguments, agentID: request.agentID)
+    }
+
+    /// The app-only Dashboard tool acts on the host's project, never a folder supplied by
+    /// the HTML. Every write uses the same person's operations as the native page.
+    private func dashboardViewAction(_ arguments: JSONValue?, project: URL) async throws -> JSONValue {
+        guard let action = arguments?["action"]?.stringValue else {
+            throw dashboardRefusal("Choose a Dashboard action.")
+        }
+        let id = arguments?["id"]?.stringValue ?? ""
+        let tile = dashboardSnapshot(project, withUpdate: false).tiles.first { $0.id == id }
+        func result(_ words: String, extra: JSONValue? = nil) -> JSONValue {
+            if let extra {
+                return ["content": [["type": "text", "text": .string(words)]], "structuredContent": extra]
+            }
+            return ["content": [["type": "text", "text": .string(words)]]]
+        }
+        switch action {
+        case "update":
+            _ = try await updateDashboard(.init(folder: project))
+            return result("Dashboard update started.")
+        case "hide", "show":
+            try setTileHidden(.init(folder: project, id: id), hidden: action == "hide")
+            return result("Tile \(action == "hide" ? "hidden" : "shown").")
+        case "remove":
+            try removeTileByPerson(.init(folder: project, id: id), from: nil)
+            return result("Tile removed.")
+        case "move":
+            guard tile != nil else { throw dashboardRefusal("Move needs a tile.") }
+            let snapshot = dashboardSnapshot(project, withUpdate: false)
+            let order: DashboardOrder
+            if let section = arguments?["section"]?.stringValue {
+                let title: String? = section.isEmpty ? nil : section
+                guard DashboardModel.sections(snapshot, includeHidden: true).contains(where: { $0.title == title }) else {
+                    throw dashboardRefusal("This Dashboard has no such section.")
+                }
+                order = DashboardModel.arrangement(snapshot).moving([id], to: title)
+            } else if let step = arguments?["step"]?.intValue, abs(step) == 1,
+                      let stepped = DashboardModel.stepping(id, by: step, in: snapshot, includeHidden: true) {
+                order = stepped
+            } else {
+                throw dashboardRefusal("The tile is already at the edge of its section.")
+            }
+            try arrangeDashboard(.init(folder: project, order: order))
+            return result("Tile moved.")
+        case "move_section":
+            let snapshot = dashboardSnapshot(project, withUpdate: false)
+            let sections = DashboardModel.arrangement(snapshot).sections
+            let title = arguments?["section"]?.stringValue
+            let name = title.flatMap { $0.isEmpty ? nil : $0 }
+            guard let at = sections.firstIndex(where: { $0.title == name }),
+                  let step = arguments?["step"]?.intValue, abs(step) == 1,
+                  sections.indices.contains(at + step) else {
+                throw dashboardRefusal("The section is already at the edge of the Dashboard.")
+            }
+            let before: String?? = at + step + (step > 0 ? 1 : 0) < sections.count
+                ? .some(sections[at + step + (step > 0 ? 1 : 0)].title) : nil
+            let order = DashboardModel.arrangement(snapshot).movingSection(name, before: before)
+            try arrangeDashboard(.init(folder: project, order: order))
+            return result("Section moved.")
+        case "open_keeper":
+            guard let tile, !tile.keeper.id.isEmpty else { throw dashboardRefusal("This tile has no keeper to open.") }
+            return result("Opening keeper.", extra: ["open": ["kind": .string(tile.keeper.kind.rawValue),
+                                                              "id": .string(tile.keeper.id)]])
+        case "open_page":
+            guard let tile, let file = tile.tile?.page?.file ?? tile.tile?.link?.file else {
+                throw dashboardRefusal("This tile has no page to open.")
+            }
+            _ = try readPage(.init(folder: project, path: file))
+            return result("Opening page.", extra: ["open": ["kind": "page", "id": .string(file)]])
+        case "open_link":
+            guard let tile, let kind = arguments?["kind"]?.stringValue else {
+                throw dashboardRefusal("This tile has no destination.")
+            }
+            let destination = kind == "agent" ? tile.tile?.link?.session :
+                kind == "workflow" ? tile.tile?.link?.workflow : nil
+            guard let destination, !destination.isEmpty else {
+                throw dashboardRefusal("This tile has no \(kind) destination.")
+            }
+            return result("Opening \(kind).", extra: ["open": ["kind": .string(kind), "id": .string(destination)]])
+        case "read_page":
+            guard let tile, let file = tile.tile?.page?.file else {
+                throw dashboardRefusal("This tile has no page to read.")
+            }
+            switch try readPage(.init(folder: project, path: file)) {
+            case .text(let text, _, _, _):
+                return result("Page read.", extra: ["text": .string(text)])
+            default: throw dashboardRefusal("This page cannot be shown as text.")
+            }
+        default:
+            throw dashboardRefusal("Unknown Dashboard action \(action).")
+        }
     }
 
     /// A view's `notifications/message`.

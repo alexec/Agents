@@ -67,7 +67,9 @@ public enum AppViewCatalog {
     static let dashboardActionTool = Tool(definition: [
         "name": "dashboard_action", "title": "Dashboard action",
         "description": "Perform a Dashboard action requested by the person.",
-        "inputSchema": ["type": "object", "properties": ["action": ["type": "string"]]],
+        "inputSchema": ["type": "object", "properties": ["action": ["type": "string"],
+                                                    "id": ["type": "string"], "step": ["type": "integer"]],
+                        "required": ["action"]],
         "_meta": ["ui": ["resourceUri": .string(dashboardURI), "visibility": ["app"]]],
     ])
 
@@ -80,20 +82,28 @@ public enum AppViewCatalog {
     <style>
     :root{color-scheme:light dark;font:15px -apple-system,BlinkMacSystemFont,sans-serif;color:CanvasText;background:Canvas}
     html,body{height:100%}body{margin:0;padding:20px;box-sizing:border-box;overflow:auto}
-    header{display:flex;align-items:center;gap:12px}h1{font-size:22px;margin:0 auto 12px 0}
-    button{font:inherit;color:inherit;background:transparent;border:1px solid color-mix(in srgb,CanvasText 20%,transparent);border-radius:8px;padding:6px 10px}
+    header{display:flex;align-items:center;justify-content:flex-end;gap:12px}h1{font-size:22px;margin:0 auto 12px 0}
+    button{font:inherit;color:inherit;background:transparent;border:1px solid color-mix(in srgb,CanvasText 20%,transparent);border-radius:8px;padding:6px 10px;cursor:pointer}
+    button:disabled{opacity:.45;cursor:default}select{font:inherit;color:inherit;background:Canvas;border:1px solid color-mix(in srgb,CanvasText 20%,transparent);border-radius:7px;max-width:100%;font-size:12px}.small{font-size:12px}.error{color:#b32d37}
     section{margin:20px 0}h2{font-size:12px;text-transform:uppercase;opacity:.65} .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
     article{border:1px solid color-mix(in srgb,CanvasText 16%,transparent);border-radius:12px;padding:14px;min-width:0}article.wide{grid-column:1/-1}
-    article.stale{opacity:.48}h3{font-size:14px;margin:0 0 10px}p{margin:6px 0;overflow-wrap:anywhere}.value{font-size:24px;font-weight:600}
+    article.stale{opacity:.48}article header{gap:4px}article h3{font-size:14px;margin:0 auto 10px 0;overflow-wrap:anywhere}
+    .delta{font-size:13px}.delta.good{color:#248a53}.delta.bad{color:#cb3946}
+    p{margin:6px 0;overflow-wrap:anywhere}.value{font-size:24px;font-weight:600}.tile-actions{display:flex;gap:4px;flex-wrap:wrap;margin-top:10px}.tile-actions button{font-size:12px;padding:3px 6px}
     small{opacity:.65}table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:6px;border-bottom:1px solid color-mix(in srgb,CanvasText 12%,transparent)}
-    svg{width:100%;height:36px}a{color:LinkText}
-    </style></head><body><header><h1>Dashboard</h1><button id="hidden" type="button">Show hidden</button></header>
-    <main id="root"><p>Waiting for Dashboard…</p></main>
+    svg{width:100%;height:36px}a{color:LinkText}pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto}
+    .light{display:inline-block;width:9px;height:9px;border-radius:50%;background:#888}.light.ok{background:#248a53}.light.warn{background:#d38b00}.light.bad{background:#cb3946}
+    dialog{color:CanvasText;background:Canvas;border:1px solid color-mix(in srgb,CanvasText 25%,transparent);border-radius:12px;max-width:min(90vw,560px)}
+    dialog::backdrop{background:#0008}dt{font-weight:600}dd{margin:0 0 10px}a,button{touch-action:manipulation}
+    </style></head><body><header><button id="hidden" type="button">Show hidden</button><button id="update" type="button" disabled>Update now</button></header>
+    <p id="status" class="small"></p><p id="error" class="error" role="alert"></p><main id="root"><p>Waiting for Dashboard…</p></main><p class="small">Tiles and their trends are files in .agents/dashboard/ in this project, which you may commit.</p><dialog id="details"></dialog>
     <script>
     (() => {
       const root = document.querySelector("#root");
       const hidden = document.querySelector("#hidden");
-      let showHidden = false, latest = null, nextID = 1;
+      const update = document.querySelector("#update");
+      let showHidden = false, latest = null, nextID = 1, isMobile = false;
+      const expandedTables = new Set();
       const waiting = new Map();
       const ref = Date.UTC(2001, 0, 1);
       const post = (message) => window.parent.postMessage(Object.assign({ jsonrpc: "2.0" }, message), "*");
@@ -107,50 +117,129 @@ public enum AppViewCatalog {
         if (typeof v === "number") return new Date(v > 1e11 ? v : ref + v * 1000);
         const d = new Date(v); return Number.isNaN(d.getTime()) ? null : d;
       };
+      const safeURL = (text) => { try { const u = new URL(text); return ["http:", "https:", "mailto:"].includes(u.protocol) ? u.href : null; } catch { return null; } };
+      const action = async (name, id, extra = {}) => {
+        try {
+          const answer = await request("tools/call", { name: "dashboard_action", arguments: { action: name, id, ...extra } });
+          if (answer.isError) throw new Error(answer.content?.[0]?.text || "Action failed");
+          if (name === "read_page") return answer.structuredContent?.text || "";
+        } catch (e) { document.querySelector("#error").textContent = e.message || String(e); }
+      };
+      const button = (label, actionName, id, extra = "") => `<button type="button" data-action="${actionName}" data-id="${esc(id)}" ${extra}>${label}</button>`;
+      const date = (value) => { const d = at(value); return d ? d.toLocaleString() : "unknown"; };
+      const markdown = (text) => esc(text).replace(/\\*\\*([^*]+)\\*\\*/g, "<strong>$1</strong>").replace(/\\n/g, "<br>");
+      const refreshUpdate = (data) => {
+        const lastStart = at(data?.update?.lastStartedAt);
+        update.disabled = !data?.update || data.update.isRunning || !!data.update.blocked ||
+          !!lastStart && Date.now() < lastStart.getTime() + 300000;
+        update.textContent = data?.update?.isRunning ? "Updating…" : "Update now";
+        const u = data?.update;
+        const line = u?.isRunning ? `${u.name || "Dashboard update"} is running` : u?.blocked ? `Update now cannot start: ${u.blocked}` :
+          lastStart ? `Last update ${lastStart.toLocaleString()}${u.lastFailed ? " (did not finish)" : ""}` : "";
+        document.querySelector("#status").textContent = [line, data?.note].filter(Boolean).join(" · ");
+      };
       function draw(data) {
         latest = data;
+        refreshUpdate(data);
         if (!data || !Array.isArray(data.tiles)) { root.innerHTML = "<p>Dashboard data is unavailable.</p>"; return; }
-        const tiles = data.tiles.filter((x) => showHidden || !x.tile || !x.tile.hidden);
-        if (!tiles.length) { root.innerHTML = "<p>No tiles yet.</p>"; return; }
-        const groups = new Map();
-        for (const t of tiles) {
-          const section = (t.tile && t.tile.section) || "";
-          if (!groups.has(section)) groups.set(section, []);
-          groups.get(section).push(t);
+        const tiles = data.tiles.filter((x) => showHidden || !x.tile?.hidden);
+        if (!tiles.length) { root.innerHTML = `<p>${data.tiles.length ? "Every tile is hidden. Show hidden brings them back." : "No tiles yet. Agents keep tiles here with set_tile."}</p>`; return; }
+        const groups = new Map(), placed = new Set();
+        const byID = new Map(tiles.map((v) => [v.id, v]));
+        for (const section of data.order?.sections || []) {
+          const name = section.title || "";
+          const items = (section.tiles || []).map((id) => byID.get(id)).filter(Boolean);
+          for (const item of items) placed.add(item.id);
+          if (items.length) groups.set(name, [...(groups.get(name) || []), ...items]);
         }
-        root.innerHTML = [...groups].map(([name, items]) => `<section>${name ? `<h2>${esc(name)}</h2>` : ""}<div class="grid">${items.map(tile).join("")}</div></section>`).join("");
+        for (const item of tiles) if (!placed.has(item.id)) {
+          const name = item.tile?.section || "";
+          if (!groups.has(name)) groups.set(name, []);
+          groups.get(name).push(item);
+        }
+        root.innerHTML = [...groups].map(([name, items], sectionIndex) => `<section>${name ? `<h2>${esc(name)} ${button("↑", "move_section", "", `data-section="${esc(name)}" data-step="-1" ${sectionIndex === 0 ? "disabled" : ""}`)} ${button("↓", "move_section", "", `data-section="${esc(name)}" data-step="1" ${sectionIndex === groups.size - 1 ? "disabled" : ""}`)}</h2>` : ""}<div class="grid">${items.map((v, i) => tile(v, i, items.length, [...groups.keys()], name)).join("")}</div></section>`).join("");
       }
-      function tile(v) {
+      function tile(v, index, count, sections, currentSection) {
         const t = v.tile;
-        if (!t) return `<article class="wide"><h3>${esc(v.id)}</h3><p>${esc(v.problem || "Unreadable tile")}</p></article>`;
-        const set = at(v.setAt);
-        const hours = t.stale_after_hours || t.staleAfterHours || 24;
-        const stale = !set || (Date.now() - set.getTime() > hours * 3600000);
+        if (!t) return `<article class="wide"><h3>${esc(v.id)}</h3><p class="error">${esc(v.problem || "Unreadable tile")}</p></article>`;
+        const set = at(v.setAt), now = at(latest.now) || new Date();
+        const stale = t.type !== "page" && (!set || (now.getTime() - set.getTime() > (t.stale_after_hours || 24) * 3600000));
         let body = "";
         switch (t.type) {
           case "number": {
-            const val = t.number && t.number.value != null ? t.number.value : 0;
-            const pts = v.points || [];
-            const peak = Math.max(...pts.map((x) => x.value), 1);
-            const line = pts.map((p, i) => `${i * 100 / (pts.length - 1 || 1)},${32 - (p.value / peak) * 28}`).join(" ");
-            body = `<p class="value">${esc(val)} ${esc(t.number && t.number.unit || "")}</p>${pts.length > 1 ? `<svg viewBox="0 0 100 36" preserveAspectRatio="none"><polyline fill="none" stroke="currentColor" stroke-width="2" points="${line}"/></svg>` : ""}`;
+            const n = t.number || {}, pts = v.points || [];
+            const values = pts.map((x) => x.value), min = Math.min(...values), max = Math.max(...values);
+            const start = pts.length ? at(pts[0].at)?.getTime() : 0;
+            const span = Math.max((pts.length ? at(pts[pts.length - 1].at)?.getTime() : 0) - start, 1);
+            const line = pts.length > 1 ? pts.map((p) => `${((at(p.at).getTime() - start) * 160 / span).toFixed(1)},${(max === min ? 13 : 26 - (p.value - min) * 26 / (max - min)).toFixed(1)}`).join(" ") : "";
+            const older = pts.filter((p) => at(p.at).getTime() <= (set || now).getTime() - 86400000);
+            const base = older.length ? older[older.length - 1] : pts[0];
+            const delta = pts.length > 1 && base ? n.value - base.value : 0;
+            const good = !stale && n.good && delta ? (delta > 0) === (n.good === "up") : null;
+            const trend = delta ? `<span class="delta ${good === null ? "" : good ? "good" : "bad"}">${delta > 0 ? "▲" : "▼"}${esc(Math.abs(delta).toLocaleString())}</span>` : "";
+            body = `<p class="value">${esc(Number(n.value ?? 0).toLocaleString())} ${esc(n.unit || "")} ${trend}</p>${line ? `<svg viewBox="0 0 160 26" preserveAspectRatio="none" aria-label="Trend"><polyline fill="none" stroke="currentColor" stroke-width="2" points="${line}"/></svg>` : ""}`;
             break;
           }
-          case "status": body = `<p>${esc(t.status && t.status.level || "unknown")} · ${esc(t.status && t.status.line || "")}</p>`; break;
-          case "table": body = `<table><thead><tr>${(t.table && t.table.columns || []).map((x) => `<th>${esc(x)}</th>`).join("")}</tr></thead><tbody>${(t.table && t.table.rows || []).map((r) => `<tr>${r.map((c) => `<td>${esc(typeof c === "string" ? c : c.text)}</td>`).join("")}</tr>`).join("")}</tbody></table>`; break;
-          case "note": body = `<p>${esc(t.note && t.note.markdown || "")}</p>`; break;
-          case "link": body = `<p>${esc(t.link && (t.link.url || t.link.file || t.link.session || t.link.workflow) || "")}</p>`; break;
-          case "page": body = `<p>${esc(t.page && t.page.file || "")}</p>`; break;
+          case "status": body = `<p><span class="light ${esc(stale ? "unknown" : t.status?.level || "unknown")}" aria-label="${esc(stale ? "unknown" : t.status?.level || "unknown")}"></span> ${esc(t.status?.line || "")}${t.status?.since ? `<br><small>since ${esc(t.status.since)}</small>` : ""}</p>`; break;
+          case "table": {
+            const rows = t.table?.rows || [], shown = isMobile && !expandedTables.has(v.id) ? rows.slice(0, 5) : rows;
+            body = `<table><thead><tr>${(t.table?.columns || []).map((x) => `<th>${esc(x)}</th>`).join("")}</tr></thead><tbody>${shown.map((r) => `<tr>${r.map((c) => { const text = typeof c === "string" ? c : c.text; const url = safeURL(c?.url); return `<td>${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(text)}</a>` : esc(text)}</td>`; }).join("")}</tr>`).join("")}</tbody></table>${isMobile && rows.length > 5 ? button(expandedTables.has(v.id) ? "Show less" : `Show all ${rows.length} rows`, "expand_table", v.id) : ""}`;
+            break;
+          }
+          case "note": body = `<p>${markdown(t.note?.markdown || "")}</p>`; break;
+          case "link": {
+            const link = t.link || {}, url = safeURL(link.url);
+            body = url ? `<p><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(new URL(url).host)} ↗</a></p>`
+              : link.session ? button("A session →", "open_session", v.id)
+              : link.workflow ? button(`Workflow ${esc(link.workflow)} →`, "open_workflow", v.id)
+              : link.file ? button(`${esc(link.file)} →`, "open_page", v.id) : "";
+            break;
+          }
+          case "page": body = `<p class="small">${esc(t.page?.file || "")}</p><pre id="page-${esc(v.id)}">Reading…</pre>${button("Open", "open_page", v.id)}`; break;
         }
-        const who = (v.keeper && v.keeper.name) || "";
-        const when = stale ? "stale" : (set ? set.toLocaleString() : "age unknown");
         const wide = ["table", "note", "page"].includes(t.type) ? "wide" : "";
-        return `<article class="${wide} ${stale ? "stale" : ""}"><h3>${esc(t.title)}</h3>${body}<small>${esc(who)} · ${esc(when)}</small></article>`;
+        const seconds = set ? Math.max(0, Math.floor((now - set) / 1000)) : null;
+        const age = t.type === "page" ? "live" : seconds === null ? "age unknown" :
+          stale ? `${Math.max(1, Math.floor(seconds / 3600))} h old` :
+          seconds < 60 ? "just now" : seconds < 3600 ? `${Math.floor(seconds / 60)} min ago` :
+          seconds < 86400 ? `${Math.floor(seconds / 3600)} h ago` : `${Math.floor(seconds / 86400)} days ago`;
+        return `<article class="${wide} ${stale ? "stale" : ""}"><header><h3>${esc(t.title)}${t.hidden ? " (hidden)" : ""}</h3>${button("Details", "details", v.id)}</header>${body}<small>${esc(v.keeper?.name || "nobody")} · ${esc(age)}</small><div class="tile-actions">${button("Keeper", "open_keeper", v.id, !v.keeper?.id ? "disabled" : "")}${button("↑", "move", v.id, index === 0 ? "disabled" : "data-step='-1'")}${button("↓", "move", v.id, index === count - 1 ? "disabled" : "data-step='1'")}${button(t.hidden ? "Show" : "Hide", t.hidden ? "show" : "hide", v.id)}${sections.length > 1 ? `<select data-id="${esc(v.id)}" aria-label="Move to section"><option value="">Move to section…</option>${sections.filter((x) => x !== currentSection).map((x) => `<option value="${esc(x || "__none__")}">${esc(x || "No section")}</option>`).join("")}</select>` : ""}${button("Remove", "remove", v.id)}</div></article>`;
       }
+      root.addEventListener("click", async (event) => {
+        const link = event.target.closest("a[href]");
+        if (link) { event.preventDefault(); await request("ui/open-link", { url: link.href }); return; }
+        const button = event.target.closest("button[data-action]"); if (!button) return;
+        const id = button.dataset.id, name = button.dataset.action;
+        const v = latest?.tiles?.find((x) => x.id === id); if (!v && name !== "move_section") return;
+        if (name === "details") {
+          const t = v.tile || {}, dialog = document.querySelector("#details");
+          const recent = (v.recent || []).slice().reverse().map((p) => `<li>${esc(date(p.at))}: ${esc(p.value)}</li>`).join("");
+          const keepers = (v.keeperChanges || []).map((change) => `<li>${esc(date(change.at))}: ${esc(change.from)} → ${esc(change.to)}</li>`).join("");
+          dialog.innerHTML = `<h2>${esc(t.title || id)}</h2><dl><dt>File</dt><dd>.agents/dashboard/${esc(id)}.json</dd><dt>Kept by</dt><dd>${esc(v.keeper?.name || "nobody")} (${esc(v.keeper?.state || "unknown")})</dd><dt>Set</dt><dd>${date(v.setAt)}</dd><dt>Source</dt><dd>${esc(t.source || "unknown")}</dd><dt>Changed outside Agents</dt><dd>${v.changedOutside ? "Yes" : "No"}</dd><dt>Problem</dt><dd>${esc(v.problem || "none")}</dd>${t.type === "number" ? `<dt>History</dt><dd>.agents/dashboard/history/${esc(id)}.jsonl</dd>` : ""}</dl>${recent ? `<h3>Recent values</h3><ol>${recent}</ol>` : ""}${keepers ? `<h3>Keeper changes</h3><ol>${keepers}</ol>` : ""}<button id="close-details">Done</button>`;
+          dialog.showModal(); dialog.querySelector("#close-details").onclick = () => dialog.close(); return;
+        }
+        if (name === "expand_table") { expandedTables.has(id) ? expandedTables.delete(id) : expandedTables.add(id); draw(latest); void loadPages(); return; }
+        if (name === "open_session") { await action("open_link", id, { kind: "agent" }); return; }
+        if (name === "open_workflow") { await action("open_link", id, { kind: "workflow" }); return; }
+        if (name === "move" || name === "move_section") { await action(name, id, { step: Number(button.dataset.step), ...(name === "move_section" ? { section: button.dataset.section } : {}) }); return; }
+        await action(name, id);
+      });
+      root.addEventListener("change", async (event) => {
+        const select = event.target.closest("select[data-id]");
+        if (select && select.value !== "") await action("move", select.dataset.id, { section: select.value === "__none__" ? "" : select.value });
+      });
+      const loadPages = async () => {
+        for (const v of latest?.tiles || []) if (v.tile?.type === "page") {
+          const place = document.getElementById(`page-${v.id}`); if (!place) continue;
+          place.textContent = await action("read_page", v.id) || "This page is unavailable.";
+        }
+      };
+      update.onclick = () => action("update");
+      setInterval(() => { if (latest?.update) refreshUpdate(latest); }, 15000);
       hidden.onclick = () => {
         showHidden = !showHidden;
         hidden.textContent = showHidden ? "Hide hidden" : "Show hidden";
-        if (latest) draw(latest);
+        if (latest) { draw(latest); void loadPages(); }
       };
       window.addEventListener("message", (event) => {
         const m = event.data;
@@ -159,7 +248,7 @@ public enum AppViewCatalog {
           const w = waiting.get(m.id); waiting.delete(m.id);
           return m.error ? w.reject(new Error(m.error.message)) : w.resolve(m.result);
         }
-        if (m.method === "ui/notifications/tool-result") draw((m.params && m.params.structuredContent) || {});
+        if (m.method === "ui/notifications/tool-result") { draw((m.params && m.params.structuredContent) || {}); void loadPages(); }
         if (m.method === "ui/resource-teardown") post({ id: m.id, result: {} });
         if (m.method === "ping") post({ id: m.id, result: {} });
       });
@@ -169,6 +258,7 @@ public enum AppViewCatalog {
         appCapabilities: { availableDisplayModes: ["inline", "fullscreen"] },
       }).then((result) => {
         const ctx = result.hostContext || {};
+        isMobile = ctx.platform === "mobile";
         const vars = (ctx.styles && ctx.styles.variables) || {};
         for (const [key, value] of Object.entries(vars)) if (value) document.documentElement.style.setProperty(key, value);
         if (ctx.theme) document.documentElement.style.colorScheme = ctx.theme;

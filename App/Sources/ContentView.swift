@@ -94,13 +94,21 @@ struct ContentView: View {
                 WaitingForOKBanner(folder: folder)
                 OfflineStrip(host: summary.host)
                 ProjectDashboardView(
+                    folder: folder,
                     snapshot: model.dashboard(in: folder),
                     revision: model.dashboardRevision(in: folder),
                     call: { method, params in
                         try await model.client(for: summary.host).call(method, params)
                     },
                     refresh: { await model.refreshDashboard(folder, on: summary.host) },
-                    update: { await model.updateDashboard(folder, on: summary.host) })
+                    openTarget: { kind, id in
+                        switch kind {
+                        case "agent": model.selection = UUID(uuidString: id)
+                        case "workflow": model.openWorkflow = id
+                        case "page": model.openPin = id
+                        default: break
+                        }
+                    })
                     .navigationTitle(AppCheckout.windowTitle(summary.name))
                     .navigationSubtitle("Dashboard")
             }

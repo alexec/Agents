@@ -74,6 +74,30 @@ struct DashboardTests {
         s.project.appendingPathComponent(".agents/dashboard/\(id).json")
     }
 
+    @Test func standaloneViewActionsUseTheirProjectAndPreserveTileValues() async throws {
+        let s = try await setUp([("Lead", false, nil, .finished)])
+        _ = try await set(s, "Lead", number("open_bugs", 4))
+        let place = UUID(), view = UUID()
+        let hide = DaemonAPI.ViewCallRequest(agentID: place, viewID: view, name: "dashboard_action",
+                                             arguments: ["action": "hide", "id": "open_bugs"], project: s.project)
+        _ = try await s.core.callFromView(hide)
+        #expect(try TileFile.read(Data(contentsOf: file(s, "open_bugs"))).hidden == true)
+        #expect(try TileFile.read(Data(contentsOf: file(s, "open_bugs"))).number?.value == 4)
+        let show = DaemonAPI.ViewCallRequest(agentID: place, viewID: view, name: "dashboard_action",
+                                             arguments: ["action": "show", "id": "open_bugs"], project: s.project)
+        _ = try await s.core.callFromView(show)
+        #expect(try TileFile.read(Data(contentsOf: file(s, "open_bugs"))).hidden != true)
+        await #expect {
+            _ = try await s.core.callFromView(.init(agentID: place, viewID: view, name: "dashboard_action",
+                                                    arguments: ["action": "hide", "id": "open_bugs"]))
+        } throws: { ($0 as? JSONRPCError)?.code == DaemonAPI.Failure.noSuchAgent }
+        await #expect {
+            _ = try await s.core.callFromView(.init(agentID: place, viewID: view, name: "dashboard_action",
+                                                    arguments: ["action": "set", "id": "open_bugs", "value": 9],
+                                                    project: s.project))
+        } throws: { ($0 as? JSONRPCError)?.code == DaemonAPI.Failure.dashboardRefused }
+    }
+
     // MARK: US1
 
     @Test func aSetWritesTheProjectFileAndTheSnapshotShowsIt() async throws {

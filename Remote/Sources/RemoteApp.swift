@@ -183,14 +183,20 @@ struct RemoteView: View {
         case .dashboard:
             // ui://agents/dashboard, through the same host a chat uses (#188).
             ProjectDashboardView(
+                folder: model.selectedProject ?? URL(fileURLWithPath: "/"),
                 snapshot: model.selectedProject.flatMap { model.work.dashboards[Project.standardize($0)] },
                 revision: model.work.dashboardRevision(in: model.selectedProject),
                 call: { method, params in try await model.viewCall(method, params) },
                 refresh: {
                     if let folder = model.selectedProject { await model.refreshDashboard(folder) }
                 },
-                update: {
-                    if let folder = model.selectedProject { await model.updateDashboard(folder) }
+                openTarget: { kind, id in
+                    switch kind {
+                    case "agent": model.selection = UUID(uuidString: id)
+                    case "workflow": model.openWorkflow = id
+                    case "page": model.openPin = id
+                    default: break
+                    }
                 })
                 .paperGround()
                 .navigationTitle("Dashboard")

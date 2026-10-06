@@ -18,6 +18,8 @@ import {
 
 export interface ViewActions {
   agentID: string;
+  project?: string;
+  openDashboardTarget?(kind: string, id: string): void;
   call(method: "views/read" | "views/call" | "views/log" | "views/context", params: Record<string, unknown>): Promise<unknown>;
   /** A ui/message the person said yes to, sent as their prompt. */
   send(text: string): Promise<boolean>;
@@ -186,7 +188,12 @@ export class HostedView {
         break;
       case "callTool":
         this.relay(ask.id, "views/call", { agentID: this.actions.agentID, viewID: this.call.id, name: ask.name,
-          ...(ask.arguments === undefined ? {} : { arguments: ask.arguments }) });
+          ...(this.actions.project ? { project: this.actions.project } : {}),
+          ...(ask.arguments === undefined ? {} : { arguments: ask.arguments }) }, (value) => {
+          const open = (value as { structuredContent?: { open?: { kind?: string; id?: string } } })?.structuredContent?.open;
+          if (open?.kind && open.id) this.actions.openDashboardTarget?.(open.kind, open.id);
+          return value;
+        });
         break;
       case "readResource":
         void this.actions.call("views/read", { agentID: this.actions.agentID, uri: ask.uri })
