@@ -158,11 +158,14 @@ export function policyWire(policy: AppViewPolicy): Record<string, string[]> {
   return out;
 }
 
-/** What the host owes a view about its call, in order, once each (AppViewFeed). */
+/** What the host owes a view about its call, in order (AppViewFeed). A later result is said
+ *  again, so an open Dashboard can change. A cancellation is not followed by a result. */
 export class Feed {
   initialized = false;
   private sentInput = false;
   private sentEnd = false;
+  /** The result last given to the view. Unset when a cancellation ended the call. */
+  private sentResult: unknown = undefined;
 
   viewInitialized(call: AppViewCall): unknown[] {
     this.initialized = true;
@@ -176,9 +179,16 @@ export class Feed {
       this.sentInput = true;
       out.push(notification("ui/notifications/tool-input", { arguments: call.arguments ?? {} }));
     }
-    if (!this.sentEnd && call.state === "done") {
-      this.sentEnd = true;
-      out.push(notification("ui/notifications/tool-result", call.result ?? { content: [] }));
+    if (call.state === "done") {
+      const result = call.result ?? { content: [] };
+      if (!this.sentEnd) {
+        this.sentEnd = true;
+        this.sentResult = result;
+        out.push(notification("ui/notifications/tool-result", result));
+      } else if (this.sentResult !== undefined && JSON.stringify(this.sentResult) !== JSON.stringify(result)) {
+        this.sentResult = result;
+        out.push(notification("ui/notifications/tool-result", result));
+      }
     } else if (!this.sentEnd && call.state === "cancelled") {
       this.sentEnd = true;
       out.push(notification("ui/notifications/tool-cancelled", { reason: call.reason ?? "The turn was stopped." }));
@@ -189,5 +199,7 @@ export class Feed {
 
 /** A view's name in the chat, from its tool. */
 export function viewTitle(tool: string): string {
-  return tool === "show_test_view" ? "Test view" : tool.replaceAll("_", " ");
+  if (tool === "show_test_view") return "Test view";
+  if (tool === "read_dashboard") return "Dashboard";
+  return tool.replaceAll("_", " ");
 }

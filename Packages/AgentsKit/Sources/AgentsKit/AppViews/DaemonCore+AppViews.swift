@@ -56,6 +56,17 @@ extension DaemonCore {
     private func answer(_ name: String, arguments: JSONValue?, agentID: UUID,
                         stillWanted: @Sendable () async -> Bool = { true }) async -> JSONValue {
         switch name {
+        case AppService.readDashboardToolName:
+            guard let token = appTokens.first(where: { $0.value == agentID })?.key,
+                  let agent = agents[agentID] else {
+                return ["content": [], "isError": true]
+            }
+            let snapshot = dashboardSnapshot(Project.standardize(agent.cwd), withUpdate: true)
+            let text = (try? readDashboard(DaemonAPI.DashboardTokenRequest(token: token))) ?? "Dashboard"
+            return ["content": [["type": "text", "text": .string(text)]],
+                    "structuredContent": (try? JSONValue.encoding(snapshot)) ?? .object([:])]
+        case "dashboard_action":
+            return ["content": [["type": "text", "text": .string("Dashboard action is unavailable.")]], "isError": true]
         case AppViewCatalog.showTestView:
             let seconds = min(30, max(0, arguments?["seconds"]?.intValue ?? 0))
             var waited = 0.0
@@ -84,15 +95,16 @@ extension DaemonCore {
 
     /// `resources/read`, for a view drawn in `agentID`'s conversation, with the policy it
     /// is to be drawn under. The policy goes in the log, as the spec asks.
+    ///
+    /// A project page names no conversation (#188): the catalog still answers, and the log
+    /// says it was a project page.
     func readView(_ request: DaemonAPI.ViewReadRequest) throws -> DaemonAPI.ViewResource {
-        guard let agent = agents[request.agentID] else {
-            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
-        }
         guard let resource = AppViewCatalog.resource(request.uri) else {
             throw JSONRPCError(code: DaemonAPI.Failure.viewRefused, message: "No view at \(request.uri).")
         }
         let policy = AppViewPolicy(csp: resource.meta?["ui"]?["csp"])
-        DaemonLog.shared.write("view \(resource.uri) in \(LeaseWords.agentName(agent.title)): policy \(policy.logLine)")
+        let who = agents[request.agentID].map { LeaseWords.agentName($0.title) } ?? "a project page"
+        DaemonLog.shared.write("view \(resource.uri) in \(who): policy \(policy.logLine)")
         return DaemonAPI.ViewResource(uri: resource.uri, html: resource.html, policy: policy,
                                       prefersBorder: resource.meta?["ui"]?["prefersBorder"]?.boolValue)
     }

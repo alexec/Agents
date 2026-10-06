@@ -234,12 +234,15 @@ public struct AppViewContext: Equatable, Sendable {
     }
 }
 
-/// What the host owes a view about its call, in order, sent once each: the input once the
-/// view has said it is initialized, then the result or the cancellation.
+/// What the host owes a view about its call, in order: the input once the view has said it
+/// is initialized, then the result or the cancellation. A later result — a Dashboard that
+/// changed while it stayed open — is said again. A cancellation is not followed by a result.
 public struct AppViewFeed: Equatable, Sendable {
     public private(set) var initialized = false
     public private(set) var sentInput = false
     public private(set) var sentEnd = false
+    /// The result last given to the view. Nil when what ended the call was a cancellation.
+    private var sentResult: JSONValue?
 
     public init() {}
 
@@ -258,14 +261,23 @@ public struct AppViewFeed: Equatable, Sendable {
             out.append(AppViewBridge.notification("ui/notifications/tool-input",
                                                   ["arguments": call.arguments ?? [:]]))
         }
-        if !sentEnd {
-            switch call.state {
-            case .running:
-                break
-            case .done:
+        switch call.state {
+        case .running:
+            break
+        case .done:
+            let result = call.result ?? ["content": []]
+            // A cancellation already closed this call. A new result, after one was shown,
+            // is the Dashboard changing under an open view (#188).
+            if !sentEnd {
                 sentEnd = true
-                out.append(AppViewBridge.notification("ui/notifications/tool-result", call.result ?? ["content": []]))
-            case .cancelled:
+                sentResult = result
+                out.append(AppViewBridge.notification("ui/notifications/tool-result", result))
+            } else if sentResult != nil, sentResult != result {
+                sentResult = result
+                out.append(AppViewBridge.notification("ui/notifications/tool-result", result))
+            }
+        case .cancelled:
+            if !sentEnd {
                 sentEnd = true
                 out.append(AppViewBridge.notification("ui/notifications/tool-cancelled",
                                                       ["reason": .string(call.reason ?? "The turn was stopped.")]))

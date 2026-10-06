@@ -181,7 +181,20 @@ struct RemoteView: View {
             }
         case .workflow(let id): WorkflowPage(workflowID: id).paperGround()
         case .dashboard:
-            DashboardPage().paperGround()
+            // ui://agents/dashboard, through the same host a chat uses (#188).
+            ProjectDashboardView(
+                snapshot: model.selectedProject.flatMap { model.work.dashboards[Project.standardize($0)] },
+                revision: model.work.dashboardRevision(in: model.selectedProject),
+                call: { method, params in try await model.viewCall(method, params) },
+                refresh: {
+                    if let folder = model.selectedProject { await model.refreshDashboard(folder) }
+                },
+                update: {
+                    if let folder = model.selectedProject { await model.updateDashboard(folder) }
+                })
+                .paperGround()
+                .navigationTitle("Dashboard")
+                .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     // New session, from the project's own page (029), as from its row's menu.
                     if let folder = model.selectedProject {
