@@ -10,13 +10,14 @@ struct MCPClientLoggingTests {
     private let secret = "SENTINEL-71c3-client"
 
     @Test func aStdioServerDrivenThroughLeavesNoSentinel() async throws {
-        // The command itself holds it: a folder named for it, with python3 linked inside.
+        // The command itself holds it: a folder named for it, with a script inside that
+        // runs python3 (a link would not do: Xcode's python3 goes by the name it is called).
         let folder = FileManager.default.temporaryDirectory.appending(path: "\(secret)-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
-        let python = try #require(Self.which("python3"))
         let command = folder.appending(path: "python3-\(secret)")
-        try FileManager.default.createSymbolicLink(at: command, withDestinationURL: python)
+        try "#!/bin/sh\nexec python3 \"$@\"\n".write(to: command, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: command.path)
 
         let lines = Lines()
         let server = MCPServer(name: "echo", transport: .stdio(
@@ -51,12 +52,6 @@ struct MCPClientLoggingTests {
 
         #expect(lines.all.contains("remote"), "it did log")
         #expect(!lines.all.lowercased().contains(secret.lowercased()))
-    }
-
-    static func which(_ name: String) -> URL? {
-        let path = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
-        return path.split(separator: ":").map { URL(filePath: String($0)).appending(path: name) }
-            .first { FileManager.default.isExecutableFile(atPath: $0.path) }?.resolvingSymlinksInPath()
     }
 }
 
