@@ -64,6 +64,24 @@ test("a value the runtime does not offer is said, naming what it does", () => {
   ]);
 });
 
+test("the host list offers This Mac first and leaves out a relay (#317)", () => {
+  assert.deepEqual(w.workflowHostChoices([
+    { id: "box", name: "Zebra", machineID: "z" },
+    { id: "relay", name: "Relay", machineID: "r", relay: true },
+    { id: "mac", name: "Office", machineID: "mac-id" },
+    { id: "gone", name: "No id" },
+    { id: "again", name: "Also", machineID: "mac-id" },
+  ]), [
+    { machineID: "mac-id", name: "This Mac" },
+    { machineID: "z", name: "Zebra" },
+  ]);
+  assert.equal(w.workflowRunsOn(undefined, "mac-id"), true);
+  assert.equal(w.workflowRunsOn([], "mac-id"), true);
+  assert.equal(w.workflowRunsOn(["other"], undefined), false);
+  assert.equal(w.workflowRunsOn(["mac-id"], "mac-id"), true);
+  assert.equal(w.workflowRunsOn(["other"], "mac-id"), false);
+});
+
 test("the cooldown is written as the file writes it", () => {
   assert.equal(ws.cooldownFileText(15 * 60), "15m");
   assert.equal(ws.cooldownFileText(90 * 60), "1h30m");

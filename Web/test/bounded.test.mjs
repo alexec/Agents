@@ -553,6 +553,23 @@ test("a workflow change redraws that project's list and no other (#291)", async 
   second.stop();
 });
 
+test("a workflow pinned to other computers leaves this host's list (#317)", async () => {
+  const updated = { workflow: { folder: "file:///w/p", workflowID: "open", hosts: ["other"], settings: { options: {}, labels: [] } } };
+  const link = fakeLink((method) => (method === "workflows/list" ? [] : method === "workflows/settings" ? updated : undefined));
+  const store = new Store(link);
+  store.hosts.value = [{ id: "mac", name: "Office", platform: "macOS", version: "1", state: "online", reach: "local", machineID: "this-mac" }];
+  store.holdWorkflows("mac", "file:///w/p");
+  await wait(20);
+  const row = { workflow: { folder: "file:///w/p", workflowID: "open", settings: { options: {}, labels: [] } } };
+  store.apply("workflow/changed", { workflow: { folder: "file:///w/p", workflowID: "here", hosts: ["this-mac"] } }, "mac");
+  store.apply("workflow/changed", { workflow: { folder: "file:///w/p", workflowID: "there", hosts: ["other"] } }, "mac");
+  store.apply("workflow/changed", row, "mac");
+  assert.deepEqual(store.projectWorkflows("mac", "file:///w/p").map((item) => item.workflow.workflowID), ["here", "open"]);
+  const summary = store.projectWorkflows("mac", "file:///w/p").find((item) => item.workflow.workflowID === "open");
+  assert.equal(await store.setWorkflowSettings("mac", summary, { hosts: ["other"] }), null);
+  assert.deepEqual(store.projectWorkflows("mac", "file:///w/p").map((item) => item.workflow.workflowID), ["here"]);
+});
+
 test("a reconnect lists the workflow folds still open, and no other (#291)", async () => {
   const listed = [];
   const link = fakeLink((method, params) => {

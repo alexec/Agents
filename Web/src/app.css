@@ -834,6 +834,7 @@ button.remove:hover { opacity: 1; }
 .workflow-page .marked { margin: 0; color: var(--tint-attention); }
 .workflow-page .pill[disabled], .workflow-page .pill:has(select:disabled) { opacity: 0.55; }
 .workflow-page .labels:empty { display: none; }
+.workflow-page .host-pins { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .workflow-page .unknown-keys { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }
 .workflow-page .unknown-keys code { font: 12px var(--font-mono); opacity: 0.7; }
 

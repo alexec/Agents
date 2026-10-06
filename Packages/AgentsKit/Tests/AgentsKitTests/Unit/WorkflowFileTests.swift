@@ -166,6 +166,109 @@ struct WorkflowFileTests {
         #expect(workflow.unknownFields["retries"] == .string("3"))
     }
 
+    // MARK: Which computers run it (#317)
+
+    @Test func absentOrEmptyHostsRunOnEveryMachine() {
+        let absent = parse("---\non: agent-finished\n---\n\nGo.")
+        #expect(absent.hosts == nil)
+        #expect(absent.runs(on: "anywhere"))
+
+        let empty = parse("---\non: agent-finished\nhosts: []\n---\n\nGo.")
+        #expect(empty.problem == nil)
+        #expect(empty.hosts == nil)
+        #expect(empty.runs(on: "anywhere"))
+
+        let blank = parse("---\non: agent-finished\nhosts:\n---\n\nGo.")
+        #expect(blank.problem == nil)
+        #expect(blank.hosts == nil)
+    }
+
+    @Test func aListAndASingleIdNameTheSameComputers() {
+        let listed = parse("""
+            ---
+            on: agent-finished
+            hosts:
+              - this-mac
+              - this-mac
+              -  other-box
+            ---
+
+            Go.
+            """)
+        #expect(listed.problem == nil)
+        #expect(listed.hosts == ["this-mac", "other-box"])
+        #expect(listed.unknownFields["hosts"] == nil)
+        #expect(listed.runs(on: "this-mac"))
+        #expect(!listed.runs(on: "a-third"))
+
+        let one = parse("---\non: agent-finished\nhosts: this-mac\n---\n\nGo.")
+        #expect(one.problem == nil)
+        #expect(one.hosts == ["this-mac"])
+        #expect(one.runs(on: "this-mac"))
+        #expect(!one.runs(on: "other-box"))
+    }
+
+    @Test func aClaimBesideHostsStaysAKeyThisVersionDoesNotKnow() {
+        let workflow = parse("""
+            ---
+            on: agent-finished
+            claim: one
+            hosts:
+              - this-mac
+            ---
+
+            Go.
+            """)
+        #expect(workflow.problem == nil)
+        #expect(workflow.hosts == ["this-mac"])
+        #expect(workflow.unknownFields["claim"] == .string("one"))
+        #expect(workflow.unknownFields["hosts"] == nil)
+    }
+
+    @Test func hostsThatAreNotIdsAreUnreadableAndStillShowEverywhere() {
+        let mapped = parse("""
+            ---
+            on: agent-finished
+            hosts:
+              name: this-mac
+            ---
+
+            Go.
+            """)
+        #expect(mapped.problem == .unreadable("`hosts:` must be a list of machine ids"))
+        // The list itself could not be read, so it is not hidden from the computer that can fix it.
+        #expect(mapped.hosts == nil)
+        #expect(mapped.runs(on: "anywhere"))
+
+        let nested = parse("""
+            ---
+            on: agent-finished
+            hosts:
+              - name: this-mac
+            ---
+
+            Go.
+            """)
+        #expect(nested.problem == .unreadable("`hosts:` must be a list of machine ids"))
+    }
+
+    @Test func aBrokenFilePinnedElsewhereStaysOffThisList() {
+        let workflow = parse("""
+            ---
+            on: agent-finished
+            enabled: sometimes
+            hosts:
+              - other-box
+            ---
+
+            Go.
+            """)
+        #expect(workflow.problem == .unreadable("`enabled:` must be true or false"))
+        #expect(workflow.hosts == ["other-box"])
+        #expect(!workflow.runs(on: "this-mac"))
+        #expect(workflow.runs(on: "other-box"))
+    }
+
     // MARK: Settings that cannot be read
 
     @Test func aSettingThatIsNotASingleValueIsUnreadable() {

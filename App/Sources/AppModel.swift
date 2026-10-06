@@ -929,34 +929,65 @@ final class AppModel {
         }
     }
 
+    /// The machine id of the host being looked at, for a workflow pinned to computers
+    /// (#317). This Mac's is `MachineID` even before the control plane has listed it.
+    func workflowMachineID(on host: HostID) -> String? {
+        if let id = controlPlaneHosts?.first(where: { $0.id == host })?.machineID, !id.isEmpty {
+            return id
+        }
+        if host == .mac || controlPlaneHosts == nil { return MachineID.current }
+        return nil
+    }
+
+    /// Keep a workflow the host still runs. A save that pins it elsewhere answers with
+    /// the workflow, and putting that answer back would show a row this host does not run.
+    func keepWorkflow(_ summary: WorkflowSummary, on host: HostID) {
+        if !summary.workflow.runs(on: workflowMachineID(on: host)) {
+            work.removeWorkflow(summary.workflowID, in: summary.folder)
+        } else {
+            work.upsert(summary)
+        }
+    }
+
+    /// The computers the workflow page can pin to, under the names already on screen.
+    var workflowHostChoices: [WorkflowHostChoice] {
+        var listed = WorkflowHosts.choices(from: controlPlaneHosts ?? [], thisMachine: MachineID.current)
+        if !listed.contains(where: { $0.machineID == MachineID.current }) {
+            listed.insert(WorkflowHostChoice(machineID: MachineID.current, name: "This Mac"), at: 0)
+        }
+        return listed
+    }
+
     /// Run one now. The daemon still applies the in-flight, ceiling and archive rules,
     /// and says so on the summary, which is why nothing here second-guesses it first.
     func runWorkflow(_ summary: WorkflowSummary) async {
         // Its refusal is said, not swallowed: a Run now that does nothing looked broken (073).
-        await attempt {
-            try await self.client.call(DaemonAPI.Method.workflowsRun,
-                                       DaemonAPI.WorkflowRequest(folder: summary.folder,
-                                                                 workflowID: summary.workflowID))
+        await attempt(on: selectedProjectHost) {
+            try await self.client(for: self.selectedProjectHost).call(
+                DaemonAPI.Method.workflowsRun,
+                DaemonAPI.WorkflowRequest(folder: summary.folder, workflowID: summary.workflowID))
         }
     }
 
     /// Put one away, or bring it back. The person's answer to a workflow an agent
     /// wrote, which is what makes writing one not need asking first.
     func setWorkflowArchived(_ summary: WorkflowSummary, _ archived: Bool) async {
-        await attempt {
-            try await self.client.call(DaemonAPI.Method.workflowsArchive,
-                                       DaemonAPI.WorkflowArchiveRequest(folder: summary.folder,
-                                                                        workflowID: summary.workflowID,
-                                                                        archived: archived))
+        await attempt(on: selectedProjectHost) {
+            try await self.client(for: self.selectedProjectHost).call(
+                DaemonAPI.Method.workflowsArchive,
+                DaemonAPI.WorkflowArchiveRequest(folder: summary.folder,
+                                                 workflowID: summary.workflowID,
+                                                 archived: archived))
         }
     }
 
     /// Turn one on or off, keeping its place on the list (#100).
     func setWorkflowEnabled(_ summary: WorkflowSummary, _ enabled: Bool) async {
-        _ = try? await client.call(DaemonAPI.Method.workflowsEnable,
-                                   DaemonAPI.WorkflowEnableRequest(folder: summary.folder,
-                                                                   workflowID: summary.workflowID,
-                                                                   enabled: enabled))
+        _ = try? await client(for: selectedProjectHost).call(
+            DaemonAPI.Method.workflowsEnable,
+            DaemonAPI.WorkflowEnableRequest(folder: summary.folder,
+                                            workflowID: summary.workflowID,
+                                            enabled: enabled))
     }
 
     // MARK: Pinned pages (#159)
@@ -1151,12 +1182,13 @@ final class AppModel {
     func approveWorkflow(_ summary: WorkflowSummary) async {
         guard let waiting = summary.awaitingApproval else { return }
         do {
-            let updated: WorkflowSummary = try await client.call(
+            let host = selectedProjectHost
+            let updated: WorkflowSummary = try await client(for: host).call(
                 DaemonAPI.Method.workflowsApprove,
                 DaemonAPI.WorkflowApproveRequest(folder: summary.folder, workflowID: summary.workflowID,
                                                  digest: waiting.digest),
                 returning: WorkflowSummary.self)
-            work.upsert(updated)
+            keepWorkflow(updated, on: host)
         } catch {
             problem = describe(error)
             await refreshWorkflows()
@@ -1174,16 +1206,18 @@ final class AppModel {
     /// `cooldown` is the file's `cooldown:` to write (#103), empty to remove it; left
     /// `nil`, the file's is left as it is.
     func setWorkflowSettings(_ summary: WorkflowSummary, _ settings: WorkflowSettings,
-                             cooldown: String? = nil, labels: [String]? = nil) async {
+                             cooldown: String? = nil, labels: [String]? = nil,
+                             hosts: [String]? = nil) async {
+        let host = selectedProjectHost
         do {
-            let updated: WorkflowSummary = try await client.call(
+            let updated: WorkflowSummary = try await client(for: host).call(
                 DaemonAPI.Method.workflowsSettings,
                 DaemonAPI.WorkflowSettingsRequest(folder: summary.folder,
                                                   workflowID: summary.workflowID,
                                                   settings: settings, cooldown: cooldown,
-                                                  labels: labels),
+                                                  labels: labels, hosts: hosts),
                 returning: WorkflowSummary.self)
-            work.upsert(updated)
+            keepWorkflow(updated, on: host)
         } catch {
             problem = describe(error)
             // What the file still says, so the control goes back to the truth rather

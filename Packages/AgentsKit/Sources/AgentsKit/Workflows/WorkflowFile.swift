@@ -54,6 +54,11 @@ public enum WorkflowFile {
                 // Its switch and its archive, so a broken file put away stays put away.
                 workflow.enabled = WorkflowSwitches.flag(mapping["enabled"])
                 workflow.archived = WorkflowSwitches.flag(mapping[WorkflowSwitches.archived])
+                // Where it was pinned, when that list can be read, so a broken file
+                // meant for another computer stays off this one's list (#317).
+                if let node = mapping["hosts"], let ids = try? Self.hostIDs(from: node) {
+                    workflow.hosts = ids.isEmpty ? nil : ids
+                }
             }
             return workflow
         }
@@ -195,6 +200,21 @@ public enum WorkflowFile {
             }
         }
 
+        // Which computers may run it (#317). Absent, or an empty list, is every host.
+        // A list that is not ids is a file to fix: guessing which computer was meant
+        // would run it in the wrong place, or hide it from the right one.
+        var hosts: [String]?
+        if let node = mapping["hosts"] {
+            do {
+                let ids = try Self.hostIDs(from: node)
+                hosts = ids.isEmpty ? nil : ids
+            } catch let error as YAMLNode.Failure {
+                return broken(error.message)
+            } catch {
+                return broken(String(describing: error))
+            }
+        }
+
         let settings: WorkflowSettings
         do {
             settings = WorkflowSettings(permissionMode: try setting("permission-mode"),
@@ -215,7 +235,7 @@ public enum WorkflowFile {
 
         let known: Set<String> = ["on", "agent", "name", "permission-mode", "runtime", "model", "labels",
                                    "effort", "options", "enabled", WorkflowSwitches.archived,
-                                   WorkflowCooldown.key]
+                                   WorkflowCooldown.key, "hosts"]
         let unknown = mapping.filter { !known.contains($0.key) }.mapValues(\.jsonValue)
 
         return Workflow(workflowID: workflowID, folder: project,
@@ -223,7 +243,29 @@ public enum WorkflowFile {
                         triggers: triggers, mode: mode,
                         prompt: body, problem: problem, unknownFields: unknown,
                         settings: settings, cooldown: cooldown, enabled: enabled,
-                        archived: archived)
+                        archived: archived, hosts: hosts)
+    }
+
+    /// The machine ids under `hosts:`. A bare id and a list of them are the same
+    /// thing, as `days:` already is. A block that is not a list of ids is refused.
+    static func hostIDs(from node: YAMLNode) throws -> [String] {
+        let texts: [String]
+        switch node {
+        case .mapping:
+            throw YAMLNode.Failure("`hosts:` must be a list of machine ids")
+        case .scalar(let value):
+            texts = [value]
+        case .sequence(let items):
+            var read: [String] = []
+            for item in items {
+                guard let text = item.scalar else {
+                    throw YAMLNode.Failure("`hosts:` must be a list of machine ids")
+                }
+                read.append(text)
+            }
+            texts = read
+        }
+        return WorkflowHosts.cleaned(texts)
     }
 
     // MARK: Triggers

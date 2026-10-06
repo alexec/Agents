@@ -70,6 +70,9 @@ an agent finishes.
    - `permission-mode`, `runtime`, `model` and `effort` are optional. The values are the
      runtime's own; `plan` is Claude's read-only mode. Leave them out to use the
      runtime's defaults.
+   - `hosts` is optional. Leave it out and every computer with this project runs the
+     workflow. To pin it to one computer, open its page and choose that computer under
+     **Runs on**. The page writes the computer's id.
 2. Open the project's page and find the workflow under **Workflows**. Its line says what
    it does, such as *When an agent finishes, in a new agent*. A workflow an agent wrote,
    or one you wrote in another editor, shows a raised hand and **New — waiting for your

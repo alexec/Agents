@@ -28,8 +28,9 @@ and tell me in one paragraph. Don't fix anything.
 | `on` | yes | list | The triggers. At least one entry. |
 | `agent` | no | string | `new` (default), `standing`, `triggering` |
 | `name` | no | string | Display name. Falls back to the file name. |
+| `hosts` | no | list of machine ids | Computers that may run it. Absent or empty means every host. A listed workflow runs, and is listed, only on those hosts. One id may be written as a bare scalar; it is the same as a list of one. |
 
-Any other top-level key is preserved verbatim and round-trips on rewrite. This is the `Agent.unknownFields` pattern, and it is what lets a file written against a newer version survive being edited by an older one.
+Any other top-level key is preserved verbatim and round-trips on rewrite. This is the `Agent.unknownFields` pattern, and it is what lets a file written against a newer version survive being edited by an older one. A key this version does not act on, including one it does not know, stays in the file when `hosts` is written.
 
 ## Triggers
 
@@ -100,6 +101,7 @@ An empty body is a parse error: a workflow with nothing to say is a scheduled no
 | `at` contains a value other than `:00` / `:30` | Unreadable |
 | A trigger name this version does not know | Listed, inert, *not yet supported* |
 | An `agent:` value this version does not know | Listed, inert, *not yet supported* |
+| `hosts` is not a list of machine ids | Unreadable |
 | An unknown top-level key | Accepted and preserved |
 
 The line between the middle rows and the top ones is the whole point: a file we cannot read is broken, and a file we can read but cannot act on yet is a file from the future. They get different rows and different words.

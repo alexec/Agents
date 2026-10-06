@@ -94,7 +94,7 @@ extension DaemonCore {
         approve(workflow, digest: request.digest, in: &records)
         try keep("this workflow's settings") { try workflowStore.save(records, replacing: true) }
         let summary = summary(for: workflow, records: records)
-        broadcast(DaemonAPI.Notification.workflowChanged, summary)
+        announceWorkflow(workflow, records: records)
         // Its place among the waiting is free for the next in line.
         rebroadcastWorkflows(in: workflow.folder, except: [workflow.workflowID])
         return summary

@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 206 rows: **111 same**, **37 by design**, **58 delta** (after #221, #238–#244, #249, #252, #253, #255–#261, #263–#266, #291). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 207 rows: **112 same**, **37 by design**, **58 delta** (after #221, #238–#244, #249, #252, #253, #255–#261, #263–#266, #291, #317). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -27,7 +27,7 @@ Of 206 rows: **111 same**, **37 by design**, **58 delta** (after #221, #238–#2
 | Start sheet and new project | 17 | 5 | 0 |
 | Worktrees and Files | 12 | 6 | 3 |
 | Dashboard and pins | 8 | 0 | 6 |
-| Workflows page | 11 | 1 | 2 |
+| Workflows page | 12 | 1 | 2 |
 | Settings and Project Settings | 1 | 6 | 0 |
 | Pool, runtimes and spending | 7 | 1 | 2 |
 | Events and resources | 2 | 1 | 2 |
@@ -256,6 +256,7 @@ The deltas are tracked by 29 issues:
 | Settings: runtime, permission, model, effort, labels (#162) | `A/Projects/WorkflowPage.swift:479-592` | A row each: `R/Projects/WorkflowPage.swift:291-512` | Pills: `W/views/WorkflowSettings.tsx:44-139` | **same** |
 | Cooldown | A menu: `A/Projects/WorkflowPage.swift:310-339` | A menu and cooldown sentence: `R/Projects/WorkflowPage.swift` | A menu: `W/views/WorkflowSettings.tsx:142-157` | **delta**: web #260 |
 | An unreadable file locks the settings (#179) | `S/WorkflowStatus.swift:144` | `R/Projects/WorkflowPage.swift:296, 333, 510` | `W/views/WorkflowPage.tsx:44` | **same** |
+| Runs only on the hosts it names (#317) | `S/WorkflowHostsSection.swift` on `A/Projects/WorkflowPage.swift`; the list is the host's | The same section on `R/Projects/WorkflowPage.swift` | `W/views/WorkflowPage.tsx`; the list is the host's | **same** |
 | Writing a workflow | None (the author's) | None | None | **same** |
 
 ## Settings and Project Settings

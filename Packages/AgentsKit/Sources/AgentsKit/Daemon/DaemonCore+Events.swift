@@ -141,7 +141,8 @@ extension DaemonCore {
         let triggeringAgent = event.details["agent"].flatMap(UUID.init(uuidString:)) ?? event.publisher?.agentID
         for folder in folders {
             for workflow in (workflows[folder] ?? [:]).values.sorted(by: { $0.workflowID < $1.workflowID }) {
-                guard workflow.problem == nil,
+                guard workflow.runs(on: MachineID.current),
+                      workflow.problem == nil,
                       !workflow.isArchived,
                       !(event.subject == .workflow && event.details["workflow"] == workflow.workflowID),
                       !(event.subject == .agent && triggeringAgent.map {

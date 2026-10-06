@@ -22,6 +22,7 @@ import { blockLines, openBlock } from "./block";
 import { DashboardOrderSync } from "./dashboardOrderSync";
 import { Drafts } from "./drafts";
 import { scopeRoot, WatchCounts } from "./fileWatch";
+import { workflowRunsOn } from "./workflows";
 
 export { folderKey } from "./groups";
 
@@ -264,6 +265,28 @@ export class Work {
     this.writeWorkflows(key, [...list, summary]);
   }
 
+  /** The machine id of the host being looked at, when the control plane has said it. */
+  private hostMachineID(host: string): string | undefined {
+    const id = this.hosts.peek().find((item) => item.id === host)?.machineID;
+    return id ? id : undefined;
+  }
+
+  /**
+   * Keep a workflow this host still runs (#317). A save that pins it to other computers
+   * answers with the workflow, and putting that answer back would show a row this host
+   * does not run.
+   */
+  protected placeWorkflow(summary: WorkflowSummary, host: string): void {
+    if (workflowRunsOn(summary.workflow.hosts, this.hostMachineID(host))) this.upsertWorkflow(summary, host);
+    else this.removeWorkflow(summary.workflow.workflowID, summary.workflow.folder, host);
+  }
+
+  private removeWorkflow(workflowID: string, folder: string, host: string): void {
+    const key = `${host}|${folderKey(folder)}`;
+    const held = this.workflows.peek()[key];
+    if (held) this.writeWorkflows(key, held.filter((item) => item.workflow.workflowID !== workflowID));
+  }
+
   /** The latest correction to a new agent's form, for the form holding that draft. */
   readonly draftOptions = signal<DraftOptionsNotification | null>(null);
   /** Each host's resources and who holds them (036, #116): read-only on the page. */
@@ -359,7 +382,7 @@ export class Work {
         this.draftOptions.value = params as DraftOptionsNotification;
         return true;
       case "workflow/changed":
-        this.upsertWorkflow(params as WorkflowSummary, host);
+        this.placeWorkflow(params as WorkflowSummary, host);
         return true;
       case "dashboard/changed": {
         const note = params as DashboardChangedNotification;
@@ -1656,14 +1679,14 @@ export class Store extends Work {
   /** Run now (US5). The session it starts arrives as any other does, by agent/changed. */
   async runWorkflow(host: string, summary: WorkflowSummary): Promise<void> {
     const ran = await this.act("workflows/run", { folder: summary.workflow.folder, workflowID: summary.workflow.workflowID }, host);
-    if (ran) this.upsertWorkflow(ran, host);
+    if (ran) this.placeWorkflow(ran, host);
   }
 
   /** Turn Off / Turn On (#100): it keeps its place on the list either way. */
   async setWorkflowEnabled(host: string, summary: WorkflowSummary, enabled: boolean): Promise<void> {
     const changed = await this.act("workflows/enable",
       { folder: summary.workflow.folder, workflowID: summary.workflow.workflowID, enabled }, host);
-    if (changed) this.upsertWorkflow(changed, host);
+    if (changed) this.placeWorkflow(changed, host);
   }
 
   /** Approve (#142): the digest is what the page was showing, so a file changed since still waits. */
@@ -1671,27 +1694,28 @@ export class Store extends Work {
     if (!summary.awaitingApproval) return;
     const changed = await this.act("workflows/approve",
       { folder: summary.workflow.folder, workflowID: summary.workflow.workflowID, digest: summary.awaitingApproval.digest }, host);
-    if (changed) this.upsertWorkflow(changed, host);
+    if (changed) this.placeWorkflow(changed, host);
   }
 
   /** Archive or Bring Back (#142), as the window's page has them. */
   async setWorkflowArchived(host: string, summary: WorkflowSummary, archived: boolean): Promise<void> {
     const changed = await this.act("workflows/archive",
       { folder: summary.workflow.folder, workflowID: summary.workflow.workflowID, archived }, host);
-    if (changed) this.upsertWorkflow(changed, host);
+    if (changed) this.placeWorkflow(changed, host);
   }
 
   private settingsInFlight = new Map<string, Promise<unknown>>();
 
   /**
-   * One setting, its label list or its cooldown (#162), written to the file through the daemon
-   * as the window's page writes it. `change` is applied to what the file says when the call is
-   * sent, after any earlier change to the same workflow has been answered, so two quick changes
-   * cannot undo each other. The answer replaces the one summary; the list is not asked for
-   * again. Answers the daemon's refusal, for the page to say beside the controls, or null.
+   * One setting, its label list, its cooldown or the computers it runs on (#162, #317), written
+   * to the file through the daemon as the window's page writes it. `change` is applied to what
+   * the file says when the call is sent, after any earlier change to the same workflow has been
+   * answered, so two quick changes cannot undo each other. The answer replaces the one summary;
+   * the list is not asked for again. Answers the daemon's refusal, for the page to say beside
+   * the controls, or null.
    */
   setWorkflowSettings(host: string, summary: WorkflowSummary,
-                      change: { settings?: (s: WorkflowSettings) => WorkflowSettings; cooldown?: string; labels?: (labels: string[]) => string[] }): Promise<string | null> {
+                      change: { settings?: (s: WorkflowSettings) => WorkflowSettings; cooldown?: string; labels?: (labels: string[]) => string[]; hosts?: string[] }): Promise<string | null> {
     const { folder, workflowID } = summary.workflow;
     const key = `${host}|${folderKey(folder)}|${workflowID}`;
     const send = async (): Promise<string | null> => {
@@ -1703,8 +1727,9 @@ export class Store extends Work {
           folder, workflowID, settings,
           ...(change.cooldown !== undefined ? { cooldown: change.cooldown } : {}),
           ...(change.labels !== undefined ? { labels: change.labels(current.labels) } : {}),
+          ...(change.hosts !== undefined ? { hosts: change.hosts } : {}),
         }, host);
-        this.upsertWorkflow(updated, host);
+        this.placeWorkflow(updated, host);
         return null;
       } catch (error) {
         log("call.failed", error instanceof CallFailed ? error.code : undefined);

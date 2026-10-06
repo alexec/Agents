@@ -76,6 +76,10 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
     /// Archived, from the file's `archived: true` (#125). Archive writes the line and
     /// Bring Back takes it out; `nil` is a file that does not say, which is not archived.
     public var archived: Bool?
+    /// Machine ids allowed to run this workflow (#317). `nil` or empty is every host,
+    /// which is a file that does not say. Each id is a `MachineID`: a Mac's hardware
+    /// UUID, Linux `/etc/machine-id`, the host name only when neither exists.
+    public var hosts: [String]?
 
     /// Whether it is put away.
     public var isArchived: Bool { archived == true }
@@ -90,7 +94,9 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
                 prompt: String = "", problem: WorkflowProblem? = nil,
                 unknownFields: [String: JSONValue] = [:],
                 settings: WorkflowSettings = WorkflowSettings(),
-                cooldown: TimeInterval? = nil, enabled: Bool? = nil, archived: Bool? = nil) {
+                cooldown: TimeInterval? = nil, enabled: Bool? = nil, archived: Bool? = nil,
+                hosts: [String]? = nil) {
+        self.hosts = hosts
         self.cooldown = cooldown
         self.enabled = enabled
         self.archived = archived
@@ -118,6 +124,16 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
 
     /// The schedules it runs on, of which there is usually one and may be none.
     public var schedules: [WorkflowSchedule] { triggers.compactMap(\.schedule) }
+
+    /// Whether `machineID` may fire this workflow (#317).
+    ///
+    /// Absent or empty `hosts:` is every host. A listed workflow runs only where the
+    /// id matches, on a schedule, on an event, or by hand.
+    public func runs(on machineID: String?) -> Bool {
+        guard let hosts, !hosts.isEmpty else { return true }
+        guard let machineID, !machineID.isEmpty else { return false }
+        return hosts.contains(machineID)
+    }
 
     /// Whether anything could make this fire on its own.
     ///

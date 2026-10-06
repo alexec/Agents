@@ -1167,6 +1167,13 @@ public actor AppService {
             going, are held and run once, with the latest of them, when it ends. Set one \
             for a workflow on a busy event such as `agent.finished`.
 
+            `hosts:` names the computers that run it, by machine id: a Mac's hardware \
+            UUID, or on Linux the contents of `/etc/machine-id`. Leave it out and every \
+            host that has the project runs it and lists it. Name ids and only those \
+            hosts run it and list it, on a schedule, on an event, or by hand. The id is \
+            the computer's, not its name. The workflow page writes it from the hosts \
+            the control plane knows; do not invent an id.
+
             Once its runtime has been used in this project, reading a workflow also \
             lists what that runtime offers for each of these, in the words the file \
             takes. To change how an existing workflow runs, \
