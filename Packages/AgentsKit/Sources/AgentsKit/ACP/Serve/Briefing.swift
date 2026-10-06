@@ -155,18 +155,23 @@ public enum Briefing {
     /// A question card read on a phone, beside other agents' cards, cannot say who "I"
     /// is or which "you" is meant: the agent asking, the agent it is asking about, or
     /// the person. So the agent is told its own name and the person's once, and told to
-    /// use them in questions above all. Pronouns are the person's to give; where they
-    /// gave none, the name or "they", never a guess. A helper is told who started it,
-    /// by title, so it can name that agent the same way.
+    /// use them in questions: a form card, a finished turn that needs an answer, or a
+    /// question asked in a reply. Anywhere else the reader is in the agent's own
+    /// conversation, where "I" and "you" are plain, so they are allowed there (#335).
+    /// Pronouns are the person's to give; where they gave none, the name or "they",
+    /// never a guess. A helper is told who started it, by title, so it can name that
+    /// agent the same way.
     public static func naming(_ naming: Naming) -> String {
         let you = naming.startedBy.map { "\(naming.runtime), started by \(LeaseWords.agentName($0))," }
             ?? naming.runtime
         let refer = naming.pronouns.map { "as \($0)" } ?? "as \"they\""
         return """
-            You are \(you) and I am \(naming.person): in questions and messages to me, \
-            never write a bare "I" or "you" — say "\(naming.runtime) (this agent) will…" \
-            and "\(naming.person), do you want…?" — name any other agent by its title, \
-            and refer to me by name or \(refer).
+            You are \(you) and I am \(naming.person): in a question to me (a form card, \
+            a turn ending on my answer, or a question in a reply), never write a bare \
+            "I" or "you" — say "\(naming.runtime) (this agent) will…" and \
+            "\(naming.person), do you want…?" — while anywhere else plain "I" and "you" \
+            are fine; name any other agent by its title, and refer to me by name or \
+            \(refer).
             """
     }
 

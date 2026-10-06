@@ -68,11 +68,14 @@ struct BriefingTests {
     static let alex = Briefing.Naming(runtime: "Claude", person: "Alex")
 
     /// One sentence, second, naming the runtime by its display name and the person by
-    /// theirs, with the rule for questions: no bare "I" or "you".
+    /// theirs, with the rule for questions only: no bare "I" or "you" there, plain
+    /// "I" and "you" anywhere else (#335).
     @Test func theNamingSentenceNamesTheRuntimeAndThePerson() {
         let line = Briefing.naming(Self.alex)
         #expect(line.hasPrefix("You are Claude and I am Alex:"))
-        #expect(line.contains("in questions and messages to me"))
+        #expect(line.contains("in a question to me (a form card, a turn ending on my answer, or a question in a reply)"))
+        #expect(!line.contains("messages to me"))
+        #expect(line.contains("anywhere else plain \"I\" and \"you\" are fine"))
         #expect(line.contains("never write a bare \"I\" or \"you\""))
         #expect(line.contains("\"Claude (this agent) will…\""))
         #expect(line.contains("\"Alex, do you want…?\""))
