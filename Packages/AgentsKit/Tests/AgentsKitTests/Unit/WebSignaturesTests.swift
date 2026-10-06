@@ -27,6 +27,12 @@ struct WebSignaturesTests {
         #expect(notifications.contains(DaemonAPI.Notification.agentEntry))
     }
 
+    /// The page branches a session as the window does, and opens the new one by its id (#342).
+    @Test func thePageBranchesASession() {
+        #expect(Rows.rows.contains { $0.method == DaemonAPI.Method.agentsFork && $0.kind == .hostRequest
+            && $0.params == DaemonAPI.AgentRequest.self && $0.result == UUID.self })
+    }
+
     /// The page asks what the host could not read and hears it change, as the window does (#223).
     @Test func thePageAsksAndHearsStoreNotes() {
         let rows = Rows.rows

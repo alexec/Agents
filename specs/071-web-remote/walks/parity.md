@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 211 rows: **142 same**, **38 by design**, **31 delta** (after #188, #189, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 212 rows: **141 same**, **40 by design**, **31 delta** (after #188, #189, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -23,12 +23,12 @@ Of 211 rows: **142 same**, **38 by design**, **31 delta** (after #188, #189, #22
 | Session rows and states | 16 | 2 | 5 |
 | Chat turns and turn detail | 19 | 3 | 2 |
 | Prompt bar and queued prompts | 18 | 2 | 0 |
-| Question and permission cards | 12 | 3 | 0 |
+| Question and permission cards | 11 | 4 | 0 |
 | Start sheet and new project | 17 | 5 | 0 |
 | Worktrees and Files | 9 | 6 | 6 |
 | Dashboard and pins | 13 | 1 | 0 |
 | Workflows page | 12 | 1 | 2 |
-| Settings and Project Settings | 1 | 6 | 0 |
+| Settings and Project Settings | 1 | 7 | 0 |
 | Pool, runtimes and spending | 7 | 1 | 2 |
 | Events and resources | 2 | 1 | 2 |
 | Notifications and badges | 3 | 1 | 0 |
@@ -87,7 +87,7 @@ The deltas are tracked by 29 issues:
 | Last-activity time in the corner | *5m*, *3h*, *2d*, read again on the minute: `S/ActivityTime.swift` in `A/AgentList/AgentRow.swift` | The same view in `R/Sidebar/SidebarRows.swift` | `W/views/SessionRow.tsx`, words in `W/model/activity.ts` | **same** (#341; `ActivityWords.short`, held to `Fixtures/web/activity/short.json`) |
 | In flight, "telling …" (#87) | The host's name: `A/Permission/AnswerRecipient.swift:6-9` | The host's name: `R/RemoteModel.swift` `answerRecipient`, at `R/Projects/AgentCard.swift:122` and four more | `store.recipient(host)`: `W/model/store.ts:1111-1113` | **same** (#239) |
 | One action at a time, held while telling (#87) | `A/AgentList/AgentRow.swift` | `R/Projects/AgentCard.swift` | `W/views/SessionRow.tsx` | **same** |
-| Row actions | Carry on, Stop, Bring Back, Retire Now…, Mark Read / Unread, Pin, Branch, Park, Archive, Show in Finder: `A/AgentList/AgentRow.swift:213-268` | Stop, Bring Back, and the other card actions: `R/Projects/AgentCard.swift` | Stop, Park / Unpark, Mark, Pin, Bring Back / Archive, Move: `W/views/SessionMenu.tsx:16-44` | **same** for Stop and Bring Back; Branch #267. Retire Now and Show in Finder: **by design** (retention and Finder are the Mac's) |
+| Row actions | Carry on, Stop, Bring Back, Retire Now…, Mark Read / Unread, Pin, Branch, Park, Archive, Show in Finder: `A/AgentList/AgentRow.swift:213-268`; Branch in the Session menu too (⌥⌘B) | Stop, Bring Back, Branch, and the other card actions: `R/Projects/AgentCard.swift`; Branch in the chat's ··· too: `R/Chat/RemoteChatView.swift` | Stop, Park / Unpark, Mark, Pin, Branch, Bring Back / Archive, Move, in the row's menu and the chat's ···: `W/views/SessionMenu.tsx:20-54` | **same** for Stop, Bring Back and Branch (#342: `agents/fork`, the new session opened). Retire Now and Show in Finder: **by design** (retention and Finder are the Mac's) |
 | Swipe | Pin; Archive, or Bring Back when archived: `A/Projects/ProjectListView.swift:487-506` | Pin; Archive, or Bring Back when archived: `R/Projects/AgentCard.swift` | None | **same**; web: **by design** (no swipe) |
 | Swipe waits for the swipe to close (#74) | Yes | Yes | n/a | **by design** (the page has no swipe) |
 | Mark Read / Unread reaches the agent's host | Per host | Per host: `R/RemoteModel.swift:2493-2507` | Per host: `W/views/SessionMenu.tsx:78` | **same** (#238) |

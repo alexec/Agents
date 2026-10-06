@@ -1425,6 +1425,14 @@ export class Store extends Work {
       { agentID: agentID as UUID, text, attachments, requestID: crypto.randomUUID().toUpperCase() as UUID }, host);
   }
 
+  /**
+   * Branch (#342): a new session that carries this one's history so far, the original left alone.
+   * Answers its id, or null with `problem` saying why.
+   */
+  async fork(host: string, agentID: string): Promise<string | null> {
+    return this.act("agents/fork", { agentID: agentID as UUID }, host);
+  }
+
   /** Recreate the worktree from its branch (#119); the row follows from `agent/changed`. */
   async recreateWorktree(host: string, agentID: string): Promise<void> {
     const agent = await this.act("agents/recreateWorktree", { agentID: agentID as UUID }, host);

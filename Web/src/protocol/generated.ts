@@ -2018,6 +2018,7 @@ export interface Methods {
   "agents/archive": { params: AgentRequest; result: Empty };
   "agents/continueInProject": { params: ContinueInProjectRequest; result: UUID };
   "agents/discardDraft": { params: DiscardDraftRequest; result: Empty };
+  "agents/fork": { params: AgentRequest; result: UUID };
   "agents/labelVocabulary": { params: LabelVocabularyRequest; result: string[] };
   "agents/list": { params: ListRequest; result: Agent[] };
   "agents/options": { params: OptionsRequest; result: OptionsResponse };
@@ -2112,6 +2113,7 @@ export const MethodTarget = {
   "agents/archive": "host",
   "agents/continueInProject": "host",
   "agents/discardDraft": "host",
+  "agents/fork": "host",
   "agents/labelVocabulary": "host",
   "agents/list": "host",
   "agents/options": "host",
