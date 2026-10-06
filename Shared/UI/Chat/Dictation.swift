@@ -120,7 +120,8 @@ final class Dictation {
         emptyUtterances = 0
         run += 1
         problem = nil
-        Task { await requestAccessThenListen() }
+        let thisRun = run
+        Task { await requestAccessThenListen(for: thisRun) }
     }
 
     /// Asking for speech recognition, off the main actor.
@@ -141,23 +142,26 @@ final class Dictation {
         await AVCaptureDevice.requestAccess(for: .audio)
     }
 
-    private func requestAccessThenListen() async {
+    private func requestAccessThenListen(for thisRun: Int) async {
         let speech = await Self.askForSpeech()
+        guard thisRun == run else { return }
         guard speech == .authorized else {
             problem = Problem(message: "Dictation needs permission to recognise speech. " + Self.whereTheSwitchIs,
                               permission: .speechRecognition)
             return
         }
         let microphone = await Self.askForMicrophone()
+        guard thisRun == run else { return }
         guard microphone else {
             problem = Problem(message: "Dictation needs the microphone. " + Self.whereTheSwitchIs,
                               permission: .microphone)
             return
         }
-        await listen()
+        await listen(for: thisRun)
     }
 
-    private func listen() async {
+    private func listen(for thisRun: Int) async {
+        guard thisRun == run else { return }
         guard let recogniser, recogniser.isAvailable else {
             problem = Problem(message: "Speech recognition is not available for \(Locale.current.identifier).")
             return
@@ -169,6 +173,14 @@ final class Dictation {
             return
         } catch {
             problem = Problem(message: "The microphone would not start: \(error.localizedDescription)")
+            return
+        }
+        // `stop()` may have been called while opening the microphone. The engine
+        // cannot be cancelled mid-open, so retire this start before it can listen.
+        guard thisRun == run else {
+            engine.inputNode.removeTap(onBus: 0)
+            if engine.isRunning { engine.stop() }
+            sink.point(at: nil)
             return
         }
         isListening = true
@@ -287,8 +299,22 @@ final class Dictation {
     func dismissProblem() { problem = nil }
 
     func stop() {
-        guard isListening || engine.isRunning else { return }
+        // Retire pending permission/opening work as well as recogniser callbacks.
+        // Results already queued on the main actor carry the old run number.
+        run += 1
+        onText = nil
         isListening = false
+        guard engine.isRunning else {
+            request?.endAudio()
+            task?.cancel()
+            request = nil
+            task = nil
+            sink.point(at: nil)
+            #if os(iOS)
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            #endif
+            return
+        }
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
         sink.point(at: nil)
