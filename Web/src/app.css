@@ -885,6 +885,9 @@ button.remove:hover { opacity: 1; }
 .menu-head { margin: 6px 10px 2px; font-size: 11px; opacity: 0.55; }
 .empty-projects { display: flex; flex-direction: column; gap: 8px; padding: 12px 8px; }
 .empty-projects .quiet { line-height: 1.45; }
+.empty-runtimes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.empty-runtimes li { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; }
+.empty-runtimes a { font-size: 12px; }
 .empty-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .row.cloning { cursor: default; opacity: 0.7; }
 .row.cloning .spinner { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
