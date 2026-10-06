@@ -139,7 +139,6 @@ struct HostWindow: View {
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("This Mac")
     }
 
     /// Grey when the process is down, orange when it is up and has no membership (#303).

@@ -208,7 +208,10 @@ final class LoopbackListener: @unchecked Sendable {
                     return ControlWebSocketServer.configure(channel, tls: nil, reply: { head in
                         let reply = gate.reply(head)
                         let path = head.uri.split(separator: "?", maxSplits: 1).first.map(String.init) ?? ""
-                        log("web \(head.method.rawValue) \(path) \(reply.status.code)")
+                        if head.method != .GET {
+                            let entry = "web \(head.method.rawValue) \(path) \(reply.status.code)"
+                            DispatchQueue.global(qos: .utility).async { log(entry) }
+                        }
                         return reply
                     }, upgrade: { head in
                         gate.judge(head) == .upgrade

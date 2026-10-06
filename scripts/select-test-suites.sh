@@ -125,7 +125,7 @@ else
 					codetext_full_required=true
 					;;
 				# These areas cannot affect either SwiftPM package's tests.
-				App/*|Host/*|Remote/*|RemoteNotify/*|RemoteWidget/*|Shared/UI/*|docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|.github/workflows/*|scripts/select-test-suites.sh|scripts/web.sh|scripts/slow-tests.sh|scripts/flaky-tests.sh|scripts/normalize-metaltoolchain-cache.py)
+				App/*|Host/*|Remote/*|RemoteNotify/*|RemoteWidget/*|Shared/UI/*|docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|.github/workflows/*|scripts/select-test-suites.sh|scripts/check-agentsd-links-no-parsers.sh|scripts/web.sh|scripts/slow-tests.sh|scripts/flaky-tests.sh|scripts/normalize-metaltoolchain-cache.py)
 					;;
 				*)
 					# Root config, CI, scripts, or a new area may change test behavior.

@@ -6,6 +6,7 @@
 #   bare.sh up        start the box, building the image the first time; waits for ssh
 #   bare.sh status    box, installed agentsd and Claude toolset, running agentsd
 #   bare.sh ssh [CMD] ssh in as agents (or run CMD), trusting whatever key it has now
+#   bare.sh fresh    stop the daemon by its lock pid and remove ~/.agents-server
 #   bare.sh rebuild   throw the box away and start a new one: blank disk, new host key
 #   bare.sh down      stop and remove the box
 #
@@ -65,6 +66,9 @@ case "${1:-status}" in
     shift
     if [ $# -eq 0 ]; then exec ssh -t -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -p $PORT agents@127.0.0.1
     else exec "${SSH[@]}" "$@"; fi
+    ;;
+  fresh)
+    "${SSH[@]}" 'p=$(cat ~/.agents-server/root/daemon.lock 2>/dev/null | tr -d "[:space:]"); [ -n "$p" ] && kill "$p" 2>/dev/null; sleep 1; rm -rf ~/.agents-server; echo "removed ~/.agents-server"'
     ;;
   rebuild)
     colima_up

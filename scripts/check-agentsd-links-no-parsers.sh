@@ -19,7 +19,10 @@ if [[ -n $binary && -f $binary ]]; then
   if nm $binary 2>/dev/null | grep -qE 'tree_sitter_|ts_parser_'; then
     print -u2 "$binary has tree-sitter symbols"; exit 1
   fi
-  print "agentsd: no parsers ($binary)"
+  if otool -L "$binary" 2>/dev/null | grep -q '/AppKit.framework/'; then
+    print -u2 "$binary links AppKit"; exit 1
+  fi
+  print "agentsd: no parsers or AppKit ($binary)"
 else
   print "agentsd: project.yml clean (no built binary to check)"
 fi

@@ -45,7 +45,13 @@ extension DaemonCore {
     /// A write nobody was waiting on was refused. Logged always; told to the windows
     /// when it is one of the three and that cause has not been told lately.
     func lost(_ error: any Error, keeping what: String) {
-        DaemonLog.shared.write("store: could not save \(what): \(error)")
+        let key = "\(what): \(error.localizedDescription)"
+        if let notice = failedSaveNotices.note(key, at: now()) {
+            switch notice {
+            case .first: DaemonLog.shared.write("store: could not save \(what): \(error)")
+            case .again(let times, _): DaemonLog.shared.write("store: could not save a line (repeated \(times) times): \(error)")
+            }
+        }
         guard let failure = WriteFailure(error, keeping: what) else { return }
         let at = now()
         if let told = writeFailuresTold[failure.cause], at.timeIntervalSince(told) < Self.writeFailureQuiet { return }

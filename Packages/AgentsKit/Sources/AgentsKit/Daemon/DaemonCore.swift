@@ -1,4 +1,5 @@
 import Foundation
+import AgentsKitCore
 
 /// The owner of every agent.
 ///
@@ -111,6 +112,10 @@ public actor DaemonCore {
     /// When each kind of refused write was last told to the windows (#88), so a full
     /// disk under a streaming agent is one alert and not one per token.
     var writeFailuresTold: [WriteFailure.Cause: Date] = [:]
+    /// Runtime diagnostics are bounded per live agent and minute (#222).
+    var stderrBudget = DaemonStderrBudget()
+    var stderrNotices = RepeatedNotice(every: 60)
+    var failedSaveNotices = RepeatedNotice(every: 3600)
     /// What the machine says about its own power, and the claim on its idle sleep.
     /// Injected together so a test can cross the battery floor without a laptop and
     /// assert on holds without touching the real one (024).
@@ -1554,6 +1559,7 @@ public actor DaemonCore {
             reconsider()
 
         case .processExited:
+            stderrBudget.remove(agentID)
             await closeQuestionsOfAGoneRuntime(agentID)
             if agents[agentID]?.state.holdsRuntime == true {
                 await move(agentID, on: .processDied)
@@ -1562,7 +1568,19 @@ public actor DaemonCore {
             reconsider()
 
         case .standardError(let text):
-            DaemonLog.shared.write("agent \(agentID) stderr: \(text)")
+            switch stderrBudget.consume(text, from: agentID, at: now()) {
+            case .log(let chunk):
+                DaemonLog.shared.write("agent \(agentID) stderr: \(chunk)")
+            case .suppress:
+                if let notice = stderrNotices.note("stderr-budget-\(agentID)", at: now()) {
+                    switch notice {
+                    case .first:
+                        DaemonLog.shared.write("agent \(agentID) stderr: 4 KB/minute budget reached; counting suppressed chunks")
+                    case .again(let count, _):
+                        DaemonLog.shared.write("agent \(agentID) stderr: suppressed \(count) chunks by the 4 KB/minute budget")
+                    }
+                }
+            }
 
         case .unknownUpdate(let kind):
             DaemonLog.shared.write("agent \(agentID) sent an update we do not know: \(kind)")

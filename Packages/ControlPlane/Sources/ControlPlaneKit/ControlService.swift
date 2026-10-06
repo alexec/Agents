@@ -96,7 +96,7 @@ public final class ControlService: @unchecked Sendable {
     let peerOrigin: String?
     public let leases: Leases
     public let mesh: CopyMesh?
-    private var server: (any Channel)?
+    private var servers: [any Channel] = []
     private let loopback = LoopbackListener()
     /// The loopback listener's port once it is up, or nil (071).
     public var webPort: Int? { loopback.port == 0 ? nil : loopback.port }
@@ -179,7 +179,7 @@ public final class ControlService: @unchecked Sendable {
             try await resumeForwardingIfMarked()
         }
         let configuration = self.configuration
-        let servers = ServerFiles.folder()
+        let serverFolder = ServerFiles.folder()
         let bootstrap = ServerBootstrap(group: MultiThreadedEventLoopGroup.singleton)
             .serverChannelOption(ChannelOptions.backlog, value: 256)
             .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
@@ -196,7 +196,7 @@ public final class ControlService: @unchecked Sendable {
                     case "/v1/install.sh":
                         return PlainReply(.ok, Data(HostInstallScript.text.utf8), contentType: "text/x-shellscript")
                     case let served where served.hasPrefix("/v1/servers/"):
-                        guard let data = ServerFiles.read(String(served.dropFirst("/v1/servers/".count)), in: servers) else {
+                        guard let data = ServerFiles.read(String(served.dropFirst("/v1/servers/".count)), in: serverFolder) else {
                             return PlainReply(.notFound, text: "this control plane has no such file\n")
                         }
                         return PlainReply(.ok, data)
@@ -209,7 +209,16 @@ public final class ControlService: @unchecked Sendable {
                 })
             }
         let channel = try await bootstrap.bind(host: configuration.bind, port: configuration.port).get()
-        server = channel
+        servers = [channel]
+        if configuration.bind == "0.0.0.0" {
+            do {
+                servers.append(try await bootstrap.bind(host: "::", port: channel.localAddress?.port ?? configuration.port).get())
+            } catch {
+                try? await channel.close()
+                servers = []
+                throw error
+            }
+        }
         if let web = configuration.web { await startWeb(web) }
         refresher = Task { [weak self] in
             while !Task.isCancelled {
@@ -315,8 +324,8 @@ public final class ControlService: @unchecked Sendable {
         sweeper?.cancel()
         await leases.stop()
         await mesh?.stop()
-        try? await server?.close()
-        server = nil
+        for server in servers { try? await server.close() }
+        servers = []
         await loopback.stop()
         sockets.closeAll()
     }
