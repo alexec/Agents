@@ -53,7 +53,8 @@ struct AppServiceTests {
         // that may use them — which is the default. The three lease tools (036) follow
         // them, for every agent, then the three event tools (042). Moving (053) rides on
         // finish_turn. The two session tools (065) sit after the agent tools, for every
-        // agent. The four Dashboard tools (074, #147) come last, for every agent.
+        // agent. The Dashboard tools (074, #147) follow, for every agent, and the
+        // dashboard view's own read_dashboard comes last, served with that view (#329).
         #expect(tools.compactMap { $0["name"]?.stringValue }
             == [AppService.finishTurnToolName, AppService.showFileToolName,
                 AppService.workflowToolName, AppService.askFormToolName,
@@ -66,9 +67,9 @@ struct AppServiceTests {
                 AppService.waitForEventToolName, AppService.cancelWaitToolName,
                 AppService.publishEventToolName,
                 AppService.setTileToolName, AppService.removeTileToolName,
-                AppService.readDashboardToolName, AppService.moveTileToolName,
+                AppService.moveTileToolName,
                 AppService.pinPageToolName, AppService.unpinPageToolName, AppService.movePinToolName,
-                AppService.pinSessionToolName])
+                AppService.pinSessionToolName, AppService.readDashboardToolName])
 
         let finish = tools.first?["inputSchema"]
         #expect(finish?["properties"]?["outcome"]?["enum"]?.arrayValue?

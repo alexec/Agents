@@ -120,7 +120,9 @@ struct ReconnectScheduleTests {
 
     /// The window's client through a control plane with its host down: one try, and the
     /// window's backoff decides the next, not a dial every 100 ms for 8 s (#172).
-    @Test func aLinkWithNothingToStartIsTriedOnce() async {
+    /// The second is wall-clock, so it is quarantined with the timing bounds that only
+    /// hold on a machine that is not also running the other 3866 tests.
+    @Test(.flakyUnderLoad) func aLinkWithNothingToStartIsTriedOnce() async {
         let link = Down(starting: false)
         let client = DaemonClient(link: link)
         let started = ContinuousClock.now

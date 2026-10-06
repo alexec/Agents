@@ -34,6 +34,8 @@ extension Trait where Self == ConditionTrait {
     /// - PoolSwitchTests.anotherChatOnTheSpentRuntimeMovesBeforeItsNextTurn — takes two
     ///   turns and waits up to 30 s for the first chat's report before the second starts;
     ///   the suite was still running at the 10-minute CI cutoff (2026-09-28).
+    /// - ReconnectScheduleTests.aLinkWithNothingToStartIsTriedOnce — 1 s wall-clock on
+    ///   the connect, spent by the whole suite's load while the rest ran (2026-10-06).
     /// - Failed in the whole AgentsKit suite (3790 tests at once) on the three-core runner,
     ///   PR #277's third run (2026-10-05), and passed in full local runs at load 40-130:
     ///   most waited out the one-minute limit for a child process, a pipe or an answer.

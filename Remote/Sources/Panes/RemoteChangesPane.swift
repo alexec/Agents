@@ -97,7 +97,7 @@ struct RemoteChangesPane: View {
         .scrollContentBackground(.hidden)
     }
 
-    private func treeRow(_ name: String, icon: String, color: Color = .accentColor,
+    private func treeRow(_ name: String, icon: String, color: Color = Paper.accent,
                          depth: Int, detail: String) -> some View {
         HStack(spacing: 7) {
             Image(systemName: icon).foregroundStyle(color).frame(width: 18)
