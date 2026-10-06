@@ -102,6 +102,15 @@ struct RemoteChatView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 6)
                 }
+                // Blocked (039): what it waits on, as the row says it (#341). Carry on is
+                // the toolbar's.
+                if let agent, model.isBlocked(agent) {
+                    WaitLines(lines: model.blockLines(agent))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 6)
+                        .background(Paper.ground)
+                }
                 // Under the banner, not over it: when the Mac has gone quiet, what
                 // the agent last said it would do is the less urgent of the two.
                 if let agent { CurrentPlanStrip(agent: agent) }

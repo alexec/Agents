@@ -1,0 +1,253 @@
+[
+  {
+    "expected" : null,
+    "input" : {
+      "plans" : [
+
+      ]
+    },
+    "name" : "no plan"
+  },
+  {
+    "expected" : "Fix the row — 1 of 3 done",
+    "input" : {
+      "plans" : [
+        {
+          "at" : 812500060,
+          "entries" : [
+            {
+              "content" : "Read the code",
+              "priority" : "medium",
+              "status" : "completed"
+            },
+            {
+              "content" : "Fix the row",
+              "priority" : "medium",
+              "status" : "in_progress"
+            },
+            {
+              "content" : "Test it",
+              "priority" : "medium",
+              "status" : "pending"
+            }
+          ],
+          "planID" : "a",
+          "state" : "current"
+        }
+      ]
+    },
+    "name" : "a step being worked"
+  },
+  {
+    "expected" : "Plan — 1 of 2 done",
+    "input" : {
+      "plans" : [
+        {
+          "at" : 812500120,
+          "entries" : [
+            {
+              "content" : "Read the code",
+              "priority" : "medium",
+              "status" : "completed"
+            },
+            {
+              "content" : "Test it",
+              "priority" : "medium",
+              "status" : "pending"
+            }
+          ],
+          "planID" : "b",
+          "state" : "current"
+        }
+      ]
+    },
+    "name" : "no step being worked"
+  },
+  {
+    "expected" : "Plan — 2 of 2 done",
+    "input" : {
+      "plans" : [
+        {
+          "at" : 812500180,
+          "entries" : [
+            {
+              "content" : "One",
+              "priority" : "medium",
+              "status" : "completed"
+            },
+            {
+              "content" : "Two",
+              "priority" : "medium",
+              "status" : "completed"
+            }
+          ],
+          "planID" : "c",
+          "state" : "current"
+        }
+      ]
+    },
+    "name" : "every step done"
+  },
+  {
+    "expected" : "Plan — 1 of 2 done",
+    "input" : {
+      "plans" : [
+        {
+          "at" : 812500060,
+          "entries" : [
+            {
+              "content" : "Read the code",
+              "priority" : "medium",
+              "status" : "completed"
+            },
+            {
+              "content" : "Fix the row",
+              "priority" : "medium",
+              "status" : "in_progress"
+            },
+            {
+              "content" : "Test it",
+              "priority" : "medium",
+              "status" : "pending"
+            }
+          ],
+          "planID" : "a",
+          "state" : "current"
+        },
+        {
+          "at" : 812500120,
+          "entries" : [
+            {
+              "content" : "Read the code",
+              "priority" : "medium",
+              "status" : "completed"
+            },
+            {
+              "content" : "Test it",
+              "priority" : "medium",
+              "status" : "pending"
+            }
+          ],
+          "planID" : "b",
+          "state" : "current"
+        }
+      ]
+    },
+    "name" : "the last of several"
+  },
+  {
+    "expected" : "Fix the row — 1 of 3 done",
+    "input" : {
+      "plans" : [
+        {
+          "at" : 812500060,
+          "entries" : [
+            {
+              "content" : "Read the code",
+              "priority" : "medium",
+              "status" : "completed"
+            },
+            {
+              "content" : "Fix the row",
+              "priority" : "medium",
+              "status" : "in_progress"
+            },
+            {
+              "content" : "Test it",
+              "priority" : "medium",
+              "status" : "pending"
+            }
+          ],
+          "planID" : "a",
+          "state" : "current"
+        },
+        {
+          "at" : 812500060,
+          "entries" : [
+            {
+              "content" : "Read the code",
+              "priority" : "medium",
+              "status" : "completed"
+            },
+            {
+              "content" : "Fix the row",
+              "priority" : "medium",
+              "status" : "in_progress"
+            },
+            {
+              "content" : "Test it",
+              "priority" : "medium",
+              "status" : "pending"
+            }
+          ],
+          "planID" : "d",
+          "state" : "withdrawn"
+        }
+      ]
+    },
+    "name" : "a dropped plan is passed over"
+  },
+  {
+    "expected" : null,
+    "input" : {
+      "plans" : [
+        {
+          "at" : 812500060,
+          "entries" : [
+            {
+              "content" : "Read the code",
+              "priority" : "medium",
+              "status" : "completed"
+            },
+            {
+              "content" : "Fix the row",
+              "priority" : "medium",
+              "status" : "in_progress"
+            },
+            {
+              "content" : "Test it",
+              "priority" : "medium",
+              "status" : "pending"
+            }
+          ],
+          "planID" : "d",
+          "state" : "withdrawn"
+        }
+      ]
+    },
+    "name" : "only a dropped plan"
+  },
+  {
+    "expected" : "Plan — 1 of 2 done",
+    "input" : {
+      "plans" : [
+        {
+          "at" : 812500120,
+          "entries" : [
+            {
+              "content" : "Read the code",
+              "priority" : "medium",
+              "status" : "completed"
+            },
+            {
+              "content" : "Test it",
+              "priority" : "medium",
+              "status" : "pending"
+            }
+          ],
+          "planID" : "b",
+          "state" : "current"
+        },
+        {
+          "at" : 812500240,
+          "entries" : [
+
+          ],
+          "planID" : "e",
+          "state" : "current"
+        }
+      ]
+    },
+    "name" : "an empty plan is passed over"
+  }
+]
