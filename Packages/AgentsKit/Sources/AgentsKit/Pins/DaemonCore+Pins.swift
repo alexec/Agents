@@ -295,6 +295,7 @@ extension DaemonCore {
     func pinFilesChanged(_ changed: [URL], in project: URL) {
         let base = project.standardizedFileURL.path(percentEncoded: false)
         let root = base.hasSuffix("/") ? base : base + "/"
+        let ignored = MentionIgnore(folder: project)
         // Folders inside the project, relative to it, worktrees and git's own left out.
         let folders = Set(changed.compactMap { url -> String? in
             let path = url.standardizedFileURL.path(percentEncoded: false)
@@ -302,6 +303,9 @@ extension DaemonCore {
             guard path.hasPrefix(root) else { return nil }
             let relative = String(path.dropFirst(root.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
             if relative.hasPrefix(".agents/worktrees") || relative == ".git" || relative.hasPrefix(".git/") { return nil }
+            var isDirectory: ObjCBool = false
+            _ = FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
+            if ignored.skips(relative, isDirectory: isDirectory.boolValue) { return nil }
             return relative
         })
         guard !folders.isEmpty else { return }

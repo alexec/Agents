@@ -111,6 +111,7 @@ struct EventsListView: View {
         .task(id: Ask(filter: filter, connected: model.isConnected)) {
             if model.isConnected { await model.refreshEvents(filter) }
         }
+        .onDisappear { model.work.clearEvents() }
         .sheet(item: $picked) { event in
             EventSheet(event: event, scopeName: scopeName(event.scope))
         }

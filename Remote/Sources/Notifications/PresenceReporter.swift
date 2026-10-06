@@ -19,6 +19,7 @@ final class PresenceReporter {
     private var last: (watching: UUID?, active: Bool, showing: UUID?)?
     private var active = false
     private var watching: UUID?
+    private var tail: Task<Void, Never>?
 
     init(report: @escaping Report) {
         self.report = report
@@ -44,7 +45,9 @@ final class PresenceReporter {
         if !force, let last, last.watching == now.watching, last.active == now.active,
            last.showing == now.showing { return }
         last = now
-        Task {
+        let previous = tail
+        tail = Task {
+            await previous?.value
             let settings = await UNUserNotificationCenter.current().notificationSettings()
             let mayNotify: Bool?
             switch settings.authorizationStatus {

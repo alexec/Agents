@@ -132,10 +132,10 @@ extension FileMention {
 /// every keystroke and on a phone's behalf, and a `Process` is not something the kit may
 /// start on iOS. Getting one of those wrong only means a file is offered that git would
 /// have hidden, which is how every search behaved before this.
-struct MentionIgnore {
+public struct MentionIgnore {
     /// Folders that are build output in every project this app has met, whatever the
     /// project's `.gitignore` says, or whether it has one.
-    static let alwaysSkipped: Set<String> = [
+    public static let alwaysSkipped: Set<String> = [
         ".git", "node_modules", ".build", "build", "DerivedData", "Pods", ".swiftpm",
     ]
 
@@ -154,7 +154,7 @@ struct MentionIgnore {
 
     let rules: [Rule]
 
-    init(folder: URL) {
+    public init(folder: URL) {
         let text = (try? String(contentsOf: folder.appending(path: ".gitignore"), encoding: .utf8)) ?? ""
         self.init(gitignore: text)
     }
@@ -187,7 +187,7 @@ struct MentionIgnore {
     }
 
     /// Whether this path, relative to the folder, is left out.
-    func skips(_ relative: String, isDirectory: Bool) -> Bool {
+    public func skips(_ relative: String, isDirectory: Bool) -> Bool {
         let name = relative.split(separator: "/").last.map(String.init) ?? relative
         if isDirectory, Self.alwaysSkipped.contains(name) { return true }
         return rules.contains { rule in
@@ -200,4 +200,3 @@ struct MentionIgnore {
         }
     }
 }
-

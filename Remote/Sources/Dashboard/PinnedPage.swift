@@ -1,6 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 import UIKit
+import ImageIO
 
 /// A pinned page, pushed over the project page: the live page an agent's files show,
 /// read from the project folder through the Mac. Markdown follows the file and takes
@@ -19,7 +20,9 @@ struct PinnedPage: View {
 
     private var pin: PinView? { model.pins(in: folder).first { $0.path == path } }
     private var url: URL { folder.appending(path: path) }
-    private var revision: Int { model.work.pageRevision(in: folder) }
+    private var revision: Int {
+        model.work.pageRevision(in: folder, path: path, includesDescendants: PinRules.kind(path) == .html)
+    }
 
     var body: some View {
         Group {
@@ -135,7 +138,8 @@ struct PageTileBody: View {
                     if PinRules.kind(file) == .html {
                         HTMLPage(text: text, path: folder.appending(path: file).path(percentEncoded: false),
                                  scope: HTMLPageScope(root: folder.path(percentEncoded: false)),
-                                 allowsScripts: false, folderEvent: model.work.pageRevision(in: folder),
+                                 allowsScripts: false, folderEvent: model.work.pageRevision(
+                                    in: folder, path: file, includesDescendants: PinRules.kind(file) == .html),
                                  read: { [model, folder] path in try await model.readPage(path, in: folder) },
                                  follow: { _ in })
                     } else {
@@ -154,7 +158,8 @@ struct PageTileBody: View {
             Button("Open") { model.openPin = file }
                 .appText(.fine)
         }
-        .task(id: model.work.pageRevision(in: folder)) {
+        .task(id: model.work.pageRevision(in: folder, path: file,
+                                          includesDescendants: PinRules.kind(file) == .html)) {
             do {
                 switch try await model.readPage(file, in: folder, known: stamp) {
                 case .text(let read, _, _, let at):
@@ -182,16 +187,27 @@ final class PhonePagePictures {
     private let model: RemoteModel
     private let folder: URL
     private var held: [URL: Held] = [:]
+    private var recency: [URL] = []
+    private var warning: (any NSObjectProtocol)?
+    private let byteLimit = 64 * 1_024 * 1_024
+    private let entryLimit = 24
+    private var heldBytes = 0
 
     init(model: RemoteModel, folder: URL) {
         self.model = model
         self.folder = folder
+        warning = NotificationCenter.default.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification,
+                                                         object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.clear() }
+        }
     }
+
+    isolated deinit { if let warning { NotificationCenter.default.removeObserver(warning) } }
 
     func stamp(_ url: URL) async -> FileStamp? { await refresh(url)?.stamp }
 
     func image(_ url: URL) async -> UIImage? {
-        if let image = held[url]?.image { return image }
+        if let image = held[url]?.image { touch(url); return image }
         return await refresh(url)?.image
     }
 
@@ -203,13 +219,39 @@ final class PhonePagePictures {
         case .unchanged:
             return known
         case .image(let bytes, _, let stamp):
-            let fresh = Held(stamp: stamp, image: UIImage(data: bytes))
-            held[url] = fresh
+            let source = CGImageSourceCreateWithData(bytes as CFData, nil)
+            let maxPixels = 3_600
+            let cg = source.flatMap { CGImageSourceCreateThumbnailAtIndex($0, 0, [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceThumbnailMaxPixelSize: maxPixels,
+            ] as CFDictionary) }
+            let fresh = Held(stamp: stamp, image: cg.map(UIImage.init(cgImage:)))
+            store(fresh, for: url)
             return fresh
         case .text(_, _, _, let stamp), .other(_, _, let stamp):
             let fresh = Held(stamp: stamp, image: nil)
-            held[url] = fresh
+            store(fresh, for: url)
             return fresh
         }
     }
+
+    private func store(_ value: Held, for url: URL) {
+        if let old = held[url] { heldBytes -= old.image?.cgImage.map { $0.bytesPerRow * $0.height } ?? 0 }
+        held[url] = value
+        touch(url)
+        heldBytes += value.image?.cgImage.map { $0.bytesPerRow * $0.height } ?? 0
+        while (heldBytes > byteLimit || held.count > entryLimit), let first = recency.first {
+            let old = held.removeValue(forKey: first)
+            heldBytes -= old?.image?.cgImage.map { $0.bytesPerRow * $0.height } ?? 0
+            recency.removeFirst()
+        }
+    }
+
+    private func touch(_ url: URL) {
+        recency.removeAll { $0 == url }
+        recency.append(url)
+    }
+
+    private func clear() { held.removeAll(); recency.removeAll(); heldBytes = 0 }
 }

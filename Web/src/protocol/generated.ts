@@ -2020,6 +2020,7 @@ export interface Methods {
   "agents/start": { params: StartRequest; result: UUID };
   "agents/stop": { params: AgentRequest; result: Empty };
   "agents/stopBackground": { params: StopBackgroundRequest; result: JSONValue };
+  "agents/touchedPaths": { params: AgentRequest; result: string[] };
   "agents/transcript": { params: TranscriptRequest; result: TranscriptPage };
   "agents/turns": { params: TurnsRequest; result: TurnsPage };
   "agents/unarchive": { params: AgentRequest; result: Empty };
@@ -2113,6 +2114,7 @@ export const MethodTarget = {
   "agents/start": "host",
   "agents/stop": "host",
   "agents/stopBackground": "host",
+  "agents/touchedPaths": "host",
   "agents/transcript": "host",
   "agents/turns": "host",
   "agents/unarchive": "host",

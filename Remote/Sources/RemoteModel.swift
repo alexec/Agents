@@ -20,6 +20,8 @@ import Observation
 final class RemoteModel {
     let work = AgentsModel()
     private var labelVocabularies: [URL: [String]] = [:]
+    @ObservationIgnored private var dashboardSummariesLoading = false
+    @ObservationIgnored private var attentionRefreshTask: Task<Void, Never>?
 
     /// Whether the Mac is answering, and when it last did.
     private(set) var isConnected = false
@@ -724,8 +726,7 @@ final class RemoteModel {
     }
 
     func labelSuggestions(in folder: URL) -> [String] {
-        labelVocabularies[Project.standardize(folder)]
-            ?? SessionLabelPolicy.vocabulary(in: folder, agents: work.agents).map(\.value)
+        labelVocabularies[Project.standardize(folder)] ?? []
     }
 
     func loadLabelVocabulary(in folder: URL) async {
@@ -776,7 +777,7 @@ final class RemoteModel {
         StartDraftKeeper.shared.clear(in: folder)
         guard open else { return }
         startDraftID = nil
-        await refreshSnapshot()
+        await loadWholeAgent(id)
         startingIn = nil
         selectedProject = folder
         openWorkflow = nil
@@ -918,23 +919,13 @@ final class RemoteModel {
     func loadTouchedHistory(for agentID: UUID) async {
         guard !touchedHistoryAsked.contains(agentID) else { return }
         touchedHistoryAsked.insert(agentID)
-        var before: Int? = selection == agentID ? work.firstEntryIndex : nil
-        if before == 0 { return }
-        while true {
-            guard let page = try? await client.call(
-                DaemonAPI.Method.agentsTranscript,
-                DaemonAPI.TranscriptRequest(agentID: agentID, before: before, limit: 500),
-                returning: TranscriptPage.self) else {
-                // Try again next time Files opens; the marks are short, not wrong.
-                touchedHistoryAsked.remove(agentID)
-                break
-            }
-            // Added to what is there rather than replacing it: entries trimmed off the
-            // page while this was reading are already in it, and came after these.
-            for entry in page.entries { touchedEarlier[agentID, default: TouchedPaths()].absorb(entry) }
-            guard page.hasMoreBefore else { break }
-            before = page.firstIndex
+        let request = DaemonAPI.AgentRequest(agentID: agentID)
+        guard let paths = try? await client(for: request).call(
+            DaemonAPI.Method.agentsTouchedPaths, request, returning: [String].self) else {
+            touchedHistoryAsked.remove(agentID)
+            return
         }
+        touchedEarlier[agentID] = TouchedPaths(paths: paths)
     }
 
     /// Something is being typed on this device: the prompt, a passage on a page, the
@@ -1609,6 +1600,14 @@ final class RemoteModel {
     func scenePhase(_ phase: ScenePhase) {
         presence?.scenePhase(phase)
         if phase == .active {
+            attentionRefreshTask?.cancel()
+            attentionRefreshTask = Task { [weak self] in
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(300))
+                    guard !Task.isCancelled else { break }
+                    self?.publishAttention()
+                }
+            }
             Task {
                 await goBackNow(.wake)
                 await refreshAttention()
@@ -1616,6 +1615,10 @@ final class RemoteModel {
                 // shut may have been missed; the model is now as true as it can be.
                 publishAttention()
             }
+        } else {
+            attentionRefreshTask?.cancel()
+            attentionRefreshTask = nil
+            publishAttention()
         }
     }
 
@@ -1757,11 +1760,7 @@ final class RemoteModel {
     /// this — a shell printing, a file changing, a runtime's status — and a widget does
     /// not redraw for any of those.
     private static let attentionNotifications: Set<String> = [
-        DaemonAPI.Notification.agentChanged,
-        DaemonAPI.Notification.projectChanged,
         DaemonAPI.Notification.attentionChanged,
-        DaemonAPI.Notification.agentPermission,
-        DaemonAPI.Notification.agentElicitation,
     ]
 
     /// A tap on the widget: `agents://attention` for the body, `agents://agent/<id>` for
@@ -2245,6 +2244,13 @@ final class RemoteModel {
         guard let listed = try? await client.call(DaemonAPI.Method.dashboardSummaries, DaemonAPI.Empty(),
                                                   returning: [DashboardSummary].self) else { return }
         work.replaceDashboardSummaries(listed)
+    }
+
+    func refreshDashboardSummaryIfNeeded(in folder: URL) async {
+        guard work.dashboardSummary(in: folder) == nil, !dashboardSummariesLoading else { return }
+        dashboardSummariesLoading = true
+        defer { dashboardSummariesLoading = false }
+        await refreshDashboardSummaries()
     }
 
     func refreshDashboard(_ folder: URL) async {
@@ -2750,7 +2756,7 @@ final class RemoteModel {
                                         DaemonAPI.ContinueInProjectRequest(agentID: agentID, text: text,
                                                                            attachments: attachments,
                                                                            requestID: UUID())).decode(UUID.self)
-            await refreshAgents()
+            await loadWholeAgent(id)
             if let folder { selectedProject = folder }
             selection = id
             return true
@@ -2771,7 +2777,7 @@ final class RemoteModel {
         }
         do {
             try await sendOnce(DaemonAPI.Method.agentsRecreateWorktree, DaemonAPI.AgentRequest(agentID: agentID))
-            await refreshAgents()
+            await loadWholeAgent(agentID)
         } catch let error as JSONRPCError {
             problem = error.message
         } catch {
