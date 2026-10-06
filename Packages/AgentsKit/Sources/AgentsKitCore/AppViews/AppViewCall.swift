@@ -33,10 +33,12 @@ public struct AppViewCall: Codable, Hashable, Sendable, Identifiable {
     public var state: State
     /// Why it was cancelled, for `ui/notifications/tool-cancelled`.
     public var reason: String?
+    /// The server says this call can feed a pin (#189): the view's menu offers Pin.
+    public var pinnable: Bool?
 
     public init(id: UUID = UUID(), server: String = AppTool.serverName, tool: String,
                 resourceURI: String, arguments: JSONValue? = nil, result: JSONValue? = nil,
-                state: State = .running, reason: String? = nil) {
+                state: State = .running, reason: String? = nil, pinnable: Bool? = nil) {
         self.id = id
         self.server = server
         self.tool = tool
@@ -45,10 +47,16 @@ public struct AppViewCall: Codable, Hashable, Sendable, Identifiable {
         self.result = result
         self.state = state
         self.reason = reason
+        self.pinnable = pinnable
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, server, tool, resourceURI = "resourceUri", arguments, result, state, reason
+        case id, server, tool, resourceURI = "resourceUri", arguments, result, state, reason, pinnable
+    }
+
+    /// The pin this call would make (#189): its view, and the call that feeds it.
+    public var viewPin: ViewPin {
+        ViewPin(server: server, uri: resourceURI, tool: tool, arguments: arguments)
     }
 
     /// The result's text, for the places that read rather than draw: what the model was

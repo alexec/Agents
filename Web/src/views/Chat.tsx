@@ -10,7 +10,7 @@ import { openTurnsHeld, rememberOpen, type Store } from "../model/store";
 import { backgroundAge, backgroundEnded, backgroundNoun, isRunning } from "../model/background";
 import { display, isPersonsAsk, isWorking, type ChatTurn, type Item } from "../model/turns";
 import { toWireDate } from "../protocol/dates";
-import type { Agent, TranscriptEntry } from "../protocol/generated";
+import type { Agent, AppViewCall, TranscriptEntry } from "../protocol/generated";
 import { replace, route } from "../route";
 import { Cards } from "./Cards";
 import { OfflineStrip } from "./OfflineStrip";
@@ -28,6 +28,7 @@ import { CallActionsContext, detailSummaries, detailTitles, TurnView, type CallA
 import { setPane } from "./files/paneState";
 import { focusedEntry } from "../model/focus";
 import { ViewLayerContext } from "./chat/AppView";
+import { viewPin } from "./chat/appViewBridge";
 import { ViewLayer, type ViewActions } from "./chat/viewLayer";
 import { BackToList } from "./BackToList";
 import { comingBackDescription } from "../model/status";
@@ -125,14 +126,17 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   // The chat's views (#187): one layer while the chat is open, its views told and taken down
   // when another chat opens, and when the page leaves the chat.
   const layer = useMemo(() => new ViewLayer(), []);
+  const pinFolder = agent ? projectFolder(agent) : undefined;
   const viewHosting = useMemo(() => {
     const actions: ViewActions = {
       agentID: session,
       call: (method, params) => store.link.call(method, params as never, host) as Promise<unknown>,
       send: (text) => store.prompt(host, session, text, []),
+      // Pin (#189): under the project the chat works in.
+      ...(pinFolder ? { pin: (call: AppViewCall) => store.pinView(host, pinFolder, viewPin(call)) } : {}),
     };
     return { layer, actions };
-  }, [layer, host, session]);
+  }, [layer, host, session, pinFolder]);
   useEffect(() => () => { void layer.tearDownAll("The conversation was closed."); }, [layer, host, session]);
   useEffect(() => () => layer.stop(), [layer]);
   useLayoutEffect(() => {

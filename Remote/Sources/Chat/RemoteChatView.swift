@@ -266,7 +266,8 @@ struct RemoteChatView: View {
             agentID: agent.id,
             call: { [model] method, params in try await model.viewCall(method, params) },
             send: { [model] text in await model.send(text, to: agent.id) },
-            openLink: { [openURL] url in openURL(url) })
+            openLink: { [openURL] url in openURL(url) },
+            pin: { [model] view in await model.pinView(view, in: agent.projectFolder) })
     }
 
     /// The open agent's sandbox card, while it waits (064).

@@ -125,6 +125,10 @@ struct AppViewFullscreen: View {
             HStack(spacing: 8) {
                 Text(host.title).appText(.supporting).fontWeight(.semibold)
                 Spacer(minLength: 0)
+                if let note = host.pinNote {
+                    Text(note).appText(.fine).foregroundStyle(.secondary).lineLimit(2)
+                }
+                AppViewMenu(host: host)
                 Button("Back to the chat") { host.setFullscreen(false) }
                     .buttonStyle(.paper)
                     .appText(.fine)
@@ -161,6 +165,9 @@ private struct AppViewCaption: View {
                 Text("Cancelled").appText(.fine).foregroundStyle(.tertiary)
             }
             Spacer(minLength: 0)
+            if let note = host.pinNote {
+                Text(note).appText(.fine).foregroundStyle(.secondary).lineLimit(2)
+            }
             if host.phase == .ready, !host.isFullscreen {
                 Button {
                     host.setFullscreen(true)
@@ -172,6 +179,30 @@ private struct AppViewCaption: View {
                 .foregroundStyle(.secondary)
                 .help("Show this view in the chat's place")
             }
+            AppViewMenu(host: host)
+        }
+    }
+}
+
+/// The view's menu: Pin to Project (#189), when the call can feed a pin. Nothing else yet,
+/// so no menu at all without it.
+private struct AppViewMenu: View {
+    let host: AppViewHost
+
+    var body: some View {
+        if host.canPin {
+            Menu {
+                Button("Pin to Project") { host.pinToProject() }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .accessibilityLabel("View menu")
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .foregroundStyle(.secondary)
+            .help("Pin this view under the project, opened by the same call")
         }
     }
 }

@@ -18,7 +18,10 @@ extension DaemonCore {
         try requireFolder(project)
         let lead = "Nothing was pinned: "
         let arguments = request.arguments
-        guard let given = pinText(arguments, "path") else { throw pinRefusal(lead + "say which file, in `path`.") }
+        if arguments["view"] != nil { return try pinViewTool(arguments, for: caller, lead: lead) }
+        guard let given = pinText(arguments, "path") else {
+            throw pinRefusal(lead + "say which file, in `path`, or which view, in `view`.")
+        }
         guard let path = agentPinPath(given, for: caller) else {
             throw pinRefusal(lead + "\(given) is not in this project. Give a path in the project folder, "
                 + "relative to it or absolute.")
@@ -35,7 +38,8 @@ extension DaemonCore {
             throw pinRefusal(lead + "there is no file at \(path) in the project folder"
                 + (caller.worktree != nil ? " or in your worktree." : "."))
         }
-        let notes = try pin(path, title: title, first: position == "first", by: pinner(for: caller), in: project, lead: lead)
+        let notes = try pin(PinEntry(path: path, title: title, pinnedBy: pinner(for: caller)), first: position == "first",
+                            in: project, lead: lead)
         var lines = notes
         if !inProject {
             lines.append("\(path) is only in your worktree so far. The pin opens the project folder's copy, "
@@ -51,7 +55,8 @@ extension DaemonCore {
         let lead = "Nothing was unpinned: "
         guard let given = pinText(request.arguments, "path") else { throw pinRefusal(lead + "say which page, in `path`.") }
         var file = try readPinsToChange(project)
-        guard let path = agentPinPath(given, for: caller), let index = file.pins.firstIndex(where: { $0.path == path }) else {
+        guard let path = pinKey(given) ?? agentPinPath(given, for: caller),
+              let index = file.pins.firstIndex(where: { $0.path == path }) else {
             throw pinRefusal(lead + "\(given) is not pinned in this project.")
         }
         let held = file.pins[index].pinnedBy
@@ -74,7 +79,7 @@ extension DaemonCore {
         guard let given = pinText(arguments, "path") else { throw pinRefusal(lead + "say which page, in `path`.") }
         var file = try readPinsToChange(project)
         let paths = file.pins.map(\.path)
-        guard let path = agentPinPath(given, for: caller), paths.contains(path) else {
+        guard let path = pinKey(given) ?? agentPinPath(given, for: caller), paths.contains(path) else {
             throw pinRefusal(lead + "\(given) is not pinned in this project.")
         }
         let rawBefore = pinText(arguments, "before"), rawAfter = pinText(arguments, "after")
@@ -83,7 +88,7 @@ extension DaemonCore {
             throw pinRefusal(lead + "give one of `before`, `after` or `position`.")
         }
         func pinned(_ other: String) throws -> String {
-            guard let found = agentPinPath(other, for: caller), paths.contains(found) else {
+            guard let found = pinKey(other) ?? agentPinPath(other, for: caller), paths.contains(found) else {
                 throw pinRefusal(lead + "\(other) is not pinned in this project.")
             }
             guard found != path else { throw pinRefusal(lead + "a page can't go next to itself.") }
@@ -115,13 +120,18 @@ extension DaemonCore {
     public func pinByPerson(_ request: DaemonAPI.PinRequest) throws -> [PinView] {
         let project = try knownPinProject(request.folder)
         let lead = "Nothing was pinned: "
+        if let view = request.view {
+            if let refusal = AppViewCatalog.pinRefusal(view, testView: offersTestView) { throw pinRefusal(lead + refusal) }
+            _ = try pin(PinEntry(view: view, title: request.title, pinnedBy: .thePerson), first: false, in: project, lead: lead)
+            return pinViews(project)
+        }
         guard let path = personPinPath(request.path, in: project) else {
             throw pinRefusal(lead + "\(request.path) is not in this project.")
         }
         guard pinFileExists(path, in: project) else {
             throw pinRefusal(lead + "there is no file at \(path) in the project folder.")
         }
-        _ = try pin(path, title: request.title, first: false, by: .thePerson, in: project, lead: lead)
+        _ = try pin(PinEntry(path: path, title: request.title, pinnedBy: .thePerson), first: false, in: project, lead: lead)
         return pinViews(project)
     }
 
@@ -129,7 +139,7 @@ extension DaemonCore {
     public func unpinByPerson(_ request: DaemonAPI.PinPathRequest) throws {
         let project = try knownPinProject(request.folder)
         var file = try readPinsToChange(project)
-        let path = personPinPath(request.path, in: project) ?? request.path
+        let path = pinKey(request.path) ?? personPinPath(request.path, in: project) ?? request.path
         guard file.pins.contains(where: { $0.path == path }) else {
             throw pinRefusal("Nothing was unpinned: \(request.path) is not pinned in this project.")
         }
@@ -331,7 +341,7 @@ extension DaemonCore {
     /// read again only when their own files change.
     func pagePaths(_ project: URL) -> [String] {
         let tiles = dashboardStore.readTiles(project).compactMap { $0.tile?.page?.file }.compactMap(PinRules.normalize)
-        return readPins(project).pins.map(\.path) + tiles
+        return readPins(project).pins.filter { $0.view == nil }.map(\.path) + tiles
     }
 
     /// The project's watch saw these folders change: what was read from them is read
@@ -385,6 +395,12 @@ extension DaemonCore {
 
     func pinViews(_ project: URL) -> [PinView] {
         readPins(project).pins.compactMap { entry in
+            if let view = entry.view {
+                let reason = AppViewCatalog.missingReason(view, testView: offersTestView)
+                return PinView(path: view.uri, title: entry.title ?? PinRules.defaultTitle(view), kind: .view,
+                               missing: reason != nil, pinnedBy: pinnerView(entry.pinnedBy, in: project),
+                               view: view, missingReason: reason)
+            }
             guard let kind = PinRules.kind(entry.path) else { return nil }
             return PinView(path: entry.path, title: entry.title ?? PinRules.defaultTitle(entry.path), kind: kind,
                            missing: !pinFileExists(entry.path, in: project),
@@ -437,7 +453,7 @@ extension DaemonCore {
     func writePins(_ file: PinsFile, in project: URL) throws {
         let url = Self.pinsFileURL(project)
         do {
-            if file.pins.isEmpty, file.sessionPins.isEmpty {
+            if file.pins.isEmpty, file.sessionPins.isEmpty, file.unread.isEmpty {
                 try StoreFile.requireWritable(url)
                 if FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) {
                     try FileManager.default.removeItem(at: url)
@@ -455,29 +471,51 @@ extension DaemonCore {
         pinsChanged(project)
     }
 
-    /// Pin or retitle, under the limit. Returns what to say.
-    private func pin(_ path: String, title: String?, first: Bool, by who: Pinner, in project: URL,
-                     lead: String) throws -> [String] {
-        guard PinRules.kind(path) != nil else {
+    /// Pin or retitle, under the limit. Returns what to say. A view pinned again takes the
+    /// new call's arguments.
+    private func pin(_ entry: PinEntry, first: Bool, in project: URL, lead: String) throws -> [String] {
+        let path = entry.path
+        guard entry.view != nil || PinRules.kind(path) != nil else {
             throw pinRefusal(lead + "only a Markdown (.md) or HTML (.html) page can be pinned.")
         }
-        if let title, title.count > PinLimits.titleLength {
+        if let title = entry.title, title.count > PinLimits.titleLength {
             throw pinRefusal(lead + "`title` is at most \(PinLimits.titleLength) characters.")
         }
         var file = try readPinsToChange(project)
         if let index = file.pins.firstIndex(where: { $0.path == path }) {
-            if let title { file.pins[index].title = title }
+            if let title = entry.title { file.pins[index].title = title }
+            if let view = entry.view { file.pins[index].view = view }
             try writePins(file, in: project)
-            return [title == nil ? "\(path) was already pinned." : "\(path) was already pinned; its title is now \u{201C}\(title!)\u{201D}."]
+            return [entry.title.map { "\(path) was already pinned; its title is now \u{201C}\($0)\u{201D}." }
+                ?? "\(path) was already pinned."]
         }
-        guard file.pins.count < PinLimits.perProject else {
-            throw pinRefusal(lead + "this project already has \(PinLimits.perProject) pinned pages, the most it can have. "
-                + "Unpin one first, or ask the person which to unpin.")
+        guard file.pinCount < PinLimits.perProject else {
+            throw pinRefusal(lead + "this project already has \(PinLimits.perProject) pins, pages and views together, "
+                + "the most it can have. Unpin one first, or ask the person which to unpin.")
         }
-        let entry = PinEntry(path: path, title: title, pinnedBy: who)
         if first { file.pins.insert(entry, at: 0) } else { file.pins.append(entry) }
         try writePins(file, in: project)
         return ["Pinned \(path) under the project, in .agents/pins.json in the project folder."]
+    }
+
+    /// `pin_page` with `view` (#189): a view of the agents server, fed by a read-only tool.
+    private func pinViewTool(_ arguments: JSONValue, for caller: Agent, lead: String) throws -> String {
+        let project = caller.projectFolder
+        guard pinText(arguments, "path") == nil else { throw pinRefusal(lead + "give `path` or `view`, not both.") }
+        guard let given = arguments["view"], case .object = given else {
+            throw pinRefusal(lead + "`view` is an object: server, uri, tool and arguments.")
+        }
+        let view = ViewPin(server: given["server"]?.stringValue ?? "", uri: given["uri"]?.stringValue ?? "",
+                           tool: given["tool"]?.stringValue ?? "", arguments: given["arguments"])
+        if let refusal = AppViewCatalog.pinRefusal(view, testView: offersTestView) { throw pinRefusal(lead + refusal) }
+        let position = pinText(arguments, "position")
+        if let position, position != "first", position != "last" {
+            throw pinRefusal(lead + "`position` is first or last.")
+        }
+        let entry = PinEntry(view: view, title: pinText(arguments, "title"), pinnedBy: pinner(for: caller))
+        let notes = try pin(entry, first: position == "first", in: project, lead: lead)
+        return (notes + ["Opening it calls \(view.tool) on the \(view.server) server and draws \(view.uri).", "",
+                         pinsWords(project, for: caller)]).joined(separator: "\n")
     }
 
     /// The numbered pins, for an agent's answer and `read_dashboard`.
@@ -488,8 +526,13 @@ extension DaemonCore {
         let entries = readPins(project).pins
         let lines = pins.enumerated().map { index, pin in
             let yours = entries.first { $0.path == pin.path }?.pinnedBy == mine
-            return "\(index + 1). \(pin.title) — \(pin.path) [\(pin.kind.rawValue)], pinned by "
-                + (yours ? "you" : pinnerWords(pin.pinnedBy)) + (pin.missing ? "; missing from the project folder" : "")
+            let by = ", pinned by " + (yours ? "you" : pinnerWords(pin.pinnedBy))
+            if let view = pin.view {
+                return "\(index + 1). \(pin.title) — \(view.uri) [view of the \(view.server) server, fed by \(view.tool)]"
+                    + by + (pin.missingReason.map { "; missing: \($0)" } ?? "")
+            }
+            return "\(index + 1). \(pin.title) — \(pin.path) [\(pin.kind.rawValue)]"
+                + by + (pin.missing ? "; missing from the project folder" : "")
         }
         return (["Pinned pages (\(pins.count) of \(PinLimits.perProject)), after the Dashboard:"] + lines)
             .joined(separator: "\n")
@@ -527,6 +570,11 @@ extension DaemonCore {
         // The worktree first: it is often inside the project's own `.agents/worktrees/`.
         if agent.worktree != nil, let inTree = PinRules.relative(given, in: agent.cwd) { return inTree }
         return PinRules.relative(given, in: agent.projectFolder)
+    }
+
+    /// A pinned view's key: its `ui://` address, as given (#189).
+    private func pinKey(_ given: String) -> String? {
+        given.hasPrefix("ui://") ? given : nil
     }
 
     private func personPinPath(_ given: String, in project: URL) -> String? {

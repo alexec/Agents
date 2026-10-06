@@ -121,12 +121,12 @@ struct PinsTests {
         }
         try write(s.project, "eleven.md")
         let message = await refusal { try await pin(s, "Lead", ["path": "eleven.md"]) }
-        #expect(message == "Nothing was pinned: this project already has 10 pinned pages, the most it can have. "
-            + "Unpin one first, or ask the person which to unpin.")
+        #expect(message == "Nothing was pinned: this project already has 10 pins, pages and views together, "
+            + "the most it can have. Unpin one first, or ask the person which to unpin.")
         let person = await refusal {
             try await s.core.pinByPerson(DaemonAPI.PinRequest(folder: s.project, path: "eleven.md"))
         }
-        #expect(person?.contains("already has 10 pinned pages") == true)
+        #expect(person?.contains("already has 10 pins") == true)
         // Pinning one already pinned is a retitle, not a new pin.
         let again = try await pin(s, "Lead", ["path": "p3.md", "title": "Three"])
         #expect(again.contains("its title is now"))
@@ -392,6 +392,131 @@ struct PinsTests {
         #expect(read.file.sessionPins.count == PinLimits.sessionsPerProject)
         #expect(read.file.sessionPins.first?.session == one)
         #expect(read.skipped == 4)
+    }
+
+    // MARK: Views (#189)
+
+    private let testView: JSONValue = ["server": "agents", "uri": "ui://agents/test-view", "tool": "show_test_view",
+                                       "arguments": ["note": "pinned"]]
+
+    @Test func anAgentPinsAViewWithItsFeedingCall() async throws {
+        let s = try await setUp([("Lead", false, nil)])
+        await s.core.offerTestView(true)
+        let said = try await pin(s, "Lead", ["view": testView, "title": "Test view"])
+        #expect(said.contains("Pinned ui://agents/test-view"))
+        #expect(said.contains("view of the agents server, fed by show_test_view"))
+        let entry = try #require(try pinsFile(s).pins.first)
+        #expect(entry.view == ViewPin(server: "agents", uri: "ui://agents/test-view", tool: "show_test_view",
+                                      arguments: ["note": "pinned"]))
+        // The file says `view`, never a `path`, for a view pin.
+        let raw = try String(contentsOf: s.project.appending(path: PinsFile.path), encoding: .utf8)
+        #expect(raw.contains("\"view\"") && !raw.contains("\"path\""))
+        let shown = try #require(await s.core.pinViews(s.project).first)
+        #expect(shown.kind == .view && !shown.missing && shown.missingReason == nil)
+        #expect(shown.path == "ui://agents/test-view" && shown.title == "Test view")
+        // Pinned again: the new arguments, still one pin.
+        _ = try await pin(s, "Lead", ["view": ["server": "agents", "uri": "ui://agents/test-view",
+                                               "tool": "show_test_view", "arguments": ["note": "again"]]])
+        #expect(try pinsFile(s).pins.count == 1)
+        #expect(try pinsFile(s).pins.first?.view?.arguments?["note"]?.stringValue == "again")
+        // Moved and unpinned by its address.
+        try write(s.project, "a.md")
+        _ = try await pin(s, "Lead", ["path": "a.md"])
+        _ = try await move(s, "Lead", ["path": "a.md", "before": "ui://agents/test-view"])
+        #expect(try pinsFile(s).pins.map(\.path) == ["a.md", "ui://agents/test-view"])
+        let gone = try await unpin(s, "Lead", ["path": "ui://agents/test-view"])
+        #expect(gone.hasPrefix("Unpinned ui://agents/test-view."))
+    }
+
+    @Test func onlyAReadOnlyToolOfTheAppsOwnServerFeedsAPin() async throws {
+        let s = try await setUp([("Lead", false, nil)])
+        await s.core.offerTestView(true)
+        func refused(_ view: JSONValue) async -> String? { await refusal { try await pin(s, "Lead", ["view": view]) } }
+        let counting = await refused(["server": "agents", "uri": "ui://agents/test-view", "tool": "test_view_count"])
+        #expect(counting?.contains("test_view_count can't feed a pin") == true)
+        let dashboard = await refused(["server": "agents", "uri": "ui://agents/dashboard", "tool": "read_dashboard"])
+        #expect(dashboard == "Nothing was pinned: the Dashboard is already in the sessions column.")
+        let other = await refused(["server": "github", "uri": "ui://github/issues", "tool": "list_issues"])
+        #expect(other?.contains("only the agents server's views can be pinned so far") == true)
+        let big = await refused(["server": "agents", "uri": "ui://agents/test-view", "tool": "show_test_view",
+                                 "arguments": ["note": .string(String(repeating: "x", count: 3000))]])
+        #expect(big?.contains("at most 2 KB") == true)
+        let person = await refusal {
+            try await s.core.pinByPerson(DaemonAPI.PinRequest(
+                folder: s.project, view: ViewPin(server: "agents", uri: "ui://agents/dashboard", tool: "read_dashboard")))
+        }
+        #expect(person?.contains("already in the sessions column") == true)
+        #expect(!FileManager.default.fileExists(atPath: s.project.appending(path: PinsFile.path).path))
+    }
+
+    @Test func theLimitCountsPagesAndViewsTogether() async throws {
+        let s = try await setUp([("Lead", false, nil)])
+        await s.core.offerTestView(true)
+        for index in 0..<9 {
+            try write(s.project, "p\(index).md")
+            _ = try await pin(s, "Lead", ["path": .string("p\(index).md")])
+        }
+        _ = try await s.core.pinByPerson(DaemonAPI.PinRequest(
+            folder: s.project, view: ViewPin(server: "agents", uri: "ui://agents/test-view", tool: "show_test_view")))
+        try write(s.project, "eleven.md")
+        let message = await refusal { try await pin(s, "Lead", ["path": "eleven.md"]) }
+        #expect(message?.contains("already has 10 pins, pages and views together") == true)
+        // The person unpins the view by its address.
+        try await s.core.unpinByPerson(DaemonAPI.PinPathRequest(folder: s.project, path: "ui://agents/test-view"))
+        #expect(try pinsFile(s).pins.count == 9)
+    }
+
+    @Test func aViewThisHostCannotDrawShowsAsMissingWithWhy() async throws {
+        let s = try await setUp([("Lead", false, nil)])
+        let file = PinsFile(pins: [
+            PinEntry(view: ViewPin(server: "github", uri: "ui://github/issues", tool: "list_issues"), pinnedBy: .thePerson),
+            PinEntry(view: ViewPin(server: "agents", uri: "ui://agents/test-view", tool: "show_test_view"), pinnedBy: .thePerson),
+        ])
+        try FileManager.default.createDirectory(at: s.project.appending(path: ".agents"), withIntermediateDirectories: true)
+        try file.fileData().write(to: s.project.appending(path: PinsFile.path))
+        // The test view is not offered on this host.
+        let shown = await s.core.pinViews(s.project)
+        #expect(shown.map(\.missingReason) == [PinMissing.serverNotSetUp, PinMissing.noSuchView])
+        #expect(shown.allSatisfy { $0.missing })
+        #expect(shown.first?.title == "Issues")
+        await s.core.offerTestView(true)
+        #expect(await s.core.pinViews(s.project).map(\.missing) == [true, false])
+        let words = await s.core.pinsWords(s.project, for: nil)
+        #expect(words.contains("missing: server not set up here"))
+    }
+
+    @Test func anEntryThisBuildCannotReadIsKeptAndCounted() async throws {
+        let s = try await setUp([("Lead", false, nil)])
+        try write(s.project, "a.md")
+        let raw = #"{"pins":[{"path":"a.md","pinned_by":{"person":true}},{"widget":{"kind":"later"},"pinned_by":{"person":true}}]}"#
+        try FileManager.default.createDirectory(at: s.project.appending(path: ".agents"), withIntermediateDirectories: true)
+        try Data(raw.utf8).write(to: s.project.appending(path: PinsFile.path))
+        #expect(await s.core.pinViews(s.project).map(\.path) == ["a.md"])
+        try write(s.project, "b.md")
+        _ = try await pin(s, "Lead", ["path": "b.md"])
+        let file = try pinsFile(s)
+        #expect(file.pins.map(\.path) == ["a.md", "b.md"])
+        #expect(file.unread.count == 1 && file.pinCount == 3)
+        #expect(file.unread.first?["widget"]?["kind"]?.stringValue == "later")
+    }
+
+    @Test func aPinnedViewIsFedOnlyByAReadOnlyTool() async throws {
+        let s = try await setUp([])
+        await s.core.offerTestView(true)
+        func feed(_ name: String) async throws -> JSONValue {
+            try await s.core.callFromView(DaemonAPI.ViewCallRequest(
+                agentID: UUID(), viewID: UUID(), name: name, arguments: ["note": "pinned"], project: s.project, feed: true))
+        }
+        guard AppViewCatalog.offersTestView else {
+            // The catalog's own tools are read from the daemon's environment.
+            let refused = await refusal { try await feed("dashboard_action") }
+            #expect(refused?.contains("can't feed a pinned view") == true)
+            return
+        }
+        let fed = try await feed("show_test_view")
+        #expect(fed["structuredContent"]?["note"]?.stringValue == "pinned")
+        let refused = await refusal { try await feed("test_view_count") }
+        #expect(refused?.contains("can't feed a pinned view") == true)
     }
 }
 

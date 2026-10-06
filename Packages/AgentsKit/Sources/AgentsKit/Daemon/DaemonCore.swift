@@ -157,6 +157,8 @@ public actor DaemonCore {
     var runningViews: [UUID: [UUID: AppViewCall]] = [:]
     /// The test view's count, by agent (#187).
     var viewCounts: [UUID: Int] = [:]
+    /// Whether the test view can be pinned (#189): the daemon's environment, or a test's say.
+    var offersTestView = AppViewCatalog.offersTestView
     /// What each view last asked the agent to know (`ui/update-model-context`), by agent
     /// and view, as the words told with the person's next message. Memory only.
     var viewContexts: [UUID: [UUID: String]] = [:]
