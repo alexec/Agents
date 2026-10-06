@@ -328,6 +328,11 @@ public enum PinMissing {
     public static let serverNotSetUp = "server not set up here"
     public static let waitingForApproval = "waiting for approval"
     public static let noSuchView = "no such view"
+    /// A stdio server's: views from local servers aren't shown yet (#191, Q5).
+    public static let localServer = "views from local servers aren't shown yet"
+    public static let missingSecret = "a secret is missing"
+    /// It wants a sign-in first (#306).
+    public static let signIn = "needs a sign-in"
 }
 
 /// Who pinned it, named for a person.

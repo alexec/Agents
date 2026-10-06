@@ -2638,6 +2638,18 @@ final class AppModel {
         }
     }
 
+    /// Ask Again for a server's views (#191): forget the person's Show or Don't Show.
+    func forgetMCPViews(_ name: String, at destination: DaemonAPI.SkillDestination) async -> Bool {
+        do {
+            _ = try await client.call(DaemonAPI.Method.mcpForgetViews,
+                                      DaemonAPI.MCPViewsForgetRequest(destination: destination, name: name),
+                                      returning: DaemonAPI.Empty.self)
+            return true
+        } catch {
+            return false
+        }
+    }
+
     /// Approve the entry the row showed. A digest that no longer matches comes back as an error.
     func approveProjectMCP(_ name: String, digest: String, in folder: URL) async -> DaemonAPI.MCPCatalogError? {
         do {

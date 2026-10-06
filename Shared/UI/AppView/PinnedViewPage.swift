@@ -88,7 +88,8 @@ struct PinnedViewPage: View {
         guard pin.missingReason == nil else { return }
         do {
             answer = try await call(DaemonAPI.Method.viewsCall, try JSONValue.encoding(DaemonAPI.ViewCallRequest(
-                agentID: place, viewID: place, name: view.tool, arguments: view.arguments, project: folder, feed: true)))
+                agentID: place, viewID: place, name: view.tool, arguments: view.arguments, project: folder, feed: true,
+                server: view.server == AppTool.serverName ? nil : view.server)))
             problem = nil
         } catch {
             problem = "The view's call did not answer: \(AppViewHost.words(error))"

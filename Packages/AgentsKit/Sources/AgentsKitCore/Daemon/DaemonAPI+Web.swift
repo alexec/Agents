@@ -91,6 +91,7 @@ public extension DaemonAPI {
                 Row(Method.viewsCall, params: ViewCallRequest.self, result: JSONValue.self, kind: .hostRequest),
                 Row(Method.viewsLog, params: ViewLogRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.viewsContext, params: ViewContextRequest.self, result: Empty.self, kind: .hostRequest),
+                Row(Method.viewsShow, params: ViewShowRequest.self, result: Empty.self, kind: .hostRequest),
                 // Acting
                 Row(Method.agentsStart, params: StartRequest.self, result: UUID.self, kind: .hostRequest),
                 // A server's key ask (#344): the pasted key, offered and lent on this browser's

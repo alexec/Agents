@@ -135,6 +135,7 @@ private struct ProjectMCPRow: View {
                     }
                     if needsSignIn { SharedChip(text: "needs sign-in", tone: .attention) }
                     if server.signIn == .signedIn { SharedChip(text: "signed in", tone: .source) }
+                    if let views = viewsWord { SharedChip(text: views, tone: .source) }
                 }
                 Text(detail).appText(.supporting).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                 if let note {
@@ -196,6 +197,17 @@ private struct ProjectMCPRow: View {
                     .buttonStyle(.paper)
                     .appText(.fine)
                 }
+                if server.views != nil {
+                    // Its views asked Show or Don't Show (#191): ask again next time.
+                    Button("Ask Again") {
+                        Task {
+                            if await model.forgetMCPViews(server.name, at: place.destination) { changed() }
+                        }
+                    }
+                    .buttonStyle(.paper)
+                    .appText(.fine)
+                    .help("Ask Show or Don't Show again the next time one of its views is drawn")
+                }
                 if server.managed != nil {
                     Button("Remove…") { removing = true }
                         .buttonStyle(.paper)
@@ -230,6 +242,16 @@ private struct ProjectMCPRow: View {
 
     private var isWaiting: Bool {
         if case .waiting = server.approval { true } else { false }
+    }
+
+    /// What was said about its views (#191).
+    private var viewsWord: String? {
+        switch server.views {
+        case "shown": "views shown"
+        case "hidden": "views not shown"
+        case "mixed": "some views shown"
+        default: nil
+        }
     }
 
     private var icon: String {

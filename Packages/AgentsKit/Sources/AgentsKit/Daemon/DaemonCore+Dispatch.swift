@@ -312,6 +312,11 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.MCPApproveRequest.self)
                 return .success(try JSONValue.encoding(try await mcpApprove(request)))
 
+            case DaemonAPI.Method.mcpForgetViews:
+                let request = try require(params, as: DaemonAPI.MCPViewsForgetRequest.self)
+                try forgetViewAnswers(request)
+                return .success([:])
+
             case DaemonAPI.Method.mcpSetSecret:
                 let request = try require(params, as: DaemonAPI.MCPSetSecretRequest.self)
                 return .success(try JSONValue.encoding(try mcpSetSecret(request)))
@@ -781,7 +786,7 @@ extension DaemonCore {
 
             case DaemonAPI.Method.viewsRead:
                 let request = try require(params, as: DaemonAPI.ViewReadRequest.self)
-                return .success(try JSONValue.encoding(try readView(request)))
+                return .success(try JSONValue.encoding(try await readView(request)))
 
             case DaemonAPI.Method.viewsCall:
                 let request = try require(params, as: DaemonAPI.ViewCallRequest.self)
@@ -795,6 +800,11 @@ extension DaemonCore {
             case DaemonAPI.Method.viewsContext:
                 let request = try require(params, as: DaemonAPI.ViewContextRequest.self)
                 try keepViewContext(request)
+                return .success([:])
+
+            case DaemonAPI.Method.viewsShow:
+                let request = try require(params, as: DaemonAPI.ViewShowRequest.self)
+                try answerViewShow(request)
                 return .success([:])
 
             case DaemonAPI.Method.pinsRead:

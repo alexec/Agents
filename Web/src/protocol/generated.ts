@@ -68,6 +68,7 @@ export const Failure = {
   shellWillNotStart: -32010,
   signInWanted: -32070,
   storeUnavailable: -32094,
+  viewNeedsShow: -32063,
   viewRefused: -32062,
   workflowLimitReached: -32017,
   workflowTurnedOffByPerson: -32041,
@@ -1751,6 +1752,7 @@ export interface ViewCallRequest {
   name: string;
   arguments?: JSONValue;
   feed?: boolean;
+  server?: string;
 }
 
 export interface ViewContextRequest {
@@ -1778,6 +1780,8 @@ export interface ViewPin {
 export interface ViewReadRequest {
   agentID: UUID;
   uri: string;
+  server?: string;
+  project?: URLString;
 }
 
 export interface ViewResource {
@@ -1787,6 +1791,15 @@ export interface ViewResource {
   policy: AppViewPolicy;
   prefersBorder?: boolean;
   variables: Record<string, string>;
+}
+
+export interface ViewShowRequest {
+  agentID: UUID;
+  project?: URLString;
+  server: string;
+  uri: string;
+  hash: string;
+  show: boolean;
 }
 
 export interface Wait {
@@ -2118,6 +2131,7 @@ export interface Methods {
   "views/context": { params: ViewContextRequest; result: Empty };
   "views/log": { params: ViewLogRequest; result: Empty };
   "views/read": { params: ViewReadRequest; result: ViewResource };
+  "views/show": { params: ViewShowRequest; result: Empty };
   "workflows/approve": { params: WorkflowApproveRequest; result: WorkflowSummary };
   "workflows/archive": { params: WorkflowArchiveRequest; result: WorkflowSummary };
   "workflows/enable": { params: WorkflowEnableRequest; result: WorkflowSummary };
@@ -2216,6 +2230,7 @@ export const MethodTarget = {
   "views/context": "host",
   "views/log": "host",
   "views/read": "host",
+  "views/show": "host",
   "workflows/approve": "host",
   "workflows/archive": "host",
   "workflows/enable": "host",
@@ -2440,12 +2455,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   TurnsRequest: { required: ["agentID", "limit"], optional: ["before"] },
   UnqueueRequest: { required: ["agentID", "promptID"], optional: [] },
   Usage: { required: ["used", "size", "at"], optional: ["cost"] },
-  ViewCallRequest: { required: ["agentID", "viewID", "name"], optional: ["project", "arguments", "feed"] },
+  ViewCallRequest: { required: ["agentID", "viewID", "name"], optional: ["project", "arguments", "feed", "server"] },
   ViewContextRequest: { required: ["agentID", "viewID"], optional: ["uri", "content", "structuredContent"] },
   ViewLogRequest: { required: ["agentID", "viewID"], optional: ["level", "data"] },
   ViewPin: { required: ["server", "uri", "tool"], optional: ["arguments"] },
-  ViewReadRequest: { required: ["agentID", "uri"], optional: [] },
+  ViewReadRequest: { required: ["agentID", "uri"], optional: ["server", "project"] },
   ViewResource: { required: ["uri", "mimeType", "html", "policy", "variables"], optional: ["prefersBorder"] },
+  ViewShowRequest: { required: ["agentID", "server", "uri", "hash", "show"], optional: ["project"] },
   Wait: { required: ["agentID", "nameAtReport"], optional: ["ending"] },
   WaitEnding: { required: ["at", "how"], optional: [] },
   WaitStatus: { required: ["line", "mark", "cancellable"], optional: [] },
