@@ -150,6 +150,10 @@ struct MCPEntryBuilder: Sendable {
             return Built(nameHere: nameHere, chosenRun: .docker, commandOrURL: command, hostLabel: nil,
                          entry: entry, variables: variables,
                          transport: .stdio(command: "docker", args: args, env: Dictionary(uniqueKeysWithValues: env)))
+
+        case .command:
+            // Only a server added by hand runs as a command of its own (#305).
+            throw DaemonAPI.MCPCatalogError.noRunnableWay
         }
     }
 

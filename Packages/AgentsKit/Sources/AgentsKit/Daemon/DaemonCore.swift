@@ -632,6 +632,12 @@ public actor DaemonCore {
     var mcpRegistrySession: URLSession = .shared
     var mcpRegistryEndpoints = MCPRegistryEndpoints.from(environment: ProcessInfo.processInfo.environment)
     lazy var mcpPreviewStore = MCPPreviewStore()
+    /// Servers added by hand that answered Verify, until added (#305).
+    lazy var mcpVerifiedStore = MCPVerifiedStore()
+    /// How long Verify waits for a server's answers (#305). A test makes it short.
+    var mcpVerifyTimeout: Duration = .seconds(20)
+    /// What Verify sends http through. A test stands a server in.
+    var mcpVerifyHTTP: MCPClient.HTTPSend?
     #endif
     /// The single ticker. One for the daemon, not one per workflow: see
     /// `tickWorkflows` for why it reads the wall clock rather than sleeping until due.

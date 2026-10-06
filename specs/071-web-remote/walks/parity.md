@@ -265,7 +265,7 @@ The deltas are tracked by 29 issues:
 |---|---|---|---|---|
 | Settings (General, Appearance, Agent Runtimes, Shared, Limits, Resources, Control plane) | `A/Settings/SettingsWindow.swift` | None | None | **by design** (the Mac's) |
 | Project Settings (helper limits, disk lines, MCP, plugins, skills, worktrees; #64, #97, #126, #195) | `A/Projects/ProjectSettingsSheet.swift` | None | None | **by design** |
-| Add an MCP server, a skill, plugins (059) | `A/Catalog/` | None | None | **by design** |
+| Add an MCP server (from the registry, or by hand with Verify, #305), a skill, plugins (059) | `A/Catalog/` | None | None | **by design** |
 | Light and dark | System / Light / Dark: `A/Settings/AppearanceSettingsView.swift` | The system's | `prefers-color-scheme`: `W/theme/paper.css:48` | **by design** (a setting) |
 | The accent (#156) | AccentColor | AccentColor | `--accent`, the same values | **same** |
 | What agents call you (#121) | Settings ▸ General | None | None | **by design** |

@@ -126,8 +126,8 @@ recorded as met.** It can run beside Phase 4.
 
 T041–T046 are daemon-only groundwork. They can start early in a lane of their own.
 
-- [ ] T041 [P] [US4] Move `RouteProcess`'s spawning out of `AK/MCP/MCPBridge.swift` into a portable `AK/MCP/MCPStdioProcess.swift` (Linux too: no `Network`), with the same scrubbed `RuntimeEnvironment.forRuntimes()`, the server's env, cwd and stderr discarded. `MCPBridge` uses it
-- [ ] T042 [US4] Add `AK/MCP/MCPClient.swift` with stdio (through `MCPStdioProcess`) and streamable HTTP (`URLSession`, its own `Mcp-Session-Id`, the configured headers). `initialize` advertises `extensions["io.modelcontextprotocol/ui"] = {mimeTypes: ["text/html;profile=mcp-app"]}`; then `tools/list`, `resources/list`, `resources/read` and `tools/call` (60 s timeout). `-32601` on optional methods is tolerated. sse is refused for views
+- [x] T041 [P] [US4] Move `RouteProcess`'s spawning out of `AK/MCP/MCPBridge.swift` into a portable `AK/MCP/MCPStdioProcess.swift` (Linux too: no `Network`), with the same scrubbed `RuntimeEnvironment.forRuntimes()`, the server's env, cwd and stderr discarded. `MCPBridge` uses it
+- [x] T042 [US4] Add `AK/MCP/MCPClient.swift` with stdio (through `MCPStdioProcess`) and streamable HTTP (`URLSession`, its own `Mcp-Session-Id`, the configured headers). `initialize` advertises `extensions["io.modelcontextprotocol/ui"] = {mimeTypes: ["text/html;profile=mcp-app"]}`; then `tools/list`, `resources/list`, `resources/read` and `tools/call` (60 s timeout). `-32601` on optional methods is tolerated. sse is refused for views
 - [ ] T043 [US4] Add `AK/MCP/MCPClientPool.swift`, on the host that runs the project:
   - at most 4 clients a host, least recently used ended first;
   - one start in flight per server;
@@ -142,7 +142,7 @@ T041–T046 are daemon-only groundwork. They can start early in a lane of their 
   - the result from `rawOutput.result`, from `rawOutput.structuredContent`/`contents`, or from a JSON-string `rawOutput`.
 
   Tests in `Tests/AgentsKitTests/Unit/ACPToolShapeTests.swift`, built from the #186 wire logs in `specs/research/186-mcp-apps-acp-probe/`
-- [ ] T046 [P] [US4] Add a sentinel test in `Tests/AgentsKitTests/Unit/MCPClientLoggingTests.swift`: a server whose command, args, env, headers and URL hold a sentinel, driven through connect, read, call and end, leaves no sentinel in the daemon log (054 FR-023)
+- [x] T046 [P] [US4] Add a sentinel test in `Tests/AgentsKitTests/Unit/MCPClientLoggingTests.swift`: a server whose command, args, env, headers and URL hold a sentinel, driven through connect, read, call and end, leaves no sentinel in the daemon log (054 FR-023)
 - [ ] T047 [US4] Review the template: hash each server's `ui://` resources (uri, mimeType, text, `_meta.ui`) into a `views` section of `<root>/mcp-approvals.json`, in `AK/Catalog/MCPApprovals.swift`. A new or changed hash makes `views/read` answer "needs Show" until the person answers. Personal servers are included (Q6)
 - [ ] T048 [US4] Give `views/read`, `views/call` and `views/log` a `server` in `AKC/AppViews/AppViewsWire.swift` and `AK/AppViews/DaemonCore+AppViews.swift`. `views/call` is passed through only when the server is the held `AppViewCall.server` and the catalog says `app`; a cross-server or `agents` tool from a third-party view is refused and logged. `resources/read` is same-server only. Each policy is logged on read
 - [ ] T049 [US4] Write `appView` entries for third-party calls in the ACP update path (`AK/ACP/ACPSession.swift`, the tool_call and tool_call_update handling) through `ACPToolShape`, only when the catalog says the tool has a view. A text-only result is pinned only (Q7). A model's tool is never called again
