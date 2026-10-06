@@ -113,19 +113,42 @@ final class RemoteModel {
     let files: RemoteFiles
     let panes = RemotePanes()
     let pictures: PhonePictures
-    /// This device's end of each agent's shell it has opened (034). The shell is the
-    /// Mac's; these only know how to reach it.
-    @ObservationIgnored private var shells: [UUID: ShellClient] = [:]
+    /// This device's end of each of an agent's shells it has opened (034), one per
+    /// terminal tab (055, #345). The shells are the Mac's; these only know how to reach them.
+    @ObservationIgnored private var shells: [ShellKey: ShellClient] = [:]
     /// When this device last asked to warm each session, and why (#183).
     @ObservationIgnored private var prewarmed: [String: Date] = [:]
 
-    func shellClient(for agentID: UUID) -> ShellClient {
-        if let existing = shells[agentID] { return existing }
-        let fresh = ShellClient(agentID: agentID, client: client, describe: { error in
+    struct ShellKey: Hashable {
+        let agentID: UUID
+        let shell: Int
+    }
+
+    func shellClient(for agentID: UUID, shell: Int = 0) -> ShellClient {
+        let key = ShellKey(agentID: agentID, shell: shell)
+        if let existing = shells[key] { return existing }
+        let fresh = ShellClient(agentID: agentID, shell: shell, client: client, describe: { error in
             (error as? JSONRPCError)?.message ?? "Your Mac is not answering."
         })
-        shells[agentID] = fresh
+        shells[key] = fresh
         return fresh
+    }
+
+    /// The shells the Mac holds for an agent, so the pane opens with the tabs the window
+    /// has (055). Nil from a daemon too old to hold more than one, and the pane then
+    /// offers only the one.
+    func shellNumbers(for agentID: UUID) async -> [Int]? {
+        let response = try? await client.call(DaemonAPI.Method.shellList, DaemonAPI.AgentRequest(agentID: agentID),
+                                              returning: DaemonAPI.ShellListResponse.self)
+        return response?.shells
+    }
+
+    /// The person closed a terminal tab: the shell ends, on the Mac too, and this
+    /// device forgets it.
+    func closeShell(agentID: UUID, shell: Int) async {
+        let client = shellClient(for: agentID, shell: shell)
+        shells[ShellKey(agentID: agentID, shell: shell)] = nil
+        await client.close()
     }
 
 
@@ -1374,14 +1397,12 @@ final class RemoteModel {
         // The Mac sends a device only the shells it has open (034).
         if notification.method == DaemonAPI.Notification.shellOutput,
            let params = notification.params,
-           let output = DaemonAPI.ShellOutputNotification(params: params),
-           output.shell == 0 {
-            self.shells[output.agentID]?.received(output.bytes)
+           let output = DaemonAPI.ShellOutputNotification(params: params) {
+            self.shells[ShellKey(agentID: output.agentID, shell: output.shell)]?.received(output.bytes)
         }
         if notification.method == DaemonAPI.Notification.shellStateChanged,
-           let change = try? notification.params?.decode(DaemonAPI.ShellStateNotification.self),
-           change.shell == 0 {
-            self.shells[change.agentID]?.received(change.state)
+           let change = try? notification.params?.decode(DaemonAPI.ShellStateNotification.self) {
+            self.shells[ShellKey(agentID: change.agentID, shell: change.shell)]?.received(change.state)
         }
         if notification.method == DaemonAPI.Notification.filesChanged,
            let change = try? notification.params?.decode(DaemonAPI.FilesChangedNotification.self) {

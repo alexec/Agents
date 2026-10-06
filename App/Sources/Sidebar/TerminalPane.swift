@@ -17,7 +17,13 @@ struct TerminalPane: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ShellTabs(state: state, open: open, close: close)
+            ShellTabs(shells: state.shells, front: state.frontShell,
+                      canOpenMore: state.canOpenMoreShells,
+                      select: { shell in
+                          state.frontShell = shell
+                          state.shellToFocus = shell
+                      },
+                      open: open, close: close)
             Divider()
             // Every tab's screen is built and the hidden ones kept alive, as the panes
             // are, so a tab comes back with its screen and scrollback as it was.
@@ -58,100 +64,6 @@ struct TerminalPane: View {
             state.shellToFocus = state.frontShell
         }
         Task { await model.closeShell(agentID: agent.id, shell: shell) }
-    }
-}
-
-/// The row of tabs over the screen, with the button that opens another.
-private struct ShellTabs: View {
-    let state: AgentPaneState
-    let open: () -> Void
-    let close: (Int) -> Void
-
-    var body: some View {
-        HStack(spacing: 4) {
-            // More tabs than fit scroll sideways, and the one on top is kept in view:
-            // a tab just opened at the end of a narrow column is otherwise off the edge.
-            ScrollViewReader { reader in
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 4) {
-                        ForEach(Array(state.shells.enumerated()), id: \.element) { position, shell in
-                            ShellTab(title: "Shell \(position + 1)",
-                                     isFront: state.frontShell == shell,
-                                     canClose: state.shells.count > 1,
-                                     select: {
-                                         state.frontShell = shell
-                                         state.shellToFocus = shell
-                                     },
-                                     close: { close(shell) })
-                            .id(shell)
-                        }
-                    }
-                }
-                .onChange(of: state.frontShell) { _, front in
-                    withAnimation { reader.scrollTo(front) }
-                }
-            }
-            Button(action: open) {
-                Image(systemName: "plus")
-                    .frame(width: 22, height: 22)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.borderless)
-            .accessibilityLabel("New shell")
-            .disabled(!state.canOpenMoreShells)
-            .help(state.canOpenMoreShells
-                  ? "New shell"
-                  : "This agent's machine runs an older helper that holds one shell per agent.")
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-    }
-}
-
-/// One tab. The whole tab is the button that brings it forward; the close mark shows
-/// on the front tab and under the pointer, and only when there is another to fall
-/// back to.
-private struct ShellTab: View {
-    let title: String
-    let isFront: Bool
-    let canClose: Bool
-    let select: () -> Void
-    let close: () -> Void
-
-    @State private var isHovered = false
-
-    var body: some View {
-        Button(action: select) {
-            HStack(spacing: 6) {
-                Text(title)
-                    .appText(.supporting)
-                    .foregroundStyle(isFront ? .primary : .secondary)
-                if canClose {
-                    // Room is kept for the mark whether or not it shows, so tabs do
-                    // not shift under the pointer.
-                    Button(action: close) {
-                        Image(systemName: "xmark")
-                            .appText(.fine)
-                            .frame(width: 14, height: 14)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.borderless)
-                    .opacity(isFront || isHovered ? 1 : 0)
-                    .help("Close this shell")
-                }
-            }
-            .padding(.leading, 10)
-            .padding(.trailing, canClose ? 6 : 10)
-            .padding(.vertical, 4)
-            .background(isFront ? Paper.wash : (isHovered ? Paper.well : .clear),
-                        in: RoundedRectangle(cornerRadius: 6))
-            .contentShape(RoundedRectangle(cornerRadius: 6))
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovered = $0 }
-        // The mark is inside the tab's button, where accessibility cannot reach it on
-        // its own, so closing is offered on the tab as well.
-        .accessibilityAction(named: "Close") { if canClose { close() } }
     }
 }
 

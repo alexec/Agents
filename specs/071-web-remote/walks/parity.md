@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 212 rows: **142 same**, **40 by design**, **30 delta** (after #188, #189, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 212 rows: **142 same**, **40 by design**, **30 delta** (after #188, #189, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -200,7 +200,7 @@ The deltas are tracked by 29 issues:
 |---|---|---|---|---|
 | Worktree list, Remove…, Clean up | Project Settings ▸ Worktrees: `A/Projects/WorktreeRow.swift` | None | None | **by design** (Project Settings are the Mac's) |
 | Recreate a removed worktree (#119) | `A/Chat/MissingFolderStrip.swift:29-35` | `R/Chat/RemoteMissingFolderStrip.swift:24-26` | `W/views/MissingFolder.tsx:22-23` | **same** |
-| Files: a tree, or a folder at a time (#133) | A tree: `A/Sidebar/FilesPane.swift:292-375` | A folder at a time: `R/Panes/FilesPane.swift:103-260` | A tree from 760 px: `W/views/files/Tree.tsx:25` | **by design** (phone width). The iPad: #267 |
+| Files: a tree, or a folder at a time (#133, #345) | A tree: `A/Sidebar/FilesPane.swift`, rows `S/Files/FileTreeRow.swift`, reads `K/Files/FileTreeReads.swift` | A tree on a regular-width iPad, the same rows and reads; a folder at a time on the phone: `R/Panes/FilesPane.swift` | A tree from 760 px: `W/views/files/Tree.tsx:25` | **by design** (a phone's width has no room for the indents; the iPad and the page draw the tree, #345) |
 | Change marks in Files (#63) | Square, +N −M, folder totals: `A/Sidebar/FilesPane.swift:420-474` | Square status marks, +N −M and folder totals: `R/Panes/FilesPane.swift` | `W/views/FilesPane.tsx:50-115` | **same** |
 | Changes: tree, squares, total (#63) | `A/Sidebar/ChangesPane.swift:93-199` | Tree, status marks and total: `R/Panes/RemoteChangesPane.swift` | `W/views/Changes.tsx:69-143` | **same** |
 | Changes: *may include other agents' work* | `A/Sidebar/ChangesPane.swift:142, 185-192` | Says git may include others' work: `R/Panes/RemoteChangesPane.swift` | The window's two sentences: `W/views/Changes.tsx` | **same** |
@@ -216,7 +216,7 @@ The deltas are tracked by 29 issues:
 | Writing a file: the live Markdown page only | `A/Sidebar/FilesPane.swift:501-506` | `R/Panes/PagePane.swift` | `W/views/LiveDocument.tsx` | **same** |
 | Search in files | None | None | None | **same** |
 | Exchanged documents | `A/Sidebar/ArtifactsPane.swift` | `R/Chat/DocumentView.swift` | `W/views/Exchanged.tsx` (a web address is a link) | **same** |
-| Terminal | Tabs (055): `A/Sidebar/TerminalPane.swift` | One shell: `R/Panes/TerminalPane.swift` | None | Web: **by design** (071). The Remote's one shell: #267 |
+| Terminal | Tabs (055): `A/Sidebar/TerminalPane.swift`, `S/Terminal/ShellTabs.swift` | The same tabs, new, switch, close (#345): `R/Panes/TerminalPane.swift` | None | **by design** (web: no terminal on the page, 071) |
 | Browser pane | `A/Sidebar/BrowserPane.swift` | None (FR-030) | None | **by design** (local servers only listen on the Mac) |
 | Open in another app, Show in Finder | `A/Sidebar/OpenElsewhere.swift` | *It can't be shown here.* | *It can't be shown here.* | **by design** |
 

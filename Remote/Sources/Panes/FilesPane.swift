@@ -9,10 +9,15 @@ import SwiftUI
 /// conversation remembers it. A Markdown file goes to the Page. What the agent did to a
 /// file stays one tap away.
 ///
+/// On a regular-width iPad the folder is a tree, as the window's is: folders open in
+/// place and stay open (#345). A phone's width has no room for the indents, so the
+/// phone keeps one folder at a time, as the page does below 760 points.
+///
 /// Read-only, as the Mac's is (FR-016). Nothing here can create, rename or delete.
 struct FilesPane: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.openURL) private var openURL
+    @Environment(\.horizontalSizeClass) private var sizeClass
     let agent: Agent
 
     private enum Listed: Equatable {
@@ -35,10 +40,17 @@ struct FilesPane: View {
     /// The file the person just chose from a row, which is in view already.
     @State private var chosenFromRow: URL?
     @State private var changeIndex = ChangeTree.Index()
+    /// The tree's folders, read as the window reads its own (#345).
+    @State private var reads = FileTreeReads()
 
     private var state: PaneState { model.panes.state(for: agent.id) }
     private var folder: URL { state.folder ?? agent.cwd }
     private var isAtTop: Bool { folder.standardizedFileURL == agent.cwd.standardizedFileURL }
+    /// A tree on a regular-width iPad, a folder at a time on a phone.
+    private var isTree: Bool { sizeClass == .regular }
+    /// The top of the tree: the agent's folder, with whatever was asked for inside it
+    /// opened down to; or, for something outside it, that folder on its own.
+    private var root: URL { FileTree.isInside(folder, agent.cwd) ? agent.cwd : folder }
 
     var body: some View {
         @Bindable var state = state
@@ -48,7 +60,9 @@ struct FilesPane: View {
             // The folder stays under an open file rather than going, so Back finds it
             // as it was left: scrolled where it was, the file's row marked (#66).
             ZStack {
-                listingView
+                Group {
+                    if isTree { treeView } else { listingView }
+                }
                     .opacity(state.openFile == nil ? 1 : 0)
                     .allowsHitTesting(state.openFile == nil)
                     .accessibilityHidden(state.openFile != nil)
@@ -68,11 +82,30 @@ struct FilesPane: View {
             guard let url else { return }
             state.place.opened(url, fromRow: url == chosenFromRow)
             chosenFromRow = nil
+            // In the tree, opened down to, so Back has it in view.
+            if isTree {
+                reveal(url.deletingLastPathComponent())
+                readUnread()
+            }
         }
-        .task(id: folder) { await relist() }
+        .task(id: Shown(isTree: isTree, folder: folder)) {
+            if isTree {
+                reveal(folder)
+                readTree()
+            } else {
+                await relist()
+            }
+        }
         .task(id: state.openFile) { await reopen() }
         .onChange(of: model.files.changeCount(agentID: agent.id, folder: folder)) {
+            guard !isTree else { return }
             Task { await relist(inBackground: true) }
+        }
+        // The tree shows more than one folder: anything changed under the agent's is
+        // read again, as the window does.
+        .onChange(of: model.files.anyChange[agent.id] ?? 0) {
+            guard isTree else { return }
+            readTree()
         }
         .onChange(of: state.openFile.map { model.files.changeCount(agentID: agent.id, folder: $0.deletingLastPathComponent()) }) {
             Task { await reopen(inBackground: true) }
@@ -81,7 +114,7 @@ struct FilesPane: View {
         // folder it is in, and a read that failed while it was gone gets another go (#62).
         .onChange(of: model.files.reconnections) {
             Task {
-                await relist(inBackground: true)
+                if isTree { readTree() } else { await relist(inBackground: true) }
                 await reopen(inBackground: true)
             }
         }
@@ -112,6 +145,16 @@ struct FilesPane: View {
                     Label("Back", systemImage: "chevron.left").labelStyle(.iconOnly)
                 }
                 .accessibilityHint("Back to the folder")
+            } else if isTree {
+                // The tree opens folders in place: the only way up is out of a folder
+                // outside the agent's, back to its own, as on the Mac.
+                if root.standardizedFileURL != agent.cwd.standardizedFileURL {
+                    Button {
+                        state.folder = nil
+                    } label: {
+                        Label("The agent's folder", systemImage: "house").labelStyle(.iconOnly)
+                    }
+                }
             } else if !isAtTop {
                 Button {
                     state.folder = folder.deletingLastPathComponent()
@@ -120,7 +163,7 @@ struct FilesPane: View {
                 }
                 .accessibilityHint("Up one folder")
             }
-            Text(state.openFile?.lastPathComponent ?? folder.lastPathComponent)
+            Text(state.openFile?.lastPathComponent ?? (isTree ? root : folder).lastPathComponent)
                 .appText(.reading).fontWeight(.medium)
                 .lineLimit(1)
                 .truncationMode(.head)
@@ -220,6 +263,127 @@ struct FilesPane: View {
                 .onChange(of: listing) { bringMarkedIntoView(listing, reader) }
                 .onChange(of: state.place.toScroll) { bringMarkedIntoView(listing, reader) }
             }
+        }
+    }
+
+    // MARK: The tree (#345)
+
+    /// What the folder view is keyed on: a tree or a folder, and which.
+    private struct Shown: Hashable {
+        var isTree: Bool
+        var folder: URL
+    }
+
+    /// The window's tree, on a regular-width iPad: each open folder's entries under it,
+    /// one step in, drawn with the window's rows.
+    @ViewBuilder
+    private var treeView: some View {
+        if let problem = reads.problems[FileTree.key(root)] {
+            Said(message: problem, symbol: "questionmark.folder") { reads.read(root, agentID: agent.id, files: model.files) { readUnread() } }
+        } else if reads.listings[FileTree.key(root)] != nil {
+            let lines = reads.lines(root: root, expanded: state.expanded)
+            let touched = model.touchedPaths(for: agent.id)
+            ScrollViewReader { reader in
+                List {
+                    ForEach(lines) { line in
+                        switch line {
+                        case .entry(let entry, let depth):
+                            treeRow(entry, depth: depth, touched: touched)
+                        case .note(_, let words, let depth):
+                            Text(words)
+                                .appText(.fine)
+                                .foregroundStyle(.secondary)
+                                .padding(.leading, FileTreeRow.indent(depth))
+                                .paperListRow()
+                        case .problem(let folder, let words, let depth):
+                            HStack(spacing: 8) {
+                                Text(words)
+                                    .appText(.fine)
+                                    .foregroundStyle(.secondary)
+                                Button("Try Again") {
+                                    reads.read(folder, agentID: agent.id, files: model.files) { readUnread() }
+                                }
+                                .appText(.fine)
+                                .buttonStyle(.borderless)
+                            }
+                            .padding(.leading, FileTreeRow.indent(depth))
+                            .paperListRow()
+                        }
+                    }
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .onAppear { bringMarkedIntoView(lines, reader) }
+                .onChange(of: lines.map(\.id)) { bringMarkedIntoView(lines, reader) }
+                .onChange(of: state.place.toScroll) { bringMarkedIntoView(lines, reader) }
+            }
+        } else {
+            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    private func treeRow(_ entry: DirectoryEntry, depth: Int, touched: TouchedPaths) -> some View {
+        let key = FileTree.key(entry.url)
+        let isMarked = !entry.isDirectory && state.place.marked == key
+        let changed = entry.isDirectory ? nil : changeIndex.files[entry.url.path]
+        return FileTreeRow(entry: entry, depth: depth,
+                           isOpen: entry.isDirectory && state.expanded.contains(key),
+                           changed: changed, folderTotals: changeIndex.folders[entry.url.path],
+                           touched: !entry.isDirectory && changed == nil && touched.contains(entry.url)) {
+            if entry.isDirectory {
+                toggle(folder: entry.url)
+            } else {
+                chosenFromRow = entry.url
+                // A Markdown file goes to the Page, and Files is drawn again on return.
+                state.place.opened(entry.url, fromRow: true)
+                state.open(file: entry.url, line: nil)
+            }
+        }
+        // The file last open, so Back shows where it is (#66).
+        .listRowBackground(Paper.raised.overlay(isMarked ? Paper.accent.opacity(0.15) : .clear))
+        .accessibilityAddTraits(isMarked ? .isSelected : [])
+    }
+
+    /// Scroll the marked file's row into view, once its folder has been read.
+    private func bringMarkedIntoView(_ lines: [FileTree.Line], _ reader: ScrollViewProxy) {
+        guard state.place.toScroll != nil else { return }
+        var rows: [String: String] = [:]
+        for line in lines {
+            if case .entry(let entry, _) = line, !entry.isDirectory { rows[FileTree.key(entry.url)] = line.id }
+        }
+        guard let key = state.place.scroll(among: rows.keys), let id = rows[key] else { return }
+        // After this pass: a list that has only just appeared has not been laid out.
+        Task { reader.scrollTo(id, anchor: .center) }
+    }
+
+    /// Open a folder in place, or close it. Opening reads it again even when it was
+    /// read before: what it held then may not be what it holds now.
+    private func toggle(folder url: URL) {
+        let key = FileTree.key(url)
+        if state.expanded.contains(key) {
+            state.expanded.remove(key)
+        } else {
+            state.expanded.insert(key)
+            reads.read(url, agentID: agent.id, files: model.files) { readUnread() }
+        }
+    }
+
+    /// Open every folder between the agent's and the one asked for.
+    private func reveal(_ folder: URL) {
+        state.expanded.formUnion(FileTree.opening(to: folder, from: agent.cwd))
+    }
+
+    /// Every folder on screen, read again; the listings up stay until the new ones are in.
+    private func readTree() {
+        for folder in reads.visibleFolders(root: root, expanded: state.expanded) {
+            reads.read(folder, agentID: agent.id, files: model.files) { readUnread() }
+        }
+    }
+
+    /// Every open folder on screen with nothing to show and no read on its way (#62).
+    private func readUnread() {
+        for folder in reads.unread(root: root, expanded: state.expanded) {
+            reads.read(folder, agentID: agent.id, files: model.files) { readUnread() }
         }
     }
 
@@ -347,6 +511,8 @@ struct FilesPane: View {
     private func start() async {
         // A list drawn new starts at the top: the file open, or last open, is found again.
         if let file = state.openFile { state.place.opened(file, fromRow: false) } else { state.place.drawnAfresh() }
+        // In the tree, the file open is found with its folders open (#345).
+        if isTree, let file = state.openFile { reveal(file.deletingLastPathComponent()) }
         await model.files.watch(agentID: agent.id, folder: agent.cwd)
         await model.loadTouchedHistory(for: agent.id)
     }

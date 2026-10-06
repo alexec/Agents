@@ -40,6 +40,9 @@ final class PaneState {
     var pagePath: String?
     /// The folder Files is showing. Nil means the agent's own folder.
     var folder: URL?
+    /// Folders open in the iPad's Files tree, by `FileTree.key` (#345). The phone shows
+    /// a folder at a time and leaves this alone.
+    var expanded: Set<String> = []
     /// The file open in Files, if any.
     var openFile: URL?
     /// The file last open, marked in the folder, and whether the list still has to be
@@ -58,6 +61,14 @@ final class PaneState {
     var scriptsAllowed: Set<String> = []
     /// A file the Changes pane should open when it appears.
     var changesPath: String?
+    /// The terminal tabs, by shell number, left to right, as the window has them (055,
+    /// #345). Filled from the Mac each time the pane is shown, so the phone opens on
+    /// the shells still running rather than only the first.
+    var shells: [Int] = [0]
+    /// The tab on top.
+    var frontShell = 0
+    /// False when the agent's daemon holds only one shell — a server not yet updated.
+    var canOpenMoreShells = true
 
     /// Open a pane, remembering it as the one to come back to.
     func show(_ pane: Pane) {
