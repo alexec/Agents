@@ -1,0 +1,87 @@
+sidebar: sidebar | rows: row activity-row:Events | row activity-row:Resources | row activity-row:Runtimes | row activity-row:Spending | row project:work
+sessions: row activity-row:Events | row activity-row:Resources | row activity-row:Runtimes | row activity-row:Spending | row project:⌄work | row session:!Repo notesnow
+— light
+{
+ "tokens": {
+  "--paper-ground": "#f7f8f9",
+  "--paper-sidebar": "#f0f1f3",
+  "--paper-raised": "#ffffff",
+  "--paper-well": "#f0f2f4",
+  "--paper-wash": "#e7eaee",
+  "--paper-rule": "#dde1e6",
+  "--paper-ink": "#1c1d20",
+  "--paper-muted": "",
+  "--paper-selection": "#d8dee6",
+  "--paper-shadow": "rgb(32 36 42 / 10%)",
+  "--accent": "#5b3be0",
+  "--font-text": "-apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+  "--font-ui": "",
+  "--font-code": "",
+  "--tint-attention": "#ba4a13",
+  "--tint-failure": "#b4232b",
+  "--tint-vouched": "#2d765c"
+ },
+ "body": {
+  "background": "rgb(247, 248, 249)",
+  "color": "rgb(28, 29, 32)",
+  "font": "-apple-system, \"system-ui\", system-ui, sans-serif"
+ },
+ "turn": {
+  "font": "-apple-system, \"system-ui\", system-ui, sans-serif",
+  "size": "15px",
+  "colour": "rgb(28, 29, 32)",
+  "background": "rgba(0, 0, 0, 0)"
+ },
+ "code": {
+  "font": "ui-monospace, \"SF Mono\", Menlo, monospace",
+  "size": "12px",
+  "colour": "rgb(28, 29, 32)",
+  "background": "rgb(240, 242, 244)"
+ },
+ "row": null,
+ "serif": false,
+ "turns": 1
+}
+— dark
+{
+ "tokens": {
+  "--paper-ground": "#1c1d20",
+  "--paper-sidebar": "#161719",
+  "--paper-raised": "#26282c",
+  "--paper-well": "#2a2d31",
+  "--paper-wash": "#33363b",
+  "--paper-rule": "#3a3e44",
+  "--paper-ink": "#e8eaed",
+  "--paper-muted": "",
+  "--paper-selection": "#3a3e44",
+  "--paper-shadow": "rgb(0 0 0 / 10%)",
+  "--accent": "#ab8eff",
+  "--font-text": "-apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+  "--font-ui": "",
+  "--font-code": "",
+  "--tint-attention": "#f0a06b",
+  "--tint-failure": "#f08086",
+  "--tint-vouched": "#8bc6a7"
+ },
+ "body": {
+  "background": "rgb(28, 29, 32)",
+  "color": "rgb(232, 234, 237)",
+  "font": "-apple-system, \"system-ui\", system-ui, sans-serif"
+ },
+ "turn": {
+  "font": "-apple-system, \"system-ui\", system-ui, sans-serif",
+  "size": "15px",
+  "colour": "rgb(232, 234, 237)",
+  "background": "rgba(0, 0, 0, 0)"
+ },
+ "code": {
+  "font": "ui-monospace, \"SF Mono\", Menlo, monospace",
+  "size": "12px",
+  "colour": "rgb(232, 234, 237)",
+  "background": "rgb(42, 45, 49)"
+ },
+ "row": null,
+ "serif": false,
+ "turns": 1
+}
+shot page-dark-steps.png
