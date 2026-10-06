@@ -2811,6 +2811,26 @@ final class RemoteModel {
             problem = "That did not reach your Mac."
         }
     }
+    /// Branch (#342): a new session that carries the history so far, the original left
+    /// alone, as the Mac's row has it. Opened once its host has started it.
+    func fork(_ agentID: UUID) async {
+        guard !isStale(on: work.agent(agentID)?.host ?? .mac) else {
+            problem = "Your Mac is not answering, so that could not be sent."
+            return
+        }
+        let folder = work.agent(agentID)?.projectFolder
+        do {
+            let id = try await sendOnce(DaemonAPI.Method.agentsFork,
+                                        DaemonAPI.AgentRequest(agentID: agentID)).decode(UUID.self)
+            await loadWholeAgent(id)
+            if let folder { selectedProject = folder }
+            selection = id
+        } catch let error as JSONRPCError {
+            problem = error.message
+        } catch {
+            problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
+        }
+    }
     func unarchive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsUnarchive, agentID) }
     /// Park or unpark, whichever `Agent.parkAction` offers (040). From the card's menu.
     func perform(_ action: ParkAction, on agentID: UUID) async {

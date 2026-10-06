@@ -309,7 +309,10 @@ private struct ChatMenu: View {
             .pickerStyle(.inline)
             Divider()
             Button("Exchanged", systemImage: "doc") { model.panes.state(for: agent.id).show(.exchanged) }
-            if agent.state == .archived {
+            if agent.state != .archived {
+                // As the Mac's Session menu has it (#342).
+                BranchAgentButton(agent: agent)
+            } else {
                 Divider()
                 Button("Bring Back", systemImage: "tray.and.arrow.up") {
                     Task { await model.unarchive(agent.id) }

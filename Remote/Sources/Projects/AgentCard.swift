@@ -239,8 +239,8 @@ struct AgentCard: View {
 }
 
 /// A session's long-press menu, wherever its row is drawn: Carry on, Park, Mark as Read
-/// or Unread, Pin and where among the pinned, Archive or Bring Back. The Mac's row menu,
-/// less what the phone leaves to the Mac (Branch, Retire, Show in Finder).
+/// or Unread, Pin and where among the pinned, Branch, Archive or Bring Back. The Mac's row
+/// menu, less what the phone leaves to the Mac (Retire, Show in Finder).
 struct AgentMenuItems: View {
     @Environment(RemoteModel.self) private var model
     let agent: Agent
@@ -284,6 +284,7 @@ struct AgentMenuItems: View {
                 Button("Move Down", systemImage: "arrow.down") { step(1, in: ids) }
                     .disabled(ids.last == agent.id || model.isStale)
             }
+            BranchAgentButton(agent: agent)
             ArchiveAgentButton(agent: agent)
         } else {
             BringBackAgentButton(agent: agent)
@@ -313,6 +314,22 @@ struct PinAgentButton: View {
             Label(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin")
         }
         .disabled(model.isStale)
+    }
+}
+
+/// Branch (#342): in a row's menu, and the chat's. Branching leaves the original alone
+/// and carries the history so far.
+struct BranchAgentButton: View {
+    @Environment(RemoteModel.self) private var model
+    let agent: Agent
+
+    var body: some View {
+        Button {
+            Task { await model.fork(agent.id) }
+        } label: {
+            Label("Branch", systemImage: "arrow.triangle.branch")
+        }
+        .disabled(model.isStale(agent))
     }
 }
 
