@@ -1380,6 +1380,11 @@ export interface SessionNotice {
   detail?: string;
 }
 
+export interface SetCeilingRequest {
+  agentID: UUID;
+  ceiling?: Cost;
+}
+
 export interface SetLabelsRequest {
   agentID: UUID;
   add: string[];
@@ -1390,6 +1395,11 @@ export interface SetOptionRequest {
   agentID: UUID;
   optionID: string;
   value: JSONValue;
+}
+
+export interface SetSandboxRequest {
+  agentID: UUID;
+  choice?: SandboxChoice;
 }
 
 export interface SetUnreadRequest {
@@ -2002,8 +2012,10 @@ export interface Methods {
   "agents/resuming": { params: Empty; result: ResumingResponse };
   "agents/retired": { params: RetiredRequest; result: Tombstone[] };
   "agents/sendNow": { params: UnqueueRequest; result: Empty };
+  "agents/setCeiling": { params: SetCeilingRequest; result: Agent };
   "agents/setLabels": { params: SetLabelsRequest; result: Agent };
   "agents/setOption": { params: SetOptionRequest; result: ConfigOption[] };
+  "agents/setSandbox": { params: SetSandboxRequest; result: Agent };
   "agents/setUnread": { params: SetUnreadRequest; result: Empty };
   "agents/start": { params: StartRequest; result: UUID };
   "agents/stop": { params: AgentRequest; result: Empty };
@@ -2093,8 +2105,10 @@ export const MethodTarget = {
   "agents/resuming": "host",
   "agents/retired": "host",
   "agents/sendNow": "host",
+  "agents/setCeiling": "host",
   "agents/setLabels": "host",
   "agents/setOption": "host",
+  "agents/setSandbox": "host",
   "agents/setUnread": "host",
   "agents/start": "host",
   "agents/stop": "host",
@@ -2340,8 +2354,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ServedRequest: { required: ["kind", "outcome"], optional: [] },
   SessionLabel: { required: ["value", "owner", "addedAt"], optional: [] },
   SessionNotice: { required: ["severity", "title"], optional: ["detail"] },
+  SetCeilingRequest: { required: ["agentID"], optional: ["ceiling"] },
   SetLabelsRequest: { required: ["agentID", "add", "remove"], optional: [] },
   SetOptionRequest: { required: ["agentID", "optionID", "value"], optional: [] },
+  SetSandboxRequest: { required: ["agentID"], optional: ["choice"] },
   SetUnreadRequest: { required: ["agentID", "unread"], optional: [] },
   ShowFileNotification: { required: ["agentID", "file"], optional: [] },
   ShownFile: { required: ["path"], optional: ["line"] },

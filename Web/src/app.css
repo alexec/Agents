@@ -634,6 +634,16 @@ button.link.reading:hover { text-decoration: underline; }
 .sandbox-refusal > div { flex: 1; min-width: 0; }
 .sandbox-refusal p { margin: 0; }
 .menus-right { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-left: auto; }
+.options-note { opacity: 0.68; font-size: 12px; }
+.model-effort { position: relative; }
+.model-effort > summary { list-style: none; cursor: pointer; }
+.model-effort > summary::-webkit-details-marker { display: none; }
+.model-effort-menu { position: absolute; z-index: 20; right: 0; bottom: calc(100% + 6px); display: flex; gap: 6px; padding: 8px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); box-shadow: 0 4px 18px #0002; }
+.context-meter { display: inline-flex; align-items: center; gap: 5px; opacity: 0.72; font-size: 11px; font-variant-numeric: tabular-nums; }
+.context-ring { --used: 0%; width: 12px; height: 12px; box-sizing: border-box; border: 2px solid var(--paper-rule); border-radius: 50%; background: conic-gradient(var(--paper-ink) var(--used), transparent 0); }
+.context-ring.close { background: conic-gradient(var(--danger, #bd4238) var(--used), transparent 0); }
+.cost-limit { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; padding: 6px 10px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); font-size: 12px; }
+.cost-limit button { white-space: nowrap; }
 .pill {
   position: relative;
   flex: none;
