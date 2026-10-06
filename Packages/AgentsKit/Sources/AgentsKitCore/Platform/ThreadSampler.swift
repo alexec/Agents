@@ -1,3 +1,4 @@
+#if canImport(Darwin)
 import Darwin
 import Foundation
 import MachO
@@ -221,3 +222,4 @@ public enum ThreadSampler {
 private func swiftDemangle(_ mangled: UnsafePointer<CChar>, _ length: Int,
                            _ output: UnsafeMutablePointer<CChar>?, _ outputLength: UnsafeMutablePointer<Int>?,
                            _ flags: UInt32) -> UnsafeMutablePointer<CChar>?
+#endif

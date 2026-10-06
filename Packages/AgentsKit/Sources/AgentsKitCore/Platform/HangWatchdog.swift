@@ -1,3 +1,4 @@
+#if canImport(Darwin)
 import Darwin
 import Foundation
 import os
@@ -203,3 +204,4 @@ public final class HangWatchdog: Sendable {
         String(format: "%.1f s", value)
     }
 }
+#endif
