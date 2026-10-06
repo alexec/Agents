@@ -15,13 +15,13 @@
 
 ## Counts
 
-Of 206 rows: **102 same**, **37 by design**, **67 delta** (after #221, #238–#244, #249, #255–#261, #263–#266, #291). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 206 rows: **108 same**, **37 by design**, **61 delta** (after #221, #238–#244, #249, #252, #255–#261, #263–#266, #291). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
 | Sidebar and project list | 3 | 2 | 12 |
 | Session rows and states | 10 | 2 | 11 |
-| Chat turns and turn detail | 5 | 3 | 16 |
+| Chat turns and turn detail | 11 | 3 | 10 |
 | Prompt bar and queued prompts | 7 | 2 | 11 |
 | Question and permission cards | 10 | 4 | 1 |
 | Start sheet and new project | 17 | 5 | 0 |
@@ -100,15 +100,15 @@ The deltas are tracked by 29 issues:
 | Outcome / Steps / Details, and the chooser (069) | View ▸ Turns: `A/Commands/AgentsCommands.swift:113` | ··· ▸ Turns show: `R/Chat/RemoteChatView.swift:265` | A select in the chat's head, kept: `W/views/Chat.tsx:29-37, 193` | **same** |
 | Reconnect catch-up keeps one row per turn and entry id (#221) | `K/Client/AgentsModel.swift`; rows deduplicated in `S/Chat/ChatTranscript.swift` | Shared | `W/model/store.ts` | **same** |
 | Concise turn: prompt, *7 steps*, reply, report; no chevron (#148) | `S/Chat/TranscriptRows.swift:38-158` | Shared | `W/views/chat/Rows.tsx:345-399` (walked, #148) | **same** |
-| An open call: diff, Argument, Return (#153) | `S/Chat/TranscriptRows.swift:572-675` | Shared | `W/views/chat/Rows.tsx:128-187`; drops non-text content (`:165-167`) | **delta** (minor): web #252 |
+| An open call: diff, Argument, Return (#153) | `S/Chat/TranscriptRows.swift:572-675` | Shared | `W/views/chat/Rows.tsx:128-187`; unknown pieces shown raw | **same** (#252) |
 | Show in Changes under an edit (#153) | `A/Chat/ChatView.swift:82-88` | Opens what the agent did to that file, in a sheet (#242): `R/Chat/RemoteChatView.swift`; a Changes of its own is #245 | `W/views/Chat.tsx:76-79` | **same** |
 | A location in a call | Opens in the Mac's editor: `A/Chat/ChatView.swift:74` | Opens in Files at the line: `R/Chat/RemoteChatView.swift:222-228` | Opens in Files: `W/views/Chat.tsx:72-75` | **by design** (only the Mac has an editor) |
 | Terminal output in a call | `S/Chat/ChatBlocks.swift:151` | Shared | *shown in the Mac window*: `W/views/chat/Rows.tsx:166` | **by design** (no terminal on the page) |
-| Markdown: code colour, task lists | `S/Page/MarkdownText.swift:24, 204`, `S/Code/CodeBlockText.swift` | Shared | No colour, no checkboxes: `W/render/markdown.ts:89-93` | **delta**: web #252 |
-| Pictures in messages | `S/Chat/ChatBlocks.swift:40-51` | Shared | *[image]*: `W/views/chat/Rows.tsx:40` | **delta**: web #252 |
-| Plan; a withdrawn plan | `S/Chat/ChatBlocks.swift:177-223` | Shared, plus a current-plan strip: `R/Chat/PlanView.swift:13-69` | Withdrawn ignored: `W/views/chat/Rows.tsx:87-96` | **delta**: web #252; the plan strip #267 |
-| Switch note and handoff | `S/Chat/SwitchNote.swift:7-24` | Shared | Headline only: `W/views/chat/Rows.tsx:198-212` | **delta**: web #252 |
-| Jump to end | Whenever scrolled away, *Something new*: `S/Chat/JumpToEnd.swift:9-43` | Shared | Only on news, *New messages ↓*: `W/views/Chat.tsx:221` | **delta**: web #252 |
+| Markdown: code colour, task lists | `S/Page/MarkdownText.swift:24, 204`, `S/Code/CodeBlockText.swift` | Shared | Coloured known fences, static task boxes: `W/render/codeHighlight.ts`, `W/render/markdown.ts` | **same** (#252) |
+| Pictures in messages | `S/Chat/ChatBlocks.swift:40-51` | Shared | Image data drawn from a data URL; external addresses stay unloaded: `W/views/chat/Rows.tsx:40-45` | **same** (#252) |
+| Plan; a withdrawn plan | `S/Chat/ChatBlocks.swift:177-223` | Shared, plus a current-plan strip: `R/Chat/PlanView.swift:13-69` | Withdrawn entries crossed out; *The agent dropped this plan*: `W/views/chat/Rows.tsx:87-96` | **same** (#252); the plan strip #267 |
+| Switch note and handoff | `S/Chat/SwitchNote.swift:7-24` | Shared | Full switch note: `W/model/switchNote.ts`, drawn by `W/views/chat/Rows.tsx:220-227` | **same** (#252) |
+| Jump to end | Whenever scrolled away, *Something new*: `S/Chat/JumpToEnd.swift:9-43` | Shared | Shown while away; *Something new* when messages arrive: `W/views/Chat.tsx:370-375` | **same** (#252) |
 | First open: the last 12 turns, earlier ones at the top (#90, #91) | 12: `K/Daemon/DaemonAPI.swift` (`TurnsRequest.opening`, #242) | 12, the same request: `R/RemoteModel.swift` | 12: `W/model/store.ts` (`openingTurns`) | **same** |
 | A finished turn longer than a page | One call for up to the host's ceiling (1,000); eight opened turns kept: `A/AppModel.swift` turnEntries, `S/Chat/ChatTranscript.swift` fetchedTurns | The same call, kept for every turn opened: `R/RemoteModel.swift` turnEntries | The last 200, then Earlier steps; eight open turns kept: `W/model/store.ts` turnEntries, `W/views/Chat.tsx`, `W/views/chat/Rows.tsx` | **delta**: remote #215 |
 | Coming back after a restart, in the chat | `S/Chat/ChatTranscript.swift:135-136` | Shared | Only *Working*: `W/views/Chat.tsx:216-218` | **delta**: web #251 |

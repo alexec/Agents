@@ -300,6 +300,12 @@ button.link {
   white-space: pre;
 }
 .markdown code { font: 0.92em var(--font-mono); }
+.markdown pre .code-keyword { color: var(--code-keyword, #8656a3); }
+.markdown pre .code-string { color: var(--code-string, #287a50); }
+.markdown pre .code-number { color: var(--code-number, #a45a12); }
+.markdown pre .code-comment { color: var(--code-comment, #777); font-style: italic; }
+.markdown pre .code-type { color: var(--code-type, #246b8a); }
+.markdown pre .code-operator, .markdown pre .code-punctuation { color: var(--code-operator, #8656a3); }
 .markdown blockquote { border-left: 2px solid var(--paper-rule); padding-left: 10px; opacity: 0.8; }
 .markdown table { border-collapse: collapse; }
 .markdown th, .markdown td { border: 1px solid var(--paper-rule); padding: 3px 8px; }

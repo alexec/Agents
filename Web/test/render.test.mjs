@@ -56,9 +56,17 @@ test("an https link opens in a new tab without the opener", () => {
 test("the usual Markdown is drawn", () => {
   assert.equal(md("# Title\n\n- **one**\n- `two`\n\n```swift\nlet x = 1 < 2\n```"),
     "<h1>Title</h1><ul><li><strong>one</strong></li><li><code>two</code></li></ul>"
-    + '<pre data-language="swift"><code>let x = 1 &lt; 2\n</code></pre>');
+    + '<pre data-language="swift"><code><span class="code-keyword">let</span> x <span class="code-operator">=</span> <span class="code-number">1</span> <span class="code-operator">&lt;</span> <span class="code-number">2</span>\n</code></pre>');
   assert.equal(md("3. three\n4. four"), '<ol start="3"><li>three</li><li>four</li></ol>');
   assert.equal(md("1. one\n2. two"), "<ol><li>one</li><li>two</li></ol>");
+});
+
+test("known fenced code is coloured as inert token spans; unknown fences stay plain", () => {
+  const code = md('```swift\nlet answer = "yes" // ready\n```');
+  assert.match(code, /class="code-keyword">let<\/span>/);
+  assert.match(code, /class="code-string">"yes"<\/span>/);
+  assert.match(code, /class="code-comment">\/\/ ready<\/span>/);
+  assert.equal(md("```mystery\nlet answer\n```"), '<pre data-language="mystery"><code>let answer\n</code></pre>');
 });
 
 test("only http, https and mailto are safe", () => {

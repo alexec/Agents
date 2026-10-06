@@ -10,6 +10,7 @@ import MarkdownIt, { type Token } from "markdown-it";
 import { pageImagePath } from "../model/pageImage";
 import { LocalPicture } from "./LocalPicture";
 import { memo } from "./memo";
+import { highlightCode } from "./codeHighlight";
 import { Fragment, h, type ComponentChildren } from "preact";
 
 /** A Markdown page's pictures: read from beside the document, never from an address. */
@@ -114,7 +115,8 @@ function build(tokens: readonly Token[], images?: PageImages): ComponentChildren
       case "code_block":
       case "fence": {
         const language = token.info.trim().split(/\s+/)[0];
-        push(h("pre", language ? { "data-language": language } : null, h("code", null, token.content)));
+        push(h("pre", language ? { "data-language": language } : null,
+          h("code", null, language ? highlightCode(token.content, language) : token.content)));
         break;
       }
       case "hr":
