@@ -81,6 +81,7 @@ nav:
       - how-to/use-a-shell.md
       - how-to/set-up-a-workflow.md
       - how-to/keep-a-project-dashboard.md
+      - how-to/pin-a-page-to-a-project.md
       - how-to/sign-a-runtime-in.md
       - how-to/assess-a-runtime.md
       - how-to/share-skills-across-agents.md
