@@ -15,13 +15,13 @@
 
 ## Counts
 
-Of 206 rows: **108 same**, **37 by design**, **61 delta** (after #221, #238–#244, #249, #252, #255–#261, #263–#266, #291). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 206 rows: **111 same**, **37 by design**, **58 delta** (after #221, #238–#244, #249, #252, #253, #255–#261, #263–#266, #291). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
 | Sidebar and project list | 3 | 2 | 12 |
 | Session rows and states | 10 | 2 | 11 |
-| Chat turns and turn detail | 11 | 3 | 10 |
+| Chat turns and turn detail | 14 | 3 | 7 |
 | Prompt bar and queued prompts | 7 | 2 | 11 |
 | Question and permission cards | 10 | 4 | 1 |
 | Start sheet and new project | 17 | 5 | 0 |
@@ -112,10 +112,10 @@ The deltas are tracked by 29 issues:
 | First open: the last 12 turns, earlier ones at the top (#90, #91) | 12: `K/Daemon/DaemonAPI.swift` (`TurnsRequest.opening`, #242) | 12, the same request: `R/RemoteModel.swift` | 12: `W/model/store.ts` (`openingTurns`) | **same** |
 | A finished turn longer than a page | One call for up to the host's ceiling (1,000); eight opened turns kept: `A/AppModel.swift` turnEntries, `S/Chat/ChatTranscript.swift` fetchedTurns | The same call, kept for every turn opened: `R/RemoteModel.swift` turnEntries | The last 200, then Earlier steps; eight open turns kept: `W/model/store.ts` turnEntries, `W/views/Chat.tsx`, `W/views/chat/Rows.tsx` | **delta**: remote #215 |
 | Coming back after a restart, in the chat | `S/Chat/ChatTranscript.swift:135-136` | Shared | Only *Working*: `W/views/Chat.tsx:216-218` | **delta**: web #251 |
-| A retired agent | `S/Retired/RetiredAgentPage.swift` with Started by: `A/ContentView.swift:106-108` | With Started by, worded by `K/Client/AgentsModel.swift` (`retiredStarterLabel`, #242) | *New session*, prompt off: `W/views/Chat.tsx:191, 225` | **delta**: web #253 |
-| Background work over the prompt, its ending line | Stop, Steps, Output: `S/Chat/BackgroundRows.swift:13-45, 228-262`, `A/Sidebar/BackgroundPane.swift` | Stop and Steps: `R/Chat/PromptBar.swift:54-63` | Names only; no Stop, no Steps: `W/views/Chat.tsx:309-328` | **delta**: web #253 |
-| Sandbox failure card (064) | `S/Chat/SandboxFailureCard.swift:19-68` | Shared: `R/Chat/RemoteChatView.swift:238-252` | Title and details only, no answers: `W/views/chat/Rows.tsx:294-302` | **delta**: web #253 |
-| Park line in the chat | `A/Chat/ChatView.swift:141-145` | At the chat's head: `R/Chat/RemoteChatView.swift:89-95` | Row only | **delta**: web #253 |
+| A retired agent | `S/Retired/RetiredAgentPage.swift` with Started by: `A/ContentView.swift:106-108` | With Started by, worded by `K/Client/AgentsModel.swift` (`retiredStarterLabel`, #242) | `W/views/RetiredPage.tsx`, looked up by `W/views/Chat.tsx` | **same** (#253) |
+| Background work over the prompt, its ending line | Stop, Steps, Output: `S/Chat/BackgroundRows.swift:13-45, 228-262`, `A/Sidebar/BackgroundPane.swift` | Stop and Steps: `R/Chat/PromptBar.swift:54-63` | Stop and stopping states: `W/views/Chat.tsx` (`BackgroundRows`); Started/ended lines and failed tint: `W/views/chat/Rows.tsx` | **same** (#253) |
+| Sandbox failure card (064) | `S/Chat/SandboxFailureCard.swift:19-68` | Shared: `R/Chat/RemoteChatView.swift:238-252` | What happened, recovery offer and Keep stopped / Continue without sandbox: `W/views/chat/Rows.tsx` | **same** (#253) |
+| Park line in the chat | `A/Chat/ChatView.swift:141-145` | At the chat's head: `R/Chat/RemoteChatView.swift:89-95` | `parkLine` over the transcript in `W/views/Chat.tsx` | **same** (#253) |
 | Block strip (#157) | Park line and Carry on: `A/Chat/ChatView.swift:134-161` | Carry on in the toolbar: `R/Chat/RemoteChatView.swift:144-154` | Wait lines and Carry on: `W/views/BlockStrip.tsx:7-17` | **delta**: decide, #267 (wait lines in the chat on the page only) |
 | Folder is missing strip, refused send (#119) | `A/Chat/MissingFolderStrip.swift` | `R/Chat/RemoteMissingFolderStrip.swift`, alert `R/RemoteApp.swift:135-151` | `W/views/MissingFolder.tsx:30-55` (inline notice) | **same** |
 | Who is asking, on a card (#121) | `askerLine` | `askerLine` | `W/model/asker.ts`, held to `Fixtures/web/asker/line.json` | **same** |
