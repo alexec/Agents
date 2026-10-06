@@ -29,9 +29,8 @@ import AppKit
 ///     fine          .subheadline  11     .footnote     13
 ///     code          .body    mono 13     .subheadline mono 15
 ///
-/// Paper (the theme in `Paper.swift`) sets `title`, `reading` and `supporting` in New
-/// York, the system serif, because those are the steps a person reads at length. `fine`
-/// stays in SF: it is chrome, and small serif chrome reads as fussy. `code` stays mono.
+/// Paper sets `title`, `reading`, `supporting` and `fine` in the system sans-serif.
+/// `code` stays in the system monospace.
 ///
 /// There is no `heading` step. A heading is `reading` with a weight on it, which is how
 /// `.headline` has always related to `.body` on Apple's platforms, and one fewer name
@@ -63,17 +62,17 @@ enum TextStep {
     var font: Font {
         #if os(macOS)
         switch self {
-        case .title: return .system(.title, design: .serif)
-        case .reading: return .system(.title3, design: .serif)
-        case .supporting: return .system(.body, design: .serif)
+        case .title: return .system(.title)
+        case .reading: return .system(.title3)
+        case .supporting: return .system(.body)
         case .fine: return .subheadline
         case .code: return .body.monospaced()
         }
         #else
         switch self {
-        case .title: return .system(.title, design: .serif)
-        case .reading: return .system(.body, design: .serif)
-        case .supporting: return .system(.subheadline, design: .serif)
+        case .title: return .system(.title)
+        case .reading: return .system(.body)
+        case .supporting: return .system(.subheadline)
         case .fine: return .footnote
         case .code: return .subheadline.monospaced()
         }
@@ -88,22 +87,15 @@ extension TextStep {
     /// a step becomes a size.
     var nsFont: NSFont {
         switch self {
-        case .title: return Self.serif(.title1)
-        case .reading: return Self.serif(.title3)
-        case .supporting: return Self.serif(.body)
+        case .title: return .preferredFont(forTextStyle: .title1)
+        case .reading: return .preferredFont(forTextStyle: .title3)
+        case .supporting: return .preferredFont(forTextStyle: .body)
         case .fine: return .preferredFont(forTextStyle: .subheadline)
         case .code: return .monospacedSystemFont(ofSize: NSFont.preferredFont(forTextStyle: .body).pointSize,
                                                   weight: .regular)
         }
     }
 
-    /// New York at a text style's size, falling back to the system face if the serif
-    /// design is ever unavailable.
-    private static func serif(_ style: NSFont.TextStyle) -> NSFont {
-        let base = NSFont.preferredFont(forTextStyle: style)
-        guard let serif = base.fontDescriptor.withDesign(.serif) else { return base }
-        return NSFont(descriptor: serif, size: base.pointSize) ?? base
-    }
 }
 #endif
 
@@ -151,7 +143,7 @@ extension TextStep {
         #else
         let style: Font.TextStyle = level <= 1 ? .title : level == 2 ? .title2 : .body
         #endif
-        let font = Font.system(style, design: .serif)
+        let font = Font.system(style)
         return font.weight(.semibold)
     }
 }
@@ -162,21 +154,14 @@ extension TextStep {
     /// phone's side of `nsFont`, resolved here for the same reason.
     var uiFont: UIFont {
         switch self {
-        case .title: return Self.serif(.title1)
-        case .reading: return Self.serif(.body)
-        case .supporting: return Self.serif(.subheadline)
+        case .title: return .preferredFont(forTextStyle: .title1)
+        case .reading: return .preferredFont(forTextStyle: .body)
+        case .supporting: return .preferredFont(forTextStyle: .subheadline)
         case .fine: return .preferredFont(forTextStyle: .footnote)
         case .code: return .monospacedSystemFont(ofSize: UIFont.preferredFont(forTextStyle: .subheadline).pointSize,
                                                   weight: .regular)
         }
     }
 
-    /// New York at a text style's size, or the system face if the serif design is not
-    /// there.
-    private static func serif(_ style: UIFont.TextStyle) -> UIFont {
-        let base = UIFont.preferredFont(forTextStyle: style)
-        guard let serif = base.fontDescriptor.withDesign(.serif) else { return base }
-        return UIFont(descriptor: serif, size: 0)
-    }
 }
 #endif

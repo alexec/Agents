@@ -46,14 +46,11 @@ enum StateTint {
         }
     }
 
-    /// Orange, red and green mixed for paper rather than taken from the system. The
-    /// system's are tuned for a cool white and a glass sheet; on warm off-white they
-    /// read as neon. These are burnt orange, brick and moss: still unmistakably the
-    /// three colours the rules name, and quiet enough that a page with none of them on
-    /// it looks finished rather than drained.
-    private static let orange = Color(light: 0xC2410C, dark: 0xF08A4B)
-    private static let red = Color(light: 0xB42318, dark: 0xF07B6E)
-    private static let green = Color(light: 0x3B7A4A, dark: 0x7FBF8E)
+    /// Orange, red and green mixed for cool paper rather than taken from the system.
+    /// Each clears 4.5:1 against the ground and the well in both appearances.
+    private static let orange = Color(light: 0xBA4A13, dark: 0xF0A06B)
+    private static let red = Color(light: 0xB4232B, dark: 0xF08086)
+    private static let green = Color(light: 0x2D765C, dark: 0x8BC6A7)
 
     /// The tint as a style, or whatever the surface already draws in when there is
     /// no tint. For the sites that pick between a colour and their own grey.

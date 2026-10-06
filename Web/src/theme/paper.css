@@ -1,67 +1,74 @@
 /* The Paper palette (071 FR-020): the Mac window's own, from Shared/UI/Paper.swift and
    Shared/UI/StateTint.swift, and the accent from the AccentColor asset. Light and dark follow the system, as the window does. Keep the
-   values in step with those files; nothing else in the web remote names a colour. */
+   values in step with those files; nothing else in the web remote names a colour.
+
+   Crisp paper (#326): cool near-white in the light, a neutral charcoal in the dark, and
+   hairlines that carry the crispness rather than the tint. The paper is still the
+   accent's home, so the violet is unchanged (#156) and clears 6.2:1 on the ground and
+   5.9:1 on the well. Nothing is drawn in the accent on a selection, where it would be
+   4.9:1 in the light and 4.1:1 in the dark. */
 
 :root {
   color-scheme: light dark;
 
   /* The page every column sits on. */
-  --paper-ground: #fbf9f4;
+  --paper-ground: #f7f8f9;
   /* The projects column, one shade deeper. */
-  --paper-sidebar: #f3f0e8;
+  --paper-sidebar: #f0f1f3;
   /* What floats: the prompt bar, cards, menus. */
   --paper-raised: #ffffff;
   /* What is set into the page: code, your own message. */
-  --paper-well: #f1ede4;
+  --paper-well: #f0f2f4;
   /* A row under the pointer, a picked item. */
-  --paper-wash: #ece7db;
+  --paper-wash: #e7eaee;
   /* Hairlines between rows, and round raised things. */
-  --paper-rule: #e2dccf;
+  --paper-rule: #dde1e6;
   /* Text, and the prominent button's fill. */
-  --paper-ink: #1f1d1a;
-  --paper-selection: #e4dcc8;
-  /* Soft and short: paper lifted a little off the desk. */
-  --paper-shadow: rgb(59 47 30 / 10%);
+  --paper-ink: #1c1d20;
+  --paper-selection: #d8dee6;
+  /* Soft and short: paper lifted a little off the desk. Neutral, so the lift reads as
+     lift and not as a smudge. */
+  --paper-shadow: rgb(32 36 42 / 10%);
   /* The app icon's violet (#156): links, focus, controls and the prominent button's fill,
-     as the window's AccentColor. Deep enough for text on every paper (4.9:1 on the
-     selection, 6.3:1 on the ground), and the ground reads on it at 6.3:1. */
+     as the window's AccentColor. Unchanged by #326; the numbers are against the cool
+     ground. */
   --accent: #5b3be0;
   accent-color: var(--accent);
 
-  /* The three tints, and only Needs you is drawn in colour in a list (FR-018). */
-  --tint-attention: #c2410c;
-  --tint-failure: #b42318;
-  --tint-vouched: #3b7a4a;
+  /* The three tints, and only Needs you is drawn in colour in a list (FR-018). Mixed for a
+     neutral ground rather than a warm one, each clearing 4.5:1 on the ground and the well. */
+  --tint-attention: #ba4a13;
+  --tint-failure: #b4232b;
+  --tint-vouched: #2d765c;
 
   --radius-control: 7px;
   --radius-card: 10px;
   --radius-floating: 16px;
 
-  /* The system's own fonts; nothing is loaded from anywhere (FR-034). */
+  /* The system's own fonts; nothing is loaded from anywhere (FR-034). One sans-serif for
+     everything a person reads, as the window's Paper type scale has it since #326
+     (Shared/UI/TypeScale.swift), and one monospace for code. */
   --font-text: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  /* What a person reads at length, the chat's turns: New York, as the window's Paper type
-     scale has it (Shared/UI/TypeScale.swift), where the system has a serif. */
-  --font-reading: ui-serif, "New York", Georgia, serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper-ground: #1c1b19;
-    --paper-sidebar: #161513;
-    --paper-raised: #262421;
-    --paper-well: #2a2825;
-    --paper-wash: #2f2c28;
-    --paper-rule: #3a3733;
-    --paper-ink: #ece7dc;
-    --paper-selection: #3a3630;
+    --paper-ground: #1c1d20;
+    --paper-sidebar: #161719;
+    --paper-raised: #26282c;
+    --paper-well: #2a2d31;
+    --paper-wash: #33363b;
+    --paper-rule: #3a3e44;
+    --paper-ink: #e8eaed;
+    --paper-selection: #3a3e44;
     --paper-shadow: rgb(0 0 0 / 10%);
-    /* Light enough for text on dark paper (4.6:1 on the selection, 6.6:1 on the ground);
-       white can't read on it, so what is drawn on it is the ground, at 6.6:1. */
+    /* Light enough for text on dark paper (6.5:1 on the ground, 5.3:1 on the well); white
+       can't read on it, so what is drawn on it is the ground, at 6.5:1. */
     --accent: #ab8eff;
 
-    --tint-attention: #f08a4b;
-    --tint-failure: #f07b6e;
-    --tint-vouched: #7fbf8e;
+    --tint-attention: #f0a06b;
+    --tint-failure: #f08086;
+    --tint-vouched: #8bc6a7;
   }
 }

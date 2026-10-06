@@ -38,7 +38,7 @@ public enum AppViewShell {
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <style>
             :root { color-scheme: light dark; }
-            html, body { margin: 0; padding: 0; overflow: hidden; background: light-dark(#fbf9f4, #1c1b19); }
+            html, body { margin: 0; padding: 0; overflow: hidden; background: light-dark(#f7f8f9, #1c1d20); }
             iframe { display: block; border: 0; width: 100%; height: 100vh; background: transparent; }
             </style></head>
             <body><iframe id="view" title="View" sandbox="allow-scripts" srcdoc="\(escapeAttribute(withPolicy(html, policy)))"></iframe></body></html>

@@ -323,8 +323,8 @@ button.link {
 .tinted { color: var(--tint-attention); }
 
 /* A turn (069): the ask, "N steps", the steps in the turn's margin (no rule, no indent: #148), and the outcome. */
-/* Its text at the window's reading step (15, serif); the control is chrome, at fine (11, sans). */
-.turn { display: flex; flex-direction: column; gap: 10px; font-family: var(--font-reading); font-size: 15px; }
+/* Its text at the window's reading step (15, sans, as every other step since #326); the control is chrome, at fine (11). */
+.turn { display: flex; flex-direction: column; gap: 10px; font-family: var(--font-text); font-size: 15px; }
 .steps-control {
   align-self: flex-start;
   border: 1px solid transparent;
@@ -623,7 +623,7 @@ button.link.reading:hover { text-decoration: underline; }
 @media (max-width: 759px) {
   .medium-only, .wide-only { display: none; }
   .narrow-only { display: block; }
-  button.back.narrow-only { display: inline-block; border: none; background: none; color: #2f6fd1; padding: 0; }
+  button.back.narrow-only { display: inline-block; border: none; background: none; color: var(--accent); padding: 0; }
   .column-head h1.narrow-only { display: block; text-align: center; }
 }
 
@@ -840,7 +840,7 @@ button.remove:hover { opacity: 1; }
 .status-card .what { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .status-card li.attention { color: var(--tint-attention); }
 .status-card li.failure { color: var(--tint-failure); }
-.workflow-page .link { border: 0; background: none; padding: 0; color: var(--tint-link, #2f6fd1); cursor: pointer; white-space: nowrap; }
+.workflow-page .link { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; white-space: nowrap; }
 .workflow-page .agent-mode { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
 .workflow-page .agent-mode code { font: 11.5px var(--font-mono); }
 .workflow-page .workflow-settings { display: flex; flex-direction: column; gap: 8px; }

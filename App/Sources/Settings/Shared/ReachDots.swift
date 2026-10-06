@@ -41,7 +41,7 @@ struct ReachDots: View {
         var body: some View {
             Text(letter)
                 // Decorative: a runtime's letter in its dot, sized to the dot; the row says it in words.
-                .font(.system(size: 10, weight: .semibold, design: .serif))
+                .font(.system(size: 10, weight: .semibold))
                 .strikethrough(isNo)
                 .foregroundStyle(isGets ? SharedInk.reach : .secondary)
                 .frame(width: 18, height: 18)

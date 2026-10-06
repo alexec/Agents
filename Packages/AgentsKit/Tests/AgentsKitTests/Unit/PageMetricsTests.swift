@@ -6,9 +6,9 @@ import Testing
 struct PageMetricsTests {
     /// Measured on this Mac with real prose, not with an average character. The
     /// document face is the app's `reading` step — the system sans at 15pt — since the
-    /// type scale was made the whole app's. It was New York at 12pt and 5.56 when 007
-    /// wrote these; see research section 6.
-    private let advance = 6.83
+    /// type scale was made the whole app's, and 326 took the serif out of it. It was
+    /// New York at 12pt and 5.56 when 007 wrote these; see research section 6.
+    private let advance = 6.76
 
     private func characters(at width: Double) -> Int {
         Int((PageMetrics.forPane(width: width).measure / advance).rounded())
@@ -17,14 +17,14 @@ struct PageMetricsTests {
     @Test func theDefaultPaneWidthClearsTheFloor() {
         // SC-003 asks for 60 to 90 characters at the pane's default width, which
         // `SidebarFrame` puts at 460. The floor is what fixes that width: at the
-        // reading step a pane of 380 yields 50 and misses, so the pane widened rather
+        // reading step a pane of 380 yields 51 and misses, so the pane widened rather
         // than the text shrinking back.
         #expect(characters(at: 460) >= 60)
         #expect(characters(at: 460) <= 90)
     }
 
     @Test func theWidestPaneStillReadsAtNinetyCharacters() {
-        // Uncapped, a 900pt pane would run to 126 characters.
+        // Uncapped, a 900pt pane would run to 127 characters.
         #expect(characters(at: 900) <= 90)
         #expect(PageMetrics.forPane(width: 900).measure == PageMetrics.measureCap)
     }
