@@ -319,6 +319,14 @@ extension DaemonCore {
             case DaemonAPI.Method.mcpRemove:
                 let request = try require(params, as: DaemonAPI.MCPRemoveRequest.self)
                 return .success(try JSONValue.encoding(try mcpRemove(request)))
+
+            case DaemonAPI.Method.mcpVerify:
+                let request = try require(params, as: DaemonAPI.MCPVerifyRequest.self)
+                return .success(try JSONValue.encoding(await mcpVerify(request)))
+
+            case DaemonAPI.Method.mcpAddByHand:
+                let request = try require(params, as: DaemonAPI.MCPAddByHandRequest.self)
+                return .success(try JSONValue.encoding(try await mcpAddByHand(request)))
             #endif
 
             case DaemonAPI.Method.runtimesInstall:

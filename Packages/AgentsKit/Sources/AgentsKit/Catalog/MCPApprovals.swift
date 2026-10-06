@@ -151,7 +151,7 @@ enum MCPProjectListing {
                 guard let run = DaemonAPI.MCPRunKind(rawValue: record.run) else { return nil }
                 return DaemonAPI.ManagedMCPServer(name: server.name, registryName: record.registryName,
                                                   version: record.version, run: run, addedAt: record.addedAt,
-                                                  destination: destination)
+                                                  destination: destination, byHand: record.byHand ?? false)
             }
             var seen = Set<String>()
             let secretNames = SecretsEnv.referencedNames(in: server).filter { seen.insert($0).inserted }

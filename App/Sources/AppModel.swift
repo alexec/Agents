@@ -2624,6 +2624,31 @@ final class AppModel {
         }
     }
 
+    /// Connect to a server typed on the sheet; nothing is written (#305).
+    func mcpVerify(_ server: DaemonAPI.MCPHandServer,
+                   for destination: DaemonAPI.SkillDestination) async -> DaemonAPI.MCPVerifyAnswer {
+        do {
+            return try await client.call(DaemonAPI.Method.mcpVerify,
+                                         DaemonAPI.MCPVerifyRequest(destination: destination, server: server),
+                                         returning: DaemonAPI.MCPVerifyAnswer.self)
+        } catch {
+            return .init(error: Self.mcpError(error))
+        }
+    }
+
+    func mcpAddByHand(_ verifyID: UUID, to destination: DaemonAPI.SkillDestination)
+        async -> Result<DaemonAPI.ManagedMCPServer, DaemonAPI.MCPCatalogError> {
+        do {
+            let answer = try await client.call(DaemonAPI.Method.mcpAddByHand,
+                                               DaemonAPI.MCPAddByHandRequest(verifyID: verifyID, destination: destination),
+                                               returning: DaemonAPI.MCPAddAnswer.self)
+            if let server = answer.server { return .success(server) }
+            return .failure(answer.error ?? .failed("no server"))
+        } catch {
+            return .failure(Self.mcpError(error))
+        }
+    }
+
     private static func mcpError(_ error: any Error) -> DaemonAPI.MCPCatalogError {
         if let rpc = error as? JSONRPCError, rpc.code == DaemonAPI.Failure.mcpCatalogRefused,
            let reason = try? rpc.data?.decode(DaemonAPI.MCPCatalogError.self) {

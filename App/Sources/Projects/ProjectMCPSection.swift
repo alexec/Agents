@@ -125,7 +125,9 @@ private struct ProjectMCPRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(server.name).appText(.reading).fontWeight(.semibold).lineLimit(1)
-                    if server.managed != nil { SharedChip(text: "registry", tone: .source) }
+                    if let managed = server.managed {
+                        SharedChip(text: managed.byHand ? "added by hand" : "registry", tone: .source)
+                    }
                     if isWaiting { SharedChip(text: "waiting for your OK", tone: .attention) }
                     ForEach(server.missingSecrets, id: \.self) { name in
                         SharedChip(text: "\(name) not set", tone: .attention)
@@ -210,7 +212,7 @@ private struct ProjectMCPRow: View {
     }
 
     private var detail: String {
-        if let managed = server.managed, server.summary.contains("://") {
+        if let managed = server.managed, !managed.byHand, server.summary.contains("://") {
             return "\(server.summary) · \(managed.version)"
         }
         return server.summary
