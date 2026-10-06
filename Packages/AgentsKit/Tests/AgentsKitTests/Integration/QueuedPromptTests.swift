@@ -18,7 +18,7 @@ struct QueuedPromptTests {
         return (StoreLocations(root: root), work)
     }
 
-    private func core(_ launcher: FakeLauncher, locations: StoreLocations) throws -> DaemonCore {
+    private func core(_ launcher: any SessionLauncher, locations: StoreLocations) throws -> DaemonCore {
         DaemonCore(store: try AgentStore(locations: locations),
                    locations: locations,
                    discovery: .findsEverything,
@@ -79,12 +79,83 @@ struct QueuedPromptTests {
         try await core.prompt(.init(agentID: id, text: "three"))
         #expect(await core.agent(id)?.queuedPrompts.map(\.text) == ["two", "three"])
 
-        await eventually("all three turns ran") {
-            (try? await texts(core, id)) == ["one", "two", "three"]
+        await eventually("both turns ran") {
+            (try? await texts(core, id)) == ["one", "two\n\nthree"]
         }
         #expect(await core.agent(id)?.queuedPrompts.isEmpty == true)
-        #expect(try await texts(core, id) == ["one", "two", "three"],
-                "each queued prompt is a turn of its own, in the order it was typed")
+        #expect(try await texts(core, id) == ["one", "two\n\nthree"],
+                "what was queued went as one message, in the order it was typed")
+    }
+
+    /// Three things typed during one long turn are one more turn, not three (#346):
+    /// one `session/prompt`, every text in order and every attachment with it.
+    @Test func everythingQueuedGoesAsOnePromptInOneTurn() async throws {
+        let (locations, work) = try temporary()
+        let launcher = slowLauncher()
+        let core = try core(launcher, locations: locations)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "one"))
+        await eventually("the first turn is in flight") { await core.agent(id)?.state == .running }
+        let first = Attachment.file(work.appendingPathComponent("a.txt"))
+        let second = Attachment.file(work.appendingPathComponent("b.txt"))
+        try await core.prompt(.init(agentID: id, text: "two", attachments: [first]))
+        try await core.prompt(.init(agentID: id, text: "three"))
+        try await core.prompt(.init(agentID: id, text: "four", attachments: [second]))
+        #expect(await core.agent(id)?.queuedPrompts.map(\.text) == ["two", "three", "four"],
+                "separate until the turn ends, so each can still be changed on its own")
+
+        await eventually("the queued words went") { (try? await texts(core, id))?.count == 2 }
+        await settled(core, id, "the second turn ended")
+
+        #expect(await core.agent(id)?.queuedPrompts.isEmpty == true)
+        #expect(try await texts(core, id) == ["one", "two\n\nthree\n\nfour"])
+        // Every prompt any runtime was sent; the three went in exactly one of them.
+        var sent: [JSONValue] = []
+        for fake in launcher.allAgents { sent += await fake.prompts }
+        let carrying = sent.compactMap(\.arrayValue).filter { blocks in
+            blocks.contains { $0["text"]?.stringValue?.contains("three") == true }
+        }
+        let prompt = try #require(carrying.first)
+        #expect(carrying.count == 1, "one session/prompt, not one each")
+        #expect(prompt.contains { $0["text"]?.stringValue == "two\n\nthree\n\nfour" })
+        #expect(prompt.compactMap { $0["uri"]?.stringValue }
+                    == ["a.txt", "b.txt"].map { work.appendingPathComponent($0).absoluteString },
+                "every attachment, in the order queued")
+    }
+
+    /// A runtime that will not start leaves the words where they were (#346): all of
+    /// them, still separate, so nothing typed is lost to the merge.
+    @Test func aRuntimeThatWillNotStartLeavesEveryQueuedPrompt() async throws {
+        let (locations, work) = try temporary()
+        let launcher = RefusingLauncher(slowLauncher(.seconds(2)))
+        let core = try core(launcher, locations: locations)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "one"))
+        await eventually("the first turn is in flight") { await core.agent(id)?.state == .running }
+        for text in ["two", "three", "four"] { try await core.prompt(.init(agentID: id, text: text)) }
+        try await core.stop(id)
+        await eventually("the agent stopped") { await core.agent(id)?.state == .stopped }
+
+        launcher.refusing = true
+        await #expect(throws: (any Error).self) { try await core.sendNextQueued(to: id) }
+        #expect(await core.agent(id)?.queuedPrompts.map(\.text) == ["two", "three", "four"])
+        #expect(try await texts(core, id) == ["one"])
+    }
+
+    /// The app's own words are a turn of their own and never folded into the person's.
+    @Test func onlyThePersonsPromptsAtTheHeadGoTogether() {
+        let app = QueuedPrompt(text: "how did it go?", from: .app)
+        let two = QueuedPrompt(text: "two", preface: "the wait ended")
+        let three = QueuedPrompt(text: "three", preface: "a view said hello")
+        #expect([app, two, three].nextTurn == [app])
+        #expect([two, three, app].nextTurn == [two, three])
+        #expect([QueuedPrompt]().nextTurn.isEmpty)
+
+        let merged = QueuedPrompt.merging([two, three])
+        #expect(merged?.id == two.id, "put back as one, under the first one's id")
+        #expect(merged?.text == "two\n\nthree")
+        #expect(merged?.preface == "the wait ended\n\na view said hello")
+        #expect(QueuedPrompt.merging([app]) == app)
     }
 
     /// The point of showing the queue is being able to change your mind about it.
@@ -209,5 +280,24 @@ struct QueuedPromptTests {
         }
         #expect(sent.filter { $0.contains("two") }.count == 1)
         #expect(await core.agent(id)?.queuedPrompts.isEmpty == true)
+    }
+}
+
+/// A launcher that can be told to refuse, as a runtime that will not start does.
+private final class RefusingLauncher: SessionLauncher, @unchecked Sendable {
+    private let inner: FakeLauncher
+    private let lock = NSLock()
+    private var refuses = false
+    var refusing: Bool {
+        get { lock.withLock { refuses } }
+        set { lock.withLock { refuses = newValue } }
+    }
+    var keepsRuntimesWarm: Bool { inner.keepsRuntimesWarm }
+
+    init(_ inner: FakeLauncher) { self.inner = inner }
+
+    func launch(runtime: Runtime, path: String, cwd: URL) throws -> ACPSession {
+        if refusing { throw JSONRPCError(code: -32000, message: "would not start") }
+        return try inner.launch(runtime: runtime, path: path, cwd: cwd)
     }
 }

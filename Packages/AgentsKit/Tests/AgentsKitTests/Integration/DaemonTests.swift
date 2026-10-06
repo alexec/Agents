@@ -905,11 +905,13 @@ struct DaemonTests {
             guard case .userMessage(let text, _, _) = entry.kind else { return nil }
             return text
         }
-        let restart = prompts.firstIndex { $0.contains("The app restarted") }
-        let queued = prompts.firstIndex { $0.contains("and then deploy it") }
+        // In one prompt since #346, as everything waiting at once is; the order holds.
+        let said = prompts.joined(separator: "\n\n")
+        let restart = said.range(of: "The app restarted")
+        let queued = said.range(of: "and then deploy it")
         #expect(restart != nil && queued != nil, "both were sent: \(prompts)")
         if let restart, let queued {
-            #expect(restart < queued, "the news first, then the instructions premised on it")
+            #expect(restart.lowerBound < queued.lowerBound, "the news first, then the instructions premised on it")
         }
     }
 

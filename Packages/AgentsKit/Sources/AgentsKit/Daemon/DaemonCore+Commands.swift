@@ -390,15 +390,16 @@ extension DaemonCore {
         // Every `await` above this line is a window for it: `prepareServing`,
         // `session.apply`, and the two before them.
         guard var made = agents[agent.id], made.state == AgentState.starting,
-              let first = made.queuedPrompts.first
+              let first = QueuedPrompt.merging(made.queuedPrompts.nextTurn)
         else { return agent.id }
 
-        // Off the queue as its turn begins, exactly as `sendNextQueued` does it. It
-        // cannot go through that function: `starting` answers true to
-        // `hasTurnInFlight` — which is what makes a *second* prompt queue rather than
-        // race (FR-004) — and that same answer would make `sendNextQueued` decline to
-        // send the first.
-        made.queuedPrompts.removeFirst()
+        // Off the queue as its turn begins, exactly as `sendNextQueued` does it, and
+        // with whatever was typed behind it while it started (#346). It cannot go
+        // through that function: `starting` answers true to `hasTurnInFlight` — which
+        // is what makes a *second* prompt queue rather than race (FR-004) — and that
+        // same answer would make `sendNextQueued` decline to send the first.
+        let taken = Set(made.queuedPrompts.nextTurn.map(\.id))
+        made.queuedPrompts.removeAll { taken.contains($0.id) }
         changed(made)
         await beginTurn(agentID: agent.id, text: first.text,
                         blocks: first.blocks, session: session)
@@ -771,9 +772,10 @@ extension DaemonCore {
 
     /// Send the next thing waiting, if the agent is free to take it.
     ///
-    /// One at a time. Each queued prompt is a turn of its own, so the transcript reads
-    /// the way it would have if the user had waited, and the agent is free in between.
-    /// The runtime is started before the prompt leaves the queue, so a runtime that
+    /// Everything the person queued goes together (#346): the run of their prompts at
+    /// the head of the queue is one prompt in one turn, since what was typed later so
+    /// often corrects what was typed first. The app's own prompt is still a turn of its
+    /// own. The runtime is started before anything leaves the queue, so a runtime that
     /// will not start leaves the words exactly where they were.
     func sendNextQueued(to agentID: UUID) async throws {
         guard let agent = agents[agentID], !agent.state.hasTurnInFlight,
@@ -847,9 +849,14 @@ extension DaemonCore {
             await releaseRuntime(for: agentID)
             return
         }
-        guard var agent = agents[agentID],
-              let index = agent.queuedPrompts.firstIndex(where: { $0.id == next.id }) else { return }
-        agent.queuedPrompts.remove(at: index)
+        // Read again now the runtime is up: more may have been typed while it started,
+        // and some taken back. Taken back is gone; typed since goes with the rest.
+        guard var agent = agents[agentID], agent.queuedPrompts.contains(where: { $0.id == next.id })
+        else { return }
+        let taking = agent.queuedPrompts.nextTurn
+        guard let next = QueuedPrompt.merging(taking) else { return }
+        let taken = Set(taking.map(\.id))
+        agent.queuedPrompts.removeAll { taken.contains($0.id) }
         changed(agent)
         await beginTurn(agentID: agentID, text: next.text, blocks: next.blocks,
                         from: next.from, session: session, unlessStoppedSince: stopsBefore,
