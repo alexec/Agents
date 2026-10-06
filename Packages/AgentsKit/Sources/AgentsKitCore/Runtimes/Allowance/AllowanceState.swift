@@ -9,8 +9,15 @@ public struct AllowanceState: Codable, Hashable, Sendable {
     /// The first entry with this credential. Others with the same key share this state.
     public var entryID: UUID
     public var status: Status
-    /// When `status` last changed.
+    /// When it last became available, rate limited or out: the time the words show
+    /// ("Out since …"). An out marked out again keeps its first time (#334).
     public var since: Date
+    /// When anything last changed the status, a re-mark while it stays out included: the
+    /// freshness stamp. The newer shared word wins by it, a check's result is dropped
+    /// when it moved, the first check counts from it, and a late plan window writes its
+    /// reset time only while it is fresh (#334). A state saved before it existed reads
+    /// `since`.
+    public var changedAt: Date
     public var learnedFrom: Source
     /// The latest plan window the runtime reported, for the return time (R2).
     public var lastRateLimit: RateLimitInfo?
@@ -27,17 +34,41 @@ public struct AllowanceState: Codable, Hashable, Sendable {
     public init(credentialKey: String, entryID: UUID, status: Status = .available, since: Date,
                 learnedFrom: Source = .person, lastRateLimit: RateLimitInfo? = nil,
                 reading: AllowanceReading? = nil,
-                spent: Spent = .known(nil), rateLimitStreak: [Date] = [], modelsOut: [ModelOut]? = nil) {
+                spent: Spent = .known(nil), rateLimitStreak: [Date] = [], modelsOut: [ModelOut]? = nil,
+                changedAt: Date? = nil) {
         self.credentialKey = credentialKey
         self.entryID = entryID
         self.status = status
         self.since = since
+        self.changedAt = changedAt ?? since
         self.learnedFrom = learnedFrom
         self.lastRateLimit = lastRateLimit
         self.reading = reading
         self.spent = spent
         self.rateLimitStreak = rateLimitStreak
         self.modelsOut = modelsOut
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case credentialKey, entryID, status, since, changedAt, learnedFrom, lastRateLimit, reading,
+             spent, rateLimitStreak, modelsOut
+    }
+
+    /// A state saved before `changedAt` existed, or sent by a host that has none, reads
+    /// `since` for it.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        credentialKey = try c.decode(String.self, forKey: .credentialKey)
+        entryID = try c.decode(UUID.self, forKey: .entryID)
+        status = try c.decode(Status.self, forKey: .status)
+        since = try c.decode(Date.self, forKey: .since)
+        changedAt = try c.decodeIfPresent(Date.self, forKey: .changedAt) ?? since
+        learnedFrom = try c.decode(Source.self, forKey: .learnedFrom)
+        lastRateLimit = try c.decodeIfPresent(RateLimitInfo.self, forKey: .lastRateLimit)
+        reading = try c.decodeIfPresent(AllowanceReading.self, forKey: .reading)
+        spent = try c.decode(Spent.self, forKey: .spent)
+        rateLimitStreak = try c.decode([Date].self, forKey: .rateLimitStreak)
+        modelsOut = try c.decodeIfPresent([ModelOut].self, forKey: .modelsOut)
     }
 
     /// One model a provider failed on (#140): its value as the runtime's model menu has
@@ -140,6 +171,7 @@ public struct AllowanceState: Codable, Hashable, Sendable {
         guard settled != status else { return lapsed }
         status = settled
         since = now
+        changedAt = now
         rateLimitStreak = []
         return true
     }
@@ -167,8 +199,12 @@ public struct AllowanceState: Codable, Hashable, Sendable {
             back = until
             retry = now.addingTimeInterval(Self.retryWithoutATime)
         }
+        // Out since the moment it went out: marked out again while out, by another
+        // refusal, a shared plan's word or a failed check, it keeps that time and moves
+        // only the freshness stamp (#334), as `markFailed` and a model's mark do.
+        if !isOut { since = now }
         status = .out(until: back, retryAfter: retry, why: why)
-        since = now
+        changedAt = now
         learnedFrom = source
         rateLimitStreak = []
     }
@@ -180,6 +216,7 @@ public struct AllowanceState: Codable, Hashable, Sendable {
         guard !isOut else { return false }
         status = .out(until: nil, retryAfter: now.addingTimeInterval(Self.retryWithoutATime), why: .runtimeFailed)
         since = now
+        changedAt = now
         learnedFrom = .runtimeFailure
         rateLimitStreak = []
         return true
@@ -214,6 +251,7 @@ public struct AllowanceState: Codable, Hashable, Sendable {
         guard case .out(_, _, .runtimeFailed) = status else { return false }
         status = .available
         since = now
+        changedAt = now
         rateLimitStreak = []
         return true
     }
@@ -224,6 +262,7 @@ public struct AllowanceState: Codable, Hashable, Sendable {
     public mutating func rateLimited(now: Date, retryAt: Date) {
         status = .rateLimited(until: retryAt)
         since = now
+        changedAt = now
     }
 
     /// A turn worked here: whatever was holding it is over.
@@ -231,6 +270,7 @@ public struct AllowanceState: Codable, Hashable, Sendable {
         guard status != .available || !rateLimitStreak.isEmpty else { return }
         status = .available
         since = now
+        changedAt = now
         rateLimitStreak = []
     }
 
@@ -241,6 +281,7 @@ public struct AllowanceState: Codable, Hashable, Sendable {
         status = .available
         spent = .known(nil)
         since = now
+        changedAt = now
         learnedFrom = .person
         rateLimitStreak = []
     }

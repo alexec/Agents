@@ -248,9 +248,10 @@ extension DaemonCore {
     // MARK: Servers (R6, T069)
 
     /// What another daemon learned about a shared allowance: a plan's sign-in, which a
-    /// server spends through the Mac's relay. The newer word wins (by `since`); a key is
-    /// never taken from elsewhere. Returns whether anything changed, which is also what
-    /// stops the Mac and a server passing the same state back and forth.
+    /// server spends through the Mac's relay. The newer word wins, by `changedAt`, which
+    /// a re-mark while out still moves (#334); a key is never taken from elsewhere.
+    /// Returns whether anything changed, which is also what stops the Mac and a server
+    /// passing the same state back and forth.
     @discardableResult
     public func applyAllowances(_ incoming: [AllowanceState]) -> Bool {
         var changed = false
@@ -259,7 +260,7 @@ extension DaemonCore {
             // reading beside it.
             let mine = allowances[state.credentialKey]
             let newerReading = [mine?.reading, state.reading].compactMap { $0 }.max { $0.at < $1.at }
-            if var mine, mine.since >= state.since {
+            if var mine, mine.changedAt >= state.changedAt {
                 if newerReading != mine.reading {
                     mine.reading = newerReading
                     allowances[state.credentialKey] = mine
@@ -268,6 +269,8 @@ extension DaemonCore {
                 continue
             }
             state.reading = newerReading
+            // Out here and out there: still out since whichever went out first.
+            if let mine, mine.isOut, state.isOut { state.since = min(mine.since, state.since) }
             let wasOut = allowances[state.credentialKey]?.isOut ?? false
             allowances[state.credentialKey] = state
             changed = true
@@ -442,7 +445,9 @@ extension DaemonCore {
             let key = AllowanceState.credentialKey(for: entry)
             if var state = allowances[key],
                case .out(let until, let retry, let why) = state.status {
-                let firstCheck = state.since.addingTimeInterval(AllowanceState.retryWithoutATime)
+                // Four hours after the latest word that it is out (`changedAt`), not after
+                // it first went out: a re-mark has just been told it is still out (#334).
+                let firstCheck = state.changedAt.addingTimeInterval(AllowanceState.retryWithoutATime)
                 if retry.map({ $0 < firstCheck }) ?? true {
                     state.status = .out(until: until, retryAfter: firstCheck, why: why)
                     setAllowanceState(state)
@@ -464,8 +469,10 @@ extension DaemonCore {
         defer { allowanceChecks.remove(key) }
         let passed = await probeAllowance(runtimeID: entry.runtimeID,
                                           skipping: Set(expected.modelsOut(now: now()).map(\.model)))
+        // Dropped when anything changed while the probe ran, a re-mark that kept the
+        // same `since` included: `changedAt` is the stamp that moves (#334).
         guard var state = allowances[key], state.status == expected.status,
-              state.since == expected.since else { return }
+              state.changedAt == expected.changedAt else { return }
         let at = now()
         if passed {
             markSignedIn(runtimeID: entry.runtimeID)
@@ -589,11 +596,13 @@ extension DaemonCore {
         // Late: a plan window saying when it is back can be read after the refusal it
         // explains, which was then recorded with no time. Put the time in, so the page
         // shows the provider's reset; the four-hour check still decides when it is back (R2).
+        // Late means within a minute of the latest word that it is out (`changedAt`), so a
+        // re-mark of an out that began hours ago still takes its reset time (#334).
         guard info.isRejected, let back = info.resetsAt, back > at, let agent = agents[agentID] else { return }
         let entry = poolEntry(for: agent)
         guard var state = allowances[AllowanceState.credentialKey(for: entry)],
               case .out(nil, let retry, .allowanceSpent) = state.status,
-              at.timeIntervalSince(state.since) < 60 else { return }
+              at.timeIntervalSince(state.changedAt) < 60 else { return }
         state.status = .out(until: back, retryAfter: retry, why: .allowanceSpent)
         setAllowanceState(state)
     }

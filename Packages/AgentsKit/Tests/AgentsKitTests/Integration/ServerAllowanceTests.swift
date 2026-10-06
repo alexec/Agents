@@ -92,6 +92,36 @@ struct ServerAllowanceTests {
         #expect(await mac.allowanceStates().first?.isOut == false)
     }
 
+    /// A re-mark while out keeps `since` but is still the newer word: it wins by
+    /// `changedAt` (#334), and an out learned from elsewhere keeps the first time.
+    @Test func aReMarkWhileOutIsTheNewerWordAndKeepsTheFirstTime() async throws {
+        let (mac, _, _) = try await daemon()
+        let wentOut = Date(timeIntervalSince1970: 1_790_000_000)
+        var first = AllowanceState(credentialKey: "codex:sign-in", entryID: UUID(), since: wentOut)
+        first.markOut(.allowanceSpent, until: nil, payment: codex.payment, now: wentOut, from: .typedFailure)
+        #expect(await mac.applyAllowances([first]))
+
+        // The server, refused again an hour later, now has the provider's time.
+        var again = first
+        let back = wentOut.addingTimeInterval(5 * 3600)
+        again.markOut(.allowanceSpent, until: back, payment: codex.payment, now: wentOut.addingTimeInterval(3600), from: .typedFailure)
+        #expect(again.since == wentOut)
+        #expect(await mac.applyAllowances([again]))
+        var kept = try #require(await mac.allowanceStates().first { $0.credentialKey == "codex:sign-in" })
+        #expect(kept.knownReturn == back)
+        #expect(kept.since == wentOut)
+        #expect(await mac.applyAllowances([first]) == false, "the older word loses")
+        #expect(await mac.applyAllowances([again]) == false, "no ping-pong")
+
+        // A host that went out on its own, later, is the newer word; out since the first.
+        var separately = AllowanceState(credentialKey: "codex:sign-in", entryID: UUID(), since: wentOut)
+        separately.markOut(.allowanceSpent, until: nil, payment: codex.payment, now: wentOut.addingTimeInterval(7200), from: .words)
+        #expect(await mac.applyAllowances([separately]))
+        kept = try #require(await mac.allowanceStates().first { $0.credentialKey == "codex:sign-in" })
+        #expect(kept.learnedFrom == .words)
+        #expect(kept.since == wentOut)
+    }
+
     /// An entry nobody has used shows as available on the page, but that is not a word
     /// about the plan, and must never be carried over one that is.
     @Test func whatIsCarriedIsWhatWasRecordedNotTheRows() async throws {
