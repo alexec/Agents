@@ -15,26 +15,26 @@
 
 ## Counts
 
-Of 210 rows: **124 same**, **37 by design**, **49 delta** (after #188, #189, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 211 rows: **142 same**, **38 by design**, **31 delta** (after #188, #189, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
 | Sidebar and project list | 3 | 2 | 12 |
-| Session rows and states | 10 | 2 | 11 |
-| Chat turns and turn detail | 14 | 3 | 7 |
-| Prompt bar and queued prompts | 16 | 2 | 2 |
-| Question and permission cards | 10 | 4 | 1 |
+| Session rows and states | 16 | 2 | 5 |
+| Chat turns and turn detail | 19 | 3 | 2 |
+| Prompt bar and queued prompts | 18 | 2 | 0 |
+| Question and permission cards | 12 | 3 | 0 |
 | Start sheet and new project | 17 | 5 | 0 |
-| Worktrees and Files | 12 | 6 | 3 |
-| Dashboard and pins | 8 | 0 | 6 |
+| Worktrees and Files | 9 | 6 | 6 |
+| Dashboard and pins | 13 | 1 | 0 |
 | Workflows page | 12 | 1 | 2 |
 | Settings and Project Settings | 1 | 6 | 0 |
 | Pool, runtimes and spending | 7 | 1 | 2 |
 | Events and resources | 2 | 1 | 2 |
-| Notifications and badges | 3 | 0 | 1 |
+| Notifications and badges | 3 | 1 | 0 |
 | Disk strip | 2 | 1 | 0 |
 | Hosts, connection and pairing | 3 | 3 | 0 |
-| MCP Apps views | 4 | 0 | 0 |
+| MCP Apps views | 5 | 0 | 0 |
 
 The deltas are tracked by 29 issues:
 - **Already open:** #226 (the Remote's one sidebar) and #235 (the page's one sidebar at phone width).
@@ -84,7 +84,7 @@ The deltas are tracked by 29 issues:
 | Worktree badge | ⑂ name, struck when gone, help *branch — path*: `A/AgentList/AgentRow.swift:361-386` | Struck when gone, help *branch — path*: `R/Projects/AgentCard.swift` | Struck; help the branch only: `W/views/SessionRow.tsx:84`, `W/app.css:561` | **same**; web #251 |
 | Folder is missing (#119) | On the row | On the row | On the row | **same** |
 | Labels | Every chip: `A/AgentList/AgentRow.swift:138-148` | Two, then *+N*: `R/Projects/AgentCard.swift:22-45` | Every chip: `W/views/SessionRow.tsx:85` | **by design** (phone width) |
-| Last-activity time in the corner | None | None | *5m*, *3h*, *2d*: `W/views/SessionRow.tsx:93` | **delta**: decide, #267 |
+| Last-activity time in the corner | *5m*, *3h*, *2d*, read again on the minute: `S/ActivityTime.swift` in `A/AgentList/AgentRow.swift` | The same view in `R/Sidebar/SidebarRows.swift` | `W/views/SessionRow.tsx`, words in `W/model/activity.ts` | **same** (#341; `ActivityWords.short`, held to `Fixtures/web/activity/short.json`) |
 | In flight, "telling …" (#87) | The host's name: `A/Permission/AnswerRecipient.swift:6-9` | The host's name: `R/RemoteModel.swift` `answerRecipient`, at `R/Projects/AgentCard.swift:122` and four more | `store.recipient(host)`: `W/model/store.ts:1111-1113` | **same** (#239) |
 | One action at a time, held while telling (#87) | `A/AgentList/AgentRow.swift` | `R/Projects/AgentCard.swift` | `W/views/SessionRow.tsx` | **same** |
 | Row actions | Carry on, Stop, Bring Back, Retire Now…, Mark Read / Unread, Pin, Branch, Park, Archive, Show in Finder: `A/AgentList/AgentRow.swift:213-268` | Stop, Bring Back, and the other card actions: `R/Projects/AgentCard.swift` | Stop, Park / Unpark, Mark, Pin, Bring Back / Archive, Move: `W/views/SessionMenu.tsx:16-44` | **same** for Stop and Bring Back; Branch #267. Retire Now and Show in Finder: **by design** (retention and Finder are the Mac's) |
@@ -106,7 +106,7 @@ The deltas are tracked by 29 issues:
 | Terminal output in a call | `S/Chat/ChatBlocks.swift:151` | Shared | *shown in the Mac window*: `W/views/chat/Rows.tsx:166` | **by design** (no terminal on the page) |
 | Markdown: code colour, task lists | `S/Page/MarkdownText.swift:24, 204`, `S/Code/CodeBlockText.swift` | Shared | Coloured known fences, static task boxes: `W/render/codeHighlight.ts`, `W/render/markdown.ts` | **same** (#252) |
 | Pictures in messages | `S/Chat/ChatBlocks.swift:40-51` | Shared | Image data drawn from a data URL; external addresses stay unloaded: `W/views/chat/Rows.tsx:40-45` | **same** (#252) |
-| Plan; a withdrawn plan | `S/Chat/ChatBlocks.swift:177-223` | Shared, plus a current-plan strip: `R/Chat/PlanView.swift:13-69` | Withdrawn entries crossed out; *The agent dropped this plan*: `W/views/chat/Rows.tsx:87-96` | **same** (#252); the plan strip #267 |
+| Plan; a withdrawn plan; the current-plan strip | `S/Chat/ChatBlocks.swift:177-223`; the strip under the chat's head: `S/Chat/CurrentPlanStrip.swift` in `A/Chat/ChatView.swift` | Shared, the strip in `R/Chat/RemoteChatView.swift` | Withdrawn entries crossed out; *The agent dropped this plan*: `W/views/chat/Rows.tsx`; the strip: `W/views/PlanStrip.tsx` | **same** (#252, #341; `Agent.planInForce` and `Plan.stripSummary`, held to `Fixtures/web/plan/strip.json`) |
 | Switch note and handoff | `S/Chat/SwitchNote.swift:7-24` | Shared | Full switch note: `W/model/switchNote.ts`, drawn by `W/views/chat/Rows.tsx:220-227` | **same** (#252) |
 | Jump to end | Whenever scrolled away, *Something new*: `S/Chat/JumpToEnd.swift:9-43` | Shared | Shown while away; *Something new* when messages arrive: `W/views/Chat.tsx:370-375` | **same** (#252) |
 | First open: the last 12 turns, earlier ones at the top (#90, #91) | 12: `K/Daemon/DaemonAPI.swift` (`TurnsRequest.opening`, #242) | 12, the same request: `R/RemoteModel.swift` | 12: `W/model/store.ts` (`openingTurns`) | **same** |
@@ -116,7 +116,7 @@ The deltas are tracked by 29 issues:
 | Background work over the prompt, its ending line | Stop, Steps, Output: `S/Chat/BackgroundRows.swift:13-45, 228-262`, `A/Sidebar/BackgroundPane.swift` | Stop and Steps: `R/Chat/PromptBar.swift:54-63` | Stop and stopping states: `W/views/Chat.tsx` (`BackgroundRows`); Started/ended lines and failed tint: `W/views/chat/Rows.tsx` | **same** (#253) |
 | Sandbox failure card (064) | `S/Chat/SandboxFailureCard.swift:19-68` | Shared: `R/Chat/RemoteChatView.swift:238-252` | What happened, recovery offer and Keep stopped / Continue without sandbox: `W/views/chat/Rows.tsx` | **same** (#253) |
 | Park line in the chat | `A/Chat/ChatView.swift:141-145` | At the chat's head: `R/Chat/RemoteChatView.swift:89-95` | `parkLine` over the transcript in `W/views/Chat.tsx` | **same** (#253) |
-| Block strip (#157) | Park line and Carry on: `A/Chat/ChatView.swift:134-161` | Carry on in the toolbar: `R/Chat/RemoteChatView.swift:144-154` | Wait lines and Carry on: `W/views/BlockStrip.tsx:7-17` | **delta**: decide, #267 (wait lines in the chat on the page only) |
+| Block strip (#157) | Park line, wait lines and Carry on: `A/Chat/ChatView.swift`, lines by `S/Chat/WaitLines.swift` | Wait lines at the chat's head (`S/Chat/WaitLines.swift`), Carry on in the toolbar: `R/Chat/RemoteChatView.swift` | Wait lines and Carry on: `W/views/BlockStrip.tsx:7-17` | **same** (#341) |
 | Folder is missing strip, refused send (#119) | `A/Chat/MissingFolderStrip.swift` | `R/Chat/RemoteMissingFolderStrip.swift`, alert `R/RemoteApp.swift:135-151` | `W/views/MissingFolder.tsx:30-55` (inline notice) | **same** |
 | Who is asking, on a card (#121) | `askerLine` | `askerLine` | `W/model/asker.ts`, held to `Fixtures/web/asker/line.json` | **same** |
 | Crowd mark on an empty chat | `A/Chat/CrowdMark.swift` | None | None | **by design** (decoration of the window's empty chat) |

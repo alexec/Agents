@@ -10,12 +10,16 @@ import SwiftUI
 /// Collapsed to one line by default. A plan is context for what is being read below
 /// it, and seven steps pinned over a phone-sized transcript would be most of the
 /// screen given to something the reader has already taken in.
+///
+/// The phone's first; the window draws it too since #341, and the page has its own
+/// (`Web/src/views/PlanStrip.tsx`). Which plan, and its line, are `Agent.planInForce` and
+/// `Plan.stripSummary`, so the three say the same.
 struct CurrentPlanStrip: View {
     let agent: Agent
     @State private var isExpanded = false
 
     var body: some View {
-        if let plan = current {
+        if let plan = agent.planInForce {
             VStack(alignment: .leading, spacing: 0) {
                 Button {
                     withAnimation(.easeOut(duration: 0.15)) { isExpanded.toggle() }
@@ -26,7 +30,7 @@ struct CurrentPlanStrip: View {
                             .foregroundStyle(.tertiary)
                             .rotationEffect(.degrees(isExpanded ? 90 : 0))
                             .accessibilityHidden(true)
-                        Text(summary(plan))
+                        Text(plan.stripSummary)
                             .appText(.supporting)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.leading)
@@ -35,35 +39,28 @@ struct CurrentPlanStrip: View {
                     .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .padding(.horizontal, 16)
                 .padding(.vertical, 8)
 
                 if isExpanded {
                     PlanView(plan: plan)
-                        .padding(.horizontal, 16)
                         .padding(.bottom, 10)
                 }
             }
+            .edges()
             .frame(maxWidth: .infinity)
             .background(Paper.ground)
         }
     }
+}
 
-    /// The plan in force: the last one the agent put forward that it has not dropped.
-    /// A dropped plan is kept on the record and shown in the transcript where it
-    /// happened, but it is not what the agent is doing now, so it is not up here.
-    private var current: Plan? {
-        agent.plans.last { $0.state == .current && !$0.entries.isEmpty }
-    }
-
-    /// The step being worked, because that is the one thing worth a line of the
-    /// screen; how far along, because that is the other. No plan has a title.
-    private func summary(_ plan: Plan) -> String {
-        let done = plan.entries.filter { $0.status == .completed }.count
-        let progress = "\(done) of \(plan.entries.count) done"
-        guard let doing = plan.entries.first(where: { $0.status == .inProgress }) else {
-            return "Plan — \(progress)"
-        }
-        return "\(doing.content) — \(progress)"
+private extension View {
+    /// The window's chat column, where its other strips sit; the phone's own margin.
+    @ViewBuilder
+    func edges() -> some View {
+        #if os(macOS)
+        chatColumn()
+        #else
+        padding(.horizontal, 16)
+        #endif
     }
 }

@@ -16,6 +16,7 @@ import { Cards } from "./Cards";
 import { OfflineStrip } from "./OfflineStrip";
 import { FolderGoneNotice, MissingFolderStrip } from "./MissingFolder";
 import { BlockStrip } from "./BlockStrip";
+import { CurrentPlanStrip } from "./PlanStrip";
 import { Telling } from "./Telling";
 import { Labels } from "./Labels";
 import { Prompt } from "./Prompt";
@@ -352,6 +353,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       {/* Why a parked chat is parked, and since when, as the window's strip says it (040, #253). */}
       {agent && parkLine(agent) && <p class="park-strip quiet" role="status">{parkLine(agent)}</p>}
       <BlockStrip store={store} host={host} agent={agent} disabled={down} />
+      {/* What it said it would do, under what it waits on, as the Remote has it (#341). */}
+      <CurrentPlanStrip agent={agent} />
       <CallActionsContext.Provider value={callActions}>
       <ViewLayerContext.Provider value={viewHosting}>
       <div class="scroll transcript" ref={scroller} onScroll={onScroll}>

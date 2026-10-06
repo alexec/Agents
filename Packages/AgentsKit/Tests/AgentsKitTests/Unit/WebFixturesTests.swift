@@ -663,6 +663,58 @@ struct WebFixturesTests {
         }
     }
 
+    /// The strip at the head of the chat (#341): the plan in force, and its one line.
+    @Test func planStrip() throws {
+        func step(_ content: String, _ status: PlanEntry.Status) -> PlanEntry {
+            PlanEntry(content: content, status: status)
+        }
+        let working = Plan(planID: "a", entries: [step("Read the code", .completed), step("Fix the row", .inProgress),
+                                                  step("Test it", .pending)], at: Self.at(1))
+        let between = Plan(planID: "b", entries: [step("Read the code", .completed), step("Test it", .pending)],
+                           at: Self.at(2))
+        let done = Plan(planID: "c", entries: [step("One", .completed), step("Two", .completed)], at: Self.at(3))
+        var dropped = working
+        dropped.planID = "d"
+        dropped.state = .withdrawn
+        let empty = Plan(planID: "e", entries: [], at: Self.at(4))
+        let lists: [(String, [Plan])] = [
+            ("no plan", []),
+            ("a step being worked", [working]),
+            ("no step being worked", [between]),
+            ("every step done", [done]),
+            ("the last of several", [working, between]),
+            ("a dropped plan is passed over", [working, dropped]),
+            ("only a dropped plan", [dropped]),
+            ("an empty plan is passed over", [between, empty]),
+        ]
+        let cases = try lists.map { Case(name: $0.0, input: .object(["plans": try Self.encode($0.1)])) }
+        try pin("plan/strip.json", cases) { input in
+            var agent = Self.agent(1, .running)
+            agent.plans = try (input["plans"] ?? .array([])).decode([Plan].self)
+            return agent.planInForce.map { .string($0.stripSummary) } ?? .null
+        }
+    }
+
+    // MARK: activity/
+
+    /// The time in the corner of a session row (#341).
+    @Test func activity() throws {
+        let seconds: [(String, Double)] = [
+            ("just now", 20), ("ahead of now", -90), ("a minute", 60), ("under the hour", 59 * 60 + 59),
+            ("an hour", 3600), ("under a day", 23 * 3600 + 3599), ("a day", 86_400), ("weeks", 40 * 86_400),
+        ]
+        let now = Self.at(10_000)
+        let cases = try seconds.map { name, ago in
+            Case(name: name, input: .object(["lastActivityAt": try Self.encode(now.addingTimeInterval(-ago)),
+                                             "now": try Self.encode(now)]))
+        }
+        try pin("activity/short.json", cases) { input in
+            let at = try (input["lastActivityAt"] ?? .null).decode(Date.self)
+            let now = try (input["now"] ?? .null).decode(Date.self)
+            return .string(ActivityWords.short(since: at, now: now))
+        }
+    }
+
     // MARK: sandbox/
 
     @Test func sandbox() throws {

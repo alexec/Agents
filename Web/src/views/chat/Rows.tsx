@@ -93,7 +93,7 @@ function pretty(value: JSONValue): string {
 }
 
 /** ChatBlocks' PlanView: a withdrawn plan is struck through, and says the agent dropped it (#252). */
-function PlanView({ plan }: { plan: Plan }) {
+export function PlanView({ plan }: { plan: Plan }) {
   const marks = { pending: "○", in_progress: "◐", completed: "●" } as const;
   const spoken = { pending: "To do", in_progress: "Doing now", completed: "Done" } as const;
   const withdrawn = plan.state === "withdrawn";
