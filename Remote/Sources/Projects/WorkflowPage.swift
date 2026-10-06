@@ -7,16 +7,16 @@ import SwiftUI
 /// running, what it does (who gets the prompt, the prompt, what it may do, its labels),
 /// what the file says that this version does not understand, and the agents it has run.
 /// The same things change here as change there — the runtime, the permission mode, the
-/// model, the effort and the runtime's other options, the labels, Run now or Approve,
-/// and Archive or Bring Back — and the same things do not. The prompt, the triggers
+/// model, the effort and the runtime's other options, the labels, which computers run
+/// it, Run now or Approve, and Archive or Bring Back — and the same things do not. The prompt, the triggers
 /// and the agent mode are the author's, and are shown, not edited.
 ///
 /// Laid out as a column rather than the Mac's prompt-bar shape: three menus side by
 /// side do not fit a phone, and a row per setting with its name on the left reads
 /// the way the phone's own Settings do.
 ///
-/// Every change goes to the Mac, which writes the file and answers with what it now
-/// says. The menus are drawn from that answer rather than state of their own, so a
+/// Every change goes to the host being looked at, which writes the file and answers
+/// with what it now says. The menus are drawn from that answer rather than state of their own, so a
 /// refusal puts them back to the truth without a second mechanism (FR-025).
 struct WorkflowPage: View {
     @Environment(RemoteModel.self) private var model
@@ -92,6 +92,7 @@ struct WorkflowPage: View {
             triggers(summary)
             settings(summary)
             labels(summary)
+            hostsSection(summary)
             unknownKeys(workflow)
             runs(workflow)
         }
@@ -643,6 +644,15 @@ struct WorkflowPage: View {
             .padding(14)
             .paperRaised(in: RoundedRectangle(cornerRadius: 18))
             .disabled(summary.workflow.settingsLocked || model.isStale)
+        }
+    }
+
+    /// Which computers run it (#317), under the names already on screen.
+    private func hostsSection(_ summary: WorkflowSummary) -> some View {
+        WorkflowHostsSection(choices: model.workflowHostChoices,
+                             hosts: summary.workflow.hosts ?? [],
+                             locked: summary.workflow.settingsLocked || model.isStale) { next in
+            Task { await model.setWorkflowSettings(summary, summary.workflow.settings, hosts: next) }
         }
     }
 

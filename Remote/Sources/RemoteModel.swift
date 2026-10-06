@@ -2312,9 +2312,8 @@ final class RemoteModel {
     /// says so on the summary, which is why nothing here second-guesses it first.
     func runWorkflow(_ summary: WorkflowSummary) async {
         do {
-            try await client.call(DaemonAPI.Method.workflowsRun,
-                                  DaemonAPI.WorkflowRequest(folder: summary.folder,
-                                                            workflowID: summary.workflowID))
+            let request = DaemonAPI.WorkflowRequest(folder: summary.folder, workflowID: summary.workflowID)
+            try await client(for: request).call(DaemonAPI.Method.workflowsRun, request)
         } catch {
             problem = sentence(for: error)
         }
@@ -2323,10 +2322,10 @@ final class RemoteModel {
     /// Put one away, or bring it back. `workflow/changed` redraws the page.
     func setWorkflowArchived(_ summary: WorkflowSummary, _ archived: Bool) async {
         do {
-            try await client.call(DaemonAPI.Method.workflowsArchive,
-                                  DaemonAPI.WorkflowArchiveRequest(folder: summary.folder,
-                                                                   workflowID: summary.workflowID,
-                                                                   archived: archived))
+            let request = DaemonAPI.WorkflowArchiveRequest(folder: summary.folder,
+                                                           workflowID: summary.workflowID,
+                                                           archived: archived)
+            try await client(for: request).call(DaemonAPI.Method.workflowsArchive, request)
         } catch {
             problem = sentence(for: error)
         }
@@ -2337,12 +2336,12 @@ final class RemoteModel {
     func approveWorkflow(_ summary: WorkflowSummary) async {
         guard let waiting = summary.awaitingApproval else { return }
         do {
-            let updated: WorkflowSummary = try await client.call(
-                DaemonAPI.Method.workflowsApprove,
-                DaemonAPI.WorkflowApproveRequest(folder: summary.folder, workflowID: summary.workflowID,
-                                                 digest: waiting.digest),
-                returning: WorkflowSummary.self)
-            work.upsert(updated)
+            let request = DaemonAPI.WorkflowApproveRequest(folder: summary.folder,
+                                                            workflowID: summary.workflowID,
+                                                            digest: waiting.digest)
+            let updated: WorkflowSummary = try await client(for: request).call(
+                DaemonAPI.Method.workflowsApprove, request, returning: WorkflowSummary.self)
+            keepWorkflow(updated, named: request)
         } catch {
             problem = sentence(for: error)
             await refreshWorkflows()
@@ -2352,10 +2351,10 @@ final class RemoteModel {
     /// Turn one on or off, keeping its place on the list (#100).
     func setWorkflowEnabled(_ summary: WorkflowSummary, _ enabled: Bool) async {
         do {
-            try await client.call(DaemonAPI.Method.workflowsEnable,
-                                  DaemonAPI.WorkflowEnableRequest(folder: summary.folder,
-                                                                  workflowID: summary.workflowID,
-                                                                  enabled: enabled))
+            let request = DaemonAPI.WorkflowEnableRequest(folder: summary.folder,
+                                                          workflowID: summary.workflowID,
+                                                          enabled: enabled)
+            try await client(for: request).call(DaemonAPI.Method.workflowsEnable, request)
         } catch {
             problem = sentence(for: error)
         }
@@ -2365,18 +2364,34 @@ final class RemoteModel {
     /// answers with what it now says; a refusal has to reach the person, and the list
     /// is asked again so the menu goes back to what the file still holds (FR-025).
     func setWorkflowSettings(_ summary: WorkflowSummary, _ settings: WorkflowSettings,
-                             cooldown: String? = nil, labels: [String]? = nil) async {
+                             cooldown: String? = nil, labels: [String]? = nil,
+                             hosts: [String]? = nil) async {
         do {
-            let updated: WorkflowSummary = try await client.call(
-                DaemonAPI.Method.workflowsSettings,
-                DaemonAPI.WorkflowSettingsRequest(folder: summary.folder,
-                                                  workflowID: summary.workflowID,
-                                                  settings: settings, cooldown: cooldown, labels: labels),
-                returning: WorkflowSummary.self)
-            work.upsert(updated)
+            let request = DaemonAPI.WorkflowSettingsRequest(folder: summary.folder,
+                                                            workflowID: summary.workflowID,
+                                                            settings: settings, cooldown: cooldown,
+                                                            labels: labels, hosts: hosts)
+            let updated: WorkflowSummary = try await client(for: request).call(
+                DaemonAPI.Method.workflowsSettings, request, returning: WorkflowSummary.self)
+            keepWorkflow(updated, named: request)
         } catch {
             problem = sentence(for: error)
             await refreshWorkflows()
+        }
+    }
+
+    /// The computers the workflow page can pin to, under the names already on screen.
+    var workflowHostChoices: [WorkflowHostChoice] {
+        WorkflowHosts.choices(from: controlHosts, thisMachine: nil)
+    }
+
+    /// Keep a workflow the host still runs (#317). The host is the one the call named.
+    private func keepWorkflow(_ summary: WorkflowSummary, named params: some Encodable) {
+        let host = otherHost(named: params) ?? controlHome ?? .mac
+        if !summary.workflow.runs(on: controlHosts.first(where: { $0.id == host })?.machineID) {
+            work.removeWorkflow(summary.workflowID, in: summary.folder)
+        } else {
+            work.upsert(summary)
         }
     }
 

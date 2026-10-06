@@ -2255,13 +2255,17 @@ public enum DaemonAPI {
         /// left alone, as the cooldown is, so a phone or page from before the labels
         /// field cannot remove them by saving a mode.
         public var labels: [String]?
+        /// The `hosts:` to write (#317): machine ids, or empty to take the line out so
+        /// every host runs it. Left out means left alone, as the labels are.
+        public var hosts: [String]?
         public init(folder: URL, workflowID: String, settings: WorkflowSettings, cooldown: String? = nil,
-                    labels: [String]? = nil) {
+                    labels: [String]? = nil, hosts: [String]? = nil) {
             self.folder = folder
             self.workflowID = workflowID
             self.settings = settings
             self.cooldown = cooldown
             self.labels = labels
+            self.hosts = hosts
         }
     }
 

@@ -2,16 +2,17 @@
 // Remote's), in their order: its name and what it is; Run Now or Approve, the Enabled switch and
 // Archive or Bring Back; the status card, why it is or isn't running; what it does (who gets the
 // prompt and, for a standing one, its agent; the prompt; its settings; its labels); what makes it
-// run, a line a trigger, and its cooldown; what its file says that this version does not know; and
-// the sessions it started. Every attribute is shown; the settings, labels and cooldown are edited
-// here as in the window (#162), what the workflow is (name, triggers, prompt, agent mode) is not.
+// run, a line a trigger, its cooldown, and which computers run it; what its file says that this
+// version does not know; and the sessions it started. Every attribute is shown; the settings,
+// labels, cooldown and hosts are edited here as in the window (#162, #317), what the workflow is
+// (name, triggers, prompt, agent mode) is not.
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
 import {
   cooldownSentence, labelsNote, agentModeWords, unknownLines, waitsItsTurn, workflowStatusLines, isOn, isSupportedTrigger, switchesSentence, lastRanLine, nextLine, resumedAgent, scopeLine, triggerFilters, triggerGlyph,
-  triggerSummary, workflowSummary,
+  triggerSummary, workflowHostChoices, workflowSummary,
 } from "../model/workflows";
 import { go } from "../route";
 import { RunNow } from "./WorkflowRow";
@@ -67,6 +68,10 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
     ? [store.agent(host, summary.standingAgentID)].find((a) => a !== undefined && a.archivedAt === undefined) : undefined;
   const cooldown = cooldownSentence(summary);
   const unknown = unknownLines(workflow);
+  const pinned = workflow.hosts ?? [];
+  const choices = workflowHostChoices(store.hosts.value);
+  const knownHosts = new Set(choices.map((choice) => choice.machineID));
+  const rows = [...choices, ...pinned.filter((id) => !knownHosts.has(id)).map((id) => ({ machineID: id, name: id }))];
   // A file that could not be read has no settings to show, so a change would write the empty ones.
   const locked = down || workflow.problem !== undefined;
   const change = (what: Parameters<Store["setWorkflowSettings"]>[2]) =>
@@ -159,6 +164,27 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
           )}
           <CooldownMenu summary={summary} disabled={locked} change={change} />
           <p class="quiet small">{cooldown ?? "No cooldown: every trigger runs it, one run at a time."}</p>
+
+          <h2 class="section-head">Runs on</h2>
+          <p class="quiet small">Every host with this project runs it, unless it is pinned to some of them. The file stores each computer's id, so renaming one does not unpin it.</p>
+          <div class="host-pins">
+            <label class="switch">
+              <input type="checkbox" role="switch" aria-label="Every host" checked={pinned.length === 0} disabled={locked || pinned.length === 0}
+                onChange={() => change({ hosts: [] })} />
+              Every host
+            </label>
+            {rows.map((row) => (
+              <label class="switch" key={row.machineID}>
+                <input type="checkbox" aria-label={row.name} checked={pinned.includes(row.machineID)} disabled={locked}
+                  onChange={(event) => {
+                    const on = (event.currentTarget as HTMLInputElement).checked;
+                    const next = on ? [...pinned, row.machineID] : pinned.filter((id) => id !== row.machineID);
+                    change({ hosts: next });
+                  }} />
+                {row.name}
+              </label>
+            ))}
+          </div>
 
           {unknown.length > 0 && (
             <>

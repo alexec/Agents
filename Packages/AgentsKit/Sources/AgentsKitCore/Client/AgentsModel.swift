@@ -652,6 +652,16 @@ public final class AgentsModel {
         refillWorkflowShelf(summary.folder)
     }
 
+    /// Drop one workflow from the list a window is showing (#317). A save that pins it
+    /// to other computers is answered with the workflow, and putting that answer back
+    /// would show a row this host does not run.
+    public func removeWorkflow(_ workflowID: String, in folder: URL) {
+        let key = Project.standardize(folder)
+        guard workflows.contains(where: { $0.folder == key && $0.workflowID == workflowID }) else { return }
+        workflows.removeAll { $0.folder == key && $0.workflowID == workflowID }
+        refillWorkflowShelf(key)
+    }
+
     public func replaceWorkflows(_ summaries: [WorkflowSummary]) {
         workflows = summaries.sorted(by: Self.workflowName)
         let folders = Set(workflowShelves.keys)

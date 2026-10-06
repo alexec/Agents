@@ -80,7 +80,7 @@ extension DaemonCore {
         // project may hold a few dozen workflows.
         let records = workflowStore.load()
         let ceilings = workflowCeilings(records: records)
-        for workflow in held {
+        for workflow in held where workflow.runs(on: MachineID.current) {
             broadcast(DaemonAPI.Notification.workflowChanged,
                       summary(for: workflow, records: records, ceilings: ceilings))
         }
@@ -352,8 +352,13 @@ extension DaemonCore {
         loadWorkflows(in: standardized)
         let after = workflows[standardized] ?? [:]
 
-        let moved = Set(after.keys.filter { before[$0] != after[$0] })
-        let gone = before.keys.filter { after[$0] == nil }
+        // The list a window sees is the workflows this computer may run (#317). One
+        // pinned to another host leaves this list, which is a removal, even while the
+        // file stays in the project for that other host to read.
+        let beforeShown = before.filter { $0.value.runs(on: MachineID.current) }
+        let afterShown = after.filter { $0.value.runs(on: MachineID.current) }
+        let moved = Set(afterShown.keys.filter { beforeShown[$0] != afterShown[$0] })
+        let gone = beforeShown.keys.filter { afterShown[$0] == nil }
         for id in gone {
             broadcast(DaemonAPI.Notification.workflowRemoved,
                       DaemonAPI.WorkflowRemovedNotification(folder: standardized, workflowID: id))
@@ -390,6 +395,7 @@ extension DaemonCore {
         let ceilings = workflowCeilings(records: records)
         return folders
             .flatMap { workflows[$0]?.values ?? [:].values }
+            .filter { $0.runs(on: MachineID.current) }
             .map { summary(for: $0, records: records, ceilings: ceilings) }
             .sorted { $0.workflow.name.localizedCaseInsensitiveCompare($1.workflow.name) == .orderedAscending }
     }
@@ -484,7 +490,7 @@ extension DaemonCore {
         var ceilings = WorkflowCeilings()
         for folder in workflows.keys.sorted(by: { $0.path < $1.path }) {
             for id in (workflows[folder] ?? [:]).keys.sorted() {
-                guard let workflow = workflows[folder]?[id] else { continue }
+                guard let workflow = workflows[folder]?[id], workflow.runs(on: MachineID.current) else { continue }
                 let state = records.state(folder: folder, workflowID: id)
                 guard !workflow.isArchived else { continue }
                 if awaitingApproval(workflow, state: state, records: records) != nil {
@@ -515,6 +521,29 @@ extension DaemonCore {
             ? nil : .total
     }
 
+    /// Tell the windows this workflow changed, when this computer runs it (#317).
+    ///
+    /// The dictionary's copy is the file as it reads now. A workflow pinned to other
+    /// computers is left unannounced: `workflow/changed` after a rescan had taken the
+    /// row off would put it back.
+    func announceWorkflow(_ workflow: Workflow, records: WorkflowRecords? = nil) {
+        let current = workflows[Project.standardize(workflow.folder)]?[workflow.workflowID] ?? workflow
+        guard current.runs(on: MachineID.current) else { return }
+        broadcast(DaemonAPI.Notification.workflowChanged, summary(for: current, records: records))
+    }
+
+    /// Write `hosts:`. A single id on one line is that same list, so it is rewritten
+    /// as a list rather than refused. Empty takes the line out: every host.
+    private func writeHosts(_ hosts: [String], into source: String) throws -> String {
+        do {
+            return try FrontMatterEdit.set("hosts", toList: hosts, in: source)
+        } catch let refusal as FrontMatterEdit.Refusal
+            where refusal.message == "`hosts:` is not written as a list, which this cannot change" {
+            let cleared = try FrontMatterEdit.set("hosts", to: nil, in: source)
+            return try FrontMatterEdit.set("hosts", toList: hosts, in: cleared)
+        }
+    }
+
     /// Tell the windows about every other workflow in a project, after something that
     /// can move one across a ceiling: approving, archiving or removing a waiting one
     /// lets the next in line be approved.
@@ -522,7 +551,8 @@ extension DaemonCore {
         let standardized = Project.standardize(folder)
         let records = workflowStore.load()
         let ceilings = workflowCeilings(records: records)
-        for (id, workflow) in workflows[standardized] ?? [:] where !except.contains(id) {
+        for (id, workflow) in workflows[standardized] ?? [:]
+        where !except.contains(id) && workflow.runs(on: MachineID.current) {
             broadcast(DaemonAPI.Notification.workflowChanged,
                       summary(for: workflow, records: records, ceilings: ceilings))
         }
@@ -629,6 +659,9 @@ extension DaemonCore {
 
         for (folder, byID) in workflows {
             for workflow in byID.values {
+                // Another computer's workflow is not news here: no fire, and no refusal
+                // every half hour for as long as the file sits in the project (#317).
+                guard workflow.runs(on: MachineID.current) else { continue }
                 guard let due = workflow.nextDue(after: since), due <= now else { continue }
                 // Nothing is recorded against an archived one, here or on a lifecycle
                 // event. A refusal is news, and "the thing you put away did not run"
@@ -668,6 +701,9 @@ extension DaemonCore {
               at when: Date? = nil,
               causingEvent: EventPosition? = nil,
               byHand: Bool = false) async -> WorkflowRefusal? {
+        // Before any record. A workflow pinned elsewhere must not fire here, and must
+        // not leave a refusal that would look like this computer's own workflow failing.
+        guard workflow.runs(on: MachineID.current) else { return nil }
         let now = when ?? self.now()
         let key = workflow.id
         let records = workflowStore.load()
@@ -726,7 +762,7 @@ extension DaemonCore {
         // while the runtime is still starting leaves a run the next one can find its
         // agent for, by `startedByRun`, rather than one it never knew was in flight.
         persistWorkflowRuns()
-        broadcast(DaemonAPI.Notification.workflowChanged, summary(for: workflow, records: records))
+        announceWorkflow(workflow, records: records)
 
         do {
             let agentID = try await runAgent(for: workflow, run: run, causingEvent: causingEvent)
@@ -1022,7 +1058,7 @@ extension DaemonCore {
         records.record(outcome, folder: workflow.folder, workflowID: workflow.workflowID,
                        causingEvent: causingEvent, cause: cause)
         keepQuietly("workflow history") { try workflowStore.save(records) }
-        broadcast(DaemonAPI.Notification.workflowChanged, summary(for: workflow, records: records))
+        announceWorkflow(workflow, records: records)
         // On the log (042): what the fire came to, on the event that caused it, and as
         // an event of its own, one step deeper in the chain.
         switch outcome {
@@ -1153,7 +1189,8 @@ extension DaemonCore {
         case .stopped: trigger = .agentStopped
         }
 
-        for workflow in byID.values where workflow.responds(to: event)
+        for workflow in byID.values where workflow.runs(on: MachineID.current)
+            && workflow.responds(to: event)
             && !workflow.isArchived
             && !isOwnAgent(agentID, of: workflow, endingRun: endingRun) {
             // Detached, because this is called from inside the actor by `move`, and
@@ -1172,7 +1209,7 @@ extension DaemonCore {
         workflowRuns.removeValue(forKey: key)
         persistWorkflowRuns()
         if let workflow = workflow(run.workflowID, in: run.folder) {
-            broadcast(DaemonAPI.Notification.workflowChanged, summary(for: workflow))
+            announceWorkflow(workflow)
             // Update now's line (#146) says the run is over.
             if workflow.settings.labels.contains(DashboardUpdate.label) { dashboardChanged(workflow.folder) }
         }
@@ -1189,7 +1226,8 @@ extension DaemonCore {
                                 .map { ["outcome": $0.outcome.rawValue] } ?? [:]) { $1 },
                          chainDepth: run.depth + 1))
         guard let byID = workflows[folder] else { return }
-        for other in byID.values where other.respondsToCompletion(of: run.workflowID)
+        for other in byID.values where other.runs(on: MachineID.current)
+            && other.respondsToCompletion(of: run.workflowID)
             && !other.isArchived {
             Task { [weak self] in
                 await self?.fire(other, on: .workflowCompleted(id: run.workflowID),
@@ -1217,6 +1255,7 @@ extension DaemonCore {
         for state in records.states {
             guard let held = state.heldFire else { continue }
             guard let workflow = workflows[state.folder]?[state.workflowID],
+                  workflow.runs(on: MachineID.current),
                   !workflow.isArchived, !workflow.isOff else {
                 records.update(folder: state.folder, workflowID: state.workflowID) { $0.heldFire = nil }
                 dropped = true
@@ -1248,6 +1287,10 @@ extension DaemonCore {
         guard let workflow = workflow(request.workflowID, in: request.folder) else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchWorkflow,
                                message: "There is no workflow called \(request.workflowID) in this project.")
+        }
+        guard workflow.runs(on: MachineID.current) else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchWorkflow,
+                               message: "\(workflow.name) runs on another computer.")
         }
         await fire(workflow, on: .schedule(WorkflowSchedule()), byHand: true)
         return summary(for: workflow)
@@ -1322,8 +1365,9 @@ extension DaemonCore {
         }
         let summary = summary(for: reread)
         // A change the rescan could not see — the outcome or held trigger let go — is
-        // still news to the windows.
-        broadcast(DaemonAPI.Notification.workflowChanged, summary)
+        // still news to the windows. One pinned to another computer is not: announcing
+        // it would put the row back after the rescan took it off (#317).
+        announceWorkflow(reread)
         return summary
     }
 
@@ -1396,6 +1440,14 @@ extension DaemonCore {
                 }
                 if labels != existing.settings.labels {
                     edited = try FrontMatterEdit.set(WorkflowSettings.Setting.labels, toList: labels, in: edited)
+                }
+            }
+            // Empty takes the line out: every host, as a file that never said (#317).
+            // `claim:` and any other key this version does not know are left as written.
+            if let requested = request.hosts {
+                let hosts = WorkflowHosts.cleaned(requested)
+                if hosts != (existing.hosts ?? []) {
+                    edited = try writeHosts(hosts, into: edited)
                 }
             }
         } catch let refusal as FrontMatterEdit.Refusal {
@@ -1510,7 +1562,7 @@ extension DaemonCore {
         persistWorkflowRuns()
         for run in released {
             if let workflow = workflow(run.workflowID, in: run.folder) {
-                broadcast(DaemonAPI.Notification.workflowChanged, summary(for: workflow))
+                announceWorkflow(workflow)
             }
         }
     }

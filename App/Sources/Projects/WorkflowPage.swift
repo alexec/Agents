@@ -17,7 +17,8 @@ import SwiftUI
 /// Nothing on this page edits the file's triggers or its prompt. Those are the
 /// author's, and an app that quietly rewrote the body of a file in somebody's
 /// repository would be a worse thing than one that made you open an editor. What can
-/// be changed from here is how much the workflow is allowed to do.
+/// be changed from here is how much the workflow is allowed to do, and which
+/// computers run it.
 ///
 /// Every workflow opens, including the ones that cannot run: archived, over a ceiling,
 /// waiting on a trigger this version does not know, and unreadable. The unreadable one
@@ -121,6 +122,7 @@ struct WorkflowPage: View {
             }
             form(summary)
             triggers(summary)
+            hostsSection(summary)
             unknownKeys(workflow)
             history(summary)
         }
@@ -617,6 +619,15 @@ struct WorkflowPage: View {
                 }
             }
             note(summary.workflow.labelsNote)
+        }
+    }
+
+    /// Which computers run it (#317). The names are the ones already on screen.
+    private func hostsSection(_ summary: WorkflowSummary) -> some View {
+        WorkflowHostsSection(choices: model.workflowHostChoices,
+                             hosts: summary.workflow.hosts ?? [],
+                             locked: summary.workflow.settingsLocked) { next in
+            Task { await model.setWorkflowSettings(summary, summary.workflow.settings, hosts: next) }
         }
     }
 

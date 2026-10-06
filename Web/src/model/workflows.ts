@@ -663,3 +663,42 @@ export function cooldownSentence(s: WorkflowSummary): string | null {
   }
   return sentence;
 }
+
+/** Whether this host may run the workflow (#317). A pinned workflow needs a known matching id. */
+export function workflowRunsOn(hosts: readonly string[] | undefined, machineID: string | undefined): boolean {
+  if (!hosts || hosts.length === 0) return true;
+  if (!machineID) return false;
+  return hosts.includes(machineID);
+}
+
+/** One computer the workflow page can pin to. The name is the one already on screen. */
+export interface WorkflowHostChoice {
+  machineID: string;
+  name: string;
+}
+
+/**
+ * Enrolled hosts that run agents, This Mac first, then the rest by name. A relay runs
+ * no agents, and a host with no machine id cannot be written, so both are left out.
+ * On the phone and the page, This Mac is the host whose id is `mac`.
+ */
+export function workflowHostChoices(hosts: readonly { id: string; name: string; machineID?: string | undefined; relay?: boolean | undefined }[]): WorkflowHostChoice[] {
+  const usable = hosts.flatMap((host) => {
+    const machineID = (host.machineID ?? "").trim();
+    return host.relay === true || machineID === "" ? [] : [{ ...host, machineID }];
+  });
+  const ordered = [...usable].sort((a, b) => {
+    const aMac = a.id === "mac";
+    const bMac = b.id === "mac";
+    if (aMac !== bMac) return aMac ? -1 : 1;
+    return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+  });
+  const seen = new Set<string>();
+  const result: WorkflowHostChoice[] = [];
+  for (const host of ordered) {
+    if (seen.has(host.machineID)) continue;
+    seen.add(host.machineID);
+    result.push({ machineID: host.machineID, name: host.id === "mac" ? "This Mac" : (host.name || host.machineID) });
+  }
+  return result;
+}
