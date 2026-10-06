@@ -42,7 +42,8 @@ extension DaemonCore {
             outcome = .cancel
         }
         elicitations.removeValue(forKey: request.requestID)
-        if let session = live[pending.agentID] {
+        let turnIsLive = turnTasks[pending.agentID] != nil
+        if turnIsLive, let session = live[pending.agentID] {
             await session.answerElicitation(id: pending.request.id, outcome: outcome)
         }
         var answers: [ElicitationAnswer] = []
@@ -52,6 +53,26 @@ extension DaemonCore {
         // An `ask_form` call is waiting on this same id: wake it with the words the
         // agent reads, then carry on as a runtime elicitation would.
         answerAsk(pending.request.id, .success(Self.askFormNote(outcome: outcome, answers: answers)))
+        // A warm session is not a turn. Preserve the question beside the answer and
+        // start a fresh turn through the same durable queue as an ordinary prompt.
+        let shouldResume: Bool
+        if case .cancel = outcome { shouldResume = false } else { shouldResume = true }
+        if !turnIsLive, shouldResume, agents[pending.agentID] != nil {
+            let properties: [String?]
+            if case .form(let schema) = pending.request.mode {
+                properties = schema.properties.map(\.title)
+            } else {
+                properties = []
+            }
+            let question = ([pending.request.message ?? pending.request.title] + properties)
+                .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n")
+            let asked = question.isEmpty ? "The agent asked a question." : question
+            let response = Self.askFormNote(outcome: outcome, answers: answers)
+            let text = "The agent asked:\n\(asked)\n\nYour answer: \(response)"
+            let prompt = DaemonAPI.PromptRequest(agentID: pending.agentID, text: text, from: .app)
+            try await keepPrompt(prompt)
+            try await enqueue(prompt, first: false)
+        }
         await record(.elicitationAnswered(id: pending.request.id, summary: outcome.summary,
                                           answers: answers),
                      for: pending.agentID)
@@ -83,6 +104,13 @@ extension DaemonCore {
     }
 
     func holdElicitation(_ request: ElicitationRequest, agentID: UUID) async {
+        guard turnTasks[agentID] != nil else {
+            await record(.runtimeNote(RuntimeNote.questionWentUnanswered), for: agentID)
+            if let session = live[agentID] {
+                await session.answerElicitation(id: request.id, outcome: .cancel)
+            }
+            return
+        }
         var request = request
         request.agentID = agentID
         elicitations[request.id] = PendingElicitation(request: request, agentID: agentID)

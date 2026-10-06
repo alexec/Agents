@@ -399,6 +399,10 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent,
                                message: "That conversation is not open any more, so nobody was asked.")
         }
+        guard turnTasks[agentID] != nil else {
+            throw JSONRPCError(code: JSONRPCError.invalidRequest,
+                               message: "A question can only be asked while this agent is working.")
+        }
         guard !request.questions.isEmpty else {
             throw JSONRPCError(code: JSONRPCError.invalidParams,
                                message: "Nothing was asked: send at least one question.")
