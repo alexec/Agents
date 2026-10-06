@@ -1,6 +1,6 @@
 # Parity: the Mac window, the Remote and the web page (#233)
 
-**Date:** 2026-10-04, at main 28884102.
+**Date:** 2026-10-05, at `f681d39e` plus #254.
 
 **What it is:** where each of the three clients stands, a row per screen and feature. The three are the Mac window (`App/`), the Remote on iPhone and iPad (`Remote/`), and the web page (`Web/`). Every parity line in a commit (AGENTS.md, "Keeping the three clients in step") updates the row it changes.
 
@@ -15,14 +15,14 @@
 
 ## Counts
 
-Of 206 rows: **111 same**, **37 by design**, **58 delta** (after #221, #238–#244, #249, #252, #253, #255–#261, #263–#266, #291). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 206 rows: **120 same**, **37 by design**, **49 delta** (after #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
 | Sidebar and project list | 3 | 2 | 12 |
 | Session rows and states | 10 | 2 | 11 |
 | Chat turns and turn detail | 14 | 3 | 7 |
-| Prompt bar and queued prompts | 7 | 2 | 11 |
+| Prompt bar and queued prompts | 16 | 2 | 2 |
 | Question and permission cards | 10 | 4 | 1 |
 | Start sheet and new project | 17 | 5 | 0 |
 | Worktrees and Files | 12 | 6 | 3 |
@@ -120,7 +120,7 @@ The deltas are tracked by 29 issues:
 | Folder is missing strip, refused send (#119) | `A/Chat/MissingFolderStrip.swift` | `R/Chat/RemoteMissingFolderStrip.swift`, alert `R/RemoteApp.swift:135-151` | `W/views/MissingFolder.tsx:30-55` (inline notice) | **same** |
 | Who is asking, on a card (#121) | `askerLine` | `askerLine` | `W/model/asker.ts`, held to `Fixtures/web/asker/line.json` | **same** |
 | Crowd mark on an empty chat | `A/Chat/CrowdMark.swift` | None | None | **by design** (decoration of the window's empty chat) |
-| Context meter | `A/Chat/ContextMeter.swift:15` | Its own copy: `R/Chat/RemoteChatView.swift:289-343` | None | **delta**: web #254 |
+| Context meter | `A/Chat/ContextMeter.swift:15` | Its own copy: `R/Chat/RemoteChatView.swift:289-343` | `W/views/PromptStatus.tsx` | **same** |
 
 ## Prompt bar and queued prompts
 
@@ -129,21 +129,21 @@ The deltas are tracked by 29 issues:
 | Layout (#108) | `A/Chat/PromptBar.swift` | `R/Chat/PromptBar.swift` | `W/views/Prompt.tsx` (walked, `walks/108/`) | **same** (each to its width) |
 | The bar's head: place, labels, runtime | `A/Chat/PromptBar.swift:246-269, 353-363` | Over the field: the place (said, not offered), labels, runtime: `R/Chat/PromptBar.swift` (`PromptHead`, #242) | `W/views/Chat.tsx:230-271` | **same** (moving a session stays the window's, 053) |
 | Moving a session to another place (053) | Worktree capsule: `A/Chat/PromptBar.swift:1185-1261` | None | Names the place, can't move: `W/views/Chat.tsx:249-264` | **by design** (moving is the window's) |
-| Model and effort | One `ModelPill`: `S/Chat/ModelPill.swift` | One `ModelPill` | A pill each: `W/views/PromptMenus.tsx:44-63` | **delta**: web #254 (or record by design) |
-| No-controls note | `OptionsNote`: `S/Chat/PromptPieces.swift` | The same | Nothing: `W/views/PromptMenus.tsx:48` | **delta**: web #254 |
-| Sandbox capsule | `S/Chat/SandboxCapsule.swift`, `A/Chat/PromptBar.swift:854-878` | `R/Chat/PromptBar.swift:498-505` | None | **delta**: web #254 |
-| Lease and event-wait capsules | `S/Chat/LeaseRow.swift`, `S/Chat/WaitCapsule.swift` | The same, the wait without ✕ (`WaitCapsule.swift:9-10`) | None | **delta**: web #254 |
-| Cost / day-limit banner | `S/Chat/PromptPieces.swift:104` | The same | None | **delta**: web #254 |
-| Placeholder | `PromptWords.placeholder`: `S/Chat/PromptPieces.swift:14-24` | The same | *Reply…*: `W/views/Chat.tsx:225` | **delta**: web #254 |
-| Send / Queue / Stop button | `A/Chat/PromptBar.swift:478-524` | `R/Chat/PromptBar.swift:228-272` | Always *↑ Send*; Stop in ···: `W/views/Prompt.tsx:173-176` | **delta**: web #254 |
+| Model and effort | One `ModelPill`: `S/Chat/ModelPill.swift` | One `ModelPill` | One combined disclosure: `W/views/PromptMenus.tsx` | **same** |
+| No-controls note | `OptionsNote`: `S/Chat/PromptPieces.swift` | The same | `W/views/PromptMenus.tsx` | **same** |
+| Sandbox capsule | `S/Chat/SandboxCapsule.swift`, `A/Chat/PromptBar.swift:854-878` | `R/Chat/PromptBar.swift:498-505` | `W/views/PromptStatus.tsx` | **same** |
+| Lease and event-wait capsules | `S/Chat/LeaseRow.swift`, `S/Chat/WaitCapsule.swift` | The same, the wait without ✕ (`WaitCapsule.swift:9-10`) | `W/views/Chat.tsx:472-488` | **same** |
+| Cost / day-limit banner | `S/Chat/PromptPieces.swift:104` | The same | `W/views/PromptStatus.tsx` | **same** |
+| Placeholder | `PromptWords.placeholder`: `S/Chat/PromptPieces.swift:14-24` | The same | `promptPlaceholder`: `W/model/promptWords.ts`, offered suggestion as placeholder: `W/views/Prompt.tsx` | **same** (#276) |
+| Send / Queue / Stop button | `A/Chat/PromptBar.swift:478-524` | `R/Chat/PromptBar.swift:228-272` | `W/views/Prompt.tsx` | **same** (#276) |
 | Sending in flight (#87) | Spinner, *telling* after 400 ms: `A/Chat/PromptBar.swift:120-138` | The host's name: `R/Chat/PromptBar.swift:94` | `W/views/Prompt.tsx:119-121` | **same** (#239) |
 | Queued prompts as bubbles, Send now, × (#95) | `S/Chat/TranscriptRows.swift:377-463` | Shared | `W/views/Chat.tsx:277-306` | **same** |
 | Attachments | Picker, drag, paste: `A/Chat/PromptBar.swift:455-463` | `R/Chat/PromptBar.swift:214` | Picker, drop, paste: `W/views/Prompt.tsx:122-171` | **same** |
 | Dictation (#69) | `S/Chat/Dictation.swift` | Shared | None | **by design** (071) |
 | Slash commands | `S/Chat/CommandList.swift` | Shared | Over the field: `W/views/Prompt.tsx:223`, `W/model/completions.ts` | **same** (#255) |
 | @ file mentions | `A/Chat/PromptBar.swift:644-690` | `R/Chat/PromptBar.swift:418-454` | Asks the host (`files/mention`): `W/views/Prompt.tsx:236`; none on a new session, as the Remote (no agent to ask yet) | **same** (#255) |
-| Suggested next prompt (031) | Placeholder and Tab: `A/Chat/PromptBar.swift:67-88` | A chip: `R/Chat/PromptBar.swift:537-561` | None | **delta**: web #254. Placeholder against chip: **by design** (touch) |
-| Drafts kept | Across relaunch: `A/Chat/DraftKeeper.swift` | Flushed on going to the background | Memory only, lost on reload: `W/model/store.ts:1009` | **delta**: web #254 |
+| Suggested next prompt (031) | Placeholder and Tab: `A/Chat/PromptBar.swift:67-88` | A chip: `R/Chat/PromptBar.swift:537-561` | Placeholder and Tab: `W/views/Prompt.tsx` | **same** (placeholder against chip: **by design**, touch; #276) |
+| Drafts kept | Across relaunch: `A/Chat/DraftKeeper.swift` | Flushed on going to the background | Across reload: `W/model/drafts.ts` | **same** (#276) |
 | Warm on intent (#183) | `A/Chat/PromptBar.swift:175-177` | To the agent's host: `R/RemoteModel.swift:2480-2490` | `W/views/Chat.tsx:50, 229` | **same** (#238) |
 | The bar on an archived chat | Shown: *Say what next, and this comes back* | Shown (#242) | Shown | **same** |
 

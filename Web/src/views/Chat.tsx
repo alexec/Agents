@@ -20,6 +20,7 @@ import { Telling } from "./Telling";
 import { Labels } from "./Labels";
 import { Prompt } from "./Prompt";
 import { PromptMenus } from "./PromptMenus";
+import { ContextMeter, CostLimitBanner, SandboxCapsule } from "./PromptStatus";
 import { SessionMenu } from "./SessionMenu";
 import { drawable } from "../model/options";
 import { projectFolder } from "../model/groups";
@@ -258,6 +259,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     if (changed) fetched.value = next;
   }, [rows, chosen.value, level.value]);
 
+  useEffect(() => { void store.loadCost(host); }, [store, host]);
+
   const hold = (id: string, value: HeldTurn) => {
     const kept = rememberOpen(fetched.peek(), openedTurns.current, id, value);
     openedTurns.current = kept.order;
@@ -381,6 +384,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         <Prompt store={store} draftKey={`${host}|${session}`} placeholder={promptPlaceholder(agent)} disabled={down || !agent}
           stop={agent && hasTurnInFlight(agent) ? () => void store.perform(host, agent.id, "agents/stop") : undefined}
           queues={willQueue(agent)} suggestion={agent?.suggestedPrompts?.[0]}
+          banner={agent && <CostLimitBanner agent={agent} costs={store.costs.value[host]}
+            goOn={() => void store.letAgentGoOn(host, agent)} />}
           recipient={store.recipient(host)}
           capabilities={agent ? store.account(host, agent.runtimeID)?.promptCapabilities : undefined}
           send={(text, attachments) => store.prompt(host, session, text, attachments)}
@@ -395,9 +400,14 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           )}
           runtime={agent && <RuntimeLabel store={store} host={host} runtimeID={agent.runtimeID} />}>
           {agent && (
-            <PromptMenus options={drawable(agent.advertisedOptions, [])} disabled={down}
+          <PromptMenus options={drawable(agent.advertisedOptions, [])} disabled={down}
               value={(o) => store.pendingOptions.value[agent.id]?.[o.id] ?? agent.startOptions.values[o.id] ?? o.currentValue}
-              onChange={(o, v) => void store.setOption(host, agent.id, o.id, v)} />
+              onChange={(o, v) => void store.setOption(host, agent.id, o.id, v)}
+              trailing={<ContextMeter agent={agent} />}
+              besideMode={<SandboxCapsule runtimeID={agent.runtimeID} override={agent.sandboxOverride}
+                runtimeDefault={store.sandboxDefaults.value[host]?.[agent.runtimeID] ?? "runtime"}
+                mode={typeof agent.startOptions.values.mode === "string" ? agent.startOptions.values.mode : undefined} disabled={down}
+                onChange={(choice) => void store.setAgentSandbox(host, agent.id, choice)} />} />
           )}
         </Prompt>
       </footer>
