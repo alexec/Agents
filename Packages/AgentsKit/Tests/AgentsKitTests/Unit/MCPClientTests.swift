@@ -71,7 +71,7 @@ struct MCPClientTests {
         await client.end()
 
         let seen = server.requests
-        #expect(seen.map(\.method) == ["initialize", "notifications/initialized", "tools/list", "DELETE"])
+        try #require(seen.map(\.method) == ["initialize", "notifications/initialized", "tools/list", "DELETE"])
         #expect(seen.allSatisfy { $0.headers["X-Key"] == "k1" })
         #expect(seen[0].headers["Mcp-Session-Id"] == nil)
         #expect(seen.dropFirst().allSatisfy { $0.headers["Mcp-Session-Id"] == "s-1" })
