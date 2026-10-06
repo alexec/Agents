@@ -1,7 +1,8 @@
 // Which projects in the sidebar are unfolded, which of their Archived folds are open (#151), and
 // which of their session groups and Workflows are folded (#181), kept across visits in
 // localStorage, as the window keeps them in defaults (SidebarFolds.swift). A fold is named by
-// host and folder, so the same folder on two hosts folds apart.
+// host and folder, so the same folder on two hosts folds apart. Archived projects, the one fold
+// under no project, is kept on its own, as the window's `showsArchivedProjects` (#343).
 import { signal } from "@preact/signals";
 import type { AgentGroup } from "../protocol/generated";
 import { folderKey } from "./groups";
@@ -11,6 +12,8 @@ export type Fold = "project" | "archivedSessions" | "archivedWorkflows" | "workf
 const storageKey = "agents.sidebar.folds";
 /** The folds that start open and have been closed: the groups and Workflows (#181). */
 const closedKey = "agents.sidebar.folded";
+/** Whether Archived projects is open; closed until opened (#343). */
+const archivedProjectsKey = "agents.sidebar.archivedProjects";
 
 /** A project and the Archived folds start folded; the groups, Pinned (#180) and Workflows start open. */
 export function startsOpen(fold: Fold): boolean {
@@ -34,10 +37,28 @@ export function foldName(host: string, folder: string, fold: Fold = "project"): 
 export class Folds {
   readonly open;
   readonly closed;
+  readonly showsArchivedProjects;
 
   constructor(private readonly storage: Storage | undefined) {
     this.open = signal(read(storage, storageKey));
     this.closed = signal(read(storage, closedKey));
+    let shows = false;
+    try {
+      shows = storage?.getItem(archivedProjectsKey) === "true";
+    } catch {
+      // Unreadable storage leaves it closed.
+    }
+    this.showsArchivedProjects = signal(shows);
+  }
+
+  setShowsArchivedProjects(isOpen: boolean): void {
+    if (this.showsArchivedProjects.peek() === isOpen) return;
+    this.showsArchivedProjects.value = isOpen;
+    try {
+      this.storage?.setItem(archivedProjectsKey, String(isOpen));
+    } catch {
+      // A private window may refuse to store; the fold still holds for this visit.
+    }
   }
 
   isOpen(host: string, folder: string, fold: Fold = "project"): boolean {
