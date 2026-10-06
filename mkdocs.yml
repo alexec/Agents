@@ -88,6 +88,7 @@ nav:
       - how-to/add-a-skill-from-a-catalogue.md
       - how-to/add-an-mcp-server-from-the-registry.md
       - how-to/add-an-mcp-server-by-hand.md
+      - how-to/sign-in-to-an-mcp-server.md
       - how-to/keep-going-when-a-runtime-runs-out.md
       - how-to/limit-spending.md
       - how-to/archive-park-stop.md

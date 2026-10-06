@@ -4,6 +4,10 @@ import SwiftUI
 /// Add an MCP server that is not in the registry (#305): a name, a local command or a
 /// remote URL, its env, arguments and headers. **Verify** connects before anything is
 /// written; **Add** is only offered for what answered, as it answered.
+extension DaemonAPI.MCPSignInTarget: @retroactive Identifiable {
+    public var id: Self { self }
+}
+
 struct AddMCPByHandPane: View {
     @Environment(AppModel.self) private var model
 
@@ -34,6 +38,8 @@ struct AddMCPByHandPane: View {
     @State private var verified: DaemonAPI.MCPHandServer?
     @State private var adding = false
     @State private var addError: String?
+    /// The server asked for a sign-in: Verify waits on it, then asks again (#306).
+    @State private var signingIn: DaemonAPI.MCPSignInTarget?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -63,6 +69,9 @@ struct AddMCPByHandPane: View {
             }
         }
         .padding(18)
+        .sheet(item: $signingIn) { target in
+            MCPSignInSheet(target: target, onSignedIn: { Task { await verify() } })
+        }
     }
 
     // MARK: The form
@@ -162,9 +171,11 @@ struct AddMCPByHandPane: View {
                             .appText(.fine).tinted(.attention)
                     }
                 case .authRequired:
-                    Text("This server asks you to sign in before it answers. The app can't sign in to an MCP server yet, so it can't be verified or added here. Nothing was written.")
+                    Text("This server asks you to sign in before it answers. Once you have, it is verified again. Nothing was written.")
                         .appText(.fine).tinted(.attention)
                         .fixedSize(horizontal: false, vertical: true)
+                    Button("Sign in…") { signingIn = .url(name: current.name, url: current.url) }
+                        .buttonStyle(.paper).appText(.fine)
                 case .failed(let why):
                     Text("It did not answer: \(why) Nothing was written.").appText(.fine).tinted(.failure)
                         .fixedSize(horizontal: false, vertical: true)
@@ -255,6 +266,9 @@ struct AddMCPByHandPane: View {
         let server = current
         answer = await model.mcpVerify(server, for: destination)
         verified = server
+        if case .authRequired = answer?.outcome, signingIn == nil {
+            signingIn = .url(name: server.name, url: server.url)
+        }
     }
 
     private func add() async {

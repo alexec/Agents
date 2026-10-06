@@ -2664,6 +2664,44 @@ final class AppModel {
         }
     }
 
+    /// Start signing in to a server that asks for OAuth (#306): the page to open, or the
+    /// client the person has to give first.
+    func mcpSignIn(_ target: DaemonAPI.MCPSignInTarget,
+                   client: DaemonAPI.MCPSignInClient? = nil) async -> DaemonAPI.MCPSignInAnswer {
+        do {
+            return try await self.client.call(DaemonAPI.Method.mcpSignIn,
+                                              DaemonAPI.MCPSignInRequest(target: target, client: client),
+                                              returning: DaemonAPI.MCPSignInAnswer.self)
+        } catch {
+            return .init(error: "The sign-in couldn't start: the app could not reach its host.")
+        }
+    }
+
+    /// Wait on a sign-in, a while at a time: `waiting` means ask again.
+    func mcpSignInWait(_ flowID: UUID) async -> DaemonAPI.MCPSignInStatus {
+        do {
+            return try await client.call(DaemonAPI.Method.mcpSignInWait, DaemonAPI.MCPSignInFlowRequest(flowID: flowID),
+                                         returning: DaemonAPI.MCPSignInWaitAnswer.self).status
+        } catch {
+            return .failed("The app lost touch with its host while waiting.")
+        }
+    }
+
+    func mcpSignInCancel(_ flowID: UUID) async {
+        _ = try? await client.call(DaemonAPI.Method.mcpSignInCancel, DaemonAPI.MCPSignInFlowRequest(flowID: flowID),
+                                   returning: DaemonAPI.MCPSignInWaitAnswer.self)
+    }
+
+    /// Forget a server's sign-in. Nil, or why it could not.
+    func mcpSignOut(_ target: DaemonAPI.MCPSignInTarget) async -> String? {
+        do {
+            return try await client.call(DaemonAPI.Method.mcpSignOut, DaemonAPI.MCPSignOutRequest(target: target),
+                                         returning: DaemonAPI.MCPSignOutAnswer.self).error
+        } catch {
+            return "It couldn't be signed out: the app could not reach its host."
+        }
+    }
+
     private static func mcpError(_ error: any Error) -> DaemonAPI.MCPCatalogError {
         if let rpc = error as? JSONRPCError, rpc.code == DaemonAPI.Failure.mcpCatalogRefused,
            let reason = try? rpc.data?.decode(DaemonAPI.MCPCatalogError.self) {

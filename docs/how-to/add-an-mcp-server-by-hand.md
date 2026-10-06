@@ -41,8 +41,8 @@ the sheet shows the tools it listed.
    - **It did not answer**: the sheet says why, for example that the command was not found,
      or what the URL answered with. Change something and choose **Verify** again.
    - **It asks you to sign in**: the server wants a sign-in, an OAuth one, before it answers.
-     The app cannot sign in to an MCP server yet, so it cannot be verified or added from the
-     sheet.
+     The sign-in sheet opens, and once you have signed in in your browser, Verify runs
+     again with it: see [Sign in to an MCP server](sign-in-to-an-mcp-server.md).
 7. Choose **Add to ~/.agents**, or **Add to project**. It is offered only once the server
    has answered, and only while the form still says what was verified. Change anything and
    you verify again.

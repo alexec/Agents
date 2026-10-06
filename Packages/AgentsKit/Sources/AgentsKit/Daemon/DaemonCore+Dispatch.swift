@@ -306,11 +306,11 @@ extension DaemonCore {
 
             case DaemonAPI.Method.mcpList:
                 let request = try require(params, as: DaemonAPI.MCPListRequest.self)
-                return .success(try JSONValue.encoding(try mcpList(request)))
+                return .success(try JSONValue.encoding(try await mcpList(request)))
 
             case DaemonAPI.Method.mcpApprove:
                 let request = try require(params, as: DaemonAPI.MCPApproveRequest.self)
-                return .success(try JSONValue.encoding(try mcpApprove(request)))
+                return .success(try JSONValue.encoding(try await mcpApprove(request)))
 
             case DaemonAPI.Method.mcpSetSecret:
                 let request = try require(params, as: DaemonAPI.MCPSetSecretRequest.self)
@@ -327,6 +327,22 @@ extension DaemonCore {
             case DaemonAPI.Method.mcpAddByHand:
                 let request = try require(params, as: DaemonAPI.MCPAddByHandRequest.self)
                 return .success(try JSONValue.encoding(try await mcpAddByHand(request)))
+
+            case DaemonAPI.Method.mcpSignIn:
+                let request = try require(params, as: DaemonAPI.MCPSignInRequest.self)
+                return .success(try JSONValue.encoding(await mcpSignIn(request)))
+
+            case DaemonAPI.Method.mcpSignInWait:
+                let request = try require(params, as: DaemonAPI.MCPSignInFlowRequest.self)
+                return .success(try JSONValue.encoding(await mcpSignInWait(request)))
+
+            case DaemonAPI.Method.mcpSignInCancel:
+                let request = try require(params, as: DaemonAPI.MCPSignInFlowRequest.self)
+                return .success(try JSONValue.encoding(mcpSignInCancel(request)))
+
+            case DaemonAPI.Method.mcpSignOut:
+                let request = try require(params, as: DaemonAPI.MCPSignOutRequest.self)
+                return .success(try JSONValue.encoding(await mcpSignOut(request)))
             #endif
 
             case DaemonAPI.Method.runtimesInstall:

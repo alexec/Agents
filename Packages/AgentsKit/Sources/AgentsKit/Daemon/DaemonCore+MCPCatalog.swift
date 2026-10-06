@@ -113,14 +113,32 @@ extension DaemonCore {
             return home
         }()
         let timeout = mcpVerifyTimeout
-        let client = MCPClient(server: built.filled, cwd: cwd, timeout: timeout, http: mcpVerifyHTTP)
+        // Signed in to already (#306): verified as an agent will reach it, with its bearer.
+        var server = built.filled
+        var ownAuthorization = true
+        if case .http(let url, var headers) = server.transport, !MCPSignIns.bringsOwnAuthorization(headers) {
+            ownAuthorization = false
+            if case .token(let token) = await mcpSignIns.bearer(server: url, name: name) {
+                headers["Authorization"] = "Bearer \(token)"
+                server = MCPServer(name: server.name, transport: .http(url: url, headers: headers))
+            }
+        }
+        let client = MCPClient(server: server, cwd: cwd, timeout: timeout, http: mcpVerifyHTTP)
         let outcome: DaemonAPI.MCPVerifyOutcome
         do {
             let info = try await client.connect()
             let tools = try await client.listTools()
             outcome = .answered(serverName: info.name, version: info.version, tools: tools.map(\.name))
         } catch MCPClient.Failure.authRequired(let metadata) {
-            outcome = .authRequired(resourceMetadata: metadata)
+            // Not a sign-in when the entry sends its own Authorization: that was refused.
+            if ownAuthorization {
+                outcome = .failed("It refused the Authorization header it was sent (HTTP 401).")
+            } else {
+                if case .http(let url, _) = built.filled.transport {
+                    await mcpSignIns.markNeedsSignIn(server: url, name: name, resourceMetadata: metadata)
+                }
+                outcome = .authRequired(resourceMetadata: metadata)
+            }
         } catch let failure as MCPClient.Failure {
             outcome = .failed(MCPHandEntry.sentence(failure, timeout: Int(timeout.components.seconds)))
         } catch {
@@ -174,7 +192,7 @@ extension DaemonCore {
         }
     }
 
-    func mcpList(_ request: DaemonAPI.MCPListRequest) throws -> DaemonAPI.MCPListAnswer {
+    func mcpList(_ request: DaemonAPI.MCPListRequest) async throws -> DaemonAPI.MCPListAnswer {
         try requireMCPProject(request.destination)
         let approvals = mcpApprovalStore.load()
         let listed = MCPProjectListing.list(destination: request.destination,
@@ -188,10 +206,11 @@ extension DaemonCore {
         if case .project = request.destination, approvals.unreadable {
             approvalsProblem = ApprovalFile.note(mcpApprovalStore.file)
         }
-        return .init(servers: listed.servers, problem: listed.problem, approvalsProblem: approvalsProblem)
+        let servers = await mcpSignInStates(listed.servers, destination: request.destination)
+        return .init(servers: servers, problem: listed.problem, approvalsProblem: approvalsProblem)
     }
 
-    func mcpApprove(_ request: DaemonAPI.MCPApproveRequest) throws -> DaemonAPI.MCPListAnswer {
+    func mcpApprove(_ request: DaemonAPI.MCPApproveRequest) async throws -> DaemonAPI.MCPListAnswer {
         guard case .project(let path) = request.destination else {
             throw Self.mcpRefusal(.failed("Only a project's server waits for approval."))
         }
@@ -217,7 +236,7 @@ extension DaemonCore {
             throw Self.mcpRefusal(error)
         }
         DaemonLog.shared.write("mcp: approve \(request.name) in project")
-        return try mcpList(.init(destination: request.destination))
+        return try await mcpList(.init(destination: request.destination))
     }
 
     func mcpSetSecret(_ request: DaemonAPI.MCPSetSecretRequest) throws -> DaemonAPI.MCPSetSecretAnswer {
