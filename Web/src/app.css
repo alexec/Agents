@@ -1028,9 +1028,10 @@ pre.page-tile-body { white-space: pre-wrap; font-size: 11px; margin: 0; }
 .view-box.full .view-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px;
   height: 40px; padding: 0 16px; border-bottom: 1px solid var(--paper-rule); font-size: 13px; flex: none; }
 .view-box.full iframe { flex: 1; height: auto; }
+.view-box.full .view-bar strong { flex: 1; }
 .app-view { display: flex; flex-direction: column; gap: 6px; }
 .app-view .view-caption { display: flex; gap: 8px; align-items: center; margin: 0; font-size: 12px; }
-.app-view .view-caption button { margin-left: auto; }
+.app-view .view-caption .view-actions { margin-left: auto; display: flex; gap: 12px; align-items: center; }
 .app-view .view-slot { width: 100%; }
 button.plain { background: none; border: none; padding: 0; color: inherit; opacity: 0.65; font: inherit; }
 button.plain:hover { opacity: 1; }

@@ -2185,6 +2185,18 @@ final class RemoteModel {
         }
     }
 
+    /// Pin a view under a project (#189), from its menu in a chat. Why it was not, or nil.
+    func pinView(_ view: ViewPin, in folder: URL) async -> String? {
+        do {
+            let pins = try await client.call(DaemonAPI.Method.pinsPin, DaemonAPI.PinRequest(folder: folder, view: view),
+                                             returning: [PinView].self)
+            work.setPins(pins, in: folder)
+            return nil
+        } catch {
+            return sentence(for: error)
+        }
+    }
+
     func unpin(_ path: String, in folder: URL) async {
         work.setPins(pins(in: folder).filter { $0.path != path }, in: folder)
         if openPin == path { openPin = nil }

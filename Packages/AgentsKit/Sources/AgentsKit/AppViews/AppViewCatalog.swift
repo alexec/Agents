@@ -17,6 +17,11 @@ public enum AppViewCatalog {
         public var resourceURI: String? { definition["_meta"]?["ui"]?["resourceUri"]?.stringValue }
         public var forModel: Bool { visibility.contains("model") }
         public var forApp: Bool { visibility.contains("app") }
+        /// Marked as changing nothing (`annotations.readOnlyHint`).
+        public var readOnly: Bool { definition["annotations"]?["readOnlyHint"]?.boolValue == true }
+        /// Whether opening a pin may call it (#189): a view may call it, and it changes
+        /// nothing, because a pin calls it every time it opens.
+        public var feedsPins: Bool { forApp && readOnly }
     }
 
     /// A `ui://` resource.
@@ -60,6 +65,41 @@ public enum AppViewCatalog {
 
     public static func resource(_ uri: String, testView: Bool = offersTestView) -> Resource? {
         resources(testView: testView).first { $0.uri == uri }
+    }
+
+    // MARK: Pins (#189)
+
+    /// Why `view` can't be pinned, in words for whoever asked, or nil when it can. Until
+    /// third-party views (#191), only the app's own server's.
+    public static func pinRefusal(_ view: ViewPin, testView: Bool = offersTestView) -> String? {
+        if let problem = PinRules.problem(view) { return problem }
+        guard view.server == AppTool.serverName else {
+            return "only the \(AppTool.serverName) server's views can be pinned so far, not \(view.server)'s."
+        }
+        if view.uri == dashboardURI { return "the Dashboard is already in the sessions column." }
+        guard resource(view.uri, testView: testView) != nil else { return "the \(view.server) server has no view at \(view.uri)." }
+        guard let tool = tools(testView: testView).first(where: { $0.name == view.tool }), tool.resourceURI == view.uri else {
+            return "\(view.tool) does not feed \(view.uri)."
+        }
+        guard tool.feedsPins else {
+            return "\(view.tool) can't feed a pin: only a tool a view may call and that changes nothing "
+                + "(readOnlyHint) can, since opening the pin calls it."
+        }
+        return nil
+    }
+
+    /// Why a pinned view can't be drawn on this host (`PinMissing`), or nil when it can.
+    public static func missingReason(_ view: ViewPin, testView: Bool = offersTestView) -> String? {
+        guard view.server == AppTool.serverName else { return PinMissing.serverNotSetUp }
+        guard view.uri != dashboardURI, resource(view.uri, testView: testView) != nil,
+              tools(testView: testView).contains(where: { $0.name == view.tool && $0.resourceURI == view.uri && $0.feedsPins })
+        else { return PinMissing.noSuchView }
+        return nil
+    }
+
+    /// Whether a call of `tool` drawing `uri` could be pinned, for the Pin in a view's menu.
+    public static func pinnable(tool: String, uri: String, testView: Bool = offersTestView) -> Bool {
+        pinRefusal(ViewPin(server: AppTool.serverName, uri: uri, tool: tool), testView: testView) == nil
     }
 
     // MARK: The test view
@@ -285,6 +325,7 @@ public enum AppViewCatalog {
                             "description": "How long to wait before answering. Default 0."],
             ],
         ],
+        "annotations": ["readOnlyHint": true],
         "_meta": [
             "ui": ["resourceUri": .string(testViewURI), "visibility": ["model", "app"]],
             "ui/resourceUri": .string(testViewURI),

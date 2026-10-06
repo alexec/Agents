@@ -75,6 +75,35 @@ host a chat uses for a tool's view. The page makes the call itself, so no conver
 to be open. The tiles stay files in `.agents/dashboard/`. Keepers and `take_over` are
 unchanged. **Update now** stays on the page, beside the view.
 
+## Pinning a view
+
+A view can be pinned under a project, beside its Dashboard and pinned pages, on the Mac,
+the Remote and the web page. **This is our extension of MCP Apps (SEP-1865).** The spec
+ties a view to a tool call the model made. A pin is the host making that call itself.
+
+- **What a pin names.** The server, the view's `ui://` address, the tool that feeds it,
+  and that tool's arguments (at most 2 KB of JSON). It is kept in `.agents/pins.json`
+  beside the Markdown and HTML pins, and shared through git, so the arguments never hold a
+  secret. A project has at most 10 pins, pages and views together.
+- **Opening it.** The host calls the feeding tool (`views/call` with `feed: true`) and
+  draws the view full page with that call's input and result. Each time it is opened the
+  call is made again, so the view is as of then. It does not update while open.
+- **Which tools can feed a pin.** Only a tool a view may call (`visibility` includes
+  `app`) that is marked as changing nothing (`annotations.readOnlyHint`), because opening
+  a pin calls it. Anything else is refused, and so is `ui://agents/dashboard`, which is
+  already the project's first row.
+- **Which servers.** Until third-party views arrive (#191), only the `agents` server's.
+  A pin this host can't draw shows as missing, with why: *server not set up here*, *waiting
+  for approval* or *no such view*. That is the way a pinned file shows as missing until its
+  branch lands.
+- **No agent.** A pinned view, like the Dashboard, is on a project's page with no
+  conversation. Its `ui/message` and `ui/update-model-context` are refused, and the refusal
+  goes in the daemon's log.
+- **How to pin one.** **Pin to Project** in the view's menu, beside its name in the chat
+  or in full screen, when the server says the call can feed a pin. An agent pins one with
+  `pin_page` and `view` (`server`, `uri`, `tool`, `arguments`). `unpin_page` and `move_pin`
+  take the view's `ui://` address as its `path`.
+
 ## The test view
 
 The `agents` server has a test view, `ui://agents/test-view`, for proving all of this on
@@ -82,4 +111,5 @@ every device. An agent can draw it with `show_test_view`. Its **Count** button c
 `test_view_count`, which only a view may call. Inside, the view tries to reach `example.com`,
 which it never declared, and says in the view and in the daemon's log that it was blocked.
 It is offered to agents only when the daemon is started with `AGENTS_TEST_VIEWS=1`, so the
-agents you work with are not handed a tool for testing the app.
+agents you work with are not handed a tool for testing the app. `show_test_view` is
+read-only, so the test view can be pinned; `test_view_count` is not, so it can't feed one.

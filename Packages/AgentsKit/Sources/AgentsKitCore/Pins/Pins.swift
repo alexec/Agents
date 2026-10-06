@@ -10,11 +10,41 @@ public struct PinsFile: Codable, Sendable, Hashable {
     /// The pinned sessions (#180), in the order shown. Absent when there are none, so a
     /// file of pages alone is the same bytes it always was.
     public var sessions: [SessionPinEntry]?
+    /// Entries this build cannot read (a newer build's kind of pin), kept as they were and
+    /// written back after the rest, so an older reader never loses them (#189). They count
+    /// towards the limit.
+    public var unread: [JSONValue] = []
 
-    public init(pins: [PinEntry] = [], sessions: [SessionPinEntry] = []) {
+    public init(pins: [PinEntry] = [], sessions: [SessionPinEntry] = [], unread: [JSONValue] = []) {
         self.pins = pins
         self.sessions = sessions.isEmpty ? nil : sessions
+        self.unread = unread
     }
+
+    enum CodingKeys: String, CodingKey {
+        case pins, sessions
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        var pins: [PinEntry] = []
+        var unread: [JSONValue] = []
+        for raw in try container.decodeIfPresent([JSONValue].self, forKey: .pins) ?? [] {
+            if let entry = try? raw.decode(PinEntry.self) { pins.append(entry) } else { unread.append(raw) }
+        }
+        self.pins = pins
+        self.unread = unread
+        sessions = try container.decodeIfPresent([SessionPinEntry].self, forKey: .sessions)
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(try pins.map { try JSONValue.encoding($0) } + unread, forKey: .pins)
+        try container.encodeIfPresent(sessions, forKey: .sessions)
+    }
+
+    /// Pins of either kind, and those this build cannot read: what the limit counts.
+    public var pinCount: Int { pins.count + unread.count }
 
     /// The pinned sessions, none for a file without the key.
     public var sessionPins: [SessionPinEntry] {
@@ -39,12 +69,18 @@ public struct PinsFile: Codable, Sendable, Hashable {
         let raw = try JSONDecoder().decode(PinsFile.self, from: data)
         var seen: Set<String> = []
         var kept: [PinEntry] = []
+        let room = PinLimits.perProject - raw.unread.count
         for entry in raw.pins {
-            guard let path = PinRules.normalize(entry.path), PinRules.kind(path) != nil,
-                  !seen.contains(path), kept.count < PinLimits.perProject else { continue }
-            seen.insert(path)
             var clean = entry
-            clean.path = path
+            if let view = entry.view {
+                guard PinRules.problem(view) == nil else { continue }
+                clean.path = view.uri
+            } else {
+                guard let path = PinRules.normalize(entry.path), PinRules.kind(path) != nil else { continue }
+                clean.path = path
+            }
+            guard !seen.contains(clean.path), kept.count < room else { continue }
+            seen.insert(clean.path)
             kept.append(clean)
         }
         var sessions: [SessionPinEntry] = []
@@ -52,7 +88,7 @@ public struct PinsFile: Codable, Sendable, Hashable {
             && sessions.count < PinLimits.sessionsPerProject {
             sessions.append(entry)
         }
-        return (PinsFile(pins: kept, sessions: sessions),
+        return (PinsFile(pins: kept, sessions: sessions, unread: raw.unread),
                 raw.pins.count - kept.count + raw.sessionPins.count - sessions.count)
     }
 }
@@ -75,16 +111,19 @@ public struct SessionPinEntry: Codable, Sendable, Hashable {
     }
 }
 
-/// One pin in the file.
+/// One pin in the file: a page, by its `path`, or a view (#189), by its `view`. Never both.
 public struct PinEntry: Codable, Sendable, Hashable {
     /// Relative to the project folder, `/` between its parts, no `..`. The pin's identity.
+    /// A view pin's is its `ui://` address, and is not written: `view` says it.
     public var path: String
     /// What the row says, if not the file's own name.
     public var title: String?
     public var pinnedBy: Pinner
+    /// A `ui://` view and the call that feeds it (#189).
+    public var view: ViewPin?
 
     enum CodingKeys: String, CodingKey {
-        case path, title
+        case path, title, view
         case pinnedBy = "pinned_by"
     }
 
@@ -92,6 +131,51 @@ public struct PinEntry: Codable, Sendable, Hashable {
         self.path = path
         self.title = title
         self.pinnedBy = pinnedBy
+    }
+
+    public init(view: ViewPin, title: String? = nil, pinnedBy: Pinner) {
+        self.path = view.uri
+        self.title = title
+        self.pinnedBy = pinnedBy
+        self.view = view
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let path = try container.decodeIfPresent(String.self, forKey: .path)
+        let view = try container.decodeIfPresent(ViewPin.self, forKey: .view)
+        guard (path == nil) != (view == nil) else {
+            throw DecodingError.dataCorruptedError(forKey: .path, in: container,
+                                                   debugDescription: "A pin has one of path and view.")
+        }
+        self.path = path ?? view!.uri
+        self.view = view
+        title = try container.decodeIfPresent(String.self, forKey: .title)
+        pinnedBy = try container.decode(Pinner.self, forKey: .pinnedBy)
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        if let view { try container.encode(view, forKey: .view) } else { try container.encode(path, forKey: .path) }
+        try container.encodeIfPresent(title, forKey: .title)
+        try container.encode(pinnedBy, forKey: .pinnedBy)
+    }
+}
+
+/// A pinned view (#189): which server's `ui://` resource, and the tool call that feeds it.
+/// Opening the pin makes that call. Our extension of MCP Apps (SEP-1865), which ties a view
+/// only to a call the model made. Shared through git, so `arguments` never holds a secret.
+public struct ViewPin: Codable, Sendable, Hashable {
+    public var server: String
+    public var uri: String
+    public var tool: String
+    public var arguments: JSONValue?
+
+    public init(server: String, uri: String, tool: String, arguments: JSONValue? = nil) {
+        self.server = server
+        self.uri = uri
+        self.tool = tool
+        self.arguments = arguments
     }
 }
 
@@ -118,6 +202,8 @@ public struct Pinner: Codable, Sendable, Hashable {
 
 public enum PinKind: String, Codable, Sendable, Hashable {
     case markdown, html
+    /// A `ui://` view (#189).
+    case view
 }
 
 public enum PinLimits {
@@ -126,6 +212,8 @@ public enum PinLimits {
     /// Pinned sessions a project may hold, apart from its pages (#180).
     public static let sessionsPerProject = 10
     public static let titleLength = 60
+    /// A view pin's arguments, as JSON (#189).
+    public static let viewArgumentsBytes = 2048
 }
 
 /// The rules every door holds to: which files, which paths, what a row is called.
@@ -170,6 +258,27 @@ public enum PinRules {
         return stem
     }
 
+    /// What is wrong with a view pin's shape, or nil. Whether its server has the view is
+    /// the host's to say.
+    public static func problem(_ view: ViewPin) -> String? {
+        if view.server.trimmingCharacters(in: .whitespaces).isEmpty { return "a view pin names its server." }
+        if !view.uri.hasPrefix("ui://") || view.uri.count <= 5 { return "a view's address starts ui://." }
+        if view.tool.trimmingCharacters(in: .whitespaces).isEmpty { return "a view pin names the tool that feeds it." }
+        if let arguments = view.arguments {
+            guard case .object = arguments else { return "`arguments` is a JSON object." }
+            if ((try? JSONEncoder().encode(arguments))?.count ?? .max) > PinLimits.viewArgumentsBytes {
+                return "`arguments` is at most \(PinLimits.viewArgumentsBytes / 1024) KB of JSON."
+            }
+        }
+        return nil
+    }
+
+    /// The row's words for a view without a title: the last part of its address.
+    public static func defaultTitle(_ view: ViewPin) -> String {
+        let name = view.uri.split(separator: "/").last.map(String.init) ?? view.uri
+        return name.replacingOccurrences(of: "-", with: " ").capitalized(with: nil)
+    }
+
     /// The order after moving `path`: before or after another, or first or last.
     public static func moving(_ paths: [String], _ path: String, before: String? = nil, after: String? = nil,
                               first: Bool = false) -> [String] {
@@ -197,14 +306,28 @@ public struct PinView: Codable, Sendable, Hashable, Identifiable {
     /// The file is not in the project folder (deleted, moved, or only on a branch).
     public var missing: Bool
     public var pinnedBy: PinnerView
+    /// A view pin's view and feeding call (#189); `path` is then its `ui://` address.
+    public var view: ViewPin?
+    /// Why a view pin is missing here, in a few words: `PinMissing`.
+    public var missingReason: String?
 
-    public init(path: String, title: String, kind: PinKind, missing: Bool, pinnedBy: PinnerView) {
+    public init(path: String, title: String, kind: PinKind, missing: Bool, pinnedBy: PinnerView,
+                view: ViewPin? = nil, missingReason: String? = nil) {
         self.path = path
         self.title = title
         self.kind = kind
         self.missing = missing
         self.pinnedBy = pinnedBy
+        self.view = view
+        self.missingReason = missingReason
     }
+}
+
+/// Why a view pin shows as missing (#189), as a pinned file does until its branch lands.
+public enum PinMissing {
+    public static let serverNotSetUp = "server not set up here"
+    public static let waitingForApproval = "waiting for approval"
+    public static let noSuchView = "no such view"
 }
 
 /// Who pinned it, named for a person.

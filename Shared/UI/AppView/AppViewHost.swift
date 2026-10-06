@@ -7,6 +7,8 @@ import WebKit
 struct AppViewActions {
     /// The conversation the views are in.
     var agentID: UUID
+    /// Set for a view on a project's page (the Dashboard, a pin), which has no agent: its
+    /// `ui/message` and `ui/update-model-context` are refused, and logged (#189).
     var project: URL? = nil
     /// One of `views/*`, to the host the conversation is on.
     var call: @MainActor (String, JSONValue) async throws -> JSONValue
@@ -15,6 +17,8 @@ struct AppViewActions {
     /// A `ui/open-link`, in the default browser.
     var openLink: @MainActor (URL) -> Void
     var openDashboardTarget: @MainActor (String, String) -> Void = { _, _ in }
+    /// Pin this call's view under the chat's project (#189). Why it was not, or nil.
+    var pin: (@MainActor (ViewPin) async -> String?)? = nil
 }
 
 /// The views open in one chat, kept by call so a view keeps what it is showing while it is
@@ -78,6 +82,8 @@ final class AppViewHost {
     private(set) var contextLine: String?
     private(set) var title: String
     private(set) var prefersBorder = true
+    /// What Pin to Project last said: pinned, or why not.
+    private(set) var pinNote: String?
 
     @ObservationIgnored var actions: AppViewActions
     @ObservationIgnored weak var store: AppViewStore?
@@ -244,6 +250,19 @@ final class AppViewHost {
         }
     }
 
+    /// Pin to Project is offered: the server says the call can feed a pin, it is answered,
+    /// and the chat knows its project.
+    var canPin: Bool { call.pinnable == true && call.state == .done && actions.pin != nil }
+
+    func pinToProject() {
+        guard let pin = actions.pin else { return }
+        Task {
+            pinNote = await pin(call.viewPin) ?? "Pinned under the project."
+            try? await Task.sleep(for: .seconds(4))
+            pinNote = nil
+        }
+    }
+
     func setFullscreen(_ on: Bool) {
         store?.fullscreen = on ? call.id : (store?.fullscreen == call.id ? nil : store?.fullscreen)
     }
@@ -325,6 +344,10 @@ final class AppViewHost {
         case .openLink(let id, let url):
             actions.openLink(url)
             send(AppViewBridge.result(id))
+        case .message(let id, _) where actions.project != nil:
+            refuseOnProjectPage(id, "ui/message")
+        case .updateContext(let id, _, _) where actions.project != nil:
+            refuseOnProjectPage(id, "ui/update-model-context")
         case .message(let id, let text):
             // Never sent on the view's say-so: the person is asked, under the view.
             if let earlier = messageID { send(AppViewBridge.error(earlier, code: -32000, "Another message replaced it.")) }
@@ -355,6 +378,17 @@ final class AppViewHost {
             send(AppViewBridge.error(id, code: -32602, reason))
         case .ignored:
             break
+        }
+    }
+
+    /// A view on a project's page has no agent to tell anything to: refused, and the
+    /// daemon's log says so.
+    private func refuseOnProjectPage(_ id: JSONValue, _ method: String) {
+        send(AppViewBridge.error(id, code: -32000, "A view on a project's page has no agent to tell."))
+        Task {
+            _ = try? await actions.call(DaemonAPI.Method.viewsLog, try JSONValue.encoding(
+                DaemonAPI.ViewLogRequest(agentID: actions.agentID, viewID: call.id, level: "warning",
+                                         data: .string("\(method) refused: the view is on a project's page, with no agent"))))
         }
     }
 

@@ -8,7 +8,7 @@ import type {
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, DiskState, StoreNotes,
   DashboardChangedNotification, DashboardOrder, DashboardSnapshot, DashboardSummary, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
-  PagesChangedNotification, PinsChangedNotification, PinView, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
+  PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
 } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -1577,6 +1577,14 @@ export class Store extends Work {
   async pin(host: string, folder: string, path: string): Promise<void> {
     const pins = await this.act("pins/pin", { folder: folder as never, path }, host);
     if (pins) this.pins.value = { ...this.pins.value, [`${host}|${folderKey(folder)}`]: pins };
+  }
+
+  /** A chat's view pinned to its project (#189): keyed by its ui:// address. Answers whether
+   *  it was; a refusal is said in `problem`. */
+  async pinView(host: string, folder: string, view: ViewPin): Promise<boolean> {
+    const pins = await this.act("pins/pin", { folder: folder as never, path: view.uri, view }, host);
+    if (pins) this.pins.value = { ...this.pins.value, [`${host}|${folderKey(folder)}`]: pins };
+    return pins !== null;
   }
 
   async unpin(host: string, folder: string, path: string): Promise<void> {

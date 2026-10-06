@@ -72,14 +72,18 @@ public extension DaemonAPI {
         public var viewID: UUID
         public var name: String
         public var arguments: JSONValue?
+        /// The host's own call that feeds a pinned view (#189), not the view's: allowed
+        /// only for a tool a view may call and that changes nothing (`readOnlyHint`).
+        public var feed: Bool?
 
         public init(agentID: UUID, viewID: UUID, name: String, arguments: JSONValue? = nil,
-                    project: URL? = nil) {
+                    project: URL? = nil, feed: Bool? = nil) {
             self.agentID = agentID
             self.project = project
             self.viewID = viewID
             self.name = name
             self.arguments = arguments
+            self.feed = feed
         }
     }
 

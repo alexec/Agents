@@ -243,7 +243,7 @@ struct PinnedPageRows: View {
         let pins = model.pins(in: project.folder)
         ForEach(Array(pins.enumerated()), id: \.element.path) { index, pin in
             HStack(spacing: 8) {
-                Image(systemName: pin.kind == .html ? "globe" : "doc.text")
+                Image(systemName: pin.kind == .view ? "square.grid.2x2" : pin.kind == .html ? "globe" : "doc.text")
                     .foregroundStyle(.secondary)
                     .frame(width: 20)
                     .accessibilityHidden(true)
@@ -257,7 +257,7 @@ struct PinnedPageRows: View {
             }
             .appText(.supporting)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(pin.missing ? "\(pin.title), pinned page, missing" : "\(pin.title), pinned page")
+            .accessibilityLabel("\(pin.title), pinned \(pin.kind == .view ? "view" : "page")" + (pin.missing ? ", missing" : ""))
             .tag(SidebarItem.pin(pin.path, in: project))
             .contextMenu {
                 Button("Move Up", systemImage: "arrow.up") { step(pin, -1, in: pins) }

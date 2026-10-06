@@ -1031,6 +1031,21 @@ final class AppModel {
         }
     }
 
+    /// Pin a view under a project (#189), from its menu in a chat. Why it was not, or nil.
+    func pinView(_ view: ViewPin, in key: ProjectKey) async -> String? {
+        do {
+            let pins = try await client(for: key.host).call(DaemonAPI.Method.pinsPin,
+                                                            DaemonAPI.PinRequest(folder: key.folder, view: view),
+                                                            returning: [PinView].self)
+            work.setPins(pins, in: key.folder)
+            return nil
+        } catch let error as JSONRPCError {
+            return error.message
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
     func unpin(_ path: String, in key: ProjectKey) async {
         work.setPins(pins(in: key.folder).filter { $0.path != path }, in: key.folder)
         if openPin == path, selectedProjectKey == key { showProject(key) }

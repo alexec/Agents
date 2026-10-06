@@ -3,7 +3,8 @@
 // changes. Markdown is the live page an agent's show_file opens. HTML is shown as its source,
 // as the files pane shows it here: the page allows no frames and no HTML of its own making
 // (its policy), which is what keeps what an agent wrote from running in it. The window and
-// the Remote draw it.
+// the Remote draw it. A pinned ui:// view (#189) is a row the same, and its page is
+// PinnedViewPage's.
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { Store } from "../model/store";
@@ -14,6 +15,7 @@ import { go } from "../route";
 import { isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
 import { LiveDocument, type PageSource } from "./LiveDocument";
 import { BackToList } from "./BackToList";
+import { PinnedViewPage } from "./PinnedViewPage";
 
 export function PinnedPageRows({ store, host, folder, chosen, down }: {
   store: Store; host: string; folder: string; chosen: string | undefined; down: boolean;
@@ -60,9 +62,10 @@ export function PinnedPageRows({ store, host, folder, chosen, down }: {
           onContextMenu={(e) => openContextMenu(e, menu(pin))}
           onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu(pin)); }}>
           <div class={`row pin${chosen === pin.path ? " chosen" : ""}${pin.missing ? " missing" : ""}${dragged.value === pin.path ? " dragging" : ""}`}>
-            <button class="pick" aria-current={chosen === pin.path} title={pin.path}
+            <button class="pick" aria-current={chosen === pin.path}
+              title={pin.missing && pin.missingReason ? `${pin.path}: ${pin.missingReason}` : pin.path}
               onClick={() => go({ host, project: folder, page: pin.path })}>
-              <span class="pin-mark" aria-hidden="true">{pin.kind === "html" ? "◍" : "▤"}</span>
+              <span class="pin-mark" aria-hidden="true">{pinMark(pin)}</span>
               <span class="title">{pin.title}</span>
               {pin.missing && <span class="faint small">Missing</span>}
             </button>
@@ -73,12 +76,26 @@ export function PinnedPageRows({ store, host, folder, chosen, down }: {
   );
 }
 
+function pinMark(pin: PinView): string {
+  return pin.kind === "view" ? "◇" : pin.kind === "html" ? "◍" : "▤";
+}
+
 type Shown =
   | { kind: "reading" }
   | { kind: "html"; path: string; text: string; stamp: FileStamp }
   | { kind: "problem"; why: string };
 
 export function PinnedPage({ store, host, folder, path, down }: {
+  store: Store; host: string; folder: string; path: string; down: boolean;
+}) {
+  const pin = store.pinsIn(host, folder).find((p) => p.path === path);
+  if (pin?.view || path.startsWith("ui://")) {
+    return <PinnedViewPage store={store} host={host} folder={folder} path={path} pin={pin} down={down} />;
+  }
+  return <PinnedFilePage store={store} host={host} folder={folder} path={path} down={down} />;
+}
+
+function PinnedFilePage({ store, host, folder, path, down }: {
   store: Store; host: string; folder: string; path: string; down: boolean;
 }) {
   const key = `${host}|${folderKey(folder)}`;

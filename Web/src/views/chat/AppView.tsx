@@ -1,9 +1,10 @@
 // A tool's view, inline in the chat where its call began (#187). The row holds the view's place,
-// its name and what it asks of the person; the frame itself is the chat's ViewLayer's.
+// its name and what it asks of the person; the frame itself is the chat's ViewLayer's. Pin, when
+// the host says the call can feed one, puts the view under the chat's project (#189).
 import { createContext } from "preact";
 import { useContext, useLayoutEffect, useRef } from "preact/hooks";
 import type { AppViewCall } from "../../protocol/generated";
-import { viewTitle } from "./appViewBridge";
+import { canPin, viewTitle } from "./appViewBridge";
 import type { ViewActions, ViewLayer } from "./viewLayer";
 
 export const ViewLayerContext = createContext<{ layer: ViewLayer; actions: ViewActions } | null>(null);
@@ -34,11 +35,16 @@ export function AppView({ call }: { call: AppViewCall }) {
       <p class="view-caption">
         <span class="faint">{view.title}</span>
         {call.state === "cancelled" && <span class="faint">Cancelled</span>}
-        {view.phase.value === "ready" && !full && (
-          <button class="plain" title="Show this view in the chat's place" onClick={() => hosting.layer.setFullscreen(call.id)}>
-            Full screen
-          </button>
-        )}
+        <span class="view-actions">
+          {hosting.actions.pin && canPin(call) && (view.pinned.value
+            ? <span class="faint">Pinned</span>
+            : <button class="plain" title="Pin this view under the project" onClick={() => void view.pin()}>Pin</button>)}
+          {view.phase.value === "ready" && !full && (
+            <button class="plain" title="Show this view in the chat's place" onClick={() => hosting.layer.setFullscreen(call.id)}>
+              Full screen
+            </button>
+          )}
+        </span>
       </p>
       {view.phase.value === "failed" && <p class="quiet">{view.failure.value}</p>}
       {view.phase.value === "gone" && <p class="quiet">This view was closed.</p>}

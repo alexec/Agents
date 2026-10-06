@@ -2,7 +2,7 @@
 // postMessage. The web page's copy of AgentsKitCore/AppViews/AppViewBridge.swift, which the Mac
 // and the phone use; docs/explanation/views.md says what each message does in Agents, and the
 // two are kept to it. Pure, so test/appViews.test.mjs reads every row.
-import type { AppViewCall, AppViewPolicy, JSONValue } from "../../protocol/generated";
+import type { AppViewCall, AppViewPolicy, JSONValue, UUID, ViewPin } from "../../protocol/generated";
 
 export const protocolVersion = "2026-01-26";
 export const displayModes = ["inline", "fullscreen"] as const;
@@ -203,3 +203,37 @@ export function viewTitle(tool: string): string {
   if (tool === "read_dashboard") return "Dashboard";
   return tool.replaceAll("_", " ");
 }
+
+// MARK: Pins (#189)
+
+/** Whether a view's caption offers Pin: the host said its call can feed a pin, and it has. */
+export function canPin(call: AppViewCall): boolean {
+  return call.pinnable === true && call.state === "done";
+}
+
+/** The pin a call would make: its view, and the call that feeds it. */
+export function viewPin(call: AppViewCall): ViewPin {
+  return { server: call.server, uri: call.resourceUri, tool: call.tool, ...(call.arguments === undefined ? {} : { arguments: call.arguments }) };
+}
+
+/** A pinned view's call, made by the host since no model made it: running until the feeding
+ *  call answers, then done with its answer, so the view hears tool-input and then tool-result. */
+export function pinnedViewCall(id: UUID, view: ViewPin, answer?: JSONValue): AppViewCall {
+  return {
+    id, server: view.server, tool: view.tool, resourceUri: view.uri,
+    ...(view.arguments === undefined ? {} : { arguments: view.arguments }),
+    state: answer === undefined ? "running" : "done",
+    ...(answer === undefined ? {} : { result: answer }),
+  };
+}
+
+/** The host's feeding call for a pinned view: views/call, marked as the host's own. */
+export function feedParams(id: UUID, folder: string, view: ViewPin): Record<string, unknown> {
+  return {
+    agentID: id, viewID: id, name: view.tool, project: folder, feed: true,
+    ...(view.arguments === undefined ? {} : { arguments: view.arguments }),
+  };
+}
+
+/** What a view on a project's page is told when it asks to reach an agent: there is none. */
+export const noAgentWords = "A view on a project's page has no agent to tell.";

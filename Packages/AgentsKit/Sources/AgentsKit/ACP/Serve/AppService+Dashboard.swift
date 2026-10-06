@@ -118,28 +118,43 @@ extension AppService {
             what lasts, not what you are writing this turn (show it with show_file). The \
             path is in the project folder: an agent in a worktree pins the same path, and \
             the pin opens the project folder's copy once the branch lands. Pinning a path \
-            already pinned changes only its title. The pins are kept in .agents/pins.json \
-            in the project folder; never edit it by hand. At most 10 a project.
+            already pinned changes only its title. Or pin a view (`view` instead of \
+            `path`): a ui:// view of the agents server, opened by calling the read-only \
+            tool that feeds it with the arguments given. The pins are kept in \
+            .agents/pins.json in the project folder; never edit it by hand. At most 10 a \
+            project, pages and views together.
             """,
         "inputSchema": [
             "type": "object",
             "properties": [
                 "path": ["type": "string",
                          "description": "The .md or .html file, from the project folder (e.g. docs/roadmap.md), or absolute."],
+                "view": [
+                    "type": "object",
+                    "description": "A view to pin instead of a file. Its arguments are shared through git: never a secret.",
+                    "properties": [
+                        "server": ["type": "string", "description": "The MCP server whose view it is: agents."],
+                        "uri": ["type": "string", "description": "The view's ui:// address."],
+                        "tool": ["type": "string",
+                                 "description": "The read-only tool that feeds the view, called each time the pin opens."],
+                        "arguments": ["type": "object", "description": "That tool's arguments, at most 2 KB of JSON."],
+                    ],
+                    "required": .array(["server", "uri", "tool"]),
+                ],
                 "title": ["type": "string", "description": "What the row says, up to 60 characters. The file's name if left out."],
                 "position": ["type": "string", "enum": ["first", "last"], "description": "Where among the pins; last if left out."],
             ],
-            "required": .array(["path"]),
         ],
     ]
 
     static let unpinPageTool: JSONValue = [
         "name": .string(unpinPageToolName),
         "title": "Unpin a page",
-        "description": "Unpin a page you pinned (or your workflow did) from the project. The file is left as it is.",
+        "description": "Unpin a page or view you pinned (or your workflow did) from the project. The file is left as it is.",
         "inputSchema": [
             "type": "object",
-            "properties": ["path": ["type": "string", "description": "The pinned file, from the project folder."]],
+            "properties": ["path": ["type": "string",
+                                    "description": "The pinned file, from the project folder, or a pinned view's ui:// address."]],
             "required": .array(["path"]),
         ],
     ]
@@ -155,9 +170,9 @@ extension AppService {
         "inputSchema": [
             "type": "object",
             "properties": [
-                "path": ["type": "string", "description": "The pinned page to move."],
-                "before": ["type": "string", "description": "Put it just before this pinned page."],
-                "after": ["type": "string", "description": "Put it just after this pinned page."],
+                "path": ["type": "string", "description": "The pinned page to move, or a pinned view's ui:// address."],
+                "before": ["type": "string", "description": "Put it just before this pinned page or view."],
+                "after": ["type": "string", "description": "Put it just after this pinned page or view."],
                 "position": ["type": "string", "enum": ["first", "last"]],
             ],
             "required": .array(["path"]),

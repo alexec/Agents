@@ -211,7 +211,15 @@ struct RemoteView: View {
                 }
         case .page(let path):
             if let folder = model.selectedProject {
-                PinnedPage(folder: folder, path: path).paperGround()
+                if let pin = model.pins(in: folder).first(where: { $0.path == path }), let view = pin.view {
+                    // A pinned view (#189), fed afresh, through the host a chat's views use.
+                    PinnedViewPage(folder: folder, pin: pin, view: view,
+                                   call: { method, params in try await model.viewCall(method, params) },
+                                   unpin: { await model.unpin(path, in: folder) })
+                        .paperGround()
+                } else {
+                    PinnedPage(folder: folder, path: path).paperGround()
+                }
             }
         }
     }
