@@ -189,6 +189,7 @@ export interface AllowanceState {
   entryID: UUID;
   status: AllowanceStateStatus;
   since: WireDate;
+  changedAt: WireDate;
   learnedFrom: AllowanceStateSource;
   lastRateLimit?: RateLimitInfo;
   reading?: AllowanceReading;
@@ -2236,7 +2237,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AgentRequest: { required: ["agentID"], optional: [] },
   AgentWorktree: { required: ["name", "root", "project", "madeByApp"], optional: ["branch", "base"] },
   AllowanceReading: { required: ["spent", "nearlySpent", "at"], optional: ["window", "used", "resetsAt"] },
-  AllowanceState: { required: ["credentialKey", "entryID", "status", "since", "learnedFrom", "spent", "rateLimitStreak"], optional: ["lastRateLimit", "reading", "modelsOut"] },
+  AllowanceState: { required: ["credentialKey", "entryID", "status", "since", "changedAt", "learnedFrom", "spent", "rateLimitStreak"], optional: ["lastRateLimit", "reading", "modelsOut"] },
   AllowanceStateModelOut: { required: ["model", "since", "retryAfter"], optional: ["name"] },
   AnswerElicitationRequest: { required: ["requestID", "action", "content"], optional: ["sendID"] },
   AnswerRequest: { required: ["permissionID", "optionID"], optional: ["sendID"] },

@@ -62,6 +62,85 @@ struct RuntimeStateTests {
         #expect(await core.eventLog.events.contains { $0.name == "cost.allowance_back" && $0.details["how"] == "check" })
     }
 
+    // MARK: Out since, and the freshness stamp beside it (#334)
+
+    /// A check's result is dropped when the out was marked again while it ran, even
+    /// though `since` did not move: `changedAt` did.
+    @Test func aCheckIsDroppedWhenTheOutWasMarkedAgainWhileItRan() async throws {
+        let clock = TestClock()
+        let gate = TurnGate()
+        var script = answersOK
+        script.handshakeGate = gate
+        let (core, _, _) = try core(clock: clock, launcher: FakeLauncher(script: script))
+        let wentOut = clock.now
+        await core.setAllowanceState(claudeOut(at: wentOut))
+
+        clock.advance(by: AllowanceState.retryWithoutATime + 1)
+        await core.tickWorkflows(now: clock.now)
+        await eventually("the check is under way") { gate.turnsArrived >= 1 }
+        var again = try #require(await state(core))
+        again.markOut(.allowanceSpent, until: nil, payment: .allowance(label: nil), now: clock.now, from: .typedFailure)
+        // The same status as the check began with: only the stamp says it moved.
+        again.status = try #require(await state(core)).status
+        await core.setAllowanceState(again)
+        gate.open()
+        await eventually("the check ended", within: .seconds(30)) { await core.allowanceChecks.isEmpty }
+        let kept = try #require(await state(core))
+        #expect(kept.isOut)
+        #expect(kept.since == wentOut)
+    }
+
+    /// The first check counts from the latest word that it is out, so a stale retry
+    /// time is moved to four hours after a re-mark, not after it first went out.
+    @Test func theFirstCheckCountsFromTheLatestWord() async throws {
+        let clock = TestClock()
+        let launcher = FakeLauncher(script: answersOK)
+        let (core, _, _) = try core(clock: clock, launcher: launcher)
+        let wentOut = clock.now
+        let remarked = wentOut.addingTimeInterval(3 * 3600)
+        var out = claudeOut(at: wentOut)
+        out.markOut(.allowanceSpent, until: nil, payment: .allowance(label: nil), now: remarked, from: .typedFailure)
+        // A retry time older than the re-mark, as a host from before it would carry.
+        out.status = .out(until: nil, retryAfter: wentOut.addingTimeInterval(AllowanceState.retryWithoutATime),
+                          why: .allowanceSpent)
+        await core.setAllowanceState(out)
+
+        clock.advance(by: AllowanceState.retryWithoutATime + 1)
+        await core.checkDueAllowances(now: clock.now)
+        let kept = try #require(await state(core))
+        guard case .out(nil, let retry?, .allowanceSpent) = kept.status else { Issue.record("\(kept.status)"); return }
+        #expect(retry == remarked.addingTimeInterval(AllowanceState.retryWithoutATime))
+        #expect(kept.since == wentOut)
+        #expect(launcher.launchCount == 0, "not due yet")
+    }
+
+    /// A late plan window writes its reset time while the latest word is fresh, even on
+    /// an out that began hours ago.
+    @Test func aLateResetTimeIsTakenWhileTheLatestWordIsFresh() async throws {
+        let clock = TestClock()
+        let (core, work, _) = try core(clock: clock, launcher: FakeLauncher(script: answersOK))
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "go"))
+        await eventually("the turn worked") { await core.agent(id)?.endedReason == .endTurn }
+        let wentOut = clock.now.addingTimeInterval(-3 * 3600)
+        var out = claudeOut(at: wentOut)
+        out.markOut(.allowanceSpent, until: nil, payment: .allowance(label: nil), now: clock.now, from: .typedFailure)
+        await core.setAllowanceState(out)
+
+        let back = clock.now.addingTimeInterval(3600)
+        await core.notePlanWindow(RateLimitInfo(status: "rejected", resetsAt: back, rateLimitType: "five_hour"), agentID: id)
+        let kept = try #require(await state(core))
+        #expect(kept.knownReturn == back)
+        #expect(kept.since == wentOut)
+
+        // The latest word two minutes old: not late any more, so nothing is written.
+        var stale = claudeOut(at: wentOut)
+        stale.markOut(.allowanceSpent, until: nil, payment: .allowance(label: nil), now: clock.now, from: .typedFailure)
+        await core.setAllowanceState(stale)
+        clock.advance(by: 120)
+        await core.notePlanWindow(RateLimitInfo(status: "rejected", resetsAt: back, rateLimitType: "five_hour"), agentID: id)
+        #expect(try #require(await state(core)).knownReturn == nil)
+    }
+
     @Test func aTurnThatWorksBringsItBack() async throws {
         let (core, work, _) = try core()
         await core.setAllowanceState(claudeOut(at: Date()))
