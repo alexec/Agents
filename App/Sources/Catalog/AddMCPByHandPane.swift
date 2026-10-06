@@ -80,17 +80,17 @@ struct AddMCPByHandPane: View {
         switch kind {
         case .command:
             labelled("Command") {
-                TextField("npx", text: $command).textFieldStyle(.roundedBorder).font(.system(.body, design: .monospaced))
+                TextField("npx", text: $command).textFieldStyle(.roundedBorder).appText(.code)
             }
             labelled("Arguments") {
                 TextField("-y @scope/server@1.0.0", text: $arguments).textFieldStyle(.roundedBorder)
-                    .font(.system(.body, design: .monospaced))
+                    .appText(.code)
             }
             rows("Environment", add: "Add variable", rows: $env, header: false)
         case .url:
             labelled("URL") {
                 TextField("https://example.com/mcp", text: $url).textFieldStyle(.roundedBorder)
-                    .font(.system(.body, design: .monospaced))
+                    .appText(.code)
             }
             rows("Headers", add: "Add header", rows: $headers, header: true)
         }
