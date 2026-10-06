@@ -37,6 +37,30 @@ export function formRuntime(opened: string | undefined, picked: string | undefin
   return newSessionRuntime(kept, startable);
 }
 
+/**
+ * The window's empty project list (ProjectListView): nothing on this Mac can start an agent.
+ * Unknown until the host has listed its runtimes. An empty list counts: there is nothing to start.
+ */
+export function noAgentRuntime(runtimes: readonly RuntimeStatus[] | undefined): boolean {
+  return runtimes !== undefined && !runtimes.some((r) => "available" in r.availability);
+}
+
+/**
+ * The line under a runtime's name on that empty list (RuntimeInstallRow), and the install page
+ * when the window would offer **Open install page**. A runtime the app itself can install has no
+ * page here: **Install** stays on the Mac, in Settings ▸ Agent Runtimes. The download size the
+ * window adds ("112 MB from Google") comes from the app bundle, which the page does not carry.
+ */
+export function emptyListRuntimeLine(status: RuntimeStatus): { line: string; failed: boolean; page?: string } {
+  const a = status.availability;
+  const page = status.runtime.installPage;
+  if ("missing" in a) return { line: "Not on this Mac", failed: false, ...(status.runtime.install ? {} : { page }) };
+  if ("installing" in a) return { line: a.installing.progress ? `${a.installing.progress}…` : "Starting…", failed: false };
+  if ("installFailed" in a) return { line: a.installFailed.reason, failed: true, page };
+  if ("available" in a) return { line: "", failed: false };
+  return { line: unavailableReason(status) ?? "Can’t be used", failed: false };
+}
+
 /** RuntimeStatus.unavailableReason: why it cannot be started, in the runtime's own terms, or null. */
 export function unavailableReason(status: RuntimeStatus): string | null {
   const a = status.availability;
