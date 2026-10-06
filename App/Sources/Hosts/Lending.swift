@@ -1,16 +1,6 @@
 import AgentsKitCore
 import Foundation
 
-/// A server asked for a credential this window has none of (043, FR-015): asked of the
-/// person in place, before the agent starts, and answered once.
-struct TokenAsk: Identifiable {
-    let id = UUID()
-    let runtimeID: String
-    let host: HostID
-    let label: String
-    let answer: CheckedContinuation<Bool, Never>
-}
-
 /// A server asked for a sign-in this Mac relays (058, T091): asked of the person, once per
 /// server and runtime, before the control plane lets the server reach this Mac's relay.
 struct SignInLendAsk: Identifiable {
@@ -82,7 +72,11 @@ extension AppModel {
         if let relayed = await relaySignInThroughControl(wanted, to: id) { return relayed }
         if credentials.secretToLend(wanted.runtime) == nil {
             let saved = await withCheckedContinuation { answer in
-                tokenAsk = TokenAsk(runtimeID: wanted.runtime, host: id, label: hosts.label(id), answer: answer)
+                let label = hosts.label(id)
+                tokenAsk = TokenAsk(runtimeID: wanted.runtime, host: id, label: label,
+                                    keeping: "Paste a key and Agents keeps it in this Mac’s Keychain, and lends it to \(label) only while an agent runs there.",
+                                    whereToGet: CredentialKind.whereToGet(for: wanted.runtime),
+                                    action: "Save and start", answer: answer)
             }
             guard saved else { return false }
         }

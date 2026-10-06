@@ -93,6 +93,10 @@ public extension DaemonAPI {
                 Row(Method.viewsContext, params: ViewContextRequest.self, result: Empty.self, kind: .hostRequest),
                 // Acting
                 Row(Method.agentsStart, params: StartRequest.self, result: UUID.self, kind: .hostRequest),
+                // A server's key ask (#344): the pasted key, offered and lent on this browser's
+                // own connection, then the start again, as the window's TokenAskCard does.
+                Row(Method.credentialsOffer, params: CredentialsOffer.self, result: Empty.self, kind: .hostRequest),
+                Row(Method.credentialsLend, params: CredentialsLend.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.runtimesMarkAvailable, params: MarkRuntimeAvailable.self, result: RuntimeAllowances.self,
                     kind: .hostRequest),
                 Row(Method.agentsPrompt, params: PromptRequest.self, result: Empty.self, kind: .hostRequest),

@@ -95,6 +95,24 @@ final class ControlSettingsModel {
         await perform(DaemonAPI.Method.clientsForget, DaemonAPI.ClientRequest(client: client))
     }
 
+    /// Forget This Mac (#344, 071 FR-015): the control plane forgets this window, and only
+    /// it, then the window's pairing goes. True when it was forgotten; otherwise `problem`
+    /// says why, and nothing has changed.
+    func forgetThisWindow() async -> Bool {
+        do {
+            _ = try await client.call(DaemonAPI.Method.clientsForgetSelf, DaemonAPI.Empty())
+        } catch let error as JSONRPCError {
+            problem = HostProblem.controlRefusal(error)
+            return false
+        } catch {
+            problem = "The control plane can’t be reached."
+            return false
+        }
+        problem = nil
+        ControlConfig.forget()
+        return true
+    }
+
     func checkAgain(_ host: HostID) async {
         await perform(DaemonAPI.Method.hostsCheckAgain, DaemonAPI.HostRequest(host: host))
     }

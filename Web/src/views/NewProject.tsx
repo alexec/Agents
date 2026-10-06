@@ -19,7 +19,7 @@ type Adding = { kind: "folder" | "clone"; host: string };
 const adding = signal<Adding | null>(null);
 
 /** "This Mac" for the host on this Mac; otherwise its name, as the window labels them. */
-function hostLabel(store: Store, host: string): string {
+export function hostLabel(store: Store, host: string): string {
   return host === "mac" ? "This Mac" : store.hosts.value.find((h) => h.id === host)?.name ?? host;
 }
 
@@ -167,7 +167,7 @@ export function NewProjectDialog({ store }: { store: Store }) {
 }
 
 /** A modal `<dialog>`: Escape and the backdrop's focus come with it. */
-function Modal({ label, close, children }: { label: string; close: () => void; children: ComponentChildren }) {
+export function Modal({ label, close, children }: { label: string; close: () => void; children: ComponentChildren }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current;

@@ -1777,6 +1777,8 @@ final class AppModel {
     /// not an error worth showing.
     private func lostConnection() async {
         isConnected = false
+        // Let go of on purpose (#344), not lost: nothing to say or go back for.
+        guard !needsFirstRun else { return }
         // Said at once, everywhere this Mac's host is the target (#83), rather than
         // when the next action has waited out a connect.
         if hosts.macDownSince == nil { hosts.macDownSince = Date() }
@@ -1847,6 +1849,29 @@ final class AppModel {
         await stayConnected()
     }
 
+    /// Forget This Mac has gone through (#344): the control plane no longer knows this
+    /// window, and its pairing is gone from disk. Everything dialled through it stops, and
+    /// the window asks how to work again, as at first run.
+    func leaveControlPlane() {
+        needsFirstRun = true
+        reconnecting?.cancel()
+        reconnecting = nil
+        controlWatch?.cancel()
+        controlWatch = nil
+        listening?.cancel()
+        listening = nil
+        controlHosts = [:]
+        hosts.controlled = [:]
+        controlLink?.disconnect()
+        controlLink = nil
+        controlPlaneHosts = nil
+        controlPlaneListed = false
+        controlPlaneReachable = false
+        controlPlaneMissed = false
+        client = DaemonClient(link: UnreachableLink())
+        isConnected = false
+    }
+
     /// Keep going back until the daemon answers.
     ///
     /// One try used to be all there was, and a daemon slow to come back left a window
@@ -1861,6 +1886,8 @@ final class AppModel {
                 await backoff.wait()
                 guard let self else { return }
                 if self.isConnected { break }
+                // Forgotten (#344): nothing to go back to until first run pairs again.
+                if self.needsFirstRun { break }
                 WakeAndNetwork.log.info("reconnect: trying")
                 await self.connect()
                 if self.isConnected {

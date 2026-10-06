@@ -247,6 +247,75 @@ final class RemoteModel {
         pairing = .idle
     }
 
+    /// Set once this device has forgotten itself: the app makes a new, unpaired model (#344).
+    private(set) var forgotItself = false
+
+    /// Forget This iPhone (#344, 071 FR-015): the control plane forgets this device, and only
+    /// it, then the pairing goes and the app asks for a code again. Answers why not, with
+    /// nothing changed, or nil.
+    func forgetThisDevice() async -> String? {
+        do {
+            try await client.call(DaemonAPI.Method.clientsForgetSelf, DaemonAPI.Empty())
+        } catch let error as JSONRPCError {
+            return error.message
+        } catch {
+            return "Your Mac is not answering. This \(UIDevice.current.model) is still paired."
+        }
+        note("pairing: forgot itself")
+        RemoteControl.forget()
+        forgotItself = true
+        return nil
+    }
+
+    // MARK: A server's key (#344)
+
+    /// A server asked for a key this device has none of to lend: the window's card asks the
+    /// person, and the key is lent on this device's own connection to it (043, #344).
+    var tokenAsk: TokenAsk?
+
+    /// The home host's asks: the control plane's, which may be a server.
+    private func answerHomeCredentialWanted(_ wanted: DaemonAPI.CredentialWanted) async -> Bool {
+        await answerCredentialWanted(wanted, on: controlHome ?? .mac)
+    }
+
+    /// A server's daemon wants a key to start a runtime (043, R6): asked of the person, as the
+    /// window asks. True when one was lent, and the refused call is then sent again, as
+    /// it was. A second ask while one is showing is refused rather than left waiting.
+    private func answerCredentialWanted(_ wanted: DaemonAPI.CredentialWanted, on id: HostID) async -> Bool {
+        guard id != .mac, !CredentialKind.kinds(for: wanted.runtime).isEmpty, tokenAsk == nil else { return false }
+        let label = hostName(id)
+        return await withCheckedContinuation { answer in
+            tokenAsk = TokenAsk(runtimeID: wanted.runtime, host: id, label: label,
+                                keeping: "Paste a key and Agents lends it to \(label) while this \(UIDevice.current.model) "
+                                    + "is connected. It is kept nowhere.",
+                                whereToGet: CredentialKind.source(for: wanted.runtime),
+                                action: "Lend and start", answer: answer)
+        }
+    }
+
+    /// The person pasted a key: offered and lent to the server that asked, on this device's
+    /// connection to it, and nowhere else. The ask is answered either way.
+    func lend(_ secret: Secret, for ask: TokenAsk) async {
+        let server = ask.host == controlHome ? client : otherHosts[ask.host]
+        var lent = false
+        if let server {
+            lent = (try? await server.call(DaemonAPI.Method.credentialsOffer,
+                                           DaemonAPI.CredentialsOffer(runtimes: [ask.runtimeID], ownSignInOnly: false))) != nil
+            if lent {
+                lent = (try? await server.call(DaemonAPI.Method.credentialsLend,
+                                               DaemonAPI.CredentialsLend(runtime: ask.runtimeID, secret: secret))) != nil
+            }
+        }
+        finishTokenAsk(lent: lent)
+    }
+
+    /// The ask answered: lent (true), or cancelled. Once per ask: its answer is a continuation.
+    func finishTokenAsk(lent: Bool) {
+        guard let ask = tokenAsk else { return }
+        tokenAsk = nil
+        ask.answer.resume(returning: lent)
+    }
+
     /// Put what the person typed on a page on disk, through the daemon, which is the one
     /// writer and the one that tells the agent (022). The same request the Mac's page
     /// makes, so a phone's edit is the person's in exactly the same way (034 FR-006).
@@ -1076,6 +1145,10 @@ final class RemoteModel {
             }
             note("link: connected \(link) after \(ContinuousClock.now - began)")
             refusals.connected()
+            // A home host that is a server asks for a key as any other server does (#344).
+            await client.setCredentialLender { [weak self] wanted in
+                await self?.answerHomeCredentialWanted(wanted) ?? false
+            }
             isConnected = true
             lastHeardFrom = Date()
             problem = nil
@@ -1269,6 +1342,10 @@ final class RemoteModel {
             guard (try? await other.connect(startIfNeeded: false, timeout: .seconds(5))) != nil else { continue }
             let id = host.id
             reachableHosts.insert(id)
+            // A start there with no key of its own asks this device for one (#344).
+            await other.setCredentialLender { [weak self] wanted in
+                await self?.answerCredentialWanted(wanted, on: id) ?? false
+            }
             if let projects = try? await other.call(DaemonAPI.Method.projectsList,
                                                     DaemonAPI.ProjectsListRequest(includeArchived: false),
                                                     returning: [DaemonAPI.ProjectSummary].self) {
