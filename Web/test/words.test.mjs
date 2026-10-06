@@ -7,6 +7,26 @@ import { cases } from "./fixtures.mjs";
 const background = await load("src/model/background.ts");
 const labels = await load("src/model/labels.ts");
 
+test("background transcript lines include starts, subagents and failure tint wording", () => {
+  const item = { id: "work", kind: "task", name: "Build", state: "running", canStop: true, isStopping: false, startedAt: 0 };
+  assert.equal(background.backgroundEntryLine(item), "Started “Build” in the background");
+  assert.equal(background.backgroundEntryLine({ ...item, kind: "subagent", state: "paused" }), "Started subagent “Build” in the background");
+  assert.equal(background.backgroundEntryLine({ ...item, state: "failed" }), "Task “Build” failed");
+});
+
+const sandboxWords = await load("src/model/sandboxWords.ts");
+
+test("sandbox failure card explains the recovery and preserves the two choices", () => {
+  const record = { runtimeID: "codex", detail: "sandbox unavailable", hang: false, recoveryOffered: true, completedToolCalls: 2 };
+  const card = sandboxWords.sandboxCard(record);
+  assert.equal(card.title, "Codex’s sandbox could not start");
+  assert.match(card.body, /could not isolate commands/);
+  assert.match(card.offer, /Full access/);
+  assert.match(card.offer, /asks it to carry on/);
+  assert.equal(sandboxWords.keepStopped, "Keep stopped");
+  assert.equal(sandboxWords.continueWithout, "Continue without sandbox");
+});
+
 for (const { name, input, expected } of cases("background/words.json")) {
   test(`background: ${name}`, () => {
     assert.deepEqual({
