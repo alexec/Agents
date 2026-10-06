@@ -137,6 +137,66 @@ struct AllowanceStateTests {
         // Nothing says it is small: keep the runtime's own default.
         #expect(DaemonCore.probeModel(in: [choice("big", "Big"), choice("bigger", "Bigger")]) == nil)
     }
+
+    // MARK: Out since (#334)
+
+    @Test func markedOutAgainItKeepsTheTimeItWentOut() {
+        var state = state()
+        state.markOut(.allowanceSpent, until: nil, payment: .allowance(label: nil), now: now, from: .typedFailure)
+        #expect(state.since == now)
+        #expect(state.changedAt == now)
+        // Refused again an hour later, now with the provider's time: still out since then.
+        let later = now.addingTimeInterval(3600)
+        let back = now.addingTimeInterval(5 * 3600)
+        state.markOut(.allowanceSpent, until: back, payment: .allowance(label: nil), now: later, from: .words)
+        #expect(state.since == now)
+        #expect(state.changedAt == later, "the freshness stamp still moves")
+        #expect(state.knownReturn == back)
+        #expect(state.learnedFrom == .words)
+        // A different reason is still the same out.
+        state.markOut(.overage, until: nil, payment: .allowance(label: nil), now: later.addingTimeInterval(60), from: .overageReport)
+        #expect(state.since == now)
+        #expect(PoolWords.state(state, now: later).hasPrefix("Out since \(PoolWords.time(now, now: later)) · "))
+    }
+
+    @Test func aFailedRuntimeMarkedOutKeepsItsFirstTime() {
+        var state = state()
+        state.markFailed(now: now)
+        state.markOut(.allowanceSpent, until: nil, payment: .allowance(label: nil), now: now.addingTimeInterval(600), from: .typedFailure)
+        #expect(state.since == now)
+        #expect(state.changedAt == now.addingTimeInterval(600))
+    }
+
+    @Test func backAndOutAgainIsANewOut() {
+        var state = state()
+        state.markOut(.allowanceSpent, until: nil, payment: .allowance(label: nil), now: now, from: .typedFailure)
+        let back = now.addingTimeInterval(4 * 3600)
+        state.markAvailable(now: back)
+        #expect(state.since == back)
+        #expect(state.changedAt == back)
+        let outAgain = back.addingTimeInterval(600)
+        state.markOut(.allowanceSpent, until: nil, payment: .allowance(label: nil), now: outAgain, from: .typedFailure)
+        #expect(state.since == outAgain)
+        #expect(state.changedAt == outAgain)
+        // Rate limited then out: that is when it went out.
+        var limited = self.state()
+        limited.rateLimited(now: now, retryAt: now.addingTimeInterval(30))
+        limited.markOut(.rateLimitPersisted, until: nil, payment: .allowance(label: nil), now: now.addingTimeInterval(20), from: .typedFailure)
+        #expect(limited.since == now.addingTimeInterval(20))
+    }
+
+    @Test func aStateSavedBeforeTheStampReadsSince() throws {
+        var state = state()
+        state.markOut(.allowanceSpent, until: nil, payment: .allowance(label: nil), now: now, from: .typedFailure)
+        state.markOut(.allowanceSpent, until: nil, payment: .allowance(label: nil), now: now.addingTimeInterval(60), from: .typedFailure)
+        let data = try JSONEncoder().encode(state)
+        #expect(try JSONDecoder().decode(AllowanceState.self, from: data) == state)
+        var old = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(old.removeValue(forKey: "changedAt") != nil)
+        let read = try JSONDecoder().decode(AllowanceState.self, from: JSONSerialization.data(withJSONObject: old))
+        #expect(read.changedAt == read.since)
+        #expect(read.since == now)
+    }
 }
 
 /// Three rate limits within ten minutes, on one chat, is a limit that persists (065,
