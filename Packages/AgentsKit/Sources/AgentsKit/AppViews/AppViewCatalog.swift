@@ -4,11 +4,7 @@ import Foundation
 /// The views the app's own `agents` server serves (#187, MCP Apps): each `ui://` resource,
 /// and the tools that draw one or that only a view may call.
 ///
-/// One so far, the test view, which exists to prove a view draws, themes, resizes, calls a
-/// tool only a view may call, is held to its policy and tears down, on every client. It is
-/// offered to agents only when the daemon is started with `AGENTS_TEST_VIEWS=1`, so the
-/// agents people work with are not handed a tool for testing the app. The Dashboard's view
-/// is the next (#188).
+/// Dashboard and test views served by the app's own MCP server.
 public enum AppViewCatalog {
     /// A tool with a view, or one only a view may call.
     public struct Tool: Sendable {
@@ -41,15 +37,17 @@ public enum AppViewCatalog {
     public static let testViewURI = "ui://agents/test-view"
     public static let showTestView = "show_test_view"
     public static let testViewCount = "test_view_count"
+    public static let dashboardURI = "ui://agents/dashboard"
 
     /// Every tool with a view or for a view, as offered now.
     public static func tools(testView: Bool = offersTestView) -> [Tool] {
-        testView ? [showTestViewTool, testViewCountTool] : []
+        [Tool(definition: AppService.readDashboardTool), dashboardActionTool]
+            + (testView ? [showTestViewTool, testViewCountTool] : [])
     }
 
     /// Every resource, as offered now.
     public static func resources(testView: Bool = offersTestView) -> [Resource] {
-        testView ? [Self.testView] : []
+        [Self.dashboard] + (testView ? [Self.testView] : [])
     }
 
     /// The tool called `name`, matched on the end as every app tool is: a runtime may put
@@ -65,6 +63,120 @@ public enum AppViewCatalog {
     }
 
     // MARK: The test view
+
+    static let dashboardActionTool = Tool(definition: [
+        "name": "dashboard_action", "title": "Dashboard action",
+        "description": "Perform a Dashboard action requested by the person.",
+        "inputSchema": ["type": "object", "properties": ["action": ["type": "string"]]],
+        "_meta": ["ui": ["resourceUri": .string(dashboardURI), "visibility": ["app"]]],
+    ])
+
+    static let dashboard = Resource(uri: dashboardURI, name: "dashboard", title: "Dashboard",
+                                    description: "The project's live Dashboard.", html: dashboardHTML,
+                                    meta: ["ui": ["prefersBorder": false]])
+
+    static let dashboardHTML = """
+    <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+    :root{color-scheme:light dark;font:15px -apple-system,BlinkMacSystemFont,sans-serif;color:CanvasText;background:Canvas}
+    html,body{height:100%}body{margin:0;padding:20px;box-sizing:border-box;overflow:auto}
+    header{display:flex;align-items:center;gap:12px}h1{font-size:22px;margin:0 auto 12px 0}
+    button{font:inherit;color:inherit;background:transparent;border:1px solid color-mix(in srgb,CanvasText 20%,transparent);border-radius:8px;padding:6px 10px}
+    section{margin:20px 0}h2{font-size:12px;text-transform:uppercase;opacity:.65} .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+    article{border:1px solid color-mix(in srgb,CanvasText 16%,transparent);border-radius:12px;padding:14px;min-width:0}article.wide{grid-column:1/-1}
+    article.stale{opacity:.48}h3{font-size:14px;margin:0 0 10px}p{margin:6px 0;overflow-wrap:anywhere}.value{font-size:24px;font-weight:600}
+    small{opacity:.65}table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:6px;border-bottom:1px solid color-mix(in srgb,CanvasText 12%,transparent)}
+    svg{width:100%;height:36px}a{color:LinkText}
+    </style></head><body><header><h1>Dashboard</h1><button id="hidden" type="button">Show hidden</button></header>
+    <main id="root"><p>Waiting for Dashboard…</p></main>
+    <script>
+    (() => {
+      const root = document.querySelector("#root");
+      const hidden = document.querySelector("#hidden");
+      let showHidden = false, latest = null, nextID = 1;
+      const waiting = new Map();
+      const ref = Date.UTC(2001, 0, 1);
+      const post = (message) => window.parent.postMessage(Object.assign({ jsonrpc: "2.0" }, message), "*");
+      const request = (method, params) => new Promise((resolve, reject) => {
+        const id = nextID++; waiting.set(id, { resolve, reject }); post({ id, method, params });
+      });
+      const notify = (method, params) => post({ method, params });
+      const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+      const at = (v) => {
+        if (v instanceof Date) return v;
+        if (typeof v === "number") return new Date(v > 1e11 ? v : ref + v * 1000);
+        const d = new Date(v); return Number.isNaN(d.getTime()) ? null : d;
+      };
+      function draw(data) {
+        latest = data;
+        if (!data || !Array.isArray(data.tiles)) { root.innerHTML = "<p>Dashboard data is unavailable.</p>"; return; }
+        const tiles = data.tiles.filter((x) => showHidden || !x.tile || !x.tile.hidden);
+        if (!tiles.length) { root.innerHTML = "<p>No tiles yet.</p>"; return; }
+        const groups = new Map();
+        for (const t of tiles) {
+          const section = (t.tile && t.tile.section) || "";
+          if (!groups.has(section)) groups.set(section, []);
+          groups.get(section).push(t);
+        }
+        root.innerHTML = [...groups].map(([name, items]) => `<section>${name ? `<h2>${esc(name)}</h2>` : ""}<div class="grid">${items.map(tile).join("")}</div></section>`).join("");
+      }
+      function tile(v) {
+        const t = v.tile;
+        if (!t) return `<article class="wide"><h3>${esc(v.id)}</h3><p>${esc(v.problem || "Unreadable tile")}</p></article>`;
+        const set = at(v.setAt);
+        const hours = t.stale_after_hours || t.staleAfterHours || 24;
+        const stale = !set || (Date.now() - set.getTime() > hours * 3600000);
+        let body = "";
+        switch (t.type) {
+          case "number": {
+            const val = t.number && t.number.value != null ? t.number.value : 0;
+            const pts = v.points || [];
+            const peak = Math.max(...pts.map((x) => x.value), 1);
+            const line = pts.map((p, i) => `${i * 100 / (pts.length - 1 || 1)},${32 - (p.value / peak) * 28}`).join(" ");
+            body = `<p class="value">${esc(val)} ${esc(t.number && t.number.unit || "")}</p>${pts.length > 1 ? `<svg viewBox="0 0 100 36" preserveAspectRatio="none"><polyline fill="none" stroke="currentColor" stroke-width="2" points="${line}"/></svg>` : ""}`;
+            break;
+          }
+          case "status": body = `<p>${esc(t.status && t.status.level || "unknown")} · ${esc(t.status && t.status.line || "")}</p>`; break;
+          case "table": body = `<table><thead><tr>${(t.table && t.table.columns || []).map((x) => `<th>${esc(x)}</th>`).join("")}</tr></thead><tbody>${(t.table && t.table.rows || []).map((r) => `<tr>${r.map((c) => `<td>${esc(typeof c === "string" ? c : c.text)}</td>`).join("")}</tr>`).join("")}</tbody></table>`; break;
+          case "note": body = `<p>${esc(t.note && t.note.markdown || "")}</p>`; break;
+          case "link": body = `<p>${esc(t.link && (t.link.url || t.link.file || t.link.session || t.link.workflow) || "")}</p>`; break;
+          case "page": body = `<p>${esc(t.page && t.page.file || "")}</p>`; break;
+        }
+        const who = (v.keeper && v.keeper.name) || "";
+        const when = stale ? "stale" : (set ? set.toLocaleString() : "age unknown");
+        const wide = ["table", "note", "page"].includes(t.type) ? "wide" : "";
+        return `<article class="${wide} ${stale ? "stale" : ""}"><h3>${esc(t.title)}</h3>${body}<small>${esc(who)} · ${esc(when)}</small></article>`;
+      }
+      hidden.onclick = () => {
+        showHidden = !showHidden;
+        hidden.textContent = showHidden ? "Hide hidden" : "Show hidden";
+        if (latest) draw(latest);
+      };
+      window.addEventListener("message", (event) => {
+        const m = event.data;
+        if (!m || m.jsonrpc !== "2.0") return;
+        if (m.id !== undefined && !m.method && waiting.has(m.id)) {
+          const w = waiting.get(m.id); waiting.delete(m.id);
+          return m.error ? w.reject(new Error(m.error.message)) : w.resolve(m.result);
+        }
+        if (m.method === "ui/notifications/tool-result") draw((m.params && m.params.structuredContent) || {});
+        if (m.method === "ui/resource-teardown") post({ id: m.id, result: {} });
+        if (m.method === "ping") post({ id: m.id, result: {} });
+      });
+      request("ui/initialize", {
+        protocolVersion: "2026-01-26",
+        clientInfo: { name: "agents-dashboard", version: "1.0.0" },
+        appCapabilities: { availableDisplayModes: ["inline", "fullscreen"] },
+      }).then((result) => {
+        const ctx = result.hostContext || {};
+        const vars = (ctx.styles && ctx.styles.variables) || {};
+        for (const [key, value] of Object.entries(vars)) if (value) document.documentElement.style.setProperty(key, value);
+        if (ctx.theme) document.documentElement.style.colorScheme = ctx.theme;
+        notify("ui/notifications/initialized", {});
+      }).catch((e) => { root.innerHTML = "<p>The host refused: " + esc(e.message) + "</p>"; });
+    })();
+    </script></body></html>
+    """
 
     static let showTestViewTool = Tool(definition: [
         "name": .string(showTestView),

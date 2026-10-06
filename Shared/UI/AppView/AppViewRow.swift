@@ -76,6 +76,45 @@ private struct AppViewInline: View {
     }
 }
 
+/// A view filling the page it was opened on (#188). No way back to a chat: this page is the
+/// destination, as the project's Dashboard is.
+struct AppViewPage: View {
+    let host: AppViewHost
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        GeometryReader { proxy in
+            Group {
+                switch host.phase {
+                case .failed(let words):
+                    Text(words)
+                        .appText(.supporting)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .padding(24)
+                case .gone:
+                    Text("This view was closed.")
+                        .appText(.supporting)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                default:
+                    AppViewWeb(host: host)
+                }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .onChange(of: proxy.size, initial: true) { place(proxy) }
+            .onChange(of: scheme) { place(proxy) }
+        }
+        .onAppear { host.start() }
+    }
+
+    private func place(_ proxy: GeometryProxy) {
+        let insets = proxy.safeAreaInsets
+        host.place(width: proxy.size.width, height: proxy.size.height, theme: scheme,
+                   safeArea: (Double(insets.top), Double(insets.trailing), Double(insets.bottom), Double(insets.leading)))
+    }
+}
+
 /// The view in the chat's place: `fullscreen`, as a pinned page is drawn there.
 struct AppViewFullscreen: View {
     let host: AppViewHost

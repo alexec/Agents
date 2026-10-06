@@ -1,6 +1,6 @@
 # Parity: the Mac window, the Remote and the web page (#233)
 
-**Date:** 2026-10-05, at `f681d39e` plus #254.
+**Date:** 2026-10-05, at `a4f16ad4` plus #188.
 
 **What it is:** where each of the three clients stands, a row per screen and feature. The three are the Mac window (`App/`), the Remote on iPhone and iPad (`Remote/`), and the web page (`Web/`). Every parity line in a commit (AGENTS.md, "Keeping the three clients in step") updates the row it changes.
 
@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 206 rows: **120 same**, **37 by design**, **49 delta** (after #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 207 rows: **121 same**, **37 by design**, **49 delta** (after #188, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -34,7 +34,7 @@ Of 206 rows: **120 same**, **37 by design**, **49 delta** (after #221, #238–#2
 | Notifications and badges | 3 | 0 | 1 |
 | Disk strip | 2 | 1 | 0 |
 | Hosts, connection and pairing | 3 | 3 | 0 |
-| MCP Apps views | 1 | 0 | 0 |
+| MCP Apps views | 2 | 0 | 0 |
 
 The deltas are tracked by 29 issues:
 - **Already open:** #226 (the Remote's one sidebar) and #235 (the page's one sidebar at phone width).
@@ -224,12 +224,12 @@ The deltas are tracked by 29 issues:
 
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
-| Dashboard row and page (#122) | `A/Dashboard/DashboardPage.swift` | `R/Dashboard/DashboardPage.swift` | `W/views/Dashboard.tsx` | **same** |
+| Dashboard row and page (#122, #188) | The row opens `ui://agents/dashboard` through `AppViewHost`: `S/Dashboard/ProjectDashboardView.swift`, from `A/ContentView.swift`. The native page is not the destination | The same view for `RemoteRoute.dashboard`: `R/RemoteApp.swift` | The same view through the page's view host: `W/views/DashboardAppView.tsx` | **same** |
 | Tile kinds, sparklines, greying when stale | `S/Dashboard/TileCard.swift` | Shared | `W/views/Dashboard.tsx:259-305` | **same** |
 | Tile detail, its History row (#127) | `A/Dashboard/DashboardPage.swift:343-383` | Details… in the tile's long-press menu; same detail and History rows: `R/Dashboard/DashboardPage.swift` | All rows, including *Greyed after*: `W/views/Dashboard.tsx` | **same** |
 | Hide, Show, Remove, Show Hidden Tiles | `A/Dashboard/DashboardPage.swift:86-93, 283-289` | Toggle above tiles; Hide, Show and Remove in the long-press menu: `R/Dashboard/DashboardPage.swift` | `W/views/Dashboard.tsx:75-79, 241-244` | **same** |
 | Order: drag, Move items (#147) | Drag and every Move item: `A/Dashboard/DashboardPage.swift:174-187, 292-316` | Tile Move items and section heading's Move Section Up / Down; no drag: `R/Dashboard/DashboardPage.swift` | Drag and every Move item: `W/views/Dashboard.tsx:99-204` | **same** (no drag on the Remote: **by design**) |
-| Update now (#146) | `A/Dashboard/DashboardPage.swift:98-136` | In the toolbar: `R/Dashboard/DashboardPage.swift:103-158` | `W/views/Dashboard.tsx:137-169` | **same** |
+| Update now (#146) | In the toolbar, beside the view: `S/Dashboard/ProjectDashboardView.swift` | The same toolbar item | In the page head, beside the view: `W/views/DashboardAppView.tsx` | **same** |
 | *‹project› · updated …* | `A/Dashboard/DashboardPage.swift:81, 138-146` | Under the update line: `R/Dashboard/DashboardPage.swift` | `W/views/Dashboard.tsx:87-88` | **same** |
 | A store file set aside, said (#171); the footer sentence (#127) | `A/Dashboard/DashboardPage.swift:24-29, 47-50` | `R/Dashboard/DashboardPage.swift:65-69, 88-92` | `W/views/Dashboard.tsx:90, 129` | **same** |
 | Pinned page rows (#159) | Drag; Open, Move Up / Down, Unpin: `A/Projects/PinnedPageRows.swift` | Long press: `R/Dashboard/PinnedPage.swift:8-60` | Drag and the menu: `W/views/Pins.tsx:17-73` | **same** (no drag on the Remote: **by design**) |
@@ -327,7 +327,8 @@ The deltas are tracked by 29 issues:
 
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
-| `ui://` views (#187–#191) | Not built | Not built | Not built | **same** (planned for all three in #187) |
+| A tool's `ui://` view in a chat (#187) | WebKit host `S/AppView/AppViewHost.swift`, from `A/Chat/ChatView.swift` | The same host, from `R/Chat/RemoteChatView.swift` | The sandbox proxy `W/views/chat/viewLayer.ts` | **same** |
+| The project Dashboard row opens `ui://agents/dashboard` (#188) | `ProjectDashboardView` through that host, in place of the native page: `A/ContentView.swift` | The same view for `RemoteRoute.dashboard`: `R/RemoteApp.swift` | `DashboardAppView` through the page's view host: `W/views/Columns.tsx` | **same** |
 
 ## Live sync
 
@@ -421,7 +422,8 @@ The record of the walks that brought the page level with the window, from 2026-1
 | Change | Issue | Page | Notes |
 |---|---|---|---|
 | Declared resources with descriptions, counted holders ("2 of 3 held") | #116 | **has**, read-only | A **Resources** fold under each host lists the declared resources with their descriptions and "2 of 3 held", each holder, and anything else held or awaited; kept by `leases/changed` (added to `WebSignatures`). **web: by design** for declaring, editing and ending leases: they are the Mac's (Settings ▸ Resources, the Resources page), as on the Remote. |
-| The project Dashboard: row at the top of the sessions column, page of tiles, greying, detail, Hide/Show/Remove, live | #122 (074) | **has** | Same row, sections, grid (tables and notes across), SVG sparklines, greyed stale tiles, a keeper foot that opens the session or workflow; Hide/Show/Remove and Details… in a tile's ···. Show Hidden Tiles is a check box in the page's head, where the window has it in a menu. Shots: `specs/074-project-dashboard/walks/074-web-*.png`; window: `specs/074-project-dashboard/look/mac-dashboard.png`. |
+| The project Dashboard: row at the top of the sessions column, page of tiles, greying, detail, Hide/Show/Remove, live | #122 (074) | **has** | Same row, sections, grid (tables and notes across), SVG sparklines, greyed stale tiles, a keeper foot that opens the session or workflow; Hide/Show/Remove and Details… in a tile's ···. Show Hidden Tiles is a check box in the page's head, where the window has it in a menu. Shots: `specs/074-project-dashboard/walks/074-web-*.png`; window: `specs/074-project-dashboard/look/mac-dashboard.png`. Since #188 the row opens `ui://agents/dashboard` instead of this native page. |
+| The Dashboard row opens `ui://agents/dashboard` through the app-view host. The native page is no longer where the row goes. Tile files, keepers and `take_over` stay | #188 | **has** | The Mac and the Remote draw it with `AppViewHost` (`Shared/UI/Dashboard/ProjectDashboardView.swift`). The page draws it through the same view host as a chat (`Web/src/views/DashboardAppView.tsx`). Update now, the unreadable-file note and the footer stay on the page around the view. Show hidden is in the view. |
 | Workflow Enabled and Archive are lines in the workflow's file (`enabled: false`, `archived: true`), and each page says so under the switch | #125 | **has** | The page's Enabled switch writes the file as the window's does, and the page says the window's sentence under it: *Enabled and Archive are saved in .agents/workflows/<id>.md, a file in this project you may commit*. A workflow turned off on another clone reads *Off: its file says enabled: false*, on every client. The page has no Archive (by design, as before: Archive and Bring Back are the window's and the Remote's). |
 | Number-tile history kept in the project (`.agents/dashboard/history/<id>.jsonl`); the Dashboard says its tiles and trends are project files | #127 | **has** | The window, the Remote and the page end the Dashboard with *Tiles and their trends are files in .agents/dashboard/ in this project, which you may commit.* A number tile's detail adds a **History** row naming its file, on the window and the page (the Remote has no detail). The trend itself comes from the host as before, so nothing else on the page changed. |
 | Update now on the Dashboard: runs the `dashboard` workflow or a one-off agent, Updating… while it runs, the last update and its cooldown, why it can't start | #146 | **has** | A button at the right of the page's head, after Show Hidden Tiles (the window has it beside its ··· menu; the Remote in the toolbar), and a line under *updated …*: running with Open Session, the waiting-for-approval refusal with Open Workflow, *Last update 12:11; again from 12:16*. Shots: `specs/074-project-dashboard/walks/146-web-update-*.png`; window: `specs/074-project-dashboard/look/146-mac-update-*.png`. Also fixed here: a status tile's line wore the session list's `.status` ring. |

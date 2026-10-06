@@ -162,9 +162,13 @@ extension AppService {
                 return await send(DaemonAPI.Method.pinsPinSessionTool,
                                   DaemonAPI.PinToolRequest(token: token, arguments: arguments), fallback: "Pinned.")
             case .read:
-                return await send(DaemonAPI.Method.dashboardRead,
-                                  DaemonAPI.DashboardTokenRequest(token: token),
-                                  fallback: "The Dashboard has no tiles yet.")
+                guard let params = try? JSONValue.encoding(DaemonAPI.DashboardTokenRequest(token: token)) else {
+                    return .refused("The Dashboard request could not be read.")
+                }
+                switch await relay(DaemonAPI.Method.dashboardRead, params) {
+                case .success(let result): return .shownResult(result)
+                case .failure(let error): return .refused(error.message)
+                }
             }
         } viewTool: { name, arguments in
             // The whole result back, not a note: the view is drawn from it (#187).

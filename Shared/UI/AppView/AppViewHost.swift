@@ -95,7 +95,7 @@ final class AppViewHost {
         self.call = call
         self.actions = actions
         self.store = store
-        self.title = call.tool == "show_test_view" ? "Test view" : call.tool.replacingOccurrences(of: "_", with: " ")
+        self.title = Self.title(for: call)
         #if os(macOS)
         let platform = AppViewContext.Platform.desktop
         #else
@@ -108,6 +108,12 @@ final class AppViewHost {
     }
 
     var isFullscreen: Bool { store?.fullscreen == call.id }
+
+    static func title(for call: AppViewCall) -> String {
+        if call.resourceURI == "ui://agents/dashboard" { return "Dashboard" }
+        if call.tool == "show_test_view" { return "Test view" }
+        return call.tool.replacingOccurrences(of: "_", with: " ")
+    }
 
     // MARK: Loading
 

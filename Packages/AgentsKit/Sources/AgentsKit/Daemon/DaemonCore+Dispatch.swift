@@ -784,7 +784,7 @@ extension DaemonCore {
 
             case DaemonAPI.Method.dashboardRead:
                 let request = try require(params, as: DaemonAPI.DashboardTokenRequest.self)
-                return .success(["note": .string(try readDashboard(request))])
+                return .success(try readDashboardResult(request))
 
             case DaemonAPI.Method.dashboardGet:
                 let request = try require(params, as: DaemonAPI.DashboardRequest.self)

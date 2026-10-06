@@ -139,7 +139,7 @@ export function DashboardPage({ store, host, folder, projectName, down }: {
 }
 
 /** Update now (#146): Updating… while a run is going, off while it can't start. */
-function UpdateNow({ store, host, folder, update, down }: {
+export function UpdateNow({ store, host, folder, update, down }: {
   store: Store; host: string; folder: string; update: DashboardUpdate; down: boolean;
 }) {
   // Ticks so the cooldown's end turns the button back on.
@@ -157,7 +157,7 @@ function UpdateNow({ store, host, folder, update, down }: {
 }
 
 /** What is going, why it can't, or how the last one went, with the way to its session. */
-function UpdateLine({ host, folder, update }: { host: string; folder: string; update: DashboardUpdate }) {
+export function UpdateLine({ host, folder, update }: { host: string; folder: string; update: DashboardUpdate }) {
   const line = updateLine(update, toWireDate(new Date()));
   if (!line) return null;
   const failed = update.lastFailed && !update.isRunning;

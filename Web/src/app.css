@@ -141,6 +141,10 @@ a { color: var(--accent); }
   margin: 0;
 }
 
+.dashboard-host { padding: 0; position: relative; }
+.dashboard-note, .dashboard-files { margin: 0; padding: 6px 16px; }
+.dashboard-files { border-top: 1px solid var(--paper-rule); }
+
 .column-head {
   display: flex;
   align-items: center;
