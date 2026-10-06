@@ -215,6 +215,7 @@ struct WorkflowMark: View {
                 SyncedSpinner(diameter: 14)
             } else {
                 Image(systemName: symbol)
+                    // Decorative: the workflow's mark filling a 20-point well, not text (FR-015).
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
             }

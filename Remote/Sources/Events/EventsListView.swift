@@ -48,7 +48,9 @@ struct EventsListView: View {
                                 Button {
                                     Task { await model.cancelWait(of: agent.agentID) }
                                 } label: {
-                                    Image(systemName: "xmark").font(.caption)
+                                    Image(systemName: "xmark")
+                                        // Decorative: the glyph that ends the wait, not text (FR-015).
+                                        .font(.caption)
                                 }
                                 .buttonStyle(.plain)
                                 .foregroundStyle(.secondary)
