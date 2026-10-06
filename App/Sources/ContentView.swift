@@ -88,12 +88,21 @@ struct ContentView: View {
             // asked about a file, so there would be nothing for either to show.
             WorkflowPage(workflowID: id).paperGround()
         } else if model.openDashboard, let folder = model.selectedProject, let summary = model.selectedProjectSummary {
-            // The project's own page (#145): its Dashboard (074), with anything waiting for
-            // somebody's OK across the top, as over a new session.
+            // The project's own page (#145): its Dashboard, drawn as ui://agents/dashboard
+            // (#188), with anything waiting for somebody's OK across the top.
             VStack(spacing: 0) {
                 WaitingForOKBanner(folder: folder)
                 OfflineStrip(host: summary.host)
-                DashboardPage(folder: folder, host: summary.host)
+                ProjectDashboardView(
+                    snapshot: model.dashboard(in: folder),
+                    revision: model.dashboardRevision(in: folder),
+                    call: { method, params in
+                        try await model.client(for: summary.host).call(method, params)
+                    },
+                    refresh: { await model.refreshDashboard(folder, on: summary.host) },
+                    update: { await model.updateDashboard(folder, on: summary.host) })
+                    .navigationTitle(AppCheckout.windowTitle(summary.name))
+                    .navigationSubtitle("Dashboard")
             }
             .paperGround()
         } else if let path = model.openPin, let key = model.selectedProjectKey, let summary = model.selectedProjectSummary {

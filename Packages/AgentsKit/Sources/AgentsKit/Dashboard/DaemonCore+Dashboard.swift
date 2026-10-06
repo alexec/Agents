@@ -183,6 +183,14 @@ extension DaemonCore {
         return blocks.joined(separator: "\n\n")
     }
 
+    func readDashboardResult(_ request: DaemonAPI.DashboardTokenRequest) throws -> JSONValue {
+        let caller = try dashboardCaller(request.token)
+        let text = try readDashboard(request)
+        return ["note": .string(text),
+                "content": [["type": .string("text"), "text": .string(text)]],
+                "structuredContent": try JSONValue.encoding(dashboardSnapshot(caller.projectFolder, withUpdate: true))]
+    }
+
     /// `move_tile`: put a tile somewhere else on the Dashboard (#147). Any agent in the
     /// project may, as a person may: moving a tile is not keeping it.
     public func moveTile(_ request: DaemonAPI.MoveTileRequest) throws -> String {

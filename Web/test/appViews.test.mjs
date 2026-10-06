@@ -67,6 +67,11 @@ test("the feed says each thing once and in order", () => {
   assert.deepEqual(sent.map((m) => m.method), ["ui/notifications/tool-result"]);
   assert.deepEqual(sent[0].params.structuredContent, { a: 1 });
   assert.deepEqual(feed.due(done), []);
+  const again = { ...done, result: { content: [], structuredContent: { a: 2 } } };
+  const resent = feed.due(again);
+  assert.deepEqual(resent.map((m) => m.method), ["ui/notifications/tool-result"]);
+  assert.deepEqual(resent[0].params.structuredContent, { a: 2 });
+  assert.deepEqual(feed.due(again), []);
   const late = new bridge.Feed();
   assert.deepEqual(late.viewInitialized({ ...call, state: "cancelled", reason: "Stopped." }).map((m) => m.method),
     ["ui/notifications/tool-input", "ui/notifications/tool-cancelled"]);

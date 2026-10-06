@@ -62,7 +62,7 @@ struct WorkflowPage: View {
         }
         .onChange(of: workflowID) { shownRuns = Self.runsAtFirst }
         // Its runs, archived ones too, a page at a time; again when one starts.
-        .task(id: RunsAsk(workflowID: workflowID, shown: shownRuns, held: summary.map(started)?.count ?? 0)) {
+        .task(id: RunsAsk(workflowID: workflowID, shown: shownRuns)) {
             guard let summary else { return }
             moreRuns = await model.loadRuns(of: summary.workflowID, in: summary.workflow.folder,
                                             limit: shownRuns)
@@ -81,13 +81,6 @@ struct WorkflowPage: View {
     }
 
     /// The agents it started that the phone holds, newest first.
-    private func started(_ summary: WorkflowSummary) -> [Agent] {
-        let folder = Project.standardize(summary.workflow.folder)
-        return model.work.agents
-            .filter { $0.projectFolder == folder && $0.startedByWorkflow == summary.workflowID }
-            .sorted { $0.createdAt > $1.createdAt }
-    }
-
     private func content(_ summary: WorkflowSummary) -> some View {
         let workflow = summary.workflow
         return VStack(alignment: .leading, spacing: 22) {
@@ -697,10 +690,7 @@ struct WorkflowPage: View {
     /// The agents it started, newest first, as the project page draws them — each a
     /// tap from its conversation, and back comes here. Three to begin with.
     private func runs(_ workflow: Workflow) -> some View {
-        let folder = Project.standardize(workflow.folder)
-        let started = model.work.agents
-            .filter { $0.projectFolder == folder && $0.startedByWorkflow == workflow.workflowID }
-            .sorted { $0.createdAt > $1.createdAt }
+        let started = model.work.workflowRuns(workflow.workflowID, in: workflow.folder)
         return VStack(alignment: .leading, spacing: 10) {
             sectionTitle("Recent runs")
             if started.isEmpty {
@@ -745,5 +735,4 @@ struct WorkflowPage: View {
 private struct RunsAsk: Equatable {
     var workflowID: Workflow.ID
     var shown: Int
-    var held: Int
 }

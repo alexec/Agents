@@ -1,6 +1,6 @@
 # Parity: the Mac window, the Remote and the web page (#233)
 
-**Date:** 2026-10-04, at main 28884102.
+**Date:** 2026-10-05, at `a4f16ad4` plus #188.
 
 **What it is:** where each of the three clients stands, a row per screen and feature. The three are the Mac window (`App/`), the Remote on iPhone and iPad (`Remote/`), and the web page (`Web/`). Every parity line in a commit (AGENTS.md, "Keeping the three clients in step") updates the row it changes.
 
@@ -15,14 +15,14 @@
 
 ## Counts
 
-Of 207 rows: **112 same**, **37 by design**, **58 delta** (after #221, #238–#244, #249, #252, #253, #255–#261, #263–#266, #291, #317). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 208 rows: **122 same**, **37 by design**, **49 delta** (after #188, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
 | Sidebar and project list | 3 | 2 | 12 |
 | Session rows and states | 10 | 2 | 11 |
 | Chat turns and turn detail | 14 | 3 | 7 |
-| Prompt bar and queued prompts | 7 | 2 | 11 |
+| Prompt bar and queued prompts | 16 | 2 | 2 |
 | Question and permission cards | 10 | 4 | 1 |
 | Start sheet and new project | 17 | 5 | 0 |
 | Worktrees and Files | 12 | 6 | 3 |
@@ -34,7 +34,7 @@ Of 207 rows: **112 same**, **37 by design**, **58 delta** (after #221, #238–#2
 | Notifications and badges | 3 | 0 | 1 |
 | Disk strip | 2 | 1 | 0 |
 | Hosts, connection and pairing | 3 | 3 | 0 |
-| MCP Apps views | 1 | 0 | 0 |
+| MCP Apps views | 2 | 0 | 0 |
 
 The deltas are tracked by 29 issues:
 - **Already open:** #226 (the Remote's one sidebar) and #235 (the page's one sidebar at phone width).
@@ -120,7 +120,7 @@ The deltas are tracked by 29 issues:
 | Folder is missing strip, refused send (#119) | `A/Chat/MissingFolderStrip.swift` | `R/Chat/RemoteMissingFolderStrip.swift`, alert `R/RemoteApp.swift:135-151` | `W/views/MissingFolder.tsx:30-55` (inline notice) | **same** |
 | Who is asking, on a card (#121) | `askerLine` | `askerLine` | `W/model/asker.ts`, held to `Fixtures/web/asker/line.json` | **same** |
 | Crowd mark on an empty chat | `A/Chat/CrowdMark.swift` | None | None | **by design** (decoration of the window's empty chat) |
-| Context meter | `A/Chat/ContextMeter.swift:15` | Its own copy: `R/Chat/RemoteChatView.swift:289-343` | None | **delta**: web #254 |
+| Context meter | `A/Chat/ContextMeter.swift:15` | Its own copy: `R/Chat/RemoteChatView.swift:289-343` | `W/views/PromptStatus.tsx` | **same** |
 
 ## Prompt bar and queued prompts
 
@@ -129,21 +129,21 @@ The deltas are tracked by 29 issues:
 | Layout (#108) | `A/Chat/PromptBar.swift` | `R/Chat/PromptBar.swift` | `W/views/Prompt.tsx` (walked, `walks/108/`) | **same** (each to its width) |
 | The bar's head: place, labels, runtime | `A/Chat/PromptBar.swift:246-269, 353-363` | Over the field: the place (said, not offered), labels, runtime: `R/Chat/PromptBar.swift` (`PromptHead`, #242) | `W/views/Chat.tsx:230-271` | **same** (moving a session stays the window's, 053) |
 | Moving a session to another place (053) | Worktree capsule: `A/Chat/PromptBar.swift:1185-1261` | None | Names the place, can't move: `W/views/Chat.tsx:249-264` | **by design** (moving is the window's) |
-| Model and effort | One `ModelPill`: `S/Chat/ModelPill.swift` | One `ModelPill` | A pill each: `W/views/PromptMenus.tsx:44-63` | **delta**: web #254 (or record by design) |
-| No-controls note | `OptionsNote`: `S/Chat/PromptPieces.swift` | The same | Nothing: `W/views/PromptMenus.tsx:48` | **delta**: web #254 |
-| Sandbox capsule | `S/Chat/SandboxCapsule.swift`, `A/Chat/PromptBar.swift:854-878` | `R/Chat/PromptBar.swift:498-505` | None | **delta**: web #254 |
-| Lease and event-wait capsules | `S/Chat/LeaseRow.swift`, `S/Chat/WaitCapsule.swift` | The same, the wait without ✕ (`WaitCapsule.swift:9-10`) | None | **delta**: web #254 |
-| Cost / day-limit banner | `S/Chat/PromptPieces.swift:104` | The same | None | **delta**: web #254 |
-| Placeholder | `PromptWords.placeholder`: `S/Chat/PromptPieces.swift:14-24` | The same | *Reply…*: `W/views/Chat.tsx:225` | **delta**: web #254 |
-| Send / Queue / Stop button | `A/Chat/PromptBar.swift:478-524` | `R/Chat/PromptBar.swift:228-272` | Always *↑ Send*; Stop in ···: `W/views/Prompt.tsx:173-176` | **delta**: web #254 |
+| Model and effort | One `ModelPill`: `S/Chat/ModelPill.swift` | One `ModelPill` | One combined disclosure: `W/views/PromptMenus.tsx` | **same** |
+| No-controls note | `OptionsNote`: `S/Chat/PromptPieces.swift` | The same | `W/views/PromptMenus.tsx` | **same** |
+| Sandbox capsule | `S/Chat/SandboxCapsule.swift`, `A/Chat/PromptBar.swift:854-878` | `R/Chat/PromptBar.swift:498-505` | `W/views/PromptStatus.tsx` | **same** |
+| Lease and event-wait capsules | `S/Chat/LeaseRow.swift`, `S/Chat/WaitCapsule.swift` | The same, the wait without ✕ (`WaitCapsule.swift:9-10`) | `W/views/Chat.tsx:472-488` | **same** |
+| Cost / day-limit banner | `S/Chat/PromptPieces.swift:104` | The same | `W/views/PromptStatus.tsx` | **same** |
+| Placeholder | `PromptWords.placeholder`: `S/Chat/PromptPieces.swift:14-24` | The same | `promptPlaceholder`: `W/model/promptWords.ts`, offered suggestion as placeholder: `W/views/Prompt.tsx` | **same** (#276) |
+| Send / Queue / Stop button | `A/Chat/PromptBar.swift:478-524` | `R/Chat/PromptBar.swift:228-272` | `W/views/Prompt.tsx` | **same** (#276) |
 | Sending in flight (#87) | Spinner, *telling* after 400 ms: `A/Chat/PromptBar.swift:120-138` | The host's name: `R/Chat/PromptBar.swift:94` | `W/views/Prompt.tsx:119-121` | **same** (#239) |
 | Queued prompts as bubbles, Send now, × (#95) | `S/Chat/TranscriptRows.swift:377-463` | Shared | `W/views/Chat.tsx:277-306` | **same** |
 | Attachments | Picker, drag, paste: `A/Chat/PromptBar.swift:455-463` | `R/Chat/PromptBar.swift:214` | Picker, drop, paste: `W/views/Prompt.tsx:122-171` | **same** |
 | Dictation (#69) | `S/Chat/Dictation.swift` | Shared | None | **by design** (071) |
 | Slash commands | `S/Chat/CommandList.swift` | Shared | Over the field: `W/views/Prompt.tsx:223`, `W/model/completions.ts` | **same** (#255) |
 | @ file mentions | `A/Chat/PromptBar.swift:644-690` | `R/Chat/PromptBar.swift:418-454` | Asks the host (`files/mention`): `W/views/Prompt.tsx:236`; none on a new session, as the Remote (no agent to ask yet) | **same** (#255) |
-| Suggested next prompt (031) | Placeholder and Tab: `A/Chat/PromptBar.swift:67-88` | A chip: `R/Chat/PromptBar.swift:537-561` | None | **delta**: web #254. Placeholder against chip: **by design** (touch) |
-| Drafts kept | Across relaunch: `A/Chat/DraftKeeper.swift` | Flushed on going to the background | Memory only, lost on reload: `W/model/store.ts:1009` | **delta**: web #254 |
+| Suggested next prompt (031) | Placeholder and Tab: `A/Chat/PromptBar.swift:67-88` | A chip: `R/Chat/PromptBar.swift:537-561` | Placeholder and Tab: `W/views/Prompt.tsx` | **same** (placeholder against chip: **by design**, touch; #276) |
+| Drafts kept | Across relaunch: `A/Chat/DraftKeeper.swift` | Flushed on going to the background | Across reload: `W/model/drafts.ts` | **same** (#276) |
 | Warm on intent (#183) | `A/Chat/PromptBar.swift:175-177` | To the agent's host: `R/RemoteModel.swift:2480-2490` | `W/views/Chat.tsx:50, 229` | **same** (#238) |
 | The bar on an archived chat | Shown: *Say what next, and this comes back* | Shown (#242) | Shown | **same** |
 
@@ -191,7 +191,7 @@ The deltas are tracked by 29 issues:
 | Add Folder…, Clone Git URL… (#115) | `A/Projects/ProjectListView.swift:150-180`, `A/Projects/CloneSheet.swift` | Actions on the empty-project screen: `R/Sidebar/ProjectRow.swift`, `R/RemoteModel.swift` | `W/views/NewProject.tsx:34-260` | **same** |
 | Add Server… | `A/Control/ControlAddServerSheet.swift` | None | None | **by design** (installs over ssh from the Mac) |
 | Add Folder on this Mac: Finder drag, the clipboard's URL | Yes | n/a | Browses the host instead | **by design** (#115: no drag from Finder, no clipboard read) |
-| No projects yet | Words and buttons, or *No agent runtime found*: `A/Projects/ProjectListView.swift:81-84, 636-655` | Empty-state words and Add Folder / Clone Git URL actions: `R/Sidebar/ProjectRow.swift` | *No projects yet* only: `W/views/NewProject.tsx:85-103` | **same** (web #257; *No agent runtime found* remains window-only) |
+| No projects yet | Words and buttons, or *No agent runtime found* and each runtime's standing: `A/Projects/ProjectListView.swift:593-623` | Empty-state words and Add Folder / Clone Git URL actions: `R/Sidebar/ProjectRow.swift:141-159` | *No projects yet*, or *No agent runtime found* when this Mac has none that can start: `W/views/NewProject.tsx:89-156` | **same** (#257; Install stays on the Mac. The Remote's empty list does not switch, by design: a phone does not install a runtime) |
 | Continue in the project folder (#119, 065) | `A/AppModel.swift:2944-2958` | `R/RemoteModel.swift:2387-2407` | `W/model/store.ts:1088-1091` | **same** |
 
 ## Worktrees and Files
@@ -224,12 +224,12 @@ The deltas are tracked by 29 issues:
 
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
-| Dashboard row and page (#122) | `A/Dashboard/DashboardPage.swift` | `R/Dashboard/DashboardPage.swift` | `W/views/Dashboard.tsx` | **same** |
+| Dashboard row and page (#122, #188) | The row opens `ui://agents/dashboard` through `AppViewHost`: `S/Dashboard/ProjectDashboardView.swift`, from `A/ContentView.swift`. The native page is not the destination | The same view for `RemoteRoute.dashboard`: `R/RemoteApp.swift` | The same view through the page's view host: `W/views/DashboardAppView.tsx` | **same** |
 | Tile kinds, sparklines, greying when stale | `S/Dashboard/TileCard.swift` | Shared | `W/views/Dashboard.tsx:259-305` | **same** |
 | Tile detail, its History row (#127) | `A/Dashboard/DashboardPage.swift:343-383` | Details… in the tile's long-press menu; same detail and History rows: `R/Dashboard/DashboardPage.swift` | All rows, including *Greyed after*: `W/views/Dashboard.tsx` | **same** |
 | Hide, Show, Remove, Show Hidden Tiles | `A/Dashboard/DashboardPage.swift:86-93, 283-289` | Toggle above tiles; Hide, Show and Remove in the long-press menu: `R/Dashboard/DashboardPage.swift` | `W/views/Dashboard.tsx:75-79, 241-244` | **same** |
 | Order: drag, Move items (#147) | Drag and every Move item: `A/Dashboard/DashboardPage.swift:174-187, 292-316` | Tile Move items and section heading's Move Section Up / Down; no drag: `R/Dashboard/DashboardPage.swift` | Drag and every Move item: `W/views/Dashboard.tsx:99-204` | **same** (no drag on the Remote: **by design**) |
-| Update now (#146) | `A/Dashboard/DashboardPage.swift:98-136` | In the toolbar: `R/Dashboard/DashboardPage.swift:103-158` | `W/views/Dashboard.tsx:137-169` | **same** |
+| Update now (#146) | In the toolbar, beside the view: `S/Dashboard/ProjectDashboardView.swift` | The same toolbar item | In the page head, beside the view: `W/views/DashboardAppView.tsx` | **same** |
 | *‹project› · updated …* | `A/Dashboard/DashboardPage.swift:81, 138-146` | Under the update line: `R/Dashboard/DashboardPage.swift` | `W/views/Dashboard.tsx:87-88` | **same** |
 | A store file set aside, said (#171); the footer sentence (#127) | `A/Dashboard/DashboardPage.swift:24-29, 47-50` | `R/Dashboard/DashboardPage.swift:65-69, 88-92` | `W/views/Dashboard.tsx:90, 129` | **same** |
 | Pinned page rows (#159) | Drag; Open, Move Up / Down, Unpin: `A/Projects/PinnedPageRows.swift` | Long press: `R/Dashboard/PinnedPage.swift:8-60` | Drag and the menu: `W/views/Pins.tsx:17-73` | **same** (no drag on the Remote: **by design**) |
@@ -328,7 +328,8 @@ The deltas are tracked by 29 issues:
 
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
-| `ui://` views (#187–#191) | Not built | Not built | Not built | **same** (planned for all three in #187) |
+| A tool's `ui://` view in a chat (#187) | WebKit host `S/AppView/AppViewHost.swift`, from `A/Chat/ChatView.swift` | The same host, from `R/Chat/RemoteChatView.swift` | The sandbox proxy `W/views/chat/viewLayer.ts` | **same** |
+| The project Dashboard row opens `ui://agents/dashboard` (#188) | `ProjectDashboardView` through that host, in place of the native page: `A/ContentView.swift` | The same view for `RemoteRoute.dashboard`: `R/RemoteApp.swift` | `DashboardAppView` through the page's view host: `W/views/Columns.tsx` | **same** |
 
 ## Live sync
 
@@ -422,7 +423,8 @@ The record of the walks that brought the page level with the window, from 2026-1
 | Change | Issue | Page | Notes |
 |---|---|---|---|
 | Declared resources with descriptions, counted holders ("2 of 3 held") | #116 | **has**, read-only | A **Resources** fold under each host lists the declared resources with their descriptions and "2 of 3 held", each holder, and anything else held or awaited; kept by `leases/changed` (added to `WebSignatures`). **web: by design** for declaring, editing and ending leases: they are the Mac's (Settings ▸ Resources, the Resources page), as on the Remote. |
-| The project Dashboard: row at the top of the sessions column, page of tiles, greying, detail, Hide/Show/Remove, live | #122 (074) | **has** | Same row, sections, grid (tables and notes across), SVG sparklines, greyed stale tiles, a keeper foot that opens the session or workflow; Hide/Show/Remove and Details… in a tile's ···. Show Hidden Tiles is a check box in the page's head, where the window has it in a menu. Shots: `specs/074-project-dashboard/walks/074-web-*.png`; window: `specs/074-project-dashboard/look/mac-dashboard.png`. |
+| The project Dashboard: row at the top of the sessions column, page of tiles, greying, detail, Hide/Show/Remove, live | #122 (074) | **has** | Same row, sections, grid (tables and notes across), SVG sparklines, greyed stale tiles, a keeper foot that opens the session or workflow; Hide/Show/Remove and Details… in a tile's ···. Show Hidden Tiles is a check box in the page's head, where the window has it in a menu. Shots: `specs/074-project-dashboard/walks/074-web-*.png`; window: `specs/074-project-dashboard/look/mac-dashboard.png`. Since #188 the row opens `ui://agents/dashboard` instead of this native page. |
+| The Dashboard row opens `ui://agents/dashboard` through the app-view host. The native page is no longer where the row goes. Tile files, keepers and `take_over` stay | #188 | **has** | The Mac and the Remote draw it with `AppViewHost` (`Shared/UI/Dashboard/ProjectDashboardView.swift`). The page draws it through the same view host as a chat (`Web/src/views/DashboardAppView.tsx`). Update now, the unreadable-file note and the footer stay on the page around the view. Show hidden is in the view. |
 | Workflow Enabled and Archive are lines in the workflow's file (`enabled: false`, `archived: true`), and each page says so under the switch | #125 | **has** | The page's Enabled switch writes the file as the window's does, and the page says the window's sentence under it: *Enabled and Archive are saved in .agents/workflows/<id>.md, a file in this project you may commit*. A workflow turned off on another clone reads *Off: its file says enabled: false*, on every client. The page has no Archive (by design, as before: Archive and Bring Back are the window's and the Remote's). |
 | Number-tile history kept in the project (`.agents/dashboard/history/<id>.jsonl`); the Dashboard says its tiles and trends are project files | #127 | **has** | The window, the Remote and the page end the Dashboard with *Tiles and their trends are files in .agents/dashboard/ in this project, which you may commit.* A number tile's detail adds a **History** row naming its file, on the window and the page (the Remote has no detail). The trend itself comes from the host as before, so nothing else on the page changed. |
 | Update now on the Dashboard: runs the `dashboard` workflow or a one-off agent, Updating… while it runs, the last update and its cooldown, why it can't start | #146 | **has** | A button at the right of the page's head, after Show Hidden Tiles (the window has it beside its ··· menu; the Remote in the toolbar), and a line under *updated …*: running with Open Session, the waiting-for-approval refusal with Open Workflow, *Last update 12:11; again from 12:16*. Shots: `specs/074-project-dashboard/walks/146-web-update-*.png`; window: `specs/074-project-dashboard/look/146-mac-update-*.png`. Also fixed here: a status tile's line wore the session list's `.status` ring. |

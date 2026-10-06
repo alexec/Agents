@@ -1480,6 +1480,21 @@ export class Store extends Work {
     await this.act("agents/answerSandbox", { agentID: agentID as UUID, carryOn }, host);
   }
 
+  async setAgentSandbox(host: string, agentID: string, choice: SandboxChoice | undefined): Promise<void> {
+    await this.act("agents/setSandbox", { agentID: agentID as UUID, ...(choice ? { choice } : {}) }, host);
+  }
+
+  async letAgentGoOn(host: string, agent: Agent): Promise<void> {
+    const limits = this.costs.value[host]?.limits;
+    const ceiling = agent.costCeiling ?? limits?.perAgent;
+    const currency = ceiling?.currency ?? "USD";
+    const spent = agent.costToDate?.[currency] ?? 0;
+    const step = ceiling?.amount ?? spent;
+    await this.act("agents/setCeiling", {
+      agentID: agent.id, ceiling: { amount: spent + step, currency },
+    }, host);
+  }
+
   async perform(host: string, agentID: string,
                 action: "agents/stop" | "agents/park" | "agents/unpark" | "agents/archive" | "agents/unarchive"): Promise<void> {
     await this.acting(agentID, action, () => this.act(action, { agentID: agentID as UUID }, host));

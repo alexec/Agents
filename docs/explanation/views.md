@@ -67,6 +67,14 @@ How each client enforces it:
 | `notifications/message` | A line in the daemon's log. |
 | `ui/resource-teardown` | Sent before a view goes: when you open another conversation, or when more than eight views are open in one chat. The app waits up to two seconds for the answer. |
 
+## The Dashboard
+
+Opening a project's Dashboard — the row at the top of its sessions, on the Mac, the Remote
+or the web page — draws `ui://agents/dashboard` from the app's own server. It uses the same
+host a chat uses for a tool's view. The page makes the call itself, so no conversation has
+to be open. The tiles stay files in `.agents/dashboard/`. Keepers and `take_over` are
+unchanged. **Update now** stays on the page, beside the view.
+
 ## The test view
 
 The `agents` server has a test view, `ui://agents/test-view`, for proving all of this on

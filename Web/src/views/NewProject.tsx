@@ -5,10 +5,12 @@
 import { signal, useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef } from "preact/hooks";
-import type { ControlHost, DirectoryEntry, DirectoryListing } from "../protocol/generated";
+import type { ControlHost, DirectoryEntry, DirectoryListing, RuntimeStatus } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { gitRemote } from "../model/gitRemote";
 import { describe } from "../model/errors";
+import { emptyListRuntimeLine, noAgentRuntime } from "../model/runtimes";
+import { isSafeLink } from "../render/markdown";
 import { go } from "../route";
 
 type Adding = { kind: "folder" | "clone"; host: string };
@@ -80,14 +82,39 @@ export function NewProjectMenu({ store }: { store: Store }) {
 
 /**
  * The first thing a fresh control plane shows: what to do, not that something is wrong. Only
- * once every host that answers has listed its projects, and none has any.
+ * once every host that answers has listed its projects, and none has any. When this Mac has
+ * answered and nothing there can start, it says so instead, as the window's empty list does
+ * (#257). Install stays on the Mac.
  */
 export function EmptyProjects({ store }: { store: Store }) {
   const online = store.hosts.value.filter((h) => h.state === "online");
   const listed = online.every((h) => store.projects.value[h.id] !== undefined);
   const none = online.every((h) => (store.projects.value[h.id] ?? []).length === 0
     && (store.clones.value[h.id] ?? []).length === 0);
-  if (online.length === 0 || !listed || !none) return null;
+  const showing = online.length > 0 && listed && none;
+  const macOnline = online.some((h) => h.id === "mac");
+  const macListed = macOnline && store.runtimes.value.mac !== undefined;
+  // A list that failed is not "no runtime": the add-folder prompt stays, and the next look tries again.
+  const failed = useSignal(false);
+  useEffect(() => {
+    if (!showing || !macOnline) return;
+    let live = true;
+    if (!macListed) {
+      failed.value = false;
+      void store.loadRuntimes("mac").finally(() => {
+        if (live && store.runtimes.peek().mac === undefined) failed.value = true;
+      });
+    }
+    // An install on the Mac shows up when the page is shown again: the page is not told runtime/changed.
+    const onVis = () => { if (document.visibilityState === "visible") void store.loadRuntimes("mac"); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { live = false; document.removeEventListener("visibilitychange", onVis); };
+  }, [showing, macOnline, macListed]);
+  if (!showing) return null;
+  const macRuntimes = macOnline ? store.runtimes.value.mac : undefined;
+  // Held until this Mac's list arrives, so "No projects yet" does not flash in its place.
+  if (macOnline && macRuntimes === undefined && !failed.value) return null;
+  if (noAgentRuntime(macRuntimes)) return <NoAgentRuntime runtimes={macRuntimes ?? []} />;
   // On this Mac when it answers, as the window's empty list adds to this Mac.
   const host = online.find((h) => h.id === "mac")?.id ?? online[0]!.id;
   return (
@@ -98,6 +125,32 @@ export function EmptyProjects({ store }: { store: Store }) {
         <button class="prominent" onClick={() => (adding.value = { kind: "folder", host })}>Add Folder…</button>
         <button onClick={() => (adding.value = { kind: "clone", host })}>Clone Git URL…</button>
       </div>
+    </div>
+  );
+}
+
+/** Nothing on this Mac can start: the window's words, and each runtime's standing. */
+function NoAgentRuntime({ runtimes }: { runtimes: RuntimeStatus[] }) {
+  return (
+    <div class="empty-projects">
+      <p class="strong">No agent runtime found</p>
+      <p class="quiet">Agents runs the coding CLIs on this Mac. Install one on the Mac, in Settings ▸ Agent Runtimes, or from its own page.</p>
+      {runtimes.length > 0 && (
+        <ul class="empty-runtimes">
+          {runtimes.map((status) => {
+            const row = emptyListRuntimeLine(status);
+            return (
+              <li key={status.runtime.id}>
+                <span class="strong">{status.runtime.name}</span>
+                {row.line && <span class={row.failed ? "small failure" : "quiet small"}>{row.line}</span>}
+                {row.page && isSafeLink(row.page) && (
+                  <a href={row.page} target="_blank" rel="noopener noreferrer">Open install page</a>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

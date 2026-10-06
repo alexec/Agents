@@ -141,6 +141,10 @@ a { color: var(--accent); }
   margin: 0;
 }
 
+.dashboard-host { padding: 0; position: relative; }
+.dashboard-note, .dashboard-files { margin: 0; padding: 6px 16px; }
+.dashboard-files { border-top: 1px solid var(--paper-rule); }
+
 .column-head {
   display: flex;
   align-items: center;
@@ -634,6 +638,16 @@ button.link.reading:hover { text-decoration: underline; }
 .sandbox-refusal > div { flex: 1; min-width: 0; }
 .sandbox-refusal p { margin: 0; }
 .menus-right { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-left: auto; }
+.options-note { opacity: 0.68; font-size: 12px; }
+.model-effort { position: relative; }
+.model-effort > summary { list-style: none; cursor: pointer; }
+.model-effort > summary::-webkit-details-marker { display: none; }
+.model-effort-menu { position: absolute; z-index: 20; right: 0; bottom: calc(100% + 6px); display: flex; gap: 6px; padding: 8px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); box-shadow: 0 4px 18px #0002; }
+.context-meter { display: inline-flex; align-items: center; gap: 5px; opacity: 0.72; font-size: 11px; font-variant-numeric: tabular-nums; }
+.context-ring { --used: 0%; width: 12px; height: 12px; box-sizing: border-box; border: 2px solid var(--paper-rule); border-radius: 50%; background: conic-gradient(var(--paper-ink) var(--used), transparent 0); }
+.context-ring.close { background: conic-gradient(var(--danger, #bd4238) var(--used), transparent 0); }
+.cost-limit { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; padding: 6px 10px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); font-size: 12px; }
+.cost-limit button { white-space: nowrap; }
 .pill {
   position: relative;
   flex: none;
@@ -876,6 +890,9 @@ button.remove:hover { opacity: 1; }
 .menu-head { margin: 6px 10px 2px; font-size: 11px; opacity: 0.55; }
 .empty-projects { display: flex; flex-direction: column; gap: 8px; padding: 12px 8px; }
 .empty-projects .quiet { line-height: 1.45; }
+.empty-runtimes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.empty-runtimes li { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; }
+.empty-runtimes a { font-size: 12px; }
 .empty-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .row.cloning { cursor: default; opacity: 0.7; }
 .row.cloning .spinner { grid-column: 2; grid-row: 1 / span 2; align-self: center; }

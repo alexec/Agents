@@ -37,9 +37,10 @@ export class HostedView {
   readonly askedMessage = signal<string | null>(null);
   readonly contextLine = signal<string | null>(null);
   readonly title: string;
+  /** The project's Dashboard fills the page: no "Back to the chat" bar (#188). */
+  readonly fillsPage: boolean;
   readonly box: HTMLDivElement;
   private frame: HTMLIFrameElement | null = null;
-  private bar: HTMLDivElement;
   private feed = new Feed();
   private policy: AppViewPolicy = { connectDomains: [], resourceDomains: [], frameDomains: [], baseUriDomains: [], refused: [] };
   private resource: ViewResource | null = null;
@@ -51,18 +52,21 @@ export class HostedView {
 
   constructor(public call: AppViewCall, public actions: ViewActions, private layer: ViewLayer) {
     this.title = viewTitle(call.tool);
+    this.fillsPage = call.resourceUri === "ui://agents/dashboard";
     this.box = document.createElement("div");
     this.box.className = "view-box";
     this.box.hidden = true;
-    this.bar = document.createElement("div");
-    this.bar.className = "view-bar";
-    const name = document.createElement("strong");
-    name.textContent = this.title;
-    const back = document.createElement("button");
-    back.textContent = "Back to the chat";
-    back.onclick = () => this.layer.setFullscreen(null);
-    this.bar.append(name, back);
-    this.box.append(this.bar);
+    if (!this.fillsPage) {
+      const bar = document.createElement("div");
+      bar.className = "view-bar";
+      const name = document.createElement("strong");
+      name.textContent = this.title;
+      const back = document.createElement("button");
+      back.textContent = "Back to the chat";
+      back.onclick = () => this.layer.setFullscreen(null);
+      bar.append(name, back);
+      this.box.append(bar);
+    }
     this.context = {
       theme: dark() ? "dark" : "light", displayMode: "inline", width: 600, maxHeight: maxInlineHeight,
       locale: navigator.language || "en", timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
@@ -320,7 +324,7 @@ export class ViewLayer {
         box.classList.add("full");
         Object.assign(box.style, { position: "fixed", top: `${rect.top}px`, left: `${rect.left}px`,
           width: `${rect.width}px`, height: `${rect.height}px` });
-        view.place(rect.width, rect.height - 41);
+        view.place(rect.width, rect.height - (view.fillsPage ? 0 : 41));
         continue;
       }
       box.classList.remove("full");

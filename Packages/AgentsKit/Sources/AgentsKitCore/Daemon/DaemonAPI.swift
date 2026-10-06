@@ -156,6 +156,7 @@ public enum DaemonAPI {
         /// behind, and a runtime nobody prompts goes as the warm pool decides.
         public static let agentsPrewarm = "agents/prewarm"
         public static let agentsTranscript = "agents/transcript"
+        public static let agentsTouchedPaths = "agents/touchedPaths"
         /// The conversation's finished turns, each as its ask and its last block.
         public static let agentsTurns = "agents/turns"
         /// What an agent changed: the files its runtime reported editing, and — where its

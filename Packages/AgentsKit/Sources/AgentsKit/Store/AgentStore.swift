@@ -473,6 +473,21 @@ public actor AgentStore {
         return try reader.page(index, before: before, limit: limit)
     }
 
+    /// The files an agent touched, without sending its transcript back to a client.
+    public func touchedPaths(for agentID: UUID) throws -> [String] {
+        let reader = TranscriptReader(url: locations.transcript(agentID))
+        let index = try lineIndex(for: agentID, with: reader)
+        var touched = TouchedPaths()
+        var before = index.count
+        while before > 0 {
+            let page = try reader.page(index, before: before, limit: min(500, before))
+            for entry in page.entries { touched.absorb(entry) }
+            guard page.firstIndex < before else { break }
+            before = page.firstIndex
+        }
+        return touched.all
+    }
+
     /// What is known of one conversation's turns.
     private struct Turns {
         /// The lines of the transcript that are a person's ask, up to `scanned`.

@@ -234,5 +234,7 @@ extension AppService {
             other agents' tiles, or to pick up the tiles of a session you are continuing.
             """,
         "inputSchema": ["type": "object", "properties": .object([:])],
+        "_meta": ["ui": ["resourceUri": .string(AppViewCatalog.dashboardURI), "visibility": ["model", "app"]]],
+        "ui/resourceUri": .string(AppViewCatalog.dashboardURI),
     ]
 }

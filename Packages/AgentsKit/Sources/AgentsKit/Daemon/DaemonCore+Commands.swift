@@ -2139,6 +2139,14 @@ extension DaemonCore {
         return try await store.transcript(for: request.agentID, before: request.before, limit: limit)
     }
 
+    public func touchedPaths(_ request: DaemonAPI.AgentRequest) async throws -> [String] {
+        if agents[request.agentID] == nil, let tombstone = retired[request.agentID] {
+            throw JSONRPCError(code: DaemonAPI.Failure.agentRetired,
+                               message: RetirementWords.retiredSentence(tombstone))
+        }
+        return try await store.touchedPaths(for: request.agentID)
+    }
+
     /// The finished turns, as the chat shows them until one is opened.
     public func turns(_ request: DaemonAPI.TurnsRequest) async throws -> TurnsPage {
         let request = try request.bounded()

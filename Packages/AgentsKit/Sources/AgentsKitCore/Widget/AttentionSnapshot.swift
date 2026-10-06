@@ -103,6 +103,10 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
                             limit: Int = AttentionSnapshot.rowLimit) -> AttentionSnapshot {
         var total = 0
         var waiting: [Agent] = []
+        var newestNeed: [UUID: Need] = [:]
+        for need in model.needs.values where newestNeed[need.agentID].map({ $0.raisedAt < need.raisedAt }) ?? true {
+            newestNeed[need.agentID] = need
+        }
         for summary in model.liveProjects {
             total += model.attentionCount(in: summary.folder)
             waiting += AgentGroup.allCases.flatMap { model.agents(in: summary.folder, group: $0) }
@@ -113,7 +117,7 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
         var seen = Set<UUID>()
         let sessions = waiting
             .filter { seen.insert($0.id).inserted }
-            .map { session(for: $0, model: model) }
+            .map { session(for: $0, model: model, need: newestNeed[$0.id]) }
             .sorted { $0.since > $1.since }
         return AttentionSnapshot(writtenAt: date, total: total, sessions: Array(sessions.prefix(max(0, limit))))
     }
@@ -125,10 +129,7 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
     /// about the same agent. A session with no need pending (a finished turn nobody has
     /// read) says nothing rather than being given a question it did not ask (FR-007).
     @MainActor
-    private static func session(for agent: Agent, model: AgentsModel) -> AttentionSnapshotSession {
-        let need = model.needs.values
-            .filter { $0.agentID == agent.id }
-            .max { $0.raisedAt < $1.raisedAt }
+    private static func session(for agent: Agent, model: AgentsModel, need: Need?) -> AttentionSnapshotSession {
         return AttentionSnapshotSession(
             id: agent.id,
             project: model.project(agent.projectFolder)?.name ?? agent.projectFolder.lastPathComponent,

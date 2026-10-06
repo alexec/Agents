@@ -35,7 +35,7 @@ struct DashboardRow: View {
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
-        .task(id: folder) { await model.refreshDashboard(folder) }
+        .task(id: folder) { await model.refreshDashboardSummaryIfNeeded(in: folder) }
     }
 
     static func detail(_ summary: DashboardSummary?) -> String {
@@ -131,6 +131,7 @@ struct DashboardPage: View {
         .task(id: model.work.dashboardRevision(in: folder)) {
             if let folder { await model.refreshDashboard(folder) }
         }
+        .onDisappear { model.work.forgetDashboard(in: folder) }
         .refreshable { if let folder { await model.refreshDashboard(folder) } }
         .sheet(item: $wholeTable) { tile in
             NavigationStack {

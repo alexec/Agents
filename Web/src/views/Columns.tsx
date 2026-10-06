@@ -19,7 +19,7 @@ import { NewProjectDialog } from "./NewProject";
 import { Problem } from "./Errors";
 import { FilesPane } from "./FilesPane";
 import { WorkflowPage } from "./WorkflowPage";
-import { DashboardPage } from "./Dashboard";
+import { DashboardAppView } from "./DashboardAppView";
 import { PinnedPage } from "./Pins";
 import { Sidebar } from "./Sidebar";
 import { ActivityPageView } from "./Activity";
@@ -60,7 +60,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
             <WorkflowPage store={store} host={r.host} folder={project.project.folder} projectName={project.name}
               workflowID={r.workflow} down={down || !store.hostIsOnline(r.host)} />
           ) : r.host && r.project && project && r.dashboard ? (
-            <DashboardPage store={store} host={r.host} folder={project.project.folder} projectName={project.name}
+            <DashboardAppView store={store} host={r.host} folder={project.project.folder}
               down={down || !store.hostIsOnline(r.host)} />
           ) : r.host && r.project && project && r.page ? (
             <PinnedPage store={store} host={r.host} folder={project.project.folder} path={r.page} down={down || !store.hostIsOnline(r.host)} />

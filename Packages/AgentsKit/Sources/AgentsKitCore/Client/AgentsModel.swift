@@ -58,7 +58,7 @@ public final class AgentsModel {
     @ObservationIgnored public private(set) var sessionPins: [URL: [UUID]] = [:]
     /// Bumped by `pages/changed`: a page a screen may be showing changed on disk. Whoever
     /// shows one reads it again, with its stamp, so an unchanged file costs nothing.
-    public private(set) var pageRevisions: [URL: Int] = [:]
+    public private(set) var pageRevisions: [URL: [String: Int]] = [:]
 
     /// Each project's plugins, by its standardized folder, as the daemon last listed them:
     /// which are waiting for the person's OK (security review, S2).
@@ -147,6 +147,7 @@ public final class AgentsModel {
     var heldCellCount: Int { cells.count }
     /// Workflows and pins per project, made when a fold first asks (#285).
     @ObservationIgnored private var workflowShelves: [URL: WorkflowShelf] = [:]
+    @ObservationIgnored private var workflowRunShelves: [String: WorkflowRunShelf] = [:]
     @ObservationIgnored private var pinShelves: [URL: PinShelf] = [:]
     /// Every agent's title by id, and a count that moves only when one of them does.
     @ObservationIgnored private var titles: [UUID: String] = [:]
@@ -250,6 +251,12 @@ public final class AgentsModel {
     /// Whether a page of events has arrived at all, so an empty list can say "nothing
     /// yet" rather than "loading".
     public private(set) var eventsLoaded = false
+    public func clearEvents() {
+        recentEvents = []
+        moreEvents = false
+        lastEventAt = nil
+        eventsLoaded = false
+    }
     /// The mode last chosen for each runtime, as the Mac holds it (029). A copy, kept
     /// current by `modes/changed`, so a start form can open on it without a round trip.
     public private(set) var rememberedModes: DaemonAPI.RememberedModes = [:]
@@ -539,7 +546,10 @@ public final class AgentsModel {
             pinShelves[folder]?.setSessions(sessions)
 
         case .pagesChanged(let notification):
-            pageRevisions[Project.standardize(notification.folder), default: 0] += 1
+            let project = Project.standardize(notification.folder)
+            for folder in notification.folders {
+                pageRevisions[project, default: [:]][folder, default: 0] += 1
+            }
 
         case .pluginsChanged(let list):
             replacePlugins(list)
@@ -699,6 +709,11 @@ public final class AgentsModel {
         dashboardSummaries[folder] = DashboardModel.summary(snapshot)
     }
 
+    public func forgetDashboard(in folder: URL?) {
+        guard let folder else { return }
+        dashboards[Project.standardize(folder)] = nil
+    }
+
     /// One project's pinned pages, in their order. Read from that project's shelf.
     public func pins(in folder: URL?) -> [PinView] {
         guard let folder else { return [] }
@@ -751,8 +766,17 @@ public final class AgentsModel {
         return shelf
     }
 
-    public func pageRevision(in folder: URL?) -> Int {
-        folder.map { pageRevisions[Project.standardize($0)] ?? 0 } ?? 0
+    public func pageRevision(in folder: URL?, path: String? = nil, includesDescendants: Bool = false) -> Int {
+        guard let folder else { return 0 }
+        let revisions = pageRevisions[Project.standardize(folder)] ?? [:]
+        guard let path else { return revisions.values.reduce(0, +) }
+        let parent = (path as NSString).deletingLastPathComponent
+        return revisions.reduce(0) { total, event in
+            let changed = event.key
+            let applies = changed.isEmpty || changed == parent || parent.hasPrefix(changed + "/")
+                || (includesDescendants && (parent.isEmpty || changed.hasPrefix(parent + "/")))
+            return total + (applies ? event.value : 0)
+        }
     }
 
     public func dashboardRevision(in folder: URL?) -> Int {
@@ -769,6 +793,19 @@ public final class AgentsModel {
         shelf.replace(workflows.filter { $0.folder == key })
         workflowShelves[key] = shelf
         return shelf.summaries
+    }
+
+    /// Runs for one workflow, kept in an observable per-workflow shelf so streaming
+    /// updates to unrelated agents do not refilter the global agent list (#215).
+    public func workflowRuns(_ workflowID: String, in folder: URL?) -> [Agent] {
+        guard let folder else { return [] }
+        let projectFolder = Project.standardize(folder)
+        let key = projectFolder.path + "\n" + workflowID
+        if let shelf = workflowRunShelves[key] { return shelf.agents }
+        let shelf = WorkflowRunShelf()
+        shelf.replace(agents(inFolder: projectFolder).filter { $0.startedByWorkflow == workflowID })
+        workflowRunShelves[key] = shelf
+        return shelf.agents
     }
 
     public func upsert(_ summary: DaemonAPI.ProjectSummary) {
@@ -1397,6 +1434,12 @@ public final class AgentsModel {
     /// One agent into its place everywhere, out of where it was.
     private func file(_ agent: Agent) {
         let old = byID[agent.id]
+        if let old, let workflowID = old.startedByWorkflow {
+            workflowRunShelves[Project.standardize(old.projectFolder).path + "\n" + workflowID]?.remove(old.id)
+        }
+        if let workflowID = agent.startedByWorkflow {
+            workflowRunShelves[Project.standardize(agent.projectFolder).path + "\n" + workflowID]?.upsert(agent)
+        }
         let folder = agent.projectFolder
         let group = group(of: agent)
         byID[agent.id] = agent
@@ -1471,6 +1514,9 @@ public final class AgentsModel {
     /// One agent out of everything (retired, 051).
     private func unfile(_ id: UUID) {
         guard let old = byID.removeValue(forKey: id) else { return }
+        if let workflowID = old.startedByWorkflow {
+            workflowRunShelves[Project.standardize(old.projectFolder).path + "\n" + workflowID]?.remove(old.id)
+        }
         Self.remove(old, from: &agents)
         agentCount = byID.count
         var titlesChanged = false
@@ -1597,6 +1643,25 @@ public final class AgentsModel {
         guard let agentID else { return nil }
         return elicitations.first { $0.agentID == agentID }
     }
+}
+
+@MainActor
+@Observable
+public final class WorkflowRunShelf {
+    public private(set) var agents: [Agent] = []
+
+    public init() {}
+
+    func replace(_ agents: [Agent]) {
+        self.agents = agents.sorted { $0.createdAt > $1.createdAt }
+    }
+
+    func upsert(_ agent: Agent) {
+        agents.removeAll { $0.id == agent.id }
+        agents.insert(agent, at: ProjectShelf.place(of: agent, in: agents, by: { $0.createdAt > $1.createdAt }))
+    }
+
+    func remove(_ id: UUID) { agents.removeAll { $0.id == id } }
 }
 
 /// Where a project's shelf is kept: its folder, standardized, and its host.

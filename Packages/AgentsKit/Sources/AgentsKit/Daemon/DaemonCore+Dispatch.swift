@@ -524,6 +524,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.TranscriptRequest.self)
                 return .success(try JSONValue.encoding(try await transcript(request)))
 
+            case DaemonAPI.Method.agentsTouchedPaths:
+                let request = try require(params, as: DaemonAPI.AgentRequest.self)
+                return .success(try JSONValue.encoding(try await touchedPaths(request)))
+
             case DaemonAPI.Method.agentsTurns:
                 let request = try require(params, as: DaemonAPI.TurnsRequest.self)
                 return .success(try JSONValue.encoding(try await turns(request)))
@@ -780,7 +784,7 @@ extension DaemonCore {
 
             case DaemonAPI.Method.dashboardRead:
                 let request = try require(params, as: DaemonAPI.DashboardTokenRequest.self)
-                return .success(["note": .string(try readDashboard(request))])
+                return .success(try readDashboardResult(request))
 
             case DaemonAPI.Method.dashboardGet:
                 let request = try require(params, as: DaemonAPI.DashboardRequest.self)
