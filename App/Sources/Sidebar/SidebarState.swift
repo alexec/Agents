@@ -89,9 +89,9 @@ final class SidebarFrame {
         // conversation with nothing.
         //
         // 460 rather than the 380 it opened at through 022: the document pane is set at
-        // the app's `reading` step now, and 60 characters of it needs 410 points of text
-        // plus its padding. `PageMetrics.comfortablePane` is the same number for the
-        // same reason.
+        // the app's `reading` step now, and 60 characters of it needs about 406 points
+        // of text plus its padding. `PageMetrics.comfortablePane` is the same number for
+        // the same reason.
         width = Self.clamp((defaults.object(forKey: Key.width) as? Double) ?? Self.readableWidth)
         pane = (defaults.string(forKey: Key.pane).flatMap(SidebarPane.init(rawValue:))) ?? .files
     }

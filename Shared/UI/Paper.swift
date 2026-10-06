@@ -8,8 +8,8 @@ import UIKit
 /// The app's surfaces: what the page is printed on, and the few ways a thing sits on it.
 ///
 /// The theme is paper. Most of what this app shows is prose — a report, a transcript, a
-/// document an agent is writing — so the ground is warm off-white rather than a window
-/// grey, the ink is near-black rather than pure black, and a list is rows under hairline
+/// document an agent is writing — so the ground is cool near-white rather than pure
+/// white, the ink is charcoal rather than pure black, and a list is rows under hairline
 /// rules rather than a stack of glass cards. Glass made every row a floating object;
 /// on paper a row is a line in a ledger, and the only things that float are the ones
 /// that really are on top: the prompt bar, a question, a menu.
@@ -18,23 +18,23 @@ import UIKit
 /// everything else a surface is drawn in, so no view picks a background of its own.
 ///
 ///     TOKEN     LIGHT     DARK      FOR
-///     ground    #FBF9F4   #1C1B19   the page every column sits on
-///     sidebar   #F3F0E8   #161513   the projects column, one shade deeper
-///     raised    #FFFFFF   #262421   what floats: prompt bar, cards, menus
-///     well      #F1EDE4   #2A2825   what is set into the page: code, your own message
-///     wash      #ECE7DB   #2F2C28   a row under the pointer, a picked item
-///     rule      #E2DCCF   #3A3733   hairlines between rows and round raised things
-///     ink       #1F1D1A   #ECE7DC   text drawn as ink
+///     ground    #F7F8F9   #1C1D20   the page every column sits on
+///     sidebar   #F0F1F3   #161719   the projects column, one shade deeper
+///     raised    #FFFFFF   #26282C   what floats: prompt bar, cards, menus
+///     well      #F0F2F4   #2A2D31   what is set into the page: code, your own message
+///     wash      #E7EAEE   #33363B   a row under the pointer, a picked item
+///     rule      #DDE1E6   #3A3E44   hairlines between rows and round raised things
+///     ink       #1C1D20   #E8EAED   text drawn as ink
 ///     accent    #5B3BE0   #AB8EFF   the icon's violet (#156): links, focus, the prominent
 ///                                   button's fill; `Color.accentColor`, from the asset
 enum Paper {
-    static let ground = Color(light: 0xFBF9F4, dark: 0x1C1B19)
-    static let sidebar = Color(light: 0xF3F0E8, dark: 0x161513)
-    static let raised = Color(light: 0xFFFFFF, dark: 0x262421)
-    static let well = Color(light: 0xF1EDE4, dark: 0x2A2825)
-    static let wash = Color(light: 0xECE7DB, dark: 0x2F2C28)
-    static let rule = Color(light: 0xE2DCCF, dark: 0x3A3733)
-    static let ink = Color(light: 0x1F1D1A, dark: 0xECE7DC)
+    static let ground = Color(light: 0xF7F8F9, dark: 0x1C1D20)
+    static let sidebar = Color(light: 0xF0F1F3, dark: 0x161719)
+    static let raised = Color(light: 0xFFFFFF, dark: 0x26282C)
+    static let well = Color(light: 0xF0F2F4, dark: 0x2A2D31)
+    static let wash = Color(light: 0xE7EAEE, dark: 0x33363B)
+    static let rule = Color(light: 0xDDE1E6, dark: 0x3A3E44)
+    static let ink = Color(light: 0x1C1D20, dark: 0xE8EAED)
     /// The violet, from the asset catalogue rather than a hex here, so a control and
     /// the system's own focus rings and selections agree. The one place a view reaches it.
     static let accent = Color.accentColor
@@ -47,7 +47,7 @@ enum Paper {
 
     /// The shadow under a raised thing. Soft and short: paper lifted a little off the
     /// desk, not a window hovering over it.
-    static let shadow = Color(light: 0x3B2F1E, dark: 0x000000).opacity(0.10)
+    static let shadow = Color(light: 0x20242A, dark: 0x000000).opacity(0.10)
 }
 
 extension Color {
@@ -71,9 +71,9 @@ extension Color {
 extension NSColor {
     /// Paper for AppKit views that take an `NSColor` rather than a `Color` — the
     /// terminal. Dynamic, like the `Color`s, so the appearance can change under them.
-    static let paperGround = NSColor(light: 0xFBF9F4, dark: 0x1C1B19)
-    static let paperInk = NSColor(light: 0x1F1D1A, dark: 0xECE7DC)
-    static let paperSelection = NSColor(light: 0xE4DCC8, dark: 0x3A3630)
+    static let paperGround = NSColor(light: 0xF7F8F9, dark: 0x1C1D20)
+    static let paperInk = NSColor(light: 0x1C1D20, dark: 0xE8EAED)
+    static let paperSelection = NSColor(light: 0xD8DEE6, dark: 0x3A3E44)
 
     private convenience init(light: UInt32, dark: UInt32) {
         self.init(name: nil) { appearance in
@@ -94,9 +94,9 @@ private extension NSColor {
 extension UIColor {
     /// Paper for the phone's terminal, which takes a `UIColor` (034). The same values
     /// as the Mac's, dynamic in the same way.
-    static let paperGround = UIColor(light: 0xFBF9F4, dark: 0x1C1B19)
-    static let paperInk = UIColor(light: 0x1F1D1A, dark: 0xECE7DC)
-    static let paperSelection = UIColor(light: 0xE4DCC8, dark: 0x3A3630)
+    static let paperGround = UIColor(light: 0xF7F8F9, dark: 0x1C1D20)
+    static let paperInk = UIColor(light: 0x1C1D20, dark: 0xE8EAED)
+    static let paperSelection = UIColor(light: 0xD8DEE6, dark: 0x3A3E44)
 
     private convenience init(light: UInt32, dark: UInt32) {
         self.init { traits in UIColor(hex: traits.userInterfaceStyle == .dark ? dark : light) }
@@ -116,7 +116,7 @@ extension View {
     /// The page: ground under the whole column and under the toolbar above it.
     ///
     /// No foreground is set. The system's secondary and tertiary label colours are
-    /// translucent, so they already come out warm on this ground, and a foreground set
+    /// translucent, so they already pick up this ground, and a foreground set
     /// here would override the tint every link and control draws in.
     func paperGround() -> some View {
         #if os(macOS)

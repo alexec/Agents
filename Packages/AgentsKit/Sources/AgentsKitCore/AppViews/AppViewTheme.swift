@@ -8,16 +8,18 @@ import Foundation
 /// and `Web/src/theme/paper.css`, which say the same), and the view picks the half by its
 /// `color-scheme`, which follows `hostContext.theme`. So System, Light and Dark come down
 /// to `theme`, and Paper is the palette both halves are drawn from. The fonts are the
-/// system's own, as on the web page: nothing is loaded from anywhere.
+/// system's own, as on the web page: nothing is loaded from anywhere. Crisp paper (#326)
+/// put the cool near-white and the charcoal here as well as in the window itself, so a
+/// view drawn in a conversation sits on the same paper as the conversation.
 public enum AppViewTheme {
     public static let variables: [String: String] = {
         func pair(_ light: String, _ dark: String) -> String { "light-dark(\(light), \(dark))" }
-        let ground = ("#fbf9f4", "#1c1b19"), raised = ("#ffffff", "#262421"), well = ("#f1ede4", "#2a2825")
-        let wash = ("#ece7db", "#2f2c28"), rule = ("#e2dccf", "#3a3733"), ink = ("#1f1d1a", "#ece7dc")
-        let accent = ("#5b3be0", "#ab8eff"), danger = ("#b42318", "#f07b6e")
-        let success = ("#3b7a4a", "#7fbf8e"), warning = ("#c2410c", "#f08a4b")
-        let secondaryInk = ("rgb(31 29 26 / 66%)", "rgb(236 231 220 / 66%)")
-        let tertiaryInk = ("rgb(31 29 26 / 45%)", "rgb(236 231 220 / 45%)")
+        let ground = ("#f7f8f9", "#1c1d20"), raised = ("#ffffff", "#26282c"), well = ("#f0f2f4", "#2a2d31")
+        let wash = ("#e7eaee", "#33363b"), rule = ("#dde1e6", "#3a3e44"), ink = ("#1c1d20", "#e8eaed")
+        let accent = ("#5b3be0", "#ab8eff"), danger = ("#b4232b", "#f08086")
+        let success = ("#2d765c", "#8bc6a7"), warning = ("#ba4a13", "#f0a06b")
+        let secondaryInk = ("rgb(28 29 32 / 66%)", "rgb(232 234 237 / 66%)")
+        let tertiaryInk = ("rgb(28 29 32 / 45%)", "rgb(232 234 237 / 45%)")
         let tint = { (colour: (String, String), percent: Int) in
             pair("color-mix(in srgb, \(colour.0) \(percent)%, \(ground.0))",
                  "color-mix(in srgb, \(colour.1) \(percent)%, \(ground.1))")
@@ -74,9 +76,9 @@ public enum AppViewTheme {
             "--border-radius-full": "9999px",
             "--border-width-regular": "1px",
             "--shadow-hairline": "0 0 0 1px \(pair(rule.0, rule.1))",
-            "--shadow-sm": "0 1px 2px rgb(59 47 30 / 10%)",
-            "--shadow-md": "0 2px 6px rgb(59 47 30 / 10%)",
-            "--shadow-lg": "0 6px 16px rgb(59 47 30 / 12%)",
+            "--shadow-sm": "0 1px 2px rgb(32 36 42 / 10%)",
+            "--shadow-md": "0 2px 6px rgb(32 36 42 / 10%)",
+            "--shadow-lg": "0 6px 16px rgb(32 36 42 / 12%)",
         ]
         // Text and headings, on the system's own steps.
         let text: [(String, Int, Int)] = [("xs", 11, 14), ("sm", 12, 16), ("md", 14, 20), ("lg", 16, 24)]

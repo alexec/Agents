@@ -123,7 +123,7 @@ struct AppViewTests {
         #expect(host?["safeAreaInsets"]?["top"] != nil)
         #expect(host?["availableDisplayModes"] == ["inline", "fullscreen"])
         let background = host?["styles"]?["variables"]?["--color-background-primary"]?.stringValue
-        #expect(background == "light-dark(#fbf9f4, #1c1b19)")
+        #expect(background == "light-dark(#f7f8f9, #1c1d20)")
         #expect(result["hostCapabilities"]?["serverTools"] != nil)
     }
 
