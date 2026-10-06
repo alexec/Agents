@@ -34,6 +34,9 @@ jobs:
     # main as well as on a branch (run 36642820605). The selection is what keeps this
     # small; the cap has to fit the run it lets through.
     timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: write
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
     steps:
@@ -92,10 +95,9 @@ jobs:
       # can be saved as soon as both app builds finish.
       #
       # Each falls back from its own key, to the newest built from the same manifests,
-      # to the newest of its kind for this toolchain, and only then to a -partial- of
-      # its kind, which is what a build that
-      # ran out of time leaves behind. There is deliberately no key that ignores the
-      # fingerprint: that is the one that let a graph from the old image be restored
+      # to the newest of its kind for this toolchain. Partial builds are never restored:
+      # a cancelled run can leave a large, unusable cache. There is deliberately no key
+      # that ignores the fingerprint: that let a graph from the old image be restored
       # under a new one.
       - name: Restore Xcode build cache
         id: xcode-cache
@@ -106,7 +108,6 @@ jobs:
           restore-keys: |
             macos-xcode-27-derived-${{ steps.keys.outputs.base }}-
             macos-xcode-27-derived-${{ steps.toolchain.outputs.fingerprint }}-
-            macos-xcode-27-derived-partial-${{ steps.toolchain.outputs.fingerprint }}-
 
       - name: Restore SwiftPM build cache
         id: swiftpm-cache
@@ -119,7 +120,6 @@ jobs:
           restore-keys: |
             macos-xcode-27-swiftpm-${{ steps.keys.outputs.base }}-
             macos-xcode-27-swiftpm-${{ steps.toolchain.outputs.fingerprint }}-
-            macos-xcode-27-swiftpm-partial-${{ steps.toolchain.outputs.fingerprint }}-
 
       - name: Restore AgentsKit build cache
         id: agentskit-cache
@@ -130,7 +130,6 @@ jobs:
           restore-keys: |
             macos-xcode-27-agentskit-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*') }}-
             macos-xcode-27-agentskit-${{ steps.toolchain.outputs.fingerprint }}-
-            macos-xcode-27-agentskit-partial-${{ steps.toolchain.outputs.fingerprint }}-
 
       - name: Tools
         run: |
@@ -148,7 +147,6 @@ jobs:
       - name: Normalize AgentsKit build cache
         if: steps.test-selection.outputs.agentskit != 'skip'
         run: python3 scripts/normalize-metaltoolchain-cache.py Packages/AgentsKit/.build
-
       # Every build below that starts from a restored cache gets one more go from clean
       # when it fails (scripts/ci-clean-retry.sh says why). The step only fails, and so
       # is only kept from the cache, when the clean build fails as well.
@@ -162,20 +160,20 @@ jobs:
           clean_retry "$RESTORED" Packages/AgentsKit/.build -- \
             swift build --build-tests --package-path Packages/AgentsKit
 
-      # A build that failed is never saved. What it leaves behind is exactly the state
-      # that fails again, and restoring that is how one red run used to wedge every run
-      # after it: a failure saved a -partial- under the same prefix as the good caches,
-      # the broad restore-key below picked the partial in preference to a good one, and
-      # the job that read it failed identically. A build that ran out of time is a
-      # different thing — its work is sound, only unfinished — so that is what a
-      # -partial- key is for, and it is namespaced apart so it can only ever be
-      # restored when no clean cache exists for this toolchain.
+      # Only completed builds are saved. Cancellation must not persist a partial cache
+      # that can fill runner disk or poison a later restore.
       - name: Save AgentsKit build cache
-        if: ${{ always() && steps.agentskit-cache.outputs.cache-hit != 'true' && contains(fromJSON('["success", "cancelled"]'), steps.build-agentskit.outcome) }}
+        if: ${{ always() && steps.agentskit-cache.outputs.cache-hit != 'true' && steps.build-agentskit.outcome == 'success' }}
         uses: actions/cache/save@v5
         with:
           path: Packages/AgentsKit/.build
-          key: macos-xcode-27-agentskit-${{ steps.build-agentskit.outcome == 'success' && format('{0}-{1}', steps.toolchain.outputs.fingerprint, hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*')) || format('partial-{0}-{1}-{2}-{3}', steps.toolchain.outputs.fingerprint, hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*'), github.run_id, github.run_attempt) }}
+          key: macos-xcode-27-agentskit-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*') }}
+
+      - name: Prune old AgentsKit caches for this ref
+        if: ${{ always() && steps.build-agentskit.outcome == 'success' && steps.agentskit-cache.outputs.cache-hit != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/prune-ci-caches.sh macos-xcode-27-agentskit- 'macos-xcode-27-agentskit-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*') }}' "$GITHUB_REF"
 
       - name: Generate the project
         run: xcodegen generate
@@ -219,11 +217,17 @@ jobs:
       # step fails, and a skipped step used to read as "not successful", so a job that
       # died long before them saved whatever DerivedData it happened to be holding.
       - name: Save Xcode build cache
-        if: ${{ always() && steps.xcode-cache.outputs.cache-hit != 'true' && contains(fromJSON('["success", "cancelled"]'), steps.build-mac.outcome) && contains(fromJSON('["success", "cancelled"]'), steps.build-remote.outcome) }}
+        if: ${{ always() && steps.xcode-cache.outputs.cache-hit != 'true' && steps.build-mac.outcome == 'success' && steps.build-remote.outcome == 'success' }}
         uses: actions/cache/save@v5
         with:
           path: build/DD
-          key: macos-xcode-27-derived-${{ (steps.build-mac.outcome == 'success' && steps.build-remote.outcome == 'success') && format('{0}-{1}', steps.keys.outputs.base, steps.keys.outputs.xcode) || format('partial-{0}-{1}-{2}-{3}', steps.keys.outputs.base, steps.keys.outputs.xcode, github.run_id, github.run_attempt) }}
+          key: macos-xcode-27-derived-${{ steps.keys.outputs.base }}-${{ steps.keys.outputs.xcode }}
+
+      - name: Prune old Xcode caches for this ref
+        if: ${{ always() && steps.build-mac.outcome == 'success' && steps.build-remote.outcome == 'success' && steps.xcode-cache.outputs.cache-hit != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/prune-ci-caches.sh macos-xcode-27-derived- 'macos-xcode-27-derived-${{ steps.keys.outputs.base }}-${{ steps.keys.outputs.xcode }}' "$GITHUB_REF"
 
       # ServerLinkTests runs this agentsd, and builds it itself when it is missing:
       # a whole Swift build inside the test run, holding a test thread for minutes,
@@ -259,13 +263,19 @@ jobs:
         # This combined cache contains both paths below. Save it only when both
         # package builds ran, so a skipped package cannot produce a partial cache,
         # and never on a failure, for the reason above.
-        if: ${{ always() && steps.test-selection.outputs.agentskit != 'skip' && steps.test-selection.outputs.codetext != 'skip' && steps.swiftpm-cache.outputs.cache-hit != 'true' && contains(fromJSON('["success", "cancelled"]'), steps.build-agentsd.outcome) && contains(fromJSON('["success", "cancelled"]'), steps.build-codetext.outcome) }}
+        if: ${{ always() && steps.test-selection.outputs.agentskit != 'skip' && steps.test-selection.outputs.codetext != 'skip' && steps.swiftpm-cache.outputs.cache-hit != 'true' && steps.build-agentsd.outcome == 'success' && steps.build-codetext.outcome == 'success' }}
         uses: actions/cache/save@v5
         with:
           path: |
             Daemon/.build
             Packages/CodeText/.build
-          key: macos-xcode-27-swiftpm-${{ (steps.build-agentsd.outcome == 'success' && steps.build-codetext.outcome == 'success') && format('{0}-{1}', steps.keys.outputs.base, steps.keys.outputs.swiftpm) || format('partial-{0}-{1}-{2}-{3}', steps.keys.outputs.base, steps.keys.outputs.swiftpm, github.run_id, github.run_attempt) }}
+          key: macos-xcode-27-swiftpm-${{ steps.keys.outputs.base }}-${{ steps.keys.outputs.swiftpm }}
+
+      - name: Prune old SwiftPM caches for this ref
+        if: ${{ always() && steps.build-agentsd.outcome == 'success' && steps.build-codetext.outcome == 'success' && steps.swiftpm-cache.outputs.cache-hit != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/prune-ci-caches.sh macos-xcode-27-swiftpm- 'macos-xcode-27-swiftpm-${{ steps.keys.outputs.base }}-${{ steps.keys.outputs.swiftpm }}' "$GITHUB_REF"
 
       - name: Test CodeText
         if: steps.test-selection.outputs.codetext != 'skip'
@@ -297,14 +307,19 @@ jobs:
             fi
           }
 
-          if run_agentskit_tests; then
+          log="$RUNNER_TEMP/agentskit-tests.log"
+          if run_agentskit_tests 2>&1 | tee "$log"; then
             exit 0
           else
-            status=$?
+            status=${PIPESTATUS[0]}
           fi
           if [ -z "$RESTORED" ]; then exit "$status"; fi
 
-          echo "::warning::AgentsKit tests failed on a restored build cache. Rebuilding and rerunning once from clean."
+          if grep -Eq 'Undefined symbols for architecture|symbol\(s\) not found for architecture|AgentsKitCore.*undefined' "$log"; then
+            echo "::warning::Stale AgentsKit link detected on a restored cache. Rebuilding and rerunning immediately from clean."
+          else
+            echo "::warning::AgentsKit tests failed on a restored build cache. Rebuilding and rerunning once from clean."
+          fi
           rm -rf Packages/AgentsKit/.build
           swift build --build-tests --package-path Packages/AgentsKit
           run_agentskit_tests
