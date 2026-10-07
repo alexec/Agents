@@ -12,7 +12,7 @@ import { lineDiff } from "../../model/diff";
 import { Lines } from "../Changes";
 import { backgroundEntryLine } from "../../model/background";
 import { outcomeNeedsAPerson } from "../../model/groups";
-import { outcomeHeadings, startingLabel } from "../../model/status";
+import { outcomeHeadings, queuedLabel, startingLabel } from "../../model/status";
 import {
   callLine, drawnInTurn, fields, isSummaryOnly, isThought, kindOf, turnLine, turnParts, type ChatTurn, type Item,
 } from "../../model/turns";
@@ -78,6 +78,7 @@ function stateWords(state: AgentState, reason: EndedReason | undefined): string 
     case "finished": return "Finished";
     case "stopped": return (reason && stopWords[reason]) ?? "Stopped";
     case "archived": return "Archived";
+    case "queued": return queuedLabel(null);
   }
 }
 

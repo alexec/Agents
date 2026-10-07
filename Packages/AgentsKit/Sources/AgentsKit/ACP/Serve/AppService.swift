@@ -1270,8 +1270,13 @@ public actor AppService {
             here, which only the person sets (in Project Settings): how many may be \
             running — working, waiting on a question, or waiting to carry on by \
             itself — and how many may exist not yet archived, where stopped, parked and \
-            finished ones still count. A start that would break either is refused, \
-            saying which. Use list_my_agents to see yours and how many places of each \
+            finished ones still count. A start that would break either is queued \
+            instead, saying which: nothing runs yet, and it starts by itself, oldest \
+            first, once a running place and a not-archived place are both free, behind \
+            the working and waiting ones. So you can queue work up front rather than \
+            wait and try again; wait for a queued agent with wait_for_event as for any \
+            other. A third limit says how many may be queued; past it a start is \
+            refused. Use list_my_agents to see yours and how many places of each \
             are in use. Stop one with stop_agent, or park one with park_agent, when its \
             part is done: that frees its running place, and it keeps its other place \
             until it is archived. Once its work is merged or abandoned, archive it with \
@@ -1354,7 +1359,8 @@ public actor AppService {
         "description": """
             Stop an agent you started with start_agent, as the person's own Stop would. \
             It stays in the list with its conversation. Stopping frees its running \
-            place; it keeps its not-archived place until it is archived. Only agents you started can be stopped this way; not yourself, \
+            place; it keeps its not-archived place until it is archived. Stopping a \
+            queued one takes it off the queue, and it never starts. Only agents you started can be stopped this way; not yourself, \
             and not anyone else's.
             """,
         "inputSchema": agentIDSchema,
@@ -1403,7 +1409,7 @@ public actor AppService {
             The agents you started with start_agent that have not been archived: each \
             one's id, what it is doing, what it last said, and its labels with owners. Also \
             how many of this project's running and not-archived places are in use, out \
-            of the limits the person set. And which runtimes start_agent can start one \
+            of the limits the person set, and which of yours are queued and where. And which runtimes start_agent can start one \
             on here, as of now, with the model each starts on where known, and why the \
             others cannot. Archive the finished ones whose work is merged or abandoned \
             with archive_agent, so their places are free for the next.

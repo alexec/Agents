@@ -7,7 +7,7 @@ import type { Store } from "../model/store";
 import { eventWaitMark, leaseMark, retirementNote, startedByAgentLabel, worktreeHelp, type LeaseMark } from "../model/rowLines";
 import { backgroundMark } from "../model/background";
 import { parkedAt, projectFolder, showsUnread } from "../model/groups";
-import { rowStatus, type StatusShape } from "../model/status";
+import { queuedLine, rowStatus, type StatusShape } from "../model/status";
 import { fromWireDate } from "../protocol/dates";
 import { Telling } from "./Telling";
 import { folderIsMissing, folderPath, missingFolderLabel } from "../model/missingFolder";
@@ -56,6 +56,8 @@ export interface RowExtras {
   startedByAgent: string | null;
   leases: LeaseMark | null;
   eventWait: string | null;
+  /** A queued helper's place in its project's queue (#362), "Queued, 2nd". */
+  queued: string | null;
 }
 
 /** A row's extras, read from the store: only what this agent names is looked up. */
@@ -71,6 +73,7 @@ export function rowExtras(store: Store, host: string, agent: Agent): RowExtras {
     startedByAgent: startedByAgentLabel(agent, title),
     leases: leaseMark(agent.id, store.leases.value[host], title),
     eventWait: eventWaitMark(agent, title),
+    queued: agent.state === "queued" ? queuedLine(agent, store.projectAgents(host, projectFolder(agent))) : null,
   };
 }
 
@@ -106,6 +109,7 @@ export function SessionRow({ agent, chosen, onPick, going, waits = [], extras }:
         </span>
         {/* In the report's place, as the window's row has it (#87). */}
         {going ? <span class="subtitle"><Telling recipient={going.recipient} doing={going.doing} /></span>
+          : extras?.queued ? <span class="subtitle queued">{extras.queued}</span>
           : agent.report && <span class="subtitle report">{agent.report.message}</span>}
         {/* Its folder gone (#119), as a project's row says it. */}
         {folderIsMissing(agent) && <span class="subtitle missing-folder" title={folderPath(agent)}>⚠ {missingFolderLabel}</span>}

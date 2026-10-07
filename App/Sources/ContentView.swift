@@ -132,26 +132,13 @@ struct ContentView: View {
     /// whichever of its pages is open (#97).
     @ToolbarContentBuilder
     private var detailToolbar: some ToolbarContent {
-        // Compose, where Mail and Notes have it (066): a new session in the project.
-        ToolbarItem {
-            Button { newSession() } label: {
-                Label("New Session", systemImage: "square.and.pencil")
-            }
-            .help("Start a new session in this project (⌘N)")
-            .disabled(model.selectedProjectSummary == nil)
-        }
+        // No New Session button (#375): the project's New session row, ⌘N and the
+        // project menu start one.
         if model.selection != nil {
-            ToolbarSpacer(.fixed)
             ToolbarItem {
                 SidebarToggle(windowWidth: frame.windowWidth)
             }
         }
-    }
-
-    private func newSession() {
-        model.composing = true
-        model.draftWorktree = nil
-        requests.focusPrompt()
     }
 
     /// The window's title: the worktree this build came from, then whatever the detail
@@ -282,8 +269,8 @@ private struct NothingPickedPage: View {
             Label("Nothing selected", systemImage: "sidebar.left")
         } description: {
             Text("""
-            Pick a session on the left to read it, or a project to start a new session \
-            there. New Session (⌘N) starts one in the selected project.
+            Pick a session on the left to read it, or a project's New session row to \
+            start one there. ⌘N starts one in the selected project.
 
             ↑ and ↓ move through the list, → and ← unfold and fold a project, \
             and ⌘F finds a session.

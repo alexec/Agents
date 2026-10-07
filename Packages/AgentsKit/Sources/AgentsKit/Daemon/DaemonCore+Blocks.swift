@@ -84,7 +84,8 @@ extension DaemonCore {
     func hasEnded(_ agent: Agent) -> String? {
         if resuming.contains(agent.id) || interrupted[agent.id] != nil { return nil }
         switch agent.state {
-        case .starting, .running, .waitingOnUser:
+        // A queued one has not even begun (#362).
+        case .starting, .running, .waitingOnUser, .queued:
             return nil
         case .archived:
             return "archived"
@@ -184,7 +185,7 @@ extension DaemonCore {
             return .stopped(agent.endedReason)
         case .archived:
             return .archived
-        case .starting, .running, .waitingOnUser:
+        case .starting, .running, .waitingOnUser, .queued:
             return nil
         }
     }

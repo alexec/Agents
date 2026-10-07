@@ -14,8 +14,8 @@ struct ProjectRow: View {
     var label: String? = nil
     /// Folded, the row says what is under it; unfolded, the rows under it say that.
     var isFolded = true
-    /// What else a click does, after going to the project: its fold opens or closes
-    /// (#366), as the Remote's row does.
+    /// What a click does: the fold opens or closes, and nothing else (#375), as the
+    /// Remote's row and the web's do. A session starts from the fold's New session row.
     var onClick: () -> Void = {}
 
     var body: some View {
@@ -44,18 +44,10 @@ struct ProjectRow: View {
             }
         }
         .contentShape(Rectangle())
-        // Clicking a project starts a new session in it, every time, and folds or
-        // unfolds it (#366).
-        //
-        // The `List` selection binding cannot carry this: it fires only when the
-        // selection changes, and the row you click to leave a conversation is the row
-        // that is already selected. `simultaneousGesture` is the one gesture form that
-        // sits alongside the list's own handling rather than replacing it, so the
-        // highlight, the keyboard and the context menu all keep working.
-        .simultaneousGesture(TapGesture().onEnded {
-            model.showProject(summary.key)
-            onClick()
-        })
+        // Clicking a project folds or unfolds it (#375); the detail stays as it was.
+        // `simultaneousGesture` sits alongside the list's own handling rather than
+        // replacing it, so the context menu keeps working.
+        .simultaneousGesture(TapGesture().onEnded { onClick() })
         .help(abbreviatedPath)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)

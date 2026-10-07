@@ -13,7 +13,7 @@
         "parked" : 2,
         "running" : 5,
         "stopped" : 4,
-        "waiting" : 4
+        "waiting" : 5
       },
       "headings" : [
         {
@@ -40,6 +40,7 @@
             "00000000-0000-0000-0000-000000000016",
             "00000000-0000-0000-0000-000000000012",
             "00000000-0000-0000-0000-000000000023",
+            "00000000-0000-0000-0000-000000000037",
             "00000000-0000-0000-0000-000000000013"
           ],
           "title" : "Waiting",
@@ -1116,6 +1117,29 @@
           },
           "state" : "archived",
           "title" : "Session 36"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812498740,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000037",
+          "lastActivityAt" : 812501320,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "queued",
+          "title" : "Session 37"
         },
         {
           "advertisedOptions" : [

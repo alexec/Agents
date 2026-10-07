@@ -80,7 +80,7 @@ struct RemoteView: View {
         let open = [model.openPin.map(RemoteRoute.page),
                     model.openWorkflow.map(RemoteRoute.workflow), model.selection.map(RemoteRoute.agent)]
             .compactMap { $0 }
-        // A project with nothing open over it starts a session, as the Mac's row does (#366).
+        // A project with nothing open over it starts a session (#366): its New session row (#375).
         if open.isEmpty, model.selectedProject != nil { return [.start] }
         return open
     }

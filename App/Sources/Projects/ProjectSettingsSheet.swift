@@ -212,8 +212,15 @@ private struct ProjectGeneralPane: View {
                             helperLimit(\.notArchived, in: summary, default: HelperLimit.defaultNotArchived,
                                         upTo: HelperLimit.maximumNotArchived,
                                         from: summary.helperLimits.running)
-                            Text("How many agents that other agents started may be running at once, and how "
-                                 + "many may be kept until you archive them. Agents can't change these.")
+                        }
+                    }
+                    row("Helpers queued") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            helperLimit(\.queued, in: summary, default: HelperLimit.defaultQueued,
+                                        upTo: HelperLimit.maximumQueued)
+                            Text("How many agents that other agents started may be running at once, how "
+                                 + "many may be kept until you archive them, and how many more may wait to "
+                                 + "start, oldest first, when a place frees. Agents can't change these.")
                                 .appText(.fine)
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)

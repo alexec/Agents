@@ -204,10 +204,14 @@ extension DaemonCore {
     /// `workflow` is the workflow and run starting it, put on the record before its
     /// first turn so that turn's `agent.started` already says `started_by: workflow`
     /// (073).
+    ///
+    /// `queued` is a queued helper being started now its place has come (#362): the
+    /// agent is made under its id, with its title, labels and the words queued on it.
     func start(_ request: DaemonAPI.StartRequest, startedBy starter: UUID?,
                chainDepth: Int? = nil,
                labelOwner: SessionLabel.Owner? = nil,
-               workflow: (id: String, run: UUID)? = nil) async throws -> UUID {
+               workflow: (id: String, run: UUID)? = nil,
+               queued queuedID: UUID? = nil) async throws -> UUID {
         let initialLabels: [SessionLabel]
         do {
             initialLabels = try SessionLabelPolicy.change(
@@ -305,7 +309,9 @@ extension DaemonCore {
         // nothing (052, US5), and for the next form.
         remember(OptionCache.Entry(options: await session.options, commands: await session.commands),
                  for: OptionCache.key(runtimeID: request.runtimeID, cwd: cwd, mcpServers: request.mcpServers))
-        var agent = Agent(runtimeID: request.runtimeID,
+        let waited = queuedID.flatMap { agents[$0] }
+        var agent = Agent(id: queuedID ?? UUID(),
+                          runtimeID: request.runtimeID,
                           cwd: cwd,
                           title: Agent.fallbackTitle(from: request.prompt),
                           runtimeSessionID: sessionID,
@@ -322,8 +328,8 @@ extension DaemonCore {
                           // characters survive, as the title — and the next daemon
                           // would pick the agent up and spend a turn asking it to
                           // work with nothing to work on.
-                          queuedPrompts: [QueuedPrompt(text: request.prompt,
-                                                       attachments: request.attachments)],
+                          queuedPrompts: waited.map(\.queuedPrompts).flatMap { $0.isEmpty ? nil : $0 }
+                              ?? [QueuedPrompt(text: request.prompt, attachments: request.attachments)],
                           // On the record from the first save, so a daemon killed
                           // before the next one never finds this agent looking like the
                           // person's — with the tools, and holding no place.
@@ -332,10 +338,22 @@ extension DaemonCore {
                           worktree: placed?.worktree,
                           startRequestID: request.requestID)
         agent.labels = initialLabels
+        if let waited {
+            // As the person may have left it while it waited.
+            agent.title = waited.title ?? agent.title
+            agent.labels = waited.labels
+            agent.titledByAgent = waited.titledByAgent
+        }
         agent.madeInRoot = rootID
         agent.sandboxOverride = request.sandbox
         agent.startedByWorkflow = workflow?.id
         agent.startedByRun = workflow?.run
+        // Taken off the queue, or archived, while its runtime was being made (#362).
+        if let queuedID, agents[queuedID]?.state != .queued {
+            await session.end(gracePeriod: .seconds(2))
+            await undoWorktree(placed, for: request.worktree)
+            throw JSONRPCError(code: DaemonAPI.Failure.notYours, message: "it was taken off the queue")
+        }
         // Saved before it is known to the daemon, so a save that fails leaves nothing
         // behind claiming to hold a runtime. `starting` answers true to `holdsRuntime`,
         // so an agent stranded in it by a failed write would keep `isHoldingAgents`
@@ -658,7 +676,8 @@ extension DaemonCore {
             agent.outcomeAsked = false
         }
         changed(agent)
-        guard !agent.state.hasTurnInFlight, turnTasks[agent.id] == nil else { return }
+        // A queued helper (#362) takes these with it when it starts.
+        guard !agent.state.hasTurnInFlight, agent.state != .queued, turnTasks[agent.id] == nil else { return }
         try await sendNextQueued(to: agent.id)
     }
 
@@ -778,7 +797,7 @@ extension DaemonCore {
     /// own. The runtime is started before anything leaves the queue, so a runtime that
     /// will not start leaves the words exactly where they were.
     func sendNextQueued(to agentID: UUID) async throws {
-        guard let agent = agents[agentID], !agent.state.hasTurnInFlight,
+        guard let agent = agents[agentID], !agent.state.hasTurnInFlight, agent.state != .queued,
               turnTasks[agentID] == nil, !sending.contains(agentID),
               let next = agent.queuedPrompts.first else { return }
         // The two limits, in the one funnel every turn begins through: a person
@@ -1866,6 +1885,12 @@ extension DaemonCore {
             }
             await move(agentID, on: cause == .person ? .stoppedWaitingByUser : .stoppedWaitingByAgent)
         }
+        // Off the queue (#362): it had nothing running, so its stop is only the record's.
+        if agents[agentID]?.state == .queued {
+            let who = cause.starter.map(starterName) ?? (cause == .person ? "You" : "It")
+            await record(.runtimeNote("\(who) took this agent off the queue before it started."), for: agentID)
+            await move(agentID, on: cause == .person ? .stoppedByUser : .stoppedByAgent)
+        }
         if agents[agentID]?.state.holdsRuntime == true {
             switch cause {
             case .person:
@@ -1925,7 +1950,9 @@ extension DaemonCore {
         let leaseEvents = dropLeases(for: agentID, ending: .holderArchived)
         // A finished agent holds no turn to stop, but may hold a warm runtime (#183).
         await releaseWarm(agentID, because: "archived")
-        if agent.state.holdsRuntime { try await stop(agentID, by: cause) }
+        // A queued one is taken off the queue first (#362), so it is archived with an
+        // ending and comes back stopped rather than queued again.
+        if agent.state.holdsRuntime || agent.state == .queued { try await stop(agentID, by: cause) }
         await settle(leaseEvents)
         switch cause {
         case .person:
