@@ -23,14 +23,12 @@ try {
   await page.type(code);
   await page.press("Connect");
   await page.waitFor(`document.querySelector(".sidebar .row.project")`, 20_000);
-  // The project's row opens its Dashboard; its new session is the same place with /n/1, as
-  // New Session in its menu goes.
+  // The project's row opens its new session, at /n/1, as New Session in its menu does.
   await page.eval(`(() => {
     const row = [...document.querySelectorAll(".sidebar .row.project")].find((r) => r.querySelector(".title")?.textContent.includes(${JSON.stringify(project)}));
     row?.querySelector("button.pick")?.click();
   })()`);
-  await page.waitFor(`location.hash.includes("/d/1")`, 10_000);
-  await page.eval(`location.hash = location.hash.replace("/d/1", "/n/1")`);
+  await page.waitFor(`location.hash.includes("/n/1")`, 10_000);
   await page.waitFor(`document.querySelector(".new-agent .menus") || document.querySelector(".new-agent .failure")`, 90_000);
 
   // #257: what each menu offers.

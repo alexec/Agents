@@ -78,7 +78,7 @@ struct ContentView: View {
     }
 
     /// What the right-hand column shows: a page about all the work, a workflow, a
-    /// project's Dashboard, a chat, a new session, or — with nothing picked — what to do.
+    /// pinned page, a chat, a new session, or — with nothing picked — what to do.
     @ViewBuilder
     private func detail(inPaneOf width: CGFloat) -> some View {
         if model.showsEvents {
@@ -93,32 +93,6 @@ struct ContentView: View {
             // No files pane and no sidebar toggle: a workflow has no agent to have
             // asked about a file, so there would be nothing for either to show.
             WorkflowPage(workflowID: id).paperGround()
-        } else if model.openDashboard, let folder = model.selectedProject, let summary = model.selectedProjectSummary {
-            // The project's own page (#145): its Dashboard, drawn as ui://agents/dashboard
-            // (#188), with anything waiting for somebody's OK across the top.
-            VStack(spacing: 0) {
-                WaitingForOKBanner(folder: folder)
-                OfflineStrip(host: summary.host)
-                ProjectDashboardView(
-                    folder: folder,
-                    snapshot: model.dashboard(in: folder),
-                    revision: model.dashboardRevision(in: folder),
-                    call: { method, params in
-                        try await model.client(for: summary.host).call(method, params)
-                    },
-                    refresh: { await model.refreshDashboard(folder, on: summary.host) },
-                    openTarget: { kind, id in
-                        switch kind {
-                        case "agent": model.selection = UUID(uuidString: id)
-                        case "workflow": model.openWorkflow = id
-                        case "page": model.openPin = id
-                        default: break
-                        }
-                    })
-                    .navigationTitle(AppCheckout.windowTitle(summary.name))
-                    .navigationSubtitle("Dashboard")
-            }
-            .paperGround()
         } else if let path = model.openPin, let key = model.selectedProjectKey, let summary = model.selectedProjectSummary {
             // One of the project's pinned pages (#159), live, where the chat would be; or a
             // pinned view (#189), fed afresh.
@@ -164,13 +138,6 @@ struct ContentView: View {
                 Label("New Session", systemImage: "square.and.pencil")
             }
             .help("Start a new session in this project (⌘N)")
-            .disabled(model.selectedProjectSummary == nil)
-        }
-        ToolbarItem {
-            Button { requests.projectSettings = .general } label: {
-                Label("Project Settings", systemImage: "slider.horizontal.3")
-            }
-            .help("Project Settings (⌥⌘,)")
             .disabled(model.selectedProjectSummary == nil)
         }
         if model.selection != nil {
@@ -250,7 +217,15 @@ struct ContentView: View {
         // itself. Here rather than in the sidebar, because the sidebar may be shut,
         // and shut means gone: there would be nothing listening.
         .onChange(of: model.filesToShow) { showWhatWasAskedFor() }
-        .onChange(of: model.selection) { showWhatWasAskedFor() }
+        .onChange(of: model.selection) {
+            // A chat just started opens on the chat alone (#358); anything it asks
+            // to show still opens the column, just below.
+            if let id = model.selection, id == model.justStarted {
+                model.justStarted = nil
+                frame.isOpen = false
+            }
+            showWhatWasAskedFor()
+        }
         // The window's one alert, held while it is open (#101): a reconnect clearing the
         // problem, or a second arriving, waits for its button rather than closing it.
         .heldAlert(\.title, item: { WindowAlert.wanted(by: model) }, dismiss: { $0.closed(in: model) }) { alert in
@@ -307,8 +282,8 @@ private struct NothingPickedPage: View {
             Label("Nothing selected", systemImage: "sidebar.left")
         } description: {
             Text("""
-            Pick a session on the left to read it, or a project to see its Dashboard. \
-            New Session (⌘N) starts one in the selected project.
+            Pick a session on the left to read it, or a project to start a new session \
+            there. New Session (⌘N) starts one in the selected project.
 
             ↑ and ↓ move through the list, → and ← unfold and fold a project, \
             and ⌘F finds a session.

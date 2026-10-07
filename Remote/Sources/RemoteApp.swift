@@ -63,8 +63,8 @@ struct RemoteApp: App {
 ///
 /// On an iPad the sidebar stays beside the detail, as the Mac's does; on an iPhone the
 /// split view collapses, the sidebar is the screen the app opens on, and a pick is pushed
-/// over it with a way back. What is opened from the detail — a workflow's run, a session
-/// from a Dashboard tile — is pushed over it in turn.
+/// over it with a way back. What is opened from the detail — a workflow's run — is
+/// pushed over it in turn.
 struct RemoteView: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.scenePhase) private var scenePhase
@@ -73,14 +73,15 @@ struct RemoteView: View {
     @State private var compactColumn = NavigationSplitViewColumn.sidebar
 
     /// What is open over the project, in the order each was opened from the one before:
-    /// its Dashboard, a pinned page, a workflow, a conversation. The first is the detail's
-    /// own page, the one the sidebar lights; the rest are pushed over it.
+    /// a pinned page, a workflow, a conversation. The first is the detail's own page, the
+    /// one the sidebar lights; the rest are pushed over it. With none, the project's page
+    /// is a new session in it (#366).
     private var routes: [RemoteRoute] {
-        let open = [model.openDashboard ? RemoteRoute.dashboard : nil, model.openPin.map(RemoteRoute.page),
+        let open = [model.openPin.map(RemoteRoute.page),
                     model.openWorkflow.map(RemoteRoute.workflow), model.selection.map(RemoteRoute.agent)]
             .compactMap { $0 }
-        // A project with nothing open over it shows its Dashboard, as the Mac's row does.
-        if open.isEmpty, model.selectedProject != nil { return [.dashboard] }
+        // A project with nothing open over it starts a session, as the Mac's row does (#366).
+        if open.isEmpty, model.selectedProject != nil { return [.start] }
         return open
     }
 
@@ -89,7 +90,6 @@ struct RemoteView: View {
                 set: { more in
                     guard let root = routes.first else { return }
                     let all = [root] + more
-                    model.openDashboard = all.contains(.dashboard)
                     model.openPin = all.lazy.compactMap(\.pinPath).first
                     model.openWorkflow = all.lazy.compactMap(\.workflowID).first
                     model.selection = all.compactMap(\.agentID).last
@@ -130,16 +130,7 @@ struct RemoteView: View {
         .task(id: model.selectedProject) {
             if let folder = model.selectedProject { await model.loadLabelVocabulary(in: folder) }
         }
-        .sheet(isPresented: Binding(get: { model.startingIn != nil },
-                                    set: { if !$0 { model.startingIn = nil } })) {
-            if let project = model.startingIn {
-                StartAgentView(project: project)
-                    .paperSheet()
-                    .presentationDetents([.large])
-                    .presentationSizing(.form)
-            }
-        }
-        // A server asked for a key on a send, with no start sheet to ask over (#344).
+        // A server asked for a key on a send, with no start page to ask over (#344).
         .tokenAskSheet(model, shown: model.startingIn == nil)
         // Where this device is, told to the Mac on every change (021).
         .onChange(of: scenePhase, initial: true) { _, phase in model.scenePhase(phase) }
@@ -190,35 +181,15 @@ struct RemoteView: View {
                     .task(id: id) { await model.lookUpRetired(id) }
             }
         case .workflow(let id): WorkflowPage(workflowID: id).paperGround()
-        case .dashboard:
-            // ui://agents/dashboard, through the same host a chat uses (#188).
-            ProjectDashboardView(
-                folder: model.selectedProject ?? URL(fileURLWithPath: "/"),
-                snapshot: model.selectedProject.flatMap { model.work.dashboards[Project.standardize($0)] },
-                revision: model.work.dashboardRevision(in: model.selectedProject),
-                call: { method, params in try await model.viewCall(method, params) },
-                refresh: {
-                    if let folder = model.selectedProject { await model.refreshDashboard(folder) }
-                },
-                openTarget: { kind, id in
-                    switch kind {
-                    case "agent": model.selection = UUID(uuidString: id)
-                    case "workflow": model.openWorkflow = id
-                    case "page": model.openPin = id
-                    default: break
-                    }
-                })
-                .paperGround()
-                .navigationTitle("Dashboard")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    // New session, from the project's own page (029), as from its row's menu.
-                    if let folder = model.selectedProject {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            NewSessionButton(folder: folder)
-                        }
-                    }
-                }
+        case .start:
+            if let folder = model.selectedProject {
+                // Held open while it is on screen: the runtime behind its choices is let
+                // go when it is not (029).
+                StartAgentView(project: folder)
+                    .paperGround()
+                    .onAppear { model.startingIn = folder }
+                    .onDisappear { if model.startingIn == folder { model.startingIn = nil } }
+            }
         case .page(let path):
             if let folder = model.selectedProject {
                 if let pin = model.pins(in: folder).first(where: { $0.path == path }), let view = pin.view {
@@ -249,8 +220,8 @@ struct RemoteView: View {
 enum RemoteRoute: Hashable {
     case workflow(Workflow.ID)
     case agent(UUID)
-    /// The project's Dashboard (074).
-    case dashboard
+    /// A new session in the project (#366): its page when nothing is open over it.
+    case start
     /// One of the project's pinned pages (#159), by its path in the project.
     case page(String)
 

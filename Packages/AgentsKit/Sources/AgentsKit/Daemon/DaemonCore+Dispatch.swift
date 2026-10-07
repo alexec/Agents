@@ -715,23 +715,6 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.EventPublishRequest.self)
                 return .success(["note": .string(try publishEvent(request))])
 
-            case DaemonAPI.Method.dashboardSetTile:
-                let request = try require(params, as: DaemonAPI.SetTileRequest.self)
-                return .success(["note": .string(try setTile(request))])
-
-            case DaemonAPI.Method.dashboardRemoveTile:
-                let request = try require(params, as: DaemonAPI.RemoveTileRequest.self)
-                return .success(["note": .string(try removeTile(request))])
-
-            case DaemonAPI.Method.dashboardMoveTile:
-                let request = try require(params, as: DaemonAPI.MoveTileRequest.self)
-                return .success(["note": .string(try moveTile(request))])
-
-            case DaemonAPI.Method.dashboardArrange:
-                let request = try require(params, as: DaemonAPI.ArrangeRequest.self)
-                try arrangeDashboard(request)
-                return .success([:])
-
             case DaemonAPI.Method.pinsPinPage:
                 let request = try require(params, as: DaemonAPI.PinToolRequest.self)
                 return .success(["note": .string(try pinPage(request))])
@@ -814,31 +797,6 @@ extension DaemonCore {
             case DaemonAPI.Method.pinsWrite:
                 let request = try require(params, as: DaemonAPI.PinWriteRequest.self)
                 try writePage(request)
-                return .success([:])
-
-            case DaemonAPI.Method.dashboardRead:
-                let request = try require(params, as: DaemonAPI.DashboardTokenRequest.self)
-                return .success(try readDashboardResult(request))
-
-            case DaemonAPI.Method.dashboardGet:
-                let request = try require(params, as: DaemonAPI.DashboardRequest.self)
-                return .success(try JSONValue.encoding(dashboardSnapshot(request.folder)))
-
-            case DaemonAPI.Method.dashboardSummaries:
-                return .success(try JSONValue.encoding(dashboardSummaries()))
-
-            case DaemonAPI.Method.dashboardHide, DaemonAPI.Method.dashboardShow:
-                let request = try require(params, as: DaemonAPI.TileRequest.self)
-                try setTileHidden(request, hidden: method == DaemonAPI.Method.dashboardHide)
-                return .success([:])
-
-            case DaemonAPI.Method.dashboardUpdate:
-                let request = try require(params, as: DaemonAPI.DashboardRequest.self)
-                return .success(try JSONValue.encoding(try await updateDashboard(request)))
-
-            case DaemonAPI.Method.dashboardRemove:
-                let request = try require(params, as: DaemonAPI.TileRequest.self)
-                try removeTileByPerson(request, from: surface)
                 return .success([:])
 
             case DaemonAPI.Method.eventsCancelWait:

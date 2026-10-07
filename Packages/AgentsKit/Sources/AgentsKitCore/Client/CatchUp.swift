@@ -82,7 +82,6 @@ public extension DaemonClient {
 public enum CatchUpPart: String, CaseIterable, Sendable, Hashable {
     case workflows
     case pins
-    case dashboards
     case leases
     case runtimes
     case allowances

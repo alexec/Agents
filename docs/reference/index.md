@@ -18,8 +18,6 @@ something up, not for reading through.
   on the Mac, the Runtimes and Resources pages, and what iPhone and iPad need.
 - [Workflow triggers and actions](workflows.md): the workflow file format, every trigger
   and setting, and when a workflow does not run.
-- [Dashboard tiles](dashboard-tiles.md): every tile type, its fields and limits, keepers,
-  greying and history.
 - [Events](events.md): everything the app records, for waits, workflow triggers and the
   Events page.
 - [Keyboard shortcuts](keyboard-shortcuts.md): every shortcut and menu command on the Mac.

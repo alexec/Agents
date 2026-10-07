@@ -3,7 +3,7 @@ import AgentsKitCore
 
 /// What this host could not read in this run, said where the person looks (#205).
 ///
-/// Before, only the Spending page and the Dashboard said a file had been set aside; a
+/// Before, only the Spending page said a file had been set aside; a
 /// `devices.json` or `projects.json` that did not read left paired devices or projects
 /// gone from the window with only a log line to say why. Every note `StoreFile` keeps,
 /// for the daemon's root and the projects' own files, now reaches the windows: asked on

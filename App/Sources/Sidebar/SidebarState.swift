@@ -36,9 +36,10 @@ enum SidebarPane: String, CaseIterable, Identifiable, Sendable {
 
 /// Where the column is: open or not, how wide, which pane.
 ///
-/// This is one person's preference about a window, the same whichever agent is
-/// selected, so it is the window's and it is written to `UserDefaults`. It is not the
-/// daemon's: the daemon owns things that outlive windows, and a chosen width does not.
+/// The width and the pane are one person's preference about a window, the same
+/// whichever agent is selected, so they are the window's and written to `UserDefaults`.
+/// It is not the daemon's: the daemon owns things that outlive windows, and a chosen
+/// width does not. Open or not is about the chat on screen, so it is not kept (#358).
 @MainActor
 @Observable
 final class SidebarFrame {
@@ -55,7 +56,6 @@ final class SidebarFrame {
     static let minimumConversationWidth: Double = 520
 
     private enum Key {
-        static let isOpen = "sidebar.isOpen"
         static let width = "sidebar.width"
         static let pane = "sidebar.pane"
     }
@@ -63,10 +63,10 @@ final class SidebarFrame {
     private let defaults: UserDefaults
 
     /// Closed until asked for. Feature 001 is what you get until you want more, which
-    /// is FR-006 expressed as a default rather than as a promise.
-    var isOpen: Bool {
-        didSet { defaults.set(isOpen, forKey: Key.isOpen) }
-    }
+    /// is FR-006 expressed as a default rather than as a promise. Not stored: a window
+    /// opens with it shut, and so does a chat just started (#358), whatever the last
+    /// one had open.
+    var isOpen = false
 
     var width: Double {
         didSet { defaults.set(width, forKey: Key.width) }
@@ -83,7 +83,8 @@ final class SidebarFrame {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        isOpen = defaults.bool(forKey: Key.isOpen)
+        // Kept through #358, and read back into every launch since.
+        defaults.removeObject(forKey: "sidebar.isOpen")
         // Clamped on the way in as well as on the way out. A width stored on a larger
         // screen would otherwise be honoured on a smaller one and leave the
         // conversation with nothing.

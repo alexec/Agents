@@ -68,17 +68,9 @@ How each client enforces it:
 | `notifications/message` | A line in the daemon's log. |
 | `ui/resource-teardown` | Sent before a view goes: when you open another conversation, or when more than eight views are open in one chat. The app waits up to two seconds for the answer. |
 
-## The Dashboard
-
-Opening a project's Dashboard — the row at the top of its sessions, on the Mac, the Remote
-or the web page — draws `ui://agents/dashboard` from the app's own server. It uses the same
-host a chat uses for a tool's view. The page makes the call itself, so no conversation has
-to be open. The tiles stay files in `.agents/dashboard/`. Keepers and `take_over` are
-unchanged. **Update now** stays on the page, beside the view.
-
 ## Pinning a view
 
-A view can be pinned under a project, beside its Dashboard and pinned pages, on the Mac,
+A view can be pinned under a project, beside its pinned pages, on the Mac,
 the Remote and the web page. **This is our extension of MCP Apps (SEP-1865).** The spec
 ties a view to a tool call the model made. A pin is the host making that call itself.
 
@@ -91,14 +83,13 @@ ties a view to a tool call the model made. A pin is the host making that call it
   call is made again, so the view is as of then. It does not update while open.
 - **Which tools can feed a pin.** Only a tool a view may call (`visibility` includes
   `app`) that is marked as changing nothing (`annotations.readOnlyHint`), because opening
-  a pin calls it. Anything else is refused, and so is `ui://agents/dashboard`, which is
-  already the project's first row.
+  a pin calls it. Anything else is refused.
 - **Which servers.** The `agents` server's, and your own http servers' (#191). A pin this
   host can't draw shows as missing, with why: *server not set up here*, *waiting for
   approval*, *a secret is missing*, *needs a sign-in*, *views from local servers aren't
   shown yet* or *no such view*. Each host says for itself, since each has its own servers. That is the way a pinned file shows as missing until its
   branch lands.
-- **No agent.** A pinned view, like the Dashboard, is on a project's page with no
+- **No agent.** A pinned view is on a project's page with no
   conversation. Its `ui/message` and `ui/update-model-context` are refused, and the refusal
   goes in the daemon's log.
 - **How to pin one.** **Pin to Project** in the view's menu, beside its name in the chat

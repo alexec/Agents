@@ -41,14 +41,6 @@ public final class AgentsModel {
     /// not redraw every other project's (#285). The array stays, for a one-off read.
     @ObservationIgnored public private(set) var workflows: [WorkflowSummary] = []
 
-    /// Each project's Dashboard row (074), by its standardized folder: kept current by
-    /// `dashboard/changed`, which carries it.
-    public private(set) var dashboardSummaries: [URL: DashboardSummary] = [:]
-    /// The Dashboards a screen has asked for, by folder. Refetched by whoever shows one
-    /// when `dashboardRevisions` moves: the notification says only that it changed.
-    public var dashboards: [URL: DashboardSnapshot] = [:]
-    public private(set) var dashboardRevisions: [URL: Int] = [:]
-
     /// Each project's pinned pages (#159), by its standardized folder: kept current by
     /// `pins/changed`, which carries them. A project with none is absent. Not observed:
     /// a project reads its own shelf (#285).
@@ -338,7 +330,6 @@ public final class AgentsModel {
         case usage(DaemonAPI.UsageNotification)
         case workflowChanged(WorkflowSummary)
         case workflowRemoved(DaemonAPI.WorkflowRemovedNotification)
-        case dashboardChanged(DaemonAPI.DashboardChangedNotification)
         case pinsChanged(DaemonAPI.PinsChangedNotification)
         case pagesChanged(DaemonAPI.PagesChangedNotification)
         case pluginsChanged(DaemonAPI.PluginsList)
@@ -387,8 +378,6 @@ public final class AgentsModel {
         case DaemonAPI.Notification.agentUsage: return decode(DaemonAPI.UsageNotification.self, Update.usage)
         case DaemonAPI.Notification.workflowChanged: return decode(WorkflowSummary.self, Update.workflowChanged)
         case DaemonAPI.Notification.workflowRemoved: return decode(DaemonAPI.WorkflowRemovedNotification.self, Update.workflowRemoved)
-        case DaemonAPI.Notification.dashboardChanged:
-            return decode(DaemonAPI.DashboardChangedNotification.self, Update.dashboardChanged)
         case DaemonAPI.Notification.pinsChanged: return decode(DaemonAPI.PinsChangedNotification.self, Update.pinsChanged)
         case DaemonAPI.Notification.pagesChanged: return decode(DaemonAPI.PagesChangedNotification.self, Update.pagesChanged)
         case DaemonAPI.Notification.pluginsChanged: return decode(DaemonAPI.PluginsList.self, Update.pluginsChanged)
@@ -531,11 +520,6 @@ public final class AgentsModel {
                 $0.folder == folder && $0.workflowID == notification.workflowID
             }
             refillWorkflowShelf(folder)
-
-        case .dashboardChanged(let notification):
-            let folder = Project.standardize(notification.folder)
-            dashboardSummaries[folder] = notification.summary
-            dashboardRevisions[folder, default: 0] += 1
 
         case .pinsChanged(let notification):
             let folder = Project.standardize(notification.folder)
@@ -692,28 +676,6 @@ public final class AgentsModel {
         return plugins[Project.standardize(folder)] ?? []
     }
 
-    /// One project's Dashboard row, or nil when it has no tiles.
-    public func dashboardSummary(in folder: URL?) -> DashboardSummary? {
-        guard let folder else { return nil }
-        return dashboardSummaries[Project.standardize(folder)]
-    }
-
-    public func replaceDashboardSummaries(_ listed: [DashboardSummary]) {
-        dashboardSummaries = Dictionary(listed.map { (Project.standardize($0.folder), $0) }, uniquingKeysWith: { $1 })
-    }
-
-    /// A Dashboard as fetched; its row follows it.
-    public func store(_ snapshot: DashboardSnapshot) {
-        let folder = Project.standardize(snapshot.folder)
-        dashboards[folder] = snapshot
-        dashboardSummaries[folder] = DashboardModel.summary(snapshot)
-    }
-
-    public func forgetDashboard(in folder: URL?) {
-        guard let folder else { return }
-        dashboards[Project.standardize(folder)] = nil
-    }
-
     /// One project's pinned pages, in their order. Read from that project's shelf.
     public func pins(in folder: URL?) -> [PinView] {
         guard let folder else { return [] }
@@ -779,10 +741,6 @@ public final class AgentsModel {
         }
     }
 
-    public func dashboardRevision(in folder: URL?) -> Int {
-        folder.map { dashboardRevisions[Project.standardize($0)] ?? 0 } ?? 0
-    }
-
     /// The workflows of one project, which is what a project page shows. The first
     /// ask makes the shelf; later changes write that shelf and no other (#285).
     public func workflows(in folder: URL?) -> [WorkflowSummary] {
@@ -814,7 +772,7 @@ public final class AgentsModel {
         } else {
             projects.append(summary)
         }
-        projects.sort { $0.lastActivityAt > $1.lastActivityAt }
+        projects.sort(by: SidebarOrder.byAdded)
     }
 
     public func replaceAgents(_ listed: [Agent]) {
@@ -834,7 +792,7 @@ public final class AgentsModel {
     }
 
     public func replaceProjects(_ listed: [DaemonAPI.ProjectSummary]) {
-        projects = listed.sorted { $0.lastActivityAt > $1.lastActivityAt }
+        projects = listed.sorted(by: SidebarOrder.byAdded)
     }
 
     /// One host's agents, as it just listed them. Every other host's are left alone:
@@ -848,7 +806,7 @@ public final class AgentsModel {
 
     public func replaceProjects(_ listed: [DaemonAPI.ProjectSummary], from host: HostID) {
         let stamped = listed.map { var summary = $0; summary.host = host; return summary }
-        projects = (projects.filter { $0.host != host } + stamped).sorted { $0.lastActivityAt > $1.lastActivityAt }
+        projects = (projects.filter { $0.host != host } + stamped).sorted(by: SidebarOrder.byAdded)
     }
 
     /// Down to the budget, never taking the terminal just written to.
@@ -1336,13 +1294,15 @@ public final class AgentsModel {
         RuntimeCatalog.newSessionRuntime(kept: kept, available: available)
     }
 
-    /// The projects worth showing, newest activity first.
+    /// The projects worth showing, oldest added first (`SidebarOrder.byAdded`, #357).
     public var liveProjects: [DaemonAPI.ProjectSummary] {
         projects.filter { !$0.project.isArchived }
     }
 
+    /// The archived ones, latest worked on first, as the web's: their activity no longer
+    /// moves, so this order does not shuffle.
     public var archivedProjects: [DaemonAPI.ProjectSummary] {
-        projects.filter(\.project.isArchived)
+        projects.filter(\.project.isArchived).sorted { $0.lastActivityAt > $1.lastActivityAt }
     }
 
     public func project(_ key: ProjectKey?) -> DaemonAPI.ProjectSummary? {

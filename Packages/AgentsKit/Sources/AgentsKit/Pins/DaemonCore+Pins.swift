@@ -6,8 +6,7 @@ import AgentsKitCore
 /// And its pinned sessions (#180): `pin_session`, and the person's Pin, Unpin and drag.
 ///
 /// The pins are one file in the project folder, `.agents/pins.json`, written whole and
-/// only here, inside the actor, never in a worktree; nothing is committed. As the
-/// Dashboard's tiles are (074).
+/// only here, inside the actor, never in a worktree; nothing is committed.
 extension DaemonCore {
     // MARK: Agents' tools
 
@@ -160,7 +159,7 @@ extension DaemonCore {
         try writePins(file, in: project)
     }
 
-    /// Any file in the project folder, for a pinned page, a page tile or what an HTML
+    /// Any file in the project folder, for a pinned page or what an HTML
     /// page draws from. Held to the folder: a link out of it is refused, not followed.
     public func readPage(_ request: DaemonAPI.PinReadRequest) throws -> FileReading {
         let project = try knownPinProject(request.folder)
@@ -335,33 +334,31 @@ extension DaemonCore {
         pagesChanged(project, folders: touched)
     }
 
-    /// Every pinned page and every page tile's file: what a screen may be showing.
+    /// Every pinned page's file: what a screen may be showing.
     ///
-    /// Two stats when nothing changed (#216): the pins and the tiles are each held, and
-    /// read again only when their own files change.
+    /// One stat when nothing changed (#216): the pins are held, and read again only when
+    /// their own file changes.
     func pagePaths(_ project: URL) -> [String] {
-        let tiles = dashboardStore.readTiles(project).compactMap { $0.tile?.page?.file }.compactMap(PinRules.normalize)
-        return readPins(project).pins.filter { $0.view == nil }.map(\.path) + tiles
+        readPins(project).pins.filter { $0.view == nil }.map(\.path)
     }
 
     /// The project's watch saw these folders change: what was read from them is read
     /// again when next asked, and nothing else is (#216).
     func forgetProjectFileCaches(_ changed: [URL], in project: URL) {
         let agents = project.appending(path: ".agents").path
-        let tiles = DashboardStore.tilesFolder(project).path
-        let paths = Set(changed.map(\.path))
-        if paths.contains(agents) { pinsCache[project] = nil }
-        if paths.contains(tiles) { dashboardStore.forgetTiles(project) }
+        if changed.contains(where: { $0.path == agents }) { pinsCache[project] = nil }
     }
 
     /// Tell every screen, at most once a second per project.
     func pinsChanged(_ project: URL) {
         guard pinBroadcasts[project] == nil else { return }
         pinBroadcasts[project] = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(Self.dashboardBroadcastGap))
+            try? await Task.sleep(for: .milliseconds(Self.pinBroadcastGap))
             await self?.sendPinsChanged(project)
         }
     }
+
+    static let pinBroadcastGap = 1000
 
     private func sendPinsChanged(_ project: URL) {
         pinBroadcasts[project] = nil
@@ -518,7 +515,7 @@ extension DaemonCore {
                          pinsWords(project, for: caller)]).joined(separator: "\n")
     }
 
-    /// The numbered pins, for an agent's answer and `read_dashboard`.
+    /// The numbered pins, for an agent's answer.
     func pinsWords(_ project: URL, for caller: Agent?) -> String {
         let pins = pinViews(project)
         guard !pins.isEmpty else { return "This project has no pinned pages. Pin one with pin_page." }
@@ -534,7 +531,7 @@ extension DaemonCore {
             return "\(index + 1). \(pin.title) — \(pin.path) [\(pin.kind.rawValue)]"
                 + by + (pin.missing ? "; missing from the project folder" : "")
         }
-        return (["Pinned pages (\(pins.count) of \(PinLimits.perProject)), after the Dashboard:"] + lines)
+        return (["Pinned pages (\(pins.count) of \(PinLimits.perProject)):"] + lines)
             .joined(separator: "\n")
     }
 
@@ -620,6 +617,13 @@ extension DaemonCore {
     private func pinText(_ arguments: JSONValue, _ key: String) -> String? {
         let value = arguments[key]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return value.isEmpty ? nil : value
+    }
+
+    func requireFolder(_ project: URL) throws {
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: project.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            throw pinRefusal("Nothing was pinned: the project folder \(project.path) is not there.")
+        }
     }
 
     func pinRefusal(_ message: String) -> JSONRPCError {

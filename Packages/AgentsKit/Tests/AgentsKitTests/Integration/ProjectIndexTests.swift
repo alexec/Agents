@@ -186,7 +186,6 @@ struct ProjectIndexTests {
         #expect(await core.allProjects(includeArchived: false).count == 500)
         _ = await core.catchUp(DaemonAPI.CatchUpRequest())
         _ = await core.pinsList()
-        _ = await core.dashboardSummaries()
         for project in await core.allProjects() {
             #expect(await core.projectSummary(for: project.folder) != nil)
             #expect(await core.isProject(project.folder))

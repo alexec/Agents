@@ -2,7 +2,7 @@
 // root list, as the iPhone Remote's (#226, #235):
 // Activity at the top, then every project, each a row that folds open on its sessions and
 // workflows, and at the foot what the hosts and this browser are doing. No host headings: a
-// server's project reads `host:Project`. A project's row opens its Dashboard.
+// server's project reads `host:Project`. A project's row starts a new session in it and folds (#366).
 //
 // One list for the keys: ↑ and ↓ move through every row shown, opening what they land on, as the
 // window's selection does; → unfolds a project and ← folds it, or steps out to its project from
@@ -42,15 +42,25 @@ export function projectLabel(host: ControlHost | undefined, project: ProjectSumm
 }
 
 /**
- * This Mac's projects, then each server's, each with the latest worked on first, as the window's
- * and the Remote's (SidebarOrder.projects, #250): no heading for a host.
+ * Oldest added first, then by folder, as the window's and the Remote's (SidebarOrder.byAdded,
+ * #357): a row stays where it is however busy its project is, and a new project lands at the end.
  */
-function orderedProjects(store: Store): { host: ControlHost; project: ProjectSummary }[] {
-  const hosts = store.hosts.value;
+export function byAdded(a: ProjectSummary, b: ProjectSummary): number {
+  if (a.project.addedAt !== b.project.addedAt) return a.project.addedAt - b.project.addedAt;
+  const [x, y] = [folderKey(a.project.folder), folderKey(b.project.folder)];
+  return x < y ? -1 : x > y ? 1 : 0;
+}
+
+/**
+ * This Mac's projects, then each server's, each oldest added first, as the window's and the
+ * Remote's (SidebarOrder.projects, #250, #357): no heading for a host.
+ */
+export function orderedProjects(hosts: ControlHost[], projects: Record<string, ProjectSummary[]>):
+  { host: ControlHost; project: ProjectSummary }[] {
   const ordered = [...hosts.filter((h) => h.id === "mac"), ...hosts.filter((h) => h.id !== "mac")];
-  return ordered.flatMap((host) => (store.projects.value[host.id] ?? [])
+  return ordered.flatMap((host) => (projects[host.id] ?? [])
     .filter((project) => project.project.archivedAt === undefined)
-    .sort((a, b) => b.lastActivityAt - a.lastActivityAt)
+    .sort(byAdded)
     .map((project) => ({ host, project })));
 }
 
@@ -85,7 +95,7 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
   useEffect(() => {
     if (r.host && r.project && (r.session || r.workflow || r.page)) folds.set(r.host, r.project, true);
   }, [r.host, r.project, r.session, r.workflow, r.page]);
-  const projects = orderedProjects(store);
+  const projects = orderedProjects(store.hosts.value, store.projects.value);
   const archived = archivedProjects(store.hosts.value, store.projects.value);
   const showsArchived = folds.showsArchivedProjects.value;
   const offline = store.hosts.value.filter((h) => h.state !== "online");
@@ -234,12 +244,11 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   if (searching && groups.length === 0 && archived.length === 0 && allWorkflows.length === 0 && !nameMatches) return null;
 
   const chosen = r.host === host.id && r.project !== undefined && folderKey(r.project) === folderKey(folder)
-    && !!r.dashboard;
+    && !!r.compose;
   const needs = view.needsYou;
   const subtitle = !project.exists ? "Folder is missing" : view.subtitle;
   const fold = (open: boolean) => folds.set(host.id, folder, open);
   const projectMenu: MenuItem[] = [
-    { label: "Dashboard", run: () => go({ host: host.id, project: folder, dashboard: true }) },
     { label: "New Session", disabled: down, help: "Start a new session in this project",
       run: () => go({ host: host.id, project: folder, compose: true }) },
   ];
@@ -254,7 +263,12 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
         <button class="disclosure" aria-label={unfolded ? `Fold ${label}` : `Unfold ${label}`} aria-expanded={unfolded}
           tabIndex={-1} disabled={searching} onClick={() => fold(!unfolded)}>{unfolded ? "⌄" : "›"}</button>
         <button class="pick" aria-current={chosen} aria-expanded={unfolded} data-fold="project" title={folderPath(folder)}
-          onClick={() => go({ host: host.id, project: folder, dashboard: true })}
+          onClick={(e) => {
+            // A new session in it, and the row folds or unfolds (#366). Not when the arrow keys
+            // land here (a click with no detail): moving through the list folds nothing.
+            go({ host: host.id, project: folder, compose: true });
+            if (e.detail > 0 && !searching) fold(!unfolded);
+          }}
           onContextMenu={(e) => openContextMenu(e, projectMenu)}
           onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, projectMenu); }}>
           <span class="title">{label}</span>
@@ -265,7 +279,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
       </div>
       {unfolded && (
         <div class="fold-body">
-          {/* The project's pinned pages (#159), beside the Dashboard its row opens, before its sessions. */}
+          {/* The project's pinned pages (#159), before its sessions. */}
           {!searching && (
             <PinnedPageRows store={store} host={host.id} folder={folder} down={down}
               chosen={r.host === host.id && r.project !== undefined && folderKey(r.project) === folderKey(folder) ? r.page : undefined} />
@@ -366,7 +380,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
 
 /**
  * An archived project, with when it was put away, and Bring Back, as the window's
- * ArchivedProjectRow (#343). Brought back, it is a project again and its Dashboard opens.
+ * ArchivedProjectRow (#343). Brought back, it is a project again and its new-session form opens.
  */
 function ArchivedProjectRow({ store, host, project, down }: {
   store: Store; host: ControlHost; project: ProjectSummary; down: boolean;
@@ -374,7 +388,7 @@ function ArchivedProjectRow({ store, host, project, down }: {
   const folder = project.project.folder;
   const archivedAt = project.project.archivedAt;
   const bringBack = async () => {
-    if (await store.unarchiveProject(host.id, folder)) go({ host: host.id, project: folder, dashboard: true });
+    if (await store.unarchiveProject(host.id, folder)) go({ host: host.id, project: folder, compose: true });
   };
   const menu: MenuItem[] = [{ label: "Bring Back", disabled: down, run: () => void bringBack() }];
   return (

@@ -159,10 +159,11 @@ private struct RemoteProjectFold: View {
 
     var body: some View {
         let fold = SidebarProjectFold(key, label: label, in: model.work, query: query, isOpen: folds.isOpen(key))
-        let isOpen = fold.isSearching || folds.isOpen(key)
+        let isOpen = fold.isUnfolded
         if fold.isShown {
             DisclosureGroup(isExpanded: Binding(get: { isOpen }, set: { folds.set(key, open: $0) })) {
-                if !fold.isSearching {
+                // Folded, nothing at all is under the row (#356): see `isUnfolded`.
+                if fold.showsPinnedPages {
                     PinnedPageRows(project: key)
                 }
                 if !fold.pinned.isEmpty {
@@ -171,7 +172,7 @@ private struct RemoteProjectFold: View {
                 ForEach(fold.groups) { part in
                     sessionGroup(part, searching: fold.isSearching)
                 }
-                if !fold.isSearching, !fold.hasLive {
+                if fold.showsNoSessions {
                     Text("No sessions yet")
                         .appText(.fine)
                         .foregroundStyle(.secondary)
@@ -351,19 +352,18 @@ private struct ProjectMenuItems: View {
     let summary: DaemonAPI.ProjectSummary
 
     var body: some View {
-        Button("Dashboard", systemImage: "square.grid.2x2") { model.sidebarItem = .project(summary.key) }
         NewSessionButton(folder: summary.folder)
     }
 }
 
-/// New session in a project: the start sheet (029).
+/// New session in a project: its page, the start form (029, #366).
 struct NewSessionButton: View {
     @Environment(RemoteModel.self) private var model
     let folder: URL
 
     var body: some View {
         Button {
-            model.startingIn = folder
+            model.sidebarItem = .project(ProjectKey(host: model.work.project(folder)?.host ?? .mac, folder: folder))
         } label: {
             Label("New Session", systemImage: "plus")
         }

@@ -9,10 +9,10 @@ description: Check that a runtime works with the app's tools, by having an agent
 An assessment checks that a runtime, such as Codex after an update, works with the tools the
 app gives every agent. An agent on that runtime works through a fixed series of steps, one
 for each group of tools: ending a turn, asking you a question, opening a file, starting a
-helper, taking a lease, waiting for an event, the Dashboard, workflows, moving into a
-worktree and back, reading its own session, and writing outside the project. It writes a
-report. The app then scores every step from its own record of what the agent called and what
-the app answered, so a pass never rests on the agent's word.
+helper, taking a lease, waiting for an event, workflows, moving into a worktree and back,
+reading its own session, and writing outside the project. It writes a report. The app then
+scores every step from its own record of what the agent called and what the app answered,
+so a pass never rests on the agent's word.
 
 ## Before you start
 

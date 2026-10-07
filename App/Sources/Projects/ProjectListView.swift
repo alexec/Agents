@@ -86,7 +86,8 @@ struct ProjectListView: View {
 
             if !model.archivedProjects.isEmpty, searched.isEmpty {
                 Section(isExpanded: $showsArchived) {
-                    ForEach(model.archivedProjects, id: \.key) { summary in
+                    // None while folded, as under a folded project (#356).
+                    ForEach(showsArchived ? model.archivedProjects : [], id: \.key) { summary in
                         ArchivedProjectRow(summary: summary) { await model.unarchiveProject(summary.key) }
                             .appText(.supporting)
                     }
@@ -302,14 +303,15 @@ private struct ProjectFold: View {
         // heading is the shared model's, which the Remote draws too (#226).
         let fold = SidebarProjectFold(key, label: label, in: model.work, query: query,
                                       isOpen: folds.isOpen(key))
-        let isOpen = fold.isSearching || folds.isOpen(key)
+        let isOpen = fold.isUnfolded
         if fold.isShown {
             DisclosureGroup(isExpanded: Binding(
                 get: { isOpen },
                 set: { folds.set(key, open: $0) })) {
-                // The project's pinned pages (#159), beside the Dashboard its own row opens,
-                // before its sessions. Not while searching: the search is for sessions.
-                if !fold.isSearching {
+                // Folded, nothing at all is under the row (#356): see `isUnfolded`.
+                // The project's pinned pages (#159), before its sessions. Not while
+                // searching: the search is for sessions.
+                if fold.showsPinnedPages {
                     PinnedPageRows(project: key)
                 }
                 // Then its pinned sessions (#180), whatever their state, in the order
@@ -320,7 +322,7 @@ private struct ProjectFold: View {
                 ForEach(fold.groups) { part in
                     sessionGroup(part, searching: fold.isSearching)
                 }
-                if !fold.isSearching, !fold.hasLive {
+                if fold.showsNoSessions {
                     Text("No sessions yet")
                         .appText(.fine)
                         .foregroundStyle(.secondary)
@@ -328,7 +330,11 @@ private struct ProjectFold: View {
                 archivedSessions(fold)
                 ProjectWorkflowRows(fold: fold, folds: folds)
             } label: {
-                ProjectRow(summary: summary, label: label, isFolded: !isOpen)
+                ProjectRow(summary: summary, label: label, isFolded: !isOpen) {
+                    // A search holds every match open; the click still starts a session.
+                    if !fold.isSearching { folds.set(key, open: !isOpen) }
+                    requests.focusPrompt()
+                }
                     .appText(.supporting)
                     // As tall as its one or two lines and a little air (#104).
                     .listRowInsets(.vertical, 3)
@@ -411,13 +417,14 @@ private struct ProjectFold: View {
                 ForEach(FoldedRow.rows(isOpen ? shown : [], in: .archivedSessions)) { row in
                     SessionSidebarRow(agent: row.item)
                 }
-                if fold.isSearching, fold.archived.count > shown.count {
+                // Closed, the fold's foot goes too: no rows under a closed fold (#237, #356).
+                if isOpen, fold.isSearching, fold.archived.count > shown.count {
                     Button("Show all \(fold.archived.count)", action: showAllMatches)
                         .buttonStyle(.plain)
                         .appText(.fine)
                         .foregroundStyle(.secondary)
                 }
-                if let retiredLine {
+                if isOpen, let retiredLine {
                     Text(retiredLine)
                         .appText(.fine)
                         .foregroundStyle(.secondary)
@@ -482,11 +489,8 @@ private struct ProjectMenu: View {
     let summary: DaemonAPI.ProjectSummary
 
     var body: some View {
-        Button("Dashboard") { model.showProject(summary.key) }
         Button("New Session") {
-            model.select(summary.key)
-            model.composing = true
-            model.draftWorktree = nil
+            model.showProject(summary.key)
             requests.focusPrompt()
         }
         .disabled(model.hostUnreachable(summary.host))

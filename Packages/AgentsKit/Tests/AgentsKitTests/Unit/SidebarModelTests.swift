@@ -41,6 +41,36 @@ struct SidebarModelTests {
         #expect(fold.pinned.isEmpty)
     }
 
+    /// A folded project holds no rows of any kind (#356): an Archived fold, pinned pages or
+    /// "No sessions yet" coming and going under it left NSOutlineView's count of its
+    /// children apart from SwiftUI's, and Apple Intelligence reading the list crashed.
+    @Test func aFoldedProjectHasNothingUnderItsRow() {
+        let model = AgentsModel()
+        model.replaceAgents([agent(api, .archived, "old", at: 1)])
+        model.replacePins([ProjectPins(folder: api, pins: [], sessions: [])])
+        var held = summary(api, archived: 12)
+        held.retiredCount = 3
+        let folded = SidebarProjectFold(key, label: "api", in: model, isOpen: false)
+        #expect(!folded.isUnfolded)
+        #expect(!folded.showsArchivedFold(held))
+        #expect(!folded.showsPinnedPages)
+        #expect(!folded.showsNoSessions)
+        #expect(folded.groups.isEmpty && folded.pinned.isEmpty && folded.archived.isEmpty)
+        #expect(folded.workflows.isEmpty && folded.archivedWorkflows.isEmpty)
+
+        let open = SidebarProjectFold(key, label: "api", in: model, isOpen: true)
+        #expect(open.isUnfolded)
+        #expect(open.showsArchivedFold(held))
+        #expect(open.showsPinnedPages)
+        #expect(open.showsNoSessions)
+
+        // A search unfolds it, and the search is for sessions, not pages.
+        let searched = SidebarProjectFold(key, label: "api", in: model, query: "old", isOpen: false)
+        #expect(searched.isUnfolded)
+        #expect(!searched.showsPinnedPages)
+        #expect(!searched.showsNoSessions)
+    }
+
     @Test func pinnedComeFirstInTheirOrderAndLeaveTheirGroups() {
         let model = AgentsModel()
         let working = agent(api, .running, "working", at: 1)
@@ -132,6 +162,34 @@ struct SidebarModelTests {
                                        ProjectKey(host: devbox, folder: api), ProjectKey(host: gpu, folder: api)])
         #expect(SidebarOrder.label(summary(api, host: devbox)) { $0 == devbox ? "devbox" : "?" } == "devbox:api")
         #expect(SidebarOrder.label(summary(api)) { _ in "?" } == "api")
+    }
+
+    @Test func projectsStayInTheOrderTheyWereAddedHoweverBusy() {
+        let docs = URL(filePath: "/tmp/work/docs")
+        func added(_ folder: URL, at offset: Double, active: Double = 0, host: HostID = .mac) -> DaemonAPI.ProjectSummary {
+            var summary = DaemonAPI.ProjectSummary(
+                project: Project(folder: folder, addedAt: t0.addingTimeInterval(offset)),
+                name: folder.lastPathComponent, exists: true, lastActivityAt: t0.addingTimeInterval(active), counts: [:])
+            summary.host = host
+            return summary
+        }
+        let model = AgentsModel()
+        model.replaceProjects([added(web, at: 20), added(api, at: 10)])
+        #expect(model.projects.map(\.folder) == [api, web], "oldest added first")
+
+        // Activity on the newer project leaves it where it is (#357).
+        model.upsert(added(web, at: 20, active: 999))
+        #expect(model.projects.map(\.folder) == [api, web])
+
+        model.upsert(added(docs, at: 30))
+        #expect(model.projects.map(\.folder) == [api, web, docs], "a new project lands at the end")
+
+        // A server re-listing keeps the same rule, and the same moment falls back to the folder.
+        model.replaceProjects([added(web, at: 5, host: devbox), added(api, at: 5, host: devbox)], from: devbox)
+        #expect(model.projects.filter { $0.host == devbox }.map(\.folder) == [api, web])
+        #expect(SidebarOrder.projects(model.liveProjects, servers: [devbox]).map(\.key)
+                == [api, web, docs].map { ProjectKey(host: .mac, folder: $0) }
+                + [api, web].map { ProjectKey(host: devbox, folder: $0) })
     }
 
     @Test func foldsStartAsTheMacsDidAndAreKeptPerScope() throws {

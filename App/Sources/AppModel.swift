@@ -124,7 +124,6 @@ final class AppModel {
             // out of.
             selection = nil
             openWorkflow = nil
-            openDashboard = false
             openPin = nil
             composing = false
         }
@@ -285,7 +284,7 @@ final class AppModel {
             if let id = openWorkflow { return .workflow(id, in: key) }
             if let openPin { return .pin(openPin, in: key) }
             if let selection { return .session(selection) }
-            return openDashboard || composing ? .project(key) : nil
+            return composing ? .project(key) : nil
         }
         set {
             switch newValue {
@@ -344,19 +343,19 @@ final class AppModel {
         showsEvents = false
         showsRuntimes = false
         select(key)
-        // Its Dashboard, which says nothing new unless it has to: the project's own page
-        // (#145). Starting a session there is New Session, a step away.
-        openDashboard = true
+        // A new session in it (#366): the project's own page is where a session starts,
+        // as New Session has it.
+        composing = true
+        draftWorktree = nil
     }
 
     /// A new session in the selected project: the empty chat with its prompt, where a
-    /// session starts (066). The fourth of `selection`'s siblings, exclusive with them.
+    /// session starts (066). A sibling of `selection`, exclusive with the others.
     var composing = false {
         didSet {
             guard composing, !oldValue else { return }
             selection = nil
             openWorkflow = nil
-            openDashboard = false
             openPin = nil
         }
     }
@@ -366,7 +365,6 @@ final class AppModel {
     func showNothing() {
         selection = nil
         openWorkflow = nil
-        openDashboard = false
         openPin = nil
         composing = false
     }
@@ -402,7 +400,6 @@ final class AppModel {
             // A session picked is the session shown, not a workflow left open over it.
             if selection != nil {
                 openWorkflow = nil
-                openDashboard = false
                 openPin = nil
                 composing = false
             }
@@ -411,6 +408,10 @@ final class AppModel {
             Task { await loadTranscript() }
         }
     }
+
+    /// The agent this window just started, until its chat is opened. A new chat starts
+    /// with the sidebar shut, whatever the last one had open (#358).
+    @ObservationIgnored var justStarted: UUID?
 
     /// The chat being opened and since when, until its transcript is on screen (073).
     @ObservationIgnored private var chatOpening: (agent: UUID, timing: Perf.Interval)?
@@ -427,38 +428,24 @@ final class AppModel {
     var openWorkflow: Workflow.ID? {
         didSet {
             if openWorkflow != nil {
-                openDashboard = false
                 openPin = nil
                 composing = false
             }
         }
     }
 
-    /// Whether the selected project's Dashboard (074) is open in the chat's place: a third
-    /// sibling of `selection` and `openWorkflow`, exclusive with both.
-    var openDashboard = false {
-        didSet {
-            guard openDashboard, !oldValue else { return }
-            selection = nil
-            openWorkflow = nil
-            openPin = nil
-            composing = false
-        }
-    }
-
     /// The selected project's pinned page (#159) open in the chat's place, by its path in
-    /// the project: a fourth sibling of `selection`, `openWorkflow` and `openDashboard`.
+    /// the project: a third sibling of `selection` and `openWorkflow`.
     var openPin: String? {
         didSet {
             guard openPin != nil else { return }
             selection = nil
             openWorkflow = nil
-            openDashboard = false
             composing = false
         }
     }
 
-    /// A project's pinned page, from its row or a page tile's Open.
+    /// A project's pinned page, from its row.
     func showPin(_ path: String, in key: ProjectKey) {
         showsSpending = false
         showsResources = false
@@ -1094,77 +1081,6 @@ final class AppModel {
         }
     }
 
-    // MARK: Dashboard (074)
-
-    func dashboardSummary(in folder: URL?) -> DashboardSummary? { work.dashboardSummary(in: folder) }
-    func dashboard(in folder: URL?) -> DashboardSnapshot? { folder.flatMap { work.dashboards[Project.standardize($0)] } }
-    func dashboardRevision(in folder: URL?) -> Int { work.dashboardRevision(in: folder) }
-
-    func refreshDashboardSummaries() async {
-        guard let listed = try? await client.call(DaemonAPI.Method.dashboardSummaries, DaemonAPI.Empty(),
-                                                  returning: [DashboardSummary].self) else { return }
-        work.replaceDashboardSummaries(listed)
-    }
-
-    /// The order writes and fetches of each Dashboard, kept in step (#176).
-    @ObservationIgnored private var dashboardOrders = DashboardOrderSync()
-
-    /// A project's Dashboard, asked of its own host when its page opens and again on
-    /// each `dashboard/changed` for it. A reply older than one already shown is dropped.
-    func refreshDashboard(_ folder: URL, on host: HostID) async {
-        let ticket = dashboardOrders.beginFetch(in: folder)
-        guard let snapshot = try? await client(for: host).call(DaemonAPI.Method.dashboardGet,
-                                                               DaemonAPI.DashboardRequest(folder: folder),
-                                                               returning: DashboardSnapshot.self),
-              let shown = dashboardOrders.accept(snapshot, ticket: ticket) else { return }
-        work.store(shown)
-    }
-
-    /// Hide, Show or Remove a tile: the person's, from any client (FR-027 to FR-029).
-    func actOnTile(_ method: String, folder: URL, on host: HostID, id: String) async {
-        await attempt(on: host) {
-            try await self.client(for: host).call(method, DaemonAPI.TileRequest(folder: folder, id: id))
-        }
-        await refreshDashboard(folder, on: host)
-    }
-
-    /// Update now (#146): the project's dashboard workflow, or a one-off agent. A refusal
-    /// (running, cooling down, waiting for approval) is said, as Run now's is.
-    func updateDashboard(_ folder: URL, on host: HostID) async {
-        await attempt(on: host) {
-            try await self.client(for: host).call(DaemonAPI.Method.dashboardUpdate,
-                                                  DaemonAPI.DashboardRequest(folder: folder))
-        }
-        await refreshDashboard(folder, on: host)
-    }
-
-    /// A drop or a Move menu item (#147): shown at once, then the whole order sent. One
-    /// send at a time, the newest order next, so the host ends with the last drop (#176).
-    func arrangeDashboard(_ order: DashboardOrder, folder: URL, on host: HostID) async {
-        if var snapshot = dashboard(in: folder) {
-            snapshot.order = order
-            work.store(snapshot)
-        }
-        guard dashboardOrders.arrange(order, in: folder) else { return }
-        while let next = dashboardOrders.takeUnsent(in: folder) {
-            await attempt(on: host) {
-                try await self.client(for: host).call(DaemonAPI.Method.dashboardArrange,
-                                                      DaemonAPI.ArrangeRequest(folder: folder, order: next))
-            }
-        }
-        await refreshDashboard(folder, on: host)
-    }
-
-    /// A tile's keeper: its session, or its workflow's page (FR-030).
-    func openKeeper(_ keeper: KeeperView, folder: URL) {
-        switch keeper.kind {
-        case .agent:
-            if let id = UUID(uuidString: keeper.id) { openAgent(id) }
-        case .workflow:
-            showWorkflow(folder: folder, workflowID: keeper.id)
-        }
-    }
-
     /// A project's plugins, asked for when its page opens; kept current after that by
     /// `plugins/changed`.
     func plugins(in folder: URL?) -> [ProjectPlugin] { work.plugins(in: folder) }
@@ -1661,8 +1577,7 @@ final class AppModel {
     }
 
     /// Pick a project when there is none, or when the one we had has gone or been
-    /// archived. Falls back to the most recently active, which is what the sidebar
-    /// puts at the top.
+    /// archived. Falls back to what the sidebar puts at the top.
     private func settleProjectSelection() {
         let live = liveProjects
         if let selectedProjectKey, live.contains(where: { $0.key == selectedProjectKey }) { return }
@@ -2393,7 +2308,6 @@ final class AppModel {
         async let runtimes: Void = refreshRuntimes()
         async let accounts: Void = refreshAccounts()
         async let workflows: Void = refreshWorkflows()
-        async let dashboards: Void = refreshDashboardSummaries()
         async let pinned: Void = refreshPins()
         async let permissions: Void = refreshPermissions()
         async let elicitations: Void = refreshElicitations()
@@ -2413,7 +2327,7 @@ final class AppModel {
         async let events: Void = refreshEvents()
         async let modes: Void = refreshModes()
         async let transcript: Void = loadTranscript()
-        _ = await (runtimes, accounts, workflows, dashboards, pinned, permissions,
+        _ = await (runtimes, accounts, workflows, pinned, permissions,
                    elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
                    transcript, runtimeStates, sandbox, person, disk, storeNotes)
         #if DEBUG
@@ -3199,6 +3113,7 @@ final class AppModel {
             }
             // Gone to, as the phone does: what you just asked for is what you want to
             // see start. Once the list has it, so the chat opens on a row that is there.
+            justStarted = id
             selection = id
             draftSandboxRefusal = nil
             return true
@@ -3300,6 +3215,7 @@ final class AppModel {
                 DaemonAPI.StartRequest(runtimeID: runtimeID, cwd: folder, prompt: words,
                                        labels: labels),
                 returning: UUID.self)
+            self.justStarted = id
             self.selection = id
         }
     }

@@ -43,6 +43,15 @@ public struct SidebarProjectFold {
 
     public var isSearching: Bool { !query.isEmpty }
 
+    /// Whether the project's rows are open, by hand or by a search. Folded, it holds no
+    /// rows at all, not even the ones that need nothing filed (#356): `NSOutlineView`
+    /// does not follow the children of an item it has not expanded, so a row that came or
+    /// went under a folded project (an Archived fold appearing as a session is archived,
+    /// a pinned page, "No sessions yet") left its count apart from SwiftUI's. The next
+    /// update then threw (#237), and Apple Intelligence reading the list asked for a row
+    /// SwiftUI no longer had, which is a crash.
+    public let isUnfolded: Bool
+
     /// Whether the project is drawn at all: always, unless a search found nothing in it.
     public var isShown: Bool {
         !isSearching || nameMatches || !pinned.isEmpty || !groups.isEmpty || !archived.isEmpty
@@ -66,10 +75,17 @@ public struct SidebarProjectFold {
         isSearching ? nil : RetirementWords.retiredLine(summary?.retiredCount)
     }
 
-    /// Whether the project has an Archived fold to draw.
+    /// Whether the project has an Archived fold to draw: never while it is folded.
     public func showsArchivedFold(_ summary: DaemonAPI.ProjectSummary?) -> Bool {
-        archivedCount(summary) > 0 || retiredLine(summary) != nil
+        isUnfolded && (archivedCount(summary) > 0 || retiredLine(summary) != nil)
     }
+
+    /// Whether the project's pinned pages (#159) go first: unfolded, and not while
+    /// searching, since the search is for sessions.
+    public var showsPinnedPages: Bool { isUnfolded && !isSearching }
+
+    /// Whether the fold says it has no sessions yet: unfolded, with none that is live.
+    public var showsNoSessions: Bool { isUnfolded && !isSearching && !hasLive }
 
     /// The archived rows to draw: a page with no search, the first few matches until Show
     /// all with one.
@@ -86,8 +102,9 @@ public struct SidebarProjectFold {
         let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
         self.query = words
         let matcher = words.isEmpty ? nil : SessionLabelQuery(words)
+        isUnfolded = isOpen || matcher != nil
         if matcher != nil { nameMatches = label.localizedCaseInsensitiveContains(words) }
-        guard isOpen || matcher != nil else { return }
+        guard isUnfolded else { return }
         let held = work.workflows(in: key.folder)
         let workflows = matcher.map { held.filter($0.matches) } ?? held
         self.workflows = workflows.filter { !$0.isArchived }
@@ -113,9 +130,19 @@ public struct SidebarProjectFold {
 }
 
 /// The order the sidebar lists projects in: this Mac's, then each server's in the order
-/// the hosts are listed (#145). No headings for hosts: a server's project carries its
-/// server's name.
+/// the hosts are listed (#145), each host's oldest added first (#357). No headings for
+/// hosts: a server's project carries its server's name.
 public enum SidebarOrder {
+    /// Oldest added first, then by folder, so a row stays where it is however busy its
+    /// project is and a new project lands at the end (#357). Ordered by activity, every
+    /// `project/changed` moved a project to the top under the pointer. The web's
+    /// `byAdded` is the same.
+    public static func byAdded(_ a: DaemonAPI.ProjectSummary, _ b: DaemonAPI.ProjectSummary) -> Bool {
+        if a.project.addedAt != b.project.addedAt { return a.project.addedAt < b.project.addedAt }
+        if a.folder.path != b.folder.path { return a.folder.path < b.folder.path }
+        return a.host.rawValue < b.host.rawValue
+    }
+
     public static func projects(_ live: [DaemonAPI.ProjectSummary], servers: [HostID]) -> [DaemonAPI.ProjectSummary] {
         live.filter { $0.host == .mac } + servers.flatMap { host in live.filter { $0.host == host } }
     }

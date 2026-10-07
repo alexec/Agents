@@ -236,8 +236,8 @@ struct WorkflowMark: View {
     }
 }
 
-/// A project's pinned pages (#159), first in its fold, right under the row that opens its
-/// Dashboard. A long press moves or unpins one; in the list's edit mode they drag.
+/// A project's pinned pages (#159), first in its fold, right under the project's row. A long
+/// press moves or unpins one; in the list's edit mode they drag.
 struct PinnedPageRows: View {
     @Environment(RemoteModel.self) private var model
     let project: ProjectKey

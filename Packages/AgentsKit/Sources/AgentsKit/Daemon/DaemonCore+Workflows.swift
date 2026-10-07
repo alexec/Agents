@@ -88,7 +88,7 @@ extension DaemonCore {
 
 
     /// One watch per project, rooted at the project rather than at its workflow
-    /// folder, and the only one the project has (#173): workflows, the Dashboard,
+    /// folder, and the only one the project has (#173): workflows,
     /// `project.json`, pins and branch tips all come through it.
     ///
     /// Watching the leaf would be cheaper per event and wrong at the only boundary that
@@ -154,7 +154,7 @@ extension DaemonCore {
 
     /// Folders under a project whose changes nobody here reads: lane worktrees, git's
     /// objects, and build output and packages at the top and one level down (#173).
-    /// One holding a pinned page or a page tile stays watched, so the page stays live.
+    /// One holding a pinned page stays watched, so the page stays live.
     /// All of them, in the order they matter: FSEvents takes the first eight, the
     /// worktrees always among them, and the watch drops the rest itself (#216).
     func projectWatchExclusions(_ folder: URL) -> [URL] {
@@ -225,7 +225,7 @@ extension DaemonCore {
         refreshProjectWatchIfNeeded(folder)
     }
 
-    /// A pin or page tile came or went: if the folders left out of the watch should
+    /// A pin came or went: if the folders left out of the watch should
     /// change with it, the watch starts again without them.
     func refreshProjectWatchIfNeeded(_ folder: URL) {
         let standardized = Project.standardize(folder)
@@ -241,7 +241,7 @@ extension DaemonCore {
     /// Something changed under a project, worktrees and build output already left out.
     ///
     /// Several times a second while an agent edits in the main checkout, so what it costs
-    /// is bounded (#216): the pins and tiles are read again only when their own folders
+    /// is bounded (#216): the pins are read again only when their own folder
     /// changed, and the folders left out are looked at again only when the top level, a
     /// folder just under it, or the pages changed — at most once a second.
     func projectFilesChanged(_ changed: [URL], in folder: URL) {
@@ -249,7 +249,7 @@ extension DaemonCore {
         // Whatever moved, the folder is looked at again before a list says it is there.
         folderExistence[folder] = nil
         forgetProjectFileCaches(changed, in: folder)
-        // Pinned pages and page tiles (#159) can be anywhere in the project.
+        // Pinned pages (#159) can be anywhere in the project.
         pinFilesChanged(changed, in: folder)
         if branchFolders.contains(folder), changed.contains(where: Self.isBranchPath) {
             scheduleBranchCheck(in: folder)
@@ -269,14 +269,12 @@ extension DaemonCore {
         if own.contains(where: { $0.path == agents || $0.path.hasPrefix(workflowsFolder) }) {
             scheduleWorkflowRescan(in: folder)
         }
-        // A pin or page tile may have moved into a folder the watch leaves out.
+        // A pin may have moved into a folder the watch leaves out.
         let pages = pagePaths(folder)
         if pages != projectWatchPages[folder] {
             projectWatchPages[folder] = pages
             scheduleExclusionCheck(folder, near: [Self.pagesMoved])
         }
-        // The Dashboard's tile files, changed by hand or by a pull (074).
-        dashboardFilesChanged(own, in: folder)
         // And the project's own settings file (#126).
         projectConfigFilesChanged(own, in: folder)
     }
@@ -287,7 +285,6 @@ extension DaemonCore {
         projectWatches.removeAll()
         projectWatchExclusions.removeAll()
         folderExistence.removeAll()
-        dashboardSummaryCache.removeAll()
         projectWatchTopLevel.removeAll()
         projectWatchPages.removeAll()
         for (_, check) in projectExclusionChecks { check.cancel() }
@@ -320,7 +317,6 @@ extension DaemonCore {
         projectWatches.removeValue(forKey: standardized)?.stop()
         projectWatchExclusions.removeValue(forKey: standardized)
         folderExistence[standardized] = nil
-        dashboardSummaryCache[standardized] = nil
         projectWatchTopLevel.removeValue(forKey: standardized)
         projectWatchPages.removeValue(forKey: standardized)
         projectExclusionChecks.removeValue(forKey: standardized)?.cancel()
@@ -1210,8 +1206,6 @@ extension DaemonCore {
         persistWorkflowRuns()
         if let workflow = workflow(run.workflowID, in: run.folder) {
             announceWorkflow(workflow)
-            // Update now's line (#146) says the run is over.
-            if workflow.settings.labels.contains(DashboardUpdate.label) { dashboardChanged(workflow.folder) }
         }
 
         let folder = Project.standardize(run.folder)

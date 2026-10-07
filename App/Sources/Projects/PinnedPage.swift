@@ -69,7 +69,7 @@ struct PinnedPage: View {
                 Button("Unpin") { Task { await model.unpin(path, in: project) } }
                     .buttonStyle(.paper)
             } else {
-                // Opened from a page tile, and not pinned yet.
+                // Unpinned while open: it can be pinned again.
                 Button("Pin to Project") { Task { await model.pin(path, in: project) } }
                     .buttonStyle(.paper)
                     .disabled(model.pins(in: project.folder).count >= PinLimits.perProject || problem != nil)
@@ -215,87 +215,6 @@ final class PagePictures {
             let fresh = Held(stamp: stamp, image: nil)
             held.set(fresh, for: url)
             return fresh
-        }
-    }
-}
-
-/// A page tile's page (#159): the project's document or HTML page drawn live on the
-/// Dashboard, read-only, the top of it, with Open for the whole of it in the chat's place.
-struct PageTileBody: View {
-    @Environment(AppModel.self) private var model
-    let project: ProjectKey
-    let file: String
-
-    @State private var text: String?
-    @State private var stamp: FileStamp?
-    @State private var problem: String?
-
-    /// As tall as a third of a typical window: enough to read, not so much that it buries
-    /// the tiles under it.
-    static let height: CGFloat = 300
-
-    private var url: URL { project.folder.appending(path: file) }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Group {
-                if let problem {
-                    Label(problem, systemImage: "exclamationmark.triangle")
-                        .appText(.supporting)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                } else if let text {
-                    if PinRules.kind(file) == .html {
-                        HTMLPage(text: text, path: url.path(percentEncoded: false),
-                                 scope: HTMLPageScope(root: project.folder.path(percentEncoded: false)),
-                                 allowsScripts: false, folderEvent: model.pageRevision(in: project.folder),
-                                 read: { [model, project] path in try await model.readPage(path, in: project) },
-                                 follow: { _ in })
-                    } else {
-                        // Read-only, as a note is: a live page that can't be typed on draws
-                        // its passages as disabled controls, greyed.
-                        MarkdownText(markdown: text, base: url)
-                            .appText(.supporting)
-                    }
-                } else {
-                    ProgressView().controlSize(.small)
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: problem == nil ? Self.height : nil,
-                   maxHeight: problem == nil ? Self.height : nil, alignment: .top)
-            .clipped()
-            HStack {
-                Text(file)
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Spacer()
-                Button("Open") { model.showPin(file, in: project) }
-                    .buttonStyle(.link)
-                    .appText(.fine)
-            }
-        }
-        .task(id: model.pageRevision(in: project.folder)) { await load() }
-    }
-
-    private func load() async {
-        do {
-            switch try await model.readPage(file, in: project, known: stamp) {
-            case .text(let read, _, _, let at):
-                text = read
-                stamp = at
-                problem = nil
-            case .unchanged:
-                break
-            case .image, .other:
-                problem = "\(file) can't be shown as a page."
-            }
-        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.fileGone {
-            problem = "\(file) isn't in the project folder."
-            stamp = nil
-        } catch {
-            problem = "\(file) can't be read."
         }
     }
 }

@@ -100,7 +100,7 @@ struct AppViewShowAsk: View {
 }
 
 /// A view filling the page it was opened on (#188). No way back to a chat: this page is the
-/// destination, as the project's Dashboard is.
+/// destination, as a pinned view's is.
 struct AppViewPage: View {
     let host: AppViewHost
     @Environment(\.colorScheme) private var scheme
