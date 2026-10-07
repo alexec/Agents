@@ -214,10 +214,7 @@ extension DaemonCore {
             // Returning is not the same as sending. A limit holds the queue, and a stop
             // that landed while the runtime started hands it back unsent; either way our
             // words about this minute are still there, and are not ones to keep.
-            if !stillHasItsFirstWords, var agent = agents[id],
-               agent.queuedPrompts.contains(where: { $0.text == text }) {
-                agent.queuedPrompts.removeAll { $0.text == text }
-                changed(agent)
+            if !stillHasItsFirstWords, forgetRestartWords(text, on: id) {
                 DaemonLog.shared.write("did not pick agent \(id) back up: held or stopped before it went")
                 return
             }
@@ -230,10 +227,7 @@ extension DaemonCore {
             // Only our own words. What the person typed stays where it is — it was
             // never about this minute, and losing it is the thing this whole path
             // exists to prevent.
-            if !stillHasItsFirstWords, var agent = agents[id] {
-                agent.queuedPrompts.removeAll { $0.text == text }
-                changed(agent)
-            }
+            if !stillHasItsFirstWords { forgetRestartWords(text, on: id) }
             await record(.runtimeNote("Could not pick this agent back up: \(why) Send it a message to pick it up yourself."),
                          for: id)
             DaemonLog.shared.write("could not pick agent \(id) back up: \(why)")
@@ -245,6 +239,27 @@ extension DaemonCore {
     /// In brackets and in the app's voice, the way a workflow says why it started
     /// something: it is the app talking, not the user, and an agent reading its own
     /// history back should be able to tell which.
+    /// Our words about the restart, out of the queue again; whether they were there.
+    ///
+    /// On their own, or at the head of the person's words they were sent with (#346)
+    /// and handed back by a stop: then only ours come off, and theirs stay.
+    @discardableResult
+    private func forgetRestartWords(_ text: String, on id: UUID) -> Bool {
+        guard var agent = agents[id] else { return false }
+        var found = false
+        agent.queuedPrompts.removeAll {
+            guard $0.text == text else { return false }
+            found = true
+            return true
+        }
+        for index in agent.queuedPrompts.indices where agent.queuedPrompts[index].text.hasPrefix(text + "\n\n") {
+            agent.queuedPrompts[index].text.removeFirst(text.count + 2)
+            found = true
+        }
+        if found { changed(agent) }
+        return found
+    }
+
     static func wordsAboutTheRestart(_ was: AgentState) -> String {
         switch was {
         case .starting:
