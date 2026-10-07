@@ -62,6 +62,7 @@ const eventMeanings: Record<string, string> = {
   "agent.parked": "An agent in this project was parked: put down to come back to",
   "agent.archived": "An agent in this project was archived",
   "agent.retired": "An archived agent was retired and its conversation deleted",
+  "project.idle": "Every agent in this project has stopped working",
   "workflow.ran": "A workflow in this project started an agent",
   "workflow.completed": "A workflow's run in this project finished",
   "workflow.refused": "A workflow in this project did not run, and why",
@@ -227,6 +228,10 @@ const catalogue: Record<string, { scope: "mac" | "project" | "either"; details: 
   "agent.parked": { scope: "project", details: ["agent", "outcome", ...context] },
   "agent.archived": { scope: "project", details: ["agent", "by", "outcome", ...context] },
   "agent.retired": { scope: "project", details: ["agent", "because", ...context] },
+  "project.idle": {
+    scope: "project",
+    details: ["agents", "finished", "blocked", "waiting_on_you", "stopped", "failed", "since", "ids"],
+  },
   "workflow.ran": { scope: "project", details: ["workflow", "agent"] },
   "workflow.completed": { scope: "project", details: ["workflow", "agent", "outcome"] },
   "workflow.refused": { scope: "project", details: ["workflow", "reason"] },
@@ -399,7 +404,7 @@ export function triggerGlyph(trigger: WorkflowTriggerStored): string {
   if (!("unrecognised" in trigger)) return "●";
   if (!isEvent(trigger)) return "?";
   const subject = trigger.unrecognised.name.split(".")[0];
-  return subject === "agent" ? "●" : subject === "workflow" ? "⟳" : subject === "branch" ? "⎇" : subject === "custom" ? "✦" : "⌘";
+  return subject === "agent" || subject === "project" ? "●" : subject === "workflow" ? "⟳" : subject === "branch" ? "⎇" : subject === "custom" ? "✦" : "⌘";
 }
 
 const named = new Intl.RelativeTimeFormat("en", { numeric: "auto" });

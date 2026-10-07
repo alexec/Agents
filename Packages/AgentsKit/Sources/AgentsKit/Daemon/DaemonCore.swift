@@ -297,6 +297,10 @@ public actor DaemonCore {
     /// Each project's `.agents/project.json` disk space lines as last read (#195), as
     /// `projectConfigCache` holds its helper limits.
     var diskSpaceConfigCache: [URL: DiskThresholds?] = [:]
+    /// Each project's agents since it was last quiet, for `project.idle` (#360).
+    var busyPeriods: [URL: BusyPeriod] = [:]
+    /// How long a project must stay quiet before `project.idle` is raised.
+    var projectIdleSettle: Duration = .seconds(60)
     /// The once-a-minute look at the volumes (#195). Nil until started.
     var diskTicker: Task<Void, Never>?
     /// A look asked for by a lease given back or a wake, so a burst makes one.
@@ -1282,6 +1286,8 @@ public actor DaemonCore {
         // this is the one place every state change passes through. Cheap, and it says
         // nothing unless something changed (021, FR-002).
         reconsider()
+        // And whether that was the last agent working in its project (#360).
+        watchForIdle(in: agent.projectFolder)
     }
 
     // MARK: Reading

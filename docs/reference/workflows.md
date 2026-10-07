@@ -90,6 +90,22 @@ agent: new
 Write up what the agent that set this off changed, for the release notes.
 ```
 
+To run a check once a batch of agents is done, rather than after each one, use
+`project.idle`. It runs once the last agent in the project has stopped, and its own agent
+finishing does not set it off again:
+
+```markdown
+---
+name: Check the batch
+on:
+  - project.idle
+agent: new
+---
+
+Every agent here has stopped. For each agent in the event's ids, check that what it said it
+did landed: its branch merged, its checks green. Remove worktrees whose branch is on main.
+```
+
 A `new` or `standing` run set off by an event no agent is behind, such as `mac.disk_low`,
 is told the event at the end of its prompt: its sentence and every detail, so the agent can
 act on `level: critical` without looking it up.
