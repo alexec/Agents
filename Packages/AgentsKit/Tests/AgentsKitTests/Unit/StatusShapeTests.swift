@@ -78,10 +78,12 @@ struct StatusShapeTests {
 
     @Test("Every state lands on exactly one of the four")
     func total() {
-        let shapes = Set(AgentState.allCases.map {
+        // Queued waits by itself for a place (#362); every other state lands on the four.
+        let shapes = Set(AgentState.allCases.filter { $0 != .queued }.map {
             StatusShape(state: $0, outcome: nil, isWaiting: false, isComingBack: false)
         })
         #expect(shapes.isSubset(of: [.working, .needsYou, .done, .stopped]))
+        #expect(StatusShape(state: .queued, outcome: nil, isWaiting: false, isComingBack: false) == .waiting)
         #expect(Set([StatusShape.needsYou, .waiting, .done, .stopped].compactMap(\.symbol)).count == 4)
     }
 }

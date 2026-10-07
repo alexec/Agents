@@ -1235,6 +1235,15 @@ public final class AgentsModel {
             + [block.checkAgainLine()].compactMap { $0 }
     }
 
+    /// What a queued helper's row says in its report's place (#362): "Queued, 2nd", its
+    /// place in its project's queue. Nil for any other agent. Queued agents are under
+    /// Waiting, so only that group is counted.
+    public func queuedLine(_ agent: Agent) -> String? {
+        guard agent.state == .queued else { return nil }
+        let position = HelperLimit.queuePosition(of: agent, among: agents(in: agent.projectFolder, group: .waiting))
+        return HelperLimit.queuedLabel(position: position)
+    }
+
     /// The name of the button that ends a block by hand.
     public static let carryOnLabel = "Carry on"
 
@@ -1251,7 +1260,8 @@ public final class AgentsModel {
     public func canStop(_ agent: Agent) -> Bool {
         // A blocked chat too (039): it holds nothing, but a resume is coming, and Stop
         // is how the person calls it off.
-        agent.state.holdsRuntime || isComingBack(agent) || openBlock(agent) != nil
+        // And a queued one (#362): Stop takes it off the queue.
+        agent.state.holdsRuntime || agent.state == .queued || isComingBack(agent) || openBlock(agent) != nil
     }
 
     /// The one thing every client says about a chat on its way back, so the window

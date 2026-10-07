@@ -415,7 +415,9 @@ final class RemoteModel {
     /// What the sidebar has picked (#226), the Mac's one value for it: the first of what is
     /// open over the project — a pinned page, a workflow, a chat — and what
     /// was opened from that is pushed over it in the detail. A project chosen with nothing
-    /// open over it starts a new session in it, as the Mac's project row does (#366).
+    /// open over it starts a new session in it, as the Mac's New session row does (#375):
+    /// only that row and the project's New Session (long press, swipe) choose it so; a
+    /// tap on the project's own row only folds it.
     var sidebarItem: SidebarItem? {
         get {
             if let openActivity { return openActivity }
@@ -947,6 +949,7 @@ final class RemoteModel {
     /// Whether the menu offers Stop: the same answer the Mac gives.
     func canStop(_ agent: Agent) -> Bool { work.canStop(agent) }
     func blockLines(_ agent: Agent) -> [String] { work.blockLines(agent) }
+    func queuedLine(_ agent: Agent) -> String? { work.queuedLine(agent) }
     func isBlocked(_ agent: Agent) -> Bool { work.openBlock(agent) != nil }
     /// End a block by hand (039), as the person. See the Mac's `carryOn`.
     func carryOn(_ agentID: UUID) async { _ = await send(Block.carryOnPrompt, to: agentID) }

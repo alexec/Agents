@@ -1451,6 +1451,41 @@
   },
   {
     "expected" : {
+      "shape" : "waiting",
+      "symbol" : "hourglass.circle",
+      "tinted" : false,
+      "words" : "Queued"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000037",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "queued",
+        "title" : "Session 37"
+      },
+      "isComingBack" : false
+    },
+    "name" : "queued for a place (#362)"
+  },
+  {
+    "expected" : {
       "shape" : "working",
       "symbol" : null,
       "tinted" : false,

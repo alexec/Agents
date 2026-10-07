@@ -53,6 +53,8 @@ public enum StatusShape: Hashable, Sendable {
         case .stopped where ![.cancelled, .stoppedByAgent, .allowanceSpent].contains(endedReason):
             self = .needsYou
         case .stopped, .archived: self = .stopped
+        // Starts by itself when a place frees (#362).
+        case .queued: self = .waiting
         }
     }
 
@@ -100,6 +102,7 @@ public extension StatusShape {
         if isComingBack { return AgentsModel.comingBackDescription }
         if isUnread && state == .finished { return "Unread · \(outcome?.heading ?? "Finished")" }
         if isWaitingForAllowance { return "Waiting for an allowance" }
+        if state == .queued { return HelperLimit.queuedLabel(position: nil) }
         if shape == .waiting { return waitingLabel }
         if state == .finished, let outcome { return outcome.heading }
         if isUnaccountedFor && state == .finished { return "Finished without saying how it went" }
@@ -110,6 +113,7 @@ public extension StatusShape {
         case .finished: return "Finished"
         case .stopped: return ending ?? "Stopped"
         case .archived: return "Archived"
+        case .queued: return HelperLimit.queuedLabel(position: nil)
         }
     }
 

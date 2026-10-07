@@ -93,6 +93,8 @@ export function groupOf(agent: Agent, wantsEyes = false): AgentGroup {
       // The daemon never sends allowanceWait, so the Mac's "waiting for an allowance" arm is absent.
       return pausedEndings.includes(agent.endedReason) ? "stopped" : "needsAttention";
     case "archived": return "archived";
+    // Starts by itself when a place frees (#362): nobody has to do anything.
+    case "queued": return "waiting";
   }
 }
 

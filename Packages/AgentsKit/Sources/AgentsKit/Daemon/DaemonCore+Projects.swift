@@ -440,6 +440,8 @@ extension DaemonCore {
                                message: "\(standardized.path) is not a project.")
         }
         sendProject(summary)
+        // A raised limit may make room for what is queued (#362).
+        checkQueueSoon(in: standardized)
         return summary
     }
 

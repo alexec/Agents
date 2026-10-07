@@ -215,6 +215,8 @@ public final class Daemon: @unchecked Sendable {
         // And the waits on events (042): a wake queued and never sent goes now, and a
         // deadline that passed while nothing ran ends now.
         await core.resumeEventWaitsAfterRestart()
+        // Helpers queued before the restart (#362), behind the ones coming back.
+        await core.checkEveryQueue()
         // The Mac and the person, as events (042). Only in the real daemon; a test
         // hands the core a fake.
         await core.startWatchingMachine()

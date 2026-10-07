@@ -44,6 +44,14 @@ public actor DaemonCore {
     /// has to see the first's place as taken. In memory only: a start does not
     /// survive a restart, so neither does its reservation.
     var reservedStarts: [URL: Int] = [:]
+    /// Queue places taken by starts still being written down as queued (#362), by
+    /// project: held as `reservedStarts` is, so two starts arriving together cannot
+    /// both take the queue's last place.
+    var reservedQueue: [URL: Int] = [:]
+    /// Projects whose queue is to be looked at once the current call is done (#362).
+    var queueChecks: Set<URL> = []
+    /// Queued helpers being started now, so a second look at the queue passes them by.
+    var startingFromQueue: Set<UUID> = []
     /// Worktree names chosen by starts that have not finished making them, as
     /// `<worktrees folder>/<name>` (030). Held the same way and for the same reason as
     /// `reservedStarts`: two starts from the same words must not both take one name.
@@ -1035,6 +1043,12 @@ public actor DaemonCore {
         // `reviseWakefulness` compares before acting and returns doing nothing when
         // nothing has moved (024 FR-001, FR-004).
         reviseWakefulness()
+        // A helper that holds no running place now may have freed one for the queue
+        // (#362). Not on a working one's tokens: it frees nothing until it stops.
+        if agent.startedByAgent != nil, !HelperLimit.isRunning(agent),
+           agents.inProject(agent.projectFolder).contains(where: { $0.state == .queued }) {
+            checkQueueSoon(in: agent.projectFolder)
+        }
     }
 
     /// `agent/changed`, lean (#203): every connection is told what a row needs, not the
@@ -1178,7 +1192,7 @@ public actor DaemonCore {
         case .archived:
             agent.parking = nil
             agent.afterTurn = nil
-        case .starting, .running, .waitingOnUser:
+        case .starting, .running, .waitingOnUser, .queued:
             break
         }
         // When it was archived is when the time it is kept starts (051). Archiving again
@@ -1253,7 +1267,7 @@ public actor DaemonCore {
         // An agent that has started has neither finished nor stopped, so it fires
         // nothing. Named rather than folded in with `.running`, because it is not
         // running — it is about to be.
-        case .starting, .waitingOnUser, .running, .archived:
+        case .starting, .waitingOnUser, .running, .archived, .queued:
             break
         }
         // Put away (#96), after the ending it came with, so a wait hears the finish first.

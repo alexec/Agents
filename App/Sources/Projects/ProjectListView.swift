@@ -228,6 +228,9 @@ struct ProjectListView: View {
             folds.set(key, open: true)
         } else if case .pin(_, let key) = item {
             folds.set(key, open: true)
+        } else if case .project(let key) = item {
+            // A new session, from ⌘N or a menu: its row is in the fold.
+            folds.set(key, open: true)
         }
         if picked.count <= 1 || !picked.contains(item) { picked = [item] }
     }
@@ -309,6 +312,9 @@ private struct ProjectFold: View {
                 get: { isOpen },
                 set: { folds.set(key, open: $0) })) {
                 // Folded, nothing at all is under the row (#356): see `isUnfolded`.
+                // First, where a session starts (#375): the project's own row only folds.
+                NewSessionSidebarRow(project: key)
+                    .disabled(model.hostUnreachable(summary.host))
                 // The project's pinned pages (#159), before its sessions. Not while
                 // searching: the search is for sessions.
                 if fold.showsPinnedPages {
@@ -331,9 +337,8 @@ private struct ProjectFold: View {
                 ProjectWorkflowRows(fold: fold, folds: folds)
             } label: {
                 ProjectRow(summary: summary, label: label, isFolded: !isOpen) {
-                    // A search holds every match open; the click still starts a session.
+                    // A search holds every match open.
                     if !fold.isSearching { folds.set(key, open: !isOpen) }
-                    requests.focusPrompt()
                 }
                     .appText(.supporting)
                     // As tall as its one or two lines and a little air (#104).
@@ -341,10 +346,8 @@ private struct ProjectFold: View {
                     // Last known, not current: the server is not answering (037).
                     .foregroundStyle(model.hostUnreachable(summary.host) ? .secondary : .primary)
                     .contextMenu { ProjectMenu(summary: summary) }
-                    .sidebarInk(.project(key))
-                    // On the row, not the group: a group's tag goes to every untagged
-                    // row under it, and the subheadings would light with the project.
-                    .tag(SidebarItem.project(key))
+                    // No tag: the row is not something to open (#375). The project's
+                    // `.project` item is its New session row.
             }
         }
     }
@@ -443,6 +446,39 @@ private struct ProjectFold: View {
                 }
             }
         }
+    }
+}
+
+/// The first row under an unfolded project (#375): a new session in it, as ⌘N and the
+/// project menu's New Session start one. It carries the project's own item, which the
+/// sidebar lights while that project's new session is open.
+private struct NewSessionSidebarRow: View {
+    @Environment(AppModel.self) private var model
+    @Environment(WindowRequests.self) private var requests
+    let project: ProjectKey
+
+    var body: some View {
+        HStack(spacing: 6) {
+            // Plain text beside a plain image, as the pinned pages have it (#155).
+            Image(systemName: "square.and.pencil")
+                .foregroundStyle(.secondary)
+                .frame(width: 16)
+                .accessibilityHidden(true)
+            Text("New session")
+                .lineLimit(1)
+            Spacer(minLength: 0)
+        }
+        .contentShape(Rectangle())
+        // Every click, not only a changed selection: the row may already be the lit one
+        // while the prompt has lost the keyboard. See `ProjectRow` before #375.
+        .simultaneousGesture(TapGesture().onEnded {
+            model.showProject(project)
+            requests.focusPrompt()
+        })
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("New session")
+        .sidebarInk(.project(project))
+        .tag(SidebarItem.project(project))
     }
 }
 

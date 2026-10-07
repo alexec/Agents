@@ -371,7 +371,8 @@ struct AgentsModelTests {
         model.setResuming([coming.id])
 
         for other in others {
-            #expect(model.canStop(other) == other.state.holdsRuntime, "\(other.state)")
+            // A queued one too (#362): Stop takes it off the queue.
+            #expect(model.canStop(other) == (other.state.holdsRuntime || other.state == .queued), "\(other.state)")
         }
         #expect(model.canStop(coming), "a chat on its way back can be stopped before it arrives")
         model.setResuming([])

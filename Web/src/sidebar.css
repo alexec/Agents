@@ -118,12 +118,13 @@
 .context-menu button { text-align: left; border: none; background: none; padding: 5px 10px; border-radius: var(--radius-control); }
 .context-menu button:hover:not(:disabled), .context-menu button:focus-visible { background: var(--paper-selection); outline: none; }
 
-/* A project's pinned pages (#159): a mark and a title, as a session's row is tall. */
-.row.pin { grid-template-columns: minmax(0, 1fr); padding: 0; }
-.row.pin .pick { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; column-gap: 8px; align-items: center;
+/* A project's pinned pages (#159), and its New session row above them (#375): a mark and a
+   title, as a session's row is tall. */
+.row.pin, .row.new-session { grid-template-columns: minmax(0, 1fr); padding: 0; }
+.row.pin .pick, .row.new-session .pick { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; column-gap: 8px; align-items: center;
   border: none; background: none; padding: 5px 8px; text-align: left; font: inherit; color: inherit; min-width: 0; }
-.row.pin .pin-mark { opacity: 0.55; text-align: center; }
-.row.pin .title { font-weight: 400; }
+.row.pin .pin-mark, .row.new-session .pin-mark { opacity: 0.55; text-align: center; }
+.row.pin .title, .row.new-session .title { font-weight: 400; }
 .row.pin.missing .title { opacity: 0.55; }
 .row.pin.dragging { opacity: 0.4; }
 .group.pins { margin-bottom: 2px; }

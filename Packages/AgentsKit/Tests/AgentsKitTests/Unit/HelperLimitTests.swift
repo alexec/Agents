@@ -146,4 +146,59 @@ struct HelperLimitTests {
     @Test func aStartUnderWayHoldsItsPlace() {
         #expect(HelperLimit.placesInUse(in: project, agents: [helper(.running)], reserved: 2) == 3)
     }
+
+    // MARK: The queue (#362)
+
+    @Test func aQueuedHelperHoldsNoPlaceAndIsNotRunning() {
+        let queued = helper(.queued)
+        #expect(!HelperLimit.isRunning(queued))
+        #expect(HelperLimit.placesInUse(in: project, agents: [queued, helper(.running)]) == 1)
+        #expect(HelperLimit.running(in: project, agents: [queued]) == 0)
+        #expect(queued.group(wantsEyes: false) == .waiting)
+        #expect(StatusShape(row: queued, isComingBack: false) == .waiting)
+        #expect(StatusShape.words(row: queued, isComingBack: false) == "Queued")
+    }
+
+    @Test func theQueueIsFirstInFirstOutWithinAProject() {
+        var older = helper(.queued)
+        older.createdAt = Date(timeIntervalSince1970: 100)
+        var newer = helper(.queued)
+        newer.createdAt = Date(timeIntervalSince1970: 200)
+        let elsewhere = helper(.queued, in: URL(filePath: "/tmp/somewhere-else"))
+        let agents = [newer, elsewhere, older, helper(.running)]
+        #expect(HelperLimit.queue(in: project, agents: agents).map(\.id) == [older.id, newer.id])
+        #expect(HelperLimit.queuePosition(of: older, among: agents) == 1)
+        #expect(HelperLimit.queuePosition(of: newer, among: agents) == 2)
+        #expect(HelperLimit.queuePosition(of: helper(.running), among: agents) == nil)
+    }
+
+    @Test func aQueuedRowSaysItsPlace() {
+        #expect(HelperLimit.queuedLabel(position: nil) == "Queued")
+        #expect(HelperLimit.queuedLabel(position: 1) == "Queued, 1st")
+        #expect(HelperLimit.queuedLabel(position: 2) == "Queued, 2nd")
+        #expect(HelperLimit.queuedLabel(position: 3) == "Queued, 3rd")
+        #expect(HelperLimit.queuedLabel(position: 11) == "Queued, 11th")
+        #expect(HelperLimit.queuedLabel(position: 22) == "Queued, 22nd")
+    }
+
+    @Test func theQueueLimitIsKeptWithinItsHardMaximum() {
+        #expect(HelperLimits().effectiveQueued == HelperLimit.defaultQueued)
+        #expect(HelperLimits(queued: 0).problem == "Queued helpers must be between 1 and 20.")
+        #expect(HelperLimits(queued: 21).problem != nil)
+        #expect(HelperLimits(queued: 20).problem == nil)
+        #expect(HelperLimits(queued: 99).effectiveQueued == HelperLimit.maximumQueued)
+        #expect(HelperLimits(queued: 2).orNilIfDefault == HelperLimits(queued: 2))
+    }
+
+    /// Stopping or archiving a queued one ends it with a reason, as any stop does; a
+    /// prompt waits with it rather than starting a turn.
+    @Test func aQueuedAgentsTransitions() {
+        #expect(AgentState.queued.applying(.stoppedByUser)?.next == .stopped)
+        #expect(AgentState.queued.applying(.stoppedByAgent)?.endedReason == .set(.stoppedByAgent))
+        #expect(AgentState.queued.applying(.couldNotStartFromQueue)?.next == .stopped)
+        #expect(AgentState.queued.applying(.promptSent) == nil)
+        #expect(AgentState.queued.applying(.turnBegun) == nil)
+        #expect(AgentState.running.applying(.couldNotStartFromQueue) == nil)
+        #expect(!AgentState.queued.holdsRuntime && !AgentState.queued.hasTurnInFlight)
+    }
 }

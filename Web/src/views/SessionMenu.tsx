@@ -24,6 +24,9 @@ export function sessionActions(agent: Agent, pinned?: boolean): { action: Action
   if (openBlock(agent)) found.push({ action: "carryOn", label: carryOnLabel, help: carryOnHelp(agent) });
   if (holds || (agent.state === "finished" && isOpenBlock(agent.report))) {
     found.push({ action: "agents/stop", label: "Stop", help: "Stop this session's turn" });
+  } else if (agent.state === "queued") {
+    // AgentsModel.canStop: Stop takes a queued helper off the queue (#362).
+    found.push({ action: "agents/stop", label: "Stop", help: "Take this agent off the queue" });
   }
   if (agent.parking) {
     found.push({ action: "agents/unpark", label: "Unpark",
