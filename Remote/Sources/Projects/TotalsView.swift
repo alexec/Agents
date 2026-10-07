@@ -68,7 +68,7 @@ struct TotalsView: View {
             .readableWidth()
         }
         .paperGround()
-        .navigationTitle("Spending")
+        .navigationTitle("Cost")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top, spacing: 0) { StaleBanner() }
         .markedStale(model.isStale)
