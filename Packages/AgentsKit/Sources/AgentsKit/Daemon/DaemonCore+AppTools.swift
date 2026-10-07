@@ -567,6 +567,7 @@ extension DaemonCore {
             case .person, nil: if !summary.isEnabled { line += " [turned off]" }
             }
             if summary.overLimit != nil { line += " [over the limit, so it will not run]" }
+            if let never = neverHere(summary.workflow) { line += " [\(never)]" }
             if let outcome = summary.lastOutcome { line += " — \(outcome.summary)" }
             return line
         }
@@ -642,6 +643,14 @@ extension DaemonCore {
         let detail = WorkflowSettings.refusalDetail(setting: setting, value: value,
                                                     offered: offered, runtime: name)
         return "But \(detail), so as it stands it will not run. Fix it with another write."
+    }
+
+    /// The triggers in it only a Mac raises, said on a Linux host, where they never
+    /// fire (#372). Not a refusal: the file may travel to a Mac.
+    private func neverHere(_ workflow: Workflow) -> String? {
+        guard !raisesMacOnlyEvents else { return nil }
+        let names = workflow.triggers.flatMap(\.patterns).map(\.name).filter(EventCatalogue.isMacOnly)
+        return names.isEmpty ? nil : EventWords.neverHere(names)
     }
 
     // MARK: Writing
@@ -736,7 +745,8 @@ extension DaemonCore {
         // that wrote it.
         let archived = isArchived
         rescanWorkflows(in: project)
-        let warning = unofferedWarning(for: parsed).map { " " + $0 } ?? ""
+        let warning = [neverHere(parsed), unofferedWarning(for: parsed)].compactMap { $0 }
+            .map { " " + $0 }.joined()
         let startsOff = exists ? "" : " It starts turned off (the app wrote `enabled: false` into it): once they have approved it, they turn it on from its page when they are ready, and you cannot."
         if archived {
             return """

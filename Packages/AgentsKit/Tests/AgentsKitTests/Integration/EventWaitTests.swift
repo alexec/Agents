@@ -296,6 +296,34 @@ struct EventWaitTests {
         #expect(try await call.value.hasPrefix("mac.wake happened at "))
     }
 
+    /// A Linux server has nothing that hears sleep, wake or the person (#372): a wait on
+    /// only those is refused, and one with something else as well is kept and told.
+    @Test func aServerRefusesAWaitOnlyAMacCouldAnswer() async throws {
+        let (locations, work, _) = try temporary()
+        let core = try await makeCore(locations, clock: Clock())
+        await core.actAsServer()
+        let (a, token) = try await agent(core, in: work, "Server")
+        let refused = await refusal { _ = try await wait(core, token, ["mac.wake", "person.*"]) }
+        #expect(refused?.code == DaemonAPI.Failure.eventRefused)
+        #expect(refused?.message == EventWords.neverHere(["mac.wake", "person.*"]) + " Nothing is waiting.")
+        #expect(await !isWaiting(core, a))
+
+        let call = Task { try await wait(core, token, ["custom.ping", "mac.wake"]) }
+        try await eventually("held") { await isHeld(core, a) }
+        await core.raise(draft("custom.ping", in: work))
+        let answer = try await call.value
+        #expect(answer.hasPrefix(EventWords.neverHere(["mac.wake"]) + " custom.ping happened at "), "\(answer)")
+    }
+
+    /// The disk events' old names still wait (#372).
+    @Test func anOldDiskNameWaitsOnTheNewOne() async throws {
+        let (locations, work, _) = try temporary()
+        let core = try await makeCore(locations, clock: Clock(), hold: .milliseconds(100))
+        let (a, token) = try await agent(core, in: work, "Old")
+        _ = try await wait(core, token, ["mac.disk_low"])
+        #expect(await core.agents[a]?.eventWait?.patterns == [EventPattern("machine.disk_low")])
+    }
+
     @Test func itIsNeverWokenByNewsOfItself() async throws {
         let (locations, work, _) = try temporary()
         let core = try await makeCore(locations, clock: Clock(), hold: .milliseconds(100))

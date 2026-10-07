@@ -1,7 +1,7 @@
 import Foundation
 import AgentsKitCore
 
-/// Free space on the volumes the app writes to (#195): `mac.disk_low` and `mac.disk_ok`,
+/// Free space on the volumes the app writes to (#195): `machine.disk_low` and `machine.disk_ok`,
 /// and the window's strip.
 ///
 /// On 2026-10-03 the Mac's disk filled with agents' worktrees, every agent then failed
@@ -143,7 +143,7 @@ extension DaemonCore {
         }
         if !named.isEmpty { details["worktrees"] = DiskSpace.worktreeWords(named) }
         let free = DiskSpace.words(reading.freeBytes)
-        raise(EventDraft(name: "mac.disk_low", at: now(), scope: .mac,
+        raise(EventDraft(name: "machine.disk_low", at: now(), scope: .mac,
                          sentence: alarm.level == .critical
                              ? "\(reading.volume) is almost full: \(free) free."
                              : "\(reading.volume) is running low: \(free) free.",
@@ -151,7 +151,7 @@ extension DaemonCore {
     }
 
     private func raiseDiskOK(_ reading: DiskReading, threshold: Int64) {
-        raise(EventDraft(name: "mac.disk_ok", at: now(), scope: .mac,
+        raise(EventDraft(name: "machine.disk_ok", at: now(), scope: .mac,
                          sentence: "\(reading.volume) has \(DiskSpace.words(reading.freeBytes)) free again.",
                          details: ["volume": reading.volume, "free_bytes": String(reading.freeBytes),
                                    "free_percent": String(reading.freePercent), "threshold": String(threshold)]))
