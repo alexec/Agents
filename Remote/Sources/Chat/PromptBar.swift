@@ -168,9 +168,10 @@ struct PromptBar: View {
                 .accessibilityLabel("What to say to \(agent.title ?? "this agent")")
                 // The Mac's keys, from an iPad's keyboard. SwiftUI hands these over from
                 // a hardware keyboard only, so the on-screen one is left as iOS has it:
-                // Return is a new line and Send is the button.
+                // Return is a new line and Send is the button. From a hardware keyboard,
+                // Return and Shift-Return send, and Option-Return is a new line (#377).
                 .onKeyPress(.return, phases: .down) { press in
-                    guard !press.modifiers.contains(.option) else { return .ignored }
+                    guard PromptReturn(option: press.modifiers.contains(.option)) == .send else { return .ignored }
                     if isCompleting || isMentioning { acceptSelected() } else { send() }
                     return .handled
                 }
