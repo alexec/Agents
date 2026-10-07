@@ -4,8 +4,11 @@ import SwiftUI
 // MARK: - F · Clients
 
 struct ControlClientsPage: View {
+    @Environment(AppModel.self) private var model
     let control: ControlSettingsModel
     @State private var forgettingClient: ClientRecord?
+    /// Forget This Mac (#344): the window's own row, asked the same way as any other's.
+    @State private var forgettingThisWindow = false
     @State private var pairingDevice = false
     @State private var pairingMac = false
     @State private var pairingBrowser = false
@@ -38,6 +41,14 @@ struct ControlClientsPage: View {
         } message: { _ in
             Text("It is cut off at once, at home and away, until it is paired again.")
         }
+        .confirmationDialog("Forget this window?", isPresented: $forgettingThisWindow, titleVisibility: .visible) {
+            Button("Forget", role: .destructive) {
+                Task { if await control.forgetThisWindow() { model.leaveControlPlane() } }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This window is cut off at once, at home and away, until it is paired again.")
+        }
     }
 
     private func clientRow(_ client: ClientRecord) -> some View {
@@ -47,7 +58,9 @@ struct ControlClientsPage: View {
         let line = clientLine(client, isYou: isYou)
         return ControlRow(dot: .none, title: isYou ? "This window" : client.name, chip: isYou ? "you" : away ? "away" : nil,
                           chipTone: away ? .attention : .source, detail: line.plain, detailText: line.drawn) {
-            if !isYou {
+            if isYou {
+                Button("Forget This Mac…") { forgettingThisWindow = true }.buttonStyle(.paper)
+            } else {
                 Button("Forget…") { forgettingClient = client }.buttonStyle(.paper)
             }
         }

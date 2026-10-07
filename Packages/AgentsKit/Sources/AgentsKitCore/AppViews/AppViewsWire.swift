@@ -19,11 +19,16 @@ public extension DaemonAPI.Method {
     /// An agent calling one of the `agents` server's tools that has a view, relayed by
     /// the endpoint with the agent's token. Answered with the whole `CallToolResult`.
     static let viewsToolCall = "views/toolCall"
+    /// The person's Show or Don't Show for a third-party server's view (#191).
+    static let viewsShow = "views/show"
 }
 
 public extension DaemonAPI.Failure {
     /// A view asked for something the app will not do for it. The message says what.
     static let viewRefused = -32062
+    /// A third-party server's view the person has not said Show to (#191). The error's
+    /// `data` is a `ViewAsk`: what to ask, and the hash to answer for.
+    static let viewNeedsShow = -32063
 }
 
 public extension DaemonAPI {
@@ -31,10 +36,52 @@ public extension DaemonAPI {
     struct ViewReadRequest: Codable, Sendable, Hashable {
         public var agentID: UUID
         public var uri: String
+        /// The server whose view it is (#191). Nil is the app's own, `agents`.
+        public var server: String?
+        /// A pinned view's project, which has no agent (#189, #191).
+        public var project: URL?
 
-        public init(agentID: UUID, uri: String) {
+        public init(agentID: UUID, uri: String, server: String? = nil, project: URL? = nil) {
             self.agentID = agentID
             self.uri = uri
+            self.server = server
+            self.project = project
+        }
+    }
+
+    /// What a third-party server's view waits on before it is drawn: the person's Show.
+    struct ViewAsk: Codable, Sendable, Hashable {
+        public var server: String
+        public var uri: String
+        /// The resource as it was read, so the answer is for this version of it.
+        public var hash: String
+        /// Never asked before, rather than changed since the last answer.
+        public var isNew: Bool
+
+        public init(server: String, uri: String, hash: String, isNew: Bool) {
+            self.server = server
+            self.uri = uri
+            self.hash = hash
+            self.isNew = isNew
+        }
+    }
+
+    /// The person's answer to a `ViewAsk`.
+    struct ViewShowRequest: Codable, Sendable, Hashable {
+        public var agentID: UUID
+        public var project: URL?
+        public var server: String
+        public var uri: String
+        public var hash: String
+        public var show: Bool
+
+        public init(agentID: UUID, project: URL? = nil, server: String, uri: String, hash: String, show: Bool) {
+            self.agentID = agentID
+            self.project = project
+            self.server = server
+            self.uri = uri
+            self.hash = hash
+            self.show = show
         }
     }
 
@@ -75,9 +122,13 @@ public extension DaemonAPI {
         /// The host's own call that feeds a pinned view (#189), not the view's: allowed
         /// only for a tool a view may call and that changes nothing (`readOnlyHint`).
         public var feed: Bool?
+        /// The server whose view is calling (#191): the one the host holds the call of,
+        /// never one the view names. Nil is the app's own, `agents`.
+        public var server: String?
 
         public init(agentID: UUID, viewID: UUID, name: String, arguments: JSONValue? = nil,
-                    project: URL? = nil, feed: Bool? = nil) {
+                    project: URL? = nil, feed: Bool? = nil, server: String? = nil) {
+            self.server = server
             self.agentID = agentID
             self.project = project
             self.viewID = viewID

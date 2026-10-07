@@ -39,6 +39,8 @@ struct ChatView: View {
                             VStack(spacing: 0) {
                                 OfflineStrip(host: agent.host)
                                 actions(for: agent)
+                                // What it said it would do, as the phone has it (#341).
+                                CurrentPlanStrip(agent: agent)
                             }
                             // On the page's own paper, across the whole pane: the
                             // transcript scrolls under this strip, and without a ground
@@ -159,14 +161,21 @@ struct ChatView: View {
         } else if ParkWords.line(agent.parking) != nil || model.isBlocked(agent) {
             // Stop is the prompt's own button while the agent works; Park and Archive
             // are on the session's row. What is left here is only what the page has to
-            // say: why a parked chat is parked, and the way on for a blocked one.
-            HStack(spacing: 8) {
-                // Said on the page, so a chat opened from Parked says why it is there
-                // and when (040, FR-011).
-                if let line = ParkWords.line(agent.parking) {
-                    Label(line, systemImage: ParkWords.symbol)
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
+            // say: why a parked chat is parked, and what a blocked one waits on and the
+            // way on.
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 4) {
+                    // Said on the page, so a chat opened from Parked says why it is there
+                    // and when (040, FR-011).
+                    if let line = ParkWords.line(agent.parking) {
+                        Label(line, systemImage: ParkWords.symbol)
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                    }
+                    // A blocked chat (039): what it waits on, as its row says it (#341).
+                    if model.isBlocked(agent) {
+                        WaitLines(lines: model.blockLines(agent))
+                    }
                 }
                 Spacer(minLength: 0)
                 // A blocked chat (039): what the card's Carry on does.

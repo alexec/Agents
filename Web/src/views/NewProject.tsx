@@ -19,7 +19,7 @@ type Adding = { kind: "folder" | "clone"; host: string };
 const adding = signal<Adding | null>(null);
 
 /** "This Mac" for the host on this Mac; otherwise its name, as the window labels them. */
-function hostLabel(store: Store, host: string): string {
+export function hostLabel(store: Store, host: string): string {
   return host === "mac" ? "This Mac" : store.hosts.value.find((h) => h.id === host)?.name ?? host;
 }
 
@@ -89,7 +89,8 @@ export function NewProjectMenu({ store }: { store: Store }) {
 export function EmptyProjects({ store }: { store: Store }) {
   const online = store.hosts.value.filter((h) => h.state === "online");
   const listed = online.every((h) => store.projects.value[h.id] !== undefined);
-  const none = online.every((h) => (store.projects.value[h.id] ?? []).length === 0
+  // Archived ones are listed too (#343), and are not projects to work in.
+  const none = online.every((h) => (store.projects.value[h.id] ?? []).every((p) => p.project.archivedAt !== undefined)
     && (store.clones.value[h.id] ?? []).length === 0);
   const showing = online.length > 0 && listed && none;
   const macOnline = online.some((h) => h.id === "mac");
@@ -166,7 +167,7 @@ export function NewProjectDialog({ store }: { store: Store }) {
 }
 
 /** A modal `<dialog>`: Escape and the backdrop's focus come with it. */
-function Modal({ label, close, children }: { label: string; close: () => void; children: ComponentChildren }) {
+export function Modal({ label, close, children }: { label: string; close: () => void; children: ComponentChildren }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current;

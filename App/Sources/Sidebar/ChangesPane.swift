@@ -207,25 +207,6 @@ struct ChangesPane: View {
     }
 }
 
-/// `+14 −3`, by weight rather than by colour: what came in primary, what went quieter.
-/// Quiet, both are: a folder's total, which should not outweigh its files.
-struct ChangeCounts: View {
-    let added: Int?
-    let removed: Int?
-    var quiet = false
-
-    var body: some View {
-        if let added, let removed {
-            HStack(spacing: 4) {
-                Text("+\(added)").foregroundStyle(quiet ? .tertiary : .primary)
-                Text("−\(removed)").foregroundStyle(.tertiary)
-            }
-            .appText(.fine)
-            .monospacedDigit()
-        }
-    }
-}
-
 /// The one word a change needs beyond its counts, if it needs one.
 enum ChangeMark {
     static func word(for file: ChangedFile) -> String? {

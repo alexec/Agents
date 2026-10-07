@@ -91,8 +91,13 @@ public extension DaemonAPI {
                 Row(Method.viewsCall, params: ViewCallRequest.self, result: JSONValue.self, kind: .hostRequest),
                 Row(Method.viewsLog, params: ViewLogRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.viewsContext, params: ViewContextRequest.self, result: Empty.self, kind: .hostRequest),
+                Row(Method.viewsShow, params: ViewShowRequest.self, result: Empty.self, kind: .hostRequest),
                 // Acting
                 Row(Method.agentsStart, params: StartRequest.self, result: UUID.self, kind: .hostRequest),
+                // A server's key ask (#344): the pasted key, offered and lent on this browser's
+                // own connection, then the start again, as the window's TokenAskCard does.
+                Row(Method.credentialsOffer, params: CredentialsOffer.self, result: Empty.self, kind: .hostRequest),
+                Row(Method.credentialsLend, params: CredentialsLend.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.runtimesMarkAvailable, params: MarkRuntimeAvailable.self, result: RuntimeAllowances.self,
                     kind: .hostRequest),
                 Row(Method.agentsPrompt, params: PromptRequest.self, result: Empty.self, kind: .hostRequest),
@@ -108,6 +113,8 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 Row(Method.agentsRecreateWorktree, params: AgentRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.agentsSetUnread, params: SetUnreadRequest.self, result: Empty.self, kind: .hostRequest),
+                // Branch (#342): the new session's id, as the window's row and Session menu have it.
+                Row(Method.agentsFork, params: AgentRequest.self, result: UUID.self, kind: .hostRequest),
                 Row(Method.agentsPrewarm, params: PrewarmRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsUnarchive, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsSetLabels, params: SetLabelsRequest.self, result: Agent.self, kind: .hostRequest),
@@ -153,6 +160,8 @@ public extension DaemonAPI {
                 Row(Method.projectsAdd, params: ProjectRequest.self, result: ProjectSummary.self, kind: .hostRequest),
                 Row(Method.projectsClone, params: CloneRequest.self, result: ProjectSummary.self, kind: .hostRequest),
                 Row(Method.projectsClones, params: Empty.self, result: [CloneSummary].self, kind: .hostRequest),
+                // Bring Back in the Archived projects fold (#343), as the window's sidebar has it.
+                Row(Method.projectsUnarchive, params: ProjectRequest.self, result: ProjectSummary.self, kind: .hostRequest),
                 Row(Method.filesWatch, params: FilesWatchRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.filesUnwatch, params: FilesWatchRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.artifactWrite, params: ArtifactWriteRequest.self, result: Empty.self, kind: .hostRequest),

@@ -112,6 +112,8 @@ struct SidebarSessionRow: View {
                 }
             }
             Spacer(minLength: 0)
+            // When it last did anything, as the page's row has it (#341).
+            ActivityTime(date: agent.lastActivityAt)
         }
         // Last known, not current: its host is not answering.
         .opacity(model.isStale(agent) ? 0.55 : 1)

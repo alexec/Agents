@@ -1,15 +1,17 @@
 // A session's actions (071 FR-027): Carry on while it sits in an open block (#250), Stop while it
 // holds a runtime or a block, Park or Unpark
-// (Agent.parkAction), and Archive or Bring Back. In the chat header's ··· menu.
+// (Agent.parkAction), Branch (#342), and Archive or Bring Back. In the chat header's ··· menu,
+// and the sidebar row's menu.
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { isOpenBlock, projectFolder } from "../model/groups";
 import { carryOnHelp, carryOnLabel, carryOnPrompt, openBlock } from "../model/block";
+import { go } from "../route";
 
 export type Action = "carryOn" | "agents/stop" | "agents/park" | "agents/unpark" | "agents/archive" | "agents/unarchive"
-  | "markRead" | "markUnread" | "pin" | "unpin";
+  | "markRead" | "markUnread" | "pin" | "unpin" | "fork";
 
 /**
  * What the menu offers, in order, with the window's words (ParkWords, AgentRow's menu). Given
@@ -40,6 +42,10 @@ export function sessionActions(agent: Agent, pinned?: boolean): { action: Action
     found.push(pinned
       ? { action: "unpin", label: "Unpin", help: "Put this session back among the others" }
       : { action: "pin", label: "Pin", help: "Keep this session at the top of its project, whatever its state" });
+  }
+  // Branching leaves the original alone and carries the history so far (#342), as the window's row.
+  if (agent.state !== "archived") {
+    found.push({ action: "fork", label: "Branch", help: "A new session that carries this one's history so far" });
   }
   found.push(agent.state === "archived"
     ? { action: "agents/unarchive", label: "Bring Back", help: "Bring this session back from the archive" }
@@ -82,5 +88,12 @@ export function runSessionAction(store: Store, host: string, agent: Agent, actio
   if (action === "carryOn") void store.prompt(host, agent.id, carryOnPrompt, []);
   else if (action === "markRead" || action === "markUnread") void store.setUnread(host, agent.id, action === "markUnread");
   else if (action === "pin" || action === "unpin") void store.setPinned(host, projectFolder(agent), agent.id, action === "pin");
+  else if (action === "fork") void branch(store, host, agent);
   else void store.perform(host, agent.id, action);
+}
+
+/** Branch, then open the new session, as the window selects it (#342). */
+async function branch(store: Store, host: string, agent: Agent) {
+  const id = await store.fork(host, agent.id);
+  if (id) go({ host, project: projectFolder(agent), session: id });
 }

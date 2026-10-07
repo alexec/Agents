@@ -27,6 +27,26 @@ struct WebSignaturesTests {
         #expect(notifications.contains(DaemonAPI.Notification.agentEntry))
     }
 
+    /// The page branches a session as the window does, and opens the new one by its id (#342).
+    @Test func thePageBranchesASession() {
+        #expect(Rows.rows.contains { $0.method == DaemonAPI.Method.agentsFork && $0.kind == .hostRequest
+            && $0.params == DaemonAPI.AgentRequest.self && $0.result == UUID.self })
+    }
+
+    /// The page answers a server's key ask as the Remote does (#344): it offers and lends the
+    /// pasted key on its own connection, and says where to get one without the window's words
+    /// about keeping it.
+    @Test func thePageLendsAServerTheKeyItAskedFor() {
+        let rows = Rows.rows
+        #expect(rows.contains { $0.method == DaemonAPI.Method.credentialsOffer && $0.kind == .hostRequest
+            && $0.params == DaemonAPI.CredentialsOffer.self })
+        #expect(rows.contains { $0.method == DaemonAPI.Method.credentialsLend && $0.kind == .hostRequest
+            && $0.params == DaemonAPI.CredentialsLend.self })
+        let gemini = RuntimeCatalog.gemini.id
+        #expect(CredentialKind.whereToGet(for: gemini).hasPrefix(CredentialKind.source(for: gemini)))
+        #expect(!CredentialKind.source(for: gemini).contains("this Mac"))
+    }
+
     /// The page asks what the host could not read and hears it change, as the window does (#223).
     @Test func thePageAsksAndHearsStoreNotes() {
         let rows = Rows.rows

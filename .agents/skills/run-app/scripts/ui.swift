@@ -4,7 +4,8 @@
 //   swift ui.swift dump <pid> [depth]         the accessibility tree, indented
 //   swift ui.swift find <pid> <text>          every element whose label holds <text>
 //   swift ui.swift press <pid> <text>         AXPress the LAST one that matches (innermost);
-//                                             make <text> unique, `find` lists them in order
+//                                             make <text> unique, `find` lists them in order;
+//                                             `=<text>` matches the whole label only
 //   swift ui.swift set <pid> <text> <value>   type into the field labelled <text>
 //
 // AX actions go to the element, not to the pointer, so nothing is stolen from
@@ -94,10 +95,13 @@ case "dump":
 
 case "find", "press":
     guard arguments.count > 3 else { print("need text to match"); exit(2) }
-    let needle = arguments[3].lowercased()
+    // `=Show` is the label "Show" and nothing longer: no "Show Inspector" in a menu.
+    let exact = arguments[3].hasPrefix("=")
+    let needle = (exact ? String(arguments[3].dropFirst()) : arguments[3]).lowercased()
     var matches: [AXUIElement] = []
     walk(app, depth: 0, limit: 30) { element, _ in
-        if label(element).lowercased().contains(needle) { matches.append(element) }
+        let text = label(element).lowercased()
+        if exact ? text == needle : text.contains(needle) { matches.append(element) }
         return true
     }
     if verb == "find" {

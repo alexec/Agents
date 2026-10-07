@@ -11,6 +11,7 @@ import { rowStatus, type StatusShape } from "../model/status";
 import { fromWireDate } from "../protocol/dates";
 import { Telling } from "./Telling";
 import { folderIsMissing, folderPath, missingFolderLabel } from "../model/missingFolder";
+import { shortAgo } from "../model/activity";
 
 const glyphs: Record<StatusShape, string> = { working: "", needsYou: "!", waiting: "⧗", done: "✓", stopped: "■" };
 
@@ -46,16 +47,6 @@ export function parkLine(agent: Agent): string | null {
   const at = fromWireDate(parkedAt(agent)!);
   if (Date.now() - at.getTime() < 60_000) return "Parked just now";
   return "Parked " + ago(at);
-}
-
-/** "5m", "3h", "2d": when it last did anything, in the corner of the row. */
-export function shortAgo(date: Date, now = new Date()): string {
-  const minutes = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 60_000));
-  if (minutes < 1) return "now";
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
 }
 
 /** What a row says that its host's other state decides: who started it, its leases, its waits. */

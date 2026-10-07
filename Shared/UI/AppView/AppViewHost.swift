@@ -70,7 +70,8 @@ final class AppViewStore {
 /// One view: its web view, the conversation with it, and what the chat draws around it.
 @MainActor @Observable
 final class AppViewHost {
-    enum Phase: Equatable { case loading, ready, failed(String), gone }
+    /// `asking`: a person's own server's view waits on Show or Don't Show (#191).
+    enum Phase: Equatable { case loading, asking(DaemonAPI.ViewAsk), ready, failed(String), gone }
 
     private(set) var call: AppViewCall
     private(set) var phase: Phase = .loading
@@ -112,7 +113,7 @@ final class AppViewHost {
         self.context = AppViewContext(theme: "light", platform: platform, width: 600,
                                       maxHeight: Self.maxInlineHeight, touch: platform == .mobile,
                                       hover: platform == .desktop,
-                                      toolInfo: ["tool": ["name": .string(call.tool)]])
+                                      toolInfo: AppViewBridge.toolInfo(call.tool))
     }
 
     var isFullscreen: Bool { store?.fullscreen == call.id }
@@ -120,8 +121,13 @@ final class AppViewHost {
     static func title(for call: AppViewCall) -> String {
         if call.resourceURI == "ui://agents/dashboard" { return "Dashboard" }
         if call.tool == "show_test_view" { return "Test view" }
-        return call.tool.replacingOccurrences(of: "_", with: " ")
+        let tool = call.tool.replacingOccurrences(of: "_", with: " ")
+        // A person's own server's view says whose it is (#191).
+        return call.server == AppTool.serverName ? tool : "\(tool) · \(call.server)"
     }
+
+    /// The server to name in `views/*`: nil for the app's own, as before #191.
+    private var server: String? { call.server == AppTool.serverName ? nil : call.server }
 
     // MARK: Loading
 
@@ -135,10 +141,17 @@ final class AppViewHost {
     private func load() async {
         let resource: DaemonAPI.ViewResource
         do {
-            let value = try await actions.call(DaemonAPI.Method.viewsRead,
-                                               try JSONValue.encoding(DaemonAPI.ViewReadRequest(agentID: actions.agentID,
-                                                                                                uri: call.resourceURI)))
+            let value = try await actions.call(DaemonAPI.Method.viewsRead, try JSONValue.encoding(DaemonAPI.ViewReadRequest(
+                agentID: actions.agentID, uri: call.resourceURI, server: server, project: actions.project)))
             resource = try value.decode(DaemonAPI.ViewResource.self)
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.viewNeedsShow {
+            // Nothing of it is drawn until the person says Show.
+            if let ask = try? error.data?.decode(DaemonAPI.ViewAsk.self) {
+                phase = .asking(ask)
+            } else {
+                phase = .failed(error.message)
+            }
+            return
         } catch {
             phase = .failed("This view could not be read from the server: \(Self.words(error))")
             return
@@ -242,6 +255,27 @@ final class AppViewHost {
         }
     }
 
+    /// The person's Show or Don't Show for a person's own server's view (#191).
+    func answerShow(_ show: Bool) {
+        guard case .asking(let ask) = phase else { return }
+        phase = .loading
+        Task {
+            do {
+                _ = try await actions.call(DaemonAPI.Method.viewsShow, try JSONValue.encoding(DaemonAPI.ViewShowRequest(
+                    agentID: actions.agentID, project: actions.project, server: ask.server, uri: ask.uri,
+                    hash: ask.hash, show: show)))
+            } catch {
+                phase = .failed("That could not be kept: \(Self.words(error))")
+                return
+            }
+            if show {
+                await load()
+            } else {
+                phase = .failed("Not shown. Ask Again is on \(ask.server)'s row in the project's MCP servers.")
+            }
+        }
+    }
+
     func dropContext() {
         contextLine = nil
         Task {
@@ -320,7 +354,7 @@ final class AppViewHost {
         case .callTool(let id, let name, let arguments):
             relay(id, DaemonAPI.Method.viewsCall,
                   DaemonAPI.ViewCallRequest(agentID: actions.agentID, viewID: call.id, name: name,
-                                            arguments: arguments, project: actions.project),
+                                            arguments: arguments, project: actions.project, server: server),
                   answer: { [weak self] value in
                       if let target = value["structuredContent"]?["open"],
                          let kind = target["kind"]?.stringValue, let id = target["id"]?.stringValue {
@@ -331,8 +365,9 @@ final class AppViewHost {
         case .readResource(let id, let uri):
             Task {
                 do {
+                    // The same server's only: the one whose view it is.
                     let value = try await actions.call(DaemonAPI.Method.viewsRead, try JSONValue.encoding(
-                        DaemonAPI.ViewReadRequest(agentID: actions.agentID, uri: uri)))
+                        DaemonAPI.ViewReadRequest(agentID: actions.agentID, uri: uri, server: server, project: actions.project)))
                     let resource = try value.decode(DaemonAPI.ViewResource.self)
                     send(AppViewBridge.result(id, ["contents": [["uri": .string(resource.uri),
                                                                  "mimeType": .string(resource.mimeType),

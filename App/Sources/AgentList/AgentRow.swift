@@ -208,6 +208,9 @@ struct AgentRow: View {
                 }
             }
             Spacer(minLength: 0)
+            // When it last did anything, as the page's row has it (#341).
+            ActivityTime(date: agent.lastActivityAt)
+                .padding(.top, 1)
         }
         .fixedSize(horizontal: false, vertical: true)
         .contextMenu {

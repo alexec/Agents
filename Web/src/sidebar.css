@@ -69,6 +69,15 @@
 /* A folded Needs you keeps its count in the attention tint, so folding it hides nobody (#181). */
 .with-sidebar details.group:not([open]) > summary.needs .count:first-of-type { color: var(--tint-attention); opacity: 1; }
 
+/* Archived projects (#343): a heading that folds, as the window's section, and each project in
+   secondary type, when it was put away under it, and Bring Back at its end. */
+.with-sidebar details.archived-projects > summary.sidebar-head-label { margin-left: 0; }
+.with-sidebar .row.archived-project { align-items: baseline; column-gap: 8px; padding: 4px 8px 4px 18px; cursor: default; }
+.with-sidebar .row.archived-project .title { font-weight: 400; opacity: 0.65; }
+.with-sidebar .row.archived-project .subtitle { font-size: 11.5px; opacity: 0.45; }
+.with-sidebar .row.archived-project button.link { font-size: 12px; cursor: pointer; }
+.with-sidebar .row.archived-project button.link:disabled { opacity: 0.45; cursor: default; }
+
 /* A row the keys or the list landed on. */
 .with-sidebar .sidebar :is(.row.session, .row.activity-row, summary):focus-visible,
 .with-sidebar .sidebar .row:has(> .pick:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }

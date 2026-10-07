@@ -87,7 +87,8 @@ struct ProjectListView: View {
             if !model.archivedProjects.isEmpty, searched.isEmpty {
                 Section(isExpanded: $showsArchived) {
                     ForEach(model.archivedProjects, id: \.key) { summary in
-                        ArchivedProjectRow(summary: summary).appText(.supporting)
+                        ArchivedProjectRow(summary: summary) { await model.unarchiveProject(summary.key) }
+                            .appText(.supporting)
                     }
                 } header: {
                     Text("Archived projects")
@@ -556,36 +557,6 @@ private struct SidebarFoot: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Paper.sidebar)
-    }
-}
-
-/// An archived project, with when it was put away.
-private struct ArchivedProjectRow: View {
-    @Environment(AppModel.self) private var model
-    let summary: DaemonAPI.ProjectSummary
-
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(summary.name).lineLimit(1).foregroundStyle(.secondary)
-                if let archivedAt = summary.project.archivedAt {
-                    Text("Archived \(archivedAt.formatted(.relative(presentation: .named)))")
-                        .appText(.fine)
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            Spacer()
-            Button("Bring Back") {
-                Task { await model.unarchiveProject(summary.key) }
-            }
-            .buttonStyle(.link)
-            .appText(.fine)
-        }
-        .contextMenu {
-            Button("Bring Back") {
-                Task { await model.unarchiveProject(summary.key) }
-            }
-        }
     }
 }
 

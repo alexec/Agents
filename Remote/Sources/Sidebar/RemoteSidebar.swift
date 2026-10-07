@@ -1,9 +1,11 @@
 import AgentsKitCore
 import SwiftUI
+import UIKit
 
 /// The Mac's one sidebar, on an iPad or an iPhone (#226): Activity at the top, then every
 /// project, each a row that folds open on its pinned pages, its sessions in their groups,
-/// its archived sessions and its workflows.
+/// its archived sessions and its workflows; then the archived projects, folded, each with
+/// Bring Back (#343).
 ///
 /// The rules are the Mac's own, from `SidebarProjectFold`, `SidebarOrder` and
 /// `SidebarFolds` in AgentsKitCore: the same groups, order, pins and folds, kept the same
@@ -20,6 +22,8 @@ struct RemoteSidebar: View {
     @State private var searched = ""
     /// Projects whose every archived match is on show, past the first few (#176).
     @State private var showingAllMatches: Set<ProjectKey> = []
+    /// Archived projects, open or closed, kept as the window keeps it (#343).
+    @AppStorage("showsArchivedProjects") private var showsArchived = false
 
     private var selection: Binding<SidebarItem?> {
         Binding(get: { model.sidebarItem },
@@ -58,6 +62,21 @@ struct RemoteSidebar: View {
                 }
             }
 
+            // Projects put away, closed until opened, as the window's (#343).
+            if !model.shelvedProjects.isEmpty, searched.isEmpty {
+                Section(isExpanded: $showsArchived) {
+                    ForEach(model.shelvedProjects, id: \.key) { summary in
+                        ArchivedProjectRow(summary: summary, isDisabled: model.isStale
+                                            || model.hostIsOffline(summary.host)) {
+                            await model.unarchiveProject(summary)
+                        }
+                        .appText(.supporting)
+                    }
+                } header: {
+                    Text("Archived projects")
+                }
+            }
+
             // A file the Mac keeps that could not be read (#205, #223), as the window's
             // sidebar foot: why paired devices or projects may have gone from view.
             if !model.work.storeNotes.isEmpty {
@@ -68,6 +87,14 @@ struct RemoteSidebar: View {
                             .foregroundStyle(.secondary)
                             .accessibilityElement(children: .combine)
                     }
+                }
+            }
+
+            // This device, at the very foot, as the page's sidebar ends with its browser
+            // (#344): the way to forget it from here.
+            if !model.needsPairing {
+                Section {
+                    ForgetThisDeviceRow()
                 }
             }
         }
@@ -95,7 +122,15 @@ struct RemoteSidebar: View {
         .overlay {
             if model.projects.isEmpty { Waiting() }
         }
-        .refreshable { await model.catchUp() }
+        // The catch-up leaves archived projects out; they are asked for here (#343), and
+        // again once the list is pulled.
+        .task(id: model.isConnected) {
+            if model.isConnected { await model.loadArchivedProjects() }
+        }
+        .refreshable {
+            await model.catchUp()
+            await model.loadArchivedProjects()
+        }
     }
 
     /// Said once on the screen. Beside the detail on a wide iPad, the detail carries the
@@ -281,6 +316,31 @@ struct SidebarSubheading: View {
         .foregroundStyle(.secondary)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(unread > 0 ? "\(title), \(count), \(unread) unread" : "\(title), \(count)")
+    }
+}
+
+/// Forget This iPhone… (#344, 071 FR-015): the control plane forgets this device, and only
+/// it, asked first as the window asks before forgetting a client. Gone, the app asks for a
+/// code again.
+private struct ForgetThisDeviceRow: View {
+    @Environment(RemoteModel.self) private var model
+    @State private var confirming = false
+    @State private var problem: String?
+
+    private var device: String { UIDevice.current.model }
+
+    var body: some View {
+        Button("Forget This \(device)…") { confirming = true }
+            .appText(.supporting)
+            .confirmationDialog("Forget this \(device)?", isPresented: $confirming, titleVisibility: .visible) {
+                Button("Forget", role: .destructive) { Task { problem = await model.forgetThisDevice() } }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This \(device) is cut off at once, at home and away, until it is paired again.")
+            }
+        if let problem {
+            Text(problem).appText(.fine).tinted(.failure)
+        }
     }
 }
 

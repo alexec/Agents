@@ -173,7 +173,7 @@ struct TerminalOutputView: View {
 ///
 /// The clearest statement an agent makes of its intentions, which is the moment to stop
 /// it if it is wrong. 001 drew "Made a plan". In the transcript this is the plan as it
-/// was at that point; the phone's `CurrentPlanStrip` draws it as it is now.
+/// was at that point; `CurrentPlanStrip`, at the head of the chat, draws it as it is now.
 struct PlanView: View {
     let plan: Plan
 

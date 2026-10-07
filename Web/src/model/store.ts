@@ -23,10 +23,15 @@ import { DashboardOrderSync } from "./dashboardOrderSync";
 import { Drafts } from "./drafts";
 import { scopeRoot, WatchCounts } from "./fileWatch";
 import { workflowRunsOn } from "./workflows";
+import { keyKind, takesKey, wantedRuntime } from "./credentials";
+import type { Method, Params, Result } from "../protocol/methods";
 
 export { folderKey } from "./groups";
 
 /** DaemonAPI.SandboxWillNotStart, a start's refusal when its runtime's sandbox will not start, with its sentence. */
+/** A server asked for a key this browser has none of (043, #344): open until lent or cancelled. */
+export interface TokenAsk { host: string; runtimeID: string; answer: (lent: boolean) => void }
+
 export interface SandboxWillNotStart { runtimeID: string; detail: string; offOffered: boolean; message: string }
 
 function isSandboxRefusal(data: unknown): data is Omit<SandboxWillNotStart, "message"> {
@@ -1042,7 +1047,9 @@ export class Store extends Work {
       void this.search({ includeArchived: true, archivedCommands: false, archivedOnly: false, lean: true,
         limit: searchShown, query: this.searchWords }, host, this.searchTurn);
     }
-    const projects = await this.link.call("projects/list", { includeArchived: false }, host).catch(failed("projects/list"));
+    // Archived ones too, as the window lists them: the sidebar folds them under Archived projects
+    // (#343), and Spending still counts what they cost.
+    const projects = await this.link.call("projects/list", { includeArchived: true }, host).catch(failed("projects/list"));
     if (projects) this.projects.value = { ...this.projects.value, [host]: projects };
     const clones = await this.link.call("projects/clones", {}, host).catch(failed("projects/clones"));
     if (clones) this.clones.value = { ...this.clones.value, [host]: clones };
@@ -1364,6 +1371,16 @@ export class Store extends Work {
     return summary;
   }
 
+  /**
+   * An archived project brought back (#343), as the window's Bring Back does: a project again,
+   * with its Dashboard open.
+   */
+  async unarchiveProject(host: string, folder: string): Promise<ProjectSummary | null> {
+    const summary = await this.act("projects/unarchive", { folder: folder as never }, host);
+    if (summary) this.upsertProject(summary, host);
+    return summary;
+  }
+
   /** The folders at `path` on `host`, for choosing one as a project (037). Throws a refusal. */
   browse(host: string, path: string): Promise<DirectoryListing> {
     return this.link.call("files/browse", { path }, host);
@@ -1399,7 +1416,7 @@ export class Store extends Work {
 
   async prompt(host: string, agentID: string, text: string, attachments: Attachment[]): Promise<boolean> {
     try {
-      await this.link.call("agents/prompt", { agentID: agentID as UUID, text, attachments, from: "person" }, host);
+      await this.lending("agents/prompt", { agentID: agentID as UUID, text, attachments, from: "person" }, host);
       return true;
     } catch (error) {
       // Its folder has gone (#119): said with the ways on, carrying what was typed.
@@ -1413,6 +1430,56 @@ export class Store extends Work {
     }
   }
 
+  /** A server's key ask (#344), the window's TokenAskCard, while it is open. One at a time. */
+  readonly tokenAsk = signal<TokenAsk | null>(null);
+
+  /**
+   * `method` on `host`, as the window's DaemonClient sends it with a lender (043): a server that
+   * wants a key asks the person here, and once one is lent the call goes again, unchanged, so a
+   * start's `requestID` keeps it the same start. Cancelled, or asked while another ask is open,
+   * it fails as the server said.
+   */
+  private async lending<M extends Method>(method: M, params: Params<M>, host: string): Promise<Result<M>> {
+    try {
+      return await this.link.call(method, params, host);
+    } catch (error) {
+      const runtime = error instanceof CallFailed && error.code === Failure.credentialWanted ? wantedRuntime(error.data) : null;
+      if (host === "mac" || !runtime || !takesKey(runtime) || this.tokenAsk.peek()) throw error;
+      const lent = await new Promise<boolean>((answer) => { this.tokenAsk.value = { host, runtimeID: runtime, answer }; });
+      if (!lent) throw error;
+      return await this.link.call(method, params, host);
+    }
+  }
+
+  /**
+   * The person pasted a key into the ask: offered and lent to the server that asked, on this
+   * browser's own connection, and kept nowhere. Answers why not, leaving the ask open, or null
+   * once it is lent and the call that asked goes again. "notAKey" is a paste of something else.
+   */
+  async lendKey(text: string): Promise<string | null> {
+    const ask = this.tokenAsk.peek();
+    if (!ask) return null;
+    const kind = keyKind(text, ask.runtimeID);
+    if (!kind) return "notAKey";
+    try {
+      await this.link.call("credentials/offer", { runtimes: [ask.runtimeID], ownSignInOnly: false }, ask.host);
+      await this.link.call("credentials/lend", { runtime: ask.runtimeID, kind, secret: text.trim() }, ask.host);
+    } catch (error) {
+      log("call.failed", error instanceof CallFailed ? error.code : undefined);
+      return describe(error);
+    }
+    this.finishTokenAsk(true);
+    return null;
+  }
+
+  /** The ask answered: lent (true), or cancelled. Once: its answer is a promise's. */
+  finishTokenAsk(lent: boolean): void {
+    const ask = this.tokenAsk.peek();
+    if (!ask) return;
+    this.tokenAsk.value = null;
+    ask.answer(lent);
+  }
+
   /** A send refused because the agent's folder has gone (#119), until a way on or Cancel. */
   readonly folderGone = signal<FolderGoneAsk | null>(null);
 
@@ -1423,6 +1490,14 @@ export class Store extends Work {
   async continueInProject(host: string, agentID: string, text = "", attachments: Attachment[] = []): Promise<string | null> {
     return this.act("agents/continueInProject",
       { agentID: agentID as UUID, text, attachments, requestID: crypto.randomUUID().toUpperCase() as UUID }, host);
+  }
+
+  /**
+   * Branch (#342): a new session that carries this one's history so far, the original left alone.
+   * Answers its id, or null with `problem` saying why.
+   */
+  async fork(host: string, agentID: string): Promise<string | null> {
+    return this.act("agents/fork", { agentID: agentID as UUID }, host);
   }
 
   /** Recreate the worktree from its branch (#119); the row follows from `agent/changed`. */
@@ -1861,7 +1936,7 @@ export class Store extends Work {
    */
   async start(host: string, request: StartRequest): Promise<string | SandboxWillNotStart | null> {
     try {
-      return await this.link.call("agents/start", request, host);
+      return await this.lending("agents/start", request, host);
     } catch (error) {
       if (error instanceof CallFailed && error.code === Failure.sandboxWillNotStart && isSandboxRefusal(error.data)) {
         return { ...error.data, message: error.message };

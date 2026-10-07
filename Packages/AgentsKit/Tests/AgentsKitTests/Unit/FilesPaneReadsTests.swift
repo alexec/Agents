@@ -40,6 +40,32 @@ struct FilesPaneReadsTests {
                 == ["/work", "/work/a", "/work/a/b"])
     }
 
+    /// The lines the window and the iPad draw (#345): each open folder's entries one
+    /// step in, a folder not yet read saying so, one that could not be read saying why.
+    @Test func theTreeFlattensOpenFoldersUnderTheirParents() {
+        var listings: [String: DirectoryListing] = ["/work": listing(root, folders: ["a", "b", "c"])]
+        listings["/work/a"] = listing(folder("a"), folders: ["inner"])
+        let lines = FileTree.lines(root: root, expanded: ["/work/a", "/work/b", "/work/c"], listings: listings,
+                                   problems: ["/work/c": "c could not be read."])
+        let drawn = lines.map { line -> String in
+            switch line {
+            case .entry(let entry, let depth): "\(depth) \(entry.name)"
+            case .note(_, let words, let depth): "\(depth) \(words)"
+            case .problem(_, let words, let depth): "\(depth) ! \(words)"
+            }
+        }
+        #expect(drawn == ["0 a", "1 inner", "0 b", "1 Reading…", "0 c", "1 ! c could not be read."])
+        #expect(Set(lines.map(\.id)).count == lines.count)
+    }
+
+    @Test func revealingAFolderOpensEveryFolderDownToIt() {
+        #expect(FileTree.opening(to: folder("a/b/c"), from: root) == ["/work/a", "/work/a/b", "/work/a/b/c"])
+        #expect(FileTree.opening(to: root, from: root).isEmpty)
+        #expect(FileTree.opening(to: URL(filePath: "/elsewhere/a"), from: root).isEmpty)
+        #expect(FileTree.isInside(folder("a"), root))
+        #expect(!FileTree.isInside(URL(filePath: "/workshop"), root))
+    }
+
     @Test func keysIgnoreATrailingSlash() {
         #expect(FileTree.key(URL(filePath: "/work/a/")) == FileTree.key(URL(filePath: "/work/a")))
     }

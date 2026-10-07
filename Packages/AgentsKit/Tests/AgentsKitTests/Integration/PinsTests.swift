@@ -428,7 +428,7 @@ struct PinsTests {
         #expect(gone.hasPrefix("Unpinned ui://agents/test-view."))
     }
 
-    @Test func onlyAReadOnlyToolOfTheAppsOwnServerFeedsAPin() async throws {
+    @Test func onlyAReadOnlyToolOfASetUpServerFeedsAPin() async throws {
         let s = try await setUp([("Lead", false, nil)])
         await s.core.offerTestView(true)
         func refused(_ view: JSONValue) async -> String? { await refusal { try await pin(s, "Lead", ["view": view]) } }
@@ -437,7 +437,8 @@ struct PinsTests {
         let dashboard = await refused(["server": "agents", "uri": "ui://agents/dashboard", "tool": "read_dashboard"])
         #expect(dashboard == "Nothing was pinned: the Dashboard is already in the sessions column.")
         let other = await refused(["server": "github", "uri": "ui://github/issues", "tool": "list_issues"])
-        #expect(other?.contains("only the agents server's views can be pinned so far") == true)
+        // Another server's view can be pinned (#191), once it is set up here.
+        #expect(other?.contains("github is not set up here") == true)
         let big = await refused(["server": "agents", "uri": "ui://agents/test-view", "tool": "show_test_view",
                                  "arguments": ["note": .string(String(repeating: "x", count: 3000))]])
         #expect(big?.contains("at most 2 KB") == true)

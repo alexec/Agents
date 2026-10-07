@@ -69,6 +69,18 @@ an event already on the log.
 | `agent.archived` | agent, by, outcome | An agent was archived. `by` is `you`, or `agent` when the agent that started it archived it with `archive_agent`. `outcome` is its last report's, when it made one. |
 | `agent.retired` | agent, because | An archived agent was retired and its conversation deleted. `because` is `age`, `cap` or `person`. |
 
+## Projects
+
+| Event | Details | What it means |
+| --- | --- | --- |
+| `project.idle` | agents, finished, blocked, waiting_on_you, stopped, failed, since, ids | Every agent in this project has stopped working. Raised once, a minute after the last agent stops, when none has started since. `agents` is how many worked since the project was last quiet, and `ids` their ids, comma-separated. `finished`, `blocked`, `waiting_on_you`, `stopped` and `failed` count how each of those stands now. `since` is when the first of them started. |
+
+An agent asking for permission is not working, so it does not hold `project.idle` back: it
+is counted under `waiting_on_you`. The agent a workflow on `project.idle` (or `project.*`)
+runs, and any helper it starts, is not counted as work, so the clean-up finishing does not
+raise `project.idle` again. A busy period is kept in memory: a restart of the app starts
+counting again from the next agent that works.
+
 ## Workflows
 
 | Event | Details | What it means |

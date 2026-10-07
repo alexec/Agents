@@ -15,26 +15,26 @@
 
 ## Counts
 
-Of 210 rows: **124 same**, **37 by design**, **49 delta** (after #188, #189, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 214 rows: **145 same**, **40 by design**, **29 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
-| Sidebar and project list | 3 | 2 | 12 |
-| Session rows and states | 10 | 2 | 11 |
-| Chat turns and turn detail | 14 | 3 | 7 |
-| Prompt bar and queued prompts | 16 | 2 | 2 |
-| Question and permission cards | 10 | 4 | 1 |
+| Sidebar and project list | 5 | 2 | 10 |
+| Session rows and states | 16 | 2 | 5 |
+| Chat turns and turn detail | 19 | 3 | 2 |
+| Prompt bar and queued prompts | 18 | 2 | 0 |
+| Question and permission cards | 12 | 3 | 0 |
 | Start sheet and new project | 17 | 5 | 0 |
-| Worktrees and Files | 12 | 6 | 3 |
-| Dashboard and pins | 8 | 0 | 6 |
+| Worktrees and Files | 9 | 6 | 6 |
+| Dashboard and pins | 13 | 1 | 0 |
 | Workflows page | 12 | 1 | 2 |
-| Settings and Project Settings | 1 | 6 | 0 |
+| Settings and Project Settings | 1 | 7 | 0 |
 | Pool, runtimes and spending | 7 | 1 | 2 |
 | Events and resources | 2 | 1 | 2 |
-| Notifications and badges | 3 | 0 | 1 |
+| Notifications and badges | 3 | 1 | 0 |
 | Disk strip | 2 | 1 | 0 |
 | Hosts, connection and pairing | 3 | 3 | 0 |
-| MCP Apps views | 4 | 0 | 0 |
+| MCP Apps views | 6 | 1 | 0 |
 
 The deltas are tracked by 29 issues:
 - **Already open:** #226 (the Remote's one sidebar) and #235 (the page's one sidebar at phone width).
@@ -51,7 +51,7 @@ The deltas are tracked by 29 issues:
 | Project order | Last activity, newest first; this Mac's, then each server's: `K/Client/AgentsModel.swift:635`, `A/Projects/ProjectListView.swift:41-45` | Last activity, within host sections | **By name** within each host: `W/views/Sidebar.tsx:42-48` | **delta**: web #250 |
 | Project row subtitle | Needs you (· N unread), else working / unread, else *N complete* / stopped: `A/Projects/ProjectRow.swift:75-96` | No complete / stopped fallback: `R/Projects/ProjectListView.swift:143-151` | As the window: `W/model/groups.ts:176-188` | **delta**: Remote #226 |
 | Project row menu | Dashboard, New Session, Project Settings…, Archive, Show in Finder: `A/Projects/ProjectListView.swift:511-542` | None: the row is a button | Dashboard, New Session: `W/views/Sidebar.tsx:197-201` | Web: **by design** (Settings, Archive and Finder are the Mac's, #151). Remote: **delta** #226 |
-| Archived projects fold, Bring Back | `A/Projects/ProjectListView.swift:87-95, 596-623` | None | None (`W/model/store.ts:779` asks without archived) | **delta**: decide, #267 |
+| Archived projects fold, Bring Back | Closed until opened, below the projects, each row Bring Back and its menu: `A/Projects/ProjectListView.swift:87-96`, `S/ArchivedProjectRow.swift` | The same row, a swipe for Bring Back too; listed from every host as the sidebar appears (the catch-up leaves them out): `R/Sidebar/RemoteSidebar.swift`, `R/RemoteModel.swift` (`shelvedProjects`, `unarchiveProject`) | As the window, its open state kept in localStorage; `projects/list` now asks with archived ones: `W/views/Sidebar.tsx` (`ArchivedProjectRow`) | **same** (#343) |
 | Activity rows | Events, Resources, Runtimes, Spending at the top, no icons (#155): `A/Projects/ProjectListView.swift:54-59` | Events, Spending, Resources after the projects, with icons; no Runtimes row: `R/Projects/ProjectListView.swift:32-41` | As the window: `W/views/Activity.tsx:95-131` | **delta**: Remote #226 |
 | Session groups and their folds, counts and tint when folded (#181) | `A/Projects/ProjectListView.swift:356-397` | The same rules on the project page: `R/Projects/ProjectPageView.swift:94-124` | `W/views/Sidebar.tsx:230-263` | **same** (where the Remote draws them: #226) |
 | Group order: by start, newest first (#182) | `ProjectShelf` | `ProjectShelf` | `W/model/groups.ts` (`byStart`), held to `Fixtures/web/groups/panels.json` | **same** |
@@ -63,7 +63,7 @@ The deltas are tracked by 29 issues:
 | Sidebar foot: host notices | *Connecting…*; or this Mac’s host hasn’t joined (open Agents Host and press Try Again), isn’t running, or isn’t answering, with Try Again: `A/Projects/ProjectListView.swift:518-534, 804-826` | *offline* on the host heading | *This Mac's host isn't answering* even while only connecting: `W/views/Sidebar.tsx:74, 108-117` | **delta**: web #250 (connecting). Try Again on the page: **by design** (#83, nothing of its own to redial) |
 | Files the host couldn't read (`store/notes`, #205) | Sidebar foot: `A/Projects/ProjectListView.swift:580-587` | A section at the foot of the projects list, asked on each catch-up: `R/Projects/ProjectListView.swift:42-55` | Sidebar foot, a server's named: `W/views/Sidebar.tsx:117-125` | **same** (#223) |
 | Keeping this Mac awake | Wake row: `A/Projects/ProjectListView.swift:745-809` | None | None | **by design** (the Mac's setting; the page isn't told the wake state, #151) |
-| Forget this client | None (the window is paired by its Mac) | Only when the control plane refuses it: `R/Link/ControlPlaneLink.swift:70-75` | *Forget This Browser…*: `W/views/Sidebar.tsx:118-128` | **delta**: decide, #267 |
+| Forget this client | *Forget This Mac…* on the window's own row of Settings ▸ Control plane ▸ Clients, asked first; the window goes back to first run: `A/Control/ControlClientsPane.swift:41-62`, `A/AppModel.swift:1840` (#344) | *Forget This iPhone…* / *iPad…* at the sidebar's foot, asked first; the app goes back to pairing: `R/Sidebar/RemoteSidebar.swift:76-80, 299-322`, `R/RemoteModel.swift:233` (#344) | *Forget This Browser…*: `W/views/Sidebar.tsx:136-143` | **same** (#344): each forgets itself with `clients/forgetSelf` (071 FR-015) |
 
 ## Session rows and states
 
@@ -84,10 +84,10 @@ The deltas are tracked by 29 issues:
 | Worktree badge | ⑂ name, struck when gone, help *branch — path*: `A/AgentList/AgentRow.swift:361-386` | Struck when gone, help *branch — path*: `R/Projects/AgentCard.swift` | Struck; help the branch only: `W/views/SessionRow.tsx:84`, `W/app.css:561` | **same**; web #251 |
 | Folder is missing (#119) | On the row | On the row | On the row | **same** |
 | Labels | Every chip: `A/AgentList/AgentRow.swift:138-148` | Two, then *+N*: `R/Projects/AgentCard.swift:22-45` | Every chip: `W/views/SessionRow.tsx:85` | **by design** (phone width) |
-| Last-activity time in the corner | None | None | *5m*, *3h*, *2d*: `W/views/SessionRow.tsx:93` | **delta**: decide, #267 |
+| Last-activity time in the corner | *5m*, *3h*, *2d*, read again on the minute: `S/ActivityTime.swift` in `A/AgentList/AgentRow.swift` | The same view in `R/Sidebar/SidebarRows.swift` | `W/views/SessionRow.tsx`, words in `W/model/activity.ts` | **same** (#341; `ActivityWords.short`, held to `Fixtures/web/activity/short.json`) |
 | In flight, "telling …" (#87) | The host's name: `A/Permission/AnswerRecipient.swift:6-9` | The host's name: `R/RemoteModel.swift` `answerRecipient`, at `R/Projects/AgentCard.swift:122` and four more | `store.recipient(host)`: `W/model/store.ts:1111-1113` | **same** (#239) |
 | One action at a time, held while telling (#87) | `A/AgentList/AgentRow.swift` | `R/Projects/AgentCard.swift` | `W/views/SessionRow.tsx` | **same** |
-| Row actions | Carry on, Stop, Bring Back, Retire Now…, Mark Read / Unread, Pin, Branch, Park, Archive, Show in Finder: `A/AgentList/AgentRow.swift:213-268` | Stop, Bring Back, and the other card actions: `R/Projects/AgentCard.swift` | Stop, Park / Unpark, Mark, Pin, Bring Back / Archive, Move: `W/views/SessionMenu.tsx:16-44` | **same** for Stop and Bring Back; Branch #267. Retire Now and Show in Finder: **by design** (retention and Finder are the Mac's) |
+| Row actions | Carry on, Stop, Bring Back, Retire Now…, Mark Read / Unread, Pin, Branch, Park, Archive, Show in Finder: `A/AgentList/AgentRow.swift:213-268`; Branch in the Session menu too (⌥⌘B) | Stop, Bring Back, Branch, and the other card actions: `R/Projects/AgentCard.swift`; Branch in the chat's ··· too: `R/Chat/RemoteChatView.swift` | Stop, Park / Unpark, Mark, Pin, Branch, Bring Back / Archive, Move, in the row's menu and the chat's ···: `W/views/SessionMenu.tsx:20-54` | **same** for Stop, Bring Back and Branch (#342: `agents/fork`, the new session opened). Retire Now and Show in Finder: **by design** (retention and Finder are the Mac's) |
 | Swipe | Pin; Archive, or Bring Back when archived: `A/Projects/ProjectListView.swift:487-506` | Pin; Archive, or Bring Back when archived: `R/Projects/AgentCard.swift` | None | **same**; web: **by design** (no swipe) |
 | Swipe waits for the swipe to close (#74) | Yes | Yes | n/a | **by design** (the page has no swipe) |
 | Mark Read / Unread reaches the agent's host | Per host | Per host: `R/RemoteModel.swift:2493-2507` | Per host: `W/views/SessionMenu.tsx:78` | **same** (#238) |
@@ -106,7 +106,7 @@ The deltas are tracked by 29 issues:
 | Terminal output in a call | `S/Chat/ChatBlocks.swift:151` | Shared | *shown in the Mac window*: `W/views/chat/Rows.tsx:166` | **by design** (no terminal on the page) |
 | Markdown: code colour, task lists | `S/Page/MarkdownText.swift:24, 204`, `S/Code/CodeBlockText.swift` | Shared | Coloured known fences, static task boxes: `W/render/codeHighlight.ts`, `W/render/markdown.ts` | **same** (#252) |
 | Pictures in messages | `S/Chat/ChatBlocks.swift:40-51` | Shared | Image data drawn from a data URL; external addresses stay unloaded: `W/views/chat/Rows.tsx:40-45` | **same** (#252) |
-| Plan; a withdrawn plan | `S/Chat/ChatBlocks.swift:177-223` | Shared, plus a current-plan strip: `R/Chat/PlanView.swift:13-69` | Withdrawn entries crossed out; *The agent dropped this plan*: `W/views/chat/Rows.tsx:87-96` | **same** (#252); the plan strip #267 |
+| Plan; a withdrawn plan; the current-plan strip | `S/Chat/ChatBlocks.swift:177-223`; the strip under the chat's head: `S/Chat/CurrentPlanStrip.swift` in `A/Chat/ChatView.swift` | Shared, the strip in `R/Chat/RemoteChatView.swift` | Withdrawn entries crossed out; *The agent dropped this plan*: `W/views/chat/Rows.tsx`; the strip: `W/views/PlanStrip.tsx` | **same** (#252, #341; `Agent.planInForce` and `Plan.stripSummary`, held to `Fixtures/web/plan/strip.json`) |
 | Switch note and handoff | `S/Chat/SwitchNote.swift:7-24` | Shared | Full switch note: `W/model/switchNote.ts`, drawn by `W/views/chat/Rows.tsx:220-227` | **same** (#252) |
 | Jump to end | Whenever scrolled away, *Something new*: `S/Chat/JumpToEnd.swift:9-43` | Shared | Shown while away; *Something new* when messages arrive: `W/views/Chat.tsx:370-375` | **same** (#252) |
 | First open: the last 12 turns, earlier ones at the top (#90, #91) | 12: `K/Daemon/DaemonAPI.swift` (`TurnsRequest.opening`, #242) | 12, the same request: `R/RemoteModel.swift` | 12: `W/model/store.ts` (`openingTurns`) | **same** |
@@ -116,7 +116,7 @@ The deltas are tracked by 29 issues:
 | Background work over the prompt, its ending line | Stop, Steps, Output: `S/Chat/BackgroundRows.swift:13-45, 228-262`, `A/Sidebar/BackgroundPane.swift` | Stop and Steps: `R/Chat/PromptBar.swift:54-63` | Stop and stopping states: `W/views/Chat.tsx` (`BackgroundRows`); Started/ended lines and failed tint: `W/views/chat/Rows.tsx` | **same** (#253) |
 | Sandbox failure card (064) | `S/Chat/SandboxFailureCard.swift:19-68` | Shared: `R/Chat/RemoteChatView.swift:238-252` | What happened, recovery offer and Keep stopped / Continue without sandbox: `W/views/chat/Rows.tsx` | **same** (#253) |
 | Park line in the chat | `A/Chat/ChatView.swift:141-145` | At the chat's head: `R/Chat/RemoteChatView.swift:89-95` | `parkLine` over the transcript in `W/views/Chat.tsx` | **same** (#253) |
-| Block strip (#157) | Park line and Carry on: `A/Chat/ChatView.swift:134-161` | Carry on in the toolbar: `R/Chat/RemoteChatView.swift:144-154` | Wait lines and Carry on: `W/views/BlockStrip.tsx:7-17` | **delta**: decide, #267 (wait lines in the chat on the page only) |
+| Block strip (#157) | Park line, wait lines and Carry on: `A/Chat/ChatView.swift`, lines by `S/Chat/WaitLines.swift` | Wait lines at the chat's head (`S/Chat/WaitLines.swift`), Carry on in the toolbar: `R/Chat/RemoteChatView.swift` | Wait lines and Carry on: `W/views/BlockStrip.tsx:7-17` | **same** (#341) |
 | Folder is missing strip, refused send (#119) | `A/Chat/MissingFolderStrip.swift` | `R/Chat/RemoteMissingFolderStrip.swift`, alert `R/RemoteApp.swift:135-151` | `W/views/MissingFolder.tsx:30-55` (inline notice) | **same** |
 | Who is asking, on a card (#121) | `askerLine` | `askerLine` | `W/model/asker.ts`, held to `Fixtures/web/asker/line.json` | **same** |
 | Crowd mark on an empty chat | `A/Chat/CrowdMark.swift` | None | None | **by design** (decoration of the window's empty chat) |
@@ -165,7 +165,7 @@ The deltas are tracked by 29 issues:
 | Permission options | `A/Permission/PermissionView.swift:41-48` | `R/Permission/PermissionSheet.swift:110-127` | `W/views/Cards.tsx:176-184` | **same** |
 | What the call will do | Title and kind, plus the diffs and content: `A/Permission/PermissionView.swift:110-125` | Plus the diffs and content: `R/Permission/PermissionSheet.swift:66-106` | Title, kind, diffs and content; a plan instead of *switch_mode*: `W/views/Cards.tsx:224-236` | **same** (#256, #266) |
 | Plan approval | Show plan: the file or the text: `A/Permission/PermissionView.swift:96-111` | The file or the text: `R/Permission/PermissionSheet.swift` (#243) | Show plan: the file or the text: `W/views/Cards.tsx:226-231` | **same** (#243, #256) |
-| A server key ask | `A/Chat/TokenAskCard.swift`, `A/Hosts/Lending.swift:79-87` | None | None | **by design** (the key is lent from the Mac's Keychain); what the others see: #267 |
+| A server key ask | `S/TokenAskCard.swift`, `A/Hosts/Lending.swift:70-90`: kept in the Mac's Keychain, *Save and start* | The same card over the start sheet or the app, on every server's client: `R/StartAgent/TokenAskSheet.swift`, `R/RemoteModel.swift:250-300` (#344) | The same ask as a dialog, on a start or a prompt: `W/views/TokenAsk.tsx`, `W/model/store.ts:1424-1480` (#344) | **same** (#344). Where the key goes is **by design**: the window keeps it; the Remote and the page lend it on their own connection and keep it nowhere, *Lend and start* |
 
 ## Start sheet and new project
 
@@ -200,7 +200,7 @@ The deltas are tracked by 29 issues:
 |---|---|---|---|---|
 | Worktree list, Remove…, Clean up | Project Settings ▸ Worktrees: `A/Projects/WorktreeRow.swift` | None | None | **by design** (Project Settings are the Mac's) |
 | Recreate a removed worktree (#119) | `A/Chat/MissingFolderStrip.swift:29-35` | `R/Chat/RemoteMissingFolderStrip.swift:24-26` | `W/views/MissingFolder.tsx:22-23` | **same** |
-| Files: a tree, or a folder at a time (#133) | A tree: `A/Sidebar/FilesPane.swift:292-375` | A folder at a time: `R/Panes/FilesPane.swift:103-260` | A tree from 760 px: `W/views/files/Tree.tsx:25` | **by design** (phone width). The iPad: #267 |
+| Files: a tree, or a folder at a time (#133, #345) | A tree: `A/Sidebar/FilesPane.swift`, rows `S/Files/FileTreeRow.swift`, reads `K/Files/FileTreeReads.swift` | A tree on a regular-width iPad, the same rows and reads; a folder at a time on the phone: `R/Panes/FilesPane.swift` | A tree from 760 px: `W/views/files/Tree.tsx:25` | **by design** (a phone's width has no room for the indents; the iPad and the page draw the tree, #345) |
 | Change marks in Files (#63) | Square, +N −M, folder totals: `A/Sidebar/FilesPane.swift:420-474` | Square status marks, +N −M and folder totals: `R/Panes/FilesPane.swift` | `W/views/FilesPane.tsx:50-115` | **same** |
 | Changes: tree, squares, total (#63) | `A/Sidebar/ChangesPane.swift:93-199` | Tree, status marks and total: `R/Panes/RemoteChangesPane.swift` | `W/views/Changes.tsx:69-143` | **same** |
 | Changes: *may include other agents' work* | `A/Sidebar/ChangesPane.swift:142, 185-192` | Says git may include others' work: `R/Panes/RemoteChangesPane.swift` | The window's two sentences: `W/views/Changes.tsx` | **same** |
@@ -216,7 +216,7 @@ The deltas are tracked by 29 issues:
 | Writing a file: the live Markdown page only | `A/Sidebar/FilesPane.swift:501-506` | `R/Panes/PagePane.swift` | `W/views/LiveDocument.tsx` | **same** |
 | Search in files | None | None | None | **same** |
 | Exchanged documents | `A/Sidebar/ArtifactsPane.swift` | `R/Chat/DocumentView.swift` | `W/views/Exchanged.tsx` (a web address is a link) | **same** |
-| Terminal | Tabs (055): `A/Sidebar/TerminalPane.swift` | One shell: `R/Panes/TerminalPane.swift` | None | Web: **by design** (071). The Remote's one shell: #267 |
+| Terminal | Tabs (055): `A/Sidebar/TerminalPane.swift`, `S/Terminal/ShellTabs.swift` | The same tabs, new, switch, close (#345): `R/Panes/TerminalPane.swift` | None | **by design** (web: no terminal on the page, 071) |
 | Browser pane | `A/Sidebar/BrowserPane.swift` | None (FR-030) | None | **by design** (local servers only listen on the Mac) |
 | Open in another app, Show in Finder | `A/Sidebar/OpenElsewhere.swift` | *It can't be shown here.* | *It can't be shown here.* | **by design** |
 
@@ -334,6 +334,8 @@ The deltas are tracked by 29 issues:
 | Dashboard view actions and six tile kinds (#329) | `ProjectDashboardView` supplies project identity and navigation to `AppViewHost`; the shared view serves actions and tile HTML from `AppViewCatalog.swift` | The same shared view and project context via `R/RemoteApp.swift` | The sandbox view host passes project context and navigation via `W/views/DashboardAppView.tsx`; the same served HTML | **same**; app-only actions: Update now, Hide, Show, Remove, Move, Open Keeper, Details; number, status, table, note, link, page |
 | A pinned `ui://` view (#189): a row with the pages, opened full page and fed afresh by its pin's read-only call; missing with why; Unpin | `PinnedViewPage` through `AppViewHost`, from `A/ContentView.swift`; row in `A/Projects/PinnedPageRows.swift`; walked on a scratch window 2026-10-06 (`specs/188-mcp-apps-rest/walks/mac-189-*.png`): pinned from a real Claude chat's test view, opened fed afresh, unpinned | The same view for `RemoteRoute.page`: `R/RemoteApp.swift`; row in `R/Sidebar/SidebarRows.swift` | `W/views/PinnedViewPage.tsx`, from `W/views/Pins.tsx`; walked in headless Chrome (`Web/test/walk/pins189.mjs`, `specs/188-mcp-apps-rest/walks/web-189-pinned-view.png`) | **same** |
 | **Pin to Project** for a view whose call can feed a pin (#189), inline and full screen | The view's ··· menu: `S/AppView/AppViewRow.swift` | The same, shared | A Pin button in the caption and the full-screen bar: `W/views/chat/AppView.tsx`, `W/views/chat/viewLayer.ts` | **same** |
+| A view from the person's own http MCP server (#191): drawn in the turn that called its tool and as a pin; asks **Show** / **Don't Show** in the view's place first and again when the view changes; the caption names the server; reaches only its own server; stdio servers' views not shown yet | `S/AppView/AppViewHost.swift` (`asking`, `answerShow`), `S/AppView/AppViewRow.swift` (`AppViewShowAsk`); walked 2026-10-06 on a scratch window with a real Claude call of the ext-apps `basic-server-vanillajs` example: Show, inline, pinned and fed afresh, `example.com` blocked (`specs/188-mcp-apps-rest/walks/mac-191-*.png`) | The same shared host and row; builds, look not walked (Alex's) | `W/views/chat/viewLayer.ts`, `W/views/chat/AppView.tsx`, `W/views/PinnedViewPage.tsx`; walked in headless Chrome (`Web/test/walk/views191.mjs`, `specs/188-mcp-apps-rest/walks/web-191-*.png`) | **same**
+| **Ask Again** for a server's views, with what was said (views shown / not shown), on its row in the MCP servers (#191) | `A/Projects/ProjectMCPSection.swift` | None | None | **by design** (a server's settings are the Mac's) |
 
 ## Live sync
 

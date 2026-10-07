@@ -72,7 +72,13 @@ public enum CredentialKind: String, Codable, Hashable, Sendable, CaseIterable {
 
     /// Where to get one, under the paste field.
     public static func whereToGet(for runtimeID: String) -> String {
-        "Get one at aistudio.google.com/apikey. Gemini agents on this Mac use it too: Google’s own sign-in is closed to individuals."
+        source(for: runtimeID) + " Gemini agents on this Mac use it too: Google’s own sign-in is closed to individuals."
+    }
+
+    /// Where to get one, and no more: under the paste field of a client that keeps none,
+    /// the Remote and the page (#344).
+    public static func source(for runtimeID: String) -> String {
+        "Get one at aistudio.google.com/apikey."
     }
 
     /// What is said when the pasted text is not one.

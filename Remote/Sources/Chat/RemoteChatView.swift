@@ -102,6 +102,15 @@ struct RemoteChatView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 6)
                 }
+                // Blocked (039): what it waits on, as the row says it (#341). Carry on is
+                // the toolbar's.
+                if let agent, model.isBlocked(agent) {
+                    WaitLines(lines: model.blockLines(agent))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 6)
+                        .background(Paper.ground)
+                }
                 // Under the banner, not over it: when the Mac has gone quiet, what
                 // the agent last said it would do is the less urgent of the two.
                 if let agent { CurrentPlanStrip(agent: agent) }
@@ -300,7 +309,10 @@ private struct ChatMenu: View {
             .pickerStyle(.inline)
             Divider()
             Button("Exchanged", systemImage: "doc") { model.panes.state(for: agent.id).show(.exchanged) }
-            if agent.state == .archived {
+            if agent.state != .archived {
+                // As the Mac's Session menu has it (#342).
+                BranchAgentButton(agent: agent)
+            } else {
                 Divider()
                 Button("Bring Back", systemImage: "tray.and.arrow.up") {
                     Task { await model.unarchive(agent.id) }

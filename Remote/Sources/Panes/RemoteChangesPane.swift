@@ -67,25 +67,18 @@ struct RemoteChangesPane: View {
                 }
             }
             ForEach(lines) { line in
+                // The window's rows (#345): the same squares, counts and words.
                 switch line.node {
                 case .folder(let name, let key, _, let totals):
                     let open = !collapsed.contains(key)
-                    Button {
+                    FileTreeRow(name: name, kind: .folder(open: open), depth: line.depth,
+                                label: "\(name), folder, \(ChangeWords.label(totals))",
+                                added: totals.added, removed: totals.removed,
+                                isPath: name.contains("/")) {
                         if open { collapsed.insert(key) } else { collapsed.remove(key) }
-                    } label: {
-                        treeRow(name, icon: open ? "folder.fill" : "folder", depth: line.depth,
-                                detail: "\(totals.files) files · +\(totals.added) −\(totals.removed)")
                     }
-                    .accessibilityLabel("\(name), folder, \(ChangeWords.label(totals))")
-                    .buttonStyle(.plain)
                 case .file(let file):
-                    Button { selectedPath = file.path } label: {
-                        treeRow(file.fileName, icon: ChangeTint.symbol(file.state),
-                                color: ChangeTint.color(file.state), depth: line.depth,
-                                detail: file.added.map { "+\($0) −\(file.removed ?? 0)" } ?? "")
-                    }
-                    .accessibilityLabel(ChangeWords.label(file))
-                    .buttonStyle(.plain)
+                    FileTreeRow(changed: file, depth: line.depth) { selectedPath = file.path }
                 }
             }
             if let more = list.more, more > 0 {
@@ -95,18 +88,6 @@ struct RemoteChangesPane: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-    }
-
-    private func treeRow(_ name: String, icon: String, color: Color = Paper.accent,
-                         depth: Int, detail: String) -> some View {
-        HStack(spacing: 7) {
-            Image(systemName: icon).foregroundStyle(color).frame(width: 18)
-            Text(name).lineLimit(1).truncationMode(.middle)
-            Spacer(minLength: 6)
-            if !detail.isEmpty { Text(detail).appText(.fine).monospacedDigit().foregroundStyle(.secondary) }
-        }
-        .padding(.leading, CGFloat(depth * 14))
-        .contentShape(Rectangle())
     }
 
     private func fetch() async {

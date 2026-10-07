@@ -113,19 +113,42 @@ final class RemoteModel {
     let files: RemoteFiles
     let panes = RemotePanes()
     let pictures: PhonePictures
-    /// This device's end of each agent's shell it has opened (034). The shell is the
-    /// Mac's; these only know how to reach it.
-    @ObservationIgnored private var shells: [UUID: ShellClient] = [:]
+    /// This device's end of each of an agent's shells it has opened (034), one per
+    /// terminal tab (055, #345). The shells are the Mac's; these only know how to reach them.
+    @ObservationIgnored private var shells: [ShellKey: ShellClient] = [:]
     /// When this device last asked to warm each session, and why (#183).
     @ObservationIgnored private var prewarmed: [String: Date] = [:]
 
-    func shellClient(for agentID: UUID) -> ShellClient {
-        if let existing = shells[agentID] { return existing }
-        let fresh = ShellClient(agentID: agentID, client: client, describe: { error in
+    struct ShellKey: Hashable {
+        let agentID: UUID
+        let shell: Int
+    }
+
+    func shellClient(for agentID: UUID, shell: Int = 0) -> ShellClient {
+        let key = ShellKey(agentID: agentID, shell: shell)
+        if let existing = shells[key] { return existing }
+        let fresh = ShellClient(agentID: agentID, shell: shell, client: client, describe: { error in
             (error as? JSONRPCError)?.message ?? "Your Mac is not answering."
         })
-        shells[agentID] = fresh
+        shells[key] = fresh
         return fresh
+    }
+
+    /// The shells the Mac holds for an agent, so the pane opens with the tabs the window
+    /// has (055). Nil from a daemon too old to hold more than one, and the pane then
+    /// offers only the one.
+    func shellNumbers(for agentID: UUID) async -> [Int]? {
+        let response = try? await client.call(DaemonAPI.Method.shellList, DaemonAPI.AgentRequest(agentID: agentID),
+                                              returning: DaemonAPI.ShellListResponse.self)
+        return response?.shells
+    }
+
+    /// The person closed a terminal tab: the shell ends, on the Mac too, and this
+    /// device forgets it.
+    func closeShell(agentID: UUID, shell: Int) async {
+        let client = shellClient(for: agentID, shell: shell)
+        shells[ShellKey(agentID: agentID, shell: shell)] = nil
+        await client.close()
     }
 
 
@@ -224,6 +247,75 @@ final class RemoteModel {
         pairing = .idle
     }
 
+    /// Set once this device has forgotten itself: the app makes a new, unpaired model (#344).
+    private(set) var forgotItself = false
+
+    /// Forget This iPhone (#344, 071 FR-015): the control plane forgets this device, and only
+    /// it, then the pairing goes and the app asks for a code again. Answers why not, with
+    /// nothing changed, or nil.
+    func forgetThisDevice() async -> String? {
+        do {
+            try await client.call(DaemonAPI.Method.clientsForgetSelf, DaemonAPI.Empty())
+        } catch let error as JSONRPCError {
+            return error.message
+        } catch {
+            return "Your Mac is not answering. This \(UIDevice.current.model) is still paired."
+        }
+        note("pairing: forgot itself")
+        RemoteControl.forget()
+        forgotItself = true
+        return nil
+    }
+
+    // MARK: A server's key (#344)
+
+    /// A server asked for a key this device has none of to lend: the window's card asks the
+    /// person, and the key is lent on this device's own connection to it (043, #344).
+    var tokenAsk: TokenAsk?
+
+    /// The home host's asks: the control plane's, which may be a server.
+    private func answerHomeCredentialWanted(_ wanted: DaemonAPI.CredentialWanted) async -> Bool {
+        await answerCredentialWanted(wanted, on: controlHome ?? .mac)
+    }
+
+    /// A server's daemon wants a key to start a runtime (043, R6): asked of the person, as the
+    /// window asks. True when one was lent, and the refused call is then sent again, as
+    /// it was. A second ask while one is showing is refused rather than left waiting.
+    private func answerCredentialWanted(_ wanted: DaemonAPI.CredentialWanted, on id: HostID) async -> Bool {
+        guard id != .mac, !CredentialKind.kinds(for: wanted.runtime).isEmpty, tokenAsk == nil else { return false }
+        let label = hostName(id)
+        return await withCheckedContinuation { answer in
+            tokenAsk = TokenAsk(runtimeID: wanted.runtime, host: id, label: label,
+                                keeping: "Paste a key and Agents lends it to \(label) while this \(UIDevice.current.model) "
+                                    + "is connected. It is kept nowhere.",
+                                whereToGet: CredentialKind.source(for: wanted.runtime),
+                                action: "Lend and start", answer: answer)
+        }
+    }
+
+    /// The person pasted a key: offered and lent to the server that asked, on this device's
+    /// connection to it, and nowhere else. The ask is answered either way.
+    func lend(_ secret: Secret, for ask: TokenAsk) async {
+        let server = ask.host == controlHome ? client : otherHosts[ask.host]
+        var lent = false
+        if let server {
+            lent = (try? await server.call(DaemonAPI.Method.credentialsOffer,
+                                           DaemonAPI.CredentialsOffer(runtimes: [ask.runtimeID], ownSignInOnly: false))) != nil
+            if lent {
+                lent = (try? await server.call(DaemonAPI.Method.credentialsLend,
+                                               DaemonAPI.CredentialsLend(runtime: ask.runtimeID, secret: secret))) != nil
+            }
+        }
+        finishTokenAsk(lent: lent)
+    }
+
+    /// The ask answered: lent (true), or cancelled. Once per ask: its answer is a continuation.
+    func finishTokenAsk(lent: Bool) {
+        guard let ask = tokenAsk else { return }
+        tokenAsk = nil
+        ask.answer.resume(returning: lent)
+    }
+
     /// Put what the person typed on a page on disk, through the daemon, which is the one
     /// writer and the one that tells the agent (022). The same request the Mac's page
     /// makes, so a phone's edit is the person's in exactly the same way (034 FR-006).
@@ -302,8 +394,8 @@ final class RemoteModel {
     /// cost, and a grand total that quietly dropped it would be wrong rather than tidy.
     /// The archived ones are fetched when that page opens (`loadArchivedProjects`).
     var allProjects: [DaemonAPI.ProjectSummary] {
-        let held = Set(work.projects.map(\.folder))
-        return work.projects + archivedProjects.filter { !held.contains($0.folder) }
+        let held = Set(work.projects.map(\.key))
+        return work.projects + archivedProjects.filter { !held.contains($0.key) }
     }
     /// The open project's standing arrangements.
     var workflows: [WorkflowSummary] { work.workflows(in: selectedProject) }
@@ -1053,6 +1145,10 @@ final class RemoteModel {
             }
             note("link: connected \(link) after \(ContinuousClock.now - began)")
             refusals.connected()
+            // A home host that is a server asks for a key as any other server does (#344).
+            await client.setCredentialLender { [weak self] wanted in
+                await self?.answerHomeCredentialWanted(wanted) ?? false
+            }
             isConnected = true
             lastHeardFrom = Date()
             problem = nil
@@ -1246,6 +1342,10 @@ final class RemoteModel {
             guard (try? await other.connect(startIfNeeded: false, timeout: .seconds(5))) != nil else { continue }
             let id = host.id
             reachableHosts.insert(id)
+            // A start there with no key of its own asks this device for one (#344).
+            await other.setCredentialLender { [weak self] wanted in
+                await self?.answerCredentialWanted(wanted, on: id) ?? false
+            }
             if let projects = try? await other.call(DaemonAPI.Method.projectsList,
                                                     DaemonAPI.ProjectsListRequest(includeArchived: false),
                                                     returning: [DaemonAPI.ProjectSummary].self) {
@@ -1374,14 +1474,12 @@ final class RemoteModel {
         // The Mac sends a device only the shells it has open (034).
         if notification.method == DaemonAPI.Notification.shellOutput,
            let params = notification.params,
-           let output = DaemonAPI.ShellOutputNotification(params: params),
-           output.shell == 0 {
-            self.shells[output.agentID]?.received(output.bytes)
+           let output = DaemonAPI.ShellOutputNotification(params: params) {
+            self.shells[ShellKey(agentID: output.agentID, shell: output.shell)]?.received(output.bytes)
         }
         if notification.method == DaemonAPI.Notification.shellStateChanged,
-           let change = try? notification.params?.decode(DaemonAPI.ShellStateNotification.self),
-           change.shell == 0 {
-            self.shells[change.agentID]?.received(change.state)
+           let change = try? notification.params?.decode(DaemonAPI.ShellStateNotification.self) {
+            self.shells[ShellKey(agentID: change.agentID, shell: change.shell)]?.received(change.state)
         }
         if notification.method == DaemonAPI.Notification.filesChanged,
            let change = try? notification.params?.decode(DaemonAPI.FilesChangedNotification.self) {
@@ -1990,16 +2088,54 @@ final class RemoteModel {
         return listed.count > limit
     }
 
-    /// Archived projects, for Spending only: what they cost still counts. Asked for when
-    /// that page opens.
+    /// Archived projects, as each host listed them: for the sidebar's Archived projects
+    /// (#343), and for Spending, where what they cost still counts. Asked for when either
+    /// appears, since the catch-up leaves them out.
     private(set) var archivedProjects: [DaemonAPI.ProjectSummary] = []
 
+    /// Every host's archived projects, the latest worked on first, as the window's
+    /// Archived projects (#343): those listed, less any brought back since, and any put
+    /// away since, as their hosts said.
+    var shelvedProjects: [DaemonAPI.ProjectSummary] {
+        let held = Set(work.projects.map(\.key))
+        return (work.archivedProjects + archivedProjects.filter { !held.contains($0.key) })
+            .sorted { $0.lastActivityAt > $1.lastActivityAt }
+    }
+
     func loadArchivedProjects() async {
-        guard let listed = try? await client.call(DaemonAPI.Method.projectsList,
-                                                  DaemonAPI.ProjectsListRequest(includeArchived: true),
+        let request = DaemonAPI.ProjectsListRequest(includeArchived: true)
+        guard let listed = try? await client.call(DaemonAPI.Method.projectsList, request,
                                                   returning: [DaemonAPI.ProjectSummary].self)
         else { return }
-        archivedProjects = listed.filter(\.project.isArchived)
+        var archived = listed.filter(\.project.isArchived)
+        // The control plane's other hosts that answer, each stamped as its own.
+        for host in reachableHosts.sorted(by: { $0.rawValue < $1.rawValue }) {
+            guard let other = otherHosts[host],
+                  let theirs = try? await other.call(DaemonAPI.Method.projectsList, request,
+                                                     returning: [DaemonAPI.ProjectSummary].self)
+            else { continue }
+            archived += theirs.filter(\.project.isArchived).map { var summary = $0; summary.host = host; return summary }
+        }
+        archivedProjects = archived
+    }
+
+    /// Bring an archived project back (#343), through its own host, as the window's Bring
+    /// Back does: a project again, with its Dashboard open.
+    func unarchiveProject(_ summary: DaemonAPI.ProjectSummary) async {
+        let host = summary.host
+        let target = host == .mac ? client : otherHosts[host]
+        guard let target, host == .mac || reachableHosts.contains(host) else { return }
+        do {
+            var brought = try await target.call(DaemonAPI.Method.projectsUnarchive,
+                                                DaemonAPI.ProjectRequest(folder: summary.folder),
+                                                returning: DaemonAPI.ProjectSummary.self)
+            brought.host = host
+            work.upsert(brought)
+            archivedProjects.removeAll { $0.key == summary.key }
+            sidebarItem = .project(brought.key)
+        } catch {
+            problem = sentence(for: error)
+        }
     }
 
     /// What today has cost and what the reader will allow. The phone shows limits
@@ -2809,6 +2945,26 @@ final class RemoteModel {
             problem = error.message
         } catch {
             problem = "That did not reach your Mac."
+        }
+    }
+    /// Branch (#342): a new session that carries the history so far, the original left
+    /// alone, as the Mac's row has it. Opened once its host has started it.
+    func fork(_ agentID: UUID) async {
+        guard !isStale(on: work.agent(agentID)?.host ?? .mac) else {
+            problem = "Your Mac is not answering, so that could not be sent."
+            return
+        }
+        let folder = work.agent(agentID)?.projectFolder
+        do {
+            let id = try await sendOnce(DaemonAPI.Method.agentsFork,
+                                        DaemonAPI.AgentRequest(agentID: agentID)).decode(UUID.self)
+            await loadWholeAgent(id)
+            if let folder { selectedProject = folder }
+            selection = id
+        } catch let error as JSONRPCError {
+            problem = error.message
+        } catch {
+            problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
         }
     }
     func unarchive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsUnarchive, agentID) }

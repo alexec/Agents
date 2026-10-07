@@ -3,22 +3,87 @@ import SwiftTerm
 import SwiftUI
 import UIKit
 
-/// The Terminal: the agent's shell, the one the Mac's pane shows, on the phone (034).
+/// The Terminal: the agent's shells, the ones the Mac's pane shows, on the phone (034),
+/// one per tab as the window has them (055, #345).
 ///
-/// Not a second shell. The daemon holds one per agent, and this attaches to it with its
+/// Not shells of its own. The daemon holds them, and each tab attaches to one with its
 /// scrollback, as the Mac's pane does; a command started on either screen is running on
 /// the other. Leaving the pane or the app lets go of nothing on the Mac (FR-023).
+/// Closing a tab is the one thing that ends a shell, here as on the Mac.
 ///
-/// Nothing typed here reaches the agent, and nothing the agent runs appears here. This
-/// is the person's shell.
+/// Nothing typed here reaches the agent, and nothing the agent runs appears here. These
+/// are the person's shells.
 struct TerminalPane: View {
     @Environment(RemoteModel.self) private var model
     let agent: Agent
 
+    private var state: PaneState { model.panes.state(for: agent.id) }
+
+    var body: some View {
+        let state = state
+        VStack(spacing: 0) {
+            ShellTabs(shells: state.shells, front: state.frontShell,
+                      canOpenMore: state.canOpenMoreShells && !model.isStale,
+                      select: { state.frontShell = $0 },
+                      open: open, close: close)
+            Divider()
+            // Every tab's screen is built and the hidden ones kept alive, as on the Mac,
+            // so a tab comes back with its screen and scrollback as it was.
+            ZStack {
+                ForEach(state.shells, id: \.self) { shell in
+                    ShellScreen(agent: agent, shell: shell, isFront: state.frontShell == shell,
+                                isOpen: { state.shells.contains(shell) })
+                        .opacity(state.frontShell == shell ? 1 : 0)
+                        .allowsHitTesting(state.frontShell == shell)
+                        .accessibilityHidden(state.frontShell != shell)
+                }
+            }
+        }
+        // Asked each time the pane is shown, not once as the window does: the phone
+        // stays open for days, and a tab opened or closed on the Mac meanwhile is found.
+        .task(id: agent.id) {
+            guard let held = await model.shellNumbers(for: agent.id) else {
+                state.canOpenMoreShells = false
+                return
+            }
+            state.canOpenMoreShells = true
+            state.shells = held
+            if !held.contains(state.frontShell) { state.frontShell = held.first ?? 0 }
+        }
+        .onDisappear { model.isTyping = false }
+    }
+
+    private func open() {
+        let state = state
+        let next = (state.shells.max() ?? -1) + 1
+        state.shells.append(next)
+        state.frontShell = next
+    }
+
+    private func close(_ shell: Int) {
+        let state = state
+        guard state.shells.count > 1, let index = state.shells.firstIndex(of: shell) else { return }
+        state.shells.remove(at: index)
+        if state.frontShell == shell {
+            state.frontShell = state.shells[min(index, state.shells.count - 1)]
+        }
+        Task { await model.closeShell(agentID: agent.id, shell: shell) }
+    }
+}
+
+/// One tab's screen, and what it says when that shell will not start or has ended.
+private struct ShellScreen: View {
+    @Environment(RemoteModel.self) private var model
+    let agent: Agent
+    let shell: Int
+    let isFront: Bool
+    /// Whether the tab is still in the row. A closed tab's shell has ended.
+    let isOpen: () -> Bool
+
     @State private var rows = 24
     @State private var cols = 60
 
-    private var client: ShellClient { model.shellClient(for: agent.id) }
+    private var client: ShellClient { model.shellClient(for: agent.id, shell: shell) }
 
     var body: some View {
         let client = client
@@ -31,7 +96,8 @@ struct TerminalPane: View {
                 if client.dropped > 0 {
                     Note("Earlier output was dropped.")
                 }
-                PhoneTerminalView(client: client, isEnabled: !model.isStale && client.state.isLive,
+                // Only the tab on top takes the keyboard.
+                PhoneTerminalView(client: client, isEnabled: isFront && !model.isStale && client.state.isLive,
                                   onFocus: { model.isTyping = $0 }) { newRows, newCols in
                     rows = newRows
                     cols = newCols
@@ -50,7 +116,9 @@ struct TerminalPane: View {
             Task { await client.attach(rows: rows, cols: cols) }
         }
         .onDisappear {
-            model.isTyping = false
+            // A closed tab is not detached: the Mac lets a device go of an agent's
+            // shells all at once, and the tabs still open would stop hearing theirs.
+            guard isOpen() else { return }
             Task { await client.detach() }
         }
     }

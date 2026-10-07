@@ -67,6 +67,12 @@ enum ControlConfig {
         return DaemonClient(link: link.link(for: .mac))
     }
 
+    /// Forget This Mac (#344): the pairing goes, so the window asks how to work again, as
+    /// at first run. Its key stays, as the Remote's does; a new pairing names it afresh.
+    static func forget() {
+        try? FileManager.default.removeItem(at: membershipFile)  // store-ok: the window's own container
+    }
+
     /// Connect to a control plane (frames C and K2): say who this window is with the code,
     /// then keep what it was told. What the window may do is the code's.
     static func pair(with code: ControlCode) async throws -> ControlMembership {

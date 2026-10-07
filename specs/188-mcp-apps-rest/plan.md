@@ -433,6 +433,20 @@ step to check it.
 
 The app **never calls a model's tool again** to get its result.
 
+### As built (2026-10-06)
+
+- **http only** (Q5). `MCPClientPool` refuses a stdio server; `views/read` and a pin of one say
+  "views from local servers aren't shown yet". The rest of "How the app connects" above stands
+  for http.
+- **Idle** is measured from the client's last use (a read or a call), not from the last view
+  closing: the daemon is not told when a client stops drawing a view.
+- **A cold catalog.** The first call of a server's tool reads its catalog; a call answered
+  before that read finishes is written once, done, rather than running and then done.
+- **The host context's `toolInfo.tool`** carries an `inputSchema` (`{"type":"object"}`): the
+  ext-apps SDK refuses `ui/initialize` without one, which #187's own test view never noticed.
+- **A view's server** is checked by the daemon, not taken from the client: a chat's view by the
+  `appView` entry it wrote, a pinned page's by the project's pins.
+
 ### Clients
 
 The renderer and bridge are unchanged. The caption shows the server's name, and the permission
@@ -492,15 +506,23 @@ tasks (T001–T010).
    extra tokens on Claude?
 3. **`ui/message` and model context from a project place** (Dashboard, pins). There is no agent to
    tell. Alex, **refuse them** (recommended for now), or offer "Start an agent with this"?
+   **Answered (Alex, 2026-10-06): refused and logged.**
 4. **#189 before #191.** Until third-party views, the only pinnable views are the test view (and
    the Dashboard, which is already a row). Alex, **build #189 now on the test view** (recommended:
    the mechanism is #188's and is cheap), or fold it into #191?
 5. **A second copy of a stdio server** for views. Alex, is starting our own copy acceptable, gated
    by **Show / Don't Show per server** (recommended), or should #191 cover HTTP servers only at
    first?
+   **Answered (Alex, 2026-10-06): HTTP (streamable http) servers only for now.** No second copy
+   of a stdio server is started for views. A stdio server's view says plainly that views from
+   local servers aren't shown yet: a **known limit**, with a follow-up issue. `MCPClientPool`
+   covers http clients only: bounded, ended on idle, secrets by `SecretsEnv`, and no view from a
+   server waiting for approval.
 6. **Personal servers and Show / Don't Show.** Personal servers skip run approval today. Alex,
    should the view prompt apply to them too (recommended: yes, it is about HTML, not running)?
+   **Answered (Alex, 2026-10-06): yes, personal servers too.**
 7. **OpenCode** gives only text. Alex, **pinned only** (recommended) or inline with the text alone?
+   **Answered (Alex, 2026-10-06): pinned only, never inline.**
 8. **Page tiles if the nested frame is blocked.** Alex, is opening them in the native reader
    acceptable (recommended), or should #190 wait until they draw inside the view?
 9. **How long the old wire stays.** Alex, keep `dashboard/get` and its siblings indefinitely,

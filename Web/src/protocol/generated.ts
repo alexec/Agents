@@ -68,6 +68,7 @@ export const Failure = {
   shellWillNotStart: -32010,
   signInWanted: -32070,
   storeUnavailable: -32094,
+  viewNeedsShow: -32063,
   viewRefused: -32062,
   workflowLimitReached: -32017,
   workflowTurnedOffByPerson: -32041,
@@ -533,6 +534,21 @@ export interface CostState {
   today: Record<string, number>;
   day: string;
   note?: string;
+}
+
+export type CredentialKind = "geminiAPIKey";
+
+export interface CredentialsLend {
+  runtime: string;
+  kind: CredentialKind;
+  secret: string;
+}
+
+export interface CredentialsOffer {
+  runtimes: string[];
+  ownSignInOnly: boolean;
+  notRelayed?: Record<string, SignInWantedReason>;
+  signIns?: string[];
 }
 
 export interface DashboardChangedNotification {
@@ -1422,6 +1438,8 @@ export interface ShownFile {
   line?: number;
 }
 
+export type SignInWantedReason = "notSignedIn" | "unreadable";
+
 export interface SlashCommand {
   name: string;
   description?: string;
@@ -1734,6 +1752,7 @@ export interface ViewCallRequest {
   name: string;
   arguments?: JSONValue;
   feed?: boolean;
+  server?: string;
 }
 
 export interface ViewContextRequest {
@@ -1761,6 +1780,8 @@ export interface ViewPin {
 export interface ViewReadRequest {
   agentID: UUID;
   uri: string;
+  server?: string;
+  project?: URLString;
 }
 
 export interface ViewResource {
@@ -1770,6 +1791,15 @@ export interface ViewResource {
   policy: AppViewPolicy;
   prefersBorder?: boolean;
   variables: Record<string, string>;
+}
+
+export interface ViewShowRequest {
+  agentID: UUID;
+  project?: URLString;
+  server: string;
+  uri: string;
+  hash: string;
+  show: boolean;
 }
 
 export interface Wait {
@@ -2018,6 +2048,7 @@ export interface Methods {
   "agents/archive": { params: AgentRequest; result: Empty };
   "agents/continueInProject": { params: ContinueInProjectRequest; result: UUID };
   "agents/discardDraft": { params: DiscardDraftRequest; result: Empty };
+  "agents/fork": { params: AgentRequest; result: UUID };
   "agents/labelVocabulary": { params: LabelVocabularyRequest; result: string[] };
   "agents/list": { params: ListRequest; result: Agent[] };
   "agents/options": { params: OptionsRequest; result: OptionsResponse };
@@ -2049,6 +2080,8 @@ export interface Methods {
   "clients/forgetSelf": { params: Empty; result: Empty };
   "control/status": { params: Empty; result: ControlStatus };
   "cost/state": { params: Empty; result: CostState };
+  "credentials/lend": { params: CredentialsLend; result: Empty };
+  "credentials/offer": { params: CredentialsOffer; result: Empty };
   "dashboard/arrange": { params: ArrangeRequest; result: Empty };
   "dashboard/get": { params: DashboardRequest; result: DashboardSnapshot };
   "dashboard/hide": { params: TileRequest; result: Empty };
@@ -2086,6 +2119,7 @@ export interface Methods {
   "projects/clone": { params: CloneRequest; result: ProjectSummary };
   "projects/clones": { params: Empty; result: CloneSummary[] };
   "projects/list": { params: ProjectsListRequest; result: ProjectSummary[] };
+  "projects/unarchive": { params: ProjectRequest; result: ProjectSummary };
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
   "runtimes/allowances": { params: string | null; result: RuntimeAllowances };
   "runtimes/list": { params: Empty; result: RuntimeStatus[] };
@@ -2097,6 +2131,7 @@ export interface Methods {
   "views/context": { params: ViewContextRequest; result: Empty };
   "views/log": { params: ViewLogRequest; result: Empty };
   "views/read": { params: ViewReadRequest; result: ViewResource };
+  "views/show": { params: ViewShowRequest; result: Empty };
   "workflows/approve": { params: WorkflowApproveRequest; result: WorkflowSummary };
   "workflows/archive": { params: WorkflowArchiveRequest; result: WorkflowSummary };
   "workflows/enable": { params: WorkflowEnableRequest; result: WorkflowSummary };
@@ -2112,6 +2147,7 @@ export const MethodTarget = {
   "agents/archive": "host",
   "agents/continueInProject": "host",
   "agents/discardDraft": "host",
+  "agents/fork": "host",
   "agents/labelVocabulary": "host",
   "agents/list": "host",
   "agents/options": "host",
@@ -2143,6 +2179,8 @@ export const MethodTarget = {
   "clients/forgetSelf": "control",
   "control/status": "control",
   "cost/state": "host",
+  "credentials/lend": "host",
+  "credentials/offer": "host",
   "dashboard/arrange": "host",
   "dashboard/get": "host",
   "dashboard/hide": "host",
@@ -2180,6 +2218,7 @@ export const MethodTarget = {
   "projects/clone": "host",
   "projects/clones": "host",
   "projects/list": "host",
+  "projects/unarchive": "host",
   "runtimes/accounts": "host",
   "runtimes/allowances": "host",
   "runtimes/list": "host",
@@ -2191,6 +2230,7 @@ export const MethodTarget = {
   "views/context": "host",
   "views/log": "host",
   "views/read": "host",
+  "views/show": "host",
   "workflows/approve": "host",
   "workflows/archive": "host",
   "workflows/enable": "host",
@@ -2272,6 +2312,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily"] },
   CostState: { required: ["limits", "today", "day"], optional: ["note"] },
+  CredentialsLend: { required: ["runtime", "kind", "secret"], optional: [] },
+  CredentialsOffer: { required: ["runtimes", "ownSignInOnly"], optional: ["notRelayed", "signIns"] },
   DashboardChangedNotification: { required: ["folder", "summary"], optional: [] },
   DashboardOrder: { required: ["sections"], optional: [] },
   DashboardOrderSection: { required: ["tiles"], optional: ["title"] },
@@ -2413,12 +2455,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   TurnsRequest: { required: ["agentID", "limit"], optional: ["before"] },
   UnqueueRequest: { required: ["agentID", "promptID"], optional: [] },
   Usage: { required: ["used", "size", "at"], optional: ["cost"] },
-  ViewCallRequest: { required: ["agentID", "viewID", "name"], optional: ["project", "arguments", "feed"] },
+  ViewCallRequest: { required: ["agentID", "viewID", "name"], optional: ["project", "arguments", "feed", "server"] },
   ViewContextRequest: { required: ["agentID", "viewID"], optional: ["uri", "content", "structuredContent"] },
   ViewLogRequest: { required: ["agentID", "viewID"], optional: ["level", "data"] },
   ViewPin: { required: ["server", "uri", "tool"], optional: ["arguments"] },
-  ViewReadRequest: { required: ["agentID", "uri"], optional: [] },
+  ViewReadRequest: { required: ["agentID", "uri"], optional: ["server", "project"] },
   ViewResource: { required: ["uri", "mimeType", "html", "policy", "variables"], optional: ["prefersBorder"] },
+  ViewShowRequest: { required: ["agentID", "server", "uri", "hash", "show"], optional: ["project"] },
   Wait: { required: ["agentID", "nameAtReport"], optional: ["ending"] },
   WaitEnding: { required: ["at", "how"], optional: [] },
   WaitStatus: { required: ["line", "mark", "cancellable"], optional: [] },
