@@ -102,7 +102,10 @@ extension DaemonCore {
     ///
     /// A project page names no conversation (#188): the catalog still answers, and the log
     /// says it was a project page.
-    func readView(_ request: DaemonAPI.ViewReadRequest) throws -> DaemonAPI.ViewResource {
+    func readView(_ request: DaemonAPI.ViewReadRequest) async throws -> DaemonAPI.ViewResource {
+        if let server = request.server, server != AppTool.serverName {
+            return try await readThirdPartyView(request, server: server)
+        }
         guard let resource = AppViewCatalog.resource(request.uri) else {
             throw JSONRPCError(code: DaemonAPI.Failure.viewRefused, message: "No view at \(request.uri).")
         }
@@ -115,6 +118,10 @@ extension DaemonCore {
 
     /// A view's `tools/call`: only a tool of this server that a view may call.
     func callFromView(_ request: DaemonAPI.ViewCallRequest) async throws -> JSONValue {
+        if let server = request.server, server != AppTool.serverName {
+            return try await callThirdPartyFromView(request, server: server)
+        }
+        try await refuseAgentsCallFromThirdPartyView(request)
         let project: URL
         if let agent = agents[request.agentID] {
             project = Project.standardize(agent.projectFolder)

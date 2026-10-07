@@ -15,15 +15,15 @@
 
 ## Counts
 
-Of 212 rows: **142 same**, **40 by design**, **30 delta** (after #188, #189, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 214 rows: **145 same**, **40 by design**, **29 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
-| Sidebar and project list | 4 | 2 | 11 |
+| Sidebar and project list | 5 | 2 | 10 |
 | Session rows and states | 16 | 2 | 5 |
 | Chat turns and turn detail | 19 | 3 | 2 |
 | Prompt bar and queued prompts | 18 | 2 | 0 |
-| Question and permission cards | 11 | 4 | 0 |
+| Question and permission cards | 12 | 3 | 0 |
 | Start sheet and new project | 17 | 5 | 0 |
 | Worktrees and Files | 9 | 6 | 6 |
 | Dashboard and pins | 13 | 1 | 0 |
@@ -34,7 +34,7 @@ Of 212 rows: **142 same**, **40 by design**, **30 delta** (after #188, #189, #22
 | Notifications and badges | 3 | 1 | 0 |
 | Disk strip | 2 | 1 | 0 |
 | Hosts, connection and pairing | 3 | 3 | 0 |
-| MCP Apps views | 5 | 0 | 0 |
+| MCP Apps views | 6 | 1 | 0 |
 
 The deltas are tracked by 29 issues:
 - **Already open:** #226 (the Remote's one sidebar) and #235 (the page's one sidebar at phone width).
@@ -63,7 +63,7 @@ The deltas are tracked by 29 issues:
 | Sidebar foot: host notices | *Connecting…*; or this Mac’s host hasn’t joined (open Agents Host and press Try Again), isn’t running, or isn’t answering, with Try Again: `A/Projects/ProjectListView.swift:518-534, 804-826` | *offline* on the host heading | *This Mac's host isn't answering* even while only connecting: `W/views/Sidebar.tsx:74, 108-117` | **delta**: web #250 (connecting). Try Again on the page: **by design** (#83, nothing of its own to redial) |
 | Files the host couldn't read (`store/notes`, #205) | Sidebar foot: `A/Projects/ProjectListView.swift:580-587` | A section at the foot of the projects list, asked on each catch-up: `R/Projects/ProjectListView.swift:42-55` | Sidebar foot, a server's named: `W/views/Sidebar.tsx:117-125` | **same** (#223) |
 | Keeping this Mac awake | Wake row: `A/Projects/ProjectListView.swift:745-809` | None | None | **by design** (the Mac's setting; the page isn't told the wake state, #151) |
-| Forget this client | None (the window is paired by its Mac) | Only when the control plane refuses it: `R/Link/ControlPlaneLink.swift:70-75` | *Forget This Browser…*: `W/views/Sidebar.tsx:118-128` | **delta**: decide, #267 |
+| Forget this client | *Forget This Mac…* on the window's own row of Settings ▸ Control plane ▸ Clients, asked first; the window goes back to first run: `A/Control/ControlClientsPane.swift:41-62`, `A/AppModel.swift:1840` (#344) | *Forget This iPhone…* / *iPad…* at the sidebar's foot, asked first; the app goes back to pairing: `R/Sidebar/RemoteSidebar.swift:76-80, 299-322`, `R/RemoteModel.swift:233` (#344) | *Forget This Browser…*: `W/views/Sidebar.tsx:136-143` | **same** (#344): each forgets itself with `clients/forgetSelf` (071 FR-015) |
 
 ## Session rows and states
 
@@ -165,7 +165,7 @@ The deltas are tracked by 29 issues:
 | Permission options | `A/Permission/PermissionView.swift:41-48` | `R/Permission/PermissionSheet.swift:110-127` | `W/views/Cards.tsx:176-184` | **same** |
 | What the call will do | Title and kind, plus the diffs and content: `A/Permission/PermissionView.swift:110-125` | Plus the diffs and content: `R/Permission/PermissionSheet.swift:66-106` | Title, kind, diffs and content; a plan instead of *switch_mode*: `W/views/Cards.tsx:224-236` | **same** (#256, #266) |
 | Plan approval | Show plan: the file or the text: `A/Permission/PermissionView.swift:96-111` | The file or the text: `R/Permission/PermissionSheet.swift` (#243) | Show plan: the file or the text: `W/views/Cards.tsx:226-231` | **same** (#243, #256) |
-| A server key ask | `A/Chat/TokenAskCard.swift`, `A/Hosts/Lending.swift:79-87` | None | None | **by design** (the key is lent from the Mac's Keychain); what the others see: #267 |
+| A server key ask | `S/TokenAskCard.swift`, `A/Hosts/Lending.swift:70-90`: kept in the Mac's Keychain, *Save and start* | The same card over the start sheet or the app, on every server's client: `R/StartAgent/TokenAskSheet.swift`, `R/RemoteModel.swift:250-300` (#344) | The same ask as a dialog, on a start or a prompt: `W/views/TokenAsk.tsx`, `W/model/store.ts:1424-1480` (#344) | **same** (#344). Where the key goes is **by design**: the window keeps it; the Remote and the page lend it on their own connection and keep it nowhere, *Lend and start* |
 
 ## Start sheet and new project
 
@@ -334,6 +334,8 @@ The deltas are tracked by 29 issues:
 | Dashboard view actions and six tile kinds (#329) | `ProjectDashboardView` supplies project identity and navigation to `AppViewHost`; the shared view serves actions and tile HTML from `AppViewCatalog.swift` | The same shared view and project context via `R/RemoteApp.swift` | The sandbox view host passes project context and navigation via `W/views/DashboardAppView.tsx`; the same served HTML | **same**; app-only actions: Update now, Hide, Show, Remove, Move, Open Keeper, Details; number, status, table, note, link, page |
 | A pinned `ui://` view (#189): a row with the pages, opened full page and fed afresh by its pin's read-only call; missing with why; Unpin | `PinnedViewPage` through `AppViewHost`, from `A/ContentView.swift`; row in `A/Projects/PinnedPageRows.swift`; walked on a scratch window 2026-10-06 (`specs/188-mcp-apps-rest/walks/mac-189-*.png`): pinned from a real Claude chat's test view, opened fed afresh, unpinned | The same view for `RemoteRoute.page`: `R/RemoteApp.swift`; row in `R/Sidebar/SidebarRows.swift` | `W/views/PinnedViewPage.tsx`, from `W/views/Pins.tsx`; walked in headless Chrome (`Web/test/walk/pins189.mjs`, `specs/188-mcp-apps-rest/walks/web-189-pinned-view.png`) | **same** |
 | **Pin to Project** for a view whose call can feed a pin (#189), inline and full screen | The view's ··· menu: `S/AppView/AppViewRow.swift` | The same, shared | A Pin button in the caption and the full-screen bar: `W/views/chat/AppView.tsx`, `W/views/chat/viewLayer.ts` | **same** |
+| A view from the person's own http MCP server (#191): drawn in the turn that called its tool and as a pin; asks **Show** / **Don't Show** in the view's place first and again when the view changes; the caption names the server; reaches only its own server; stdio servers' views not shown yet | `S/AppView/AppViewHost.swift` (`asking`, `answerShow`), `S/AppView/AppViewRow.swift` (`AppViewShowAsk`); walked 2026-10-06 on a scratch window with a real Claude call of the ext-apps `basic-server-vanillajs` example: Show, inline, pinned and fed afresh, `example.com` blocked (`specs/188-mcp-apps-rest/walks/mac-191-*.png`) | The same shared host and row; builds, look not walked (Alex's) | `W/views/chat/viewLayer.ts`, `W/views/chat/AppView.tsx`, `W/views/PinnedViewPage.tsx`; walked in headless Chrome (`Web/test/walk/views191.mjs`, `specs/188-mcp-apps-rest/walks/web-191-*.png`) | **same**
+| **Ask Again** for a server's views, with what was said (views shown / not shown), on its row in the MCP servers (#191) | `A/Projects/ProjectMCPSection.swift` | None | None | **by design** (a server's settings are the Mac's) |
 
 ## Live sync
 

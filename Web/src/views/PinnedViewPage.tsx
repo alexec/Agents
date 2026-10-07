@@ -80,10 +80,31 @@ export function PinnedViewPage({ store, host, folder, path, pin, down }: {
         <p class="hint">{title} can't be shown: {now.why}</p>
       ) : (
         <div class="scroll dashboard-host" ref={frame}>
+          <ViewState layer={layer} id={id} />
           <div class="view-layer" ref={(el) => { layer.element = el; }} />
         </div>
       )}
     </section>
+  );
+}
+
+/** What the page's view waits on or why it failed: a person's own server's view asks Show first (#191). */
+function ViewState({ layer, id }: { layer: ViewLayer; id: string }) {
+  void layer.made.value;
+  const view = layer.find(id);
+  if (!view) return null;
+  const ask = view.ask.value;
+  if (view.phase.value === "failed") return <p class="hint">{view.failure.value}</p>;
+  if (view.phase.value !== "asking" || !ask) return null;
+  return (
+    <div class="view-ask hint">
+      <p>{ask.isNew ? `${ask.server} wants to show a view here.` : `${ask.server}'s view has changed since you said Show.`}</p>
+      <p class="faint">It is drawn in a sandbox, and reaches only what it declared.</p>
+      <p class="buttons">
+        <button class="prominent" onClick={() => void view.answerShow(true)}>Show</button>
+        <button onClick={() => void view.answerShow(false)}>Don't Show</button>
+      </p>
+    </div>
   );
 }
 

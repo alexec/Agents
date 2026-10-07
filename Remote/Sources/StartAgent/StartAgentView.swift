@@ -87,6 +87,8 @@ struct StartAgentView: View {
         .onChange(of: text) { keep() }
         .onChange(of: attachments) { keep() }
         .onDisappear { StartDraftKeeper.shared.flush() }
+        // A start on a server with no key of its own asks for one here, over the sheet (#344).
+        .tokenAskSheet(model)
     }
 
     private var promptBar: some View {

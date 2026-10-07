@@ -60,7 +60,13 @@ struct ContentView: View {
         return ProjectListView(selection: $model.sidebarItem)
             .navigationSplitViewColumnWidth(min: 240, ideal: 300, max: 420)
             // A server asked for a credential there is none of (043).
-            .sheet(item: $model.tokenAsk) { ask in TokenAskCard(ask: ask).paperSheet() }
+            .sheet(item: $model.tokenAsk) { ask in
+                TokenAskCard(ask: ask, save: { secret in
+                    let ok = await model.credentials.save(secret.reveal(), for: ask.runtimeID)
+                    model.finishTokenAsk(saved: ok)
+                }, cancel: { model.finishTokenAsk(saved: false) })
+                .paperSheet()
+            }
             // A server asking to borrow a sign-in (T091) is the window's one alert, below.
             // A known server with a new key: rebuilt, or not what it says (043).
             // Agents missing at start-up, offered once each (048). Closed any way at

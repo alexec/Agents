@@ -10,15 +10,22 @@ import Foundation
 struct MCPApprovals: Codable, Equatable, Sendable {
     var approvalsBegan: Date?
     var approved: [String: String]
+    /// The person's Show or Don't Show for each server's `ui://` resources (#191), by
+    /// `viewKey`: `show:<hash>` or `hide:<hash>`. A resource whose hash is not the one
+    /// answered asks again. Personal servers too (Q6): it is about drawing their HTML, not
+    /// about running them.
+    var views: [String: String]?
     /// Read from a file that is there and could not be read (#169): approval has begun
     /// and nothing is approved. Not written.
     var unreadable = false
 
-    enum CodingKeys: String, CodingKey { case approvalsBegan, approved }
+    enum CodingKeys: String, CodingKey { case approvalsBegan, approved, views }
 
-    init(approvalsBegan: Date? = nil, approved: [String: String] = [:], unreadable: Bool = false) {
+    init(approvalsBegan: Date? = nil, approved: [String: String] = [:], views: [String: String]? = nil,
+         unreadable: Bool = false) {
         self.approvalsBegan = approvalsBegan
         self.approved = approved
+        self.views = views
         self.unreadable = unreadable
     }
 
@@ -61,6 +68,64 @@ struct MCPApprovals: Codable, Equatable, Sendable {
 
     mutating func drop(folder: URL, name: String) {
         approved.removeValue(forKey: Self.key(folder: folder, name: name))
+    }
+
+    // MARK: Views (#191)
+
+    /// The person's answer for one server's view, as it stands.
+    enum ViewAnswer: Equatable, Sendable {
+        case show
+        case hide
+        /// Never answered, or answered for another version of the resource.
+        case ask(isNew: Bool)
+    }
+
+    /// Where a server's entry is, for its view answers: the project's folder, or `personal`.
+    static func viewScope(_ folder: URL?) -> String {
+        folder.map { Project.standardize($0).path } ?? "personal"
+    }
+
+    /// `scope|server|uri`. The scope is the project's folder, or `personal`.
+    static func viewKey(scope: String, server: String, uri: String) -> String {
+        "\(scope)|\(server)|\(uri)"
+    }
+
+    /// The hash a view is asked about: its address, type, HTML and `_meta.ui`.
+    static func viewHash(uri: String, mimeType: String, html: String, ui: JSONValue?) -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let meta = ui.flatMap { try? encoder.encode($0) }.map { String(decoding: $0, as: UTF8.self) } ?? "null"
+        return ContentDigest.sha256(Data([uri, mimeType, html, meta].joined(separator: "\u{0}").utf8))
+    }
+
+    func viewAnswer(scope: String, server: String, uri: String, hash: String) -> ViewAnswer {
+        guard let stored = views?[Self.viewKey(scope: scope, server: server, uri: uri)] else { return .ask(isNew: true) }
+        if stored == "show:\(hash)" { return .show }
+        if stored == "hide:\(hash)" { return .hide }
+        return .ask(isNew: false)
+    }
+
+    mutating func answerView(scope: String, server: String, uri: String, hash: String, show: Bool) {
+        views = views ?? [:]
+        views?[Self.viewKey(scope: scope, server: server, uri: uri)] = "\(show ? "show" : "hide"):\(hash)"
+    }
+
+    /// Forget every answer for one server, so its views ask again.
+    mutating func forgetViews(scope: String, server: String) {
+        let prefix = Self.viewKey(scope: scope, server: server, uri: "")
+        views = views?.filter { !$0.key.hasPrefix(prefix) }
+    }
+
+    /// What the person last said about a server's views: `shown`, `hidden`, `mixed`, or nil.
+    func viewsWord(scope: String, server: String) -> String? {
+        let prefix = Self.viewKey(scope: scope, server: server, uri: "")
+        let answers = Set((views ?? [:]).filter { $0.key.hasPrefix(prefix) }.values.map { $0.hasPrefix("show:") })
+        switch answers {
+        case [true]: return "shown"
+        case [false]: return "hidden"
+        case []: return nil
+        default: return "mixed"
+        }
     }
 
     /// Entries already in a project when approval begins, approved as they stand.
@@ -158,7 +223,8 @@ enum MCPProjectListing {
             let missing = secretNames.filter { secrets.value(of: $0) == nil }
             rows.append(DaemonAPI.ProjectMCPServer(
                 name: server.name, summary: summary(server), managed: managed, approval: approval,
-                missingSecrets: missing, secretNames: secretNames, entryDigest: MCPApprovals.digest(of: entry)))
+                missingSecrets: missing, secretNames: secretNames, entryDigest: MCPApprovals.digest(of: entry),
+                views: approvals.viewsWord(scope: MCPApprovals.viewScope(folder), server: server.name)))
         }
 
         let waiting = rows.filter { if case .waiting = $0.approval { true } else { false } }

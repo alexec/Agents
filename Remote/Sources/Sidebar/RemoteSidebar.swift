@@ -1,5 +1,6 @@
 import AgentsKitCore
 import SwiftUI
+import UIKit
 
 /// The Mac's one sidebar, on an iPad or an iPhone (#226): Activity at the top, then every
 /// project, each a row that folds open on its pinned pages, its sessions in their groups,
@@ -86,6 +87,14 @@ struct RemoteSidebar: View {
                             .foregroundStyle(.secondary)
                             .accessibilityElement(children: .combine)
                     }
+                }
+            }
+
+            // This device, at the very foot, as the page's sidebar ends with its browser
+            // (#344): the way to forget it from here.
+            if !model.needsPairing {
+                Section {
+                    ForgetThisDeviceRow()
                 }
             }
         }
@@ -307,6 +316,31 @@ struct SidebarSubheading: View {
         .foregroundStyle(.secondary)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(unread > 0 ? "\(title), \(count), \(unread) unread" : "\(title), \(count)")
+    }
+}
+
+/// Forget This iPhone… (#344, 071 FR-015): the control plane forgets this device, and only
+/// it, asked first as the window asks before forgetting a client. Gone, the app asks for a
+/// code again.
+private struct ForgetThisDeviceRow: View {
+    @Environment(RemoteModel.self) private var model
+    @State private var confirming = false
+    @State private var problem: String?
+
+    private var device: String { UIDevice.current.model }
+
+    var body: some View {
+        Button("Forget This \(device)…") { confirming = true }
+            .appText(.supporting)
+            .confirmationDialog("Forget this \(device)?", isPresented: $confirming, titleVisibility: .visible) {
+                Button("Forget", role: .destructive) { Task { problem = await model.forgetThisDevice() } }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This \(device) is cut off at once, at home and away, until it is paired again.")
+            }
+        if let problem {
+            Text(problem).appText(.fine).tinted(.failure)
+        }
     }
 }
 

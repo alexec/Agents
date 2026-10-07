@@ -75,6 +75,13 @@ struct SettingsWindow: View {
         }
         .task { await control?.start() }
         .onDisappear { control?.stop() }
+        // Forget This Mac (#344) leaves no control plane to show; a new pairing brings one.
+        .onChange(of: model.needsFirstRun) { _, unpaired in
+            control?.stop()
+            control = unpaired ? nil : ControlConfig.endpoint.flatMap { ControlSettingsModel(endpoint: $0) }
+            if unpaired, pane.wrappedValue == .controlPlane { pane.wrappedValue = .general }
+            if let control { Task { await control.start() } }
+        }
         // Asked for from elsewhere in the app: a link that names a Settings pane.
         .onChange(of: model.settingsPaneAsked, initial: true) { _, asked in
             guard let asked else { return }
