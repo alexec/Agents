@@ -11,8 +11,9 @@ This is MCP Apps ([SEP-1865, 2026-01-26](https://github.com/modelcontextprotocol
 a tool names a `ui://` resource, the resource is HTML, and the view talks to the app over
 `postMessage` in JSON-RPC.
 
-For now the app draws views only for its own `agents` server. Third-party servers' views
-come later.
+The app draws views from its own `agents` server, and from your own MCP servers reached over
+http ([Views from your own servers](#views-from-your-own-servers)). Views from servers that
+run on this machine (stdio) aren't shown yet.
 
 ## Where a view comes from
 
@@ -92,9 +93,10 @@ ties a view to a tool call the model made. A pin is the host making that call it
   `app`) that is marked as changing nothing (`annotations.readOnlyHint`), because opening
   a pin calls it. Anything else is refused, and so is `ui://agents/dashboard`, which is
   already the project's first row.
-- **Which servers.** Until third-party views arrive (#191), only the `agents` server's.
-  A pin this host can't draw shows as missing, with why: *server not set up here*, *waiting
-  for approval* or *no such view*. That is the way a pinned file shows as missing until its
+- **Which servers.** The `agents` server's, and your own http servers' (#191). A pin this
+  host can't draw shows as missing, with why: *server not set up here*, *waiting for
+  approval*, *a secret is missing*, *needs a sign-in*, *views from local servers aren't
+  shown yet* or *no such view*. Each host says for itself, since each has its own servers. That is the way a pinned file shows as missing until its
   branch lands.
 - **No agent.** A pinned view, like the Dashboard, is on a project's page with no
   conversation. Its `ui/message` and `ui/update-model-context` are refused, and the refusal
@@ -103,6 +105,50 @@ ties a view to a tool call the model made. A pin is the host making that call it
   or in full screen, when the server says the call can feed a pin. An agent pins one with
   `pin_page` and `view` (`server`, `uri`, `tool`, `arguments`). `unpin_page` and `move_pin`
   take the view's `ui://` address as its `path`.
+
+## Views from your own servers
+
+A tool of one of your own MCP servers — in a project's `.agents/mcp.json`, your own
+`~/.agents/mcp.json`, or a plugin — can have a view too (#191). The app draws it in the turn
+that called the tool and as a pin, on the Mac, the Remote and the web page, in the same
+sandbox as the app's own views.
+
+- **How the app knows.** The runtime connects to your server, not the app, and no runtime
+  says a tool has a view (#186). So the daemon reads which server and tool were called from
+  how the runtime describes the call (by its shape, never by the runtime's name), and checks
+  that the server's own list of tools says the tool has a view. The app never calls a tool
+  again to get its result: the view gets what the runtime passed on.
+- **Where the connection runs.** The daemon makes a connection of its own to the server, on
+  the host that runs the project, with the secrets filled from `secrets.env` as for a
+  session. It reads the server's tools and `ui://` resources (kept in `<root>/mcp-views/`, a
+  day at most), the view's HTML, and the tools the view calls. Clients never connect to your
+  server. At most 4 such connections are open on a host, the least recently used goes
+  first, and each ends after 2 minutes unused.
+- **http only, for now.** A server that runs on this machine (stdio) would need a second
+  copy of it beside the runtime's, so its views aren't shown yet, and its pin says *views
+  from local servers aren't shown yet*. The old sse transport shows no views.
+- **Approval, and Show.** A server waiting for approval shows nothing, nor does one missing
+  a secret or wanting a sign-in. The first time a server's view is to be drawn, it asks in
+  the view's place: "*server* wants to show a view here", with **Show** and **Don't Show**.
+  It asks again whenever the view changes (its address, type, HTML or `_meta.ui`), and it
+  asks for your own servers too, since it is about drawing their HTML, not about running
+  them. The answers are kept beside the approvals in `<root>/mcp-approvals.json`. **Ask
+  Again** on the server's row in the project's MCP servers forgets them.
+- **What it may reach.** Exactly what it declared in its `_meta.ui.csp`, as above. Its
+  `tools/call` reaches only its own server, and only a tool whose `visibility` includes
+  `app`. A view of one server asking for another's tool, or for the `agents` server's, is
+  refused and logged. Its `resources/read` is its own server's.
+- **The caption** names the server: "get-time · basic-vanillajs".
+- **Which runtimes draw it in the chat.** Claude (walked), Codex and Copilot (by the shapes
+  the #186 probe recorded). OpenCode passes only text, so its calls' views are not drawn in
+  the chat; pin them instead. A runtime whose call is named only by a joined title
+  (Copilot, OpenCode) is drawn once it has answered.
+- **A known limit.** A tool only a view may call (`visibility: ["app"]`) is still offered to
+  the model, since every runtime lists the server's tools itself and none filters them.
+  Nothing on the app's side can hide it.
+- **Logged.** The server's name, the view's address, its policy and words such as
+  *connected*, *ended* or *refused*. Never its command, URL, headers, environment or any
+  body.
 
 ## The test view
 

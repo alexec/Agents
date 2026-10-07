@@ -7,6 +7,12 @@ import Foundation
 /// `Web/src/views/chat/appViewBridge.ts`, and the two are kept in step by
 /// `docs/explanation/views.md`.
 public enum AppViewBridge {
+    /// `hostContext.toolInfo`: the call's tool as an MCP `Tool`, which needs an
+    /// `inputSchema`. The ext-apps SDK refuses `ui/initialize` without one (#191 walk).
+    public static func toolInfo(_ tool: String) -> JSONValue {
+        ["tool": ["name": .string(tool), "inputSchema": ["type": "object"]]]
+    }
+
     /// The version of MCP Apps this host speaks.
     public static let protocolVersion = "2026-01-26"
 

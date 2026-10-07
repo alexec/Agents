@@ -57,6 +57,30 @@ as written, even when it expects a failure, and records what the tool answered.
 | `permissions` | 5 | records the card for that write and its answer | a card came and its answer held: written only if allowed. **Not offered** where the runtime refused without asking |
 | `report` | 6 | finishes `.agents/reviews/runtimes/<runtime>-<date>.md`: a row per step and "What to fix" | the file is there and names every step |
 
+### A third party's view (#191), by hand
+
+Not one of the scored steps yet: it needs a person's own MCP Apps server. Check it after an
+adapter update, or when a runtime comes back to the pool, because the app finds a third
+party's tool call only by the shape of the runtime's ACP updates (`ACPToolShape`).
+
+1. Serve an ext-apps example over streamable http in a scratch folder, e.g.
+   `npm i @modelcontextprotocol/server-basic-vanillajs` and
+   `PORT=3191 node node_modules/@modelcontextprotocol/server-basic-vanillajs/dist/index.js`.
+2. Put it in the scratch project's `.agents/mcp.json` as
+   `{"type": "http", "url": "http://localhost:3191/mcp"}`, and approve it (`mcp/list` for the
+   digest, then `mcp/approve`): a server waiting for approval is left out of the session.
+3. Start the runtime with "Call the get-time tool of the basic-vanillajs MCP server once".
+4. **Passes** when the transcript has an `appView` entry with `"server": "basic-vanillajs"`,
+   done, whose `result` has `structuredContent.time`. Running first, then done, for a runtime
+   that names the server outright (`rawInput.server`, or `mcp__<s>__<t>`); done only, for a
+   joined title (`<s>-<t>`). **No entry** for a runtime that passes text only (OpenCode, Q7):
+   that is by design, and its view can still be pinned.
+5. Record the tool call's `title`, `name`, `rawInput` and `rawOutput` in the report, so a
+   new shape can be added to `ACPToolShape` and its tests.
+
+As of 2026-10-06: Claude walked (running, then done); Codex, Copilot and OpenCode covered by
+`ACPToolShapeTests` from the #186 probe's wire lines, not run live.
+
 ## How it is scored
 
 Every call an agent makes to the app's tools is kept by the daemon, as it answered it, in

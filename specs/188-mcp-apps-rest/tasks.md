@@ -128,14 +128,14 @@ T041–T046 are daemon-only groundwork. They can start early in a lane of their 
 
 - [x] T041 [P] [US4] Move `RouteProcess`'s spawning out of `AK/MCP/MCPBridge.swift` into a portable `AK/MCP/MCPStdioProcess.swift` (Linux too: no `Network`), with the same scrubbed `RuntimeEnvironment.forRuntimes()`, the server's env, cwd and stderr discarded. `MCPBridge` uses it
 - [x] T042 [US4] Add `AK/MCP/MCPClient.swift` with stdio (through `MCPStdioProcess`) and streamable HTTP (`URLSession`, its own `Mcp-Session-Id`, the configured headers). `initialize` advertises `extensions["io.modelcontextprotocol/ui"] = {mimeTypes: ["text/html;profile=mcp-app"]}`; then `tools/list`, `resources/list`, `resources/read` and `tools/call` (60 s timeout). `-32601` on optional methods is tolerated. sse is refused for views
-- [ ] T043 [US4] Add `AK/MCP/MCPClientPool.swift`, on the host that runs the project:
+- [x] T043 [US4] Add `AK/MCP/MCPClientPool.swift`, on the host that runs the project:
   - at most 4 clients a host, least recently used ended first;
   - one start in flight per server;
   - each ended 2 minutes after its last view closes;
   - secrets filled by `SecretsEnv.filled`;
   - no view from a server waiting under `MCPApprovals`, or under `PluginApprovalStore`.
-- [ ] T044 [US4] Add `AK/MCP/ServerViewCatalog.swift`, cached at `<root>/mcp-views/<entry digest>.json`: tools with `_meta.ui.resourceUri` or `ui/resourceUri`, their visibility and `readOnlyHint`, and the resources
-- [ ] T045 [P] [US4] Add `AKC/AppViews/ACPToolShape.swift`, which finds the (server, tool, result) of an ACP tool call by shape:
+- [x] T044 [US4] Add `AK/MCP/ServerViewCatalog.swift`, cached at `<root>/mcp-views/<entry digest>.json`: tools with `_meta.ui.resourceUri` or `ui/resourceUri`, their visibility and `readOnlyHint`, and the resources
+- [x] T045 [P] [US4] Add `AKC/AppViews/ACPToolShape.swift`, which finds the (server, tool, result) of an ACP tool call by shape:
   - `rawInput.server`/`tool`;
   - `_meta.claudeCode.toolName` `mcp__s__t`;
   - a title `s-t`/`s_t`, resolved against the session's own `mcpServers` and the catalog (no match means no view);
@@ -143,17 +143,18 @@ T041–T046 are daemon-only groundwork. They can start early in a lane of their 
 
   Tests in `Tests/AgentsKitTests/Unit/ACPToolShapeTests.swift`, built from the #186 wire logs in `specs/research/186-mcp-apps-acp-probe/`
 - [x] T046 [P] [US4] Add a sentinel test in `Tests/AgentsKitTests/Unit/MCPClientLoggingTests.swift`: a server whose command, args, env, headers and URL hold a sentinel, driven through connect, read, call and end, leaves no sentinel in the daemon log (054 FR-023)
-- [ ] T047 [US4] Review the template: hash each server's `ui://` resources (uri, mimeType, text, `_meta.ui`) into a `views` section of `<root>/mcp-approvals.json`, in `AK/Catalog/MCPApprovals.swift`. A new or changed hash makes `views/read` answer "needs Show" until the person answers. Personal servers are included (Q6)
-- [ ] T048 [US4] Give `views/read`, `views/call` and `views/log` a `server` in `AKC/AppViews/AppViewsWire.swift` and `AK/AppViews/DaemonCore+AppViews.swift`. `views/call` is passed through only when the server is the held `AppViewCall.server` and the catalog says `app`; a cross-server or `agents` tool from a third-party view is refused and logged. `resources/read` is same-server only. Each policy is logged on read
-- [ ] T049 [US4] Write `appView` entries for third-party calls in the ACP update path (`AK/ACP/ACPSession.swift`, the tool_call and tool_call_update handling) through `ACPToolShape`, only when the catalog says the tool has a view. A text-only result is pinned only (Q7). A model's tool is never called again
-- [ ] T050 [US4] Clients: the caption shows the server's name, and Show / Don't Show is drawn in the view's place:
+- [x] T047 [US4] Review the template: hash each server's `ui://` resources (uri, mimeType, text, `_meta.ui`) into a `views` section of `<root>/mcp-approvals.json`, in `AK/Catalog/MCPApprovals.swift`. A new or changed hash makes `views/read` answer "needs Show" until the person answers. Personal servers are included (Q6)
+- [x] T048 [US4] Give `views/read`, `views/call` and `views/log` a `server` in `AKC/AppViews/AppViewsWire.swift` and `AK/AppViews/DaemonCore+AppViews.swift`. `views/call` is passed through only when the server is the held `AppViewCall.server` and the catalog says `app`; a cross-server or `agents` tool from a third-party view is refused and logged. `resources/read` is same-server only. Each policy is logged on read
+- [x] T049 [US4] Write `appView` entries for third-party calls in the ACP update path (`AK/ACP/ACPSession.swift`, the tool_call and tool_call_update handling) through `ACPToolShape`, only when the catalog says the tool has a view. A text-only result is pinned only (Q7). A model's tool is never called again
+- [x] T050 [US4] Clients: the caption shows the server's name, and Show / Don't Show is drawn in the view's place:
   - `Shared/UI/AppView/AppViewRow.swift`
   - `Web/src/views/chat/AppView.tsx`
   - a Mac row in `App/Sources/Projects/ProjectMCPSection.swift`
-- [ ] T051 [US4] Pins of third-party views: lift the `server == "agents"` limit in `AK/Pins/DaemonCore+Pins.swift`, and give missing reasons per host
-- [ ] T052 [US4] Add a step to `.agents/skills/assess-runtime/` that checks a runtime's ACP shape for a third-party tool with a view
-- [ ] T053 [US4] Update the docs: in `docs/explanation/views.md`, third-party views (where the connection runs, approval and Show, policy, which runtimes inline, the known limit on app-only visibility). Update the parity row
-- [ ] T054 [US4] Walk it with an ext-apps example (`basic-server-vanillajs` through `npx` in a project's `mcp.json`) and a Codex agent: Show, inline on the Mac, the Remote and the web, as a pin, its undeclared domain blocked, a cross-server call refused, and a log free of the server's values
+- [x] T051 [US4] Pins of third-party views: lift the `server == "agents"` limit in `AK/Pins/DaemonCore+Pins.swift`, and give missing reasons per host
+- [x] T052 [US4] Add a step to `.agents/skills/assess-runtime/` that checks a runtime's ACP shape for a third-party tool with a view
+- [x] T053 [US4] Update the docs: in `docs/explanation/views.md`, third-party views (where the connection runs, approval and Show, policy, which runtimes inline, the known limit on app-only visibility). Update the parity row
+- [x] T054 [US4] Walk it with an ext-apps example (`basic-server-vanillajs` through `npx` in a project's `mcp.json`) and a Codex agent: Show, inline on the Mac, the Remote and the web, as a pin, its undeclared domain blocked, a cross-server call refused, and a log free of the server's values
+  - Done 2026-10-06 with Claude (Codex, Copilot, OpenCode were out of the pool; their shapes are unit-tested from the #186 probe), on the Mac and the web page; the Remote builds and shares the Mac's view code, its look is Alex's. Shots in `walks/*-191-*.png`, script `Web/test/walk/views191.mjs`. http only (Q5): stdio views are the follow-up
 
 ---
 

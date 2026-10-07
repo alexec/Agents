@@ -42,6 +42,8 @@ private struct AppViewInline: View {
                 case .failed(let words):
                     Text(words).appText(.supporting).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, minHeight: 60)
+                case .asking(let ask):
+                    AppViewShowAsk(host: host, ask: ask)
                 case .gone:
                     Text("This view was closed.").appText(.supporting).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, minHeight: 40)
@@ -76,6 +78,27 @@ private struct AppViewInline: View {
     }
 }
 
+/// A person's own server's view, before it is drawn: Show or Don't Show, in its place (#191).
+/// Asked once for each version of the view; a view that changes asks again.
+struct AppViewShowAsk: View {
+    let host: AppViewHost
+    let ask: DaemonAPI.ViewAsk
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(ask.isNew ? "\(ask.server) wants to show a view here." : "\(ask.server)'s view has changed since you said Show.")
+                .appText(.reading)
+            Text("It is drawn in a sandbox, and reaches only what it declared.")
+                .appText(.supporting).foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                Button("Show") { host.answerShow(true) }.buttonStyle(.paperProminent)
+                Button("Don't Show") { host.answerShow(false) }.buttonStyle(.paper)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+    }
+}
+
 /// A view filling the page it was opened on (#188). No way back to a chat: this page is the
 /// destination, as the project's Dashboard is.
 struct AppViewPage: View {
@@ -90,6 +113,10 @@ struct AppViewPage: View {
                     Text(words)
                         .appText(.supporting)
                         .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .padding(24)
+                case .asking(let ask):
+                    AppViewShowAsk(host: host, ask: ask)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .padding(24)
                 case .gone:

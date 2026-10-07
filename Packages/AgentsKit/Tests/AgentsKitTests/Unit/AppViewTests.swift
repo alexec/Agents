@@ -127,6 +127,16 @@ struct AppViewTests {
         #expect(result["hostCapabilities"]?["serverTools"] != nil)
     }
 
+    @Test func theToolInfoIsAWholeToolWithAnInputSchema() {
+        // The ext-apps SDK checks hostContext.toolInfo.tool against MCP's Tool, which needs an
+        // inputSchema; without one its app never connects (#191's walk).
+        let context = AppViewContext(theme: "light", platform: .desktop, width: 600, maxHeight: 640, touch: false,
+                                     hover: true, toolInfo: AppViewBridge.toolInfo("get-time"))
+        let tool = AppViewBridge.initializeResult(context, policy: .strict)["hostContext"]?["toolInfo"]?["tool"]
+        #expect(tool?["name"]?.stringValue == "get-time")
+        #expect(tool?["inputSchema"]?["type"]?.stringValue == "object")
+    }
+
     @Test func onlyWhatChangedIsSaidAgain() {
         let before = AppViewContext(theme: "light", platform: .mobile, width: 390, maxHeight: 640, touch: true, hover: false)
         var after = before

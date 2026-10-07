@@ -121,7 +121,7 @@ extension DaemonCore {
         let project = try knownPinProject(request.folder)
         let lead = "Nothing was pinned: "
         if let view = request.view {
-            if let refusal = AppViewCatalog.pinRefusal(view, testView: offersTestView) { throw pinRefusal(lead + refusal) }
+            if let refusal = viewPinRefusal(view, project: project) { throw pinRefusal(lead + refusal) }
             _ = try pin(PinEntry(view: view, title: request.title, pinnedBy: .thePerson), first: false, in: project, lead: lead)
             return pinViews(project)
         }
@@ -396,7 +396,7 @@ extension DaemonCore {
     func pinViews(_ project: URL) -> [PinView] {
         readPins(project).pins.compactMap { entry in
             if let view = entry.view {
-                let reason = AppViewCatalog.missingReason(view, testView: offersTestView)
+                let reason = viewPinMissing(view, project: project)
                 return PinView(path: view.uri, title: entry.title ?? PinRules.defaultTitle(view), kind: .view,
                                missing: reason != nil, pinnedBy: pinnerView(entry.pinnedBy, in: project),
                                view: view, missingReason: reason)
@@ -507,7 +507,7 @@ extension DaemonCore {
         }
         let view = ViewPin(server: given["server"]?.stringValue ?? "", uri: given["uri"]?.stringValue ?? "",
                            tool: given["tool"]?.stringValue ?? "", arguments: given["arguments"])
-        if let refusal = AppViewCatalog.pinRefusal(view, testView: offersTestView) { throw pinRefusal(lead + refusal) }
+        if let refusal = viewPinRefusal(view, project: project) { throw pinRefusal(lead + refusal) }
         let position = pinText(arguments, "position")
         if let position, position != "first", position != "last" {
             throw pinRefusal(lead + "`position` is first or last.")
