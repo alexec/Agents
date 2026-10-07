@@ -17,11 +17,14 @@ struct ChatProjectTests {
         return url
     }
 
-    /// A core on a fresh root, with this home or none.
-    private func core(home: URL?) async throws -> DaemonCore {
+    /// A core on a fresh root, with this home or none, holding these agents as a restart
+    /// arrives at them.
+    private func core(home: URL?, seeded: [Agent] = []) async throws -> DaemonCore {
         var locations = StoreLocations(root: try temporary("root"))
         locations.personalHome = home
-        let core = DaemonCore(store: try AgentStore(locations: locations),
+        let store = try AgentStore(locations: locations)
+        for agent in seeded { try await store.save(agent) }
+        let core = DaemonCore(store: store,
                               locations: locations,
                               discovery: .findsEverything,
                               launcher: FakeLauncher(script: FakeACPAgent.Script()))
@@ -180,5 +183,64 @@ struct ChatProjectTests {
         summary.isChat = true
         let marked = try JSONEncoder().encode(summary)
         #expect(try JSONDecoder().decode(DaemonAPI.ProjectSummary.self, from: marked).isChat == true)
+    }
+
+    // US2 scenario 3, FR-004: the sentence is the person's once written.
+    @Test func anEditedAgentsMdIsLeftAsThePersonLeftIt() async throws {
+        let home = try temporary("home")
+        let core = try await core(home: home)
+        await core.ensureChatProject()
+        let agentsMd = chatFolder(home).appending(path: "AGENTS.md")
+        try "# AGENTS.md\n\nMine now.\n".write(to: agentsMd, atomically: true, encoding: .utf8)
+
+        await core.ensureChatProject()
+
+        #expect(try String(contentsOf: agentsMd, encoding: .utf8) == "# AGENTS.md\n\nMine now.\n")
+    }
+
+    // US2 scenario 1, SC-003: what a chat saved outlives the chat.
+    @Test func aFileOutlivesTheChatThatWroteIt() async throws {
+        let home = try temporary("home")
+        let folder = chatFolder(home)
+        try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
+        try "socks".write(to: folder.appending(path: "packing-list.md"), atomically: true, encoding: .utf8)
+        var chat = Agent(runtimeID: "claude", cwd: folder, title: "Packing", state: .archived,
+                         createdAt: Date(timeIntervalSinceNow: -3600), lastActivityAt: Date(timeIntervalSinceNow: -3600),
+                         endedReason: .endTurn)
+        chat.archivedAt = Date(timeIntervalSinceNow: -1800)
+        chat.archivedReason = .byUser
+        let core = try await core(home: home, seeded: [chat])
+        await core.ensureChatProject()
+
+        try await core.retire(chat.id, because: .person)
+
+        #expect(try String(contentsOf: folder.appending(path: "packing-list.md"), encoding: .utf8) == "socks")
+        #expect(await core.allProjects().first?.isChat == true, "the project stays, with its file")
+    }
+
+    // US5 scenario 3, FR-013: a chat asking for a worktree is told why not.
+    @Test func aMoveIntoAWorktreeIsRefusedWithASentence() async throws {
+        let home = try temporary("home")
+        let folder = chatFolder(home)
+        try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
+        let chat = Agent(runtimeID: "claude", cwd: folder, title: "A chat", state: .finished, endedReason: .endTurn)
+        let core = try await core(home: home, seeded: [chat])
+        await core.ensureChatProject()
+
+        await #expect {
+            _ = try await core.move(DaemonAPI.MoveRequest(agentID: chat.id, target: .newWorktree(name: nil)))
+        } throws: { error in
+            (error as? JSONRPCError)?.message == "Moving needs a git repository, and chat is not in one."
+        }
+    }
+
+    // US5 scenario 1: no worktree choice, because the list says there is no repository.
+    @Test func theWorktreeListSaysItIsNotARepository() async throws {
+        let home = try temporary("home")
+        let core = try await core(home: home)
+        await core.ensureChatProject()
+
+        let listed = await core.listWorktrees(for: chatFolder(home))
+        #expect(listed == .notARepository)
     }
 }

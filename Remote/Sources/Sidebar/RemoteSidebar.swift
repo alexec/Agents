@@ -102,6 +102,44 @@ struct RemoteSidebar: View {
         .scrollContentBackground(.hidden)
         .background(Paper.sidebar)
         .toolbarBackground(Paper.sidebar, for: .navigationBar)
+        .toolbar {
+            // New Chat (#229): the host's chat project, with no project to pick, as the
+            // window's File ▸ New Chat. A menu of hosts when there are several.
+            ToolbarItem(placement: .primaryAction) {
+                if model.chatHosts.count > 1 {
+                    Menu {
+                        ForEach(model.chatHosts, id: \.self) { host in
+                            Button(host == .mac ? "This Mac" : model.hostLabel(host)) {
+                                Task { await model.newChat(on: host) }
+                            }
+                            .disabled(model.hostIsOffline(host))
+                        }
+                    } label: {
+                        Label("New Chat", systemImage: "square.and.pencil")
+                    }
+                    .disabled(model.isStale)
+                } else {
+                    Button {
+                        Task { await model.newChat(on: .mac) }
+                    } label: {
+                        Label("New Chat", systemImage: "square.and.pencil")
+                    }
+                    .disabled(model.isStale)
+                }
+            }
+        }
+        .alert("No chat project", isPresented: Binding(
+            get: { model.chatProblem != nil }, set: { if !$0 { model.chatProblem = nil } }),
+            presenting: model.chatProblem) { problem in
+            if problem.archived != nil {
+                Button("Unarchive") { Task { await model.unarchiveChatProject(problem) } }
+                Button("Cancel", role: .cancel) {}
+            } else {
+                Button("OK", role: .cancel) {}
+            }
+        } message: { problem in
+            Text(problem.message)
+        }
         .navigationTitle("Agents")
         .searchable(text: $query, prompt: "Search sessions and workflows")
         .task(id: query) {
