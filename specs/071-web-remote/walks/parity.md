@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 206 rows: **137 same**, **40 by design**, **29 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #381). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 206 rows: **138 same**, **40 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #381). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -23,7 +23,7 @@ Of 206 rows: **137 same**, **40 by design**, **29 delta** (after #188, #189, #19
 | Session rows and states | 16 | 2 | 5 |
 | Chat turns and turn detail | 19 | 3 | 2 |
 | Prompt bar and queued prompts | 18 | 2 | 0 |
-| Question and permission cards | 12 | 3 | 1 |
+| Question and permission cards | 13 | 3 | 0 |
 | Start sheet and new project | 17 | 5 | 0 |
 | Worktrees and Files | 9 | 6 | 6 |
 | Pins | 4 | 1 | 0 |
@@ -156,7 +156,7 @@ The deltas are tracked by 29 issues:
 | Where they show | Together, over the prompt: `A/Chat/ChatView.swift:172-196` | Together: `R/Chat/RemoteChatView.swift` (#243) | Together: `W/views/Cards.tsx:122-133` | **same** |
 | Asker line and title (#121) | `A/Elicitation/ElicitationView.swift:28-34` | `R/Elicitation/ElicitationSheet.swift:28-42` | `W/views/Cards.tsx:117-120` | **same** |
 | One-tap single choice | One property only, stacked full width (#338): `A/Elicitation/ElicitationView.swift:37, 303-328` | Also with the optional Other box: `R/Elicitation/ElicitationSheet.swift:79-141` | The window's rule, stacked full width (#338): `W/views/Cards.tsx:367` | **by design** (one tap on a phone; `ElicitationSheet.swift:79-89`) |
-| A tall card in a short window (#371) | Gives up height: the choices or the question scroll, the header, the ways out and the prompt bar stay on screen: `S/Chat/ChatTranscript.swift` (`footMargin`) | The same transcript: `S/Chat/ChatTranscript.swift` | A single choice's list has no bound: `W/app.css` `.card .options` | **delta** (#381) |
+| A tall card in a short window (#371) | Gives up height: the choices or the question scroll, the header, the ways out and the prompt bar stay on screen: `S/Chat/ChatTranscript.swift` (`footMargin`) | The same transcript: `S/Chat/ChatTranscript.swift` | The same: a single choice's list scrolls (at most 320px), No answer, No thanks and the prompt stay; the foot is never taller than the chat: `W/views/Cards.tsx` (`.choices`), `W/app.css` (`.foot`, `.cards`) | **same** (#381) |
 | Multi-page forms | *1/3*: `A/Elicitation/ElicitationView.swift:89-150` | *Question 1 of 3*: `R/Elicitation/FormPages.swift:50-55` | *1/3*: `W/views/Cards.tsx:209-218` | **same** |
 | Date, date-time, email, URL fields | DatePicker: `A/Elicitation/ElicitationView.swift:436-444` | DatePicker, keyboards: `R/Elicitation/FormPages.swift:125-133, 329-357` | The browser's date, datetime-local, email and url inputs: `W/views/Cards.tsx:430`, `W/model/formInputs.ts` | **same** (#265) |
 | A field's problem in place | Under every field | Under every part | Under every field: `W/views/Cards.tsx:441` | **same** (#256) |
