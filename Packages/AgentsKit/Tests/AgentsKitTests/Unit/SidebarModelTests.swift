@@ -134,6 +134,34 @@ struct SidebarModelTests {
         #expect(SidebarOrder.label(summary(api)) { _ in "?" } == "api")
     }
 
+    @Test func projectsStayInTheOrderTheyWereAddedHoweverBusy() {
+        let docs = URL(filePath: "/tmp/work/docs")
+        func added(_ folder: URL, at offset: Double, active: Double = 0, host: HostID = .mac) -> DaemonAPI.ProjectSummary {
+            var summary = DaemonAPI.ProjectSummary(
+                project: Project(folder: folder, addedAt: t0.addingTimeInterval(offset)),
+                name: folder.lastPathComponent, exists: true, lastActivityAt: t0.addingTimeInterval(active), counts: [:])
+            summary.host = host
+            return summary
+        }
+        let model = AgentsModel()
+        model.replaceProjects([added(web, at: 20), added(api, at: 10)])
+        #expect(model.projects.map(\.folder) == [api, web], "oldest added first")
+
+        // Activity on the newer project leaves it where it is (#357).
+        model.upsert(added(web, at: 20, active: 999))
+        #expect(model.projects.map(\.folder) == [api, web])
+
+        model.upsert(added(docs, at: 30))
+        #expect(model.projects.map(\.folder) == [api, web, docs], "a new project lands at the end")
+
+        // A server re-listing keeps the same rule, and the same moment falls back to the folder.
+        model.replaceProjects([added(web, at: 5, host: devbox), added(api, at: 5, host: devbox)], from: devbox)
+        #expect(model.projects.filter { $0.host == devbox }.map(\.folder) == [api, web])
+        #expect(SidebarOrder.projects(model.liveProjects, servers: [devbox]).map(\.key)
+                == [api, web, docs].map { ProjectKey(host: .mac, folder: $0) }
+                + [api, web].map { ProjectKey(host: devbox, folder: $0) })
+    }
+
     @Test func foldsStartAsTheMacsDidAndAreKeptPerScope() throws {
         let defaults = try #require(UserDefaults(suiteName: "SidebarModelTests.\(UUID())"))
         let folds = SidebarFolds(defaults: defaults, scope: "")

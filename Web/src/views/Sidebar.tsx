@@ -42,15 +42,25 @@ export function projectLabel(host: ControlHost | undefined, project: ProjectSumm
 }
 
 /**
- * This Mac's projects, then each server's, each with the latest worked on first, as the window's
- * and the Remote's (SidebarOrder.projects, #250): no heading for a host.
+ * Oldest added first, then by folder, as the window's and the Remote's (SidebarOrder.byAdded,
+ * #357): a row stays where it is however busy its project is, and a new project lands at the end.
  */
-function orderedProjects(store: Store): { host: ControlHost; project: ProjectSummary }[] {
-  const hosts = store.hosts.value;
+export function byAdded(a: ProjectSummary, b: ProjectSummary): number {
+  if (a.project.addedAt !== b.project.addedAt) return a.project.addedAt - b.project.addedAt;
+  const [x, y] = [folderKey(a.project.folder), folderKey(b.project.folder)];
+  return x < y ? -1 : x > y ? 1 : 0;
+}
+
+/**
+ * This Mac's projects, then each server's, each oldest added first, as the window's and the
+ * Remote's (SidebarOrder.projects, #250, #357): no heading for a host.
+ */
+export function orderedProjects(hosts: ControlHost[], projects: Record<string, ProjectSummary[]>):
+  { host: ControlHost; project: ProjectSummary }[] {
   const ordered = [...hosts.filter((h) => h.id === "mac"), ...hosts.filter((h) => h.id !== "mac")];
-  return ordered.flatMap((host) => (store.projects.value[host.id] ?? [])
+  return ordered.flatMap((host) => (projects[host.id] ?? [])
     .filter((project) => project.project.archivedAt === undefined)
-    .sort((a, b) => b.lastActivityAt - a.lastActivityAt)
+    .sort(byAdded)
     .map((project) => ({ host, project })));
 }
 
@@ -85,7 +95,7 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
   useEffect(() => {
     if (r.host && r.project && (r.session || r.workflow || r.page)) folds.set(r.host, r.project, true);
   }, [r.host, r.project, r.session, r.workflow, r.page]);
-  const projects = orderedProjects(store);
+  const projects = orderedProjects(store.hosts.value, store.projects.value);
   const archived = archivedProjects(store.hosts.value, store.projects.value);
   const showsArchived = folds.showsArchivedProjects.value;
   const offline = store.hosts.value.filter((h) => h.state !== "online");

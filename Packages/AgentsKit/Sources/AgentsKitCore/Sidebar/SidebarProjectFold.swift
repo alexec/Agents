@@ -113,9 +113,19 @@ public struct SidebarProjectFold {
 }
 
 /// The order the sidebar lists projects in: this Mac's, then each server's in the order
-/// the hosts are listed (#145). No headings for hosts: a server's project carries its
-/// server's name.
+/// the hosts are listed (#145), each host's oldest added first (#357). No headings for
+/// hosts: a server's project carries its server's name.
 public enum SidebarOrder {
+    /// Oldest added first, then by folder, so a row stays where it is however busy its
+    /// project is and a new project lands at the end (#357). Ordered by activity, every
+    /// `project/changed` moved a project to the top under the pointer. The web's
+    /// `byAdded` is the same.
+    public static func byAdded(_ a: DaemonAPI.ProjectSummary, _ b: DaemonAPI.ProjectSummary) -> Bool {
+        if a.project.addedAt != b.project.addedAt { return a.project.addedAt < b.project.addedAt }
+        if a.folder.path != b.folder.path { return a.folder.path < b.folder.path }
+        return a.host.rawValue < b.host.rawValue
+    }
+
     public static func projects(_ live: [DaemonAPI.ProjectSummary], servers: [HostID]) -> [DaemonAPI.ProjectSummary] {
         live.filter { $0.host == .mac } + servers.flatMap { host in live.filter { $0.host == host } }
     }
