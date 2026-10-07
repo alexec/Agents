@@ -9,22 +9,24 @@ One `on:` entry naming a server's event. It is held in `WorkflowTrigger.serverEv
 | Field | Type | Rule |
 |---|---|---|
 | `event` | String | The name as written, `noun.verbed`: `[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*`. Not in the app's catalogue, and the noun not one of the app's subjects or `custom`. |
-| `server` | String? | From the reserved `server:` key. `nil` means "whichever server offers it". If present, it must match `[A-Za-z0-9_-]+`. |
+| `servers` | `[String]?` | From the reserved `server:` key, a name or a list of names, each `[A-Za-z0-9_-]+`. `nil` means every server here that offers the event. |
 | `arguments` | `[String: JSONValue]` | Every other key under the trigger. Empty when there are none. At most 2 KB as JSON (the same as pin arguments). |
-| `subscriptionKey` | String, derived | `sha256(resolvedServer + "\n" + event + "\n" + canonicalJSON(arguments))`, the first 16 hex characters. It is worked out once the server is resolved. |
+| `subscriptionKey(server:)` | String, derived | `sha256(server + "\n" + event + "\n" + canonicalJSON(arguments))`, the first 16 hex characters. There is one per server the trigger hears. |
 
 - `name` is `event`.
-- `matches(event)` is true when the event's name equals `name` and its `subscription` detail
-  equals the trigger's resolved `subscriptionKey`.
+- `matches(event)` is true when the event's name equals `name`, and its `subscription` detail
+  is the key of one of the servers the trigger hears.
 - **Parse errors are file errors**: a bad `server:` value, arguments over 2 KB, or a
   `noun.verbed` name whose noun is reserved. Today the last one is a file error for a name
   the app doesn't know.
-- **Resolution**, done by the daemon per project and host, needs the servers, so its results
-  show on the trigger's status, not as file errors:
-  - No server offers it: `serverNotFound`.
-  - Two or more offer it and there is no `server:`: `ambiguous`, naming them.
-  - The named server doesn't offer it: `eventNotOffered`.
-  - The arguments don't fit the schema: `badArguments`.
+- **Resolution** is done by the daemon per project and host. It needs the servers, so its
+  results show on the trigger's status, one line per server, not as file errors:
+  - Each server here that offers the event (or each of `servers` that does) becomes a
+    subscription.
+  - No server offers it: one `serverNotFound` line.
+  - A server named in `servers` doesn't offer it: `eventNotOffered` on its line.
+  - The arguments don't fit that server's schema: `badArguments` on its line. The other
+    servers still run.
 
 ## MCPSubscription (daemon, one per host, server, event and arguments)
 
@@ -80,18 +82,19 @@ workflow).
 
 ## MCPTriggerStatus (wire; on `WorkflowSummary.mcpTriggers`)
 
-There is one per MCP trigger in the workflow, in file order. The full shape is in
+There is one per server each MCP trigger hears, in file order, then server name. A trigger
+no server offers has one line with `server: null`. The full shape is in
 [contracts/wire-status.md](contracts/wire-status.md).
 
 | Field | Type |
 |---|---|
 | `name` | String, such as `checks.failed` |
-| `server` | String?, the server it resolved to |
+| `server` | String?, the server this line is about |
 | `state` | `pending`, `active`, `retrying`, `stopped` or `notThisHost` |
 | `lastPolledAt`, `lastEventAt`, `missedSince` | Date? |
 | `failure` | `{ code, message, since }?` |
 
-The failure codes are `serverNotFound`, `ambiguous`, `badEventName`, `waitingForApproval`, `secretMissing`, `needsSignIn`,
+The failure codes are `serverNotFound`, `badEventName`, `waitingForApproval`, `secretMissing`, `needsSignIn`,
 `unreachable`, `noEvents`, `eventNotOffered`, `noPollMode`, `badArguments`, `refused` and
 `serverError`. `message` is a whole sentence in the app's voice, so clients don't each word it.
 

@@ -16,6 +16,10 @@ not edited.
 } ]
 ```
 
+There is one entry per server a trigger hears, so a trigger heard from GitHub and GitLab has
+two lines, each starting with its server's name. A trigger no server offers has one entry with
+`server: null`.
+
 | `state` | Line under the trigger (all three clients) |
 |---|---|
 | `pending` | "Connecting to ci…" |
@@ -26,7 +30,7 @@ not edited.
 
 When `missedSince` is set, the line adds "Events may have been missed since 09:14" and a
 **Clear** action. The action is a request (`workflows/mcpTrigger/clearMissed` with
-`{workflowID, name}`), granted as any other change to a workflow is.
+`{workflowID, name, server}`), granted as any other change to a workflow is.
 
 The status is pushed with the summary when it changes. It is never re-sent on a timer: "20 s
 ago" is worked out on the client from `lastPolledAt`.

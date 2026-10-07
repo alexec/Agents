@@ -21,8 +21,9 @@ So this feature is **one new event source** feeding that call, plus a server of 
 1. **A trigger kind** for a server's event, named `noun.verbed` like every other event
    (`checks.failed`), with no prefix. A dotted name that isn't in the app's catalogue, and
    whose noun isn't one of the app's subjects, parses as a new
-   `WorkflowTrigger.serverEvent(MCPEventTrigger)`. The server is found by asking which of the
-   project's servers offers the name, or named with `server:` when two do. Its other keys are
+   `WorkflowTrigger.serverEvent(MCPEventTrigger)`. It hears **every** project server that
+   offers the name, or only those `server:` names (one or a list), with one subscription per
+   server. Its other keys are
    the *subscription's arguments*, sent to the server, not details matched locally. They are
    checked against the event's `inputSchema` once the server has been asked.
 2. **An event source** `DaemonCore+MCPEvents.swift`. From the workflows' triggers, it works out
@@ -105,7 +106,7 @@ specs/383-mcp-integrations/
 Packages/AgentsKit/Sources/
 ├── AgentsKitCore/Model/
 │   ├── WorkflowTrigger.swift          # + case serverEvent(MCPEventTrigger), name, matches
-│   ├── MCPEventTrigger.swift          # new: event, server?, arguments, subscriptionKey
+│   ├── MCPEventTrigger.swift          # new: event, servers?, arguments, subscriptionKey(server:)
 │   ├── MCPTriggerStatus.swift         # new: wire status for the page
 │   ├── Workflow.swift                 # WorkflowSummary + mcpTriggers
 │   └── EventCatalogue.swift           # + reservedNouns (the app's subjects), isEventName (noun.verbed)
@@ -155,7 +156,7 @@ AgentsKit. That is the point of the proof of concept: no integration-specific co
 
 ## Phases for the build
 
-1. **Trigger and record**: no network. `MCPEventTrigger`, its parse, `subscriptionKey`, the
+1. **Trigger and record**: no network. `MCPEventTrigger`, its parse, `subscriptionKey(server:)`, the
    store and the schema check, with unit tests. It's useful on its own, because a file using it
    lists as "waiting for the server" rather than unrecognised.
 2. **Client and source**: `listEvents` and `pollEvents` on `MCPClient`, the subscription set,

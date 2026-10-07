@@ -88,6 +88,10 @@ Raise the same event again (same id) and see no second run.
    wrong filter on any event is shown today.
 5. **Given** the workflow is turned off, archived, or on another host (`hosts:`), **When**
    the server would report events, **Then** this host does not ask for them.
+6. **Given** two servers here (`github` and `gitlab`) both offer `pull_request.opened`, and a
+   workflow names it without `server:`, **When** either reports one, **Then** the workflow runs,
+   and the agent is told which server it came from. With `server: github`, only GitHub's run
+   it.
 
 ---
 
@@ -205,8 +209,14 @@ within one poll interval. Start it again and see it recover without anyone doing
   the same secrets as a session. That copy is separate from the runtime's.
 - **Two workflows on the same event with the same filters**: the server is asked once, and
   each event runs both workflows.
-- **Two servers offer the same event name**: a trigger without `server:` is an error on the
-  page, naming both servers. With `server: ci` it runs.
+- **Two servers offer the same event name** (GitHub and GitLab both offer
+  `pull_request.opened`): a trigger without `server:` runs for both, and the page shows one
+  status line for each server. With `server: github` it runs for GitHub only.
+- **A new server that offers the same name is added**: triggers without `server:` start
+  running for it too, from now. The page gains a line for it, and the daemon's log says so.
+- **The filters fit one server's event and not another's** (GitHub calls it `repo`, GitLab
+  `project`): the trigger runs for the servers they fit. The line for the one they don't fit
+  is an error naming its filters. To filter both, write one trigger per server.
 - **A typo in a built-in event's name** (`brnch.moved`): no server offers it, and the page
   says so and lists the nearest built-in name. It never runs.
 - **An event arrives while the workflow is cooling down**: the same as any other event today
@@ -231,9 +241,11 @@ within one poll interval. Start it again and see it recover without anyone doing
 
 - **FR-001**: Every event name MUST be `noun.verbed`, with no prefix, whoever raises it:
   `checks.failed`, `pr.merged`, the same shape as `branch.moved`. A workflow's `on:` MUST
-  accept a server's event by that name alone. The daemon finds the server among the MCP
-  servers this project can use. Only when more than one of them offers the name does the
-  trigger say which, with `server: <name>`.
+  accept a server's event by that name alone. Without `server:`, the trigger subscribes to
+  **every** MCP server this project can use that offers the name, and runs for an event from
+  any of them. `server:` narrows it to one server (`server: github`) or to a list
+  (`server: [github, gitlab]`). The event always says which server it came from, so the agent
+  knows.
 - **FR-001a**: A server's event MUST be refused, and shown as such on the page, if its name
   is not `noun.verbed`, or if its noun is one the app raises events about (`agent`,
   `project`, `workflow`, `branch`, `lease`, `mac`, `person`, `cost`, `server`, `custom`).
@@ -284,7 +296,8 @@ within one poll interval. Start it again and see it recover without anyone doing
 ### Key Entities
 
 - **Event trigger**: a workflow's `on:` entry naming a server's event (`checks.failed`), its
-  filters, and `server:` when the name is offered by more than one server.
+  filters, and optionally `server:` (one name or a list) to narrow which servers it hears.
+  It becomes one subscription per server it hears.
 - **Subscription**: one server, event and set of filters on one host, with its saved
   position, last asked time, last event time, last error and missed-events marks. It is
   shared by every workflow with the same trigger.
@@ -308,7 +321,8 @@ within one poll interval. Start it again and see it recover without anyone doing
 ## Docs *(mandatory)*
 
 - `docs/reference/workflows.md`: change. Say that an `on:` event name can be a server's
-  event, with its filters and `server:`, and give an example.
+  event, with its filters and `server:` (one or a list), and that without `server:` it hears
+  every server offering the name; give an example.
 - `docs/reference/events.md`: change. Add a section "Events from MCP servers": names,
   filters, delivered once, the saved position, missed events, poll mode only.
 - `docs/how-to/start-a-workflow-from-an-mcp-event.md`: add. Set up a server with events, write

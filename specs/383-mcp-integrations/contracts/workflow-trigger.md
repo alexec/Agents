@@ -10,10 +10,10 @@ exactly like the app's own (`branch.moved`).
 
 ```yaml
 on:
-  - <noun>.<verbed>                    # no arguments; the one server here that offers it
+  - <noun>.<verbed>                    # every server here that offers it
   - <noun>.<verbed>:
-      server: <name>                   # only when two servers here offer this name
-      <argument>: <scalar | list | map> # the event's own filters, passed to the server
+      server: <name> | [<name>, …]     # optional: only these servers
+      <argument>: <scalar | list | map> # the event's own filters, passed to each server
 ```
 
 - The name must match `[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*`.
@@ -23,7 +23,10 @@ on:
     unknown name with such a noun is a file error, as today.
   - Any other name is a server's event.
 - `server:` is reserved. Its value is the name of an MCP server in the project's
-  `.agents/mcp.json`, your `~/.agents/mcp.json`, or a plugin.
+  `.agents/mcp.json`, your `~/.agents/mcp.json`, or a plugin, or a list of them. A list
+  means any of them, the same as a list of details on the app's own events.
+- Without `server:`, the trigger hears every server here that offers the name, including one
+  added later. Each event says which server it came from (`details.server`).
 - Arguments: every key but `server`, at most 2 KB as JSON, passed to the server as they are. A
   list is a list argument. It does **not** mean "any of" as it does for the app's own
   details.
@@ -57,17 +60,30 @@ push, and use `comment_on_pr` to say what you changed.
 |---|---|---|---|
 | A name not shaped `noun.verbed`, or an unknown name with one of the app's nouns, a bad `server:` value, or arguments over 2 KB | When the file is read | An error in the file, naming the rule | Never |
 | No server here offers the name | When subscribing | "No server here offers checks.failed" (`serverNotFound`), and "Did you mean branch.moved?" when a built-in name is close | Never, until one does |
-| Two servers offer it and there's no `server:` | When subscribing | "Both ci and github offer checks.failed: add server: to say which" (`ambiguous`) | Never, until the file says |
-| `server:` names a server that doesn't offer it | After `events/list` | `eventNotOffered`, naming the events it does list | Never, until the list changes |
+| `server:` names a server that doesn't offer it | After `events/list` | `eventNotOffered` on that server's line, naming the events it does list | Not for that server. The others run. |
 | A server's event named against the rules (`branch.created`, `checksFailed`) | After `events/list` | `badEventName`: "ci names an event branch.created, which only the app can raise" | Never |
 | An event without `poll` in its `delivery` | After `events/list` | `noPollMode`: "ci offers checks.failed only by push or webhook, which this version doesn't take" | Never |
-| Arguments that don't fit `inputSchema` | After `events/list` | `badArguments`, shown as an error in the file, naming the keys it takes | Never, until the file or the schema changes |
+| Arguments that don't fit one server's `inputSchema` | After `events/list` | `badArguments` on that server's line, shown as an error in the file, naming the keys it takes | Not for that server, until the file or the schema changes. The others run. |
 
 ## Matching
 
-- A trigger matches an event when the event's name equals the trigger's, and its
-  `subscription` detail equals the trigger's resolved subscription key
-  ([data model](../data-model.md)).
-- Two triggers with an equal event, resolved server and arguments share one subscription.
+- A trigger becomes one subscription per server it hears. It matches an event when the
+  event's name equals the trigger's, and the event's `subscription` detail is one of those
+  subscriptions' keys ([data model](../data-model.md)).
+- Two triggers with an equal event and arguments share the subscription for each server they
+  both hear.
 - A `wait_for_event` on `checks.failed`, or on `checks.*`, sees events only while some
   workflow on that host subscribes to them. Waits don't create subscriptions in this feature.
+
+For example, with both `github` and `gitlab` set up and offering `pull_request.opened`:
+
+```yaml
+on:
+  - pull_request.opened            # PRs opened on either; details.server says which
+  - pull_request.opened:
+      server: github               # GitHub only, filtered by its own argument
+      repo: alexec/Agents
+  - pull_request.opened:
+      server: gitlab
+      project: alexec/agents
+```

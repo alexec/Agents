@@ -11,13 +11,21 @@ AgentsKit source at `d1822ebe`.
 **Decision** (Alex, 2026-10-06): every event name is `noun.verbed`, with no prefix, whoever
 raises it. A server's event is named exactly as the server names it, such as `checks.failed`.
 
-- **Finding the server.** A trigger names only the event. The daemon looks the name up in
-  the event lists of the servers this project can use (R3's resolution order).
-  - One server offers it: that is the server.
-  - More than one: the trigger must add `server: <name>`. Without it, the page shows an error
-    naming the servers.
-  - None: the trigger waits as `serverNotFound`, "no server here offers checks.failed", with
-    the nearest built-in name if there is one, to catch typos.
+- **Finding the servers** (Alex, 2026-10-06: "no `server:` means every server that offers
+  it"). A trigger names only the event. The daemon looks the name up in the event lists of the
+  servers this project can use (R3's resolution order).
+  - Without `server:`, the trigger hears **every** server that offers it, with one
+    subscription each. GitHub and GitLab both offering `pull_request.opened` means one
+    workflow runs for PRs from either. The agent tells them apart by `details.server`.
+  - `server: github` or `server: [github, gitlab]` narrows it to those servers. A named
+    server that doesn't offer it gets an `eventNotOffered` line, and the others still run.
+  - None offers it: the trigger waits as `serverNotFound`, "no server here offers
+    checks.failed", with the nearest built-in name if there is one, to catch typos.
+  - A server added later that offers the name joins at once, starting from now (R5). The
+    page gains its line, and the log says `subscribed`.
+  - Arguments are checked against each server's `inputSchema` separately. Servers they fit
+    are polled. A server they don't fit gets a `badArguments` line. This is how GitHub's
+    `repo` and GitLab's `project` stay two triggers, one per server.
 - **The app's names win.** A name in the app's own catalogue (`branch.moved`) is always the
   app's event. A server's event whose noun is one of the app's subjects (`agent`, `project`,
   `workflow`, `branch`, `lease`, `mac`, `person`, `cost`, `server`, `custom`) is refused, and
@@ -33,8 +41,8 @@ raises it. A server's event is named exactly as the server names it, such as `ch
   Values can be a scalar, a list or a map, kept as `JSONValue`. An event whose `inputSchema`
   declares an argument named `server` can't be given that argument, and the page says so.
 - **Matching.** The raised event carries `server` and `subscription` details (a digest of
-  server, event and arguments). A trigger matches when the names are equal and its digest
-  equals that detail. Two workflows with the same event, server and arguments share a
+  server, event and arguments). A trigger matches when the names are equal and that detail is
+  one of its subscriptions' keys (one per server it hears). Two workflows with the same event, server and arguments share a
   subscription, and both run for each event.
 
 **Rationale**:
@@ -49,6 +57,10 @@ raises it. A server's event is named exactly as the server names it, such as `ch
 - `mcp.<server>.<event>` was the first plan. Alex rejected it: names are `noun.verbed`.
 - A separate `mcp:` key with `server`, `event` and `with` was rejected: a second grammar.
 - Requiring `server:` always was rejected: it's noise in the common case of one server.
+- An error when two servers offer the name (until `server:` says which) was the second plan.
+  Alex chose hearing every server instead: one workflow for "a PR opened" wherever it was
+  opened. The cost is that a new server widens old workflows, so that is shown on the page
+  and in the log, not hidden.
 - Matching event details locally against the filters was rejected. Filter keys aren't detail
   keys, and it would ask the server for everything.
 

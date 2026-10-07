@@ -25,6 +25,7 @@ node --test Integrations/ci-watcher/
 | Unreachable, then back: `retrying` then `active`, with the backoff measured | US5 2, SC-004 |
 | NotFound and Forbidden give `stopped`, and polling stops | US5 3 |
 | Two workflows with one key: one poll, two runs | Edge case |
+| Two stand-in servers offering one name: a trigger without `server:` gets two subscriptions and runs for each, `server: a` hears only `a`, `server: [a, b]` both, and arguments that fit only `a` give `b` a `badArguments` line while `a` still runs | US1 6 |
 | `nextPollMs: 1` is clamped to 10 s | Edge case |
 
 ## 1. On a scratch root (run-app)
