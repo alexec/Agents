@@ -172,6 +172,22 @@ else
 	fi
 fi
 
+# Whether the AgentsKit run needs Daemon/'s agentsd built first. Only the fake-ssh suites
+# that read ServerLinkTests.agentsd run it, and a filtered run rarely names one, yet the
+# build costs three to five minutes on the runner. The filter is a regular expression over
+# the qualified test id, so it is matched against these suites' own ids. Keep the list to
+# the suites that read ServerLinkTests.agentsd; one left out still builds it, inside its run.
+agentsd=skip
+if [[ "$agentskit" == full ]]; then
+	agentsd=build
+elif [[ "$agentskit" == filter ]]; then
+	for suite in FakeSSHSuites/ServerLinkTests FakeSSHSuites/ServerConnectionTests FakeSSHSuites/ToolsetInstallTests; do
+		if [[ "$suite" =~ $agentskit_filter ]]; then
+			agentsd=build
+		fi
+	done
+fi
+
 {
 	printf 'agentskit=%s\n' "$agentskit"
 	printf 'agentskit_filter=%s\n' "$agentskit_filter"
@@ -179,4 +195,5 @@ fi
 	printf 'codetext_filter=%s\n' "$codetext_filter"
 	printf 'webtypes=%s\n' "$webtypes"
 	printf 'controlplane=%s\n' "$controlplane"
+	printf 'agentsd=%s\n' "$agentsd"
 } >> "${GITHUB_OUTPUT:-/dev/stdout}"
