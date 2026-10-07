@@ -15,14 +15,14 @@
 
 ## Counts
 
-Of 206 rows: **138 same**, **40 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #381). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 207 rows: **139 same**, **40 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
 | Sidebar and project list | 8 | 2 | 9 |
 | Session rows and states | 16 | 2 | 5 |
 | Chat turns and turn detail | 19 | 3 | 2 |
-| Prompt bar and queued prompts | 18 | 2 | 0 |
+| Prompt bar and queued prompts | 19 | 2 | 0 |
 | Question and permission cards | 13 | 3 | 0 |
 | Start sheet and new project | 17 | 5 | 0 |
 | Worktrees and Files | 9 | 6 | 6 |
@@ -138,6 +138,7 @@ The deltas are tracked by 29 issues:
 | Cost / day-limit banner | `S/Chat/PromptPieces.swift:104` | The same | `W/views/PromptStatus.tsx` | **same** |
 | Placeholder | `PromptWords.placeholder`: `S/Chat/PromptPieces.swift:14-24` | The same | `promptPlaceholder`: `W/model/promptWords.ts`, offered suggestion as placeholder: `W/views/Prompt.tsx` | **same** (#276) |
 | Send / Queue / Stop button | `A/Chat/PromptBar.swift:478-524` | `R/Chat/PromptBar.swift:228-272` | `W/views/Prompt.tsx` | **same** (#276) |
+| Return and Shift-Return send, Option-Return a new line (#377) | `PromptReturn` (AgentsKitCore): `A/Chat/PromptBar.swift:401` | `PromptReturn` from a hardware keyboard; the on-screen keyboard's Return is a new line: `R/Chat/PromptBar.swift:172` | `returnAction`: `W/views/Prompt.tsx` | **same** |
 | Sending in flight (#87) | Spinner, *telling* after 400 ms: `A/Chat/PromptBar.swift:120-138` | The host's name: `R/Chat/PromptBar.swift:94` | `W/views/Prompt.tsx:119-121` | **same** (#239) |
 | Queued prompts as bubbles, Send now, × (#95) | `S/Chat/TranscriptRows.swift:377-463` | Shared | `W/views/Chat.tsx:277-306` | **same** |
 | Attachments | Picker, drag, paste: `A/Chat/PromptBar.swift:455-463` | `R/Chat/PromptBar.swift:214` | Picker, drop, paste: `W/views/Prompt.tsx:122-171` | **same** |
