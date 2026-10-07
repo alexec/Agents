@@ -4,23 +4,27 @@ Phase 1 for [plan.md](plan.md). The reasons for each choice are in [research.md]
 
 ## MCPEventTrigger (AgentsKitCore, value type)
 
-One `on:` entry naming an MCP event. It is held in `WorkflowTrigger.mcpEvent`.
+One `on:` entry naming a server's event. It is held in `WorkflowTrigger.serverEvent`.
 
 | Field | Type | Rule |
 |---|---|---|
-| `server` | String | Non-empty. No dots. One of `[A-Za-z0-9_-]`. |
-| `event` | String | Non-empty. The rest of the name after `mcp.<server>.`. |
-| `arguments` | `[String: JSONValue]` | The keys under the trigger. Empty when there are none. At most 2 KB as JSON (the same as pin arguments). |
-| `subscriptionKey` | String, derived | `sha256(server + "\n" + event + "\n" + canonicalJSON(arguments))`, the first 16 hex characters. |
+| `event` | String | The name as written, `noun.verbed`: `[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*`. Not in the app's catalogue, and the noun not one of the app's subjects or `custom`. |
+| `server` | String? | From the reserved `server:` key. `nil` means "whichever server offers it". If present, it must match `[A-Za-z0-9_-]+`. |
+| `arguments` | `[String: JSONValue]` | Every other key under the trigger. Empty when there are none. At most 2 KB as JSON (the same as pin arguments). |
+| `subscriptionKey` | String, derived | `sha256(resolvedServer + "\n" + event + "\n" + canonicalJSON(arguments))`, the first 16 hex characters. It is worked out once the server is resolved. |
 
-- `name` is `mcp.<server>.<event>`.
+- `name` is `event`.
 - `matches(event)` is true when the event's name equals `name` and its `subscription` detail
-  equals `subscriptionKey`.
-- **Parse errors are file errors**: a server name with a dot or a bad character, an empty
-  event, or arguments over 2 KB.
-- **Not file errors when the file is read**: an unknown server, an unknown event, or arguments
-  that don't fit the schema. These need the server, so they show on the trigger's status
-  (below).
+  equals the trigger's resolved `subscriptionKey`.
+- **Parse errors are file errors**: a bad `server:` value, arguments over 2 KB, or a
+  `noun.verbed` name whose noun is reserved. Today the last one is a file error for a name
+  the app doesn't know.
+- **Resolution**, done by the daemon per project and host, needs the servers, so its results
+  show on the trigger's status, not as file errors:
+  - No server offers it: `serverNotFound`.
+  - Two or more offer it and there is no `server:`: `ambiguous`, naming them.
+  - The named server doesn't offer it: `eventNotOffered`.
+  - The arguments don't fit the schema: `badArguments`.
 
 ## MCPSubscription (daemon, one per host, server, event and arguments)
 
@@ -81,12 +85,13 @@ There is one per MCP trigger in the workflow, in file order. The full shape is i
 
 | Field | Type |
 |---|---|
-| `name` | String, such as `mcp.ci.checks.failed` |
+| `name` | String, such as `checks.failed` |
+| `server` | String?, the server it resolved to |
 | `state` | `pending`, `active`, `retrying`, `stopped` or `notThisHost` |
 | `lastPolledAt`, `lastEventAt`, `missedSince` | Date? |
 | `failure` | `{ code, message, since }?` |
 
-The failure codes are `serverNotFound`, `waitingForApproval`, `secretMissing`, `needsSignIn`,
+The failure codes are `serverNotFound`, `ambiguous`, `badEventName`, `waitingForApproval`, `secretMissing`, `needsSignIn`,
 `unreachable`, `noEvents`, `eventNotOffered`, `noPollMode`, `badArguments`, `refused` and
 `serverError`. `message` is a whole sentence in the app's voice, so clients don't each word it.
 
@@ -94,7 +99,7 @@ The failure codes are `serverNotFound`, `waitingForApproval`, `secretMissing`, `
 
 | Field | Value |
 |---|---|
-| `name` | `mcp.<server>.<event>` |
+| `name` | the server's event name, as it is (`checks.failed`) |
 | `scope` | `.project(folder)` |
 | `sentence` | `<server> reported <event>` |
 | `details.server` | `<server>` |
@@ -106,6 +111,8 @@ The failure codes are `serverNotFound`, `waitingForApproval`, `secretMissing`, `
 | `details.payload_cut` | `"true"` only when it was cut |
 | `publisher` | none (it is not an agent) |
 
-`EventSubject` gains `mcp`, and `EventCatalogue` treats `mcp.` names as open, as it does
-`custom.`. A **wait** (`wait_for_event`) on `mcp.ci.*` therefore works with no extra work, and
-the Events page lists these events like any other.
+`EventCatalogue` gains `reservedNouns` (its subjects plus `custom`) and an `isEventName`
+check (`noun.verbed`). A raised server event is accepted by `EventPattern` when its name is not
+the app's and its noun is not reserved. A **wait** (`wait_for_event`) on `checks.failed` (or
+`checks.*`) therefore works with no extra work while some workflow subscribes, and the Events
+page lists these events like any other, with the server from `details.server`.

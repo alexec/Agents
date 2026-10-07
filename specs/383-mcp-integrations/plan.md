@@ -18,15 +18,18 @@ matching workflows. Workflows already parse dotted event names with filters, and
 
 So this feature is **one new event source** feeding that call, plus a server of our own:
 
-1. **A trigger kind** `mcp.<server>.<event>`. Its filters are the *subscription's arguments*,
-   sent to the server, not details matched locally. It parses as a new
-   `WorkflowTrigger.mcpEvent(MCPEventTrigger)`. Its filters are checked against the event's
-   `inputSchema` once the server has been asked, not when the file is read.
+1. **A trigger kind** for a server's event, named `noun.verbed` like every other event
+   (`checks.failed`), with no prefix. A dotted name that isn't in the app's catalogue, and
+   whose noun isn't one of the app's subjects, parses as a new
+   `WorkflowTrigger.serverEvent(MCPEventTrigger)`. The server is found by asking which of the
+   project's servers offers the name, or named with `server:` when two do. Its other keys are
+   the *subscription's arguments*, sent to the server, not details matched locally. They are
+   checked against the event's `inputSchema` once the server has been asked.
 2. **An event source** `DaemonCore+MCPEvents.swift`. From the workflows' triggers, it works out
    a set of **subscriptions** (server, event, arguments) per project. For each one it holds a
    poll loop on its own MCP connection, separate from the views pool, which may be stdio. Each
-   new event is raised as `mcp.<server>.<event>` with a `subscription` detail, which only that
-   subscription's triggers match.
+   new event is raised under its own name (`checks.failed`) with `server` and `subscription`
+   details, which only that subscription's triggers match.
 3. **Exactly once**, by a write-ahead record in `<root>/mcp-events.json`. That record holds the
    cursor, the ids recently seen, and the ids "being delivered". `events.jsonl` is the commit
    point. See [research R4](research.md#r4-exactly-once-across-a-restart).
@@ -88,7 +91,7 @@ specs/383-mcp-integrations/
 ├── data-model.md        # Phase 1: records and states
 ├── quickstart.md        # Phase 1: the walk that proves it
 ├── contracts/
-│   ├── workflow-trigger.md     # the `mcp.<server>.<event>` front matter
+│   ├── workflow-trigger.md     # a server's `noun.verbed` event in front matter
 │   ├── mcp-events-client.md    # what the daemon sends and accepts (the draft, poll mode)
 │   ├── ci-watcher-server.md    # the CI watcher's events, tools and view
 │   └── wire-status.md          # MCPTriggerStatus on WorkflowSummary
@@ -101,12 +104,12 @@ specs/383-mcp-integrations/
 ```text
 Packages/AgentsKit/Sources/
 ├── AgentsKitCore/Model/
-│   ├── WorkflowTrigger.swift          # + case mcpEvent(MCPEventTrigger), name, matches
-│   ├── MCPEventTrigger.swift          # new: server, event, arguments, subscriptionKey
+│   ├── WorkflowTrigger.swift          # + case serverEvent(MCPEventTrigger), name, matches
+│   ├── MCPEventTrigger.swift          # new: event, server?, arguments, subscriptionKey
 │   ├── MCPTriggerStatus.swift         # new: wire status for the page
 │   ├── Workflow.swift                 # WorkflowSummary + mcpTriggers
-│   └── EventCatalogue.swift           # + EventSubject.mcp, open like custom.
-├── AgentsKit/Workflows/WorkflowFile.swift   # parse `mcp.` names before EventPattern
+│   └── EventCatalogue.swift           # + reservedNouns (the app's subjects), isEventName (noun.verbed)
+├── AgentsKit/Workflows/WorkflowFile.swift   # unknown noun.verbed names → serverEvent, not unrecognised
 ├── AgentsKit/MCP/
 │   ├── MCPClient.swift                # + eventsCapability, listEvents, pollEvents
 │   ├── MCPEventsWire.swift            # new: EventDefinition, PollResult, errors

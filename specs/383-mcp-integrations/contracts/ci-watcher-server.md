@@ -24,7 +24,8 @@ and holds no token: every GitHub call is `gh api` (or `gh pr list`) as the signe
 | `checks.failed` | `repo` (string, `owner/name`, required), `branch` (string) | `{ pr: {number, title, branch, url}, headSha, run: {id, attempt, name, url}, failedJobs: [{name, url}] }` | `checks.failed:{repo}:{runId}:{attempt}` |
 | `pr.merged` | `repo` (required) | `{ pr: {number, title, branch, url}, mergedAt, mergeSha }` | `pr.merged:{repo}:{number}` |
 
-Both have `delivery: ["poll"]`. The cursor and paging rules are in
+Both have `delivery: ["poll"]`. Both names are `noun.verbed`, and neither noun is one the
+app reserves, so workflows name them as they are (`checks.failed`), with no prefix. The cursor and paging rules are in
 [research R10](../research.md#r10-the-ci-watcher-turning-github-into-events-with-a-cursor).
 
 ## Tools

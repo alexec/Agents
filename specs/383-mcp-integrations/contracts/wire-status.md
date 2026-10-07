@@ -6,7 +6,8 @@ not edited.
 
 ```json
 "mcpTriggers": [ {
-  "name": "mcp.ci.checks.failed",
+  "name": "checks.failed",
+  "server": "ci",
   "state": "active",
   "lastPolledAt": "2026-10-06T12:05:30Z",
   "lastEventAt":  "2026-10-06T11:40:02Z",

@@ -42,7 +42,7 @@ Never the real root. Seed synthetic records only, and never copy real agents.
 4. **Expect**: the workflow page shows "Checked … · no events yet" within 30 s, on the Mac,
    and on the web page against the same root.
 5. Append a failed run to `fixtures/ci.json`. **Expect**: within 40 s, one run, an agent whose
-   prompt ends with the fenced data from `ci`, and one `mcp.ci.checks.failed` event on the
+   prompt ends with the fenced data from `ci`, and one `checks.failed` event on the
    Events page.
 6. Stop the daemon, append two more failures, and start it again. **Expect**: exactly two more
    runs. The log has two `raised` lines and no repeats.
@@ -61,7 +61,7 @@ Screenshot steps 4, 5, 7 and 8 on the Mac and the web page. The Remote look is A
 3. Open a draft PR with a failing test. **Expect**: within 2 minutes, an agent on that branch
    (SC-001), and the board shows the PR failing, then running after the agent reruns or pushes.
 4. Over the following week, count runs against failures for SC-002 and SC-003, from the Events
-   page (`mcp.ci.checks.failed`) and the workflow's runs.
+   page (`checks.failed`) and the workflow's runs.
 
 ## Cleanup
 
