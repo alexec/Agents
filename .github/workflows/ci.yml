@@ -231,10 +231,14 @@ jobs:
 
       # ServerLinkTests runs this agentsd, and builds it itself when it is missing:
       # a whole Swift build inside the test run, holding a test thread for minutes,
-      # which on a shared runner stalls everything else. Built here instead.
+      # which on a shared runner stalls everything else. Built here instead, and only
+      # when the run includes a suite that reads it: a filtered run that names none of
+      # them spent three to five minutes here on a binary nothing ran. The selector says
+      # which suites those are. Skipping it also skips the SwiftPM cache save below,
+      # which already waits on this build, so no partial cache is kept.
       - name: Build agentsd for the tests
         id: build-agentsd
-        if: steps.test-selection.outputs.agentskit != 'skip'
+        if: steps.test-selection.outputs.agentsd == 'build'
         env:
           RESTORED: ${{ steps.swiftpm-cache.outputs.cache-matched-key }}
         run: |

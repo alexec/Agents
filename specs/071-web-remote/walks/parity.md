@@ -154,7 +154,7 @@ The deltas are tracked by 29 issues:
 |---|---|---|---|---|
 | Where they show | Together, over the prompt: `A/Chat/ChatView.swift:172-196` | Together: `R/Chat/RemoteChatView.swift` (#243) | Together: `W/views/Cards.tsx:122-133` | **same** |
 | Asker line and title (#121) | `A/Elicitation/ElicitationView.swift:28-34` | `R/Elicitation/ElicitationSheet.swift:28-42` | `W/views/Cards.tsx:117-120` | **same** |
-| One-tap single choice | One property only: `A/Elicitation/ElicitationView.swift:37, 303-333` | Also with the optional Other box: `R/Elicitation/ElicitationSheet.swift:79-141` | The window's rule | **by design** (one tap on a phone; `ElicitationSheet.swift:79-89`) |
+| One-tap single choice | One property only, stacked full width (#338): `A/Elicitation/ElicitationView.swift:37, 303-328` | Also with the optional Other box: `R/Elicitation/ElicitationSheet.swift:79-141` | The window's rule, stacked full width (#338): `W/views/Cards.tsx:367` | **by design** (one tap on a phone; `ElicitationSheet.swift:79-89`) |
 | Multi-page forms | *1/3*: `A/Elicitation/ElicitationView.swift:89-150` | *Question 1 of 3*: `R/Elicitation/FormPages.swift:50-55` | *1/3*: `W/views/Cards.tsx:209-218` | **same** |
 | Date, date-time, email, URL fields | DatePicker: `A/Elicitation/ElicitationView.swift:436-444` | DatePicker, keyboards: `R/Elicitation/FormPages.swift:125-133, 329-357` | The browser's date, datetime-local, email and url inputs: `W/views/Cards.tsx:430`, `W/model/formInputs.ts` | **same** (#265) |
 | A field's problem in place | Under every field | Under every part | Under every field: `W/views/Cards.tsx:441` | **same** (#256) |
