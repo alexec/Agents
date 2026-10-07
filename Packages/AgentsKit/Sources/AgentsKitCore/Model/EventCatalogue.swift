@@ -3,6 +3,8 @@ import Foundation
 /// What an event is about: the part of its name before the dot.
 public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
     case agent
+    /// The project as a whole: every agent in it at once (#360).
+    case project
     case workflow
     case branch
     case lease
@@ -20,7 +22,7 @@ public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
     /// Monochrome, and never tinted: an event is a fact, not a state (042 wireframes §5).
     public var glyph: String {
         switch self {
-        case .agent: return "●"
+        case .agent, .project: return "●"
         case .workflow: return "⟳"
         case .branch: return "⎇"
         case .mac, .person, .lease, .cost, .server: return "⌘"
@@ -31,7 +33,7 @@ public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
     /// The capsule on the events page that shows it.
     public var group: EventGroup {
         switch self {
-        case .agent: return .agents
+        case .agent, .project: return .agents
         case .workflow: return .workflows
         case .branch: return .branches
         case .mac, .person, .lease, .cost, .server: return .mac
@@ -127,6 +129,9 @@ public enum EventCatalogue {
         EventKind("agent.archived", .project, about(archivedBy, outcome), "An agent in this project was archived."),
         EventKind("agent.retired", .project, about(fixed("because", ["age", "cap", "person"])),
                   "An archived agent was retired and its conversation deleted."),
+        EventKind("project.idle", .project,
+                  open("agents", "finished", "blocked", "waiting_on_you", "stopped", "failed", "since", "ids"),
+                  "Every agent in this project has stopped working."),
         EventKind("workflow.ran", .project, [workflow, agent], "A workflow in this project started an agent."),
         EventKind("workflow.completed", .project, [workflow, agent, outcome],
                   "A workflow's run in this project finished.", aliases: ["workflow-completed"]),

@@ -425,6 +425,7 @@ struct WorkflowPage: View {
         case .event(let pattern):
             switch EventSubject(name: pattern.name) {
             case .agent: return "person.crop.circle"
+            case .project: return "person.2"
             case .workflow: return "arrow.triangle.2.circlepath"
             case .branch: return "arrow.triangle.branch"
             case .custom: return "sparkle"
