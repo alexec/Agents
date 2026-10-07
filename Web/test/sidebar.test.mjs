@@ -112,6 +112,27 @@ test("Archived projects: every host's, the latest worked on first, apart from th
   }
 });
 
+test("Projects: this Mac's then each server's, oldest added first, however busy (#357)", async () => {
+  globalThis.location = { hash: "" };
+  globalThis.addEventListener = () => {};
+  try {
+    const { orderedProjects } = await load("src/views/Sidebar.tsx");
+    const project = (name, addedAt, lastActivityAt = 0, archivedAt) => ({ name, lastActivityAt,
+      project: { folder: `file:///w/${name}/`, addedAt, ...(archivedAt === undefined ? {} : { archivedAt }) } });
+    const hosts = [{ id: "box", name: "box" }, { id: "mac", name: "This Mac" }];
+    const names = (projects) => orderedProjects(hosts, projects).map(({ host, project }) => `${host.id}:${project.name}`);
+    const listed = { mac: [project("busy", 20, 999), project("first", 10), project("gone", 5, 0, 30)],
+                     box: [project("api", 1)] };
+    assert.deepEqual(names(listed), ["mac:first", "mac:busy", "box:api"], "activity does not move a row");
+    listed.mac.push(project("new", 40));
+    assert.deepEqual(names(listed), ["mac:first", "mac:busy", "mac:new", "box:api"], "a new project lands at the end");
+    assert.deepEqual(names({ mac: [project("b", 10), project("a", 10)] }), ["mac:a", "mac:b"], "same moment: by folder");
+  } finally {
+    delete globalThis.location;
+    delete globalThis.addEventListener;
+  }
+});
+
 test("Archived projects is closed until opened, and kept so (#343)", async () => {
   const { Folds } = await load("src/model/folds.ts");
   const storage = new Memory();

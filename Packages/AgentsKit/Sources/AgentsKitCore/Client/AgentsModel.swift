@@ -814,7 +814,7 @@ public final class AgentsModel {
         } else {
             projects.append(summary)
         }
-        projects.sort { $0.lastActivityAt > $1.lastActivityAt }
+        projects.sort(by: SidebarOrder.byAdded)
     }
 
     public func replaceAgents(_ listed: [Agent]) {
@@ -834,7 +834,7 @@ public final class AgentsModel {
     }
 
     public func replaceProjects(_ listed: [DaemonAPI.ProjectSummary]) {
-        projects = listed.sorted { $0.lastActivityAt > $1.lastActivityAt }
+        projects = listed.sorted(by: SidebarOrder.byAdded)
     }
 
     /// One host's agents, as it just listed them. Every other host's are left alone:
@@ -848,7 +848,7 @@ public final class AgentsModel {
 
     public func replaceProjects(_ listed: [DaemonAPI.ProjectSummary], from host: HostID) {
         let stamped = listed.map { var summary = $0; summary.host = host; return summary }
-        projects = (projects.filter { $0.host != host } + stamped).sorted { $0.lastActivityAt > $1.lastActivityAt }
+        projects = (projects.filter { $0.host != host } + stamped).sorted(by: SidebarOrder.byAdded)
     }
 
     /// Down to the budget, never taking the terminal just written to.
@@ -1336,13 +1336,15 @@ public final class AgentsModel {
         RuntimeCatalog.newSessionRuntime(kept: kept, available: available)
     }
 
-    /// The projects worth showing, newest activity first.
+    /// The projects worth showing, oldest added first (`SidebarOrder.byAdded`, #357).
     public var liveProjects: [DaemonAPI.ProjectSummary] {
         projects.filter { !$0.project.isArchived }
     }
 
+    /// The archived ones, latest worked on first, as the web's: their activity no longer
+    /// moves, so this order does not shuffle.
     public var archivedProjects: [DaemonAPI.ProjectSummary] {
-        projects.filter(\.project.isArchived)
+        projects.filter(\.project.isArchived).sorted { $0.lastActivityAt > $1.lastActivityAt }
     }
 
     public func project(_ key: ProjectKey?) -> DaemonAPI.ProjectSummary? {

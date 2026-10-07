@@ -15,11 +15,11 @@
 
 ## Counts
 
-Of 214 rows: **145 same**, **40 by design**, **29 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 214 rows: **146 same**, **40 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
-| Sidebar and project list | 5 | 2 | 10 |
+| Sidebar and project list | 6 | 2 | 9 |
 | Session rows and states | 16 | 2 | 5 |
 | Chat turns and turn detail | 19 | 3 | 2 |
 | Prompt bar and queued prompts | 18 | 2 | 0 |
@@ -48,7 +48,7 @@ The deltas are tracked by 29 issues:
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
 | One sidebar: Activity, projects folding open on their sessions and workflows, `host:Project` names | `A/Projects/ProjectListView.swift:48-96` | Its own project list, then a project page of cards, under host headings: `R/Projects/ProjectListView.swift:18-27`, `R/Projects/ProjectPageView.swift` | From 760 px, as the window: `W/views/Sidebar.tsx:38-104` (#151). Below, one column at a time | **delta**: Remote #226; web at phone width #235 |
-| Project order | Last activity, newest first; this Mac's, then each server's: `K/Client/AgentsModel.swift:635`, `A/Projects/ProjectListView.swift:41-45` | Last activity, within host sections | **By name** within each host: `W/views/Sidebar.tsx:42-48` | **delta**: web #250 |
+| Project order | Oldest added first, then by folder; this Mac's, then each server's: `K/Sidebar/SidebarProjectFold.swift` (`SidebarOrder.byAdded`), `K/Client/AgentsModel.swift` | The same, from the shared model: `R/Sidebar/RemoteSidebar.swift` | The same: `W/views/Sidebar.tsx` (`byAdded`, `orderedProjects`) | **same** (#357) |
 | Project row subtitle | Needs you (· N unread), else working / unread, else *N complete* / stopped: `A/Projects/ProjectRow.swift:75-96` | No complete / stopped fallback: `R/Projects/ProjectListView.swift:143-151` | As the window: `W/model/groups.ts:176-188` | **delta**: Remote #226 |
 | Project row menu | Dashboard, New Session, Project Settings…, Archive, Show in Finder: `A/Projects/ProjectListView.swift:511-542` | None: the row is a button | Dashboard, New Session: `W/views/Sidebar.tsx:197-201` | Web: **by design** (Settings, Archive and Finder are the Mac's, #151). Remote: **delta** #226 |
 | Archived projects fold, Bring Back | Closed until opened, below the projects, each row Bring Back and its menu: `A/Projects/ProjectListView.swift:87-96`, `S/ArchivedProjectRow.swift` | The same row, a swipe for Bring Back too; listed from every host as the sidebar appears (the catch-up leaves them out): `R/Sidebar/RemoteSidebar.swift`, `R/RemoteModel.swift` (`shelvedProjects`, `unarchiveProject`) | As the window, its open state kept in localStorage; `projects/list` now asks with archived ones: `W/views/Sidebar.tsx` (`ArchivedProjectRow`) | **same** (#343) |

@@ -1661,8 +1661,7 @@ final class AppModel {
     }
 
     /// Pick a project when there is none, or when the one we had has gone or been
-    /// archived. Falls back to the most recently active, which is what the sidebar
-    /// puts at the top.
+    /// archived. Falls back to what the sidebar puts at the top.
     private func settleProjectSelection() {
         let live = liveProjects
         if let selectedProjectKey, live.contains(where: { $0.key == selectedProjectKey }) { return }
