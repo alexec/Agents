@@ -184,7 +184,7 @@ struct AgentStateTests {
     ///
     /// Written as a literal transcribed from the contract rather than as a rule,
     /// because a rule would be the implementation stated twice and would agree with a
-    /// wrong table as readily as a right one. Six states by ten events; a pair missing
+    /// wrong table as readily as a right one. Seven states by ten events; a pair missing
     /// from the literal fails just as loudly as a pair that disagrees, so a state added
     /// later cannot slip through undecided.
     @Test func everyPairingOfStateAndEventHasExactlyOneAnswer() {
@@ -197,6 +197,7 @@ struct AgentStateTests {
             .finished:      [ .running,  nil,      nil,      nil,         nil,               nil,      nil,      nil,      .archived, nil    ],
             .stopped:       [ .running,  nil,      nil,      nil,         nil,               nil,      nil,      nil,      .archived, nil    ],
             .archived:      [ .running,  nil,      nil,      nil,         nil,               nil,      nil,      nil,      nil,     .finished],
+            .queued:        [ nil,       nil,      nil,      nil,         nil,               .stopped, nil,      nil,      .archived, nil    ],
         ]
 
         #expect(table.count == AgentState.allCases.count,
@@ -216,7 +217,7 @@ struct AgentStateTests {
                         "\(state) + \(event)")
             }
         }
-        #expect(pairs == 60, "sixty pairs, and the loop saw \(pairs)")
+        #expect(pairs == 70, "seventy pairs, and the loop saw \(pairs)")
     }
 
     /// `waitingOnUser` accepting a prompt is not a typo in the table above.

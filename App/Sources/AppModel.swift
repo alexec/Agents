@@ -900,6 +900,7 @@ final class AppModel {
     /// Whether Stop is offered for this chat, in the toolbar and on the card alike.
     func canStop(_ agent: Agent) -> Bool { work.canStop(agent) }
     func blockLines(_ agent: Agent) -> [String] { work.blockLines(agent) }
+    func queuedLine(_ agent: Agent) -> String? { work.queuedLine(agent) }
     func isBlocked(_ agent: Agent) -> Bool { work.openBlock(agent) != nil }
 
     // MARK: Workflows

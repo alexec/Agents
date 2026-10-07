@@ -947,6 +947,7 @@ final class RemoteModel {
     /// Whether the menu offers Stop: the same answer the Mac gives.
     func canStop(_ agent: Agent) -> Bool { work.canStop(agent) }
     func blockLines(_ agent: Agent) -> [String] { work.blockLines(agent) }
+    func queuedLine(_ agent: Agent) -> String? { work.queuedLine(agent) }
     func isBlocked(_ agent: Agent) -> Bool { work.openBlock(agent) != nil }
     /// End a block by hand (039), as the person. See the Mac's `carryOn`.
     func carryOn(_ agentID: UUID) async { _ = await send(Block.carryOnPrompt, to: agentID) }

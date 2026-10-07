@@ -29,9 +29,6 @@ extension DaemonCore {
             throw JSONRPCError(code: JSONRPCError.invalidParams,
                                message: "Nothing was started: say what the agent is to do.")
         }
-        if let full = helperLimitRefusal(in: folder) {
-            throw JSONRPCError(code: DaemonAPI.Failure.notYours, message: "Nothing was started: \(full)")
-        }
         // A mode it names may be its own or stricter, never looser: otherwise an agent
         // kept on a short lead starts one on none and hands it the work.
         if let wanted = request.permissionMode {
@@ -47,6 +44,15 @@ extension DaemonCore {
         // The helper can outlive that run by hours, and a depth worked out from it then
         // would be zero.
         let depth = workflowChainDepth(causedBy: caller.id)
+        // Past a limit, or behind others already waiting, it queues (#362): first in,
+        // first out, so a start that finds a place free does not jump the queue.
+        if let full = helperLimitRefusal(in: folder) {
+            return try await queueHelper(request, prompt: prompt, caller: caller, depth: depth, full: full)
+        }
+        if !HelperLimit.queue(in: folder, agents: agents.inProject(folder)).isEmpty
+            || reservedQueue[folder, default: 0] > 0 {
+            return try await queueHelper(request, prompt: prompt, caller: caller, depth: depth, full: nil)
+        }
         reservedStarts[folder, default: 0] += 1
         defer { reservedStarts[folder, default: 1] -= 1 }
 
@@ -103,7 +109,7 @@ extension DaemonCore {
     /// worktree of this project's repository (030), or a branch to make one on. A name
     /// that is none of those is said, with the names there are, rather than quietly
     /// starting in the project folder.
-    private func helperWorktree(_ written: String?, in folder: URL) async throws -> WorktreeChoice? {
+    func helperWorktree(_ written: String?, in folder: URL) async throws -> WorktreeChoice? {
         guard let written = written?.trimmingCharacters(in: .whitespacesAndNewlines), !written.isEmpty else {
             return nil
         }
@@ -138,6 +144,12 @@ extension DaemonCore {
         // A blocked helper (039) has no turn going but has a resume coming, and
         // stopping it is how that resume is called off.
         let isBlocked = target.state == .finished && target.report?.isOpenBlock == true
+        // A queued one (#362) has nothing running; stopping it takes it off the queue.
+        if target.state == .queued {
+            try await stop(target.id, by: .agent(caller.id))
+            return "Took \u{201C}\(title)\u{201D} off the queue; it will not start. "
+                + "This project now has \(helperPlaces(in: target.projectFolder))."
+        }
         guard target.state.holdsRuntime || isComingBack || isBlocked else {
             return "\u{201C}\(title)\u{201D} had already stopped; nothing changed."
         }
@@ -205,7 +217,8 @@ extension DaemonCore {
         let caller = try helperCaller(token: request.token, refusing: "Nothing was listed")
         let folder = caller.projectFolder
         let places = "This project has \(helperPlaces(in: folder))."
-        let mine = HelperLimit.helpers(in: folder, agents: agents.inProject(folder))
+        let mine = (HelperLimit.helpers(in: folder, agents: agents.inProject(folder))
+                    + HelperLimit.queue(in: folder, agents: agents.inProject(folder)))
             .filter { $0.startedByAgent == caller.id }
         // Which runtimes it may name, last (#117): live, as a tool's description is not.
         let runtimes = runtimeChoices(in: folder)
@@ -223,6 +236,10 @@ extension DaemonCore {
         if agent.parking?.isParked == true { return "parked" }
         if case .whenTurnEnds = agent.parking { return "parking when the turn ends" }
         if resuming.contains(agent.id) || interrupted[agent.id] != nil { return "coming back" }
+        if agent.state == .queued {
+            let position = HelperLimit.queuePosition(of: agent, among: agents.inProject(agent.projectFolder))
+            return "queued" + (position.map { " (position \($0))" } ?? "")
+        }
         let said = agent.report.map { ": \($0.outcome.rawValue) — \($0.message)" } ?? ""
         switch agent.state {
         case .starting: return "starting"
@@ -235,6 +252,7 @@ extension DaemonCore {
             let why = agent.endedReason?.summary.map { " (\($0.lowercased()))" } ?? ""
             return "stopped" + why + said
         case .archived: return "archived"
+        case .queued: return "queued"
         }
     }
 
@@ -253,13 +271,16 @@ extension DaemonCore {
         let running = HelperLimit.running(in: folder, agents: agents.inProject(folder), reserved: reserved,
                                           comingBack: comingBack)
         let kept = HelperLimit.placesInUse(in: folder, agents: agents.inProject(folder), reserved: reserved)
-        return "\(running) of \(limits.running) running, \(kept) of \(limits.notArchived) not archived"
+        let queued = HelperLimit.queue(in: folder, agents: agents.inProject(folder)).count
+        // The queue only once there is one, so a project that never queues reads as it did.
+        let queue = queued == 0 ? "" : ", \(queued) of \(queueLimit(in: folder)) queued"
+        return "\(running) of \(limits.running) running, \(kept) of \(limits.notArchived) not archived\(queue)"
     }
 
     /// Why one more helper cannot start in this project, naming the limit it would
     /// break and the helpers holding it; nil when it can. Both limits are said when
     /// both are full, since only one way out frees both.
-    private func helperLimitRefusal(in folder: URL) -> String? {
+    func helperLimitRefusal(in folder: URL) -> String? {
         let limits = helperLimits(in: folder)
         let reserved = reservedStarts[folder, default: 0]
         let quoted: ([Agent]) -> String = { held in
@@ -286,7 +307,6 @@ extension DaemonCore {
         }
         guard !full.isEmpty else { return nil }
         return full.joined(separator: " And ")
-            + " The person sets these limits in Project Settings."
     }
 
     // MARK: Who may

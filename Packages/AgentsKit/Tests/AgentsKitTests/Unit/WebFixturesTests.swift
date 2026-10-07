@@ -124,7 +124,38 @@ struct WebFixturesTests {
             ("parked when the turn ends, running", agent(34, .running, parking: .whenTurnEnds(since: at(4))), false),
             ("archived", agent(35, .archived), false),
             ("archived and parked", agent(36, .archived, parking: .parked(at: at(5))), false),
+            ("queued for a place (#362)", agent(37, .queued), false),
         ]
+    }
+
+    // MARK: queue/ (#362)
+
+    /// A queued helper's place in its project's queue, as its row says it: first in first,
+    /// ties by id, another project's queue apart.
+    @Test func queue() throws {
+        func queued(_ n: Int, minutes: Double, cwd: URL = Self.folderURL) -> Agent {
+            var agent = Self.agent(n, .queued, cwd: cwd)
+            agent.createdAt = Self.at(minutes)
+            agent.startedByAgent = Self.id(1)
+            return agent
+        }
+        let first = queued(81, minutes: 1)
+        let tied = queued(82, minutes: 2)
+        let tiedToo = queued(83, minutes: 2)
+        let elsewhere = queued(84, minutes: 0, cwd: URL(filePath: "/fixture/other/"))
+        let working = Self.agent(85, .running)
+        let everyone = [tiedToo, working, elsewhere, tied, first]
+        let cases = try [first, tied, tiedToo, elsewhere, working].map { agent in
+            Case(name: agent.title ?? "?", input: .object([
+                "agents": .array(try everyone.map(Self.encode)), "agentID": .string(agent.id.uuidString)]))
+        }
+        try pin("queue/lines.json", cases) { input in
+            let model = AgentsModel()
+            let agents = try input["agents"]!.decode([Agent].self)
+            model.replaceAgents(agents)
+            let agent = agents.first { $0.id.uuidString == input["agentID"]!.stringValue! }!
+            return .object(["line": model.queuedLine(agent).map(JSONValue.string) ?? .null])
+        }
     }
 
     // MARK: asker/ (#121)

@@ -96,7 +96,7 @@ extension DaemonCore {
         switch agent.state {
         case .waitingOnUser: return "waiting_on_you"
         case .stopped: return Self.isChosenStop(agent.endedReason) ? "stopped" : "failed"
-        case .finished, .archived, .starting, .running:
+        case .finished, .archived, .starting, .running, .queued:
             if WaitStatus.of(agent, names: { _ in nil }) != nil { return "blocked" }
             if agent.report?.outcome == .needsAnswer { return "waiting_on_you" }
             if agent.report?.outcome == .blocked { return "blocked" }

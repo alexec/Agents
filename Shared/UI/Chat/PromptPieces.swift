@@ -19,13 +19,15 @@ enum PromptWords {
         // because a silent `default:` is how the next new state gets the wrong words.
         case .starting, .running, .waitingOnUser: return askPlaceholder
         case .finished, .stopped: return askPlaceholder
+        // What is typed waits with it, and goes when it starts (#362).
+        case .queued: return "Queued: what you type goes when it starts"
         case .archived: return "Say what next, and this comes back"
         }
     }
 
     /// Whether what is typed now will wait rather than go.
     static func willQueue(_ agent: Agent) -> Bool {
-        agent.state.hasTurnInFlight || !agent.queuedPrompts.isEmpty
+        agent.state.hasTurnInFlight || agent.state == .queued || !agent.queuedPrompts.isEmpty
     }
 
     /// The prompt's own words when nothing better is on offer.
