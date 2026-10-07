@@ -79,7 +79,7 @@ function NothingChosen() {
     <section class="chat empty nothing-chosen" aria-label="Nothing selected">
       <span class="glyph" aria-hidden="true">◧</span>
       <h2>Nothing selected</h2>
-      <p>Pick a session on the left to read it, or a project to start a new session there.</p>
+      <p>Pick a session on the left to read it, or a project's New session row to start one there.</p>
       <p>↑ and ↓ move through the list, → and ← unfold and fold a project.</p>
     </section>
   );
