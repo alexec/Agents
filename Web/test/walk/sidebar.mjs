@@ -75,8 +75,8 @@ try {
   say(`session: ${await hash()}`);
   await page.shot(`${out}/3-session-selected.png`);
 
-  // 4: a project picked opens its new session; only its own row lights.
-  await page.eval(`[...document.querySelectorAll(".sidebar .row.project .pick")].find((b) => b.innerText.startsWith("Agents")).click()`);
+  // 4: a project's New session row (#375) opens its new session; only that row lights.
+  await page.eval(`[...document.querySelectorAll(".sidebar .project-fold")].find((f) => f.querySelector(".row.project .pick").innerText.startsWith("Agents")).querySelector(".row.new-session .pick").click()`);
   await page.waitFor(`document.querySelector(".new-agent")`, 10_000);
   await sleep(500);
   say(`project: ${await hash()}; lit: ${js(await page.eval(`[...document.querySelectorAll(".sidebar .chosen")].map((e) => e.innerText.split("\\n")[0])`))}`);

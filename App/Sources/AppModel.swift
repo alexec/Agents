@@ -336,7 +336,7 @@ final class AppModel {
     /// daemon.
     func showProject(_ key: ProjectKey) {
         // Going to a project is going away from Spending, wherever the ask came from
-        // — a new project being added, a menu item, the list itself. And from
+        // — a new project being added, a menu item, its New session row. And from
         // Resources, for the same reason.
         showsSpending = false
         showsResources = false
@@ -344,7 +344,7 @@ final class AppModel {
         showsRuntimes = false
         select(key)
         // A new session in it (#366): the project's own page is where a session starts,
-        // as New Session has it.
+        // as New Session has it. The project's row in the sidebar only folds (#375).
         composing = true
         draftWorktree = nil
     }

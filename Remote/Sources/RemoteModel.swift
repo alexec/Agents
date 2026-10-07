@@ -415,7 +415,9 @@ final class RemoteModel {
     /// What the sidebar has picked (#226), the Mac's one value for it: the first of what is
     /// open over the project — a pinned page, a workflow, a chat — and what
     /// was opened from that is pushed over it in the detail. A project chosen with nothing
-    /// open over it starts a new session in it, as the Mac's project row does (#366).
+    /// open over it starts a new session in it, as the Mac's New session row does (#375):
+    /// only that row and the project's New Session (long press, swipe) choose it so; a
+    /// tap on the project's own row only folds it.
     var sidebarItem: SidebarItem? {
         get {
             if let openActivity { return openActivity }

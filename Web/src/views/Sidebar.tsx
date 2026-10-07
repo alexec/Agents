@@ -259,14 +259,14 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   return (
     <div class={`project-fold${down && !linkDown ? " greyed" : ""}`} role="group" aria-label={label}
       data-host={host.id} data-folder={folder}>
-      <div class={`row project${chosen ? " chosen" : ""}`}>
+      <div class="row project">
         <button class="disclosure" aria-label={unfolded ? `Fold ${label}` : `Unfold ${label}`} aria-expanded={unfolded}
           tabIndex={-1} disabled={searching} onClick={() => fold(!unfolded)}>{unfolded ? "⌄" : "›"}</button>
-        <button class="pick" aria-current={chosen} aria-expanded={unfolded} data-fold="project" title={folderPath(folder)}
+        <button class="pick" aria-expanded={unfolded} data-fold="project" title={folderPath(folder)}
           onClick={(e) => {
-            // A new session in it, and the row folds or unfolds (#366). Not when the arrow keys
-            // land here (a click with no detail): moving through the list folds nothing.
-            go({ host: host.id, project: folder, compose: true });
+            // The row folds or unfolds, and nothing else (#375): a session starts from the fold's
+            // New session row. Not when the arrow keys land here (a click with no detail): moving
+            // through the list folds nothing.
             if (e.detail > 0 && !searching) fold(!unfolded);
           }}
           onContextMenu={(e) => openContextMenu(e, projectMenu)}
@@ -279,7 +279,17 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
       </div>
       {unfolded && (
         <div class="fold-body">
-          {/* The project's pinned pages (#159), before its sessions. */}
+          {/* First, where a session starts (#375): the project's own row only folds. */}
+          <div class="nav-item">
+            <div class={`row new-session${chosen ? " chosen" : ""}`}>
+              <button class="pick" aria-current={chosen} disabled={down}
+                onClick={() => go({ host: host.id, project: folder, compose: true })}>
+                <span class="pin-mark" aria-hidden="true">+</span>
+                <span class="title">New session</span>
+              </button>
+            </div>
+          </div>
+          {/* Then the project's pinned pages (#159), before its sessions. */}
           {!searching && (
             <PinnedPageRows store={store} host={host.id} folder={folder} down={down}
               chosen={r.host === host.id && r.project !== undefined && folderKey(r.project) === folderKey(folder) ? r.page : undefined} />

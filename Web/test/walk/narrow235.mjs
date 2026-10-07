@@ -51,8 +51,8 @@ try {
   await at("4-back-to-list");
   say(`still unfolded: ${await page.eval(`document.querySelector(".sidebar .row.project .pick").getAttribute("aria-expanded")`)}`);
 
-  // 5: the project's row opens its new session; the browser's Back comes back to the list.
-  await page.eval(`document.querySelector(".sidebar .row.project .pick").click()`);
+  // 5: the project's New session row (#375) opens its new session; the browser's Back comes back to the list.
+  await page.eval(`document.querySelector(".sidebar .row.new-session .pick").click()`);
   await page.waitFor(`document.querySelector(".new-agent")`, 10_000).catch(() => {});
   await at("5-new-session");
   await page.eval(`history.back()`);

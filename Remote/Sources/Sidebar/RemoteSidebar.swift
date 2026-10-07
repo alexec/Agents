@@ -163,6 +163,8 @@ private struct RemoteProjectFold: View {
         if fold.isShown {
             DisclosureGroup(isExpanded: Binding(get: { isOpen }, set: { folds.set(key, open: $0) })) {
                 // Folded, nothing at all is under the row (#356): see `isUnfolded`.
+                // First, where a session starts (#375): the project's own row only folds.
+                NewSessionRow(project: key)
                 if fold.showsPinnedPages {
                     PinnedPageRows(project: key)
                 }
@@ -180,14 +182,23 @@ private struct RemoteProjectFold: View {
                 archivedSessions(fold)
                 workflows(fold)
             } label: {
-                ProjectRow(summary: summary, label: label, isFolded: !isOpen)
+                // A tap folds or unfolds it, and nothing else (#375): a button, so the
+                // list's own row handling has nothing left to do with the tap. A search
+                // holds every match open. No tag: the New session row carries `.project`.
+                Button {
+                    if !fold.isSearching { folds.set(key, open: !isOpen) }
+                } label: {
+                    ProjectRow(summary: summary, label: label, isFolded: !isOpen)
+                        .contentShape(Rectangle())
+                }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(isOpen ? "Folds the project" : "Unfolds the project")
                     .appText(.supporting)
                     .foregroundStyle(model.hostIsOffline(summary.host) ? .secondary : .primary)
                     .contextMenu { ProjectMenuItems(summary: summary) }
                     .swipeActions(edge: .leading) {
                         NewSessionButton(folder: summary.folder).tint(Paper.accent)
                     }
-                    .tag(SidebarItem.project(key))
             }
             // The rest of its live sessions when the first page did not hold them all.
             .task(id: isOpen) {
@@ -368,6 +379,32 @@ struct NewSessionButton: View {
             Label("New Session", systemImage: "plus")
         }
         .disabled(model.isStale)
+    }
+}
+
+/// The first row under an unfolded project (#375): a new session in it, the start form.
+/// It carries the project's own item, which the list lights while that form is open. On
+/// a phone it is the way in, now that a tap on the project only folds it.
+private struct NewSessionRow: View {
+    @Environment(RemoteModel.self) private var model
+    let project: ProjectKey
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "square.and.pencil")
+                .foregroundStyle(.secondary)
+                .frame(width: 20)
+                .accessibilityHidden(true)
+            Text("New session")
+                .lineLimit(1)
+            Spacer(minLength: 0)
+        }
+        .appText(.supporting)
+        .foregroundStyle(model.isStale ? .secondary : .primary)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("New session")
+        .tag(SidebarItem.project(project))
+        .selectionDisabled(model.isStale)
     }
 }
 

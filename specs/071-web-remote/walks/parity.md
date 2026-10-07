@@ -15,11 +15,11 @@
 
 ## Counts
 
-Of 204 rows: **136 same**, **40 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 205 rows: **137 same**, **40 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
-| Sidebar and project list | 7 | 2 | 9 |
+| Sidebar and project list | 8 | 2 | 9 |
 | Session rows and states | 16 | 2 | 5 |
 | Chat turns and turn detail | 19 | 3 | 2 |
 | Prompt bar and queued prompts | 18 | 2 | 0 |
@@ -51,7 +51,8 @@ The deltas are tracked by 29 issues:
 | Project order | Oldest added first, then by folder; this Mac's, then each server's: `K/Sidebar/SidebarProjectFold.swift` (`SidebarOrder.byAdded`), `K/Client/AgentsModel.swift` | The same, from the shared model: `R/Sidebar/RemoteSidebar.swift` | The same: `W/views/Sidebar.tsx` (`byAdded`, `orderedProjects`) | **same** (#357) |
 | Project row subtitle | Needs you (· N unread), else working / unread, else *N complete* / stopped: `A/Projects/ProjectRow.swift:75-96` | No complete / stopped fallback: `R/Projects/ProjectListView.swift:143-151` | As the window: `W/model/groups.ts:176-188` | **delta**: Remote #226 |
 | Project row menu | New Session, Project Settings…, Archive, Show in Finder: `A/Projects/ProjectListView.swift:511-542` | None: the row is a button | New Session: `W/views/Sidebar.tsx` | Web: **by design** (Settings, Archive and Finder are the Mac's, #151). Remote: **delta** #226 |
-| Clicking a project row (#366) | Starts a new session in it (the empty chat, as New Session) and folds or unfolds it; no Project Settings button in the toolbar (the row's menu and ⌥⌘, keep it): `A/AppModel.swift` (`showProject`), `A/Projects/ProjectRow.swift` | A tap opens its New session page in the detail, the form that was a sheet, and folds it: `R/RemoteApp.swift` (`RemoteRoute.start`), `R/StartAgent/StartAgentView.swift` | Opens the new-session form (`n=1`) and folds it; arrow keys landing on it fold nothing: `W/views/Sidebar.tsx` | **same**. The Dashboard and its menu item are gone on all three |
+| Clicking a project row (#366, #375) | Folds or unfolds it, nothing else; the detail stays as it was. No New Session or Project Settings button in the toolbar (⌘N, the row's menu and ⌥⌘, keep them): `A/Projects/ProjectRow.swift`, `A/Projects/ProjectListView.swift` (`ProjectFold`) | A tap folds or unfolds it, nothing else: `R/Sidebar/RemoteSidebar.swift` (`RemoteProjectFold`) | A click folds or unfolds it; arrow keys landing on it fold nothing: `W/views/Sidebar.tsx` | **same** (#375). The Dashboard and its menu item are gone on all three |
+| New session row (#375) | First under an unfolded project, above its pinned pages and sessions; starts a new session in it (the empty chat, as ⌘N) and lights while that is open: `A/Projects/ProjectListView.swift` (`NewSessionSidebarRow`), `A/AppModel.swift` (`showProject`) | The same row; opens its New session page in the detail: `R/Sidebar/RemoteSidebar.swift` (`NewSessionRow`), `R/RemoteApp.swift` (`RemoteRoute.start`) | The same row; opens the new-session form (`n=1`): `W/views/Sidebar.tsx` | **same** (#375) |
 | Archived projects fold, Bring Back | Closed until opened, below the projects, each row Bring Back and its menu: `A/Projects/ProjectListView.swift:87-96`, `S/ArchivedProjectRow.swift` | The same row, a swipe for Bring Back too; listed from every host as the sidebar appears (the catch-up leaves them out): `R/Sidebar/RemoteSidebar.swift`, `R/RemoteModel.swift` (`shelvedProjects`, `unarchiveProject`) | As the window, its open state kept in localStorage; `projects/list` now asks with archived ones: `W/views/Sidebar.tsx` (`ArchivedProjectRow`) | **same** (#343) |
 | Activity rows | Events, Resources, Runtimes, Spending at the top, no icons (#155): `A/Projects/ProjectListView.swift:54-59` | Events, Spending, Resources after the projects, with icons; no Runtimes row: `R/Projects/ProjectListView.swift:32-41` | As the window: `W/views/Activity.tsx:95-131` | **delta**: Remote #226 |
 | Session groups and their folds, counts and tint when folded (#181) | `A/Projects/ProjectListView.swift:356-397` | The same rules on the project page: `R/Projects/ProjectPageView.swift:94-124` | `W/views/Sidebar.tsx:230-263` | **same** (where the Remote draws them: #226) |

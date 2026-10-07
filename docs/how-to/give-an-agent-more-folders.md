@@ -17,7 +17,7 @@ agent more before it starts.
 
 ## Steps
 
-1. Open the project's page, or click **New Session** (the compose button above the sessions).
+1. Unfold the project in the sidebar and click **New session**, the first row under it (or press ⌘N).
 2. Above the prompt, click **Reach: this folder** (**Folders and MCP servers this agent
    may reach**).
 
