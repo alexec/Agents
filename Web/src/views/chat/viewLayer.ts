@@ -11,8 +11,9 @@
 import { signal } from "@preact/signals";
 import type { AppViewCall, AppViewPolicy, JSONValue, ViewResource } from "../../protocol/generated";
 import { encodeDomains } from "../../sandbox/policy";
+import { CallFailed } from "../../wire/link";
 import {
-  canPin, type Context, contextChanges, error as rpcError, Feed, initializeResult, noAgentWords, notification, policyWire,
+  canPin, type Context, needsShow, serverParam, type ViewAsk, contextChanges, error as rpcError, Feed, initializeResult, noAgentWords, notification, policyWire,
   read, request, result, viewTitle,
 } from "./appViewBridge";
 
@@ -21,7 +22,7 @@ export interface ViewActions {
   /** Set for a view in a project's place (the Dashboard, a pin): there is no agent to reach. */
   project?: string;
   openDashboardTarget?(kind: string, id: string): void;
-  call(method: "views/read" | "views/call" | "views/log" | "views/context", params: Record<string, unknown>): Promise<unknown>;
+  call(method: "views/read" | "views/call" | "views/log" | "views/context" | "views/show", params: Record<string, unknown>): Promise<unknown>;
   /** A ui/message the person said yes to, sent as their prompt. */
   send(text: string): Promise<boolean>;
   /** Pins the call's view to the chat's project (#189); answers whether it was pinned. */
@@ -37,7 +38,9 @@ const dark = () => typeof matchMedia === "function" && matchMedia("(prefers-colo
 /** One view: its frame, its conversation, and what the row draws around it. */
 export class HostedView {
   readonly height = signal(96);
-  readonly phase = signal<"loading" | "ready" | "failed" | "gone">("loading");
+  readonly phase = signal<"loading" | "asking" | "ready" | "failed" | "gone">("loading");
+  /** A person's own server's view, waiting on Show or Don't Show (#191). */
+  readonly ask = signal<ViewAsk | null>(null);
   readonly failure = signal("");
   readonly askedMessage = signal<string | null>(null);
   readonly contextLine = signal<string | null>(null);
@@ -60,7 +63,7 @@ export class HostedView {
   slot: HTMLElement | null = null;
 
   constructor(public call: AppViewCall, public actions: ViewActions, private layer: ViewLayer) {
-    this.title = viewTitle(call.tool);
+    this.title = viewTitle(call.tool, call.server);
     this.fillsPage = !!actions.project;
     this.box = document.createElement("div");
     this.box.className = "view-box";
@@ -100,8 +103,16 @@ export class HostedView {
 
   private async load(): Promise<void> {
     try {
-      this.resource = await this.actions.call("views/read", { agentID: this.actions.agentID, uri: this.call.resourceUri }) as ViewResource;
+      this.resource = await this.actions.call("views/read", { agentID: this.actions.agentID, uri: this.call.resourceUri,
+        ...this.where() }) as ViewResource;
     } catch (e) {
+      // Nothing of it is drawn until the person says Show.
+      const ask = e instanceof CallFailed ? needsShow(e.code, e.data) : null;
+      if (ask) {
+        this.ask.value = ask;
+        this.phase.value = "asking";
+        return;
+      }
       this.failure.value = `This view could not be read from the server: ${describe(e)}`;
       this.phase.value = "failed";
       return;
@@ -120,6 +131,33 @@ export class HostedView {
     this.frame = frame;
     this.box.append(frame);
     this.phase.value = "ready";
+  }
+
+  /** The server and project to name in views/*: none for the app's own server in a chat. */
+  private where(): Record<string, unknown> {
+    return { ...serverParam(this.call.server), ...(this.actions.project ? { project: this.actions.project } : {}) };
+  }
+
+  /** The person's Show or Don't Show for a person's own server's view (#191). */
+  async answerShow(show: boolean): Promise<void> {
+    const ask = this.ask.value;
+    if (!ask) return;
+    this.ask.value = null;
+    this.phase.value = "loading";
+    try {
+      await this.actions.call("views/show", { agentID: this.actions.agentID, server: ask.server, uri: ask.uri, hash: ask.hash, show,
+        ...(this.actions.project ? { project: this.actions.project } : {}) });
+    } catch (e) {
+      this.failure.value = `That could not be kept: ${describe(e)}`;
+      this.phase.value = "failed";
+      return;
+    }
+    if (show) {
+      await this.load();
+    } else {
+      this.failure.value = `Not shown. Ask Again is on ${ask.server}'s row in the project's MCP servers.`;
+      this.phase.value = "failed";
+    }
   }
 
   private post(message: unknown): void {
@@ -218,7 +256,7 @@ export class HostedView {
         break;
       case "callTool":
         this.relay(ask.id, "views/call", { agentID: this.actions.agentID, viewID: this.call.id, name: ask.name,
-          ...(this.actions.project ? { project: this.actions.project } : {}),
+          ...this.where(),
           ...(ask.arguments === undefined ? {} : { arguments: ask.arguments }) }, (value) => {
           const open = (value as { structuredContent?: { open?: { kind?: string; id?: string } } })?.structuredContent?.open;
           if (open?.kind && open.id) this.actions.openDashboardTarget?.(open.kind, open.id);
@@ -226,7 +264,8 @@ export class HostedView {
         });
         break;
       case "readResource":
-        void this.actions.call("views/read", { agentID: this.actions.agentID, uri: ask.uri })
+        // The same server's only: the one whose view it is.
+        void this.actions.call("views/read", { agentID: this.actions.agentID, uri: ask.uri, ...this.where() })
           .then((r) => {
             const resource = r as ViewResource;
             this.post(result(ask.id, { contents: [{ uri: resource.uri, mimeType: resource.mimeType, text: resource.html }] }));
@@ -302,6 +341,8 @@ export class HostedView {
 /** Every view open in one chat. */
 export class ViewLayer {
   readonly fullscreen = signal<string | null>(null);
+  /** Counts views made, so a page drawing one's state hears it arrive. */
+  readonly made = signal(0);
   private views = new Map<string, HostedView>();
   /** Views being taken down, still heard until they have answered. */
   private closing = new Set<HostedView>();
@@ -330,6 +371,7 @@ export class ViewLayer {
       view = new HostedView(call, actions, this);
       this.views.set(call.id, view);
       this.element?.append(view.box);
+      this.made.value += 1;
     } else {
       // Never another chat's: a row still drawn for a moment after the chat changed must not
       // hand a closing view the next chat's calls.
@@ -338,6 +380,8 @@ export class ViewLayer {
     }
     return view;
   }
+
+  find(id: string): HostedView | undefined { return this.views.get(id); }
 
   attach(id: string, slot: HTMLElement): void {
     const view = this.views.get(id);

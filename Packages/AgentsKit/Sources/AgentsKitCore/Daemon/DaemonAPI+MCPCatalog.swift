@@ -7,6 +7,8 @@ extension DaemonAPI.Method {
     public static let mcpAdd = "mcp/add"
     public static let mcpList = "mcp/list"
     public static let mcpApprove = "mcp/approve"
+    /// Forget the person's Show / Don't Show for a server's views, so they ask again (#191).
+    public static let mcpForgetViews = "mcp/forgetViews"
     public static let mcpSetSecret = "mcp/set-secret"
     public static let mcpRemove = "mcp/remove"
     /// A server not in the registry: connect to it before anything is written (#305).
@@ -20,7 +22,7 @@ extension DaemonAPI.Method {
 
     public static let mcpCatalogMethods: [String] = [
         mcpPreview, mcpAdd, mcpList, mcpApprove, mcpSetSecret, mcpRemove, mcpVerify, mcpAddByHand,
-        mcpSignIn, mcpSignInWait, mcpSignInCancel, mcpSignOut,
+        mcpSignIn, mcpSignInWait, mcpSignInCancel, mcpSignOut, mcpForgetViews,
     ]
 }
 
@@ -371,12 +373,16 @@ extension DaemonAPI {
         /// Signed in, or asking for a sign-in (#306). Nil for a server that never asked.
         /// Never the grant itself.
         public var signIn: MCPSignInState?
+        /// What the person said about the server's views (#191): `shown`, `hidden` or
+        /// `mixed`. Nil when it never asked.
+        public var views: String?
 
         public var id: String { name }
 
         public init(name: String, summary: String, managed: ManagedMCPServer?, approval: MCPApprovalState,
                     missingSecrets: [String], secretNames: [String] = [], entryDigest: String,
-                    signIn: MCPSignInState? = nil) {
+                    signIn: MCPSignInState? = nil, views: String? = nil) {
+            self.views = views
             self.name = name
             self.summary = summary
             self.managed = managed
@@ -385,6 +391,16 @@ extension DaemonAPI {
             self.secretNames = secretNames
             self.entryDigest = entryDigest
             self.signIn = signIn
+        }
+    }
+
+    /// Ask Again, for one server's views (#191).
+    public struct MCPViewsForgetRequest: Codable, Sendable, Hashable {
+        public var destination: SkillDestination
+        public var name: String
+        public init(destination: SkillDestination, name: String) {
+            self.destination = destination
+            self.name = name
         }
     }
 

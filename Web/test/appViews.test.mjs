@@ -47,6 +47,8 @@ test("the initialize answer carries the host context, as the Mac's does", () => 
   assert.deepEqual(result.hostContext.availableDisplayModes, ["inline", "fullscreen"]);
   assert.equal(result.hostContext.styles.variables["--color-background-primary"], "light-dark(#fbf9f4, #1c1b19)");
   assert.deepEqual(result.hostCapabilities.sandbox.csp, {});
+  // A whole MCP Tool: the ext-apps SDK refuses ui/initialize without an inputSchema (#191).
+  assert.deepEqual(result.hostContext.toolInfo, { tool: { name: "show_test_view", inputSchema: { type: "object" } } });
 });
 
 test("only what changed is said again", () => {
@@ -151,4 +153,18 @@ test("a pinned view is fed by the host's own call: input first, then its answer"
   const feed = new bridge.Feed();
   assert.deepEqual(feed.viewInitialized(running).map((m) => m.method), ["ui/notifications/tool-input"]);
   assert.deepEqual(feed.due(done), [{ jsonrpc: "2.0", method: "ui/notifications/tool-result", params: answer }]);
+});
+
+test("a person's own server's view names its server, and asks Show first (#191)", () => {
+  assert.equal(bridge.viewTitle("weather", "kite"), "weather · kite");
+  assert.equal(bridge.viewTitle("show_test_view", "agents"), "Test view");
+  assert.deepEqual(bridge.serverParam("agents"), {});
+  assert.deepEqual(bridge.serverParam("kite"), { server: "kite" });
+  assert.deepEqual(bridge.needsShow(-32063, { server: "kite", uri: "ui://kite/w", hash: "h", isNew: false }),
+    { server: "kite", uri: "ui://kite/w", hash: "h", isNew: false });
+  assert.equal(bridge.needsShow(-32062, { server: "kite", uri: "u", hash: "h" }), null);
+  assert.equal(bridge.needsShow(-32063, { server: "kite" }), null);
+  const view = { server: "kite", uri: "ui://kite/w", tool: "weather" };
+  assert.equal(bridge.feedParams("P", "/p", view).server, "kite");
+  assert.equal(bridge.feedParams("P", "/p", { ...view, server: "agents" }).server, undefined);
 });

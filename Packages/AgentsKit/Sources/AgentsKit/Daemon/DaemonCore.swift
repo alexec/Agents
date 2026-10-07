@@ -162,6 +162,18 @@ public actor DaemonCore {
     /// What each view last asked the agent to know (`ui/update-model-context`), by agent
     /// and view, as the words told with the person's next message. Memory only.
     var viewContexts: [UUID: [UUID: String]] = [:]
+    /// The app's own connections to people's http MCP servers, for their views (#191).
+    var viewClients = MCPClientPool()
+    /// Each server's views as last read, by its entry's digest, the last few (#191).
+    var viewCatalogs: [String: ServerViewCatalog] = [:]
+    /// When a server's views last could not be read, so it is not asked again at once.
+    var viewCatalogFailures: [String: Date] = [:]
+    /// One read of a server's views at a time.
+    var viewCatalogLoads: [String: Task<ServerViewCatalog?, Never>] = [:]
+    /// Calls of people's servers' tools the runtime has told of, by agent and call id (#191).
+    var thirdPartyCalls: [UUID: [String: ThirdPartyCall]] = [:]
+    /// Which agent and server each third-party view is of, so its calls reach only that server.
+    var thirdPartyViews: [UUID: (agent: UUID, server: String)] = [:]
     /// The one `codex plugin add/remove` pass running, which a second Codex start waits
     /// on rather than running its own (054, R12).
     var codexPluginSync: Task<Void, Never>?
@@ -1437,6 +1449,8 @@ public actor DaemonCore {
                 changed(agent)
             }
             await record(kind, for: agentID)
+            // A call of a person's server's tool that has a view (#191).
+            noteThirdPartyToolCall(kind, agentID: agentID)
             notePlanning(kind, agentID: agentID)
             heardAfterTheEnd(kind, agentID: agentID)
             // A tool call coming back is the runtime answering (#140).

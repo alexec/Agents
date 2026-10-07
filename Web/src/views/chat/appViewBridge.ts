@@ -124,7 +124,8 @@ export function contextWire(c: Context): Record<string, unknown> {
     deviceCapabilities: { touch: c.touch, hover: c.hover },
     safeAreaInsets: { top: 0, right: 0, bottom: 0, left: 0 },
     styles: { variables: c.variables },
-    toolInfo: { tool: { name: c.tool } },
+    // An MCP Tool needs an inputSchema: the ext-apps SDK refuses ui/initialize without one (#191).
+    toolInfo: { tool: { name: c.tool, inputSchema: { type: "object" } } },
   };
 }
 
@@ -197,11 +198,33 @@ export class Feed {
   }
 }
 
-/** A view's name in the chat, from its tool. */
-export function viewTitle(tool: string): string {
+/** A view's name in the chat, from its tool, with whose it is for a person's own server (#191). */
+export function viewTitle(tool: string, server?: string): string {
   if (tool === "show_test_view") return "Test view";
   if (tool === "read_dashboard") return "Dashboard";
-  return tool.replaceAll("_", " ");
+  const name = tool.replaceAll("_", " ");
+  return server && server !== appServer ? `${name} · ${server}` : name;
+}
+
+// MARK: Third-party servers (#191)
+
+/** The app's own server, which views/* names by leaving the server out. */
+export const appServer = "agents";
+
+/** What a person's own server's view waits on: their Show, for this version of it. */
+export interface ViewAsk { server: string; uri: string; hash: string; isNew: boolean }
+
+/** The daemon's "needs Show" (viewNeedsShow), read from a failed views/read. */
+export function needsShow(code: number, data: unknown): ViewAsk | null {
+  if (code !== -32063 || !data || typeof data !== "object") return null;
+  const ask = data as Partial<ViewAsk>;
+  return typeof ask.server === "string" && typeof ask.uri === "string" && typeof ask.hash === "string"
+    ? { server: ask.server, uri: ask.uri, hash: ask.hash, isNew: ask.isNew !== false } : null;
+}
+
+/** The server field of a views/* request: none for the app's own. */
+export function serverParam(server: string | undefined): { server?: string } {
+  return server && server !== appServer ? { server } : {};
 }
 
 // MARK: Pins (#189)
@@ -230,7 +253,7 @@ export function pinnedViewCall(id: UUID, view: ViewPin, answer?: JSONValue): App
 /** The host's feeding call for a pinned view: views/call, marked as the host's own. */
 export function feedParams(id: UUID, folder: string, view: ViewPin): Record<string, unknown> {
   return {
-    agentID: id, viewID: id, name: view.tool, project: folder, feed: true,
+    agentID: id, viewID: id, name: view.tool, project: folder, feed: true, ...serverParam(view.server),
     ...(view.arguments === undefined ? {} : { arguments: view.arguments }),
   };
 }

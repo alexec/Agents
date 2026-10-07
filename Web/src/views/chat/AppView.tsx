@@ -27,7 +27,7 @@ export function AppView({ call }: { call: AppViewCall }) {
     // Nowhere to draw it: what the model was told, as words.
     const text = (call.result as { content?: { type?: string; text?: string }[] } | undefined)?.content
       ?.flatMap((b) => (b.type === "text" && b.text ? [b.text] : [])).join("\n");
-    return <div class="note"><p class="faint">{viewTitle(call.tool)}</p>{text && <p class="quiet">{text}</p>}</div>;
+    return <div class="note"><p class="faint">{viewTitle(call.tool, call.server)}</p>{text && <p class="quiet">{text}</p>}</div>;
   }
   const full = hosting.layer.fullscreen.value === call.id;
   return (
@@ -47,6 +47,17 @@ export function AppView({ call }: { call: AppViewCall }) {
         </span>
       </p>
       {view.phase.value === "failed" && <p class="quiet">{view.failure.value}</p>}
+      {view.phase.value === "asking" && view.ask.value && (
+        <div class="view-ask">
+          <p>{view.ask.value.isNew ? `${view.ask.value.server} wants to show a view here.`
+            : `${view.ask.value.server}'s view has changed since you said Show.`}</p>
+          <p class="faint">It is drawn in a sandbox, and reaches only what it declared.</p>
+          <p class="buttons">
+            <button class="prominent" onClick={() => void view.answerShow(true)}>Show</button>
+            <button onClick={() => void view.answerShow(false)}>Don't Show</button>
+          </p>
+        </div>
+      )}
       {view.phase.value === "gone" && <p class="quiet">This view was closed.</p>}
       {full && (
         <p class="quiet"><button class="plain" onClick={() => hosting.layer.setFullscreen(null)}>Showing full screen. Back to the chat</button></p>

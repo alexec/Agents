@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 212 rows: **144 same**, **39 by design**, **29 delta** (after #188, #189, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 214 rows: **145 same**, **40 by design**, **29 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -34,7 +34,7 @@ Of 212 rows: **144 same**, **39 by design**, **29 delta** (after #188, #189, #22
 | Notifications and badges | 3 | 1 | 0 |
 | Disk strip | 2 | 1 | 0 |
 | Hosts, connection and pairing | 3 | 3 | 0 |
-| MCP Apps views | 5 | 0 | 0 |
+| MCP Apps views | 6 | 1 | 0 |
 
 The deltas are tracked by 29 issues:
 - **Already open:** #226 (the Remote's one sidebar) and #235 (the page's one sidebar at phone width).
@@ -334,6 +334,8 @@ The deltas are tracked by 29 issues:
 | Dashboard view actions and six tile kinds (#329) | `ProjectDashboardView` supplies project identity and navigation to `AppViewHost`; the shared view serves actions and tile HTML from `AppViewCatalog.swift` | The same shared view and project context via `R/RemoteApp.swift` | The sandbox view host passes project context and navigation via `W/views/DashboardAppView.tsx`; the same served HTML | **same**; app-only actions: Update now, Hide, Show, Remove, Move, Open Keeper, Details; number, status, table, note, link, page |
 | A pinned `ui://` view (#189): a row with the pages, opened full page and fed afresh by its pin's read-only call; missing with why; Unpin | `PinnedViewPage` through `AppViewHost`, from `A/ContentView.swift`; row in `A/Projects/PinnedPageRows.swift`; walked on a scratch window 2026-10-06 (`specs/188-mcp-apps-rest/walks/mac-189-*.png`): pinned from a real Claude chat's test view, opened fed afresh, unpinned | The same view for `RemoteRoute.page`: `R/RemoteApp.swift`; row in `R/Sidebar/SidebarRows.swift` | `W/views/PinnedViewPage.tsx`, from `W/views/Pins.tsx`; walked in headless Chrome (`Web/test/walk/pins189.mjs`, `specs/188-mcp-apps-rest/walks/web-189-pinned-view.png`) | **same** |
 | **Pin to Project** for a view whose call can feed a pin (#189), inline and full screen | The view's ··· menu: `S/AppView/AppViewRow.swift` | The same, shared | A Pin button in the caption and the full-screen bar: `W/views/chat/AppView.tsx`, `W/views/chat/viewLayer.ts` | **same** |
+| A view from the person's own http MCP server (#191): drawn in the turn that called its tool and as a pin; asks **Show** / **Don't Show** in the view's place first and again when the view changes; the caption names the server; reaches only its own server; stdio servers' views not shown yet | `S/AppView/AppViewHost.swift` (`asking`, `answerShow`), `S/AppView/AppViewRow.swift` (`AppViewShowAsk`); walked 2026-10-06 on a scratch window with a real Claude call of the ext-apps `basic-server-vanillajs` example: Show, inline, pinned and fed afresh, `example.com` blocked (`specs/188-mcp-apps-rest/walks/mac-191-*.png`) | The same shared host and row; builds, look not walked (Alex's) | `W/views/chat/viewLayer.ts`, `W/views/chat/AppView.tsx`, `W/views/PinnedViewPage.tsx`; walked in headless Chrome (`Web/test/walk/views191.mjs`, `specs/188-mcp-apps-rest/walks/web-191-*.png`) | **same**
+| **Ask Again** for a server's views, with what was said (views shown / not shown), on its row in the MCP servers (#191) | `A/Projects/ProjectMCPSection.swift` | None | None | **by design** (a server's settings are the Mac's) |
 
 ## Live sync
 
