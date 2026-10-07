@@ -51,10 +51,10 @@ try {
   await at("4-back-to-list");
   say(`still unfolded: ${await page.eval(`document.querySelector(".sidebar .row.project .pick").getAttribute("aria-expanded")`)}`);
 
-  // 5: the project's row opens its Dashboard; the browser's Back comes back to the list.
+  // 5: the project's row opens its new session; the browser's Back comes back to the list.
   await page.eval(`document.querySelector(".sidebar .row.project .pick").click()`);
-  await page.waitFor(`document.querySelector(".dashboard-page")`, 10_000).catch(() => {});
-  await at("5-dashboard");
+  await page.waitFor(`document.querySelector(".new-agent")`, 10_000).catch(() => {});
+  await at("5-new-session");
   await page.eval(`history.back()`);
   await at("6-browser-back");
 

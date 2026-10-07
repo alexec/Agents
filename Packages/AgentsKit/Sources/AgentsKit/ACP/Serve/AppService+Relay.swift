@@ -134,21 +134,9 @@ extension AppService {
                                   DaemonAPI.ReadSessionRequest(token: token, session: session),
                                   fallback: SessionLookup.unavailable)
             }
-        } dashboard: { call in
-            // Always the caller's own project folder: the daemon takes it from the token (074).
+        } pins: { call in
+            // Always the caller's own project folder: the daemon takes it from the token (#159).
             switch call {
-            case .set(let arguments):
-                return await send(DaemonAPI.Method.dashboardSetTile,
-                                  DaemonAPI.SetTileRequest(token: token, arguments: arguments),
-                                  fallback: "Set.")
-            case .remove(let id):
-                return await send(DaemonAPI.Method.dashboardRemoveTile,
-                                  DaemonAPI.RemoveTileRequest(token: token, id: id),
-                                  fallback: "Removed.")
-            case .move(let arguments):
-                return await send(DaemonAPI.Method.dashboardMoveTile,
-                                  DaemonAPI.MoveTileRequest(token: token, arguments: arguments),
-                                  fallback: "Moved.")
             case .pin(let arguments):
                 return await send(DaemonAPI.Method.pinsPinPage,
                                   DaemonAPI.PinToolRequest(token: token, arguments: arguments), fallback: "Pinned.")
@@ -161,14 +149,6 @@ extension AppService {
             case .pinSession(let arguments):
                 return await send(DaemonAPI.Method.pinsPinSessionTool,
                                   DaemonAPI.PinToolRequest(token: token, arguments: arguments), fallback: "Pinned.")
-            case .read:
-                guard let params = try? JSONValue.encoding(DaemonAPI.DashboardTokenRequest(token: token)) else {
-                    return .refused("The Dashboard request could not be read.")
-                }
-                switch await relay(DaemonAPI.Method.dashboardRead, params) {
-                case .success(let result): return .shownResult(result)
-                case .failure(let error): return .refused(error.message)
-                }
             }
         } viewTool: { name, arguments in
             // The whole result back, not a note: the view is drawn from it (#187).

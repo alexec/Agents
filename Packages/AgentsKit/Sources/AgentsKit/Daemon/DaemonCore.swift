@@ -441,19 +441,6 @@ public actor DaemonCore {
     var spendSave: Task<Void, Never>?
     var spendSaveAgents: Set<UUID> = []
 
-    // MARK: Dashboard (074)
-
-    /// The projects' tile files and the host's history of them.
-    lazy var dashboardStore = DashboardStore(locations: locations)
-    /// A `dashboard/changed` waiting to go, per project: at most one a second.
-    var dashboardBroadcasts: [URL: Task<Void, Never>] = [:]
-    /// Each project's Dashboard summary as last made, and until when it holds (#204):
-    /// let go by `dashboardChanged`, which every change to a Dashboard passes through.
-    var dashboardSummaryCache: [URL: (summary: DashboardSummary?, until: Date)] = [:]
-    /// Whose sessions each agent has read with `read_session`, in memory only: what lets
-    /// a successor take its predecessor's tiles over (074 research R1).
-    var sessionReads: [UUID: Set<UUID>] = [:]
-
     // MARK: Pinned pages (#159)
 
     /// A `pins/changed` waiting to go, per project: at most one a second.
@@ -611,7 +598,7 @@ public actor DaemonCore {
     var workflowDigests: [String: (stamp: DigestStamp, digest: String)] = [:]
     /// How many workflow files have been read and hashed, for the tests.
     var workflowDigestReads = 0
-    /// One watch per live project, for its workflows, Dashboard, settings, pins and
+    /// One watch per live project, for its workflows, settings, pins and
     /// branches alike (#173). What makes a file written by hand appear without the app
     /// being restarted.
     var projectWatches: [URL: FolderWatch] = [:]
@@ -1032,7 +1019,6 @@ public actor DaemonCore {
     func changed(_ agent: Agent, tellingClients: Bool = true) {
         let before = agents[agent.id]
         agents[agent.id] = agent
-        dashboardUpdaterMoved(agent, from: before)
         saveQuietly(agent)
         // The index of archived agents follows them in and out (051). Only when it
         // concerns one: this runs on every streamed token of a live agent.

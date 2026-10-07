@@ -1,6 +1,6 @@
 import Foundation
 
-// Pinned pages (#159) on the wire, in a file of their own as the Dashboard's are.
+// Pinned pages (#159) on the wire.
 
 public extension DaemonAPI.Method {
     /// Every live project's pins, for the sidebar.
@@ -11,7 +11,7 @@ public extension DaemonAPI.Method {
     static let pinsUnpin = "pins/unpin"
     /// A person's drop or Move item: the whole new order, once.
     static let pinsArrange = "pins/arrange"
-    /// A pinned page, a page tile's file, or a file an HTML page draws from: any file in
+    /// A pinned page, or a file an HTML page draws from: any file in
     /// the project folder, read as `files/read` reads one for an agent.
     static let pinsRead = "pins/read"
     /// What a person typed on a pinned Markdown page.
@@ -32,8 +32,8 @@ public extension DaemonAPI.Method {
 public extension DaemonAPI.Notification {
     /// A project's pins changed: pinned, unpinned, moved, or a pinned file came or went.
     static let pinsChanged = "pins/changed"
-    /// A page a screen may be showing changed on disk: a pinned file, a page tile's, or
-    /// one beside them. At most once a second per project.
+    /// A page a screen may be showing changed on disk: a pinned file, or one beside
+    /// it. At most once a second per project.
     static let pagesChanged = "pages/changed"
 }
 

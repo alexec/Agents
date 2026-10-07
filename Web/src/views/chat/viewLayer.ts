@@ -19,9 +19,8 @@ import {
 
 export interface ViewActions {
   agentID: string;
-  /** Set for a view in a project's place (the Dashboard, a pin): there is no agent to reach. */
+  /** Set for a view in a project's place (a pin): there is no agent to reach. */
   project?: string;
-  openDashboardTarget?(kind: string, id: string): void;
   call(method: "views/read" | "views/call" | "views/log" | "views/context" | "views/show", params: Record<string, unknown>): Promise<unknown>;
   /** A ui/message the person said yes to, sent as their prompt. */
   send(text: string): Promise<boolean>;
@@ -47,7 +46,7 @@ export class HostedView {
   /** Pinned from here (#189): the caption says so instead of offering Pin. */
   readonly pinned = signal(false);
   readonly title: string;
-  /** A view in a project's place (the Dashboard, a pin) fills the page: no "Back to the chat" bar (#188). */
+  /** A view in a project's place (a pin) fills the page: no "Back to the chat" bar (#188). */
   readonly fillsPage: boolean;
   private pinButton: HTMLButtonElement | null = null;
   private pinnedLabel: HTMLSpanElement | null = null;
@@ -257,11 +256,7 @@ export class HostedView {
       case "callTool":
         this.relay(ask.id, "views/call", { agentID: this.actions.agentID, viewID: this.call.id, name: ask.name,
           ...this.where(),
-          ...(ask.arguments === undefined ? {} : { arguments: ask.arguments }) }, (value) => {
-          const open = (value as { structuredContent?: { open?: { kind?: string; id?: string } } })?.structuredContent?.open;
-          if (open?.kind && open.id) this.actions.openDashboardTarget?.(open.kind, open.id);
-          return value;
-        });
+          ...(ask.arguments === undefined ? {} : { arguments: ask.arguments }) });
         break;
       case "readResource":
         // The same server's only: the one whose view it is.

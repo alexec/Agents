@@ -1,12 +1,11 @@
-// The #193 walk: the page's sidebar search and Dashboard order, as the window's since #176.
+// The #193 walk: the page's sidebar search, as the window's since #176.
 // Pairs, types a search a key at a time and reads the sidebar between keys and after the pause,
-// shows all of a fold's matches, asks for More matches…, then makes two quick drops on project
-// "alpha"'s Dashboard and reads the order the page shows.
+// shows all of a fold's matches, and asks for More matches….
 //
 //   node Web/test/walk/search193.mjs <WEB_URL> <browser code> <out dir> [words]
 //
 // Expects a root seeded with project alpha (hundreds of archived agents named "Seeded archived
-// agent N", a few live, and four status tiles) and project beta (a few dozen archived).
+// agent N" and a few live) and project beta (a few dozen archived).
 
 import { writeFileSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -80,29 +79,6 @@ try {
   await page.waitFor(`document.querySelector(".sidebar .activity")`, 5_000);
   await sleep(500);
   say(`search cleared: ${js(await state())}`);
-
-  // The Dashboard: two drops 30 ms apart, each moving the last tile to the front.
-  await page.eval(`[...document.querySelectorAll(".sidebar .row.project .pick")].find((b) => b.textContent.includes("alpha")).click()`);
-  await page.waitFor(`document.querySelectorAll(".dashboard-page .tile").length >= 4`, 20_000);
-  await sleep(500);
-  const tiles = `[...document.querySelectorAll(".dashboard-page .tile")].map((t) => t.getAttribute("aria-label"))`;
-  say(`tiles before: ${js(await page.eval(tiles))}`);
-  const dropLastOnFirst = `(() => {
-    const all = [...document.querySelectorAll(".dashboard-page .tile")];
-    const from = all[all.length - 1], onto = all[0];
-    const dataTransfer = new DataTransfer();
-    from.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer }));
-    onto.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer }));
-    onto.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer }));
-    from.dispatchEvent(new DragEvent("dragend", { bubbles: true, dataTransfer }));
-  })()`;
-  await page.eval(dropLastOnFirst);
-  await sleep(30);
-  await page.eval(dropLastOnFirst);
-  say(`tiles just after the drops: ${js(await page.eval(tiles))}`);
-  await sleep(2000);
-  say(`tiles settled: ${js(await page.eval(tiles))}`);
-  await page.shot(`${out}/193-dashboard-two-drops.png`);
 } finally {
   writeFileSync(`${out}/193-notes.txt`, notes.join("\n") + "\n");
   await chrome.close();

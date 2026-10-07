@@ -12,8 +12,7 @@ import AgentsKitCore
 ///   is tried once more. If it still does not read it is left where it is and the store
 ///   is held: it reads as empty and every write to it is refused for the rest of the
 ///   run (#205). A good `devices.json` is never moved aside for a passing error.
-/// - A file outside the daemon's root (a project's: `pins.json`, the Dashboard's order
-///   and history) is never moved inside the person's tree: a copy goes under the root
+/// - A file outside the daemon's root (a project's `pins.json`) is never moved inside the person's tree: a copy goes under the root
 ///   (`outside`), the file stays, and writes to it are refused until it reads again.
 /// - At most `StoreCoding.asidesKept` copies of one file are kept.
 /// - Every write is whole: a temporary file, synced, then renamed into place.

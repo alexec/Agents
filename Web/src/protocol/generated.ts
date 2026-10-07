@@ -26,7 +26,6 @@ export const Failure = {
   cloneFailed: -32026,
   couldNotSave: -32095,
   credentialWanted: -32036,
-  dashboardRefused: -32060,
   dayLimitReached: -32018,
   eventRefused: -32050,
   fileGone: -32032,
@@ -260,11 +259,6 @@ export interface AppViewPolicy {
   frameDomains: string[];
   baseUriDomains: string[];
   refused: string[];
-}
-
-export interface ArrangeRequest {
-  folder: URLString;
-  order: DashboardOrder;
 }
 
 export interface ArtifactWriteRequest {
@@ -550,50 +544,6 @@ export interface CredentialsOffer {
   ownSignInOnly: boolean;
   notRelayed?: Record<string, SignInWantedReason>;
   signIns?: string[];
-}
-
-export interface DashboardChangedNotification {
-  folder: URLString;
-  summary: DashboardSummary;
-}
-
-export interface DashboardOrder {
-  sections: DashboardOrderSection[];
-}
-
-export interface DashboardOrderSection {
-  title?: string;
-  tiles: string[];
-}
-
-export interface DashboardRequest {
-  folder: URLString;
-}
-
-export interface DashboardSnapshot {
-  folder: URLString;
-  tiles: TileView[];
-  now: WireDate;
-  update?: DashboardUpdate;
-  order?: DashboardOrder;
-  note?: string;
-}
-
-export interface DashboardSummary {
-  folder: URLString;
-  tiles: number;
-  bad: number;
-  line: string;
-}
-
-export interface DashboardUpdate {
-  workflowID?: string;
-  name: string;
-  isRunning: boolean;
-  agentID?: UUID;
-  lastStartedAt?: WireDate;
-  lastFailed: boolean;
-  blocked?: string;
 }
 
 export interface DeclaredResource {
@@ -905,23 +855,6 @@ export interface HostJoinStatus {
   connected: boolean;
   problem?: string;
   at: WireDate;
-}
-
-export interface KeeperChange {
-  at: WireDate;
-  from: string;
-  to: string;
-}
-
-export type KeeperKind = "agent" | "workflow";
-
-export type KeeperState = "active" | "archived" | "retired" | "unknown";
-
-export interface KeeperView {
-  kind: KeeperKind;
-  id: string;
-  name: string;
-  state: KeeperState;
 }
 
 export interface LabelVocabularyRequest {
@@ -1528,93 +1461,6 @@ export interface SwitchRecordSide {
   mode?: JSONValue;
 }
 
-export interface TileCell {
-  text: string;
-  url?: string;
-}
-
-export interface TileFile {
-  title: string;
-  type: TileType;
-  section?: string;
-  keeper: TileKeeper;
-  source?: string;
-  stale_after_hours?: number;
-  hidden?: boolean;
-  number?: TileNumber;
-  status?: TileStatus;
-  table?: TileTable;
-  note?: TileNote;
-  link?: TileLink;
-  page?: TilePage;
-}
-
-export type TileGood = "up" | "down";
-
-export interface TileKeeper {
-  agent?: string;
-  workflow?: string;
-}
-
-export type TileLevel = "ok" | "warn" | "bad" | "unknown";
-
-export interface TileLink {
-  url?: string;
-  session?: string;
-  file?: string;
-  workflow?: string;
-}
-
-export interface TileNote {
-  markdown: string;
-}
-
-export interface TileNumber {
-  value: number;
-  unit?: string;
-  good?: TileGood;
-}
-
-export interface TilePage {
-  file: string;
-}
-
-export interface TilePoint {
-  at: WireDate;
-  value: number;
-}
-
-export interface TileRequest {
-  folder: URLString;
-  id: string;
-}
-
-export interface TileStatus {
-  level: TileLevel;
-  line: string;
-  since?: string;
-}
-
-export interface TileTable {
-  columns: string[];
-  rows: TileCell[][];
-}
-
-export type TileType = "number" | "status" | "table" | "note" | "link" | "page";
-
-export interface TileView {
-  id: string;
-  tile?: TileFile;
-  problem?: string;
-  made?: WireDate;
-  setAt?: WireDate;
-  keeper: KeeperView;
-  changedOutside: boolean;
-  points: TilePoint[];
-  recent: TilePoint[];
-  keeperChanges: KeeperChange[];
-}
-
 export interface Tombstone {
   id: UUID;
   title?: string;
@@ -2092,13 +1938,6 @@ export interface Methods {
   "cost/state": { params: Empty; result: CostState };
   "credentials/lend": { params: CredentialsLend; result: Empty };
   "credentials/offer": { params: CredentialsOffer; result: Empty };
-  "dashboard/arrange": { params: ArrangeRequest; result: Empty };
-  "dashboard/get": { params: DashboardRequest; result: DashboardSnapshot };
-  "dashboard/hide": { params: TileRequest; result: Empty };
-  "dashboard/remove": { params: TileRequest; result: Empty };
-  "dashboard/show": { params: TileRequest; result: Empty };
-  "dashboard/summaries": { params: Empty; result: DashboardSummary[] };
-  "dashboard/update": { params: DashboardRequest; result: DashboardUpdate };
   "disk/state": { params: Empty; result: DiskState };
   "elicitations/answer": { params: AnswerElicitationRequest; result: Empty };
   "elicitations/pending": { params: Empty; result: ElicitationRequest[] };
@@ -2191,13 +2030,6 @@ export const MethodTarget = {
   "cost/state": "host",
   "credentials/lend": "host",
   "credentials/offer": "host",
-  "dashboard/arrange": "host",
-  "dashboard/get": "host",
-  "dashboard/hide": "host",
-  "dashboard/remove": "host",
-  "dashboard/show": "host",
-  "dashboard/summaries": "host",
-  "dashboard/update": "host",
   "disk/state": "host",
   "elicitations/answer": "host",
   "elicitations/pending": "host",
@@ -2263,7 +2095,6 @@ export interface Notifications {
   "attention/changed": AttentionNotification;
   "clone/changed": CloneNotification;
   "control/hostChanged": JSONValue;
-  "dashboard/changed": DashboardChangedNotification;
   "disk/changed": DiskState;
   "files/changed": FilesChangedNotification;
   "leases/changed": LeaseSnapshot;
@@ -2294,7 +2125,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AnswerSandboxRequest: { required: ["agentID", "carryOn"], optional: [] },
   AppViewCall: { required: ["id", "server", "tool", "resourceUri", "state"], optional: ["arguments", "result", "reason", "pinnable"] },
   AppViewPolicy: { required: ["connectDomains", "resourceDomains", "frameDomains", "baseUriDomains", "refused"], optional: [] },
-  ArrangeRequest: { required: ["folder", "order"], optional: [] },
   ArtifactWriteRequest: { required: ["agentID", "path", "text"], optional: [] },
   Attachment: { required: ["id", "block", "displayName"], optional: ["byteCount"] },
   AttentionDelivery: { required: ["needID"], optional: ["to"] },
@@ -2324,13 +2154,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   CostState: { required: ["limits", "today", "day"], optional: ["note"] },
   CredentialsLend: { required: ["runtime", "kind", "secret"], optional: [] },
   CredentialsOffer: { required: ["runtimes", "ownSignInOnly"], optional: ["notRelayed", "signIns"] },
-  DashboardChangedNotification: { required: ["folder", "summary"], optional: [] },
-  DashboardOrder: { required: ["sections"], optional: [] },
-  DashboardOrderSection: { required: ["tiles"], optional: ["title"] },
-  DashboardRequest: { required: ["folder"], optional: [] },
-  DashboardSnapshot: { required: ["folder", "tiles", "now"], optional: ["update", "order", "note"] },
-  DashboardSummary: { required: ["folder", "tiles", "bad", "line"], optional: [] },
-  DashboardUpdate: { required: ["name", "isRunning", "lastFailed"], optional: ["workflowID", "agentID", "lastStartedAt", "blocked"] },
   DeclaredResource: { required: ["name", "displayName", "description", "holders"], optional: ["defaultMinutes", "maximumMinutes"] },
   DiffLine: { required: ["kind", "text"], optional: ["newLine"] },
   DirectoryEntry: { required: ["url", "name", "isDirectory"], optional: ["size", "modifiedAt"] },
@@ -2368,8 +2191,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Headline: { required: ["h1", "h2", "h3"], optional: [] },
   HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive"] },
   HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
-  KeeperChange: { required: ["at", "from", "to"], optional: [] },
-  KeeperView: { required: ["kind", "id", "name", "state"], optional: [] },
   LabelVocabularyRequest: { required: ["folder"], optional: [] },
   Lease: { required: ["resource", "displayName", "holder", "grantedAt", "expiresAt", "warned"], optional: [] },
   LeaseSnapshot: { required: ["resources", "at"], optional: [] },
@@ -2442,18 +2263,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SurfaceIdentification: { required: ["id", "name", "kind"], optional: [] },
   SwitchRecord: { required: ["id", "at", "agentID", "from", "to", "reason", "carried", "dropped", "billing"], optional: ["shortened", "fromReturnsAt"] },
   SwitchRecordSide: { required: ["runtimeID"], optional: ["entryID", "model", "mode"] },
-  TileCell: { required: ["text"], optional: ["url"] },
-  TileFile: { required: ["title", "type", "keeper"], optional: ["section", "source", "stale_after_hours", "hidden", "number", "status", "table", "note", "link", "page"] },
-  TileKeeper: { required: [], optional: ["agent", "workflow"] },
-  TileLink: { required: [], optional: ["url", "session", "file", "workflow"] },
-  TileNote: { required: ["markdown"], optional: [] },
-  TileNumber: { required: ["value"], optional: ["unit", "good"] },
-  TilePage: { required: ["file"], optional: [] },
-  TilePoint: { required: ["at", "value"], optional: [] },
-  TileRequest: { required: ["folder", "id"], optional: [] },
-  TileStatus: { required: ["level", "line"], optional: ["since"] },
-  TileTable: { required: ["columns", "rows"], optional: [] },
-  TileView: { required: ["id", "keeper", "changedOutside", "points", "recent", "keeperChanges"], optional: ["tile", "problem", "made", "setAt"] },
   Tombstone: { required: ["id", "project", "runtimeID", "createdAt", "lastActivityAt", "archivedAt", "retiredAt", "archivedReason", "costToDate", "retiredBecause"], optional: ["title", "endedReason", "startedByWorkflow", "startedByRun", "startedByAgent", "worktreeName", "worktreeBranch", "worktreeRoot"] },
   ToolCall: { required: ["title", "content", "locations"], optional: ["toolCallID", "name", "kind", "status", "rawInput", "rawOutput", "raw"] },
   ToolCallLocation: { required: ["path"], optional: ["line"] },

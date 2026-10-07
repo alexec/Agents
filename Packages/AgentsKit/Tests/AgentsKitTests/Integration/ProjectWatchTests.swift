@@ -127,22 +127,4 @@ struct ProjectWatchTests {
         #expect(excluded.first == "worktrees")
         #expect(excluded.count <= FolderWatch.maximumExclusions)
     }
-
-    @Test func theDashboardKeepsItsPointsAcrossItsOwnWrite() throws {
-        let (locations, root) = try temporary()
-        let work = try project(root)
-        let store = DashboardStore(locations: locations)
-        try store.record(1, at: Date(timeIntervalSince1970: 1_000_000), for: "builds", in: work)
-        try store.record(2, at: Date(timeIntervalSince1970: 1_100_000), for: "builds", in: work)
-        // The watch hears that write and asks the store to forget what changed.
-        store.forgetPoints(work)
-        #expect(store.points(work, "builds").map(\.value) == [1, 2])
-
-        // A pull rewrites the file: that one is read again.
-        let file = DashboardStore.historyFolder(work).appending(path: "builds.jsonl")
-        try Data("{\"t\":1000000,\"v\":1}\n{\"t\":1100000,\"v\":3}\n".utf8).write(to: file)
-        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(5)], ofItemAtPath: file.path)
-        store.forgetPoints(work)
-        #expect(store.points(work, "builds").map(\.value) == [1, 3])
-    }
 }

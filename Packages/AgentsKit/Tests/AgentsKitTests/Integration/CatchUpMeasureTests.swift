@@ -56,7 +56,6 @@ struct CatchUpMeasureTests {
         }
         _ = try? await client.call(DaemonAPI.Method.eventsList, DaemonAPI.EventsListRequest(EventFilter()))
         _ = try? await client.call(DaemonAPI.Method.workflowsList, DaemonAPI.WorkflowsListRequest())
-        _ = try? await client.call(DaemonAPI.Method.dashboardSummaries, DaemonAPI.Empty())
         _ = try? await client.call(DaemonAPI.Method.pinsList, DaemonAPI.Empty())
         for method in [DaemonAPI.Method.runtimesList, DaemonAPI.Method.runtimesAccounts,
                        DaemonAPI.Method.modesRemembered, DaemonAPI.Method.sandboxState] {
@@ -80,7 +79,6 @@ struct CatchUpMeasureTests {
             case .part(.leases): _ = try? await client.call(DaemonAPI.Method.leasesSnapshot, none)
             case .part(.workflows): _ = try? await client.call(DaemonAPI.Method.workflowsList, DaemonAPI.WorkflowsListRequest())
             case .part(.pins): _ = try? await client.call(DaemonAPI.Method.pinsList, DaemonAPI.Empty())
-            case .part(.dashboards): _ = try? await client.call(DaemonAPI.Method.dashboardSummaries, DaemonAPI.Empty())
             case .part(.allowances): _ = try? await client.call(DaemonAPI.Method.runtimesAllowances, none)
             case .part(.modes): _ = try? await client.call(DaemonAPI.Method.modesRemembered, none)
             }

@@ -187,7 +187,7 @@ struct PinsTests {
         try FileManager.default.removeItem(at: s.project.appending(path: "a.md"))
         let views = await s.core.pinViews(s.project)
         #expect(views.map(\.missing) == [true])
-        let read = try await s.core.readDashboard(DaemonAPI.DashboardTokenRequest(token: s.tokens["Lead"]!))
+        let read = await s.core.pinsWords(s.project, for: nil)
         #expect(read.contains("missing from the project folder"))
     }
 
@@ -234,18 +234,6 @@ struct PinsTests {
         let read = try PinsFile.read(Data(json.utf8))
         #expect(read.file.pins.map(\.path) == ["a.md"])
         #expect(read.skipped == 3)
-    }
-
-    @Test func aPageTileNamesAFileAndNeverGoesStale() async throws {
-        let check = TileCheck.read(["id": "roadmap", "title": "Roadmap", "type": "page", "file": "docs/roadmap.md"])
-        guard case .success(let read) = check else { Issue.record("refused"); return }
-        #expect(read.tile.page == TilePage(file: "docs/roadmap.md"))
-        let view = TileView(id: "roadmap", tile: read.tile, keeper: KeeperView(kind: .agent, id: "", name: "", state: .active))
-        #expect(!DashboardModel.isStale(view, now: Date()))
-        guard case .failure(let problem) = TileCheck.read(["id": "x", "title": "X", "type": "page", "file": "a.txt"]) else {
-            Issue.record("taken"); return
-        }
-        #expect(problem.message.contains("Markdown (.md) or HTML (.html)"))
     }
 
     // MARK: A pins file that does not read (#205)
@@ -434,8 +422,8 @@ struct PinsTests {
         func refused(_ view: JSONValue) async -> String? { await refusal { try await pin(s, "Lead", ["view": view]) } }
         let counting = await refused(["server": "agents", "uri": "ui://agents/test-view", "tool": "test_view_count"])
         #expect(counting?.contains("test_view_count can't feed a pin") == true)
-        let dashboard = await refused(["server": "agents", "uri": "ui://agents/dashboard", "tool": "read_dashboard"])
-        #expect(dashboard == "Nothing was pinned: the Dashboard is already in the sessions column.")
+        let gone = await refused(["server": "agents", "uri": "ui://agents/dashboard", "tool": "read_dashboard"])
+        #expect(gone == "Nothing was pinned: the agents server has no view at ui://agents/dashboard.")
         let other = await refused(["server": "github", "uri": "ui://github/issues", "tool": "list_issues"])
         // Another server's view can be pinned (#191), once it is set up here.
         #expect(other?.contains("github is not set up here") == true)
@@ -446,7 +434,7 @@ struct PinsTests {
             try await s.core.pinByPerson(DaemonAPI.PinRequest(
                 folder: s.project, view: ViewPin(server: "agents", uri: "ui://agents/dashboard", tool: "read_dashboard")))
         }
-        #expect(person?.contains("already in the sessions column") == true)
+        #expect(person?.contains("has no view at ui://agents/dashboard") == true)
         #expect(!FileManager.default.fileExists(atPath: s.project.appending(path: PinsFile.path).path))
     }
 
@@ -510,8 +498,8 @@ struct PinsTests {
         }
         guard AppViewCatalog.offersTestView else {
             // The catalog's own tools are read from the daemon's environment.
-            let refused = await refusal { try await feed("dashboard_action") }
-            #expect(refused?.contains("can't feed a pinned view") == true)
+            let refused = await refusal { try await feed("test_view_count") }
+            #expect(refused?.contains("may not call test_view_count") == true)
             return
         }
         let fed = try await feed("show_test_view")

@@ -91,7 +91,6 @@ private struct Scorer {
         case "show_file": showFile()
         case "leases": leases()
         case "workflows": workflows()
-        case "dashboard": dashboard()
         case "events": events()
         case "ask_form": askForm()
         case "own_ask": ownAsk()
@@ -198,15 +197,6 @@ private struct Scorer {
         let others = all.contains { $0.ok && !isThrowaway($0) && !["list", "read"].contains($0.arguments?["action"]?.stringValue ?? "") }
         return (.passed, "listed; wrote \(name), which waited for the person's OK; listed it; removed it, nothing left"
                 + (others ? " (and changed another, which it was told not to)" : ""))
-    }
-
-    func dashboard() -> (Verdict, String) {
-        for (method, tool) in [(DaemonAPI.Method.dashboardSetTile, "set_tile"),
-                               (DaemonAPI.Method.dashboardRead, "read_dashboard"),
-                               (DaemonAPI.Method.dashboardRemoveTile, "remove_tile")] {
-            guard ok(calls(method)) else { return (.failed, said(calls(method), tool)) }
-        }
-        return (.passed, "`set_tile`, `read_dashboard` and `remove_tile` answered")
     }
 
     func events() -> (Verdict, String) {

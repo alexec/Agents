@@ -63,8 +63,8 @@ struct RemoteApp: App {
 ///
 /// On an iPad the sidebar stays beside the detail, as the Mac's does; on an iPhone the
 /// split view collapses, the sidebar is the screen the app opens on, and a pick is pushed
-/// over it with a way back. What is opened from the detail — a workflow's run, a session
-/// from a Dashboard tile — is pushed over it in turn.
+/// over it with a way back. What is opened from the detail — a workflow's run — is
+/// pushed over it in turn.
 struct RemoteView: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.scenePhase) private var scenePhase
@@ -73,11 +73,11 @@ struct RemoteView: View {
     @State private var compactColumn = NavigationSplitViewColumn.sidebar
 
     /// What is open over the project, in the order each was opened from the one before:
-    /// its Dashboard, a pinned page, a workflow, a conversation. The first is the detail's
-    /// own page, the one the sidebar lights; the rest are pushed over it. With none, the
-    /// project's page is a new session in it (#366).
+    /// a pinned page, a workflow, a conversation. The first is the detail's own page, the
+    /// one the sidebar lights; the rest are pushed over it. With none, the project's page
+    /// is a new session in it (#366).
     private var routes: [RemoteRoute] {
-        let open = [model.openDashboard ? RemoteRoute.dashboard : nil, model.openPin.map(RemoteRoute.page),
+        let open = [model.openPin.map(RemoteRoute.page),
                     model.openWorkflow.map(RemoteRoute.workflow), model.selection.map(RemoteRoute.agent)]
             .compactMap { $0 }
         // A project with nothing open over it starts a session, as the Mac's row does (#366).
@@ -90,7 +90,6 @@ struct RemoteView: View {
                 set: { more in
                     guard let root = routes.first else { return }
                     let all = [root] + more
-                    model.openDashboard = all.contains(.dashboard)
                     model.openPin = all.lazy.compactMap(\.pinPath).first
                     model.openWorkflow = all.lazy.compactMap(\.workflowID).first
                     model.selection = all.compactMap(\.agentID).last
@@ -191,35 +190,6 @@ struct RemoteView: View {
                     .onAppear { model.startingIn = folder }
                     .onDisappear { if model.startingIn == folder { model.startingIn = nil } }
             }
-        case .dashboard:
-            // ui://agents/dashboard, through the same host a chat uses (#188).
-            ProjectDashboardView(
-                folder: model.selectedProject ?? URL(fileURLWithPath: "/"),
-                snapshot: model.selectedProject.flatMap { model.work.dashboards[Project.standardize($0)] },
-                revision: model.work.dashboardRevision(in: model.selectedProject),
-                call: { method, params in try await model.viewCall(method, params) },
-                refresh: {
-                    if let folder = model.selectedProject { await model.refreshDashboard(folder) }
-                },
-                openTarget: { kind, id in
-                    switch kind {
-                    case "agent": model.selection = UUID(uuidString: id)
-                    case "workflow": model.openWorkflow = id
-                    case "page": model.openPin = id
-                    default: break
-                    }
-                })
-                .paperGround()
-                .navigationTitle("Dashboard")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    // New session, from the project's Dashboard (029), as from its row's menu.
-                    if let folder = model.selectedProject {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            NewSessionButton(folder: folder)
-                        }
-                    }
-                }
         case .page(let path):
             if let folder = model.selectedProject {
                 if let pin = model.pins(in: folder).first(where: { $0.path == path }), let view = pin.view {
@@ -250,8 +220,6 @@ struct RemoteView: View {
 enum RemoteRoute: Hashable {
     case workflow(Workflow.ID)
     case agent(UUID)
-    /// The project's Dashboard (074).
-    case dashboard
     /// A new session in the project (#366): its page when nothing is open over it.
     case start
     /// One of the project's pinned pages (#159), by its path in the project.

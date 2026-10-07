@@ -122,15 +122,6 @@ public enum Briefing {
         by id or exact title; \(AppTool.listSessions) lists them. Reading leaves it as it was.
         """
 
-    /// Keeping the project's Dashboard (074 FR-036). Told to every agent, a helper too:
-    /// a helper is often the one that measured the thing. The second sentence is the only
-    /// guard against a worktree's old copy riding back on a merge (Alex, 2026-10-02).
-    public static let dashboard = """
-        If you keep something the person checks often, keep it as a tile on the project's \
-        Dashboard with \(AppTool.setTile). .agents/dashboard/ is written only through \
-        those tools, never by hand or in a worktree.
-        """
-
     /// Who is who, for the sentence below (#121).
     public struct Naming: Hashable, Sendable {
         /// The runtime's display name ("Claude"), not its model.
@@ -305,7 +296,7 @@ public enum Briefing {
                 escalation(named: policy.escalationTool),
                 workflows(scheduling: schedulingRemoved)]
             + (managesAgents ? [helpers] : [])
-            + [leases, events, sessions, dashboard]
+            + [leases, events, sessions]
             + [residue(policy.residue)].compactMap { $0 }
     }
 

@@ -198,7 +198,7 @@ struct FilesPane: View {
         return path.flatMap { PinRules.kind($0) == nil ? nil : $0 }
     }
 
-    /// Pin to Project, or Unpin when it is pinned: beside the Dashboard, under the project.
+    /// Pin to Project, or Unpin when it is pinned: under the project.
     @ViewBuilder
     private func pinButton(_ path: String) -> some View {
         let project = ProjectKey(host: agent.host, folder: agent.projectFolder)
@@ -217,7 +217,7 @@ struct FilesPane: View {
             .buttonStyle(.borderless)
             .disabled(full)
             .help(full ? "This project already has \(PinLimits.perProject) pinned pages, the most it can have. Unpin one first."
-                       : "Pin to Project: under the project in the sidebar, beside its Dashboard.")
+                       : "Pin to Project: under the project in the sidebar.")
         }
     }
 

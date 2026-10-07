@@ -34,8 +34,6 @@ public enum RuntimeAssessment {
              passesWhen: "lease_resource, list_resources and release_resource answered; granted then released on the log; nothing left held"),
         Step(id: "workflows", area: "Workflows",
              passesWhen: "manage_workflows listed them, wrote a throwaway that was left waiting for the person's OK, listed it, and removed it, leaving nothing behind"),
-        Step(id: "dashboard", area: "Dashboard",
-             passesWhen: "set_tile, read_dashboard and remove_tile all answered"),
         Step(id: "events", area: "Events",
              passesWhen: "custom.assess_ping is on the log from this agent, and its wait came back with it; cancel_wait then cleared a second wait"),
         Step(id: "ask_form", area: "Questions",
@@ -182,7 +180,7 @@ public enum RuntimeAssessment {
             other file, make no commit, and run no commands.
 
             The report is `\(reportPath)`. Its table has one row per step, in this order, with \
-            the step id in the first column: `show_file`, `leases`, `workflows`, `dashboard`, \
+            the step id in the first column: `show_file`, `leases`, `workflows`, \
             `events`, `ask_form`, `own_ask`, `helpers`, `wait`, `ending`, `worktree`, `sessions`, \
             `scope`, `permissions`, `report`; then the result (passed, failed or not offered) \
             and the evidence: what the tool answered.
@@ -202,65 +200,62 @@ public enum RuntimeAssessment {
 
             then `list` again, and note what it says about `\(workflow)`; then action `remove`, \
             workflow `\(workflow)`. Change no other workflow.
-            4. `dashboard`: `set_tile` a status tile with id `assess-\(runtimeID)`, title \
-            "\(runtimeName) assessment" and value "running"; then `read_dashboard`; then \
-            `remove_tile` `assess-\(runtimeID)`.
-            5. `events`: `wait_for_event` with action `recent` and limit 1, and note the position \
+            4. `events`: `wait_for_event` with action `recent` and limit 1, and note the position \
             it gives; `publish_event` `\(pingEvent)` with the message "ping"; then \
             `wait_for_event` on `\(pingEvent)` from that position. It comes back at once. Then \
             `wait_for_event` on `\(neverEvent)` with no `until_minutes`; when it says you are \
             still waiting, call `cancel_wait`.
-            6. `ask_form`: `ask_form` titled "\(runtimeName) assessment" with two questions: id \
+            5. `ask_form`: `ask_form` titled "\(runtimeName) assessment" with two questions: id \
             `pick`, prompt "Pick one", options `a` (Alpha) and `b` (Beta); and id `words`, prompt \
             "Type any short phrase", with no options. Write both answers into the report exactly \
             as they came back.
-            7. `own_ask`: \(ownAsk)
-            8. `helpers`: `start_agent` a helper on runtime `\(runtimeID)` with \(modelWords), the \
+            6. `own_ask`: \(ownAsk)
+            7. `helpers`: `start_agent` a helper on runtime `\(runtimeID)` with \(modelWords), the \
             label `\(helperLabel)`, and the prompt "Reply with the word OK, then call finish_turn \
             with outcome done and the message OK." Then call `list_my_agents`. End this turn with \
             `finish_turn`: outcome `blocked`, `waiting_on` the helper's id, title \
             "Assess \(runtimeName)", a message saying you are waiting on the helper, and a \
             `next_prompt`. You are started again when the helper finishes. (If that call is \
-            refused because the helper has already finished, go straight on to step 9 in \
+            refused because the helper has already finished, go straight on to step 8 in \
             this turn.)
 
             **Turn 2**, once the helper has finished
 
-            9. `helpers`: `park_agent` the helper, then `archive_agent` it.
-            10. `wait`: `wait_for_event` on `\(neverEvent)` with `until_minutes` 1. When it says \
+            8. `helpers`: `park_agent` the helper, then `archive_agent` it.
+            9. `wait`: `wait_for_event` on `\(neverEvent)` with `until_minutes` 1. When it says \
             you are still waiting, end the turn with `finish_turn`, outcome `blocked`, saying you \
             are waiting for the wait to time out. You are started again when it does. (If the \
-            call itself comes back timed out, go straight on to step 11 in this turn.)
+            call itself comes back timed out, go straight on to step 10 in this turn.)
 
             **Turn 3**, once the wait has timed out
 
-            11. `ending`: end the turn with `finish_turn`, outcome `blocked`, \
+            10. `ending`: end the turn with `finish_turn`, outcome `blocked`, \
             `check_again_in_minutes` 1, saying you will check again in a minute.
 
             **Turn 4**
 
-            12. `worktree`: end the turn with `finish_turn`, outcome `partly_done`, `worktree` \
+            11. `worktree`: end the turn with `finish_turn`, outcome `partly_done`, `worktree` \
             `\(lease)`, saying you are moving into a worktree. You are started again in it. (If \
             that call is refused because the project is not in a git repository, or because \
             your runtime cannot move, write `not offered` with what it said, and go straight on \
-            to step 13 in this turn.)
+            to step 12 in this turn.)
 
             **Turn 5**, in the worktree
 
-            13. `sessions`: `list_sessions`, then `read_session` with your own session's id from \
+            12. `sessions`: `list_sessions`, then `read_session` with your own session's id from \
             that list. Note whether the id and title it gives back are yours.
-            14. `scope`: with your runtime's own file-writing tool (not a shell command), write \
+            13. `scope`: with your runtime's own file-writing tool (not a shell command), write \
             the line "assess" to `\(scopePath)`. It is outside the project, so expect to be \
             asked or refused; record which, and what the answer was.
-            15. `permissions`: record whether a permission card came for that write, what it \
+            14. `permissions`: record whether a permission card came for that write, what it \
             was answered, and whether the file was written.
-            16. End the turn with `finish_turn`, outcome `partly_done`, `leave_worktree` \
+            15. End the turn with `finish_turn`, outcome `partly_done`, `leave_worktree` \
             `remove`, saying you are moving back. You are started again in the project folder. \
-            (If you never moved, skip this and go straight on to step 17.)
+            (If you never moved, skip this and go straight on to step 16.)
 
             **Turn 6**
 
-            17. `report`: finish the report: every row filled in, and a section "What to fix" \
+            16. `report`: finish the report: every row filled in, and a section "What to fix" \
             naming each failure with its likely fix — the app, the adapter, the runtime's \
             version, or a setting. Then end with `finish_turn`: if every step passed by your \
             own account, outcome `done`, `afterwards` `park`, and a message saying how many \

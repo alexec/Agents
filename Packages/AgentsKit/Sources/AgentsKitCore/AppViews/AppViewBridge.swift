@@ -241,8 +241,8 @@ public struct AppViewContext: Equatable, Sendable {
 }
 
 /// What the host owes a view about its call, in order: the input once the view has said it
-/// is initialized, then the result or the cancellation. A later result — a Dashboard that
-/// changed while it stayed open — is said again. A cancellation is not followed by a result.
+/// is initialized, then the result or the cancellation. A later result — a pinned view fed
+/// again while it stayed open — is said again. A cancellation is not followed by a result.
 public struct AppViewFeed: Equatable, Sendable {
     public private(set) var initialized = false
     public private(set) var sentInput = false
@@ -273,7 +273,7 @@ public struct AppViewFeed: Equatable, Sendable {
         case .done:
             let result = call.result ?? ["content": []]
             // A cancellation already closed this call. A new result, after one was shown,
-            // is the Dashboard changing under an open view (#188).
+            // is what feeds an open view changing under it (#188).
             if !sentEnd {
                 sentEnd = true
                 sentResult = result

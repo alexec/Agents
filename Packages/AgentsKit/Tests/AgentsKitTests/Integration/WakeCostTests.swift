@@ -5,9 +5,8 @@ import Testing
 
 /// What one file-change wake in a project costs (#216).
 ///
-/// #173 made the project's watch hold; each wake still read every tile and pin, every
-/// Dashboard read every tile file, a device's watch left nothing out and named every
-/// folder, a mention walk ran per keystroke, and a big folder was stat-ed whole. Each
+/// #173 made the project's watch hold; each wake still read every pin, a device's watch
+/// left nothing out and named every folder, a mention walk ran per keystroke, and a big folder was stat-ed whole. Each
 /// test here pins one of those down by counting the work, not by timing it.
 @Suite("What a wake costs", .timeLimit(.minutes(1)))
 struct WakeCostTests {
@@ -24,31 +23,20 @@ struct WakeCostTests {
                    discovery: .findsEverything, launcher: FakeLauncher(script: FakeACPAgent.Script()))
     }
 
-    private func tile(_ id: String, page: String? = nil, in work: URL) throws {
-        let folder = DashboardStore.tilesFolder(work)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let keeper = TileKeeper(agent: UUID().uuidString)
-        let file = page.map { TileFile(title: id, type: .page, keeper: keeper, page: TilePage(file: $0)) }
-            ?? TileFile(title: id, type: .note, keeper: keeper, note: TileNote(markdown: "hi"))
-        try file.fileData().write(to: DashboardStore.tileFile(work, id))
-    }
+    // MARK: 1. A batch reads the pins once per change of theirs
 
-    // MARK: 1. A batch reads the pins and tiles once per change of theirs
-
-    @Test func aBatchOutsideAgentsReadsNoPinsAndNoTiles() async throws {
+    @Test func aBatchOutsideAgentsReadsNoPins() async throws {
         let (locations, work) = try temporary()
         let core = try core(locations)
-        for index in 0..<5 { try tile("t\(index)", page: "docs/p\(index).md", in: work) }
         try await core.writePins(PinsFile(pins: [PinEntry(path: "docs/a.md", pinnedBy: Pinner(person: true))]), in: work)
         let source = work.appending(path: "Sources")
         try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
 
         // The first batch fills what is held.
         await core.projectFilesChanged([source], in: work)
-        let pins = await core.pinsReads, tiles = await core.dashboardStore.tileReads
+        let pins = await core.pinsReads
         for _ in 0..<20 { await core.projectFilesChanged([source], in: work) }
         #expect(await core.pinsReads == pins, "an edit in Sources read pins.json again")
-        #expect(await core.dashboardStore.tileReads == tiles, "an edit in Sources read the tiles again")
 
         // The pins file changing by hand (a pull) is read once, by the batch that names `.agents`.
         let file = DaemonCore.pinsFileURL(work)
@@ -56,15 +44,6 @@ struct WakeCostTests {
         await core.projectFilesChanged([work.appending(path: ".agents")], in: work)
         #expect(await core.pagePaths(work).contains("docs/b.md"))
         #expect(await core.pinsReads == pins + 1)
-
-        // A tile edited in place, its folder named: the tiles are read again, once.
-        try tile("t0", page: "docs/moved.md", in: work)
-        await core.projectFilesChanged([DashboardStore.tilesFolder(work)], in: work)
-        #expect(await core.pagePaths(work).contains("docs/moved.md"))
-        let after = await core.dashboardStore.tileReads
-        #expect(after == tiles + 5)
-        await core.projectFilesChanged([source], in: work)
-        #expect(await core.dashboardStore.tileReads == after)
     }
 
     @Test func thePinsFileIsReadAgainWhenItChangesEvenUnheard() async throws {
@@ -78,68 +57,7 @@ struct WakeCostTests {
         #expect(await core.readPins(work).pins.map(\.path) == ["b.md"])
     }
 
-    // MARK: 2. A Dashboard read reads no tile that has not changed
-
-    @Test func aSecondDashboardReadReadsNoTileFile() async throws {
-        let (locations, work) = try temporary()
-        let core = try core(locations)
-        for index in 0..<10 { try tile("t\(index)", in: work) }
-        _ = await core.dashboardSnapshot(work, withUpdate: false)
-        let reads = await core.dashboardStore.tileReads
-        for _ in 0..<5 { _ = await core.dashboardSnapshot(work, withUpdate: false) }
-        _ = await core.dashboardSummaries()
-        #expect(await core.dashboardStore.tileReads == reads)
-
-        // A new tile file appears: its folder's stamp moves, and the next read sees it.
-        try tile("t10", in: work)
-        #expect(await core.dashboardSnapshot(work, withUpdate: false).tiles.count == 11)
-    }
-
-    @Test func theStoresOwnWriteKeepsTheOtherTilesHeld() throws {
-        let (locations, work) = try temporary()
-        let store = DashboardStore(locations: locations)
-        for index in 0..<10 { try tile("t\(index)", in: work) }
-        _ = store.readTiles(work)
-        let reads = store.tileReads
-        var changed = try #require(store.readTiles(work).first?.tile)
-        changed.title = "Changed"
-        try store.write(changed, id: "t0", in: work)
-        try store.deleteFile("t9", in: work)
-        let tiles = store.readTiles(work)
-        #expect(store.tileReads == reads)
-        #expect(tiles.map(\.id) == (0..<9).map { "t\($0)" })
-        #expect(tiles.first?.tile?.title == "Changed")
-        #expect(store.tileIDs(work).count == 9)
-    }
-
-    @Test func theHistoryTotalIsKeptUpNotAddedUp() throws {
-        let (locations, work) = try temporary()
-        let store = DashboardStore(locations: locations)
-        func onDisk() -> Int {
-            let folder = DashboardStore.historyFolder(work)
-            let names = ((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []).filter { $0.hasSuffix(".jsonl") }
-            return names.reduce(0) { total, name in
-                total + (((try? FileManager.default.attributesOfItem(atPath: folder.appending(path: name).path))?[.size]
-                          as? NSNumber)?.intValue ?? 0)
-            }
-        }
-        let start = Date(timeIntervalSince1970: 1_000_000)
-        try store.record(1, at: start, for: "a", in: work)
-        #expect(store.historyBytes(work) == onDisk())
-        for hour in 1..<20 {
-            try store.record(Double(hour), at: start.addingTimeInterval(Double(hour) * 3600), for: hour % 2 == 0 ? "a" : "b", in: work)
-            #expect(store.historyBytes(work) == onDisk())
-        }
-        try store.deletePoints("b", in: work)
-        #expect(store.historyBytes(work) == onDisk())
-        // A pull rewrites one: the watch's forget makes it add up again.
-        try Data(String(repeating: "{\"t\":1000000,\"v\":1}\n", count: 50).utf8)
-            .write(to: DashboardStore.historyFolder(work).appending(path: "c.jsonl"))
-        store.forgetPoints(work)
-        #expect(store.historyBytes(work) == onDisk())
-    }
-
-    // MARK: 3. A device's watch leaves out what the project's does, and names at most 64
+    // MARK: 2. A device's watch leaves out what the project's does, and names at most 64
 
     actor Sent {
         var notes: [DaemonAPI.FilesChangedNotification] = []
@@ -217,7 +135,7 @@ struct WakeCostTests {
         #expect(files.changeCount(agentID: other, folder: URL(filePath: "/w/src")) == 0)
     }
 
-    // MARK: 4. One mention walk in flight per agent
+    // MARK: 3. One mention walk in flight per agent
 
     final class Walks: @unchecked Sendable {
         private let lock = NSLock()
@@ -254,7 +172,7 @@ struct WakeCostTests {
         #expect(await core.mentionWalks.isEmpty)
     }
 
-    // MARK: 5. A big folder is stat-ed to twice the limit, off the actor
+    // MARK: 4. A big folder is stat-ed to twice the limit, off the actor
 
     @Test func onlyTwiceTheLimitIsStatted() throws {
         let names = (0..<100).map { String(format: "N%03d", 99 - $0) }
@@ -274,7 +192,7 @@ struct WakeCostTests {
         #expect(listing.entries.first?.isDirectory == true)
     }
 
-    // MARK: 6. Every exclusion counts, and the list follows the top level
+    // MARK: 5. Every exclusion counts, and the list follows the top level
 
     @Test func aNinthExclusionAndGitsOwnWritesAreDroppedBeforeTheActor() throws {
         let root = URL(filePath: "/p")

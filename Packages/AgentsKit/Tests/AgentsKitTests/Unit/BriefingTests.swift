@@ -229,17 +229,14 @@ struct BriefingTests {
     ///
     /// Raised with who is who (#121), to 3,150 and 2,950 and ten lines: one sentence,
     /// told to every agent, about 300 characters with a long name and a helper's starter.
-    ///
-    /// Raised with the Dashboard (074 FR-036), to 3,350 and 3,150 and eleven lines: one
-    /// line, told to every agent, helpers included (about 200 characters with its break).
     @Test func itStaysShortEnoughToBeRead() {
         let naming = Briefing.Naming(runtime: "Antigravity", person: "Alexandra", pronouns: "they/them",
                                      startedBy: "#121 agent names and questions")
         for policy in ToolPolicyCatalog.builtIn {
             let text = Briefing.text(for: policy, naming: naming)
-            #expect(text.count < 3_350, "\(policy.runtimeID): \(text.count)")
-            #expect(Briefing.lines(for: policy, naming: naming).count <= 11, "\(policy.runtimeID)")
-            #expect(Briefing.text(for: policy, managesAgents: false, naming: naming).count < 3_150,
+            #expect(text.count < 3_150, "\(policy.runtimeID): \(text.count)")
+            #expect(Briefing.lines(for: policy, naming: naming).count <= 10, "\(policy.runtimeID)")
+            #expect(Briefing.text(for: policy, managesAgents: false, naming: naming).count < 2_950,
                     "\(policy.runtimeID), for an agent another agent started")
         }
     }
