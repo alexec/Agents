@@ -41,6 +41,36 @@ struct SidebarModelTests {
         #expect(fold.pinned.isEmpty)
     }
 
+    /// A folded project holds no rows of any kind (#356): an Archived fold, pinned pages or
+    /// "No sessions yet" coming and going under it left NSOutlineView's count of its
+    /// children apart from SwiftUI's, and Apple Intelligence reading the list crashed.
+    @Test func aFoldedProjectHasNothingUnderItsRow() {
+        let model = AgentsModel()
+        model.replaceAgents([agent(api, .archived, "old", at: 1)])
+        model.replacePins([ProjectPins(folder: api, pins: [], sessions: [])])
+        var held = summary(api, archived: 12)
+        held.retiredCount = 3
+        let folded = SidebarProjectFold(key, label: "api", in: model, isOpen: false)
+        #expect(!folded.isUnfolded)
+        #expect(!folded.showsArchivedFold(held))
+        #expect(!folded.showsPinnedPages)
+        #expect(!folded.showsNoSessions)
+        #expect(folded.groups.isEmpty && folded.pinned.isEmpty && folded.archived.isEmpty)
+        #expect(folded.workflows.isEmpty && folded.archivedWorkflows.isEmpty)
+
+        let open = SidebarProjectFold(key, label: "api", in: model, isOpen: true)
+        #expect(open.isUnfolded)
+        #expect(open.showsArchivedFold(held))
+        #expect(open.showsPinnedPages)
+        #expect(open.showsNoSessions)
+
+        // A search unfolds it, and the search is for sessions, not pages.
+        let searched = SidebarProjectFold(key, label: "api", in: model, query: "old", isOpen: false)
+        #expect(searched.isUnfolded)
+        #expect(!searched.showsPinnedPages)
+        #expect(!searched.showsNoSessions)
+    }
+
     @Test func pinnedComeFirstInTheirOrderAndLeaveTheirGroups() {
         let model = AgentsModel()
         let working = agent(api, .running, "working", at: 1)

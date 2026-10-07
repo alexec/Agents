@@ -159,10 +159,11 @@ private struct RemoteProjectFold: View {
 
     var body: some View {
         let fold = SidebarProjectFold(key, label: label, in: model.work, query: query, isOpen: folds.isOpen(key))
-        let isOpen = fold.isSearching || folds.isOpen(key)
+        let isOpen = fold.isUnfolded
         if fold.isShown {
             DisclosureGroup(isExpanded: Binding(get: { isOpen }, set: { folds.set(key, open: $0) })) {
-                if !fold.isSearching {
+                // Folded, nothing at all is under the row (#356): see `isUnfolded`.
+                if fold.showsPinnedPages {
                     PinnedPageRows(project: key)
                 }
                 if !fold.pinned.isEmpty {
@@ -171,7 +172,7 @@ private struct RemoteProjectFold: View {
                 ForEach(fold.groups) { part in
                     sessionGroup(part, searching: fold.isSearching)
                 }
-                if !fold.isSearching, !fold.hasLive {
+                if fold.showsNoSessions {
                     Text("No sessions yet")
                         .appText(.fine)
                         .foregroundStyle(.secondary)
