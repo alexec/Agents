@@ -535,6 +535,21 @@ export interface CostState {
   note?: string;
 }
 
+export type CredentialKind = "geminiAPIKey";
+
+export interface CredentialsLend {
+  runtime: string;
+  kind: CredentialKind;
+  secret: string;
+}
+
+export interface CredentialsOffer {
+  runtimes: string[];
+  ownSignInOnly: boolean;
+  notRelayed?: Record<string, SignInWantedReason>;
+  signIns?: string[];
+}
+
 export interface DashboardChangedNotification {
   folder: URLString;
   summary: DashboardSummary;
@@ -1422,6 +1437,8 @@ export interface ShownFile {
   line?: number;
 }
 
+export type SignInWantedReason = "notSignedIn" | "unreadable";
+
 export interface SlashCommand {
   name: string;
   description?: string;
@@ -2050,6 +2067,8 @@ export interface Methods {
   "clients/forgetSelf": { params: Empty; result: Empty };
   "control/status": { params: Empty; result: ControlStatus };
   "cost/state": { params: Empty; result: CostState };
+  "credentials/lend": { params: CredentialsLend; result: Empty };
+  "credentials/offer": { params: CredentialsOffer; result: Empty };
   "dashboard/arrange": { params: ArrangeRequest; result: Empty };
   "dashboard/get": { params: DashboardRequest; result: DashboardSnapshot };
   "dashboard/hide": { params: TileRequest; result: Empty };
@@ -2146,6 +2165,8 @@ export const MethodTarget = {
   "clients/forgetSelf": "control",
   "control/status": "control",
   "cost/state": "host",
+  "credentials/lend": "host",
+  "credentials/offer": "host",
   "dashboard/arrange": "host",
   "dashboard/get": "host",
   "dashboard/hide": "host",
@@ -2276,6 +2297,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily"] },
   CostState: { required: ["limits", "today", "day"], optional: ["note"] },
+  CredentialsLend: { required: ["runtime", "kind", "secret"], optional: [] },
+  CredentialsOffer: { required: ["runtimes", "ownSignInOnly"], optional: ["notRelayed", "signIns"] },
   DashboardChangedNotification: { required: ["folder", "summary"], optional: [] },
   DashboardOrder: { required: ["sections"], optional: [] },
   DashboardOrderSection: { required: ["tiles"], optional: ["title"] },

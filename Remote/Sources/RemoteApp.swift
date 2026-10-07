@@ -46,6 +46,14 @@ struct RemoteApp: App {
                     model = RemoteModel(link: RemoteApp.link())
                     Task { await old.stop() }
                 }
+                // Forget This iPhone (#344): an unpaired model, so nothing of the old
+                // pairing stays on screen, and the one thing offered is a new code.
+                .onChange(of: model.forgotItself) { _, forgot in
+                    guard forgot else { return }
+                    let old = model
+                    model = RemoteModel(link: RemoteApp.link())
+                    Task { await old.stop() }
+                }
         }
     }
 }
@@ -131,6 +139,8 @@ struct RemoteView: View {
                     .presentationSizing(.form)
             }
         }
+        // A server asked for a key on a send, with no start sheet to ask over (#344).
+        .tokenAskSheet(model, shown: model.startingIn == nil)
         // Where this device is, told to the Mac on every change (021).
         .onChange(of: scenePhase, initial: true) { _, phase in model.scenePhase(phase) }
         // A tap on the Home-screen widget (068). The one place a URL is taken from
