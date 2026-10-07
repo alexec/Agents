@@ -412,6 +412,10 @@ final class AppModel {
         }
     }
 
+    /// The agent this window just started, until its chat is opened. A new chat starts
+    /// with the sidebar shut, whatever the last one had open (#358).
+    @ObservationIgnored var justStarted: UUID?
+
     /// The chat being opened and since when, until its transcript is on screen (073).
     @ObservationIgnored private var chatOpening: (agent: UUID, timing: Perf.Interval)?
 
@@ -3199,6 +3203,7 @@ final class AppModel {
             }
             // Gone to, as the phone does: what you just asked for is what you want to
             // see start. Once the list has it, so the chat opens on a row that is there.
+            justStarted = id
             selection = id
             draftSandboxRefusal = nil
             return true
@@ -3300,6 +3305,7 @@ final class AppModel {
                 DaemonAPI.StartRequest(runtimeID: runtimeID, cwd: folder, prompt: words,
                                        labels: labels),
                 returning: UUID.self)
+            self.justStarted = id
             self.selection = id
         }
     }
