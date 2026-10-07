@@ -41,10 +41,12 @@ public struct EventPattern: Hashable, Sendable {
 
     /// A pattern checked against the catalogue, or the sentence saying what is wrong
     /// with it, listing what would have been right. An older build's words for a code
-    /// are read as the code (073 FR-012); a value a detail cannot have is refused
-    /// (FR-019).
+    /// are read as the code (073 FR-012), and an event's old name as its new one (#372);
+    /// a value a detail cannot have is refused (FR-019).
     public static func parse(_ given: String, filters: [String: DetailFilter] = [:]) -> Result<EventPattern, EventPatternProblem> {
-        let name = given.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        // An old name is read as today's (#372), so a file written before a rename
+        // keeps firing.
+        let name = EventCatalogue.currentName(given.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
         let filters = Dictionary(filters.map { key, filter in
             (key.trimmingCharacters(in: .whitespaces),
              DetailFilter(anyOf: filter.values.map { $0.trimmingCharacters(in: .whitespaces) }) ?? filter)
@@ -211,7 +213,7 @@ extension EventPattern: Codable {
         for (key, values) in try c.decodeIfPresent([String: [String]].self, forKey: .anyOf) ?? [:] {
             if let filter = DetailFilter(anyOf: values) { filters[key] = filter }
         }
-        self = EventPattern(name, filters: filters).withOldWordsMapped()
+        self = EventPattern(EventCatalogue.currentName(name), filters: filters).withOldWordsMapped()
     }
 
     public func encode(to encoder: any Encoder) throws {
