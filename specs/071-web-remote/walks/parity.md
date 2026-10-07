@@ -15,14 +15,14 @@
 
 ## Counts
 
-Of 207 rows: **138 same**, **40 by design**, **29 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #381, #378). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 208 rows: **139 same**, **40 by design**, **29 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
 | Sidebar and project list | 8 | 2 | 9 |
 | Session rows and states | 16 | 2 | 5 |
 | Chat turns and turn detail | 19 | 3 | 3 |
-| Prompt bar and queued prompts | 18 | 2 | 0 |
+| Prompt bar and queued prompts | 19 | 2 | 0 |
 | Question and permission cards | 13 | 3 | 0 |
 | Start sheet and new project | 17 | 5 | 0 |
 | Worktrees and Files | 9 | 6 | 6 |
@@ -54,7 +54,7 @@ The deltas are tracked by 29 issues:
 | Clicking a project row (#366, #375) | Folds or unfolds it, nothing else; the detail stays as it was. No New Session or Project Settings button in the toolbar (⌘N, the row's menu and ⌥⌘, keep them): `A/Projects/ProjectRow.swift`, `A/Projects/ProjectListView.swift` (`ProjectFold`) | A tap folds or unfolds it, nothing else: `R/Sidebar/RemoteSidebar.swift` (`RemoteProjectFold`) | A click folds or unfolds it; arrow keys landing on it fold nothing: `W/views/Sidebar.tsx` | **same** (#375). The Dashboard and its menu item are gone on all three |
 | New session row (#375) | First under an unfolded project, above its pinned pages and sessions; starts a new session in it (the empty chat, as ⌘N) and lights while that is open: `A/Projects/ProjectListView.swift` (`NewSessionSidebarRow`), `A/AppModel.swift` (`showProject`) | The same row; opens its New session page in the detail: `R/Sidebar/RemoteSidebar.swift` (`NewSessionRow`), `R/RemoteApp.swift` (`RemoteRoute.start`) | The same row; opens the new-session form (`n=1`): `W/views/Sidebar.tsx` | **same** (#375) |
 | Archived projects fold, Bring Back | Closed until opened, below the projects, each row Bring Back and its menu: `A/Projects/ProjectListView.swift:87-96`, `S/ArchivedProjectRow.swift` | The same row, a swipe for Bring Back too; listed from every host as the sidebar appears (the catch-up leaves them out): `R/Sidebar/RemoteSidebar.swift`, `R/RemoteModel.swift` (`shelvedProjects`, `unarchiveProject`) | As the window, its open state kept in localStorage; `projects/list` now asks with archived ones: `W/views/Sidebar.tsx` (`ArchivedProjectRow`) | **same** (#343) |
-| Activity rows | Events, Resources, Runtimes, Spending at the top, no icons (#155): `A/Projects/ProjectListView.swift:54-59` | Events, Spending, Resources after the projects, with icons; no Runtimes row: `R/Projects/ProjectListView.swift:32-41` | As the window: `W/views/Activity.tsx:95-131` | **delta**: Remote #226 |
+| Activity rows | Events, Resources, Runtimes, Cost at the top, no icons (#155): `A/Projects/ProjectListView.swift:54-59` | Events, Cost, Resources after the projects, with icons; no Runtimes row: `R/Projects/ProjectListView.swift:32-41` | As the window: `W/views/Activity.tsx:95-131` | **delta**: Remote #226 |
 | Session groups and their folds, counts and tint when folded (#181) | `A/Projects/ProjectListView.swift:356-397` | The same rules on the project page: `R/Projects/ProjectPageView.swift:94-124` | `W/views/Sidebar.tsx:230-263` | **same** (where the Remote draws them: #226) |
 | Group order: by start, newest first (#182) | `ProjectShelf` | `ProjectShelf` | `W/model/groups.ts` (`byStart`), held to `Fixtures/web/groups/panels.json` | **same** |
 | Pinned sessions (#180) | Pinned group; order by drag: `A/Projects/ProjectListView.swift:383-390` | Move Up / Down in the long press: `R/Projects/AgentCard.swift:209-218` | Move Up / Down in the row menu: `W/views/Sidebar.tsx:339-348` | **by design** (drag on the window; menus where there's no drag) |
@@ -139,6 +139,7 @@ The deltas are tracked by 29 issues:
 | Cost / day-limit banner | `S/Chat/PromptPieces.swift:104` | The same | `W/views/PromptStatus.tsx` | **same** |
 | Placeholder | `PromptWords.placeholder`: `S/Chat/PromptPieces.swift:14-24` | The same | `promptPlaceholder`: `W/model/promptWords.ts`, offered suggestion as placeholder: `W/views/Prompt.tsx` | **same** (#276) |
 | Send / Queue / Stop button | `A/Chat/PromptBar.swift:478-524` | `R/Chat/PromptBar.swift:228-272` | `W/views/Prompt.tsx` | **same** (#276) |
+| Return and Shift-Return send, Option-Return a new line (#377) | `PromptReturn` (AgentsKitCore): `A/Chat/PromptBar.swift:401` | `PromptReturn` from a hardware keyboard; the on-screen keyboard's Return is a new line: `R/Chat/PromptBar.swift:172` | `returnAction`: `W/views/Prompt.tsx` | **same** |
 | Sending in flight (#87) | Spinner, *telling* after 400 ms: `A/Chat/PromptBar.swift:120-138` | The host's name: `R/Chat/PromptBar.swift:94` | `W/views/Prompt.tsx:119-121` | **same** (#239) |
 | Queued prompts as bubbles, Send now, × (#95) | `S/Chat/TranscriptRows.swift:377-463` | Shared | `W/views/Chat.tsx:277-306` | **same** |
 | Attachments | Picker, drag, paste: `A/Chat/PromptBar.swift:455-463` | `R/Chat/PromptBar.swift:214` | Picker, drop, paste: `W/views/Prompt.tsx:122-171` | **same** |
@@ -276,8 +277,8 @@ The deltas are tracked by 29 issues:
 | Mark available | Button: `A/Runtimes/RuntimesView.swift:88-93` | Swipe: `R/Projects/RuntimesView.swift:23-28` | Button: `runtimes/markAvailable` | **same** |
 | *N out* in Activity | Allowances out: `A/Runtimes/RuntimesView.swift:131-133` | `anyOut`: `R/Projects/RuntimesView.swift:89` | Allowances out: `W/views/Activity.tsx` | **same** |
 | Assess a runtime (#47) | Settings ▸ Agent Runtimes | *Assess in…* | None | **by design** (#47) |
-| Spending: all time, project shares | `A/Spending/SpendingView.swift:31-39` | `R/Projects/TotalsView.swift:31-42` | All time, project shares, unmeasured floor and today's host totals: `W/views/Activity.tsx` | **same** |
-| Today, in Activity | This Mac and every server: `A/Projects/ProjectListView.swift:719-722` | This Mac only: `R/Projects/ProjectListView.swift:189-191` | Every host: `W/views/Activity.tsx:26-32` | **delta**: Remote #248 |
+| Cost (was *Spending*, #380): the page, menu item and Settings tab are called *Cost*; all time, project shares | `A/Spending/SpendingView.swift:31-39` | `R/Projects/TotalsView.swift:31-42` | All time, project shares, unmeasured floor and today's host totals: `W/views/Activity.tsx` | **same** |
+| Today's cost, in Activity: the row reads *Cost* (was *Today* / *Spending*, #380) | This Mac and every server: `A/Projects/ProjectListView.swift:719-722` | This Mac only: `R/Projects/ProjectListView.swift:189-191` | Every host: `W/views/Activity.tsx:26-32` | **delta**: Remote #248 |
 | Close to full | 0.85: `K/Model/Usage.swift:35` | The same | 0.85: `W/views/Activity.tsx` | **same** |
 | Daily limit read-outs | Settings ▸ Limits: `A/Settings/CostSettingsView.swift` | *Today X of limit*, *limit reached*; no per-agent line: `R/Projects/TotalsView.swift:96-121` | Daily and per-agent; *Nothing new will start until tomorrow*: `W/views/Activity.tsx` | **delta**: Remote #248. The setting: **by design** |
 | A store file set aside, said (#171) | `A/Spending/SpendingView.swift:26-30` | `R/Projects/TotalsView.swift:26-30` | `W/views/Activity.tsx:302` | **same** |
