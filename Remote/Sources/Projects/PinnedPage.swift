@@ -113,69 +113,6 @@ struct PinnedPage: View {
     }
 }
 
-/// A page tile's page (#159): the top of the project's document or HTML page, live, and
-/// Open for the whole of it.
-struct PageTileBody: View {
-    @Environment(RemoteModel.self) private var model
-    let folder: URL
-    let file: String
-
-    @State private var text: String?
-    @State private var stamp: FileStamp?
-    @State private var problem: String?
-
-    /// A third of a phone's screen.
-    static let height: CGFloat = 260
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Group {
-                if let problem {
-                    Label(problem, systemImage: "exclamationmark.triangle")
-                        .appText(.supporting)
-                        .foregroundStyle(.secondary)
-                } else if let text {
-                    if PinRules.kind(file) == .html {
-                        HTMLPage(text: text, path: folder.appending(path: file).path(percentEncoded: false),
-                                 scope: HTMLPageScope(root: folder.path(percentEncoded: false)),
-                                 allowsScripts: false, folderEvent: model.work.pageRevision(
-                                    in: folder, path: file, includesDescendants: PinRules.kind(file) == .html),
-                                 read: { [model, folder] path in try await model.readPage(path, in: folder) },
-                                 follow: { _ in })
-                    } else {
-                        // Read-only, as a note is: a live page that can't be typed on draws
-                        // its passages as disabled controls, greyed.
-                        MarkdownText(markdown: text, base: folder.appending(path: file))
-                            .appText(.supporting)
-                    }
-                } else {
-                    ProgressView()
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: problem == nil ? Self.height : nil,
-                   maxHeight: problem == nil ? Self.height : nil, alignment: .top)
-            .clipped()
-            Button("Open") { model.openPin = file }
-                .appText(.fine)
-        }
-        .task(id: model.work.pageRevision(in: folder, path: file,
-                                          includesDescendants: PinRules.kind(file) == .html)) {
-            do {
-                switch try await model.readPage(file, in: folder, known: stamp) {
-                case .text(let read, _, _, let at):
-                    text = read
-                    stamp = at
-                    problem = nil
-                case .unchanged: break
-                case .image, .other: problem = "\(file) can't be shown as a page."
-                }
-            } catch {
-                problem = "\(file) isn't in the project folder."
-            }
-        }
-    }
-}
-
 /// The pictures beside a pinned page, read through the Mac and kept with their stamps.
 @MainActor
 final class PhonePagePictures {

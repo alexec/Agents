@@ -75,12 +75,12 @@ try {
   say(`session: ${await hash()}`);
   await page.shot(`${out}/3-session-selected.png`);
 
-  // 4: a project picked opens its Dashboard; only its own row lights.
+  // 4: a project picked opens its new session; only its own row lights.
   await page.eval(`[...document.querySelectorAll(".sidebar .row.project .pick")].find((b) => b.innerText.startsWith("Agents")).click()`);
-  await page.waitFor(`document.querySelector(".dashboard-page")`, 10_000);
+  await page.waitFor(`document.querySelector(".new-agent")`, 10_000);
   await sleep(500);
   say(`project: ${await hash()}; lit: ${js(await page.eval(`[...document.querySelectorAll(".sidebar .chosen")].map((e) => e.innerText.split("\\n")[0])`))}`);
-  await page.shot(`${out}/4-project-dashboard.png`);
+  await page.shot(`${out}/4-project-new-session.png`);
 
   // 5: reloaded, the folds are kept.
   await page.eval(`location.hash = "#/"; location.reload()`);

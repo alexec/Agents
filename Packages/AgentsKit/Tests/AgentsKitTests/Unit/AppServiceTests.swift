@@ -53,8 +53,7 @@ struct AppServiceTests {
         // that may use them — which is the default. The three lease tools (036) follow
         // them, for every agent, then the three event tools (042). Moving (053) rides on
         // finish_turn. The two session tools (065) sit after the agent tools, for every
-        // agent. The Dashboard tools (074, #147) follow, for every agent, and the
-        // dashboard view's own read_dashboard comes last, served with that view (#329).
+        // agent. The pin tools (#159, #180) come last, for every agent.
         #expect(tools.compactMap { $0["name"]?.stringValue }
             == [AppService.finishTurnToolName, AppService.showFileToolName,
                 AppService.workflowToolName, AppService.askFormToolName,
@@ -66,10 +65,8 @@ struct AppServiceTests {
                 AppService.listResourcesToolName,
                 AppService.waitForEventToolName, AppService.cancelWaitToolName,
                 AppService.publishEventToolName,
-                AppService.setTileToolName, AppService.removeTileToolName,
-                AppService.moveTileToolName,
                 AppService.pinPageToolName, AppService.unpinPageToolName, AppService.movePinToolName,
-                AppService.pinSessionToolName, AppService.readDashboardToolName])
+                AppService.pinSessionToolName])
 
         let finish = tools.first?["inputSchema"]
         #expect(finish?["properties"]?["outcome"]?["enum"]?.arrayValue?
@@ -698,9 +695,9 @@ struct AppServiceTests {
     /// under every runtime's spelling. A real agent's unpin was taken for a pin before this.
     @Test func unpinPageIsNeverTakenForPinPage() throws {
         for prefix in ["", "mcp__agents__", "agents_", "agents__"] {
-            #expect(try AppService.dashboardCall(named: prefix + AppTool.unpinPage, ["path": "a.md"])?.get()
+            #expect(try AppService.pinCall(named: prefix + AppTool.unpinPage, ["path": "a.md"])?.get()
                     == .unpin(arguments: ["path": "a.md"]))
-            #expect(try AppService.dashboardCall(named: prefix + AppTool.pinPage, ["path": "a.md"])?.get()
+            #expect(try AppService.pinCall(named: prefix + AppTool.pinPage, ["path": "a.md"])?.get()
                     == .pin(arguments: ["path": "a.md"]))
         }
     }

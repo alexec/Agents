@@ -155,8 +155,8 @@ export function FilesPane({ store, host, session }: { store: Store; host: string
 }
 
 /**
- * Pin to Project, or Unpin when it is pinned (#159): the page under the project, beside its
- * Dashboard. From a worktree, the same path in the project folder, where the pin opens it.
+ * Pin to Project, or Unpin when it is pinned (#159): the page under the project in the sidebar.
+ * From a worktree, the same path in the project folder, where the pin opens it.
  */
 function PinButton({ store, host, agent, file }: { store: Store; host: string; agent: Agent; file: string }) {
   const folder = agent.worktree?.project ?? agent.cwd;
@@ -172,6 +172,6 @@ function PinButton({ store, host, agent, file }: { store: Store; host: string; a
   const full = pins.length >= 10;
   return <button class="icon" aria-label="Pin to Project" disabled={full}
     title={full ? "This project already has 10 pinned pages, the most it can have. Unpin one first."
-      : "Pin to Project: under the project in the sidebar, beside its Dashboard."}
+      : "Pin to Project: under the project in the sidebar."}
     onClick={() => void store.pin(host, folder, path)}>📍</button>;
 }

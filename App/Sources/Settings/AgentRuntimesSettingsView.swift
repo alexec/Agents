@@ -187,7 +187,7 @@ private struct AssessRuntimeRow: View {
             Text("Check \(name) with the app’s tools")
         }
         Text("Starts an agent on \(name) that works through the app’s tools — ending a turn, questions, "
-             + "files, helpers, leases, events, the Dashboard and workflows — and writes a report. The app "
+             + "files, helpers, leases, events and workflows — and writes a report. The app "
              + "scores it from its own record. It asks you two short questions.")
             .appText(.supporting)
             .foregroundStyle(.secondary)

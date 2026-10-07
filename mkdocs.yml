@@ -80,7 +80,6 @@ nav:
       - how-to/watch-background-work.md
       - how-to/use-a-shell.md
       - how-to/set-up-a-workflow.md
-      - how-to/keep-a-project-dashboard.md
       - how-to/pin-a-page-to-a-project.md
       - how-to/sign-a-runtime-in.md
       - how-to/assess-a-runtime.md
@@ -105,7 +104,6 @@ nav:
       - reference/agent-tools.md
       - reference/settings.md
       - reference/workflows.md
-      - reference/dashboard-tiles.md
       - reference/events.md
       - reference/keyboard-shortcuts.md
   - Explanation:

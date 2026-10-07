@@ -20,7 +20,6 @@ import Observation
 final class RemoteModel {
     let work = AgentsModel()
     private var labelVocabularies: [URL: [String]] = [:]
-    @ObservationIgnored private var dashboardSummariesLoading = false
     @ObservationIgnored private var attentionRefreshTask: Task<Void, Never>?
 
     /// Whether the Mac is answering, and when it last did.
@@ -42,7 +41,6 @@ final class RemoteModel {
             guard selectedProject != oldValue else { return }
             selection = nil
             openWorkflow = nil
-            openDashboard = false
             openPin = nil
             if selectedProject != nil { openActivity = nil }
             letGoOfProjects(keeping: selectedProject)
@@ -404,8 +402,6 @@ final class RemoteModel {
     /// Mac page's reason: the file is the truth, and a copy would show what it used to
     /// say. Pushed under the conversation, so a run opened from its page comes back to it.
     var openWorkflow: Workflow.ID?
-    /// Whether the project's Dashboard (074) is pushed over the project page.
-    var openDashboard = false
     /// The project's pinned page (#159) pushed over the project page, by its path in it.
     var openPin: String?
     /// One of the pages about all the work, from the sidebar's Activity (#226): Events,
@@ -417,7 +413,7 @@ final class RemoteModel {
     }
 
     /// What the sidebar has picked (#226), the Mac's one value for it: the first of what is
-    /// open over the project — its Dashboard, a pinned page, a workflow, a chat — and what
+    /// open over the project — a pinned page, a workflow, a chat — and what
     /// was opened from that is pushed over it in the detail. A project chosen with nothing
     /// open over it starts a new session in it, as the Mac's project row does (#366).
     var sidebarItem: SidebarItem? {
@@ -425,7 +421,6 @@ final class RemoteModel {
             if let openActivity { return openActivity }
             guard let folder = selectedProject else { return nil }
             let key = ProjectKey(host: selectedSummary?.host ?? .mac, folder: folder)
-            if openDashboard { return .project(key) }
             if let openPin { return .pin(openPin, in: key) }
             if let openWorkflow { return .workflow(openWorkflow, in: key) }
             if let selection { return .session(selection) }
@@ -439,28 +434,23 @@ final class RemoteModel {
                 selection = nil
                 openWorkflow = nil
                 openPin = nil
-                openDashboard = false
             case .project(let key):
                 selectedProject = key.folder
                 selection = nil
                 openPin = nil
                 openWorkflow = nil
-                openDashboard = false
             case .session(let id):
                 if let folder = work.agent(id)?.projectFolder { selectedProject = folder }
-                openDashboard = false
                 openPin = nil
                 openWorkflow = nil
                 selection = id
             case .workflow(let id, let key):
                 selectedProject = key.folder
-                openDashboard = false
                 openPin = nil
                 selection = nil
                 openWorkflow = id
             case .pin(let path, let key):
                 selectedProject = key.folder
-                openDashboard = false
                 openWorkflow = nil
                 selection = nil
                 openPin = path
@@ -1679,7 +1669,6 @@ final class RemoteModel {
         switch part {
         case .workflows: await refreshWorkflows()
         case .pins: await refreshPins()
-        case .dashboards: await refreshDashboardSummaries()
         case .leases: await refreshLeases()
         case .runtimes: await refreshRuntimes()
         case .allowances: await refreshRuntimeAllowances()
@@ -2118,7 +2107,7 @@ final class RemoteModel {
     }
 
     /// Bring an archived project back (#343), through its own host, as the window's Bring
-    /// Back does: a project again, with its Dashboard open.
+    /// Back does: a project again, with its new-session form open.
     func unarchiveProject(_ summary: DaemonAPI.ProjectSummary) async {
         let host = summary.host
         let target = host == .mac ? client : otherHosts[host]
@@ -2381,74 +2370,6 @@ final class RemoteModel {
                                   DaemonAPI.PinArrangeSessionsRequest(folder: folder, agentIDs: ids))
         } catch {
             problem = sentence(for: error)
-        }
-    }
-
-    // MARK: The Dashboard (074)
-
-    func refreshDashboardSummaries() async {
-        guard let listed = try? await client.call(DaemonAPI.Method.dashboardSummaries, DaemonAPI.Empty(),
-                                                  returning: [DashboardSummary].self) else { return }
-        work.replaceDashboardSummaries(listed)
-    }
-
-    func refreshDashboardSummaryIfNeeded(in folder: URL) async {
-        guard work.dashboardSummary(in: folder) == nil, !dashboardSummariesLoading else { return }
-        dashboardSummariesLoading = true
-        defer { dashboardSummariesLoading = false }
-        await refreshDashboardSummaries()
-    }
-
-    func refreshDashboard(_ folder: URL) async {
-        guard let snapshot = try? await client.call(DaemonAPI.Method.dashboardGet,
-                                                    DaemonAPI.DashboardRequest(folder: folder),
-                                                    returning: DashboardSnapshot.self) else { return }
-        work.store(snapshot)
-    }
-
-    /// Hide, Show or Remove: every client may (FR-029).
-    func actOnTile(_ method: String, folder: URL, id: String) async {
-        do {
-            try await client.call(method, DaemonAPI.TileRequest(folder: folder, id: id))
-        } catch {
-            problem = sentence(for: error)
-        }
-        await refreshDashboard(folder)
-    }
-
-    /// Update now (#146): the Mac runs the dashboard workflow, or a one-off agent, and
-    /// says why when it won't.
-    func updateDashboard(_ folder: URL) async {
-        do {
-            try await client.call(DaemonAPI.Method.dashboardUpdate, DaemonAPI.DashboardRequest(folder: folder))
-        } catch {
-            problem = sentence(for: error)
-        }
-        await refreshDashboard(folder)
-    }
-
-    /// A Move menu item (#147): shown at once, then the whole order sent once.
-    func arrangeDashboard(_ order: DashboardOrder, folder: URL) async {
-        let key = Project.standardize(folder)
-        if var snapshot = work.dashboards[key] {
-            snapshot.order = order
-            work.store(snapshot)
-        }
-        do {
-            try await client.call(DaemonAPI.Method.dashboardArrange, DaemonAPI.ArrangeRequest(folder: folder, order: order))
-        } catch {
-            problem = sentence(for: error)
-        }
-        await refreshDashboard(folder)
-    }
-
-    /// A tile's keeper: its conversation, or its workflow's page (FR-030).
-    func openKeeper(_ keeper: KeeperView, folder: URL) {
-        switch keeper.kind {
-        case .agent:
-            if let id = UUID(uuidString: keeper.id) { selection = id }
-        case .workflow:
-            openWorkflow = Project.standardize(folder).path + "/" + keeper.id
         }
     }
 

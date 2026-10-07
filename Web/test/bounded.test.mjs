@@ -327,44 +327,6 @@ test("a search's reply for words no longer asked is dropped (#193)", async () =>
   assert.deepEqual((store.agents.value.mac ?? []).map((a) => a.id), ["for-abc"]);
 });
 
-test("two quick drops are sent one at a time, and the host and page end with the last (#193)", async () => {
-  const tiles = ["a", "b", "c"];
-  let hostOrder = { sections: [{ tiles }] };
-  const link = heldLink((method, params) => {
-    if (method === "dashboard/arrange") { hostOrder = params.order; return null; }
-    return { folder: "file:///w/p", tiles: [], now: 0, order: hostOrder };
-  });
-  const store = new Store(link);
-  const key = "mac|file:///w/p";
-  const shown = () => store.dashboards.value[key]?.order.sections[0].tiles.join("");
-
-  // The page opens and a dashboard/changed refresh is out, from before the drops.
-  const opening = store.openDashboard("mac", "file:///w/p");
-  await link.answer("dashboard/get");
-  await opening;
-  const early = store.loadDashboard("mac", "file:///w/p");
-
-  const first = store.arrangeDashboard("mac", "file:///w/p", { sections: [{ tiles: ["b", "a", "c"] }] });
-  const second = store.arrangeDashboard("mac", "file:///w/p", { sections: [{ tiles: ["c", "b", "a"] }] });
-  assert.equal(shown(), "cba");
-  assert.equal(link.out.filter((c) => c.method === "dashboard/arrange").length, 1, "one send at a time");
-
-  // The early refresh lands with the host's old order: the drop stays on the page.
-  await link.answer("dashboard/get");
-  await early;
-  assert.equal(shown(), "cba");
-
-  await link.answer("dashboard/arrange");
-  const next = await link.answer("dashboard/arrange");
-  assert.deepEqual(next.params.order.sections[0].tiles, ["c", "b", "a"], "the newest drop goes next");
-  await second;
-  await link.answer("dashboard/get");
-  await first;
-  assert.deepEqual(hostOrder.sections[0].tiles, ["c", "b", "a"]);
-  assert.equal(shown(), "cba");
-  assert.equal(link.out.length, 0);
-});
-
 function ran(n, id, extra = {}) {
   return entry(n, { [n === id ? "toolCall" : "toolCallUpdate"]: { _0: { toolCallID: `c${id}`, title: "Run", status: "in_progress", ...extra } } });
 }
@@ -439,7 +401,6 @@ test("a slow call waits longer than an ordinary one, unless a test says otherwis
   assert.ok(w.callTimeoutFor("projects/clone") > w.callTimeoutFor("agents/start"));
   assert.equal(w.callTimeoutFor("agents/start"), 2 * 60_000);
   assert.equal(w.callTimeoutFor("agents/options"), w.callTimeoutFor("agents/start"));
-  assert.equal(w.callTimeoutFor("dashboard/update"), w.callTimeoutFor("agents/start"));
   assert.equal(w.callTimeoutFor("projects/clone", 20), 20);
   assert.equal(w.callTimeoutFor("hosts/list", 20), 20);
 });
@@ -506,30 +467,6 @@ test("history stops at its cap, and a full chat does not ask for another page (#
   assert.equal(link.asked.some((line) => line.endsWith("agents/transcript")), false);
 });
 
-test("a dashboard on screen settles its changes, and a closed one is dropped (#291)", async () => {
-  let gets = 0;
-  const link = fakeLink((method) => {
-    if (method !== "dashboard/get") return undefined;
-    gets += 1;
-    return { folder: "file:///w/p", tiles: [], now: gets, order: { sections: [] } };
-  });
-  const store = new Store(link);
-  await store.openDashboard("mac", "file:///w/p");
-  assert.equal(gets, 1);
-  const changed = (bad) => store.apply("dashboard/changed", { folder: "file:///w/p", summary: { bad } }, "mac");
-  changed(0);
-  changed(1);
-  await wait(100);
-  assert.equal(gets, 1, "a burst is one read");
-  await wait(quietSettle);
-  assert.equal(gets, 2);
-  store.closeDashboard("mac", "file:///w/p");
-  assert.equal(store.dashboards.value["mac|file:///w/p"], undefined);
-  changed(2);
-  await wait(quietSettle + 40);
-  assert.equal(gets, 2, "a closed dashboard is not read");
-});
-
 test("pages changed in a burst bump the revision once (#291)", async () => {
   const work = new Work();
   work.apply("pages/changed", { folder: "file:///w/p" }, "mac");
@@ -590,13 +527,10 @@ test("a reconnect lists the workflow folds still open, and no other (#291)", asy
   assert.deepEqual(listed, ["file:///w/kept"]);
 });
 
-test("a host removed takes its dashboards, pages, runtimes and leases with it (#291)", async () => {
+test("a host removed takes its pages, runtimes and leases with it (#291)", async () => {
   const hosts = [{ id: "mac", state: "online" }, { id: "box", state: "online" }];
   const link = fakeLink((method) => (method === "hosts/list" ? hosts : undefined));
   const store = new Store(link);
-  const dash = { folder: "file:///w/p", tiles: [], now: 0, order: { sections: [] } };
-  store.dashboards.value = { "box|file:///w/p": dash, "mac|file:///w/p": dash };
-  store.dashboardRevisions.value = { "box|file:///w/p": 2, "mac|file:///w/q": 1 };
   store.pageRevisions.value = { "box|file:///w/p": 4, "mac|file:///w/p": 5 };
   store.runtimes.value = { box: [], mac: [] };
   store.accounts.value = { box: [], mac: [] };
@@ -605,10 +539,6 @@ test("a host removed takes its dashboards, pages, runtimes and leases with it (#
   hosts.pop();
   link.notify("control/hostChanged", { host: "box", state: "removed" });
   await wait(320);
-  assert.equal(store.dashboards.value["box|file:///w/p"], undefined);
-  assert.ok(store.dashboards.value["mac|file:///w/p"]);
-  assert.equal(store.dashboardRevisions.value["box|file:///w/p"], undefined);
-  assert.equal(store.dashboardRevisions.value["mac|file:///w/q"], 1);
   assert.equal(store.pageRevisions.value["box|file:///w/p"], undefined);
   assert.equal(store.pageRevisions.value["mac|file:///w/p"], 5);
   assert.equal(store.runtimes.value.box, undefined);

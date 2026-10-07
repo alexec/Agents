@@ -104,13 +104,11 @@ has checked out, and it lives inside the repository, under `.agents/worktrees`. 
 in a worktree is still listed in the same project, with the worktree's name on its row.
 An agent that starts helpers of its own can put each one in a worktree too.
 
-A project has one Dashboard, whichever checkout its agents work in. When an agent in a
-worktree sets a tile, the app writes it to `.agents/dashboard/` in the project folder, never
+A project has one set of pins, whichever checkout its agents work in. When an agent in a
+worktree pins a page, the app writes it to `.agents/pins.json` in the project folder, never
 the worktree's copy, and it never reads a worktree's copy either. The app doesn't commit
-these files: a changed tile shows in the project folder's changes and goes in with whatever is
-committed there next. Agents are told to write `.agents/dashboard/` only through their tools,
-so an old copy on a worktree's branch is not edited and carried back by a merge. See
-[Keep a project Dashboard](../how-to/keep-a-project-dashboard.md).
+this file: a changed pin shows in the project folder's changes and goes in with whatever is
+committed there next. See [Pin a page to a project](../how-to/pin-a-page-to-a-project.md).
 
 ## An agent can change where it works
 

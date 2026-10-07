@@ -7,7 +7,7 @@ import WebKit
 struct AppViewActions {
     /// The conversation the views are in.
     var agentID: UUID
-    /// Set for a view on a project's page (the Dashboard, a pin), which has no agent: its
+    /// Set for a view on a project's page (a pin), which has no agent: its
     /// `ui/message` and `ui/update-model-context` are refused, and logged (#189).
     var project: URL? = nil
     /// One of `views/*`, to the host the conversation is on.
@@ -16,7 +16,6 @@ struct AppViewActions {
     var send: @MainActor (String) async -> Bool
     /// A `ui/open-link`, in the default browser.
     var openLink: @MainActor (URL) -> Void
-    var openDashboardTarget: @MainActor (String, String) -> Void = { _, _ in }
     /// Pin this call's view under the chat's project (#189). Why it was not, or nil.
     var pin: (@MainActor (ViewPin) async -> String?)? = nil
 }
@@ -119,7 +118,6 @@ final class AppViewHost {
     var isFullscreen: Bool { store?.fullscreen == call.id }
 
     static func title(for call: AppViewCall) -> String {
-        if call.resourceURI == "ui://agents/dashboard" { return "Dashboard" }
         if call.tool == "show_test_view" { return "Test view" }
         let tool = call.tool.replacingOccurrences(of: "_", with: " ")
         // A person's own server's view says whose it is (#191).
@@ -354,14 +352,7 @@ final class AppViewHost {
         case .callTool(let id, let name, let arguments):
             relay(id, DaemonAPI.Method.viewsCall,
                   DaemonAPI.ViewCallRequest(agentID: actions.agentID, viewID: call.id, name: name,
-                                            arguments: arguments, project: actions.project, server: server),
-                  answer: { [weak self] value in
-                      if let target = value["structuredContent"]?["open"],
-                         let kind = target["kind"]?.stringValue, let id = target["id"]?.stringValue {
-                          self?.actions.openDashboardTarget(kind, id)
-                      }
-                      return value
-                  })
+                                            arguments: arguments, project: actions.project, server: server))
         case .readResource(let id, let uri):
             Task {
                 do {

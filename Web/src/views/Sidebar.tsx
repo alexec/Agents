@@ -244,12 +244,11 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   if (searching && groups.length === 0 && archived.length === 0 && allWorkflows.length === 0 && !nameMatches) return null;
 
   const chosen = r.host === host.id && r.project !== undefined && folderKey(r.project) === folderKey(folder)
-    && (!!r.dashboard || !!r.compose);
+    && !!r.compose;
   const needs = view.needsYou;
   const subtitle = !project.exists ? "Folder is missing" : view.subtitle;
   const fold = (open: boolean) => folds.set(host.id, folder, open);
   const projectMenu: MenuItem[] = [
-    { label: "Dashboard", run: () => go({ host: host.id, project: folder, dashboard: true }) },
     { label: "New Session", disabled: down, help: "Start a new session in this project",
       run: () => go({ host: host.id, project: folder, compose: true }) },
   ];
@@ -381,7 +380,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
 
 /**
  * An archived project, with when it was put away, and Bring Back, as the window's
- * ArchivedProjectRow (#343). Brought back, it is a project again and its Dashboard opens.
+ * ArchivedProjectRow (#343). Brought back, it is a project again and its new-session form opens.
  */
 function ArchivedProjectRow({ store, host, project, down }: {
   store: Store; host: ControlHost; project: ProjectSummary; down: boolean;

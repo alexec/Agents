@@ -68,8 +68,6 @@ extension DaemonCore {
         case .refused(let sentence):
             return sentence
         case .session(let agent):
-            // A successor reads the session it carries on, and may then take its tiles (074).
-            noteSessionRead(agent.id, by: caller.id)
             let header = SessionHistory.Header(
                 id: agent.id, title: agent.title, runtime: PoolWords.runtimeName(agent.runtimeID),
                 status: SessionLookup.status(of: agent), folder: agent.cwd.path,

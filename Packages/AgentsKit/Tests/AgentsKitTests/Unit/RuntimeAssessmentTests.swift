@@ -49,9 +49,6 @@ struct RuntimeAssessmentTests {
             call(5.2, DaemonAPI.Method.agentsManageWorkflows, ["action": s("list")]),
             call(5.3, DaemonAPI.Method.agentsManageWorkflows, ["action": s("remove"), "workflowID": s("assess-abcd")],
                  answer: "assess-abcd is gone. It will not run again."),
-            call(6, DaemonAPI.Method.dashboardSetTile, ["arguments": .object([:])]),
-            call(7, DaemonAPI.Method.dashboardRead, [:]),
-            call(8, DaemonAPI.Method.dashboardRemoveTile, ["id": s("assess-claude")]),
             call(9, DaemonAPI.Method.eventsPublish, ["name": s(RuntimeAssessment.pingEvent)]),
             call(10, DaemonAPI.Method.eventsWait, ["events": .array([s(RuntimeAssessment.pingEvent)]), "from": .int(4)],
                  answer: "custom.assess_ping happened at 10:00"),
@@ -160,7 +157,7 @@ struct RuntimeAssessmentTests {
             #expect(check.verdict == .passed, "\(check.id): \(check.evidence)")
         }
         #expect(score.passed)
-        #expect(score.summary == "15 of 15 passed")
+        #expect(score.summary == "14 of 14 passed")
         #expect(score.note.contains("claude (claude-agent-acp 0.81.2, on this Mac (test))"))
         #expect(score.table.contains("| `helpers` | Helpers | passed |"))
     }
@@ -171,7 +168,7 @@ struct RuntimeAssessmentTests {
         record.calls = []
         record.transcript = []
         let v = verdicts(record)
-        for id in ["show_file", "leases", "workflows", "dashboard", "events", "ask_form", "own_ask", "helpers", "wait", "ending",
+        for id in ["show_file", "leases", "workflows", "events", "ask_form", "own_ask", "helpers", "wait", "ending",
                    "worktree", "sessions", "scope"] {
             #expect(v[id] == .failed, "\(id)")
         }

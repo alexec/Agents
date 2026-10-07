@@ -7,7 +7,7 @@ import type {
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, DiskState, StoreNotes,
-  DashboardChangedNotification, DashboardOrder, DashboardSnapshot, DashboardSummary, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
+  CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
 } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
@@ -19,7 +19,6 @@ import { folderKey, projectFolder, projectView, type ProjectView } from "./group
 import { DisplayBuilder, keepingTurns, storedTurn, turns, type ChatTurn, type Item } from "./turns";
 import { sortedRuntimes } from "./runtimes";
 import { blockLines, openBlock } from "./block";
-import { DashboardOrderSync } from "./dashboardOrderSync";
 import { Drafts } from "./drafts";
 import { scopeRoot, WatchCounts } from "./fileWatch";
 import { workflowRunsOn } from "./workflows";
@@ -90,7 +89,7 @@ const turnsKept = 100;
 
 /** The most folders a settling burst keeps by name before it is "many", as the host's own limit. */
 const filesNamedAtMost = 64;
-/** How long a burst has to be quiet before the panes, a dashboard or a page read again (#170, #291). */
+/** How long a burst has to be quiet before the panes or a page read again (#170, #291). */
 export const quietSettle = 250;
 const filesSettle = quietSettle;
 
@@ -211,12 +210,6 @@ export class Work {
   /** The last folders said to have changed, for a pane watching them (`files/changed`). */
   readonly filesChanged = signal<{ host: string; agentID: string; folders: string[]; many: boolean; at: number } | null>(null);
 
-  /** Each project's Dashboard row by `host|folder` (074), kept by dashboard/changed. */
-  readonly dashboardSummaries = signal<Record<string, DashboardSummary>>({});
-  /** The Dashboards opened, by `host|folder`; asked again when `dashboardRevisions` moves. */
-  readonly dashboards = signal<Record<string, DashboardSnapshot>>({});
-  readonly dashboardRevisions = signal<Record<string, number>>({});
-
   /** Each project's pinned pages by `host|folder` (#159), kept by pins/changed. */
   readonly pins = signal<Record<string, PinView[]>>({});
   /** Each project's pinned sessions by `host|folder` (#180), in their order, kept by pins/changed. */
@@ -327,9 +320,6 @@ export class Work {
   private filesSettling = new Map<string, { folders: Set<string>; many: boolean; timer: ReturnType<typeof setTimeout> }>();
   private pageSettle = new Map<string, ReturnType<typeof setTimeout>>();
 
-  /** A dashboard on screen changed: the store fetches it once the burst settles (#291). */
-  protected dashboardChanged(_host: string, _folder: string): void {}
-
   /** Lists and timers keyed by a host, let go with it (#291). */
   protected dropHostRecords(host: string): void {
     const prefix = `${host}|`;
@@ -389,16 +379,6 @@ export class Work {
       case "workflow/changed":
         this.placeWorkflow(params as WorkflowSummary, host);
         return true;
-      case "dashboard/changed": {
-        const note = params as DashboardChangedNotification;
-        const key = `${host}|${folderKey(note.folder)}`;
-        batch(() => {
-          this.dashboardSummaries.value = { ...this.dashboardSummaries.value, [key]: note.summary };
-          this.dashboardRevisions.value = { ...this.dashboardRevisions.value, [key]: (this.dashboardRevisions.value[key] ?? 0) + 1 };
-        });
-        this.dashboardChanged(host, note.folder);
-        return true;
-      }
       case "pins/changed": {
         const note = params as PinsChangedNotification;
         this.pins.value = { ...this.pins.value, [`${host}|${folderKey(note.folder)}`]: note.pins };
@@ -978,14 +958,12 @@ export class Store extends Work {
     });
   }
 
-  /** A host removed: what was held of it goes with it, the dashboards and runtimes included (#291). */
+  /** A host removed: what was held of it goes with it, the runtimes included (#291). */
   private forgetHost(host: string): void {
     const prefix = `${host}|`;
     const without = <T,>(held: Record<string, T>) => Object.fromEntries(Object.entries(held).filter(([key]) => key !== host));
     const notOf = <T,>(held: Record<string, T>) => Object.fromEntries(Object.entries(held).filter(([key]) => !key.startsWith(prefix)));
     this.dropHostRecords(host);
-    for (const [key, timer] of this.dashboardSettle) if (key.startsWith(prefix)) { clearTimeout(timer); this.dashboardSettle.delete(key); }
-    for (const key of [...this.dashboardsOpen]) if (key.startsWith(prefix)) { this.dashboardsOpen.delete(key); this.dashboardOrders.forget(key); }
     for (const key of [...this.startRequests.keys()]) if (key.startsWith(prefix)) this.startRequests.delete(key);
     batch(() => {
       this.setAgents(host, []);
@@ -995,9 +973,6 @@ export class Store extends Work {
       this.permissions.value = without(this.permissions.value);
       this.elicitations.value = without(this.elicitations.value);
       this.workflows.value = notOf(this.workflows.value);
-      this.dashboardSummaries.value = notOf(this.dashboardSummaries.value);
-      this.dashboards.value = notOf(this.dashboards.value);
-      this.dashboardRevisions.value = notOf(this.dashboardRevisions.value);
       this.pageRevisions.value = notOf(this.pageRevisions.value);
       this.pins.value = notOf(this.pins.value);
       this.sessionPins.value = notOf(this.sessionPins.value);
@@ -1029,16 +1004,15 @@ export class Store extends Work {
     const agents = await this.listLive(host).catch(failed("agents/list"));
     if (agents) this.replaceAgents(agents, host);
     // The Archived folds that were open are listed again rather than left empty by the live list,
-    // and the workflows and Dashboards on screen asked again: they may have changed meanwhile.
+    // and the workflows on screen asked again: they may have changed meanwhile.
     const prefix = `${host}|`;
     const reopened = [...this.archivedLoaded].filter((key) => key.startsWith(prefix));
     for (const key of reopened) {
       this.archivedLoaded.delete(key);
       void this.loadArchived(host, key.slice(prefix.length));
     }
-    // Only what is on screen: a list or a dashboard left behind is not asked for again (#291).
+    // Only what is on screen: a list left behind is not asked for again (#291).
     for (const key of this.workflowHolds.keys()) if (key.startsWith(prefix)) void this.loadWorkflows(host, key.slice(prefix.length));
-    for (const key of this.dashboardsOpen) if (key.startsWith(prefix)) void this.loadDashboard(host, key.slice(prefix.length));
     // A search on show: the live list just let its archived matches go, so they are asked again.
     if (this.searchWords) {
       this.searched.delete(host);
@@ -1054,11 +1028,6 @@ export class Store extends Work {
     const clones = await this.link.call("projects/clones", {}, host).catch(failed("projects/clones"));
     if (clones) this.clones.value = { ...this.clones.value, [host]: clones };
     void this.loadRuntimes(host);
-    void this.link.call("dashboard/summaries", {}, host).then((listed) => {
-      const held = Object.fromEntries(Object.entries(this.dashboardSummaries.value).filter(([key]) => !key.startsWith(`${host}|`)));
-      for (const summary of listed) held[`${host}|${folderKey(summary.folder)}`] = summary;
-      this.dashboardSummaries.value = held;
-    }).catch(failed("dashboard/summaries"));
     void this.link.call("pins/list", {}, host).then((listed) => {
       const held = Object.fromEntries(Object.entries(this.pins.value).filter(([key]) => !key.startsWith(`${host}|`)));
       const sessions = Object.fromEntries(Object.entries(this.sessionPins.value).filter(([key]) => !key.startsWith(`${host}|`)));
@@ -1373,7 +1342,7 @@ export class Store extends Work {
 
   /**
    * An archived project brought back (#343), as the window's Bring Back does: a project again,
-   * with its Dashboard open.
+   * with its new-session form open.
    */
   async unarchiveProject(host: string, folder: string): Promise<ProjectSummary | null> {
     const summary = await this.act("projects/unarchive", { folder: folder as never }, host);
@@ -1640,7 +1609,7 @@ export class Store extends Work {
     return this.pins.value[`${host}|${folderKey(folder)}`] ?? [];
   }
 
-  /** A file of the project's: a pinned page, a page tile's, or what an HTML page draws from. */
+  /** A file of the project's: a pinned page, or what an HTML page draws from. */
   readPage(host: string, folder: string, path: string, knownStamp?: FileStamp) {
     return this.link.call("pins/read", { folder: folder as never, path, ...(knownStamp ? { knownStamp } : {}) }, host);
   }
@@ -1695,83 +1664,6 @@ export class Store extends Work {
   async arrangeSessionPins(host: string, folder: string, ids: string[]): Promise<void> {
     this.sessionPins.value = { ...this.sessionPins.value, [`${host}|${folderKey(folder)}`]: ids };
     await this.act("pins/arrangeSessions", { folder: folder as never, agentIDs: ids as UUID[] }, host);
-  }
-
-  /** The order writes and fetches of each Dashboard, kept in step (#176, #193). */
-  private dashboardOrders = new DashboardOrderSync();
-  /** Dashboards on screen, by `host|folder`. A closed one is dropped and not fetched again (#291). */
-  private dashboardsOpen = new Set<string>();
-  private dashboardSettle = new Map<string, ReturnType<typeof setTimeout>>();
-
-  /** The dashboard is on screen: ask for it, and again when it changes. */
-  openDashboard(host: string, folder: string): Promise<void> {
-    const key = `${host}|${folderKey(folder)}`;
-    this.dashboardsOpen.add(key);
-    return this.loadDashboard(host, folder);
-  }
-
-  /** The dashboard left the screen. What it held goes with it (#291). */
-  closeDashboard(host: string, folder: string): void {
-    const key = `${host}|${folderKey(folder)}`;
-    this.dashboardsOpen.delete(key);
-    const timer = this.dashboardSettle.get(key);
-    if (timer) clearTimeout(timer);
-    this.dashboardSettle.delete(key);
-    this.dashboardOrders.forget(key);
-    if (!(key in this.dashboards.peek())) return;
-    const { [key]: _gone, ...rest } = this.dashboards.value;
-    this.dashboards.value = rest;
-  }
-
-  protected override dashboardChanged(host: string, folder: string): void {
-    const key = `${host}|${folderKey(folder)}`;
-    if (!this.dashboardsOpen.has(key)) return;
-    clearTimeout(this.dashboardSettle.get(key));
-    this.dashboardSettle.set(key, setTimeout(() => {
-      this.dashboardSettle.delete(key);
-      if (this.dashboardsOpen.has(key)) void this.loadDashboard(host, folder);
-    }, quietSettle));
-  }
-
-  /**
-   * One project's Dashboard (074), asked for when it opens and on each dashboard/changed for it.
-   * A reply older than one already shown is dropped.
-   */
-  async loadDashboard(host: string, folder: string): Promise<void> {
-    const key = `${host}|${folderKey(folder)}`;
-    if (!this.dashboardsOpen.has(key)) return;
-    const ticket = this.dashboardOrders.beginFetch(key);
-    const snapshot = await this.link.call("dashboard/get", { folder: folder as never }, host).catch(() => null);
-    if (!this.dashboardsOpen.has(key)) return;
-    const shown = snapshot && this.dashboardOrders.accept(key, snapshot, ticket);
-    if (shown) this.dashboards.value = { ...this.dashboards.value, [key]: shown };
-  }
-
-  /** Hide, Show or Remove: the person's, from any client (FR-027 to FR-029). */
-  async actOnTile(host: string, folder: string, method: "dashboard/hide" | "dashboard/show" | "dashboard/remove", id: string): Promise<void> {
-    await this.act(method, { folder: folder as never, id }, host);
-    await this.loadDashboard(host, folder);
-  }
-
-  /** Update now (#146): the dashboard workflow, or a one-off agent; a refusal is said. */
-  async updateDashboard(host: string, folder: string): Promise<void> {
-    await this.act("dashboard/update", { folder: folder as never }, host);
-    await this.loadDashboard(host, folder);
-  }
-
-  /**
-   * A drop or a Move item (#147): shown at once, then the whole order sent. One send at a time,
-   * the newest order next, so the host ends with the last drop (#176, #193).
-   */
-  async arrangeDashboard(host: string, folder: string, order: DashboardOrder): Promise<void> {
-    const key = `${host}|${folderKey(folder)}`;
-    const snapshot = this.dashboards.value[key];
-    if (snapshot) this.dashboards.value = { ...this.dashboards.value, [key]: { ...snapshot, order } };
-    if (!this.dashboardOrders.arrange(key, order)) return;
-    for (let next = this.dashboardOrders.takeUnsent(key); next; next = this.dashboardOrders.takeUnsent(key)) {
-      await this.act("dashboard/arrange", { folder: folder as never, order: next }, host);
-    }
-    await this.loadDashboard(host, folder);
   }
 
   /** Run now (US5). The session it starts arrives as any other does, by agent/changed. */
