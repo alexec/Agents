@@ -43,6 +43,15 @@ public struct SidebarProjectFold {
 
     public var isSearching: Bool { !query.isEmpty }
 
+    /// Whether the project's rows are open, by hand or by a search. Folded, it holds no
+    /// rows at all, not even the ones that need nothing filed (#356): `NSOutlineView`
+    /// does not follow the children of an item it has not expanded, so a row that came or
+    /// went under a folded project (an Archived fold appearing as a session is archived,
+    /// a pinned page, "No sessions yet") left its count apart from SwiftUI's. The next
+    /// update then threw (#237), and Apple Intelligence reading the list asked for a row
+    /// SwiftUI no longer had, which is a crash.
+    public let isUnfolded: Bool
+
     /// Whether the project is drawn at all: always, unless a search found nothing in it.
     public var isShown: Bool {
         !isSearching || nameMatches || !pinned.isEmpty || !groups.isEmpty || !archived.isEmpty
@@ -66,10 +75,17 @@ public struct SidebarProjectFold {
         isSearching ? nil : RetirementWords.retiredLine(summary?.retiredCount)
     }
 
-    /// Whether the project has an Archived fold to draw.
+    /// Whether the project has an Archived fold to draw: never while it is folded.
     public func showsArchivedFold(_ summary: DaemonAPI.ProjectSummary?) -> Bool {
-        archivedCount(summary) > 0 || retiredLine(summary) != nil
+        isUnfolded && (archivedCount(summary) > 0 || retiredLine(summary) != nil)
     }
+
+    /// Whether the project's pinned pages (#159) go first: unfolded, and not while
+    /// searching, since the search is for sessions.
+    public var showsPinnedPages: Bool { isUnfolded && !isSearching }
+
+    /// Whether the fold says it has no sessions yet: unfolded, with none that is live.
+    public var showsNoSessions: Bool { isUnfolded && !isSearching && !hasLive }
 
     /// The archived rows to draw: a page with no search, the first few matches until Show
     /// all with one.
@@ -86,8 +102,9 @@ public struct SidebarProjectFold {
         let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
         self.query = words
         let matcher = words.isEmpty ? nil : SessionLabelQuery(words)
+        isUnfolded = isOpen || matcher != nil
         if matcher != nil { nameMatches = label.localizedCaseInsensitiveContains(words) }
-        guard isOpen || matcher != nil else { return }
+        guard isUnfolded else { return }
         let held = work.workflows(in: key.folder)
         let workflows = matcher.map { held.filter($0.matches) } ?? held
         self.workflows = workflows.filter { !$0.isArchived }
