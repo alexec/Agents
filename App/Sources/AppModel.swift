@@ -1725,7 +1725,7 @@ final class AppModel {
                                                      returning: DaemonAPI.ChatProjectState.self)
         } catch {
             // An older host does not know the question.
-            chatProblem = ChatProblem(host: host, message: "\(hostName(host)) has no chat project.")
+            chatProblem = ChatProblem(host: host, message: "\(hostName(host, capitalised: true)) has no chat project.")
             return false
         }
         switch state {
@@ -1736,7 +1736,7 @@ final class AppModel {
             chatProblem = ChatProblem(host: host, message: "The chat project on \(hostName(host)) is archived.",
                                       archived: folder)
         case .noPersonalHome:
-            chatProblem = ChatProblem(host: host, message: "\(hostName(host)) has no personal home folder, "
+            chatProblem = ChatProblem(host: host, message: "\(hostName(host, capitalised: true)) has no personal home folder, "
                 + "so it has no chat project. A copy started on a scratch root needs AGENTS_PERSONAL_HOME.")
         case .failed(let message):
             chatProblem = ChatProblem(host: host, message: message)
@@ -1752,8 +1752,8 @@ final class AppModel {
         if chatProjectKey(on: problem.host) != nil { showProject(key) }
     }
 
-    private func hostName(_ host: HostID) -> String {
-        host == .mac ? "This Mac" : hosts.label(host)
+    private func hostName(_ host: HostID, capitalised: Bool = false) -> String {
+        host == .mac ? (capitalised ? "This Mac" : "this Mac") : hosts.label(host)
     }
 
     // MARK: Connecting
