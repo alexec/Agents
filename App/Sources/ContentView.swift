@@ -250,7 +250,15 @@ struct ContentView: View {
         // itself. Here rather than in the sidebar, because the sidebar may be shut,
         // and shut means gone: there would be nothing listening.
         .onChange(of: model.filesToShow) { showWhatWasAskedFor() }
-        .onChange(of: model.selection) { showWhatWasAskedFor() }
+        .onChange(of: model.selection) {
+            // A chat just started opens on the chat alone (#358); anything it asks
+            // to show still opens the column, just below.
+            if let id = model.selection, id == model.justStarted {
+                model.justStarted = nil
+                frame.isOpen = false
+            }
+            showWhatWasAskedFor()
+        }
         // The window's one alert, held while it is open (#101): a reconnect clearing the
         // problem, or a second arriving, waits for its button rather than closing it.
         .heldAlert(\.title, item: { WindowAlert.wanted(by: model) }, dismiss: { $0.closed(in: model) }) { alert in

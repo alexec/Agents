@@ -19,7 +19,9 @@ struct SwipeToShowPane: ViewModifier {
     @State private var sideways: CGFloat = 0
     @State private var isSwiping = false
     /// Decided for this gesture: it is somebody else's, or it has already done its thing.
-    @State private var isSpent = false
+    /// Spent until a gesture begins under this chat, so one already going when the
+    /// chat appeared cannot open the pane (#358).
+    @State private var isSpent = true
     @State private var watcher: Any?
     /// The chat's place in its window, to tell its swipes from anybody else's.
     @State private var anchor = SwipeAnchor()
@@ -52,6 +54,7 @@ struct SwipeToShowPane: ViewModifier {
         NSEvent.removeMonitor(watcher)
         self.watcher = nil
         isSwiping = false
+        isSpent = true
     }
 
     @MainActor
