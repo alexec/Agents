@@ -39,6 +39,70 @@ public enum FileTree {
             return listings[key] == nil && !problems.contains(key) && !reading.contains(key)
         }
     }
+
+    /// One line of the tree, as a list draws it.
+    public enum Line: Identifiable, Equatable, Sendable {
+        case entry(DirectoryEntry, depth: Int)
+        case note(id: String, String, depth: Int)
+        /// A folder that could not be read, with a way to try again.
+        case problem(URL, String, depth: Int)
+
+        public var id: String {
+            switch self {
+            case .entry(let entry, _): entry.url.absoluteString
+            case .note(let id, _, _): id
+            case .problem(let folder, _, _): "problem:\(FileTree.key(folder))"
+            }
+        }
+    }
+
+    /// The tree, flattened top to bottom: each open folder's entries under it, one
+    /// step in. A folder opened before it has been read says so on a line of its own.
+    /// The window's pane and the iPad's draw these same lines (#345).
+    public static func lines(root: URL, expanded: Set<String>, listings: [String: DirectoryListing],
+                             problems: [String: String] = [:]) -> [Line] {
+        var lines: [Line] = []
+        func add(_ folder: URL, depth: Int) {
+            let folderKey = key(folder)
+            if let problem = problems[folderKey] {
+                lines.append(.problem(folder, problem, depth: depth))
+                return
+            }
+            guard let listing = listings[folderKey] else {
+                lines.append(.note(id: "reading:\(folderKey)", "Reading…", depth: depth))
+                return
+            }
+            for entry in listing.entries {
+                lines.append(.entry(entry, depth: depth))
+                if entry.isDirectory, expanded.contains(key(entry.url)) {
+                    add(entry.url, depth: depth + 1)
+                }
+            }
+            if listing.isTruncated {
+                lines.append(.note(id: "omitted:\(folderKey)", "\(listing.omitted) more, not shown", depth: depth))
+            }
+        }
+        add(root, depth: 0)
+        return lines
+    }
+
+    /// Every folder from just under `top` down to `folder`, by key: the ones to open so
+    /// `folder` shows in the tree. Empty for `top` itself or a folder outside it.
+    public static func opening(to folder: URL, from top: URL) -> [String] {
+        let topKey = key(top), target = key(folder)
+        guard target != topKey, target.hasPrefix(topKey + "/") else { return [] }
+        var url = top
+        return target.dropFirst(topKey.count + 1).split(separator: "/").map { part in
+            url = url.appending(path: String(part), directoryHint: .isDirectory)
+            return key(url)
+        }
+    }
+
+    /// Whether `url` is `folder` or somewhere under it.
+    public static func isInside(_ url: URL, _ folder: URL) -> Bool {
+        let path = key(url), top = key(folder)
+        return path == top || path.hasPrefix(top + "/")
+    }
 }
 
 /// Where a files pane is to be when it shows its folder again (#66): the file last
