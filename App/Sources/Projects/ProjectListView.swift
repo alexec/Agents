@@ -670,7 +670,7 @@ private struct SpendingRow: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(today == nil ? "Spending" : "Today").foregroundStyle(.primary)
+            Text("Cost").foregroundStyle(.primary)
             Spacer()
             VStack(alignment: .trailing, spacing: 1) {
                 if let today {
@@ -688,7 +688,7 @@ private struct SpendingRow: View {
         }
         .help(today == nil
               ? "What all of the work has cost"
-              : "What every agent has cost today. Opens Spending.")
+              : "What every agent has cost today. Opens Cost.")
     }
 
     /// This Mac's day and every server's, as one figure: what the work cost is the
