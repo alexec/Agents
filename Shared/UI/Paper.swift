@@ -202,7 +202,8 @@ private struct PaperRow: ViewModifier {
 
 /// A small control on paper: raised capsule, hairline edge, a wash while pressed.
 /// Replaces `.buttonStyle(.glass)`.
-struct PaperButtonStyle: ButtonStyle {
+struct PaperButtonStyle<Outline: InsettableShape>: ButtonStyle {
+    let outline: Outline
     /// Dimmed when it can't be used, as the prominent style is: a style of our own does
     /// not get the system's greying.
     @Environment(\.isEnabled) private var isEnabled
@@ -211,21 +212,28 @@ struct PaperButtonStyle: ButtonStyle {
         configuration.label
             .padding(.horizontal, 12)
             .padding(.vertical, 5)
-            .background(configuration.isPressed ? Paper.wash : Paper.raised, in: Capsule())
-            .overlay(Capsule().strokeBorder(Paper.rule, lineWidth: 1))
-            .contentShape(Capsule())
+            .background(configuration.isPressed ? Paper.wash : Paper.raised, in: outline)
+            .overlay(outline.strokeBorder(Paper.rule, lineWidth: 1))
+            .contentShape(outline)
             .opacity(isEnabled ? 1 : 0.4)
     }
 }
 
-extension ButtonStyle where Self == PaperButtonStyle {
-    static var paper: PaperButtonStyle { PaperButtonStyle() }
+extension ButtonStyle where Self == PaperButtonStyle<Capsule> {
+    static var paper: Self { PaperButtonStyle(outline: Capsule()) }
+}
+
+/// `.paper` with a card's corners rather than round ends, for a button whose label
+/// wraps onto several lines: a capsule that tall cuts into the text at its corners.
+extension ButtonStyle where Self == PaperButtonStyle<RoundedRectangle> {
+    static var paperCard: Self { PaperButtonStyle(outline: RoundedRectangle(cornerRadius: Paper.Radius.card)) }
 }
 
 /// The one control on a card that is the answer: the accent, with the ground as its text
 /// (6.3:1 light, 6.6:1 dark; white on the dark violet would be 2.6:1). Replaces
 /// `.buttonStyle(.glassProminent)`.
-struct PaperProminentButtonStyle: ButtonStyle {
+struct PaperProminentButtonStyle<Outline: InsettableShape>: ButtonStyle {
+    let outline: Outline
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
@@ -239,15 +247,22 @@ struct PaperProminentButtonStyle: ButtonStyle {
             // outer size filled edge to edge reads a size larger than a button whose
             // edge is a line, and send sat beside two of those looking wider than them.
             .background(Paper.accent.opacity(configuration.isPressed ? 0.8 : 1),
-                        in: Capsule().inset(by: 1))
-            .overlay(Capsule().strokeBorder(Paper.rule, lineWidth: 1))
+                        in: outline.inset(by: 1))
+            .overlay(outline.strokeBorder(Paper.rule, lineWidth: 1))
             .opacity(isEnabled ? 1 : 0.4)
-            .contentShape(Capsule())
+            .contentShape(outline)
     }
 }
 
-extension ButtonStyle where Self == PaperProminentButtonStyle {
-    static var paperProminent: PaperProminentButtonStyle { PaperProminentButtonStyle() }
+extension ButtonStyle where Self == PaperProminentButtonStyle<Capsule> {
+    static var paperProminent: Self { PaperProminentButtonStyle(outline: Capsule()) }
+}
+
+/// `.paperProminent` with a card's corners, as `.paperCard` is to `.paper`.
+extension ButtonStyle where Self == PaperProminentButtonStyle<RoundedRectangle> {
+    static var paperProminentCard: Self {
+        PaperProminentButtonStyle(outline: RoundedRectangle(cornerRadius: Paper.Radius.card))
+    }
 }
 
 /// A sheet laid out the same way every time: title, body, then Cancel / primary actions.

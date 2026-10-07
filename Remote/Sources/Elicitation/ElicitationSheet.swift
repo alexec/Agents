@@ -120,7 +120,7 @@ struct ElicitationSheet: View {
                 } label: {
                     label(choice.title, note: choice.description, onFill: true)
                 }
-                .buttonStyle(.paperProminent)
+                .buttonStyle(.paperProminentCard)
                 .controlSize(.large)
             }
             // Answering with nothing, where the agent said the question may go

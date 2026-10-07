@@ -364,7 +364,7 @@ function ElicitationCard({ request, asker, hold, answer, active }: {
       body = (
         <>
           {schema.description && <p class="quiet">{schema.description}</p>}
-          <div class="options row-options">
+          <div class="options">
             {single.choices.map((choice, index) => {
               const b = button(`choice:${choice.value}`, "prominent");
               return (
