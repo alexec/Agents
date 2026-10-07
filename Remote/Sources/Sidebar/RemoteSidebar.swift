@@ -352,19 +352,22 @@ private struct ProjectMenuItems: View {
     let summary: DaemonAPI.ProjectSummary
 
     var body: some View {
-        Button("Dashboard", systemImage: "square.grid.2x2") { model.sidebarItem = .project(summary.key) }
+        Button("Dashboard", systemImage: "square.grid.2x2") {
+            model.sidebarItem = .project(summary.key)
+            model.openDashboard = true
+        }
         NewSessionButton(folder: summary.folder)
     }
 }
 
-/// New session in a project: the start sheet (029).
+/// New session in a project: its page, the start form (029, #366).
 struct NewSessionButton: View {
     @Environment(RemoteModel.self) private var model
     let folder: URL
 
     var body: some View {
         Button {
-            model.startingIn = folder
+            model.sidebarItem = .project(ProjectKey(host: model.work.project(folder)?.host ?? .mac, folder: folder))
         } label: {
             Label("New Session", systemImage: "plus")
         }

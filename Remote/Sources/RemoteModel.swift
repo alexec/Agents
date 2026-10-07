@@ -419,7 +419,7 @@ final class RemoteModel {
     /// What the sidebar has picked (#226), the Mac's one value for it: the first of what is
     /// open over the project — its Dashboard, a pinned page, a workflow, a chat — and what
     /// was opened from that is pushed over it in the detail. A project chosen with nothing
-    /// open over it shows its Dashboard, as the Mac's project row does.
+    /// open over it starts a new session in it, as the Mac's project row does (#366).
     var sidebarItem: SidebarItem? {
         get {
             if let openActivity { return openActivity }
@@ -445,7 +445,7 @@ final class RemoteModel {
                 selection = nil
                 openPin = nil
                 openWorkflow = nil
-                openDashboard = true
+                openDashboard = false
             case .session(let id):
                 if let folder = work.agent(id)?.projectFolder { selectedProject = folder }
                 openDashboard = false
@@ -518,9 +518,9 @@ final class RemoteModel {
 
     // MARK: Starting an agent (029)
 
-    /// The project a New session sheet is open on, if one is. On the model rather than in
-    /// the page's `@State` so a launch argument can open it, and so the sheet can close
-    /// itself when the agent it started is ready to be looked at.
+    /// The project whose New session page (#366) is on screen, if one is: set by the page
+    /// while it shows, so the runtime behind its choices is held only then, and cleared
+    /// when the agent it started is ready to be looked at.
     var startingIn: URL? {
         didSet {
             guard startingIn != oldValue else { return }
@@ -534,7 +534,7 @@ final class RemoteModel {
         case failed(String)
     }
 
-    /// The runtime the sheet will start. Seeded by the kit's rule from the one it was last
+    /// The runtime the page will start. Seeded by the kit's rule from the one it was last
     /// left on (#264), as the window's start form and the page's.
     private(set) var startRuntimeID: String?
     private static let keptStartRuntime = "startRuntimeID"
@@ -554,8 +554,8 @@ final class RemoteModel {
     /// Each runtime's sandbox default, read from the Mac, for "Use runtime default (Off)".
     private(set) var sandboxSettings = SandboxSettings()
     private(set) var startChoicesState: StartChoicesState = .loading
-    /// Why the last Send did not start anything, in one sentence. Shown in the sheet
-    /// rather than as the app's alert, which a sheet would hide.
+    /// Why the last Send did not start anything, in one sentence. Shown in the page
+    /// rather than as the app's alert.
     private(set) var startRefusal: String?
     /// A start sent whose answer never came back. Its request id is reused by every
     /// retry, so the Mac answers with the agent the first one made rather than
@@ -563,14 +563,14 @@ final class RemoteModel {
     private(set) var unsettledStart: DaemonAPI.StartRequest?
     private(set) var isStarting = false
     /// Where in the project the new agent works, when not the project folder (030).
-    /// Decided per agent, so it goes back to the project folder each time the sheet
+    /// Decided per agent, so it goes back to the project folder each time the page
     /// opens and after every start.
     private(set) var startWorktree: WorktreeChoice?
-    /// What the sheet's project's repository has, for the Worktree row. Not a
+    /// What the page's project's repository has, for the Worktree row. Not a
     /// repository until the Mac says otherwise, which keeps the row hidden.
     private(set) var startWorktrees: DaemonAPI.WorktreesListResponse = .notARepository
     private var startDraftID: UUID?
-    /// The host `startDraftID` was made on: the sheet's project's (#240).
+    /// The host `startDraftID` was made on: the page's project's (#240).
     private var startDraftHost: HostID = .mac
     /// Bumped by every fetch of a runtime's choices, so an answer for a runtime the
     /// person has since moved off is recognised as that and let go.
@@ -578,7 +578,7 @@ final class RemoteModel {
 
     var startRuntime: RuntimeStatus? { startRuntimes.first { $0.runtime.id == startRuntimeID } }
 
-    /// What the sheet offers: the runtimes of the project's own host, the Mac's or a
+    /// What the page offers: the runtimes of the project's own host, the Mac's or a
     /// server's, as the window lists them (#240).
     var startRuntimes: [RuntimeStatus] { runtimes(on: startHost) }
 
@@ -586,7 +586,7 @@ final class RemoteModel {
         startRuntimes.filter(\.availability.isAvailable).map(\.runtime.id)
     }
 
-    /// What the sheet reads: the runtimes to choose from, and, for its runtime menu, what
+    /// What the page reads: the runtimes to choose from, and, for its runtime menu, what
     /// the Mac's allowances say, before it is opened rather than after whoever happens to
     /// visit the Runtimes page.
     private static let startParts: Set<CatchUpPart> = [.runtimes, .allowances, .modes, .sandbox]
@@ -602,7 +602,7 @@ final class RemoteModel {
         }
         guard startingIn == folder else { return }
         if startRuntimeID == nil || !startAvailableRuntimeIDs.contains(startRuntimeID ?? "") {
-            // The one rule (#264): the runtime this sheet was last left on, kept across launches.
+            // The one rule (#264): the runtime this page was last left on, kept across launches.
             // The list is this project's host's (#240), not every runtime the Mac knows.
             startRuntimeID = work.defaultRuntimeID(available: startAvailableRuntimeIDs,
                                                    kept: UserDefaults.standard.string(forKey: Self.keptStartRuntime))
@@ -610,7 +610,7 @@ final class RemoteModel {
         await loadStartChoices()
     }
 
-    /// Put the sheet away. Its runtime is let go; what was typed is the keeper's.
+    /// Put the page away. Its runtime is let go; what was typed is the keeper's.
     @ObservationIgnored private var startShowsParts = false
 
     private func closeStart() {
@@ -627,7 +627,7 @@ final class RemoteModel {
         startWorktree = nil
     }
 
-    /// The repository's worktrees for the sheet. Asked once when it opens, never polled.
+    /// The repository's worktrees for the page. Asked once when it opens, never polled.
     private func loadStartWorktrees(in folder: URL) async {
         let request = DaemonAPI.WorktreesListRequest(folder: folder)
         let answer = (try? await client(for: request).call(DaemonAPI.Method.worktreesList, request,
@@ -753,7 +753,7 @@ final class RemoteModel {
         discard(draft: startDraftID, on: startDraftHost)
     }
 
-    /// Not waited on: the sheet has moved on, and a Mac too old to know the method has
+    /// Not waited on: the page has moved on, and a Mac too old to know the method has
     /// nothing to be told. To the host the draft was made on (#240).
     private func discard(draft: UUID, on host: HostID) {
         let target = host == .mac ? client : otherHosts[host] ?? client
@@ -761,7 +761,7 @@ final class RemoteModel {
                                           DaemonAPI.DiscardDraftRequest(draftID: draft)) }
     }
 
-    /// Start an agent in the sheet's project. Answers whether it started, so the sheet
+    /// Start an agent in the page's project. Answers whether it started, so the page
     /// keeps what was typed when it did not.
     ///
     /// Refused here, before anything is sent, when the Mac is not answering or the
@@ -851,7 +851,7 @@ final class RemoteModel {
             }
             return false
         } catch {
-            // Out of patience too (#208): the sheet is let go, and the start is settled
+            // Out of patience too (#208): the page is let go, and the start is settled
             // when the host is back, by its `requestID`.
             startRefusal = "\((error as? HostAway).map { hostName($0.host) } ?? "Your Mac") stopped answering before it said whether the agent "
                 + "started. This will be checked when it is back."
@@ -859,7 +859,7 @@ final class RemoteModel {
         }
     }
 
-    /// - Parameter open: go to it. True when the person is waiting on the sheet; false
+    /// - Parameter open: go to it. True when the person is waiting on the page; false
     ///   when a lost answer is settled later, perhaps while they read something else,
     ///   and taking the screen from them would be the surprise.
     private func started(_ id: UUID, in folder: URL, open: Bool = true) async {
@@ -873,9 +873,7 @@ final class RemoteModel {
         startingIn = nil
         selectedProject = folder
         openWorkflow = nil
-        // A beat, so the sheet has gone before the conversation is pushed. Two
-        // presentations in one turn of the loop is not something to ask of a split view.
-        try? await Task.sleep(for: .milliseconds(400))
+        // In the start page's place, which is the detail's own: no sheet to wait out (#366).
         selection = id
     }
 
@@ -910,13 +908,13 @@ final class RemoteModel {
     // MARK: The Mac's runtimes (029)
 
     /// Every runtime the Mac knows, in the Mac's order, startable or not. The start
-    /// sheet lists the ones that cannot start too, with why, because a runtime that
+    /// page lists the ones that cannot start too, with why, because a runtime that
     /// silently is not there reads as one the phone forgot.
     private(set) var runtimes: [RuntimeStatus] = []
     private var accounts: [String: RuntimeAccount] = [:]
 
     /// Each other host's runtimes, as it last listed them (#240): a server project's
-    /// start sheet offers its server's, as the window's does (037).
+    /// start page offers its server's, as the window's does (037).
     private(set) var serverRuntimes: [HostID: [RuntimeStatus]] = [:]
 
     func runtimes(on host: HostID) -> [RuntimeStatus] {
@@ -1256,7 +1254,7 @@ final class RemoteModel {
         recipient(on: work.agent(agentID)?.host ?? .mac)
     }
 
-    /// The host of the project the start sheet is open on: where the new agent starts.
+    /// The host of the project the start page is open on: where the new agent starts.
     var startHost: HostID {
         startingIn.flatMap { work.project($0)?.host } ?? .mac
     }
@@ -1362,7 +1360,7 @@ final class RemoteModel {
             // Read off the main actor, once, and applied there (#203).
             Task.detached(priority: .userInitiated) { [weak self] in
                 for await note in notes {
-                    // Its runtimes, and the start sheet's draft made there (#240).
+                    // Its runtimes, and the start page's draft made there (#240).
                     if note.method == DaemonAPI.Notification.runtimeChanged
                         || note.method == DaemonAPI.Notification.costChanged
                         || note.method == DaemonAPI.Notification.draftOptions {
@@ -1402,7 +1400,7 @@ final class RemoteModel {
     }
 
     /// What another host says that the shared model does not claim, and the phone wants:
-    /// its runtimes changing, and the start sheet's draft settling there (#240).
+    /// its runtimes changing, and the start page's draft settling there (#240).
     private func received(_ method: String, _ params: JSONValue?, fromOther host: HostID) async {
         switch method {
         case DaemonAPI.Notification.runtimeChanged:
@@ -3091,13 +3089,8 @@ final class RemoteModel {
         }
         if let name = value("-project"),
            let summary = work.projects.first(where: { $0.name == name }) {
+            // Its page is New session (#366).
             selectedProject = summary.folder
-            // `-start` opens New session on that project: the sheet is the one screen in
-            // this app that cannot be reached by naming what to look at.
-            if arguments.contains("-start") {
-                try? await Task.sleep(for: .milliseconds(600))
-                startingIn = summary.folder
-            }
         }
         if let title = value("-agent"),
            let agent = work.agents.first(where: { $0.title == title }) {

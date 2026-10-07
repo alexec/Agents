@@ -7,8 +7,10 @@ import SwiftUI
 /// with the keyboard up the words and Send are what is in view, and the choices are a
 /// scroll away rather than behind it.
 ///
-/// Cancel keeps what was typed. It goes only when the agent it was typed for exists,
-/// which is the model's to say, not this view's: by then the sheet has gone.
+/// The project's own page (#366): what its row opens, in the detail rather than a sheet
+/// over it, as the Mac's project row opens its new-session chat. Leaving keeps what was
+/// typed. It goes only when the agent it was typed for exists, which is the model's to
+/// say, not this view's: by then the page has gone.
 struct StartAgentView: View {
     @Environment(RemoteModel.self) private var model
     let project: URL
@@ -23,49 +25,7 @@ struct StartAgentView: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        NavigationStack {
-            Form {
-                ChoiceRows()
-                Section("Reach") {
-                    ForEach(model.startFolders, id: \.self) { folder in
-                        HStack {
-                            Text(folder.path).lineLimit(1)
-                            Spacer()
-                            Button("Remove") { model.startFolders.removeAll { $0 == folder } }
-                        }
-                    }
-                    HStack {
-                        TextField("Folder path", text: $folderPath)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                        Button("Add") {
-                            let folder = URL(fileURLWithPath: (folderPath as NSString).expandingTildeInPath)
-                            if !model.startFolders.contains(folder) { model.startFolders.append(folder) }
-                            folderPath = ""
-                        }
-                        .disabled(folderPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
-                }
-                Section("Labels") {
-                    LabelTagField(labels: draftLabels.map { SessionLabel(value: $0, owner: .person) },
-                                  suggestions: model.labelSuggestions(in: project),
-                                  add: { draftLabels += $0 },
-                                  remove: { value in
-                                      draftLabels.removeAll { SessionLabelPolicy.key($0) == SessionLabelPolicy.key(value) }
-                                  })
-                }
-            }
-            .paperForm()
-            .navigationTitle(model.work.project(project)?.name ?? "New session")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { model.startingIn = nil }
-                }
-            }
-            .safeAreaInset(edge: .top, spacing: 0) { HostOfflineStrip(host: model.startHost) }
-            .safeAreaInset(edge: .bottom, spacing: 0) { promptBar }
-        }
+        form
         .onAppear {
             let kept = StartDraftKeeper.shared.draft(in: project)
             text = kept?.text ?? ""
@@ -76,7 +36,7 @@ struct StartAgentView: View {
             }
             focused = true
         }
-        // Said once, when it arrives: a refusal is the one thing on this sheet a person
+        // Said once, when it arrives: a refusal is the one thing on this page a person
         // using VoiceOver would otherwise have to go looking for.
         .onChange(of: model.startRefusal) {
             if let refusal = model.startRefusal { AccessibilityNotification.Announcement(refusal).post() }
@@ -87,8 +47,47 @@ struct StartAgentView: View {
         .onChange(of: text) { keep() }
         .onChange(of: attachments) { keep() }
         .onDisappear { StartDraftKeeper.shared.flush() }
-        // A start on a server with no key of its own asks for one here, over the sheet (#344).
+        // A start on a server with no key of its own asks for one here, over the page (#344).
         .tokenAskSheet(model)
+    }
+
+    private var form: some View {
+        Form {
+            ChoiceRows()
+            Section("Reach") {
+                ForEach(model.startFolders, id: \.self) { folder in
+                    HStack {
+                        Text(folder.path).lineLimit(1)
+                        Spacer()
+                        Button("Remove") { model.startFolders.removeAll { $0 == folder } }
+                    }
+                }
+                HStack {
+                    TextField("Folder path", text: $folderPath)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    Button("Add") {
+                        let folder = URL(fileURLWithPath: (folderPath as NSString).expandingTildeInPath)
+                        if !model.startFolders.contains(folder) { model.startFolders.append(folder) }
+                        folderPath = ""
+                    }
+                    .disabled(folderPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            Section("Labels") {
+                LabelTagField(labels: draftLabels.map { SessionLabel(value: $0, owner: .person) },
+                              suggestions: model.labelSuggestions(in: project),
+                              add: { draftLabels += $0 },
+                              remove: { value in
+                                  draftLabels.removeAll { SessionLabelPolicy.key($0) == SessionLabelPolicy.key(value) }
+                              })
+            }
+        }
+        .paperForm()
+        .navigationTitle(model.work.project(project)?.name ?? "New session")
+        .navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .top, spacing: 0) { HostOfflineStrip(host: model.startHost) }
+        .safeAreaInset(edge: .bottom, spacing: 0) { promptBar }
     }
 
     private var promptBar: some View {

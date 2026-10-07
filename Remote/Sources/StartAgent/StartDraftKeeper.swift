@@ -7,7 +7,7 @@ import Foundation
 /// The rules — what is kept, for how long, a picture too big to keep — are
 /// `DraftStore`'s, the same the Mac's window keeps by. This is only the timing, as the
 /// Mac's `DraftKeeper` is: written once typing pauses, and all of it written when the
-/// sheet goes away, so a phone put in a pocket mid-sentence loses nothing.
+/// page goes away, so a phone put in a pocket mid-sentence loses nothing.
 ///
 /// Unscoped: this app has a defaults domain of its own, so there is no Mac to write
 /// over and no scratch copy sharing it.
