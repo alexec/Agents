@@ -1042,7 +1042,9 @@ export class Store extends Work {
       void this.search({ includeArchived: true, archivedCommands: false, archivedOnly: false, lean: true,
         limit: searchShown, query: this.searchWords }, host, this.searchTurn);
     }
-    const projects = await this.link.call("projects/list", { includeArchived: false }, host).catch(failed("projects/list"));
+    // Archived ones too, as the window lists them: the sidebar folds them under Archived projects
+    // (#343), and Spending still counts what they cost.
+    const projects = await this.link.call("projects/list", { includeArchived: true }, host).catch(failed("projects/list"));
     if (projects) this.projects.value = { ...this.projects.value, [host]: projects };
     const clones = await this.link.call("projects/clones", {}, host).catch(failed("projects/clones"));
     if (clones) this.clones.value = { ...this.clones.value, [host]: clones };
@@ -1360,6 +1362,16 @@ export class Store extends Work {
    */
   async cloneProject(host: string, url: string): Promise<ProjectSummary | null> {
     const summary = await this.act("projects/clone", { url }, host);
+    if (summary) this.upsertProject(summary, host);
+    return summary;
+  }
+
+  /**
+   * An archived project brought back (#343), as the window's Bring Back does: a project again,
+   * with its Dashboard open.
+   */
+  async unarchiveProject(host: string, folder: string): Promise<ProjectSummary | null> {
+    const summary = await this.act("projects/unarchive", { folder: folder as never }, host);
     if (summary) this.upsertProject(summary, host);
     return summary;
   }

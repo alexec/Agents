@@ -91,3 +91,39 @@ test("Activity rows: spending added up by currency, headroom, out of the pool", 
   assert.equal(isOut({ runtime, availability: { missing: { lookedIn: [] } } }), false, "never in is not out");
   assert.equal(isOut({ runtime, availability: { available: { path: "/x", supportsResume: true } }, poolNote: "Out until 4pm" }), true);
 });
+
+test("Archived projects: every host's, the latest worked on first, apart from the live ones (#343)", async () => {
+  globalThis.location = { hash: "" };
+  globalThis.addEventListener = () => {};
+  try {
+    const { archivedProjects } = await load("src/views/Sidebar.tsx");
+    const project = (name, lastActivityAt, archivedAt) => ({ name, lastActivityAt,
+      project: { folder: `file:///w/${name}/`, addedAt: 0, ...(archivedAt === undefined ? {} : { archivedAt }) } });
+    const hosts = [{ id: "mac", name: "This Mac" }, { id: "box", name: "box" }];
+    const shown = archivedProjects(hosts, {
+      mac: [project("live", 50), project("old", 10, 20)],
+      box: [project("newer", 30, 40)],
+    });
+    assert.deepEqual(shown.map(({ host, project }) => `${host.id}:${project.name}`), ["box:newer", "mac:old"]);
+    assert.deepEqual(archivedProjects(hosts, { mac: [project("live", 50)] }), [], "none archived, no fold");
+  } finally {
+    delete globalThis.location;
+    delete globalThis.addEventListener;
+  }
+});
+
+test("Archived projects is closed until opened, and kept so (#343)", async () => {
+  const { Folds } = await load("src/model/folds.ts");
+  const storage = new Memory();
+  const first = new Folds(storage);
+  assert.equal(first.showsArchivedProjects.value, false, "closed by default");
+  first.setShowsArchivedProjects(true);
+  assert.equal(new Folds(storage).showsArchivedProjects.value, true);
+  first.setShowsArchivedProjects(false);
+  assert.equal(new Folds(storage).showsArchivedProjects.value, false);
+  const refusing = { getItem: () => { throw new Error("denied"); }, setItem: () => { throw new Error("quota"); } };
+  const held = new Folds(refusing);
+  assert.equal(held.showsArchivedProjects.value, false);
+  held.setShowsArchivedProjects(true);
+  assert.equal(held.showsArchivedProjects.value, true, "held for this visit");
+});

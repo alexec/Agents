@@ -2087,6 +2087,7 @@ export interface Methods {
   "projects/clone": { params: CloneRequest; result: ProjectSummary };
   "projects/clones": { params: Empty; result: CloneSummary[] };
   "projects/list": { params: ProjectsListRequest; result: ProjectSummary[] };
+  "projects/unarchive": { params: ProjectRequest; result: ProjectSummary };
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
   "runtimes/allowances": { params: string | null; result: RuntimeAllowances };
   "runtimes/list": { params: Empty; result: RuntimeStatus[] };
@@ -2182,6 +2183,7 @@ export const MethodTarget = {
   "projects/clone": "host",
   "projects/clones": "host",
   "projects/list": "host",
+  "projects/unarchive": "host",
   "runtimes/accounts": "host",
   "runtimes/allowances": "host",
   "runtimes/list": "host",

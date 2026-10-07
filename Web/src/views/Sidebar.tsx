@@ -13,7 +13,8 @@ import { actDoing, type Store } from "../model/store";
 import { folderKey, groupOf, showsUnread } from "../model/groups";
 import { folds } from "../model/folds";
 import { parseQuery, queryMatches } from "../model/labels";
-import { workflowSummary } from "../model/workflows";
+import { namedRelative, workflowSummary } from "../model/workflows";
+import { fromWireDate } from "../protocol/dates";
 import type { Agent, ControlHost, ProjectSummary } from "../protocol/generated";
 import { go, route, type ActivityPage } from "../route";
 import { browserName, type Session } from "../session";
@@ -47,9 +48,19 @@ export function projectLabel(host: ControlHost | undefined, project: ProjectSumm
 function orderedProjects(store: Store): { host: ControlHost; project: ProjectSummary }[] {
   const hosts = store.hosts.value;
   const ordered = [...hosts.filter((h) => h.id === "mac"), ...hosts.filter((h) => h.id !== "mac")];
-  return ordered.flatMap((host) => [...(store.projects.value[host.id] ?? [])]
+  return ordered.flatMap((host) => (store.projects.value[host.id] ?? [])
+    .filter((project) => project.project.archivedAt === undefined)
     .sort((a, b) => b.lastActivityAt - a.lastActivityAt)
     .map((project) => ({ host, project })));
+}
+
+/** Every host's archived projects, the latest worked on first, as the window's Archived projects (#343). */
+export function archivedProjects(hosts: ControlHost[], projects: Record<string, ProjectSummary[]>):
+  { host: ControlHost; project: ProjectSummary }[] {
+  return hosts.flatMap((host) => (projects[host.id] ?? [])
+    .filter((project) => project.project.archivedAt !== undefined)
+    .map((project) => ({ host, project })))
+    .sort((a, b) => b.project.lastActivityAt - a.project.lastActivityAt);
 }
 
 export function Sidebar({ session, store, linkDown }: { session: Session; store: Store; linkDown: boolean }) {
@@ -75,6 +86,8 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
     if (r.host && r.project && (r.session || r.workflow || r.page)) folds.set(r.host, r.project, true);
   }, [r.host, r.project, r.session, r.workflow, r.page]);
   const projects = orderedProjects(store);
+  const archived = archivedProjects(store.hosts.value, store.projects.value);
+  const showsArchived = folds.showsArchivedProjects.value;
   const offline = store.hosts.value.filter((h) => h.state !== "online");
   return (
     <nav class="sidebar" aria-label="Sidebar">
@@ -107,6 +120,17 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
           {store.hosts.value.map((host) => <CloningRows key={host.id} store={store} host={host.id} />)}
           <EmptyProjects store={store} />
         </section>
+        {/* Projects put away, under their own heading, closed until opened, as the window's (#343). */}
+        {!searched.value && archived.length > 0 && (
+          <details class="archived archived-projects" open={showsArchived}
+            onToggle={(e) => folds.setShowsArchivedProjects((e.currentTarget as HTMLDetailsElement).open)}>
+            <summary class="sidebar-head-label" data-fold="archivedProjects">Archived projects</summary>
+            {showsArchived && archived.map(({ host, project }) => (
+              <ArchivedProjectRow key={`${host.id}|${project.project.folder}`} store={store} host={host} project={project}
+                down={linkDown || !store.hostIsOnline(host.id)} />
+            ))}
+          </details>
+        )}
       </div>
       {/* What the hosts and this browser are doing, pinned at the foot: status lines rather than
           somewhere to go. Each is absent when there is nothing to say. */}
@@ -339,6 +363,30 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
     </div>
   );
 });
+
+/**
+ * An archived project, with when it was put away, and Bring Back, as the window's
+ * ArchivedProjectRow (#343). Brought back, it is a project again and its Dashboard opens.
+ */
+function ArchivedProjectRow({ store, host, project, down }: {
+  store: Store; host: ControlHost; project: ProjectSummary; down: boolean;
+}) {
+  const folder = project.project.folder;
+  const archivedAt = project.project.archivedAt;
+  const bringBack = async () => {
+    if (await store.unarchiveProject(host.id, folder)) go({ host: host.id, project: folder, dashboard: true });
+  };
+  const menu: MenuItem[] = [{ label: "Bring Back", disabled: down, run: () => void bringBack() }];
+  return (
+    <div class="row archived-project" title={folderPath(folder)}
+      onContextMenu={(e) => openContextMenu(e, menu)}>
+      <span class="title">{project.name}</span>
+      <button class="link" disabled={down} onClick={() => void bringBack()}
+        onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu); }}>Bring Back</button>
+      {archivedAt !== undefined && <span class="subtitle">Archived {namedRelative(fromWireDate(archivedAt))}</span>}
+    </div>
+  );
+}
 
 /**
  * One session's row under its project, drawn again only when the agent, whether it is chosen, or

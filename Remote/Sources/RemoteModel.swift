@@ -302,8 +302,8 @@ final class RemoteModel {
     /// cost, and a grand total that quietly dropped it would be wrong rather than tidy.
     /// The archived ones are fetched when that page opens (`loadArchivedProjects`).
     var allProjects: [DaemonAPI.ProjectSummary] {
-        let held = Set(work.projects.map(\.folder))
-        return work.projects + archivedProjects.filter { !held.contains($0.folder) }
+        let held = Set(work.projects.map(\.key))
+        return work.projects + archivedProjects.filter { !held.contains($0.key) }
     }
     /// The open project's standing arrangements.
     var workflows: [WorkflowSummary] { work.workflows(in: selectedProject) }
@@ -1990,16 +1990,54 @@ final class RemoteModel {
         return listed.count > limit
     }
 
-    /// Archived projects, for Spending only: what they cost still counts. Asked for when
-    /// that page opens.
+    /// Archived projects, as each host listed them: for the sidebar's Archived projects
+    /// (#343), and for Spending, where what they cost still counts. Asked for when either
+    /// appears, since the catch-up leaves them out.
     private(set) var archivedProjects: [DaemonAPI.ProjectSummary] = []
 
+    /// Every host's archived projects, the latest worked on first, as the window's
+    /// Archived projects (#343): those listed, less any brought back since, and any put
+    /// away since, as their hosts said.
+    var shelvedProjects: [DaemonAPI.ProjectSummary] {
+        let held = Set(work.projects.map(\.key))
+        return (work.archivedProjects + archivedProjects.filter { !held.contains($0.key) })
+            .sorted { $0.lastActivityAt > $1.lastActivityAt }
+    }
+
     func loadArchivedProjects() async {
-        guard let listed = try? await client.call(DaemonAPI.Method.projectsList,
-                                                  DaemonAPI.ProjectsListRequest(includeArchived: true),
+        let request = DaemonAPI.ProjectsListRequest(includeArchived: true)
+        guard let listed = try? await client.call(DaemonAPI.Method.projectsList, request,
                                                   returning: [DaemonAPI.ProjectSummary].self)
         else { return }
-        archivedProjects = listed.filter(\.project.isArchived)
+        var archived = listed.filter(\.project.isArchived)
+        // The control plane's other hosts that answer, each stamped as its own.
+        for host in reachableHosts.sorted(by: { $0.rawValue < $1.rawValue }) {
+            guard let other = otherHosts[host],
+                  let theirs = try? await other.call(DaemonAPI.Method.projectsList, request,
+                                                     returning: [DaemonAPI.ProjectSummary].self)
+            else { continue }
+            archived += theirs.filter(\.project.isArchived).map { var summary = $0; summary.host = host; return summary }
+        }
+        archivedProjects = archived
+    }
+
+    /// Bring an archived project back (#343), through its own host, as the window's Bring
+    /// Back does: a project again, with its Dashboard open.
+    func unarchiveProject(_ summary: DaemonAPI.ProjectSummary) async {
+        let host = summary.host
+        let target = host == .mac ? client : otherHosts[host]
+        guard let target, host == .mac || reachableHosts.contains(host) else { return }
+        do {
+            var brought = try await target.call(DaemonAPI.Method.projectsUnarchive,
+                                                DaemonAPI.ProjectRequest(folder: summary.folder),
+                                                returning: DaemonAPI.ProjectSummary.self)
+            brought.host = host
+            work.upsert(brought)
+            archivedProjects.removeAll { $0.key == summary.key }
+            sidebarItem = .project(brought.key)
+        } catch {
+            problem = sentence(for: error)
+        }
     }
 
     /// What today has cost and what the reader will allow. The phone shows limits

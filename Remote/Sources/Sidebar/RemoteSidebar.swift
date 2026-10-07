@@ -3,7 +3,8 @@ import SwiftUI
 
 /// The Mac's one sidebar, on an iPad or an iPhone (#226): Activity at the top, then every
 /// project, each a row that folds open on its pinned pages, its sessions in their groups,
-/// its archived sessions and its workflows.
+/// its archived sessions and its workflows; then the archived projects, folded, each with
+/// Bring Back (#343).
 ///
 /// The rules are the Mac's own, from `SidebarProjectFold`, `SidebarOrder` and
 /// `SidebarFolds` in AgentsKitCore: the same groups, order, pins and folds, kept the same
@@ -20,6 +21,8 @@ struct RemoteSidebar: View {
     @State private var searched = ""
     /// Projects whose every archived match is on show, past the first few (#176).
     @State private var showingAllMatches: Set<ProjectKey> = []
+    /// Archived projects, open or closed, kept as the window keeps it (#343).
+    @AppStorage("showsArchivedProjects") private var showsArchived = false
 
     private var selection: Binding<SidebarItem?> {
         Binding(get: { model.sidebarItem },
@@ -55,6 +58,21 @@ struct RemoteSidebar: View {
                                       label: SidebarOrder.label(summary) { model.hostLabel($0) },
                                       showsAllMatches: showingAllMatches.contains(summary.key),
                                       showAllMatches: { showingAllMatches.insert(summary.key) })
+                }
+            }
+
+            // Projects put away, closed until opened, as the window's (#343).
+            if !model.shelvedProjects.isEmpty, searched.isEmpty {
+                Section(isExpanded: $showsArchived) {
+                    ForEach(model.shelvedProjects, id: \.key) { summary in
+                        ArchivedProjectRow(summary: summary, isDisabled: model.isStale
+                                            || model.hostIsOffline(summary.host)) {
+                            await model.unarchiveProject(summary)
+                        }
+                        .appText(.supporting)
+                    }
+                } header: {
+                    Text("Archived projects")
                 }
             }
 
@@ -95,7 +113,15 @@ struct RemoteSidebar: View {
         .overlay {
             if model.projects.isEmpty { Waiting() }
         }
-        .refreshable { await model.catchUp() }
+        // The catch-up leaves archived projects out; they are asked for here (#343), and
+        // again once the list is pulled.
+        .task(id: model.isConnected) {
+            if model.isConnected { await model.loadArchivedProjects() }
+        }
+        .refreshable {
+            await model.catchUp()
+            await model.loadArchivedProjects()
+        }
     }
 
     /// Said once on the screen. Beside the detail on a wide iPad, the detail carries the
