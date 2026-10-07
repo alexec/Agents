@@ -32,7 +32,7 @@ description: "Tasks for #229: chat with an agent in a project the app makes"
 
 **Purpose**: no new targets or dependencies. The only setup is a test file to grow through the phases.
 
-- [ ] T001 Create `T/Integration/ChatProjectTests.swift`, a Swift Testing suite modelled on `T/Integration/ProjectsTests.swift`. It needs a helper that makes a `DaemonCore` on a temp root, with `StoreLocations.personalHome` set to a temp home folder, never `NSHomeDirectory()`. It also needs a helper with `personalHome == nil`.
+- [X] T001 Create `T/Integration/ChatProjectTests.swift`, a Swift Testing suite modelled on `T/Integration/ProjectsTests.swift`. It needs a helper that makes a `DaemonCore` on a temp root, with `StoreLocations.personalHome` set to a temp home folder, never `NSHomeDirectory()`. It also needs a helper with `personalHome == nil`.
 
 ---
 
@@ -40,16 +40,16 @@ description: "Tasks for #229: chat with an agent in a project the app makes"
 
 **Purpose**: the chat folder, the wire mark and the state. Every story needs them.
 
-- [ ] T002 In `K/Store/StoreLocations.swift`, add `public var chatFolder: URL?`: `personalHome?.appending(path: ".agents/chat", directoryHint: .isDirectory)`. Nil when `personalHome` is nil (data-model "Chat folder").
-- [ ] T003 [P] In `K/Daemon/DaemonAPI.swift`, add `public var isChat: Bool = false` to `ProjectSummary` (`:565`):
+- [X] T002 *(Done differently: `DaemonCore.chatProjectFolder()` in `AK/Daemon/DaemonCore+ChatProject.swift` resolves the home before appending, so the folder standardises the same before and after it exists; no `StoreLocations` change.)* In `K/Store/StoreLocations.swift`, add `public var chatFolder: URL?`: `personalHome?.appending(path: ".agents/chat", directoryHint: .isDirectory)`. Nil when `personalHome` is nil (data-model "Chat folder").
+- [X] T003 [P] *(Built as `isChat: Bool?`, nil on every other project, so synthesised encoding omits it.)* In `K/Daemon/DaemonAPI.swift`, add `public var isChat: Bool = false` to `ProjectSummary` (`:565`):
   - Add it to `CodingKeys`.
   - Decode it in the hand-written `init(from:)` with `decodeIfPresent(Bool.self, forKey: .isChat) ?? false`.
   - Encode it **only when true** (write an `encode(to:)`, or keep synthesised encoding if it already omits defaults). Check that one is in place.
   - Rule, verbatim from data-model: "True for exactly the one summary whose folder equals this host's chat folder. Encoded only when true, and decoded with `decodeIfPresent`."
-- [ ] T004 [P] In `K/Daemon/DaemonAPI.swift`:
+- [X] T004 [P] In `K/Daemon/DaemonAPI.swift`:
   - Add `public enum ChatProjectState: Codable, Hashable, Sendable` with the cases `ready(folder: URL)`, `archived(folder: URL)`, `noPersonalHome` and `failed(message: String)`. Encode it in the same tagged shape as `ChangesUnavailable`.
   - Add `Method.projectsChatState = "projects/chatState"` beside `projectsUnarchive` (`:193`), with an empty request.
-- [ ] T005 Create `AK/Daemon/DaemonCore+ChatProject.swift`:
+- [X] T005 Create `AK/Daemon/DaemonCore+ChatProject.swift`:
   - A stored `chatProjectState` on DaemonCore, defaulting to `.noPersonalHome`, plus `func ensureChatProject()`. It implements the data-model start-up transitions **exactly**:
 
     ```text
@@ -65,10 +65,10 @@ description: "Tasks for #229: chat with an agent in a project the app makes"
 
   - Log each outcome other than "ready, nothing changed" with `DaemonLog.shared.write("chat project: …")`.
   - Depends on T002 and T004.
-- [ ] T006 In `AK/Daemon/Daemon.swift`, call `await core.ensureChatProject()` right after `await core.reconcileHome()` (`:145`), before `core.recover()`. This file is shared by the Mac and Linux daemons (research R1, FR-006).
-- [ ] T007 In `AK/Daemon/DaemonCore+Projects.swift`, in `allProjects(includeArchived:)` (`:29`), set `isChat = true` on the one summary whose `project.folder == Project.standardize(locations.chatFolder)`. Do nothing when `chatFolder` is nil. Depends on T002 and T003.
-- [ ] T008 In `AK/Daemon/DaemonCore+Dispatch.swift`, handle `DaemonAPI.Method.projectsChatState` beside `projectsUnarchive` (`:205`). Return the current `chatProjectState`, re-derived cheaply: a record that became archived or unarchived since start answers `archived` or `ready`.
-- [ ] T009 Regenerate `Web/src/protocol/generated.ts` with `scripts/web.sh types`. Check that `isChat?: boolean` and the `ChatProjectState` union appear. Don't hand-edit the file.
+- [X] T006 In `AK/Daemon/Daemon.swift`, call `await core.ensureChatProject()` right after `await core.reconcileHome()` (`:145`), before `core.recover()`. This file is shared by the Mac and Linux daemons (research R1, FR-006).
+- [X] T007 In `AK/Daemon/DaemonCore+Projects.swift`, in `allProjects(includeArchived:)` (`:29`), set `isChat = true` on the one summary whose `project.folder == Project.standardize(locations.chatFolder)`. Do nothing when `chatFolder` is nil. Depends on T002 and T003.
+- [X] T008 In `AK/Daemon/DaemonCore+Dispatch.swift`, handle `DaemonAPI.Method.projectsChatState` beside `projectsUnarchive` (`:205`). Return the current `chatProjectState`, re-derived cheaply: a record that became archived or unarchived since start answers `archived` or `ready`.
+- [X] T009 Regenerate `Web/src/protocol/generated.ts` with `scripts/web.sh types`. Check that `isChat?: boolean` and the `ChatProjectState` union appear. Don't hand-edit the file.
 
 **Checkpoint**: the daemon makes and marks the chat project. The clients don't use it yet.
 
@@ -82,21 +82,21 @@ description: "Tasks for #229: chat with an agent in a project the app makes"
 
 ### Tests
 
-- [ ] T010 [P] [US1] In `T/Integration/ChatProjectTests.swift`, add these tests:
+- [X] T010 [P] [US1] In `T/Integration/ChatProjectTests.swift`, add these tests:
   - **noPersonalHomeMakesNothing**: with no home, no folder is made and no record is written, and `chatProjectState == .noPersonalHome`.
   - **freshHomeMakesAndMarks**: the folder exists with `.agents/` and `AGENTS.md`, there is exactly one record, and `allProjects()` has exactly one `isChat` summary, named `chat`.
   - **secondStartChangesNothing**: snapshot the contents and modification dates of every file under the chat folder, run `ensureChatProject()` again, and compare them.
   - **handMadeFolderIsAdopted**: an existing folder with a file in it and no record is laid out, and the file is untouched.
-- [ ] T011 [P] [US1] In `T/PersonalDotAgentsTests.swift`, add a test: a reconcile with `<home>/.agents/chat/.agents/skills/x` present leaves `chat/` and everything under it untouched (research R5).
+- [X] T011 [P] [US1] In `T/PersonalDotAgentsTests.swift`, add a test: a reconcile with `<home>/.agents/chat/.agents/skills/x` present leaves `chat/` and everything under it untouched (research R5).
 
 ### Implementation
 
-- [ ] T012 [US1] In `App/Sources/AppModel.swift`, add `func chatProjectKey(on host: HostID) -> ProjectKey?`. It returns the key of the summary with `isChat` on that host, or nil.
-- [ ] T013 [US1] In `App/Sources/Commands/AgentsCommands.swift`, inside `CommandGroup(replacing: .newItem)` (`:58`) after New Session in a Worktree:
+- [X] T012 [US1] In `App/Sources/AppModel.swift`, add `func chatProjectKey(on host: HostID) -> ProjectKey?`. It returns the key of the summary with `isChat` on that host, or nil.
+- [X] T013 [US1] In `App/Sources/Commands/AgentsCommands.swift`, inside `CommandGroup(replacing: .newItem)` (`:58`) after New Session in a Worktree:
   - Add **New Chat** with `.keyboardShortcut("n", modifiers: [.command, .shift])`. It calls `model.showProject(key)` for `chatProjectKey(on: .mac)` (`AppModel.swift:337`), then `requests.focusPrompt()`.
   - When the key is nil, keep it enabled. Ask `projects/chatState` and show the reason in a sheet or alert, with **Unarchive** for `archived` (existing `projects/unarchive`) (FR-011).
-- [ ] T014 [US1] In `App/Sources/Projects/ProjectListView.swift`, add **New Chat** as the first item of the sidebar's + (New project) menu, with the same action as T013.
-- [ ] T015 [US1] In `specs/071-web-remote/walks/parity.md`, add a row "New Chat (#229)" after the "Clicking a project row (#366)" row (`:54`). Fill the Mac cell from T013–T014, and mark web and remote "to come (#229 US4)" until those tasks land.
+- [X] T014 [US1] In `App/Sources/Projects/ProjectListView.swift`, add **New Chat** as the first item of the sidebar's + (New project) menu, with the same action as T013.
+- [X] T015 [US1] In `specs/071-web-remote/walks/parity.md`, add a row "New Chat (#229)" after the "Clicking a project row (#366)" row (`:54`). Fill the Mac cell from T013–T014, and mark web and remote "to come (#229 US4)" until those tasks land.
 
 **Checkpoint**: on a scratch root with a scratch home, ⇧⌘N starts a chat in `<home>/.agents/chat`. This is the MVP.
 
@@ -108,7 +108,7 @@ description: "Tasks for #229: chat with an agent in a project the app makes"
 
 **Independent Test**: quickstart section 1, `AGENTS.md` sentence. Chat A writes a file and is archived and retired, then chat B reads it.
 
-- [ ] T016 [US2] In `AK/Projects/DotAgents.swift`, give `routerContents(for:)` (`:150`) a `chat: Bool = false` parameter. When true, add this before `## Context routing`:
+- [X] T016 [US2] In `AK/Projects/DotAgents.swift`, give `routerContents(for:)` (`:150`) a `chat: Bool = false` parameter. When true, add this before `## Context routing`:
 
   ```text
   ## This folder
@@ -117,12 +117,12 @@ description: "Tasks for #229: chat with an agent in a project the app makes"
   ```
 
   Thread `chat:` through `apply(to:from:)` (`:79`).
-- [ ] T017 [US2] In `AK/Daemon/DaemonCore+Projects.swift`, add a `layOutOnce(_:chat:)` overload, or a parameter on `layOutOnce` (`:298`), that passes `chat` to `DotAgents.apply`. `ensureChatProject` (T005) uses it. Every other caller is unchanged.
+- [X] T017 [US2] In `AK/Daemon/DaemonCore+Projects.swift`, add a `layOutOnce(_:chat:)` overload, or a parameter on `layOutOnce` (`:298`), that passes `chat` to `DotAgents.apply`. `ensureChatProject` (T005) uses it. Every other caller is unchanged.
 - [ ] T018 [P] [US2] In `T/Integration/ChatProjectTests.swift`, add these tests:
   - **agentsMdNamesTheSharedFolder**: the first layout's `AGENTS.md` contains the sentence.
   - **editedAgentsMdIsLeft**: delete the sentence, run `ensureChatProject()` again, and the sentence is not back.
   - **fileOutlivesRetire**: start an echo agent in the chat project, write a file into the folder, archive the agent and retire it (`retire(_:because:)`, `AK/Daemon/DaemonCore+Retention.swift:407`), and the file is still there.
-- [ ] T019 [P] [US2] In `T/DotAgentsTests.swift`, add a test: `routerContents(for:chat: false)` is byte-for-byte what it was, so existing projects are unaffected (FR-014).
+- [X] T019 [P] [US2] In `T/DotAgentsTests.swift`, add a test: `routerContents(for:chat: false)` is byte-for-byte what it was, so existing projects are unaffected (FR-014).
 
 ---
 
@@ -166,7 +166,7 @@ description: "Tasks for #229: chat with an agent in a project the app makes"
 
 ### Mac servers
 
-- [ ] T028 [US4] In `App/Sources/Commands/AgentsCommands.swift`, when `AppModel` has an `isChat` summary on any server, add a **New Chat on ▸** submenu after New Chat (T013), with one item per host that has one. Each calls `showProject` with that host's key.
+- [X] T028 [US4] In `App/Sources/Commands/AgentsCommands.swift`, when `AppModel` has an `isChat` summary on any server, add a **New Chat on ▸** submenu after New Chat (T013), with one item per host that has one. Each calls `showProject` with that host's key.
 
 ---
 

@@ -143,6 +143,9 @@ public final class Daemon: @unchecked Sendable {
         #endif
         // The person's `~/.agents`, laid out before anything is picked up (054).
         await core.reconcileHome()
+        // The chat project (#229), after the home it lives in and before recovery, so it
+        // is listed before any client asks.
+        await core.ensureChatProject()
         // An add the last daemon died in the middle of is undone before anyone looks (059).
         #if canImport(CryptoKit)
         await core.recoverCatalog()

@@ -306,6 +306,9 @@ public actor DaemonCore {
     /// its last agent, a record or a tombstone (#204). Every project-wide call used to
     /// make the set again for each project it summarised.
     var projectIndexCache: ProjectIndex?
+    /// Why the chat project could not be made at start (#229), in a sentence; nil when it
+    /// was, or when there was nothing to make. See `DaemonCore+ChatProject`.
+    var chatProjectFailure: String?
     /// Whether each project's folder was there when last looked (#204), so a list of 500
     /// projects is not 500 stats. Dropped for a folder when its watch hears anything, and
     /// old after `folderExistenceFresh` for the moves a watch never hears.

@@ -178,12 +178,30 @@ struct ProjectListView: View {
                 } label: {
                     Label("New project", systemImage: "folder.badge.plus")
                 }
-                .help("Add Folder…, or Clone Git URL…, as a project")
+                .help("New Chat, or Add Folder… or Clone Git URL… as a project")
             }
         }
         .fileImporter(isPresented: $isChoosingFolder, allowedContentTypes: [.folder]) { result in
             guard case .success(let folder) = result else { return }
             Task { await model.addProject(folder) }
+        }
+        // New Chat found no chat project to open (#229): why, and Unarchive when that is it.
+        .alert("No chat project", isPresented: Binding(
+            get: { model.chatProblem != nil }, set: { if !$0 { model.chatProblem = nil } }),
+            presenting: model.chatProblem) { problem in
+            if problem.archived != nil {
+                Button("Unarchive") {
+                    Task {
+                        await model.unarchiveChatProject(problem)
+                        requests.focusPrompt()
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } else {
+                Button("OK", role: .cancel) {}
+            }
+        } message: { problem in
+            Text(problem.message)
         }
         .sheet(isPresented: $isCloning) { CloneSheet(host: targetHost).paperSheet() }
         .sheet(isPresented: $isChoosingServerFolder) { RemoteFolderSheet(host: targetHost).paperSheet() }
@@ -272,6 +290,11 @@ struct ProjectListView: View {
 
     @ViewBuilder
     private func newProjectItems(on host: HostID) -> some View {
+        // A chat in the host's own chat project (#229): no folder to choose.
+        Button("New Chat") {
+            Task { if await model.newChat(on: host) { requests.focusPrompt() } }
+        }
+        Divider()
         Button("Add Folder…") {
             targetHost = host
             if model.isOnThisMac(host) { isChoosingFolder = true } else { isChoosingServerFolder = true }
