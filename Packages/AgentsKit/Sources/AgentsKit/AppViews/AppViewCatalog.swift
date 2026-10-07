@@ -132,6 +132,7 @@ public enum AppViewCatalog {
     p{margin:6px 0;overflow-wrap:anywhere}.value{font-size:24px;font-weight:600}.tile-actions{display:flex;gap:4px;flex-wrap:wrap;margin-top:10px}.tile-actions button{font-size:12px;padding:3px 6px}
     small{opacity:.65}table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:6px;border-bottom:1px solid color-mix(in srgb,CanvasText 12%,transparent)}
     svg{width:100%;height:36px}a{color:LinkText}pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto}
+    .page{display:block;max-height:300px;overflow:auto}.page h1,.page h2,.page h3{font-size:15px;text-transform:none;opacity:1;margin:10px 0 4px}.page ul,.page ol{margin:6px 0;padding-left:22px}code{font:12px ui-monospace,monospace}
     .light{display:inline-block;width:9px;height:9px;border-radius:50%;background:#888}.light.ok{background:#248a53}.light.warn{background:#d38b00}.light.bad{background:#cb3946}
     dialog{color:CanvasText;background:Canvas;border:1px solid color-mix(in srgb,CanvasText 25%,transparent);border-radius:12px;max-width:min(90vw,560px)}
     dialog::backdrop{background:#0008}dt{font-weight:600}dd{margin:0 0 10px}a,button{touch-action:manipulation}
@@ -162,12 +163,65 @@ public enum AppViewCatalog {
         try {
           const answer = await request("tools/call", { name: "dashboard_action", arguments: { action: name, id, ...extra } });
           if (answer.isError) throw new Error(answer.content?.[0]?.text || "Action failed");
-          if (name === "read_page") return answer.structuredContent?.text || "";
+          if (name === "read_page") return answer.structuredContent || null;
         } catch (e) { document.querySelector("#error").textContent = e.message || String(e); }
       };
       const button = (label, actionName, id, extra = "") => `<button type="button" data-action="${actionName}" data-id="${esc(id)}" ${extra}>${label}</button>`;
       const date = (value) => { const d = at(value); return d ? d.toLocaleString() : "unknown"; };
-      const markdown = (text) => esc(text).replace(/\\*\\*([^*]+)\\*\\*/g, "<strong>$1</strong>").replace(/\\n/g, "<br>");
+      // Inline Markdown, as a note is drawn natively: code, bold, italic and links that are http, https or mailto.
+      const inline = (text) => esc(text).replace(/`([^`]+)`/g, "<code>$1</code>")
+        .replace(/\\*\\*([^*]+)\\*\\*/g, "<strong>$1</strong>").replace(/\\*([^*]+)\\*/g, "<em>$1</em>")
+        .replace(/\\[([^\\]]+)\\]\\(([^)\\s]+)\\)/g, (whole, words, target) => {
+          const url = safeURL(target.replace(/&amp;/g, "&"));
+          return url ? `<a href="${esc(url)}">${words}</a>` : whole;
+        });
+      const markdown = (text) => inline(text).replace(/\\n/g, "<br>");
+      // A Markdown page: headings, lists, fenced code and paragraphs.
+      const markdownPage = (text) => {
+        const out = []; let list = null, code = null, para = [];
+        const endPara = () => { if (para.length) out.push(`<p>${para.map(inline).join("<br>")}</p>`); para = []; };
+        const endList = () => { if (list) out.push(`</${list}>`); list = null; };
+        for (const line of String(text).split("\\n")) {
+          if (code !== null) {
+            if (/^\\s*```/.test(line)) { out.push(`<pre>${esc(code.join("\\n"))}</pre>`); code = null; } else code.push(line);
+            continue;
+          }
+          if (/^\\s*```/.test(line)) { endPara(); endList(); code = []; continue; }
+          const heading = /^(#{1,6})\\s+(.*)$/.exec(line);
+          const item = /^\\s*(?:([-*+])|\\d+[.)])\\s+(.*)$/.exec(line);
+          if (heading) { endPara(); endList(); const level = Math.min(heading[1].length, 3); out.push(`<h${level}>${inline(heading[2])}</h${level}>`); }
+          else if (item) { endPara(); const kind = item[1] ? "ul" : "ol"; if (list !== kind) { endList(); out.push(`<${kind}>`); list = kind; } out.push(`<li>${inline(item[2])}</li>`); }
+          else if (!line.trim()) { endPara(); endList(); }
+          else { endList(); para.push(line); }
+        }
+        if (code !== null) out.push(`<pre>${esc(code.join("\\n"))}</pre>`);
+        endPara(); endList();
+        return out.join("");
+      };
+      // An HTML page, drawn with no scripts and nothing from outside (#329), as the native
+      // tile draws it. The view's policy already blocks the network and allows inline
+      // script for the view itself, so the page's own scripts, handlers and loads go here.
+      const cleanHTML = (text) => {
+        const doc = new DOMParser().parseFromString(String(text), "text/html");
+        doc.querySelectorAll("script,noscript,template,iframe,frame,frameset,object,embed,applet,link,meta,base,form,portal,animate,set,animatetransform,animatemotion").forEach((n) => n.remove());
+        for (const el of doc.querySelectorAll("*")) for (const a of [...el.attributes]) {
+          const name = a.name.toLowerCase();
+          if (name.startsWith("on") || ["srcset", "srcdoc", "action", "formaction", "ping", "background", "poster", "data", "codebase"].includes(name)) el.removeAttribute(a.name);
+          else if ((name === "href" || name === "xlink:href") && !safeURL(a.value)) el.removeAttribute(a.name);
+          else if (name === "src" && !/^data:image\\//i.test(a.value.trim())) el.removeAttribute(a.name);
+          else if (name === "style" && /url\\s*\\(|expression\\s*\\(/i.test(a.value)) el.removeAttribute(a.name);
+        }
+        for (const style of doc.querySelectorAll("style")) style.textContent = style.textContent.replace(/@import[^;]*;?/gi, "").replace(/url\\s*\\([^)]*\\)/gi, "none");
+        return [...doc.querySelectorAll("head style")].map((x) => x.outerHTML).join("") + doc.body.innerHTML;
+      };
+      const pages = new Map();
+      const drawPage = (id) => {
+        const place = document.getElementById(`page-${id}`), page = pages.get(id); if (!place || !page) return;
+        if (page.kind === "html") {
+          const shadow = place.shadowRoot || place.attachShadow({ mode: "open" });
+          shadow.innerHTML = `<style>:host{display:block;max-height:300px;overflow:auto}a{color:LinkText}img{max-width:100%}</style>${cleanHTML(page.text)}`;
+        } else place.innerHTML = page.text ? markdownPage(page.text) : "<p>This page is unavailable.</p>";
+      };
       const refreshUpdate = (data) => {
         const lastStart = at(data?.update?.lastStartedAt);
         update.disabled = !data?.update || data.update.isRunning || !!data.update.blocked ||
@@ -235,7 +289,7 @@ public enum AppViewCatalog {
               : link.file ? button(`${esc(link.file)} →`, "open_page", v.id) : "";
             break;
           }
-          case "page": body = `<p class="small">${esc(t.page?.file || "")}</p><pre id="page-${esc(v.id)}">Reading…</pre>${button("Open", "open_page", v.id)}`; break;
+          case "page": body = `<p class="small">${esc(t.page?.file || "")}</p><div class="page" id="page-${esc(v.id)}">Reading…</div><p>${button("Open", "open_page", v.id)}</p>`; break;
         }
         const wide = ["table", "note", "page"].includes(t.type) ? "wide" : "";
         const seconds = set ? Math.max(0, Math.floor((now - set) / 1000)) : null;
@@ -246,7 +300,8 @@ public enum AppViewCatalog {
         return `<article class="${wide} ${stale ? "stale" : ""}"><header><h3>${esc(t.title)}${t.hidden ? " (hidden)" : ""}</h3>${button("Details", "details", v.id)}</header>${body}<small>${esc(v.keeper?.name || "nobody")} · ${esc(age)}</small><div class="tile-actions">${button("Keeper", "open_keeper", v.id, !v.keeper?.id ? "disabled" : "")}${button("↑", "move", v.id, index === 0 ? "disabled" : "data-step='-1'")}${button("↓", "move", v.id, index === count - 1 ? "disabled" : "data-step='1'")}${button(t.hidden ? "Show" : "Hide", t.hidden ? "show" : "hide", v.id)}${sections.length > 1 ? `<select data-id="${esc(v.id)}" aria-label="Move to section"><option value="">Move to section…</option>${sections.filter((x) => x !== currentSection).map((x) => `<option value="${esc(x || "__none__")}">${esc(x || "No section")}</option>`).join("")}</select>` : ""}${button("Remove", "remove", v.id)}</div></article>`;
       }
       root.addEventListener("click", async (event) => {
-        const link = event.target.closest("a[href]");
+        // A link inside an HTML page is in its shadow root: the path crosses into it.
+        const link = event.composedPath().find((n) => n instanceof Element && n.matches("a[href]"));
         if (link) { event.preventDefault(); await request("ui/open-link", { url: link.href }); return; }
         const button = event.target.closest("button[data-action]"); if (!button) return;
         const id = button.dataset.id, name = button.dataset.action;
@@ -268,10 +323,15 @@ public enum AppViewCatalog {
         const select = event.target.closest("select[data-id]");
         if (select && select.value !== "") await action("move", select.dataset.id, { section: select.value === "__none__" ? "" : select.value });
       });
+      // Read again with every result: the host says the result again when a page tile's
+      // file changes (its `_meta`), so an open view shows the page live.
       const loadPages = async () => {
         for (const v of latest?.tiles || []) if (v.tile?.type === "page") {
-          const place = document.getElementById(`page-${v.id}`); if (!place) continue;
-          place.textContent = await action("read_page", v.id) || "This page is unavailable.";
+          drawPage(v.id);
+          if (!document.getElementById(`page-${v.id}`)) continue;
+          const read = await action("read_page", v.id);
+          pages.set(v.id, read ? { text: read.text || "", kind: read.kind } : { text: "", kind: "markdown" });
+          drawPage(v.id);
         }
       };
       update.onclick = () => action("update");

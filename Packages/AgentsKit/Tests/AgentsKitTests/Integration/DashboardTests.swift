@@ -98,6 +98,64 @@ struct DashboardTests {
         } throws: { ($0 as? JSONRPCError)?.code == DaemonAPI.Failure.dashboardRefused }
     }
 
+    /// Each of the view's own actions (#329), on a Dashboard with no conversation open: what
+    /// it changes on disk, where it says to go, and what a page tile reads as.
+    @Test func everyViewActionActsOnTheProjectsTilesAndNeverTheirValues() async throws {
+        let s = try await setUp([("Lead", false, nil, .finished)])
+        let lead = s.ids["Lead"]!
+        try FileManager.default.createDirectory(at: s.project.appending(path: "docs"), withIntermediateDirectories: true)
+        try Data("<p onclick=\"x()\">Live</p>".utf8).write(to: s.project.appending(path: "docs/status.html"))
+        try Data("# Plan\n- one".utf8).write(to: s.project.appending(path: "docs/plan.md"))
+        _ = try await set(s, "Lead", number("open_bugs", 4))
+        _ = try await set(s, "Lead", status("ci", section: "Quality"))
+        _ = try await set(s, "Lead", ["id": "page_html", "title": "Status", "type": "page", "file": "docs/status.html"])
+        _ = try await set(s, "Lead", ["id": "page_md", "title": "Plan", "type": "page", "file": "docs/plan.md"])
+        _ = try await set(s, "Lead", ["id": "lead", "title": "Lead", "type": "link", "session": .string(lead.uuidString)])
+        _ = try await set(s, "Lead", ["id": "gone", "title": "Gone", "type": "status", "level": "ok", "line": "x"])
+        let place = UUID(), view = UUID()
+        func act(_ arguments: JSONValue) async throws -> JSONValue {
+            try await s.core.callFromView(.init(agentID: place, viewID: view, name: "dashboard_action",
+                                                arguments: arguments, project: s.project))
+        }
+
+        // Move, a step and to a section: the arrangement changes, the tile's file does not.
+        let before = try Data(contentsOf: file(s, "ci"))
+        let quality = await shown(s).first { $0.hasPrefix("Quality:") } ?? ""
+        let first = quality.contains("Quality: ci") ? "ci" : "open_bugs", second = first == "ci" ? "open_bugs" : "ci"
+        _ = try await act(["action": "move", "id": .string(first), "step": 1])
+        #expect(await shown(s).contains("Quality: \(second) \(first)"))
+        _ = try await act(["action": "move", "id": "ci", "section": ""])
+        #expect(await shown(s).contains { $0.hasPrefix("-:") && $0.contains("ci") })
+        #expect(try Data(contentsOf: file(s, "ci")) == before)
+        await #expect {
+            _ = try await act(["action": "move", "id": "ci", "section": "Nowhere"])
+        } throws: { ($0 as? JSONRPCError)?.code == DaemonAPI.Failure.dashboardRefused }
+
+        // Open Keeper and a link say where to go; the client goes there.
+        let keeper = try await act(["action": "open_keeper", "id": "open_bugs"])
+        #expect(keeper["structuredContent"]?["open"] == ["kind": "agent", "id": .string(lead.uuidString)])
+        let link = try await act(["action": "open_link", "id": "lead", "kind": "agent"])
+        #expect(link["structuredContent"]?["open"]?["id"]?.stringValue == lead.uuidString)
+        let open = try await act(["action": "open_page", "id": "page_md"])
+        #expect(open["structuredContent"]?["open"] == ["kind": "page", "id": "docs/plan.md"])
+
+        // A page tile reads with its kind, so the view draws HTML as a page and Markdown as text.
+        let html = try await act(["action": "read_page", "id": "page_html"])
+        #expect(html["structuredContent"]?["kind"] == "html")
+        #expect(html["structuredContent"]?["text"]?.stringValue?.contains("Live") == true)
+        #expect(try await act(["action": "read_page", "id": "page_md"])["structuredContent"]?["kind"] == "markdown")
+
+        // Remove takes the tile's file away. Update now starts an update, and again at once is refused.
+        _ = try await act(["action": "remove", "id": "gone"])
+        #expect(!FileManager.default.fileExists(atPath: file(s, "gone").path))
+        _ = try await act(["action": "update"])
+        #expect(await s.core.dashboardUpdate(s.project).lastStartedAt != nil)
+        await #expect { _ = try await act(["action": "update"]) } throws: {
+            ($0 as? JSONRPCError)?.code == DaemonAPI.Failure.dashboardRefused
+        }
+        #expect(try TileFile.read(Data(contentsOf: file(s, "open_bugs"))).number?.value == 4)
+    }
+
     // MARK: US1
 
     @Test func aSetWritesTheProjectFileAndTheSnapshotShowsIt() async throws {

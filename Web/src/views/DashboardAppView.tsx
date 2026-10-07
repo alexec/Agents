@@ -11,9 +11,12 @@ import { ViewLayer, type ViewActions } from "./chat/viewLayer";
 
 const dashboardURI = "ui://agents/dashboard";
 
-function dashboardCall(id: UUID, snapshot: DashboardSnapshot | undefined): AppViewCall {
+/** The host-made call. A page tile's file changing bumps `pageRevision`, so the result is said
+ * again and the view reads its pages afresh (#329). */
+export function dashboardCall(id: UUID, snapshot: DashboardSnapshot | undefined, pageRevision = 0): AppViewCall {
   const result: JSONValue | undefined = snapshot
-    ? { content: [{ type: "text", text: "Dashboard" }], structuredContent: snapshot as unknown as JSONValue }
+    ? { content: [{ type: "text", text: "Dashboard" }], structuredContent: snapshot as unknown as JSONValue,
+        _meta: { "agents/pageRevision": pageRevision } }
     : undefined;
   return {
     id, server: "agents", tool: "read_dashboard", resourceUri: dashboardURI,
@@ -45,7 +48,7 @@ export function DashboardAppView({ store, host, folder, down }: {
     call: (method, params) => store.link.call(method, params as never, host) as Promise<unknown>,
     send: async () => false,
   }), [id, host, store]);
-  const call = dashboardCall(id, snapshot);
+  const call = dashboardCall(id, snapshot, store.pageRevisions.value[key] ?? 0);
   const frame = useRef<HTMLDivElement>(null);
   useEffect(() => () => { void layer.tearDownAll("The Dashboard was closed."); }, [layer]);
   useEffect(() => () => layer.stop(), [layer]);

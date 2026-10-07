@@ -232,9 +232,12 @@ extension DaemonCore {
             guard let tile, let file = tile.tile?.page?.file else {
                 throw dashboardRefusal("This tile has no page to read.")
             }
+            // Its kind says how the view draws it: HTML as a page with no scripts, Markdown
+            // as text, as the native tile does (#159).
             switch try readPage(.init(folder: project, path: file)) {
             case .text(let text, _, _, _):
-                return result("Page read.", extra: ["text": .string(text)])
+                let kind = PinRules.kind(file) == .html ? "html" : "markdown"
+                return result("Page read.", extra: ["text": .string(text), "kind": .string(kind)])
             default: throw dashboardRefusal("This page cannot be shown as text.")
             }
         default:

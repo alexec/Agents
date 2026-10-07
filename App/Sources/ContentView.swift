@@ -103,6 +103,7 @@ struct ContentView: View {
                     folder: folder,
                     snapshot: model.dashboard(in: folder),
                     revision: model.dashboardRevision(in: folder),
+                    pageRevision: model.pageRevision(in: folder),
                     call: { method, params in
                         try await model.client(for: summary.host).call(method, params)
                     },

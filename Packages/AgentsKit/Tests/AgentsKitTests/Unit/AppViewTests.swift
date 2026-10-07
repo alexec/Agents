@@ -47,6 +47,18 @@ struct AppViewTests {
         #expect(policy.logLine.hasPrefix("strict (no network); refused"))
     }
 
+    /// The Dashboard declares nothing, so it and its page tiles are drawn with no network and
+    /// no frames (#329), and its tool for actions is the view's alone.
+    @Test func theDashboardIsDrawnUnderTheStrictPolicy() throws {
+        let dashboard = try #require(AppViewCatalog.resource(AppViewCatalog.dashboardURI, testView: false))
+        let policy = AppViewPolicy(csp: dashboard.meta?["ui"]?["csp"])
+        #expect(policy.header == AppViewPolicy.strict.header)
+        #expect(policy.logLine == "strict (no network)")
+        #expect(policy.header.contains("connect-src 'none'") && policy.header.contains("frame-src 'none'"))
+        let action = try #require(AppViewCatalog.tools(testView: false).first { $0.name == "dashboard_action" })
+        #expect(action.forApp && !action.forModel && !action.feedsPins)
+    }
+
     @Test func theContentRulesBlockAllButTheDeclaredOrigins() throws {
         let policy = AppViewPolicy(csp: ["connectDomains": ["https://api.example.com"],
                                          "resourceDomains": ["https://*.cdn.example.net"]])
@@ -172,6 +184,10 @@ struct AppViewTests {
         #expect(again.map { $0["method"]?.stringValue } == ["ui/notifications/tool-result"])
         #expect(again.first?["params"]?["structuredContent"] == ["a": 2])
         #expect(feed.due(call).isEmpty)
+
+        // A page tile's file changing changes only the result's `_meta` (#329): said again too.
+        call.result = ["content": [], "structuredContent": ["a": 2], "_meta": ["agents/pageRevision": 1]]
+        #expect(feed.due(call).map { $0["method"]?.stringValue } == ["ui/notifications/tool-result"])
 
         var cancelled = AppViewCall(tool: "t", resourceURI: "ui://a", state: .cancelled, reason: "Stopped.")
         var late = AppViewFeed()

@@ -196,6 +196,7 @@ struct RemoteView: View {
                 folder: model.selectedProject ?? URL(fileURLWithPath: "/"),
                 snapshot: model.selectedProject.flatMap { model.work.dashboards[Project.standardize($0)] },
                 revision: model.work.dashboardRevision(in: model.selectedProject),
+                pageRevision: model.work.pageRevision(in: model.selectedProject),
                 call: { method, params in try await model.viewCall(method, params) },
                 refresh: {
                     if let folder = model.selectedProject { await model.refreshDashboard(folder) }

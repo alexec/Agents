@@ -12,6 +12,9 @@ struct ProjectDashboardView: View {
     let snapshot: DashboardSnapshot?
     /// Bumps when the host says the Dashboard changed, so the page asks again.
     var revision: Int
+    /// Bumps when a page tile's file changes (`pages/changed`): the result is said again,
+    /// so the view reads its pages afresh (#329).
+    var pageRevision: Int = 0
     var call: @MainActor (String, JSONValue) async throws -> JSONValue
     var refresh: @MainActor () async -> Void
     var openTarget: @MainActor (String, String) -> Void
@@ -46,6 +49,7 @@ struct ProjectDashboardView: View {
             call.result = [
                 "content": [["type": "text", "text": "Dashboard"]],
                 "structuredContent": structured,
+                "_meta": ["agents/pageRevision": .int(pageRevision)],
             ]
         }
         return call

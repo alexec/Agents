@@ -76,6 +76,19 @@ host a chat uses for a tool's view. The page makes the call itself, so no conver
 to be open. The tiles stay files in `.agents/dashboard/`. Keepers and `take_over` are
 unchanged. **Update now** stays on the page, beside the view.
 
+- **Its actions.** Update now, Hide and Show, Remove, Move (a step, or to another section),
+  Open Keeper and Details. The view calls `dashboard_action`, which only a view may call, on
+  the project the page is for (#329): no conversation is needed. A person may hide, move or
+  remove any tile, but no action changes a tile's value.
+- **Its tiles.** All six kinds, as the native tiles draw them: a number with its trend, a
+  status, a table with linked cells, a note, a link, and a page. A page tile draws an HTML
+  page as a page and a Markdown page as text. The page's scripts, event handlers, frames
+  and anything it would load from outside are taken out before it is drawn, and the view's
+  strict policy would block the loads anyway, so a page's own pictures and styles files
+  don't show here either.
+- **Live.** When a tile, its order or a page tile's file changes, the host gives the open
+  view its result again, and the view redraws: nothing polls.
+
 ## Pinning a view
 
 A view can be pinned under a project, beside its Dashboard and pinned pages, on the Mac,
