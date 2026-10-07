@@ -16,6 +16,8 @@ struct ElicitationView: View {
     @State private var step = 0
     /// How tall the question on each page wants to be, measured rather than guessed.
     @State private var questionHeights: [Int: CGFloat] = [:]
+    /// How tall a one-click question's choices want to be, measured the same way.
+    @State private var choicesHeight: CGFloat?
     /// Which answer was given, while it is on the way. The card is held meanwhile, so
     /// a double click or a repeated ⌘1 is not a second answer, and the button that
     /// sent it says so. Put back if it did not go (#86).
@@ -187,6 +189,11 @@ struct ElicitationView: View {
     /// long diff and the command list keep.
     private static let questionCap: CGFloat = 260
 
+    /// As tall as a one-click question's choices may get before they scroll: a little
+    /// more than a page's question, because the choices are all there is to read, but
+    /// short enough that the card and the prompt bar fit a window of ordinary height.
+    private static let choicesCap: CGFloat = 320
+
     private func turn(to page: Int, _ symbol: String, _ label: String, enabled: Bool) -> some View {
         Button { step = page } label: { Image(systemName: symbol) }
             .buttonStyle(.paper)
@@ -263,12 +270,12 @@ struct ElicitationView: View {
                         chosen: Bool, index: Int = 0, choose: @escaping () -> Void) -> some View {
         if chosen {
             Button(action: choose) { optionLabel(title, description) }
-                .buttonStyle(.paperProminent)
+                .buttonStyle(.paperProminentCard)
                 .modifier(ElicitationNumberShortcut(index: index))
                 .modifier(Held(sending: sending))
         } else {
             Button(action: choose) { optionLabel(title, description) }
-                .buttonStyle(.paper)
+                .buttonStyle(.paperCard)
                 .modifier(ElicitationNumberShortcut(index: index))
                 .modifier(Held(sending: sending))
         }
@@ -295,40 +302,49 @@ struct ElicitationView: View {
     /// there rather than in the labels, and dropping it would make the buttons a row
     /// of bare words.
     ///
-    /// It scrolls sideways for the same reason the prompt bar's option row does: these
-    /// are the agent's words in a column of bounded width, so there is no bound on how
-    /// wide the row wants to be, and a layout that measures its own width and picks a
-    /// layout from that has crashed this app through AppKit before.
+    /// Stacked down the card, one full-width row per choice, so every title and
+    /// description wraps to fit and nothing is hidden off to the side (#338). A plain
+    /// column needs no width of its own to pick a layout from — a layout that does
+    /// has crashed this app through AppKit before.
     @ViewBuilder
     private func oneClick(_ schema: ElicitationSchema) -> some View {
         if let single = schema.singleChoice {
-            ScrollView(.horizontal) {
-                HStack(alignment: .top, spacing: 8) {
-                    ForEach(Array(single.choices.enumerated()), id: \.element.id) { index, choice in
-                        answerButton(title: choice.title, description: choice.description,
-                                     key: "choice:\(choice.value)", prominent: true, index: index) {
-                            answer(single.property.name, with: .string(choice.value))
-                        }
-                    }
-                    // Picking nothing is an answer too, where the agent said the
-                    // question may go unanswered. Still one click (FR-040).
-                    if !single.property.isRequired {
-                        answerButton(title: "No answer", description: nil, key: "choice:", prominent: false,
-                                     index: single.choices.count) {
-                            answer(single.property.name, with: .string(""))
-                        }
-                    }
-                    // Not the same thing as answering with nothing, and the daemon
-                    // already tells the two apart.
-                    answerButton(title: "No thanks", description: nil, key: "decline", prominent: false,
-                                 index: single.choices.count + (single.property.isRequired ? 0 : 1)) {
-                        send("decline", .decline)
+            // The choices scroll, as a page's question does, once they are taller than
+            // the pane or the cap; the ways of not answering stay below them in view.
+            let choices = VStack(alignment: .leading, spacing: 6) {
+                ForEach(Array(single.choices.enumerated()), id: \.element.id) { index, choice in
+                    answerButton(title: choice.title, description: choice.description,
+                                 key: "choice:\(choice.value)", prominent: true, index: index) {
+                        answer(single.property.name, with: .string(choice.value))
                     }
                 }
-                .padding(.vertical, 1)
             }
-            .scrollIndicators(.never)
-            .scrollBounceBehavior(.basedOnSize)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { choicesHeight = $0 }
+            VStack(alignment: .leading, spacing: 6) {
+                if let measured = choicesHeight, measured > 0 {
+                    ScrollView { choices }
+                        .frame(maxHeight: min(measured, Self.choicesCap))
+                        .scrollBounceBehavior(.basedOnSize)
+                } else {
+                    // The first pass, which is where the measurement comes from.
+                    choices
+                }
+                // Picking nothing is an answer too, where the agent said the
+                // question may go unanswered. Still one click (FR-040).
+                if !single.property.isRequired {
+                    answerButton(title: "No answer", description: nil, key: "choice:", prominent: false,
+                                 index: single.choices.count) {
+                        answer(single.property.name, with: .string(""))
+                    }
+                }
+                // Not the same thing as answering with nothing, and the daemon
+                // already tells the two apart.
+                answerButton(title: "No thanks", description: nil, key: "decline", prominent: false,
+                             index: single.choices.count + (single.property.isRequired ? 0 : 1)) {
+                    send("decline", .decline)
+                }
+            }
         }
     }
 
@@ -341,7 +357,7 @@ struct ElicitationView: View {
                               choose: @escaping () -> Void) -> some View {
         if prominent {
             Button(action: choose) { answerLabel(title, description, key: key) }
-                .buttonStyle(.paperProminent)
+                .buttonStyle(.paperProminentCard)
                 .modifier(ElicitationNumberShortcut(index: index))
                 .modifier(Held(sending: sending, key: key))
                 .background {
@@ -354,7 +370,7 @@ struct ElicitationView: View {
                 }
         } else {
             Button(action: choose) { answerLabel(title, description, key: key) }
-                .buttonStyle(.paper)
+                .buttonStyle(.paperCard)
                 .modifier(ElicitationNumberShortcut(index: index))
                 .modifier(Held(sending: sending, key: key))
         }
@@ -372,7 +388,7 @@ struct ElicitationView: View {
                 Telling(host: model.answerRecipient(request.agentID))
             }
         }
-        .frame(maxWidth: 240, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .fixedSize(horizontal: false, vertical: true)
     }
 
