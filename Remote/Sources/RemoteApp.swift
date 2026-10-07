@@ -74,13 +74,14 @@ struct RemoteView: View {
 
     /// What is open over the project, in the order each was opened from the one before:
     /// its Dashboard, a pinned page, a workflow, a conversation. The first is the detail's
-    /// own page, the one the sidebar lights; the rest are pushed over it.
+    /// own page, the one the sidebar lights; the rest are pushed over it. With none, the
+    /// project's page is a new session in it (#366).
     private var routes: [RemoteRoute] {
         let open = [model.openDashboard ? RemoteRoute.dashboard : nil, model.openPin.map(RemoteRoute.page),
                     model.openWorkflow.map(RemoteRoute.workflow), model.selection.map(RemoteRoute.agent)]
             .compactMap { $0 }
-        // A project with nothing open over it shows its Dashboard, as the Mac's row does.
-        if open.isEmpty, model.selectedProject != nil { return [.dashboard] }
+        // A project with nothing open over it starts a session, as the Mac's row does (#366).
+        if open.isEmpty, model.selectedProject != nil { return [.start] }
         return open
     }
 
@@ -130,16 +131,7 @@ struct RemoteView: View {
         .task(id: model.selectedProject) {
             if let folder = model.selectedProject { await model.loadLabelVocabulary(in: folder) }
         }
-        .sheet(isPresented: Binding(get: { model.startingIn != nil },
-                                    set: { if !$0 { model.startingIn = nil } })) {
-            if let project = model.startingIn {
-                StartAgentView(project: project)
-                    .paperSheet()
-                    .presentationDetents([.large])
-                    .presentationSizing(.form)
-            }
-        }
-        // A server asked for a key on a send, with no start sheet to ask over (#344).
+        // A server asked for a key on a send, with no start page to ask over (#344).
         .tokenAskSheet(model, shown: model.startingIn == nil)
         // Where this device is, told to the Mac on every change (021).
         .onChange(of: scenePhase, initial: true) { _, phase in model.scenePhase(phase) }
@@ -190,6 +182,15 @@ struct RemoteView: View {
                     .task(id: id) { await model.lookUpRetired(id) }
             }
         case .workflow(let id): WorkflowPage(workflowID: id).paperGround()
+        case .start:
+            if let folder = model.selectedProject {
+                // Held open while it is on screen: the runtime behind its choices is let
+                // go when it is not (029).
+                StartAgentView(project: folder)
+                    .paperGround()
+                    .onAppear { model.startingIn = folder }
+                    .onDisappear { if model.startingIn == folder { model.startingIn = nil } }
+            }
         case .dashboard:
             // ui://agents/dashboard, through the same host a chat uses (#188).
             ProjectDashboardView(
@@ -212,7 +213,7 @@ struct RemoteView: View {
                 .navigationTitle("Dashboard")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    // New session, from the project's own page (029), as from its row's menu.
+                    // New session, from the project's Dashboard (029), as from its row's menu.
                     if let folder = model.selectedProject {
                         ToolbarItem(placement: .topBarTrailing) {
                             NewSessionButton(folder: folder)
@@ -251,6 +252,8 @@ enum RemoteRoute: Hashable {
     case agent(UUID)
     /// The project's Dashboard (074).
     case dashboard
+    /// A new session in the project (#366): its page when nothing is open over it.
+    case start
     /// One of the project's pinned pages (#159), by its path in the project.
     case page(String)
 

@@ -344,8 +344,15 @@ final class AppModel {
         showsEvents = false
         showsRuntimes = false
         select(key)
-        // Its Dashboard, which says nothing new unless it has to: the project's own page
-        // (#145). Starting a session there is New Session, a step away.
+        // A new session in it (#366): the project's own page is where a session starts,
+        // as New Session has it. The Dashboard is on its way out, a menu item away.
+        composing = true
+        draftWorktree = nil
+    }
+
+    /// The project's Dashboard (074), from its row's menu: the old project page.
+    func showDashboard(_ key: ProjectKey) {
+        showProject(key)
         openDashboard = true
     }
 

@@ -2,7 +2,7 @@
 // root list, as the iPhone Remote's (#226, #235):
 // Activity at the top, then every project, each a row that folds open on its sessions and
 // workflows, and at the foot what the hosts and this browser are doing. No host headings: a
-// server's project reads `host:Project`. A project's row opens its Dashboard.
+// server's project reads `host:Project`. A project's row starts a new session in it and folds (#366).
 //
 // One list for the keys: ↑ and ↓ move through every row shown, opening what they land on, as the
 // window's selection does; → unfolds a project and ← folds it, or steps out to its project from
@@ -244,7 +244,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   if (searching && groups.length === 0 && archived.length === 0 && allWorkflows.length === 0 && !nameMatches) return null;
 
   const chosen = r.host === host.id && r.project !== undefined && folderKey(r.project) === folderKey(folder)
-    && !!r.dashboard;
+    && (!!r.dashboard || !!r.compose);
   const needs = view.needsYou;
   const subtitle = !project.exists ? "Folder is missing" : view.subtitle;
   const fold = (open: boolean) => folds.set(host.id, folder, open);
@@ -264,7 +264,12 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
         <button class="disclosure" aria-label={unfolded ? `Fold ${label}` : `Unfold ${label}`} aria-expanded={unfolded}
           tabIndex={-1} disabled={searching} onClick={() => fold(!unfolded)}>{unfolded ? "⌄" : "›"}</button>
         <button class="pick" aria-current={chosen} aria-expanded={unfolded} data-fold="project" title={folderPath(folder)}
-          onClick={() => go({ host: host.id, project: folder, dashboard: true })}
+          onClick={(e) => {
+            // A new session in it, and the row folds or unfolds (#366). Not when the arrow keys
+            // land here (a click with no detail): moving through the list folds nothing.
+            go({ host: host.id, project: folder, compose: true });
+            if (e.detail > 0 && !searching) fold(!unfolded);
+          }}
           onContextMenu={(e) => openContextMenu(e, projectMenu)}
           onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, projectMenu); }}>
           <span class="title">{label}</span>
@@ -275,7 +280,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
       </div>
       {unfolded && (
         <div class="fold-body">
-          {/* The project's pinned pages (#159), beside the Dashboard its row opens, before its sessions. */}
+          {/* The project's pinned pages (#159), before its sessions. */}
           {!searching && (
             <PinnedPageRows store={store} host={host.id} folder={folder} down={down}
               chosen={r.host === host.id && r.project !== undefined && folderKey(r.project) === folderKey(folder) ? r.page : undefined} />
@@ -384,7 +389,7 @@ function ArchivedProjectRow({ store, host, project, down }: {
   const folder = project.project.folder;
   const archivedAt = project.project.archivedAt;
   const bringBack = async () => {
-    if (await store.unarchiveProject(host.id, folder)) go({ host: host.id, project: folder, dashboard: true });
+    if (await store.unarchiveProject(host.id, folder)) go({ host: host.id, project: folder, compose: true });
   };
   const menu: MenuItem[] = [{ label: "Bring Back", disabled: down, run: () => void bringBack() }];
   return (

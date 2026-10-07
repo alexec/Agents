@@ -309,8 +309,8 @@ private struct ProjectFold: View {
                 get: { isOpen },
                 set: { folds.set(key, open: $0) })) {
                 // Folded, nothing at all is under the row (#356): see `isUnfolded`.
-                // The project's pinned pages (#159), beside the Dashboard its own row opens,
-                // before its sessions. Not while searching: the search is for sessions.
+                // The project's pinned pages (#159), before its sessions. Not while
+                // searching: the search is for sessions.
                 if fold.showsPinnedPages {
                     PinnedPageRows(project: key)
                 }
@@ -330,7 +330,11 @@ private struct ProjectFold: View {
                 archivedSessions(fold)
                 ProjectWorkflowRows(fold: fold, folds: folds)
             } label: {
-                ProjectRow(summary: summary, label: label, isFolded: !isOpen)
+                ProjectRow(summary: summary, label: label, isFolded: !isOpen) {
+                    // A search holds every match open; the click still starts a session.
+                    if !fold.isSearching { folds.set(key, open: !isOpen) }
+                    requests.focusPrompt()
+                }
                     .appText(.supporting)
                     // As tall as its one or two lines and a little air (#104).
                     .listRowInsets(.vertical, 3)
@@ -485,11 +489,9 @@ private struct ProjectMenu: View {
     let summary: DaemonAPI.ProjectSummary
 
     var body: some View {
-        Button("Dashboard") { model.showProject(summary.key) }
+        Button("Dashboard") { model.showDashboard(summary.key) }
         Button("New Session") {
-            model.select(summary.key)
-            model.composing = true
-            model.draftWorktree = nil
+            model.showProject(summary.key)
             requests.focusPrompt()
         }
         .disabled(model.hostUnreachable(summary.host))

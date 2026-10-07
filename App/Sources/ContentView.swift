@@ -166,13 +166,6 @@ struct ContentView: View {
             .help("Start a new session in this project (⌘N)")
             .disabled(model.selectedProjectSummary == nil)
         }
-        ToolbarItem {
-            Button { requests.projectSettings = .general } label: {
-                Label("Project Settings", systemImage: "slider.horizontal.3")
-            }
-            .help("Project Settings (⌥⌘,)")
-            .disabled(model.selectedProjectSummary == nil)
-        }
         if model.selection != nil {
             ToolbarSpacer(.fixed)
             ToolbarItem {

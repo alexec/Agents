@@ -141,7 +141,7 @@ function PinnedFilePage({ store, host, folder, path, down }: {
           <span class="small quiet">{path}</span>
         </div>
         {pin
-          ? <button disabled={down} onClick={() => { void store.unpin(host, folder, path); go({ host, project: folder, dashboard: true }); }}>Unpin</button>
+          ? <button disabled={down} onClick={() => { void store.unpin(host, folder, path); go({ host, project: folder, compose: true }); }}>Unpin</button>
           : <button disabled={down || store.pinsIn(host, folder).length >= 10} onClick={() => void store.pin(host, folder, path)}
               title="Pin this page under the project">Pin to Project</button>}
       </header>
