@@ -489,7 +489,6 @@ private struct ProjectMenu: View {
     let summary: DaemonAPI.ProjectSummary
 
     var body: some View {
-        Button("Dashboard") { model.showDashboard(summary.key) }
         Button("New Session") {
             model.showProject(summary.key)
             requests.focusPrompt()

@@ -42,13 +42,12 @@ export const defaultCallTimeout = 30_000;
 /**
  * Methods that do their work before they answer, and how long that can honestly take (#291).
  * A clone is given an hour on the host; the page waits a little past that. Starting a runtime,
- * a draft of one, or the dashboard's updater is the same kind of wait, shorter.
+ * or a draft of one, is the same kind of wait, shorter.
  */
 const slowCallTimeout: Readonly<Record<string, number>> = {
   "projects/clone": 65 * 60_000,
   "agents/start": 2 * 60_000,
   "agents/options": 2 * 60_000,
-  "dashboard/update": 2 * 60_000,
 };
 
 /** How long `method` waits. `override` is a test's one timeout for every method. */

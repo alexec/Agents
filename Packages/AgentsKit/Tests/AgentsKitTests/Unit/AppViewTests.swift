@@ -166,7 +166,7 @@ struct AppViewTests {
         #expect(done.map { $0["method"]?.stringValue } == ["ui/notifications/tool-result"])
         #expect(done.first?["params"]?["structuredContent"] == ["a": 1])
         #expect(feed.due(call).isEmpty)
-        // A Dashboard left open says a later snapshot again (#188). A cancellation does not.
+        // A view left open says a later result again (#188). A cancellation does not.
         call.result = ["content": [], "structuredContent": ["a": 2]]
         let again = feed.due(call)
         #expect(again.map { $0["method"]?.stringValue } == ["ui/notifications/tool-result"])
@@ -241,8 +241,7 @@ struct AppViewTests {
         let tools = try await server.handle(method: "tools/list", params: [:]).get()["tools"]?.arrayValue ?? []
         #expect(!tools.contains { $0["name"]?.stringValue?.contains("test_view") == true })
         let resources = try await server.handle(method: "resources/list", params: [:]).get()["resources"]?.arrayValue
-        #expect(resources?.map { $0["uri"]?.stringValue } == [AppViewCatalog.dashboardURI])
-        #expect(tools.contains { $0["name"]?.stringValue == AppService.readDashboardToolName })
+        #expect(resources?.isEmpty == true)
         // No such tool: the JSON-RPC error, as for any name the server does not have.
         if case .success = await server.handle(method: "tools/call", params: ["name": "show_test_view"]) {
             Issue.record("the test view's tool answered without the switch")

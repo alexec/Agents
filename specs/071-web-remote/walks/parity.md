@@ -15,18 +15,18 @@
 
 ## Counts
 
-Of 214 rows: **146 same**, **40 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 204 rows: **136 same**, **40 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
-| Sidebar and project list | 6 | 2 | 9 |
+| Sidebar and project list | 7 | 2 | 9 |
 | Session rows and states | 16 | 2 | 5 |
 | Chat turns and turn detail | 19 | 3 | 2 |
 | Prompt bar and queued prompts | 18 | 2 | 0 |
 | Question and permission cards | 12 | 3 | 0 |
 | Start sheet and new project | 17 | 5 | 0 |
 | Worktrees and Files | 9 | 6 | 6 |
-| Dashboard and pins | 13 | 1 | 0 |
+| Pins | 4 | 1 | 0 |
 | Workflows page | 12 | 1 | 2 |
 | Settings and Project Settings | 1 | 7 | 0 |
 | Pool, runtimes and spending | 7 | 1 | 2 |
@@ -34,7 +34,7 @@ Of 214 rows: **146 same**, **40 by design**, **28 delta** (after #188, #189, #19
 | Notifications and badges | 3 | 1 | 0 |
 | Disk strip | 2 | 1 | 0 |
 | Hosts, connection and pairing | 3 | 3 | 0 |
-| MCP Apps views | 6 | 1 | 0 |
+| MCP Apps views | 4 | 1 | 0 |
 
 The deltas are tracked by 29 issues:
 - **Already open:** #226 (the Remote's one sidebar) and #235 (the page's one sidebar at phone width).
@@ -50,8 +50,8 @@ The deltas are tracked by 29 issues:
 | One sidebar: Activity, projects folding open on their sessions and workflows, `host:Project` names | `A/Projects/ProjectListView.swift:48-96` | Its own project list, then a project page of cards, under host headings: `R/Projects/ProjectListView.swift:18-27`, `R/Projects/ProjectPageView.swift` | From 760 px, as the window: `W/views/Sidebar.tsx:38-104` (#151). Below, one column at a time | **delta**: Remote #226; web at phone width #235 |
 | Project order | Oldest added first, then by folder; this Mac's, then each server's: `K/Sidebar/SidebarProjectFold.swift` (`SidebarOrder.byAdded`), `K/Client/AgentsModel.swift` | The same, from the shared model: `R/Sidebar/RemoteSidebar.swift` | The same: `W/views/Sidebar.tsx` (`byAdded`, `orderedProjects`) | **same** (#357) |
 | Project row subtitle | Needs you (· N unread), else working / unread, else *N complete* / stopped: `A/Projects/ProjectRow.swift:75-96` | No complete / stopped fallback: `R/Projects/ProjectListView.swift:143-151` | As the window: `W/model/groups.ts:176-188` | **delta**: Remote #226 |
-| Project row menu | Dashboard, New Session, Project Settings…, Archive, Show in Finder: `A/Projects/ProjectListView.swift:511-542` | None: the row is a button | Dashboard, New Session: `W/views/Sidebar.tsx:197-201` | Web: **by design** (Settings, Archive and Finder are the Mac's, #151). Remote: **delta** #226 |
-| Clicking a project row (#366) | Starts a new session in it (the empty chat, as New Session) and folds or unfolds it; no Project Settings button in the toolbar (the row's menu and ⌥⌘, keep it): `A/AppModel.swift` (`showProject`), `A/Projects/ProjectRow.swift` | A tap opens its New session page in the detail, the form that was a sheet, and folds it: `R/RemoteApp.swift` (`RemoteRoute.start`), `R/StartAgent/StartAgentView.swift` | Opens the new-session form (`n=1`) and folds it; arrow keys landing on it fold nothing: `W/views/Sidebar.tsx` | **same**. The Dashboard is a menu item on all three until it goes |
+| Project row menu | New Session, Project Settings…, Archive, Show in Finder: `A/Projects/ProjectListView.swift:511-542` | None: the row is a button | New Session: `W/views/Sidebar.tsx` | Web: **by design** (Settings, Archive and Finder are the Mac's, #151). Remote: **delta** #226 |
+| Clicking a project row (#366) | Starts a new session in it (the empty chat, as New Session) and folds or unfolds it; no Project Settings button in the toolbar (the row's menu and ⌥⌘, keep it): `A/AppModel.swift` (`showProject`), `A/Projects/ProjectRow.swift` | A tap opens its New session page in the detail, the form that was a sheet, and folds it: `R/RemoteApp.swift` (`RemoteRoute.start`), `R/StartAgent/StartAgentView.swift` | Opens the new-session form (`n=1`) and folds it; arrow keys landing on it fold nothing: `W/views/Sidebar.tsx` | **same**. The Dashboard and its menu item are gone on all three |
 | Archived projects fold, Bring Back | Closed until opened, below the projects, each row Bring Back and its menu: `A/Projects/ProjectListView.swift:87-96`, `S/ArchivedProjectRow.swift` | The same row, a swipe for Bring Back too; listed from every host as the sidebar appears (the catch-up leaves them out): `R/Sidebar/RemoteSidebar.swift`, `R/RemoteModel.swift` (`shelvedProjects`, `unarchiveProject`) | As the window, its open state kept in localStorage; `projects/list` now asks with archived ones: `W/views/Sidebar.tsx` (`ArchivedProjectRow`) | **same** (#343) |
 | Activity rows | Events, Resources, Runtimes, Spending at the top, no icons (#155): `A/Projects/ProjectListView.swift:54-59` | Events, Spending, Resources after the projects, with icons; no Runtimes row: `R/Projects/ProjectListView.swift:32-41` | As the window: `W/views/Activity.tsx:95-131` | **delta**: Remote #226 |
 | Session groups and their folds, counts and tint when folded (#181) | `A/Projects/ProjectListView.swift:356-397` | The same rules on the project page: `R/Projects/ProjectPageView.swift:94-124` | `W/views/Sidebar.tsx:230-263` | **same** (where the Remote draws them: #226) |
@@ -221,24 +221,15 @@ The deltas are tracked by 29 issues:
 | Browser pane | `A/Sidebar/BrowserPane.swift` | None (FR-030) | None | **by design** (local servers only listen on the Mac) |
 | Open in another app, Show in Finder | `A/Sidebar/OpenElsewhere.swift` | *It can't be shown here.* | *It can't be shown here.* | **by design** |
 
-## Dashboard and pins
+## Pins
 
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
-| Dashboard row and page (#122, #188) | The row opens `ui://agents/dashboard` through `AppViewHost`: `S/Dashboard/ProjectDashboardView.swift`, from `A/ContentView.swift`. The native page is not the destination | The same view for `RemoteRoute.dashboard`: `R/RemoteApp.swift` | The same view through the page's view host: `W/views/DashboardAppView.tsx` | **same** |
-| Tile kinds, sparklines, greying when stale | `S/Dashboard/TileCard.swift` | Shared | `W/views/Dashboard.tsx:259-305` | **same** |
-| Tile detail, its History row (#127) | `A/Dashboard/DashboardPage.swift:343-383` | Details… in the tile's long-press menu; same detail and History rows: `R/Dashboard/DashboardPage.swift` | All rows, including *Greyed after*: `W/views/Dashboard.tsx` | **same** |
-| Hide, Show, Remove, Show Hidden Tiles | `A/Dashboard/DashboardPage.swift:86-93, 283-289` | Toggle above tiles; Hide, Show and Remove in the long-press menu: `R/Dashboard/DashboardPage.swift` | `W/views/Dashboard.tsx:75-79, 241-244` | **same** |
-| Order: drag, Move items (#147) | Drag and every Move item: `A/Dashboard/DashboardPage.swift:174-187, 292-316` | Tile Move items and section heading's Move Section Up / Down; no drag: `R/Dashboard/DashboardPage.swift` | Drag and every Move item: `W/views/Dashboard.tsx:99-204` | **same** (no drag on the Remote: **by design**) |
-| Update now (#146, #329) | In the hosted Dashboard view | The same hosted view | The same hosted view | **same** |
-| *‹project› · updated …* | `A/Dashboard/DashboardPage.swift:81, 138-146` | Under the update line: `R/Dashboard/DashboardPage.swift` | `W/views/Dashboard.tsx:87-88` | **same** |
-| A store file set aside, said (#171); the footer sentence (#127) | In the hosted Dashboard view | The same hosted view | The same hosted view | **same** |
-| Pinned page rows (#159) | Drag; Open, Move Up / Down, Unpin: `A/Projects/PinnedPageRows.swift` | Long press: `R/Dashboard/PinnedPage.swift:8-60` | Drag and the menu: `W/views/Pins.tsx:17-73` | **same** (no drag on the Remote: **by design**) |
-| A pinned Markdown page, live | `A/Dashboard/PinnedPage.swift:104-106` | `R/Dashboard/PinnedPage.swift:100-131` | `W/views/Pins.tsx:111-133` | **same** |
-| A pinned HTML page | Page / Source: `A/Dashboard/PinnedPage.swift:54-61` | Page / Source: `R/Dashboard/PinnedPage.swift` | Source: `W/views/Pins.tsx:139-142` | Web: **by design** (Trusted Types) |
+| Pinned page rows (#159) | Drag; Open, Move Up / Down, Unpin: `A/Projects/PinnedPageRows.swift` | Long press: `R/Projects/PinnedPage.swift:8-60` | Drag and the menu: `W/views/Pins.tsx:17-73` | **same** (no drag on the Remote: **by design**) |
+| A pinned Markdown page, live | `A/Projects/PinnedPage.swift:104-106` | `R/Projects/PinnedPage.swift:100-131` | `W/views/Pins.tsx:111-133` | **same** |
+| A pinned HTML page | Page / Source: `A/Projects/PinnedPage.swift:54-61` | Page / Source: `R/Projects/PinnedPage.swift` | Source: `W/views/Pins.tsx:139-142` | Web: **by design** (Trusted Types) |
 | Pin from the Files bar | Any Markdown or HTML file: `A/Sidebar/FilesPane.swift:192-230` | Markdown in Page and HTML in Files: `R/Panes/PagePane.swift`, `R/Panes/FilesPane.swift` | Any Markdown or HTML file open under Files: `W/views/FilesPane.tsx` | **same** |
-| A missing pin | `A/Dashboard/PinnedPage.swift:85-99` | `R/Dashboard/PinnedPage.swift:83-92` | `W/views/Pins.tsx:125-131` | **same** |
-| A page tile | `A/Dashboard/PinnedPage.swift:222-273` | `R/Dashboard/PinnedPage.swift:158-215` | `W/views/Dashboard.tsx:330-354` | **same** (HTML as source on the page: **by design**) |
+| A missing pin | `A/Projects/PinnedPage.swift:85-99` | `R/Projects/PinnedPage.swift:83-92` | `W/views/Pins.tsx:125-131` | **same** |
 
 ## Workflows page
 
@@ -331,8 +322,6 @@ The deltas are tracked by 29 issues:
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
 | A tool's `ui://` view in a chat (#187) | WebKit host `S/AppView/AppViewHost.swift`, from `A/Chat/ChatView.swift` | The same host, from `R/Chat/RemoteChatView.swift` | The sandbox proxy `W/views/chat/viewLayer.ts` | **same** |
-| The project Dashboard row opens `ui://agents/dashboard` (#188) | `ProjectDashboardView` through that host, in place of the native page: `A/ContentView.swift` | The same view for `RemoteRoute.dashboard`: `R/RemoteApp.swift` | `DashboardAppView` through the page's view host: `W/views/Columns.tsx` | **same** |
-| Dashboard view actions and six tile kinds (#329) | `ProjectDashboardView` supplies project identity and navigation to `AppViewHost`; the shared view serves actions and tile HTML from `AppViewCatalog.swift` | The same shared view and project context via `R/RemoteApp.swift` | The sandbox view host passes project context and navigation via `W/views/DashboardAppView.tsx`; the same served HTML | **same**; app-only actions: Update now, Hide, Show, Remove, Move, Open Keeper, Details; number, status, table, note, link, page |
 | A pinned `ui://` view (#189): a row with the pages, opened full page and fed afresh by its pin's read-only call; missing with why; Unpin | `PinnedViewPage` through `AppViewHost`, from `A/ContentView.swift`; row in `A/Projects/PinnedPageRows.swift`; walked on a scratch window 2026-10-06 (`specs/188-mcp-apps-rest/walks/mac-189-*.png`): pinned from a real Claude chat's test view, opened fed afresh, unpinned | The same view for `RemoteRoute.page`: `R/RemoteApp.swift`; row in `R/Sidebar/SidebarRows.swift` | `W/views/PinnedViewPage.tsx`, from `W/views/Pins.tsx`; walked in headless Chrome (`Web/test/walk/pins189.mjs`, `specs/188-mcp-apps-rest/walks/web-189-pinned-view.png`) | **same** |
 | **Pin to Project** for a view whose call can feed a pin (#189), inline and full screen | The view's ··· menu: `S/AppView/AppViewRow.swift` | The same, shared | A Pin button in the caption and the full-screen bar: `W/views/chat/AppView.tsx`, `W/views/chat/viewLayer.ts` | **same** |
 | A view from the person's own http MCP server (#191): drawn in the turn that called its tool and as a pin; asks **Show** / **Don't Show** in the view's place first and again when the view changes; the caption names the server; reaches only its own server; stdio servers' views not shown yet | `S/AppView/AppViewHost.swift` (`asking`, `answerShow`), `S/AppView/AppViewRow.swift` (`AppViewShowAsk`); walked 2026-10-06 on a scratch window with a real Claude call of the ext-apps `basic-server-vanillajs` example: Show, inline, pinned and fed afresh, `example.com` blocked (`specs/188-mcp-apps-rest/walks/mac-191-*.png`) | The same shared host and row; builds, look not walked (Alex's) | `W/views/chat/viewLayer.ts`, `W/views/chat/AppView.tsx`, `W/views/PinnedViewPage.tsx`; walked in headless Chrome (`Web/test/walk/views191.mjs`, `specs/188-mcp-apps-rest/walks/web-191-*.png`) | **same**

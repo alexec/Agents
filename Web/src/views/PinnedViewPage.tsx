@@ -2,7 +2,7 @@
 // No model called its tool, so the page makes the call itself each time it opens: the pin's
 // feeding call, which the host allows only for a tool that changes nothing. The view hears
 // tool-input, then tool-result when that call answers. It has no agent: what it would tell one
-// is refused (viewLayer.ts). Our extension of MCP Apps (SEP-1865), as the Dashboard is (#188).
+// is refused (viewLayer.ts). Our extension of MCP Apps (SEP-1865) (#188).
 import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import type { Store } from "../model/store";
@@ -79,7 +79,7 @@ export function PinnedViewPage({ store, host, folder, path, pin, down }: {
       ) : now.kind === "failed" ? (
         <p class="hint">{title} can't be shown: {now.why}</p>
       ) : (
-        <div class="scroll dashboard-host" ref={frame}>
+        <div class="scroll view-host" ref={frame}>
           <ViewState layer={layer} id={id} />
           <div class="view-layer" ref={(el) => { layer.element = el; }} />
         </div>

@@ -8,7 +8,7 @@ import Foundation
 /// with a binding each, a project and a session could both look chosen, and the reader
 /// would have to guess which one the detail was showing.
 public enum SidebarItem: Hashable, Sendable {
-    /// The project's own pages: its Dashboard, with its settings a sheet over it.
+    /// The project itself: its new-session form, with its settings a sheet over it.
     case project(ProjectKey)
     /// One session, under its project.
     case session(UUID)

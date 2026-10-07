@@ -2,8 +2,7 @@ import AgentsKitCore
 import SwiftUI
 
 /// A project's pinned pages (#159), first in its fold of the sidebar, right under the
-/// project's own row, which opens the Dashboard: the project's pages together, then its
-/// sessions. Rows tagged into the sidebar's one selection, so a pin opens in the chat's
+/// project's own row: the project's pages together, then its sessions. Rows tagged into the sidebar's one selection, so a pin opens in the chat's
 /// place as a session does, and dragged among themselves to re-order them.
 ///
 /// Left out for a project with none.

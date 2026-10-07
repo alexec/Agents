@@ -352,10 +352,6 @@ private struct ProjectMenuItems: View {
     let summary: DaemonAPI.ProjectSummary
 
     var body: some View {
-        Button("Dashboard", systemImage: "square.grid.2x2") {
-            model.sidebarItem = .project(summary.key)
-            model.openDashboard = true
-        }
         NewSessionButton(folder: summary.folder)
     }
 }

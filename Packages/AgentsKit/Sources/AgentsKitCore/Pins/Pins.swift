@@ -1,7 +1,7 @@
 import Foundation
 
 // A project's pinned pages (#159): Markdown documents and HTML pages pinned under the
-// project, beside its Dashboard. specs/159-pinned-pages/README.md is the reference.
+// project. specs/159-pinned-pages/README.md is the reference.
 // And its pinned sessions (#180), kept at the top of its sessions whatever their state.
 
 /// `<project>/.agents/pins.json`, as written: the pins in the order shown.
@@ -180,7 +180,7 @@ public struct ViewPin: Codable, Sendable, Hashable {
 }
 
 /// Who pinned a page: the person (any client: one grant for every client), an agent, or
-/// the workflow whose runs pin it, as a tile's keeper is.
+/// the workflow whose runs pin it.
 public struct Pinner: Codable, Sendable, Hashable {
     public var person: Bool?
     public var agent: String?
@@ -207,7 +207,7 @@ public enum PinKind: String, Codable, Sendable, Hashable {
 }
 
 public enum PinLimits {
-    /// Pins a project may hold, the Dashboard not counted (Alex, #159).
+    /// Pins a project may hold (Alex, #159).
     public static let perProject = 10
     /// Pinned sessions a project may hold, apart from its pages (#180).
     public static let sessionsPerProject = 10

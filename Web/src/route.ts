@@ -17,8 +17,6 @@ export interface Route {
   session?: string | undefined;
   /** A workflow's page, in the chat's place, as the window opens one from the same list (#98). */
   workflow?: string | undefined;
-  /** The project's Dashboard (074), in the chat's place, as the window opens it from the same list. */
-  dashboard?: boolean | undefined;
   /** One of the project's pinned pages (#159), by its path in the project, in the chat's place. */
   page?: string | undefined;
   /** The files pane, open beside or over the chat. */
@@ -37,7 +35,6 @@ export function parseRoute(hash: string): Route {
       case "p": route.project = value; break;
       case "s": route.session = value; break;
       case "w": route.workflow = value; break;
-      case "d": route.dashboard = value === "1"; break;
       case "pg": route.page = value; break;
       case "f": route.files = value === "1"; break;
       case "n": route.compose = value === "1"; break;
@@ -54,10 +51,9 @@ export function routeHash(route: Route): string {
   if (route.host && route.project) parts.push("p", route.project);
   if (route.host && route.project && route.session) parts.push("s", route.session);
   else if (route.host && route.project && route.workflow) parts.push("w", route.workflow);
-  else if (route.host && route.project && route.dashboard) parts.push("d", "1");
   else if (route.host && route.project && route.page) parts.push("pg", route.page);
   if (route.session && route.files) parts.push("f", "1");
-  if (route.host && route.project && !route.session && !route.workflow && !route.dashboard && !route.page && route.compose) parts.push("n", "1");
+  if (route.host && route.project && !route.session && !route.workflow && !route.page && route.compose) parts.push("n", "1");
   return "#/" + parts.map(encodeURIComponent).join("/");
 }
 

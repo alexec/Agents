@@ -4,7 +4,7 @@ import Testing
 @testable import AgentsKitCore
 
 /// The measure #216 asked for: what a wake costs on a project the size of a busy one —
-/// 60 tiles, 10 pins, 30 folders at the top — while an agent edits in the main checkout.
+/// 10 pins, 30 folders at the top — while an agent edits in the main checkout.
 /// Off unless `AGENTS_MEASURE_216` is set; it prints, it does not judge. It touches only
 /// what main had before #216, so the same file measures both.
 @Suite("Measure a wake (#216)", .enabled(if: ProcessInfo.processInfo.environment["AGENTS_MEASURE_216"] != nil))
@@ -16,15 +16,6 @@ struct WakeCostMeasure {
         defer { try? FileManager.default.removeItem(at: root) }
         let manager = FileManager.default
         for index in 0..<30 { try manager.createDirectory(at: work.appending(path: "Dir\(index)"), withIntermediateDirectories: true) }
-        let tiles = DashboardStore.tilesFolder(work)
-        try manager.createDirectory(at: tiles, withIntermediateDirectories: true)
-        let keeper = TileKeeper(agent: UUID().uuidString)
-        for index in 0..<60 {
-            let tile = index < 5
-                ? TileFile(title: "Page \(index)", type: .page, keeper: keeper, page: TilePage(file: "Dir\(index)/page.md"))
-                : TileFile(title: "Note \(index)", type: .note, keeper: keeper, note: TileNote(markdown: String(repeating: "x", count: 2000)))
-            try tile.fileData().write(to: DashboardStore.tileFile(work, "t\(index)"))
-        }
         let locations = StoreLocations(root: root.appending(path: "store"))
         let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
                               discovery: .findsEverything, launcher: FakeLauncher(script: FakeACPAgent.Script()))
@@ -44,12 +35,7 @@ struct WakeCostMeasure {
         for _ in 0..<200 { await core.projectFilesChanged([agents, work.appending(path: ".agents")], in: work) }
         let agentsBatch = (ContinuousClock.now - clock) / 200
 
-        // 2. A Dashboard read, as each client's dashboard/get is.
-        clock = ContinuousClock.now
-        for _ in 0..<200 { _ = await core.dashboardSnapshot(work, withUpdate: false) }
-        let snapshot = (ContinuousClock.now - clock) / 200
-
-        // 3. The real watch, an agent writing 400 files over about four seconds.
+        // 2. The real watch, an agent writing 400 files over about four seconds.
         await core.watchProject(work)
         try await Task.sleep(for: .milliseconds(500))
         let wakes = await core.projectWatchWakes
@@ -70,7 +56,6 @@ struct WakeCostMeasure {
         print("""
             MEASURE-216 batch(edit in a source folder): \(batch)
             MEASURE-216 batch(naming .agents): \(agentsBatch)
-            MEASURE-216 dashboardSnapshot(60 tiles): \(snapshot)
             MEASURE-216 wakes for 40 rounds of edits + git writes: \(watched)
             """)
     }

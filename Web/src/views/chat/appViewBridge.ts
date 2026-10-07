@@ -160,7 +160,7 @@ export function policyWire(policy: AppViewPolicy): Record<string, string[]> {
 }
 
 /** What the host owes a view about its call, in order (AppViewFeed). A later result is said
- *  again, so an open Dashboard can change. A cancellation is not followed by a result. */
+ *  again, so a view left open can change. A cancellation is not followed by a result. */
 export class Feed {
   initialized = false;
   private sentInput = false;
@@ -201,7 +201,6 @@ export class Feed {
 /** A view's name in the chat, from its tool, with whose it is for a person's own server (#191). */
 export function viewTitle(tool: string, server?: string): string {
   if (tool === "show_test_view") return "Test view";
-  if (tool === "read_dashboard") return "Dashboard";
   const name = tool.replaceAll("_", " ");
   return server && server !== appServer ? `${name} · ${server}` : name;
 }
