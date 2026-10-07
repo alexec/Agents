@@ -151,6 +151,7 @@ export interface Agent {
   missingFolder?: MissingFolder;
   listsLeftOut?: boolean;
   madeInRoot?: string;
+  queuedStart?: QueuedStart;
 }
 
 export type AgentArchivedReason = "byUser" | "byAgent";
@@ -165,7 +166,7 @@ export interface AgentRequest {
   agentID: UUID;
 }
 
-export type AgentState = "starting" | "running" | "waitingOnUser" | "finished" | "stopped" | "archived";
+export type AgentState = "starting" | "running" | "waitingOnUser" | "finished" | "stopped" | "archived" | "queued";
 
 export interface AgentWorktree {
   name: string;
@@ -891,6 +892,7 @@ export interface Headline {
 export interface HelperLimits {
   running?: number;
   notArchived?: number;
+  queued?: number;
   agentsMayArchive?: boolean;
 }
 
@@ -1214,6 +1216,14 @@ export interface QueuedPrompt {
   queuedAt: WireDate;
   from: PromptOrigin;
   preface?: string;
+}
+
+export interface QueuedStart {
+  runtimeID?: string;
+  permissionMode?: string;
+  model?: string;
+  worktree?: WorktreeChoice;
+  labels: string[];
 }
 
 export interface RateLimitInfo {
@@ -2272,7 +2282,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ACPAuthMethod: { required: ["id"], optional: ["name", "description", "_meta"] },
   ACPPromptCapabilities: { required: [], optional: ["image", "audio", "embeddedContext"] },
   ACPProviderInfo: { required: ["id"], optional: ["name", "protocol", "configured"] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "restartPickUps", "report", "outcomeAsked", "titledByAgent", "parking", "afterTurn", "archivedAt", "retirement", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "madeInRoot"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "restartPickUps", "report", "outcomeAsked", "titledByAgent", "parking", "afterTurn", "archivedAt", "retirement", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "madeInRoot", "queuedStart"] },
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },
   AgentWorktree: { required: ["name", "root", "project", "madeByApp"], optional: ["branch", "base"] },
@@ -2356,7 +2366,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FilesWatchRequest: { required: ["agentID", "folder"], optional: [] },
   FolderHunk: { required: ["oldStart", "newStart", "noNewlineAtEnd", "lines"], optional: [] },
   Headline: { required: ["h1", "h2", "h3"], optional: [] },
-  HelperLimits: { required: [], optional: ["running", "notArchived", "agentsMayArchive"] },
+  HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive"] },
   HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
   KeeperChange: { required: ["at", "from", "to"], optional: [] },
   KeeperView: { required: ["kind", "id", "name", "state"], optional: [] },
@@ -2398,6 +2408,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProjectsListRequest: { required: ["includeArchived"], optional: [] },
   PromptRequest: { required: ["agentID", "text", "attachments", "from"], optional: ["sendID"] },
   QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface"] },
+  QueuedStart: { required: ["labels"], optional: ["runtimeID", "permissionMode", "model", "worktree"] },
   RateLimitInfo: { required: [], optional: ["status", "resetsAt", "rateLimitType", "utilization", "overageStatus", "overageResetsAt", "isUsingOverage", "overageInUse", "overageDisabledReason"] },
   RememberedOptionsRequest: { required: ["runtimeID", "cwd"], optional: [] },
   ReportedEdit: { required: ["path", "newText", "toolCallID", "index", "entryIndex", "replaceAll", "at"], optional: ["oldText"] },

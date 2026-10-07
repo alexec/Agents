@@ -216,6 +216,10 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// else, and its runtime session, worktree and folder are somebody else's live work.
     /// The daemon shows it, stopped, and never starts a runtime for it.
     public var madeInRoot: String?
+    /// How a queued helper is to be started once a place frees (#362): what its starter
+    /// asked for, kept so the daemon makes that agent later, after a restart too. Set
+    /// only while `state` is `queued`. Its prompt is the first of `queuedPrompts`.
+    public var queuedStart: QueuedStart?
     /// The three lists that are nearly all of a record — the options and commands the
     /// runtime advertised, and the plans — are empty here and still on disk (051). An
     /// archived agent nobody is reading is held this way: 1.4 KB rather than 24.
@@ -375,6 +379,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         missingFolder = (try? c.decodeIfPresent(MissingFolder.self, forKey: .missingFolder)) ?? nil
         listsLeftOut = try c.decodeIfPresent(Bool.self, forKey: .listsLeftOut) ?? false
         madeInRoot = (try? c.decodeIfPresent(String.self, forKey: .madeInRoot)) ?? nil
+        queuedStart = (try? c.decodeIfPresent(QueuedStart.self, forKey: .queuedStart)) ?? nil
         // Only the keys this build does not know are read as open-ended values.
         // Reading the whole record that way too — which is what this did — decoded
         // every option, command and plan a second time, for every agent, on every
@@ -447,6 +452,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(missingFolder, forKey: .missingFolder)
         if listsLeftOut { try c.encode(listsLeftOut, forKey: .listsLeftOut) }
         try c.encodeIfPresent(madeInRoot, forKey: .madeInRoot)
+        try c.encodeIfPresent(queuedStart, forKey: .queuedStart)
         // Whatever a newer version wrote, written back out beside our own fields.
         if !unknownFields.isEmpty {
             var extra = encoder.container(keyedBy: AnyKey.self)
@@ -478,6 +484,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case missingFolder
         case listsLeftOut
         case madeInRoot
+        case queuedStart
     }
 
     struct AnyKey: CodingKey {
@@ -704,6 +711,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // that makes `starting` worth having: the reason the old code wrote `stopped`
         // with `endTurn` was that rule 2 demanded *some* reason, and now nothing does.
         if state == .starting && (endedReason != nil || archivedReason != nil) { return false }
+        // Queued has not begun, so it has no ending either (#362).
+        if state == .queued && (endedReason != nil || archivedReason != nil) { return false }
         return true
     }
 }

@@ -116,6 +116,13 @@ struct AgentRow: View {
                 if let acting = model.acting(agent.id) {
                     Telling(host: model.answerRecipient(agent.id), doing: acting.doing)
                         .frame(height: isCompact ? 14 : nil)
+                } else if let queued = model.queuedLine(agent) {
+                    // Its place in its project's queue (#362), in the report's place: it
+                    // has said nothing yet, and starts by itself when a place frees.
+                    Text(queued)
+                        .appText(isCompact ? .fine : .supporting)
+                        .foregroundStyle(.secondary)
+                        .help("Starts by itself when this project has a place free for another helper")
                 } else if agent.missingFolder != nil, agent.state != .archived {
                     // Its folder gone (#119): said before anybody types, as a project's
                     // row says it, in the report's place.

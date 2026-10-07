@@ -130,6 +130,11 @@ struct AgentCard: View {
                     // Stop, park or archive on its way, as on the Mac's row (#87).
                     if let acting = model.acting(agent.id) {
                         Telling(host: model.answerRecipient(agent.id), doing: acting.doing)
+                    } else if let queued = model.queuedLine(agent) {
+                        // Its place in the queue (#362), as the Mac's row says it.
+                        Text(queued)
+                            .appText(.supporting)
+                            .foregroundStyle(.secondary)
                     } else if let report = agent.report?.message {
                         Text(report)
                             .appText(.supporting)
@@ -231,7 +236,7 @@ struct AgentCard: View {
     /// The state said in words, because the icon beside it is not one VoiceOver reads.
     /// Precise where the shape is not: which outcome, and why it stopped.
     private var accessibilityLabel: String {
-        let words = StatusShape.words(row: agent, isComingBack: isComingBack)
+        let words = model.queuedLine(agent) ?? StatusShape.words(row: agent, isComingBack: isComingBack)
         return ([agent.title ?? "Untitled", model.startedByAgentLabel(agent), words, agent.report?.message]
             .compactMap { $0 } + model.blockLines(agent) + [ParkWords.line(agent.parking)].compactMap { $0 })
             .joined(separator: ", ")
@@ -424,6 +429,7 @@ struct StatusIcon: View {
     /// which is the same place the Mac reads them, so the two cannot drift (FR-017).
     static func words(for state: AgentState, outcome: WorkOutcome? = nil, isWaiting: Bool = false,
                       isUnaccountedFor: Bool = false) -> String {
+        if state == .queued { return HelperLimit.queuedLabel(position: nil) }
         if StatusShape(state: state, outcome: outcome, isWaiting: isWaiting, isComingBack: false) == .waiting {
             return StatusShape.waitingLabel
         }
@@ -436,6 +442,7 @@ struct StatusIcon: View {
         case .finished: return "Finished"
         case .stopped: return "Stopped"
         case .archived: return "Archived"
+        case .queued: return HelperLimit.queuedLabel(position: nil)
         }
     }
 }

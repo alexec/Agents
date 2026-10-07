@@ -756,6 +756,7 @@ private struct StateLine: View {
         switch state {
         case .running: return "Working"
         case .starting: return AgentState.startingLabel
+        case .queued: return HelperLimit.queuedLabel(position: nil)
         case .waitingOnUser: return "Waiting on you"
         // Never "Complete": that word is now reserved for an agent that said `done`
         // itself, and a turn handing itself back says nothing about the work (FR-012).

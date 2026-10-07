@@ -22,6 +22,10 @@ public enum AgentState: String, Codable, Hashable, Sendable, CaseIterable {
     case finished
     case stopped
     case archived
+    /// A helper waiting in its project's queue for a running place (#362): saved with
+    /// the start it asked for, no runtime made and nothing spent. The daemon starts it,
+    /// oldest first, when a place frees; it then becomes `starting` under the same id.
+    case queued
 
     /// What a row calls a starting agent, in the window and on the phone.
     ///
@@ -48,7 +52,7 @@ public enum AgentState: String, Codable, Hashable, Sendable, CaseIterable {
     public var holdsRuntime: Bool {
         switch self {
         case .starting, .running, .waitingOnUser: return true
-        case .finished, .stopped, .archived: return false
+        case .finished, .stopped, .archived, .queued: return false
         }
     }
 
@@ -78,7 +82,7 @@ public enum AgentState: String, Codable, Hashable, Sendable, CaseIterable {
     public var hasTurnInFlight: Bool {
         switch self {
         case .starting, .running, .waitingOnUser: return true
-        case .finished, .stopped, .archived: return false
+        case .finished, .stopped, .archived, .queued: return false
         }
     }
 }
@@ -117,6 +121,9 @@ public enum AgentEvent: Hashable, Sendable {
     /// Its runtime would not start because its command sandbox could not be set up
     /// (064): an agent between turns, or one still starting, stops with the card.
     case sandboxWouldNotStart
+    /// A queued helper could not be started when its place came (#362): its runtime is
+    /// no longer there, or its mode or model is not offered. Stopped, saying why.
+    case couldNotStartFromQueue
 }
 
 /// What happens to an agent's ending when an event is applied.
@@ -201,6 +208,9 @@ extension AgentState {
         switch (self, event) {
         case (.running, .promptSent):
             return nil // A turn is already in flight.
+        case (.queued, .promptSent):
+            // Its words join the queue it starts with; nothing runs until it is started.
+            return nil
         case (.starting, .promptSent):
             // A prompt arriving while an agent starts joins the queue rather than
             // beginning a turn of its own (FR-004). Refused here, in the table, and not
@@ -237,7 +247,8 @@ extension AgentState {
         case (_, .turnEnded):
             return nil
 
-        case (.starting, .stoppedByUser), (.running, .stoppedByUser), (.waitingOnUser, .stoppedByUser):
+        case (.starting, .stoppedByUser), (.running, .stoppedByUser), (.waitingOnUser, .stoppedByUser),
+             (.queued, .stoppedByUser):
             return Transition(next: .stopped, endedReason: .set(.cancelled),
                               clearsPickUpCount: true)
         case (_, .stoppedByUser):
@@ -245,7 +256,8 @@ extension AgentState {
 
         // Every row the person's stop has, and no other: an agent's stop is that stop,
         // saying who made it.
-        case (.starting, .stoppedByAgent), (.running, .stoppedByAgent), (.waitingOnUser, .stoppedByAgent):
+        case (.starting, .stoppedByAgent), (.running, .stoppedByAgent), (.waitingOnUser, .stoppedByAgent),
+             (.queued, .stoppedByAgent):
             return Transition(next: .stopped, endedReason: .set(.stoppedByAgent),
                               clearsPickUpCount: true)
         case (_, .stoppedByAgent):
@@ -270,6 +282,11 @@ extension AgentState {
              (.stopped, .sandboxWouldNotStart):
             return Transition(next: .stopped, endedReason: .set(.sandboxFailed), clearsPickUpCount: true)
         case (_, .sandboxWouldNotStart):
+            return nil
+
+        case (.queued, .couldNotStartFromQueue):
+            return Transition(next: .stopped, endedReason: .set(.runtimeError), clearsPickUpCount: true)
+        case (_, .couldNotStartFromQueue):
             return nil
 
         case (.starting, .processDied), (.running, .processDied), (.waitingOnUser, .processDied):

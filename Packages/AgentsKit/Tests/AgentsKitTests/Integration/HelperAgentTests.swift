@@ -286,28 +286,37 @@ struct HelperAgentTests {
         _ = try await core.setHelperLimits(.init(folder: folder, limits: HelperLimits(running: 5)))
     }
 
-    @Test func aSixthIsRefusedAndTheFiveAreNamed() async throws {
+    /// Past the not-archived limit a start queues (#362); past the queue too, it is
+    /// refused, naming both limits and the agents holding them.
+    @Test func aSixthIsQueuedAndASeventhPastTheQueueIsRefused() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
         let core = try await makeCore(locations, FakeLauncher())
         let (_, first) = try await caller(core, in: work)
         let (_, second) = try await caller(core, in: work, title: "Other")
-        try await runningUpToFive(core, work)
+        _ = try await core.setHelperLimits(.init(folder: work, limits: HelperLimits(running: 5, queued: 1)))
         _ = try await start(core, first, "Alpha")
         _ = try await start(core, second, "Beta")
         _ = try await start(core, first, "Gamma")
         _ = try await start(core, second, "Delta")
         _ = try await start(core, first, "Epsilon")
 
-        let error = await refusal { _ = try await start(core, second, "Zeta") }
+        let queued = try await calling(core, second) { t in try await core.startHelper(.init(token: t, prompt: "Zeta")) }
+        #expect(queued.note.hasPrefix("Queued \u{201C}Zeta\u{201D} (id \(queued.agentID.uuidString)), 1st in this project's queue: "
+                                      + "This project already has 5 of 5 agents started by agents not yet archived"))
+        #expect(queued.note.hasSuffix(", 1 of 1 queued."))
+        #expect(await core.agent(queued.agentID)?.state == .queued)
+
+        let error = await refusal { _ = try await start(core, first, "Eta") }
         let message = error?.message ?? ""
         #expect(error?.code == DaemonAPI.Failure.notYours)
         #expect(message.hasPrefix("Nothing was started: this project already has 5 of 5 agents started by agents not yet archived"))
         #expect(message.contains("Archive one of yours with archive_agent once its work is merged or abandoned, "
                                  + "or ask the person to archive one, to free that place."))
+        #expect(message.contains(" And its queue is full too: 1 of 1 agents queued — \u{201C}Zeta\u{201D}."))
         #expect(message.hasSuffix("The person sets these limits in Project Settings."))
         for name in ["Alpha", "Beta", "Gamma", "Delta", "Epsilon"] { #expect(message.contains(name), "names \(name)") }
-        #expect(await core.allAgents().count == 7)
+        #expect(await core.allAgents().count == 8)
     }
 
     @Test func archivingOneGivesItsPlaceBack() async throws {
@@ -370,9 +379,13 @@ struct HelperAgentTests {
                 return await group.reduce(into: [Bool]()) { $0.append($1) }
             }
 
-            #expect(results.filter { $0 }.count == 5)
-            #expect(await core.allAgents().filter { $0.startedByAgent != nil }.count == 5)
+            // Five take a place and the sixth queues (#362).
+            #expect(results.filter { $0 }.count == 6)
+            let helpers = await core.allAgents().filter { $0.startedByAgent != nil }
+            #expect(helpers.filter { $0.state != .queued }.count == 5)
+            #expect(helpers.filter { $0.state == .queued }.count == 1)
             #expect(await core.reservedStarts[work, default: 0] == 0)
+            #expect(await core.reservedQueue[work, default: 0] == 0)
         }
     }
 
@@ -400,32 +413,133 @@ struct HelperAgentTests {
                 return await group.reduce(into: [String?]()) { $0.append($1) }
             }
 
-            #expect(results.filter { $0 == nil }.count == 3)
-            for refused in results.compactMap({ $0 }) {
-                #expect(refused.contains("of 3 agents started by agents running"), "\(refused)")
-            }
-            #expect(await core.allAgents().filter { $0.startedByAgent != nil }.count == 3)
+            // Three run and three queue (#362); none is refused.
+            #expect(results.allSatisfy { $0 == nil }, "\(results)")
+            let helpers = await core.allAgents().filter { $0.startedByAgent != nil }
+            #expect(helpers.filter { $0.state.holdsRuntime }.count == 3)
+            #expect(helpers.filter { $0.state == .queued }.count == 3)
             #expect(await core.reservedStarts[work, default: 0] == 0)
         }
     }
 
-    @Test func aFourthRunningIsRefusedAndTheThreeAreNamed() async throws {
+    /// A fourth queues behind the three running (#362), spawning nothing; with the queue
+    /// full, a fifth is refused naming the three.
+    @Test func aFourthRunningIsQueuedAndOnePastTheQueueIsRefused() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let gate = TurnGate()
+        defer { gate.open() }
+        let launcher = heldTurns(gate)
+        let core = try await makeCore(locations, launcher)
+        let (_, token) = try await caller(core, in: work)
+        _ = try await core.setHelperLimits(.init(folder: work, limits: HelperLimits(queued: 1)))
+        for name in ["Alpha", "Beta", "Gamma"] { _ = try await start(core, token, name) }
+        let spawned = launcher.allAgents.count
+
+        let queued = try await calling(core, token) { t in try await core.startHelper(.init(token: t, prompt: "Delta")) }
+        #expect(queued.note.contains("This project already has 3 of 3 agents started by agents running"))
+        #expect(queued.note.contains("It starts by itself, oldest first"))
+        #expect(queued.note.hasSuffix("This project now has 3 of 3 running, 3 of 5 not archived, 1 of 1 queued."))
+        let delta = try #require(await core.agent(queued.agentID))
+        #expect(delta.state == .queued)
+        #expect(delta.group(wantsEyes: false) == .waiting)
+        #expect(delta.queuedPrompts.map(\.text) == ["Delta"])
+        #expect(launcher.allAgents.count == spawned, "a queued agent spawns nothing")
+
+        let error = await refusal { _ = try await start(core, token, "Epsilon") }
+        let message = error?.message ?? ""
+        #expect(error?.code == DaemonAPI.Failure.notYours)
+        #expect(message.hasPrefix("Nothing was started: this project already has 3 of 3 agents started by agents running"))
+        for name in ["Alpha", "Beta", "Gamma", "Delta"] { #expect(message.contains(name), "names \(name)") }
+        #expect(message.contains("park_agent or stop_agent"))
+        #expect(!message.contains("not yet archived"), "only the limit it would break")
+        #expect(await core.allAgents().filter { $0.startedByAgent != nil }.count == 4)
+    }
+
+    /// First in, first out (#362): stopping a running one starts the oldest queued, and
+    /// the next stays queued, now first.
+    @Test func whenOneStopsTheOldestQueuedStarts() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
         let gate = TurnGate()
         defer { gate.open() }
         let core = try await makeCore(locations, heldTurns(gate))
         let (_, token) = try await caller(core, in: work)
-        for name in ["Alpha", "Beta", "Gamma"] { _ = try await start(core, token, name) }
+        _ = try await core.setHelperLimits(.init(folder: work, limits: HelperLimits(running: 1)))
+        let alpha = try await start(core, token, "Alpha")
+        let beta = try await start(core, token, "Beta")
+        let gamma = try await start(core, token, "Gamma")
+        #expect(await core.agent(beta)?.state == .queued)
+        #expect(await core.agent(gamma)?.state == .queued)
+        let listed = try await calling(core, token) { t in try await core.listHelpers(.init(token: t)) }
+        #expect(listed.contains("\u{201C}Beta\u{201D} — queued (position 1)"))
+        #expect(listed.contains("\u{201C}Gamma\u{201D} — queued (position 2)"))
 
-        let error = await refusal { _ = try await start(core, token, "Delta") }
-        let message = error?.message ?? ""
-        #expect(error?.code == DaemonAPI.Failure.notYours)
-        #expect(message.hasPrefix("Nothing was started: this project already has 3 of 3 agents started by agents running"))
-        for name in ["Alpha", "Beta", "Gamma"] { #expect(message.contains(name), "names \(name)") }
-        #expect(message.contains("park_agent or stop_agent"))
-        #expect(!message.contains("not yet archived"), "only the limit it would break")
-        #expect(await core.allAgents().filter { $0.startedByAgent != nil }.count == 3)
+        _ = try await calling(core, token) { t in try await core.stopHelper(.init(token: t, agentID: alpha.uuidString)) }
+
+        await eventually("Beta started from the queue") { await core.agent(beta)?.state.holdsRuntime == true }
+        let started = try #require(await core.agent(beta))
+        #expect(started.queuedStart == nil)
+        #expect(started.startedByAgent != nil)
+        #expect(await core.agent(gamma)?.state == .queued)
+        #expect(HelperLimit.queuePosition(of: try #require(await core.agent(gamma)),
+                                          among: await core.allAgents()) == 1)
+        #expect(try await notes(core, beta).contains { $0.hasPrefix("Queued by ") })
+    }
+
+    /// Stop and archive take a queued one off the queue (#362); it never starts.
+    @Test func stoppingOrArchivingAQueuedOneTakesItOffTheQueue() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let gate = TurnGate()
+        defer { gate.open() }
+        let core = try await makeCore(locations, heldTurns(gate))
+        let (_, token) = try await caller(core, in: work, title: "Lead")
+        _ = try await core.setHelperLimits(.init(folder: work, limits: HelperLimits(running: 1)))
+        _ = try await start(core, token, "Alpha")
+        let beta = try await start(core, token, "Beta")
+        let gamma = try await start(core, token, "Gamma")
+
+        let stopped = try await calling(core, token) { t in try await core.stopHelper(.init(token: t, agentID: beta.uuidString)) }
+        #expect(stopped.hasPrefix("Took \u{201C}Beta\u{201D} off the queue; it will not start."))
+        let beta2 = try #require(await core.agent(beta))
+        #expect(beta2.state == .stopped)
+        #expect(beta2.endedReason == .stoppedByAgent)
+        #expect(try await notes(core, beta).contains("\u{201C}Lead\u{201D} took this agent off the queue before it started."))
+
+        _ = try await calling(core, token) { t in try await core.archiveHelper(.init(token: t, agentID: gamma.uuidString)) }
+        let gamma2 = try #require(await core.agent(gamma))
+        #expect(gamma2.state == .archived)
+        #expect(gamma2.endedReason == .stoppedByAgent)
+        #expect(HelperLimit.queue(in: work, agents: await core.allAgents()).isEmpty)
+    }
+
+    /// The queue is on disk (#362): a daemon started again finds it, and starts it once
+    /// there is a place.
+    @Test func aQueuedOneSurvivesARestartAndStartsWhenThereIsAPlace() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let first = try await makeCore(locations, FakeLauncher())
+        let (lead, token) = try await caller(first, in: work)
+        _ = try await first.setHelperLimits(.init(folder: work, limits: HelperLimits(running: 1, notArchived: 1)))
+        let alpha = try await settledHelper(first, token, "Alpha")
+        let beta = try await calling(first, token) { t in
+            try await first.startHelper(.init(token: t, prompt: "Beta"))
+        }.agentID
+        #expect(await first.agent(beta)?.state == .queued)
+        _ = alpha
+
+        // Room for one more, written into the project's file while no daemon looks.
+        _ = try ProjectConfig.setHelperLimits(HelperLimits(running: 1, notArchived: 2), in: work)
+        let second = try await makeCore(locations, FakeLauncher())
+        let found = try #require(await second.agent(beta))
+        #expect(found.state == .queued)
+        #expect(found.startedByAgent == lead)
+        #expect(found.queuedStart != nil)
+
+        await second.checkEveryQueue()
+        await eventually("Beta started after the restart") { await second.agent(beta)?.state != .queued }
+        #expect(await second.agent(beta)?.startedByAgent == lead)
     }
 
     /// A blocked helper the app will carry on by itself holds a running place; a lead
@@ -451,13 +565,15 @@ struct HelperAgentTests {
             await core.changed(agent)
         }
 
-        let error = await refusal { _ = try await start(core, token, "Delta") }
-        #expect(error?.message.contains("3 of 3 agents started by agents running") == true)
+        // Behind the three waiting ones, which hold their places (#362).
+        let queued = try await calling(core, token) { t in try await core.startHelper(.init(token: t, prompt: "Delta")) }
+        #expect(queued.note.contains("3 of 3 agents started by agents running"))
+        #expect(await core.agent(queued.agentID)?.state == .queued)
 
         try #require(!helpers.isEmpty)
         let parked = try await calling(core, token) { t in try await core.parkHelper(.init(token: t, agentID: helpers[0].uuidString)) }
-        #expect(parked.hasSuffix("This project now has 2 of 3 running, 3 of 5 not archived."))
-        _ = try await start(core, token, "Delta")
+        #expect(parked.hasSuffix("This project now has 2 of 3 running, 3 of 5 not archived, 1 of 5 queued."))
+        await eventually("Delta started once a place freed") { await core.agent(queued.agentID)?.state != .queued }
     }
 
     @Test func thePersonsSettingTakesEffectAtTheNextStartAndIsKept() async throws {
@@ -467,18 +583,20 @@ struct HelperAgentTests {
         defer { gate.open() }
         let core = try await makeCore(locations, heldTurns(gate))
         let (_, token) = try await caller(core, in: work)
-        let summary = try await core.setHelperLimits(.init(folder: work, limits: HelperLimits(running: 1, notArchived: 2)))
-        #expect(summary.project.helperLimits == HelperLimits(running: 1, notArchived: 2))
+        let limits = HelperLimits(running: 1, notArchived: 2, queued: 3)
+        let summary = try await core.setHelperLimits(.init(folder: work, limits: limits))
+        #expect(summary.project.helperLimits == limits)
         #expect(summary.helperLimits == (1, 2))
 
         let first = try await calling(core, token) { t in try await core.startHelper(.init(token: t, prompt: "Alpha")) }
         #expect(first.note.hasSuffix("This project now has 1 of 1 running, 1 of 2 not archived."))
-        let error = await refusal { _ = try await start(core, token, "Beta") }
-        #expect(error?.message.contains("1 of 1 agents started by agents running") == true)
+        let second = try await calling(core, token) { t in try await core.startHelper(.init(token: t, prompt: "Beta")) }
+        #expect(second.note.contains("1 of 1 agents started by agents running"))
+        #expect(second.note.hasSuffix(", 1 of 3 queued."))
 
         // Read back by a daemon started again on the same root.
         let again = try await makeCore(locations, FakeLauncher())
-        #expect(await again.projectSummary(for: work)?.project.helperLimits == HelperLimits(running: 1, notArchived: 2))
+        #expect(await again.projectSummary(for: work)?.project.helperLimits == limits)
 
         // Back to the defaults keeps no setting at all.
         let reset = try await core.setHelperLimits(.init(folder: work, limits: HelperLimits()))
@@ -493,7 +611,7 @@ struct HelperAgentTests {
         _ = try await caller(core, in: work)
 
         for limits in [HelperLimits(running: 11), HelperLimits(notArchived: 21), HelperLimits(running: 0),
-                       HelperLimits(running: 4, notArchived: 3)] {
+                       HelperLimits(running: 4, notArchived: 3), HelperLimits(queued: 0), HelperLimits(queued: 21)] {
             let error = await refusal { _ = try await core.setHelperLimits(.init(folder: work, limits: limits)) }
             #expect(error?.code == JSONRPCError.invalidParams, "\(limits)")
         }

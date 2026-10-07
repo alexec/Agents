@@ -74,6 +74,9 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
         // which the chat itself cannot be nagged into.
         case .stopped: self = [.cancelled, .stoppedByAgent, .allowanceSpent].contains(endedReason) ? .stopped : .needsAttention
         case .archived: self = .archived
+        // A queued helper starts by itself when a place frees (#362): nobody has to do
+        // anything, which is what Waiting means.
+        case .queued: self = .waiting
         }
     }
 
