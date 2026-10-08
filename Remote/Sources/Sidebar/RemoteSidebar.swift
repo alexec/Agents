@@ -446,7 +446,8 @@ private struct NewSessionRow: View {
     }
 }
 
-/// The Runtimes row under Activity, with the Mac's dot when a runtime is out (065).
+/// The Runtimes row under Activity: how many of the Mac's runtimes work, out of how many
+/// are installed, and its red dot when none do (#379), as the window's.
 private struct RuntimesRow: View {
     @Environment(RemoteModel.self) private var model
 
@@ -454,9 +455,18 @@ private struct RuntimesRow: View {
         HStack {
             Text("Runtimes")
             Spacer()
-            if model.runtimeAllowances?.anyOut == true {
-                Circle().fill(StateTint.failure.style(or: .primary)).frame(width: 7, height: 7)
-                    .accessibilityLabel("A runtime is out")
+            if let tally = RuntimeTally(model.runtimes, allowances: model.runtimeAllowances) {
+                HStack(spacing: 4) {
+                    if tally.noneWorking {
+                        Circle().fill(StateTint.failure.style(or: .primary)).frame(width: 7, height: 7)
+                            .accessibilityHidden(true)
+                    }
+                    Text(tally.words).monospacedDigit()
+                }
+                .foregroundStyle(.secondary)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(tally.noneWorking ? "None of \(tally.total) working"
+                                    : "\(tally.working) of \(tally.total) working")
             }
         }
         .accessibilityHint("Opens Runtimes")
