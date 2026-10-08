@@ -389,9 +389,10 @@ private struct ProjectFold: View {
     private func sessionGroup(_ part: SidebarProjectFold.Group, searching: Bool) -> some View {
         let group = part.group
         let isOpen = searching || folds.isOpen(key, .group(group))
-        return DisclosureGroup(isExpanded: Binding(
+        let open = Binding(
             get: { isOpen },
-            set: { folds.set(key, .group(group), open: $0) })) {
+            set: { folds.set(key, .group(group), open: $0) })
+        return DisclosureGroup(isExpanded: open) {
             ForEach(FoldedRow.rows(isOpen ? part.agents : [], in: .group(group))) { row in
                 SessionSidebarRow(agent: row.item)
             }
@@ -399,6 +400,7 @@ private struct ProjectFold: View {
             SidebarSubheading(title: part.heading.title, count: part.agents.count,
                               unread: part.unread,
                               tint: !isOpen && group == .needsAttention ? .attention : .none)
+                .togglesFold(open)
         }
     }
 
@@ -407,9 +409,10 @@ private struct ProjectFold: View {
         let pinned = fold.pinned
         let searching = fold.isSearching
         let isOpen = searching || folds.isOpen(key, .pinned)
-        return DisclosureGroup(isExpanded: Binding(
+        let open = Binding(
             get: { isOpen },
-            set: { folds.set(key, .pinned, open: $0) })) {
+            set: { folds.set(key, .pinned, open: $0) })
+        return DisclosureGroup(isExpanded: open) {
             ForEach(FoldedRow.rows(isOpen ? pinned : [], in: .pinned)) { row in
                 SessionSidebarRow(agent: row.item)
             }
@@ -426,6 +429,7 @@ private struct ProjectFold: View {
             SidebarSubheading(title: "Pinned", count: pinned.count,
                               unread: pinned.filter(\.showsUnread).count,
                               tint: !isOpen && fold.pinnedWantsAPerson(in: model.work) ? .attention : .none)
+                .togglesFold(open)
         }
     }
 
@@ -438,10 +442,11 @@ private struct ProjectFold: View {
         // while the fold is open (#165).
         let count = fold.archivedCount(summary)
         let isOpen = fold.isSearching || folds.isOpen(key, .archivedSessions)
+        let open = Binding(
+            get: { isOpen },
+            set: { folds.set(key, .archivedSessions, open: $0) })
         if fold.showsArchivedFold(summary) {
-            DisclosureGroup(isExpanded: Binding(
-                get: { isOpen },
-                set: { folds.set(key, .archivedSessions, open: $0) })) {
+            DisclosureGroup(isExpanded: open) {
                 let shown = fold.archivedShown(showingAll: showsAllMatches)
                 ForEach(FoldedRow.rows(isOpen ? shown : [], in: .archivedSessions)) { row in
                     SessionSidebarRow(agent: row.item)
@@ -462,6 +467,7 @@ private struct ProjectFold: View {
                 // Named for what it holds: the project's row is often scrolled away by
                 // the time this is read.
                 SidebarSubheading(title: "Archived sessions", count: count)
+                    .togglesFold(open)
             }
             // A page of them while the fold is open, let go when it closes (#165).
             .task(id: !fold.isSearching && isOpen) {
