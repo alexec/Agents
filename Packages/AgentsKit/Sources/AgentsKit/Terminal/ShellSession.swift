@@ -112,6 +112,8 @@ public final class ShellSession: @unchecked Sendable {
         return (buffer.tail(limit: buffer.end - since), since, buffer.dropped)
     }
 
+    /// The shell's process, while there is one.
+    var pid: pid_t? { pty.map(\.pid) }
     public var rows: Int { pty?.rows ?? 0 }
     public var cols: Int { pty?.cols ?? 0 }
 
@@ -189,6 +191,7 @@ public final class ShellSession: @unchecked Sendable {
         pty?.terminate()
         pty?.killNow()
         pty?.stopReading()
+        pty?.reapOnceGone()
         moveTo(.released(reason: reason))
     }
 
@@ -196,6 +199,7 @@ public final class ShellSession: @unchecked Sendable {
     public func killForShutdown() {
         pty?.killNow()
         pty?.stopReading()
+        pty?.reapOnceGone()
     }
 
     private func moveTo(_ next: ShellState) {
