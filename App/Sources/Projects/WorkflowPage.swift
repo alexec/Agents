@@ -219,6 +219,16 @@ struct WorkflowPage: View {
                           ? "Turn this workflow off: its triggers stop, and it stays on the list. Writes enabled: false into its file"
                           : "Turn this workflow back on. Takes enabled: false out of its file")
                     .accessibilityLabel("Enabled")
+                // Pinned to the top of its project in the sidebar (#432), as a session can be.
+                let pinned = model.isPinned(summary)
+                Button {
+                    Task { await model.setPinned(summary, !pinned, on: model.selectedProjectHost) }
+                } label: {
+                    Label(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin")
+                }
+                .buttonStyle(.paper)
+                .help(pinned ? "Take this workflow out of Pinned in the sidebar"
+                             : "Keep this workflow in Pinned, at the top of its project in the sidebar")
                 // One click, and back to the project: the same thing the archive
                 // button on a chat does, so putting a thing away is one gesture
                 // wherever it is.
@@ -322,7 +332,9 @@ struct WorkflowPage: View {
         VStack(alignment: .leading, spacing: 8) {
             sectionTitle("Triggers")
             if triggers.isEmpty {
-                note("None could be read from the file.")
+                // Run only by hand (#432), or a broken file whose triggers could not be read.
+                note(summary.workflow.problem == nil ? "None: it runs only by hand, with Run now."
+                                                     : "None could be read from the file.")
             } else {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(triggers.enumerated()), id: \.offset) { index, trigger in

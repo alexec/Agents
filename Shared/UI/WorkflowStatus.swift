@@ -107,6 +107,10 @@ extension WorkflowSummary {
                                       text: "Next run \(next.formatted(.relative(presentation: .named)))",
                                       detail: next.formatted(date: .abbreviated, time: .shortened))
         }
+        if !blocked, workflow.runsOnlyByHand {
+            return WorkflowStatusLine(symbol: "hand.tap", text: "Runs only by hand, with Run now",
+                                      detail: "Its file says on: manual, or has no on:")
+        }
         if !blocked, workflow.canFire {
             return WorkflowStatusLine(symbol: "bolt", text: "Runs when one of its triggers fires")
         }

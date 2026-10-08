@@ -146,6 +146,29 @@ A new tile type, set with `set_tile` like any other:
 
 The Mac, the Remote and the web page, from the start (AGENTS.md).
 
+## Pinned workflows (#432)
+
+A project's workflows can be pinned beside its pinned sessions (#180), so one run often by
+hand is one click away.
+
+- **Kept** in the same `.agents/pins.json`, as a `workflows` list of `{workflow, pinned_by}`
+  after `sessions`, absent when empty so a file without them is the same bytes. `workflow`
+  is the file name without `.md`. At most 10 a project, apart from pages and sessions.
+  Written only by the host.
+- **On the wire**: `pins/list` and `pins/changed` carry `workflows`, the ids in order;
+  `pins/pinWorkflow`, `pins/unpinWorkflow` (`WorkflowRequest`) and `pins/arrangeWorkflows`
+  (the whole order) are the person's, from every client. No agent tool pins a workflow.
+- **Shown** in the project's Pinned group, after the pinned sessions, in their order, and
+  out of the Workflows group. The row is the same row, with its Off mark, its status mark
+  and Run Now on the web; choosing it opens the workflow's page. The heading counts both
+  kinds and is tinted, folded, when a pinned workflow needs a person.
+- **Pin / Unpin** on the row's menu, a leading swipe (Mac and Remote) and the workflow's
+  page. Ordered by drag on the Mac, Move Up / Move Down on the Remote and the web.
+- **Archived: unpinned.** Archiving a workflow takes its pin off, as archiving a session
+  does, and Bring Back does not pin it again. An archived workflow can't be pinned. One
+  archived by editing its file shows only under Archived workflows until it is unpinned.
+  A workflow renamed or removed leaves an entry naming nothing, which no client shows.
+
 ## The look (2026-10-03)
 
 Taken on a scratch root (run-app, `/tmp/run-pins159`) and in headless Chrome

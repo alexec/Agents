@@ -1117,6 +1117,36 @@ final class AppModel {
         }
     }
 
+    // MARK: Pinned workflows (#432)
+
+    func pinnedWorkflows(in folder: URL?) -> [String] { work.pinnedWorkflows(in: folder) }
+
+    func isPinned(_ summary: WorkflowSummary) -> Bool {
+        pinnedWorkflows(in: summary.folder).contains(summary.workflowID)
+    }
+
+    /// Pin or Unpin from a workflow's menu, swipe or page: shown at once, then the host told.
+    func setPinned(_ summary: WorkflowSummary, _ pinned: Bool, on host: HostID) async {
+        let folder = summary.folder
+        let held = pinnedWorkflows(in: folder).filter { $0 != summary.workflowID }
+        work.setWorkflowPins(pinned ? held + [summary.workflowID] : held, in: folder)
+        await attempt(on: host) {
+            try await self.client(for: host).call(
+                pinned ? DaemonAPI.Method.pinsPinWorkflow : DaemonAPI.Method.pinsUnpinWorkflow,
+                DaemonAPI.WorkflowRequest(folder: folder, workflowID: summary.workflowID))
+        }
+    }
+
+    /// A drop among the pinned workflows: shown at once, the order sent once.
+    func arrangeWorkflowPins(_ ids: [String], in key: ProjectKey) async {
+        work.setWorkflowPins(ids, in: key.folder)
+        await attempt(on: key.host) {
+            try await self.client(for: key.host).call(
+                DaemonAPI.Method.pinsArrangeWorkflows,
+                DaemonAPI.PinArrangeWorkflowsRequest(folder: key.folder, workflowIDs: ids))
+        }
+    }
+
     /// A project's plugins, asked for when its page opens; kept current after that by
     /// `plugins/changed`.
     func plugins(in folder: URL?) -> [ProjectPlugin] { work.plugins(in: folder) }

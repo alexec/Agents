@@ -349,8 +349,9 @@ private struct ProjectFold: View {
                     PinnedPageRows(project: key)
                 }
                 // Then its pinned sessions (#180), whatever their state, in the order
-                // they were put in. They still count under their own groups' numbers.
-                if !fold.pinned.isEmpty {
+                // they were put in, and its pinned workflows (#432). They still count
+                // under their own groups' numbers.
+                if fold.hasPinned {
                     pinnedSessions(fold)
                 }
                 ForEach(fold.groups) { part in
@@ -408,9 +409,11 @@ private struct ProjectFold: View {
         }
     }
 
-    /// The pinned sessions, folding as a group does, and dragged into the order wanted.
+    /// The pinned sessions, then the pinned workflows (#432), folding as a group does,
+    /// each dragged into the order wanted among its own kind.
     private func pinnedSessions(_ fold: SidebarProjectFold) -> some View {
         let pinned = fold.pinned
+        let pinnedFlows = fold.pinnedWorkflows
         let searching = fold.isSearching
         let isOpen = searching || folds.isOpen(key, .pinned)
         let open = Binding(
@@ -429,8 +432,19 @@ private struct ProjectFold: View {
                 let rest = model.pinnedSessions(in: key.folder).filter { !shown.contains($0) }
                 Task { await model.arrangeSessionPins(ids + rest, in: key) }
             }
+            ForEach(FoldedRow.rows(isOpen ? pinnedFlows : [], in: .pinned)) { row in
+                WorkflowListRow(summary: row.item, project: key)
+            }
+            .onMove { from, to in
+                guard !searching else { return }
+                var ids = pinnedFlows.map(\.workflowID)
+                ids.move(fromOffsets: from, toOffset: to)
+                let shown = Set(ids)
+                let rest = model.pinnedWorkflows(in: key.folder).filter { !shown.contains($0) }
+                Task { await model.arrangeWorkflowPins(ids + rest, in: key) }
+            }
         } label: {
-            SidebarSubheading(title: "Pinned", count: pinned.count,
+            SidebarSubheading(title: "Pinned", count: fold.pinnedCount,
                               unread: pinned.filter(\.showsUnread).count,
                               tint: !isOpen && fold.pinnedWantsAPerson(in: model.work) ? .attention : .none)
                 .togglesFold(open)

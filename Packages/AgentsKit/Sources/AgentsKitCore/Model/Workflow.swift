@@ -46,7 +46,7 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
     public var folder: URL
     /// What to call it. The file may say; otherwise the file name does.
     public var name: String
-    /// What makes it run. At least one, or the file is unreadable.
+    /// What makes it run. None is a workflow run only by hand, with Run now (#432).
     public var triggers: [WorkflowTrigger]
     /// Which agent gets the prompt.
     public var mode: WorkflowMode
@@ -139,6 +139,12 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
         return hosts.contains(machineID)
     }
 
+    /// The row's words for a workflow run only by hand (#432), as a trigger's are.
+    public static let byHandSummary = "By hand, with Run now"
+
+    /// Whether nothing but Run now runs it (#432): its file says `on: manual`, or no `on:`.
+    public var runsOnlyByHand: Bool { triggers.isEmpty }
+
     /// Whether anything could make this fire on its own.
     ///
     /// A workflow with no supported trigger is still runnable by hand — that is FR-012,
@@ -157,10 +163,9 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
     public var summary: String {
         if let problem { return problem.message }
         let supported = supportedTriggers
-        guard !supported.isEmpty else {
-            return triggers.first?.summary ?? "Nothing makes this run"
-        }
-        let triggerPart = supported.map(\.summary).joined(separator: ", and ")
+        guard !supported.isEmpty || triggers.isEmpty else { return triggers[0].summary }
+        let triggerPart = runsOnlyByHand ? Self.byHandSummary
+            : supported.map(\.summary).joined(separator: ", and ")
         var base = "\(triggerPart), \(mode.summary)"
         if let cooldownPart { base += ", \(cooldownPart)" }
         // A `triggering` workflow never starts an agent — it resumes the one that set

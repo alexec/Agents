@@ -32,7 +32,8 @@ Check the build and say whether it is green.
 | In the file | Values | What it means |
 | --- | --- | --- |
 | `name:` | Any text | The name shown on the project page. Without it, the name is made from the file name. |
-| `on:` | One trigger, or a list of them | What makes the workflow run. Required. With a list, any one of them runs it. |
+| `on:` | One trigger, or a list of them | What makes the workflow run. With a list, any one of them runs it. |
+| `on:` `manual` | No settings | Nothing runs it but **Run now**, on its page or its row. Leaving `on:` out says the same. Its row reads "By hand, with Run now". See [Run only by hand](#run-only-by-hand). |
 | `on:` `schedule` | `at:`, and optionally `between:` and `days:` | Runs at set times. **At** is a list of minutes past the hour, `":00"` or `":30"` and nothing else. **Between** is a range of hours such as `"09:00-18:00"`; without it, every hour. **Days** is a list of `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun`; without it, every day. A time missed while the Mac slept or the app was closed is not run later; the workflow's page says it was missed. |
 | `on:` `agent-finished` | No settings | Runs when an agent in this project finishes a turn. |
 | `on:` `agent-asked-permission` | No settings | Runs when an agent in this project asks for permission. |
@@ -220,6 +221,23 @@ filters on it, whether it listens in this project or on the whole Mac or server,
 agent a `triggering` run resumes, when a schedule is next due, and a trigger this
 version does not know marked **Unknown**. Under them it says when the workflow last ran
 and what set it off. A file that cannot be read still lists the triggers it could read.
+
+## Run only by hand
+
+A workflow you only ever start yourself says `on: manual`, or has no `on:` at all.
+Nothing else starts it: it runs when you press **Run now**. Pin it to the sidebar to keep
+it one click away.
+
+```markdown
+---
+name: Release notes
+on: manual
+agent: new
+permission-mode: plan
+---
+
+Draft release notes from the commits since the last tag.
+```
 
 ## One run at a time
 

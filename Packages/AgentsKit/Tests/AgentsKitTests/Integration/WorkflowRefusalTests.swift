@@ -307,14 +307,14 @@ struct WorkflowRefusalTests {
     @Test func anUnreadableFileRefusesAndSaysWhy() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
-        try write("---\nagent: new\n---\n\nGo.", as: "broken", in: work)
+        try write("---\non: agent-finished\n---\n\n   \n", as: "broken", in: work)
 
         let core = try await core(locations)
         await core.rescanWorkflows(in: work)
         try await core.runWorkflow(DaemonAPI.WorkflowRequest(folder: work, workflowID: "broken"))
 
         #expect(await refusal(core, work, "broken")
-                == .unreadable("The metadata does not say what makes this run"))
+                == .unreadable("There is no prompt under the metadata"))
     }
 
     @Test func aTriggerFromTheFutureRefusesRatherThanErroring() async throws {
@@ -463,7 +463,7 @@ struct WorkflowRefusalTests {
         let (locations, root) = try temporary()
         let work = try project(root)
         try write(onSchedule, as: "fine", in: work)
-        try write("---\nagent: new\n---\n\nGo.", as: "broken", in: work)
+        try write("---\nagent: new\n---\n\n  \n", as: "broken", in: work)
         try write("---\non: deploys-finished\n---\n\nGo.", as: "future", in: work)
         try write("---\non: agent-finished\nagent: triggering\n---\n\nGo.", as: "follow", in: work)
 

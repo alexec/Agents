@@ -48,6 +48,8 @@ public final class AgentsModel {
     /// Each project's pinned sessions (#180), by its standardized folder, in their order:
     /// kept current by `pins/changed` as the pages are. A project with none is absent.
     @ObservationIgnored public private(set) var sessionPins: [URL: [UUID]] = [:]
+    /// Each project's pinned workflows' ids (#432), likewise.
+    @ObservationIgnored public private(set) var workflowPins: [URL: [String]] = [:]
     /// Bumped by `pages/changed`: a page a screen may be showing changed on disk. Whoever
     /// shows one reads it again, with its stamp, so an unchanged file costs nothing.
     public private(set) var pageRevisions: [URL: [String: Int]] = [:]
@@ -535,8 +537,11 @@ public final class AgentsModel {
             let sessions = notification.sessions ?? []
             pins[folder] = notification.pins.isEmpty ? nil : notification.pins
             sessionPins[folder] = sessions.isEmpty ? nil : sessions
+            let flows = notification.workflows ?? []
+            workflowPins[folder] = flows.isEmpty ? nil : flows
             pinShelves[folder]?.setPins(notification.pins)
             pinShelves[folder]?.setSessions(sessions)
+            pinShelves[folder]?.setWorkflows(flows)
 
         case .pagesChanged(let notification):
             let project = Project.standardize(notification.folder)
@@ -698,10 +703,29 @@ public final class AgentsModel {
             listed.sessions.map { (Project.standardize(listed.folder), $0) }
         }, uniquingKeysWith: { $1 })
         if sessionPins != sessions { sessionPins = sessions }
+        let flows = Dictionary(listed.compactMap { listed in
+            listed.workflows.map { (Project.standardize(listed.folder), $0) }
+        }, uniquingKeysWith: { $1 })
+        if workflowPins != flows { workflowPins = flows }
         for (folder, shelf) in pinShelves {
             shelf.setPins(pins[folder] ?? [])
             shelf.setSessions(sessionPins[folder] ?? [])
+            shelf.setWorkflows(workflowPins[folder] ?? [])
         }
+    }
+
+    /// One project's pinned workflows' ids (#432), in their order, whether or not this
+    /// client holds them.
+    public func pinnedWorkflows(in folder: URL?) -> [String] {
+        guard let folder else { return [] }
+        return pinShelf(folder).workflows
+    }
+
+    /// A project's pinned workflows as a screen left them, before the host says so.
+    public func setWorkflowPins(_ ids: [String], in folder: URL) {
+        let key = Project.standardize(folder)
+        workflowPins[key] = ids.isEmpty ? nil : ids
+        pinShelves[key]?.setWorkflows(ids)
     }
 
     /// One project's pinned sessions (#180), in their order: ids, whether or not this
@@ -733,6 +757,7 @@ public final class AgentsModel {
         let shelf = PinShelf()
         shelf.setPins(pins[key] ?? [])
         shelf.setSessions(sessionPins[key] ?? [])
+        shelf.setWorkflows(workflowPins[key] ?? [])
         pinShelves[key] = shelf
         return shelf
     }

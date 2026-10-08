@@ -30,6 +30,9 @@ public struct SidebarProjectFold {
     /// The pinned sessions held and not archived, in the order they were put in, as the
     /// search leaves them.
     public private(set) var pinned: [Agent] = []
+    /// The pinned workflows held and not archived (#432), in their order, after the pinned
+    /// sessions under the same heading, as the search leaves them. They leave `workflows`.
+    public private(set) var pinnedWorkflows: [WorkflowSummary] = []
     /// The live groups with something in them, in `AgentGroup.live`'s order.
     public private(set) var groups: [Group] = []
     /// The archived sessions held, newest first: a page while the fold is open (#165).
@@ -54,14 +57,20 @@ public struct SidebarProjectFold {
 
     /// Whether the project is drawn at all: always, unless a search found nothing in it.
     public var isShown: Bool {
-        !isSearching || nameMatches || !pinned.isEmpty || !groups.isEmpty || !archived.isEmpty
+        !isSearching || nameMatches || hasPinned || !groups.isEmpty || !archived.isEmpty
             || !workflows.isEmpty || !archivedWorkflows.isEmpty
     }
+
+    /// Whether there is a Pinned heading to draw: a pinned session or workflow.
+    public var hasPinned: Bool { !pinned.isEmpty || !pinnedWorkflows.isEmpty }
+
+    /// How many the Pinned heading counts: sessions and workflows.
+    public var pinnedCount: Int { pinned.count + pinnedWorkflows.count }
 
     /// The pinned sessions' heading: attention on a folded one, so folding it never hides
     /// that somebody is waiting.
     public func pinnedWantsAPerson(in work: AgentsModel) -> Bool {
-        pinned.contains { work.group(of: $0) == .needsAttention }
+        pinned.contains { work.group(of: $0) == .needsAttention } || pinnedWorkflows.contains(where: \.needsAPerson)
     }
 
     /// How many archived sessions the fold says it holds: the host's count while there is
@@ -102,7 +111,15 @@ public struct SidebarProjectFold {
         guard isUnfolded else { return }
         let held = work.workflows(in: key.folder)
         let workflows = matcher.map { held.filter($0.matches) } ?? held
-        self.workflows = workflows.filter { !$0.isArchived }
+        // Pinned (#432): in the pin's order, out of the Workflows group. An archived one
+        // shows only under Archived workflows, though its pin may linger until the host
+        // takes it off.
+        let pinnedFlows = work.pinnedWorkflows(in: key.folder).compactMap { id in
+            workflows.first { $0.workflowID == id && !$0.isArchived }
+        }
+        let pinnedFlowIDs = Set(pinnedFlows.map(\.workflowID))
+        pinnedWorkflows = pinnedFlows
+        self.workflows = workflows.filter { !$0.isArchived && !pinnedFlowIDs.contains($0.workflowID) }
         archivedWorkflows = workflows.filter(\.isArchived)
 
         let shelf = work.shelf(key)

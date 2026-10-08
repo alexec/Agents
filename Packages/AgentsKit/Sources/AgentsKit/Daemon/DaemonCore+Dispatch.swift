@@ -753,6 +753,21 @@ extension DaemonCore {
                 try unpinSessionByPerson(request)
                 return .success([:])
 
+            case DaemonAPI.Method.pinsPinWorkflow:
+                let request = try require(params, as: DaemonAPI.WorkflowRequest.self)
+                try pinWorkflowByPerson(request)
+                return .success([:])
+
+            case DaemonAPI.Method.pinsUnpinWorkflow:
+                let request = try require(params, as: DaemonAPI.WorkflowRequest.self)
+                try unpinWorkflowByPerson(request)
+                return .success([:])
+
+            case DaemonAPI.Method.pinsArrangeWorkflows:
+                let request = try require(params, as: DaemonAPI.PinArrangeWorkflowsRequest.self)
+                try arrangeWorkflowPins(request)
+                return .success([:])
+
             case DaemonAPI.Method.pinsArrangeSessions:
                 let request = try require(params, as: DaemonAPI.PinArrangeSessionsRequest.self)
                 try arrangeSessionPins(request)

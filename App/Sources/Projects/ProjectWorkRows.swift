@@ -124,7 +124,7 @@ private struct WorkRow<Leading: View, Detail: View, Trailing: View>: View {
 
 /// One workflow: its name and what it is. Picking it shows its page; the list's own
 /// selection lights it, as it does a session's row (066).
-private struct WorkflowListRow: View {
+struct WorkflowListRow: View {
     @Environment(AppModel.self) private var model
     let summary: WorkflowSummary
     let project: ProjectKey
@@ -147,6 +147,16 @@ private struct WorkflowListRow: View {
         .sidebarInk(.workflow(summary.id, in: project))
         .tag(SidebarItem.workflow(summary.id, in: project))
         .accessibilityElement(children: .combine)
+        // Pin or Unpin (#432), from the other edge, as a session's row has it.
+        .swipeActions(edge: .leading) {
+            if !summary.isArchived {
+                let pinned = model.isPinned(summary)
+                SwipeAction(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin") {
+                    await model.setPinned(summary, !pinned, on: project.host)
+                }
+                .tint(Paper.accent)
+            }
+        }
         .swipeActions(edge: .trailing) {
             if summary.isArchived {
                 SwipeAction("Bring Back") { await model.setWorkflowArchived(summary, false) }
@@ -173,6 +183,8 @@ private struct WorkflowListRow: View {
                 Button("Run now") { Task { await model.runWorkflow(summary) } }
             }
             if !summary.isArchived {
+                let pinned = model.isPinned(summary)
+                Button(pinned ? "Unpin" : "Pin") { Task { await model.setPinned(summary, !pinned, on: project.host) } }
                 Button(summary.isEnabled ? "Turn Off" : "Turn On") {
                     Task { await model.setWorkflowEnabled(summary, !summary.isEnabled) }
                 }

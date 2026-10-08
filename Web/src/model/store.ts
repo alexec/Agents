@@ -223,6 +223,8 @@ export class Work {
   readonly pins = signal<Record<string, PinView[]>>({});
   /** Each project's pinned sessions by `host|folder` (#180), in their order, kept by pins/changed. */
   readonly sessionPins = signal<Record<string, string[]>>({});
+  /** Each project's pinned workflows' ids by `host|folder` (#432), in their order, kept by pins/changed. */
+  readonly workflowPins = signal<Record<string, string[]>>({});
   /** Bumped by pages/changed: a page shown may have changed on disk; read it again. */
   readonly pageRevisions = signal<Record<string, number>>({});
 
@@ -390,6 +392,7 @@ export class Work {
         const note = params as PinsChangedNotification;
         this.pins.value = { ...this.pins.value, [`${host}|${folderKey(note.folder)}`]: note.pins };
         this.sessionPins.value = { ...this.sessionPins.value, [`${host}|${folderKey(note.folder)}`]: note.sessions ?? [] };
+        this.workflowPins.value = { ...this.workflowPins.value, [`${host}|${folderKey(note.folder)}`]: note.workflows ?? [] };
         return true;
       }
       case "pages/changed": {
@@ -985,6 +988,7 @@ export class Store extends Work {
       this.pageRevisions.value = notOf(this.pageRevisions.value);
       this.pins.value = notOf(this.pins.value);
       this.sessionPins.value = notOf(this.sessionPins.value);
+      this.workflowPins.value = notOf(this.workflowPins.value);
       this.leases.value = without(this.leases.value);
       this.runtimes.value = without(this.runtimes.value);
       this.accounts.value = without(this.accounts.value);
@@ -1039,12 +1043,15 @@ export class Store extends Work {
     void this.link.call("pins/list", {}, host).then((listed) => {
       const held = Object.fromEntries(Object.entries(this.pins.value).filter(([key]) => !key.startsWith(`${host}|`)));
       const sessions = Object.fromEntries(Object.entries(this.sessionPins.value).filter(([key]) => !key.startsWith(`${host}|`)));
+      const flows = Object.fromEntries(Object.entries(this.workflowPins.value).filter(([key]) => !key.startsWith(`${host}|`)));
       for (const project of listed) {
         held[`${host}|${folderKey(project.folder)}`] = project.pins;
         sessions[`${host}|${folderKey(project.folder)}`] = project.sessions ?? [];
+        flows[`${host}|${folderKey(project.folder)}`] = project.workflows ?? [];
       }
       this.pins.value = held;
       this.sessionPins.value = sessions;
+      this.workflowPins.value = flows;
     }).catch(failed("pins/list"));
     // A host from before #251 doesn't answer, and nothing is said to be coming back.
     void this.link.call("agents/resuming", {}, host).then((response) => {
@@ -1705,6 +1712,24 @@ export class Store extends Work {
   async arrangeSessionPins(host: string, folder: string, ids: string[]): Promise<void> {
     this.sessionPins.value = { ...this.sessionPins.value, [`${host}|${folderKey(folder)}`]: ids };
     await this.act("pins/arrangeSessions", { folder: folder as never, agentIDs: ids as UUID[] }, host);
+  }
+
+  workflowPinsIn(host: string, folder: string): string[] {
+    return this.workflowPins.value[`${host}|${folderKey(folder)}`] ?? [];
+  }
+
+  /** Pin or Unpin a workflow (#432) from its menu or page: shown at once, then the host told. */
+  async setWorkflowPinned(host: string, folder: string, workflowID: string, pinned: boolean): Promise<void> {
+    const key = `${host}|${folderKey(folder)}`;
+    const held = this.workflowPinsIn(host, folder).filter((id) => id !== workflowID);
+    this.workflowPins.value = { ...this.workflowPins.value, [key]: pinned ? [...held, workflowID] : held };
+    await this.act(pinned ? "pins/pinWorkflow" : "pins/unpinWorkflow", { folder: folder as never, workflowID }, host);
+  }
+
+  /** A Move item among the pinned workflows: shown at once, then the whole order sent once. */
+  async arrangeWorkflowPins(host: string, folder: string, ids: string[]): Promise<void> {
+    this.workflowPins.value = { ...this.workflowPins.value, [`${host}|${folderKey(folder)}`]: ids };
+    await this.act("pins/arrangeWorkflows", { folder: folder as never, workflowIDs: ids }, host);
   }
 
   /** Run now (US5). The session it starts arrives as any other does, by agent/changed. */

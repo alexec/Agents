@@ -21,6 +21,11 @@ public extension DaemonAPI.Method {
     static let pinsUnpinSession = "pins/unpinSession"
     /// A person's drop or Move item among the pinned sessions: the whole new order.
     static let pinsArrangeSessions = "pins/arrangeSessions"
+    /// A person's Pin and Unpin on a workflow (#432): any workflow in the project.
+    static let pinsPinWorkflow = "pins/pinWorkflow"
+    static let pinsUnpinWorkflow = "pins/unpinWorkflow"
+    /// A person's drop or Move item among the pinned workflows: the whole new order.
+    static let pinsArrangeWorkflows = "pins/arrangeWorkflows"
     /// `pin_session`, relayed: an agent pins or unpins its own session.
     static let pinsPinSessionTool = "pins/pinSessionTool"
     /// `pin_page`, `unpin_page` and `move_pin`, relayed.
@@ -145,16 +150,30 @@ public extension DaemonAPI {
         }
     }
 
+    /// The whole order a person left the pinned workflows in (#432), by id.
+    struct PinArrangeWorkflowsRequest: Codable, Sendable, Hashable {
+        public var folder: URL
+        public var workflowIDs: [String]
+
+        public init(folder: URL, workflowIDs: [String]) {
+            self.folder = folder
+            self.workflowIDs = workflowIDs
+        }
+    }
+
     struct PinsChangedNotification: Codable, Sendable, Hashable {
         public var folder: URL
         public var pins: [PinView]
         /// The pinned sessions in their order (#180). Nil from a host with none.
         public var sessions: [UUID]?
+        /// The pinned workflows' ids in their order (#432). Nil from a host with none.
+        public var workflows: [String]?
 
-        public init(folder: URL, pins: [PinView], sessions: [UUID] = []) {
+        public init(folder: URL, pins: [PinView], sessions: [UUID] = [], workflows: [String] = []) {
             self.folder = folder
             self.pins = pins
             self.sessions = sessions.isEmpty ? nil : sessions
+            self.workflows = workflows.isEmpty ? nil : workflows
         }
     }
 

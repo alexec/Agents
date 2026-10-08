@@ -1050,6 +1050,11 @@ export interface PinArrangeSessionsRequest {
   agentIDs: UUID[];
 }
 
+export interface PinArrangeWorkflowsRequest {
+  folder: URLString;
+  workflowIDs: string[];
+}
+
 export type PinKind = "markdown" | "html" | "view";
 
 export interface PinPathRequest {
@@ -1103,6 +1108,7 @@ export interface PinsChangedNotification {
   folder: URLString;
   pins: PinView[];
   sessions?: UUID[];
+  workflows?: string[];
 }
 
 export interface Plan {
@@ -1157,6 +1163,7 @@ export interface ProjectPins {
   folder: URLString;
   pins: PinView[];
   sessions?: UUID[];
+  workflows?: string[];
 }
 
 export interface ProjectRequest {
@@ -1985,12 +1992,15 @@ export interface Methods {
   "permissions/pending": { params: Empty; result: PermissionRequest[] };
   "pins/arrange": { params: PinArrangeRequest; result: Empty };
   "pins/arrangeSessions": { params: PinArrangeSessionsRequest; result: Empty };
+  "pins/arrangeWorkflows": { params: PinArrangeWorkflowsRequest; result: Empty };
   "pins/list": { params: Empty; result: ProjectPins[] };
   "pins/pin": { params: PinRequest; result: PinView[] };
   "pins/pinSession": { params: PinSessionRequest; result: Empty };
+  "pins/pinWorkflow": { params: WorkflowRequest; result: Empty };
   "pins/read": { params: PinReadRequest; result: FileReading };
   "pins/unpin": { params: PinPathRequest; result: Empty };
   "pins/unpinSession": { params: PinSessionRequest; result: Empty };
+  "pins/unpinWorkflow": { params: WorkflowRequest; result: Empty };
   "pins/write": { params: PinWriteRequest; result: Empty };
   "presence/report": { params: PresenceReport; result: Empty };
   "projects/add": { params: ProjectRequest; result: ProjectSummary };
@@ -2081,12 +2091,15 @@ export const MethodTarget = {
   "permissions/pending": "host",
   "pins/arrange": "host",
   "pins/arrangeSessions": "host",
+  "pins/arrangeWorkflows": "host",
   "pins/list": "host",
   "pins/pin": "host",
   "pins/pinSession": "host",
+  "pins/pinWorkflow": "host",
   "pins/read": "host",
   "pins/unpin": "host",
   "pins/unpinSession": "host",
+  "pins/unpinWorkflow": "host",
   "pins/write": "host",
   "presence/report": "host",
   "projects/add": "host",
@@ -2251,6 +2264,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PermissionRequest: { required: ["id", "agentID", "toolCall", "options", "askedAt"], optional: ["subagent"] },
   PinArrangeRequest: { required: ["folder", "paths"], optional: [] },
   PinArrangeSessionsRequest: { required: ["folder", "agentIDs"], optional: [] },
+  PinArrangeWorkflowsRequest: { required: ["folder", "workflowIDs"], optional: [] },
   PinPathRequest: { required: ["folder", "path"], optional: [] },
   PinReadRequest: { required: ["folder", "path"], optional: ["knownStamp"] },
   PinRequest: { required: ["folder", "path"], optional: ["title", "view"] },
@@ -2258,14 +2272,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PinView: { required: ["path", "title", "kind", "missing", "pinnedBy"], optional: ["view", "missingReason"] },
   PinWriteRequest: { required: ["folder", "path", "text"], optional: [] },
   PinnerView: { required: ["kind", "id", "name"], optional: [] },
-  PinsChangedNotification: { required: ["folder", "pins"], optional: ["sessions"] },
+  PinsChangedNotification: { required: ["folder", "pins"], optional: ["sessions", "workflows"] },
   Plan: { required: ["entries", "state", "at"], optional: ["planID"] },
   PlanEntry: { required: ["content", "priority", "status"], optional: [] },
   PresenceReport: { required: ["active"], optional: ["watching", "mayNotify", "showing"] },
   PrewarmRequest: { required: ["agentID", "why"], optional: [] },
   Project: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits", "diskSpace"] },
   ProjectDetection: { required: ["enabled", "paths"], optional: [] },
-  ProjectPins: { required: ["folder", "pins"], optional: ["sessions"] },
+  ProjectPins: { required: ["folder", "pins"], optional: ["sessions", "workflows"] },
   ProjectRequest: { required: ["folder"], optional: [] },
   ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: ["isChat"] },
   ProjectsListRequest: { required: ["includeArchived"], optional: [] },

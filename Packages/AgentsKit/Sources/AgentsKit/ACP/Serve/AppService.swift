@@ -1157,6 +1157,9 @@ public actor AppService {
             `standing`, or `triggering`); everything under the front matter is the \
             prompt, sent verbatim.
 
+            A workflow meant only to be run by hand, with Run now on its page, says \
+            `on: manual` (or leaves `on:` out). Nothing else runs it.
+
             A workflow may also say how its agent runs: `permission-mode:` (the \
             runtime's own mode, e.g. a read-only or plan mode), `runtime:`, `model:`, \
             `effort:` (how hard it thinks, e.g. `low` or `high`), and under \

@@ -102,6 +102,30 @@ approve it again. Changes you make on the workflow's page in Agents count as app
 unless the workflow was already waiting. Workflows that existed before this version
 were approved as they stood.
 
+**One you only run by hand**
+
+A workflow you only ever start yourself says `on: manual`, or has no `on:` at all, such as
+"Set up a workflow, run only by hand, that drafts release notes from the commits since the
+last tag." Nothing else runs it, and its row reads **By hand, with Run now**. See
+[Run only by hand](../reference/workflows.md#run-only-by-hand).
+
+**Pin it to the sidebar**
+
+Pin a workflow you run often, and it sits in its project's **Pinned** group, with the pinned
+sessions, at the top of the project in the sidebar: one click opens its page, and **Run
+now** is there.
+
+- On the Mac, right-click its row and choose **Pin**, swipe the row right with two fingers,
+  or click **Pin** on its page. Drag it among the pinned workflows to order them.
+- On iPhone and iPad, long-press its row for **Pin**, **Move Up** and **Move Down**, swipe
+  it right, or tap the pin in its page's bar.
+- On the web page, **Pin**, **Move Up** and **Move Down** are in the row's **···** menu, and
+  **Pin** is on its page.
+
+**Unpin** is in the same places. The pin is kept in the project's `.agents/pins.json`, so it
+lasts through a restart and every client sees it. Archiving a workflow unpins it, and
+bringing it back does not pin it again.
+
 **Turn it off**
 
 - Turn it off for a while: switch off **Enabled** on its page, or right-click its row and

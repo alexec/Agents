@@ -2,7 +2,8 @@ import Foundation
 
 // A project's pinned pages (#159): Markdown documents and HTML pages pinned under the
 // project. specs/159-pinned-pages/README.md is the reference.
-// And its pinned sessions (#180), kept at the top of its sessions whatever their state.
+// And its pinned sessions (#180), kept at the top of its sessions whatever their state,
+// and its pinned workflows (#432), after them.
 
 /// `<project>/.agents/pins.json`, as written: the pins in the order shown.
 public struct PinsFile: Codable, Sendable, Hashable {
@@ -10,19 +11,24 @@ public struct PinsFile: Codable, Sendable, Hashable {
     /// The pinned sessions (#180), in the order shown. Absent when there are none, so a
     /// file of pages alone is the same bytes it always was.
     public var sessions: [SessionPinEntry]?
+    /// The pinned workflows (#432), in the order shown, after the pinned sessions. Absent
+    /// when there are none, as `sessions` is.
+    public var workflows: [WorkflowPinEntry]?
     /// Entries this build cannot read (a newer build's kind of pin), kept as they were and
     /// written back after the rest, so an older reader never loses them (#189). They count
     /// towards the limit.
     public var unread: [JSONValue] = []
 
-    public init(pins: [PinEntry] = [], sessions: [SessionPinEntry] = [], unread: [JSONValue] = []) {
+    public init(pins: [PinEntry] = [], sessions: [SessionPinEntry] = [], workflows: [WorkflowPinEntry] = [],
+                unread: [JSONValue] = []) {
         self.pins = pins
         self.sessions = sessions.isEmpty ? nil : sessions
+        self.workflows = workflows.isEmpty ? nil : workflows
         self.unread = unread
     }
 
     enum CodingKeys: String, CodingKey {
-        case pins, sessions
+        case pins, sessions, workflows
     }
 
     public init(from decoder: any Decoder) throws {
@@ -35,12 +41,14 @@ public struct PinsFile: Codable, Sendable, Hashable {
         self.pins = pins
         self.unread = unread
         sessions = try container.decodeIfPresent([SessionPinEntry].self, forKey: .sessions)
+        workflows = try container.decodeIfPresent([WorkflowPinEntry].self, forKey: .workflows)
     }
 
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(try pins.map { try JSONValue.encoding($0) } + unread, forKey: .pins)
         try container.encodeIfPresent(sessions, forKey: .sessions)
+        try container.encodeIfPresent(workflows, forKey: .workflows)
     }
 
     /// Pins of either kind, and those this build cannot read: what the limit counts.
@@ -51,6 +59,15 @@ public struct PinsFile: Codable, Sendable, Hashable {
         get { sessions ?? [] }
         set { sessions = newValue.isEmpty ? nil : newValue }
     }
+
+    /// The pinned workflows (#432), none for a file without the key.
+    public var workflowPins: [WorkflowPinEntry] {
+        get { workflows ?? [] }
+        set { workflows = newValue.isEmpty ? nil : newValue }
+    }
+
+    /// Nothing pinned at all, of any kind: the file can go.
+    public var isEmpty: Bool { pins.isEmpty && sessionPins.isEmpty && workflowPins.isEmpty && unread.isEmpty }
 
     public static let path = ".agents/pins.json"
 
@@ -88,8 +105,14 @@ public struct PinsFile: Codable, Sendable, Hashable {
             && sessions.count < PinLimits.sessionsPerProject {
             sessions.append(entry)
         }
-        return (PinsFile(pins: kept, sessions: sessions, unread: raw.unread),
-                raw.pins.count - kept.count + raw.sessionPins.count - sessions.count)
+        var workflows: [WorkflowPinEntry] = []
+        for entry in raw.workflowPins where !workflows.contains(where: { $0.workflow == entry.workflow })
+            && workflows.count < PinLimits.workflowsPerProject {
+            workflows.append(entry)
+        }
+        return (PinsFile(pins: kept, sessions: sessions, workflows: workflows, unread: raw.unread),
+                raw.pins.count - kept.count + raw.sessionPins.count - sessions.count
+                    + raw.workflowPins.count - workflows.count)
     }
 }
 
@@ -107,6 +130,23 @@ public struct SessionPinEntry: Codable, Sendable, Hashable {
 
     public init(session: UUID, pinnedBy: Pinner) {
         self.session = session
+        self.pinnedBy = pinnedBy
+    }
+}
+
+/// One pinned workflow (#432): which, by its id (the file name without `.md`), and who
+/// pinned it. A workflow renamed or removed leaves an entry naming nothing, shown nowhere.
+public struct WorkflowPinEntry: Codable, Sendable, Hashable {
+    public var workflow: String
+    public var pinnedBy: Pinner
+
+    enum CodingKeys: String, CodingKey {
+        case workflow
+        case pinnedBy = "pinned_by"
+    }
+
+    public init(workflow: String, pinnedBy: Pinner) {
+        self.workflow = workflow
         self.pinnedBy = pinnedBy
     }
 }
@@ -211,6 +251,8 @@ public enum PinLimits {
     public static let perProject = 10
     /// Pinned sessions a project may hold, apart from its pages (#180).
     public static let sessionsPerProject = 10
+    /// Pinned workflows a project may hold, apart from its pages and sessions (#432).
+    public static let workflowsPerProject = 10
     public static let titleLength = 60
     /// A view pin's arguments, as JSON (#189).
     public static let viewArgumentsBytes = 2048
@@ -359,10 +401,13 @@ public struct ProjectPins: Codable, Sendable, Hashable {
     public var pins: [PinView]
     /// Its pinned sessions in their order (#180). Nil from a host that has none to say.
     public var sessions: [UUID]?
+    /// Its pinned workflows' ids in their order (#432). Nil from a host that has none to say.
+    public var workflows: [String]?
 
-    public init(folder: URL, pins: [PinView], sessions: [UUID] = []) {
+    public init(folder: URL, pins: [PinView], sessions: [UUID] = [], workflows: [String] = []) {
         self.folder = folder
         self.pins = pins
         self.sessions = sessions.isEmpty ? nil : sessions
+        self.workflows = workflows.isEmpty ? nil : workflows
     }
 }

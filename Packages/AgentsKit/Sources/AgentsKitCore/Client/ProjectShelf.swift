@@ -190,6 +190,12 @@ final class WorkflowShelf {
 final class PinShelf {
     private(set) var pins: [PinView] = []
     private(set) var sessions: [UUID] = []
+    /// Pinned workflows' ids (#432).
+    private(set) var workflows: [String] = []
+
+    func setWorkflows(_ workflows: [String]) {
+        if self.workflows != workflows { self.workflows = workflows }
+    }
 
     func setPins(_ pins: [PinView]) {
         if self.pins != pins { self.pins = pins }

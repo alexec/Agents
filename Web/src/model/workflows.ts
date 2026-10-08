@@ -200,12 +200,22 @@ export function cooldownWords(seconds: number): string {
 export function workflowSummary(w: Workflow, runtimeName: (id: string) => string | undefined = () => undefined): string {
   if (w.problem) return problemMessage(w.problem);
   const supported = w.triggers.filter(isSupported);
-  if (!supported.length) return w.triggers[0] ? triggerSummary(w.triggers[0]) : "Nothing makes this run";
-  let base = `${supported.map((t) => triggerSummary(t, runtimeName)).join(", and ")}, ${modeWords[w.mode]}`;
+  if (!supported.length && w.triggers[0]) return triggerSummary(w.triggers[0]);
+  // No triggers: run only by hand, with Run now (#432).
+  const triggerPart = w.triggers.length ? supported.map((t) => triggerSummary(t, runtimeName)).join(", and ") : byHandSummary;
+  let base = `${triggerPart}, ${modeWords[w.mode]}`;
   if (w.cooldown !== undefined) base += `, at most once every ${cooldownWords(w.cooldown)}`;
   if (w.mode === "triggering") return base;
   const settings = settingsSummary(w.settings, runtimeName);
   return settings ? `${base}, ${settings}` : base;
+}
+
+/** Workflow.byHandSummary (#432). */
+export const byHandSummary = "By hand, with Run now";
+
+/** Workflow.runsOnlyByHand (#432): its file says on: manual, or has no on:. */
+export function runsOnlyByHand(w: Workflow): boolean {
+  return w.triggers.length === 0;
 }
 
 /** Workflow.canFire: anything could make it run on its own. */
@@ -250,6 +260,7 @@ export function workflowStatus(s: WorkflowSummary): { mark: string; words: strin
   if (s.isRunning) return { mark: "◌", words: "Running", tinted };
   // A trigger held by its cooldown (#103): it runs once when the cooldown ends.
   if (s.holdsAFire) return { mark: "⧗", words: "Cooling down, then it runs once", tinted };
+  if (runsOnlyByHand(s.workflow) && !s.workflow.problem) return { mark: "☝\uFE0E", words: "Runs by hand", tinted };
   if (!canFire(s.workflow)) return { mark: "◌", words: "Not yet supported", tinted };
   return { mark: "◷", words: "Waiting for its trigger", tinted };
 }
@@ -733,6 +744,9 @@ function nextRunLine(s: WorkflowSummary, now: Date): StatusLine {
   if (s.nextFireAt !== undefined && !blocked) {
     const at = fromWireDate(s.nextFireAt);
     return { glyph: "◷", text: `Next run ${namedRelative(at, now)}`, detail: at.toLocaleString("en", { dateStyle: "medium", timeStyle: "short" }) };
+  }
+  if (!blocked && runsOnlyByHand(s.workflow)) {
+    return { glyph: "☝\uFE0E", text: "Runs only by hand, with Run now", detail: "Its file says on: manual, or has no on:" };
   }
   if (!blocked && canFire(s.workflow)) return { glyph: "ϟ", text: "Runs when one of its triggers fires" };
   return { glyph: "◷", text: "No next run", detail: blocked ? "Until what is above changes" : "Nothing it waits for can run it; Run now still does" };
