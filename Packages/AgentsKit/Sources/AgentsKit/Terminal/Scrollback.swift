@@ -34,6 +34,9 @@ public struct Scrollback: Sendable, Equatable {
     public var count: Int { bytes.count }
     public var isEmpty: Bool { bytes.isEmpty }
     public var hasDropped: Bool { dropped > 0 }
+    /// How many bytes the shell has printed in all: the offset just past the last one
+    /// held. A screen that knows how far it has got drops what it has already shown.
+    public var end: Int { dropped + bytes.count }
 
     public mutating func append(_ data: Data) {
         guard !data.isEmpty else { return }

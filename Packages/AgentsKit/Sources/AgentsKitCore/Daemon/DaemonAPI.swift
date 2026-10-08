@@ -1875,6 +1875,8 @@ public enum DaemonAPI {
     public struct ShellAttachResponse: Codable, Sendable {
         public var state: ShellState
         public var scrollback: Data
+        /// Bytes dropped off the front of the buffer, which is also the offset of the
+        /// replay's first byte: the replay ends where the next `shell/output` starts.
         public var dropped: Int
         public var startedAt: Date
         /// Where the shell was started. Nil from a daemon before 053, which is after the
@@ -1965,11 +1967,16 @@ public enum DaemonAPI {
         public var agentID: UUID
         public var shell: Int
         public var bytes: Data
+        /// Where the first of these bytes falls in everything the shell has printed. A
+        /// screen whose replay already holds them drops them, rather than printing them
+        /// twice (#401). Nil from a host before #401, whose output is shown as it comes.
+        public var offset: Int?
 
-        public init(agentID: UUID, shell: Int = 0, bytes: Data) {
+        public init(agentID: UUID, shell: Int = 0, bytes: Data, offset: Int? = nil) {
             self.agentID = agentID
             self.shell = shell
             self.bytes = bytes
+            self.offset = offset
         }
 
         public init(from decoder: any Decoder) throws {
@@ -1977,6 +1984,7 @@ public enum DaemonAPI {
             agentID = try c.decode(UUID.self, forKey: .agentID)
             shell = try c.decodeIfPresent(Int.self, forKey: .shell) ?? 0
             bytes = try c.decode(Data.self, forKey: .bytes)
+            offset = try c.decodeIfPresent(Int.self, forKey: .offset)
         }
 
         /// Read straight off the value that came in, without the round trip.
@@ -1997,6 +2005,7 @@ public enum DaemonAPI {
             self.agentID = agentID
             self.shell = params["shell"]?.intValue ?? 0
             self.bytes = bytes
+            self.offset = params["offset"]?.intValue
         }
     }
 

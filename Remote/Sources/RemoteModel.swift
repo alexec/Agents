@@ -1466,7 +1466,7 @@ final class RemoteModel {
         if notification.method == DaemonAPI.Notification.shellOutput,
            let params = notification.params,
            let output = DaemonAPI.ShellOutputNotification(params: params) {
-            self.shells[ShellKey(agentID: output.agentID, shell: output.shell)]?.received(output.bytes)
+            self.shells[ShellKey(agentID: output.agentID, shell: output.shell)]?.received(output.bytes, at: output.offset)
         }
         if notification.method == DaemonAPI.Notification.shellStateChanged,
            let change = try? notification.params?.decode(DaemonAPI.ShellStateNotification.self) {
