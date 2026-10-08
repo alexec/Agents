@@ -642,8 +642,7 @@ struct AppServiceTests {
     }
 
     /// The words an agent reads decide what it names: the goal, kept while it holds,
-    /// not the step it just took. Checked on the tool and on the briefing alike, since
-    /// either alone left titles naming the turn.
+    /// not the step it just took. On the tool: the briefing says nothing of it since #479.
     @Test func theTitleIsDescribedAsTheGoal() {
         let description = AppService.finishTurnTool["description"]?.stringValue ?? ""
         #expect(description.contains("its goal, not the step you just took"))
@@ -653,8 +652,6 @@ struct AppServiceTests {
             .stringValue ?? ""
         #expect(property.contains("goal"))
         #expect(property.contains("leave it out to keep the name"))
-        #expect(Briefing.finish.contains("title for the conversation's goal (only when it changes)"))
-        #expect(!Briefing.finish.contains("doing now"))
     }
 
     /// A title is a row's name: one line, spaces collapsed, no longer than a
