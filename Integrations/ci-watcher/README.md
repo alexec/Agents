@@ -31,7 +31,11 @@ node Integrations/ci-watcher/server.ts --port 8791    # in the foreground
 Integrations/ci-watcher/run.sh start                  # as a LaunchAgent, com.agents.ci-watcher
 Integrations/ci-watcher/run.sh status
 Integrations/ci-watcher/run.sh stop                   # unloads and deletes the LaunchAgent
+Integrations/ci-watcher/run.sh plist                  # prints the LaunchAgent, changes nothing
 ```
+
+The LaunchAgent runs `server.ts` from the folder `run.sh` is in, so start it from the
+project's main checkout, not from a worktree that will be removed.
 
 It listens on `127.0.0.1` only, at `POST /mcp` (JSON-RPC, JSON answers), with
 `GET /health`. It refuses any `Origin` other than none or `http://127.0.0.1:*`. `--port 0`

@@ -251,7 +251,7 @@ real repo, a failing PR yields one `checks.failed` with a stable id.
   - The cursor is base64 of `{since, ids}` (R10). `cursor: null` answers no events and now. `nextPollMs: 30000`. `truncated` follows R10.
   - Errors: `-32012` with `reason: "gh not signed in"`, `-32013` with `retryAfterMs`, and `-32602` for bad arguments.
   - It refuses any `Origin` other than none or `http://127.0.0.1:*`.
-- [ ] T029 [P] [US3] Create `Integrations/ci-watcher/run.sh`.
+- [x] T029 [P] [US3] Create `Integrations/ci-watcher/run.sh`.
   - `start` writes and loads a LaunchAgent `~/Library/LaunchAgents/com.agents.ci-watcher.plist` running `node <abs>/server.ts --port 8791`, with logs in `~/Library/Logs/ci-watcher.log`.
   - `stop` unloads and deletes it.
   - `status` prints `launchctl list | grep ci-watcher` and `curl -s 127.0.0.1:8791/health`.
