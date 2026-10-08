@@ -16,9 +16,10 @@ app can start, three things:
 - what the app could pass to change it without touching your own settings files.
 
 Read on 2026-10-08 for #395, from the source or binary of the exact copy the app runs.
-No conversation was run long enough to compact, so no allowance was spent. That means
-**nothing here has been watched happening**: where a line says *inferred*, it comes from the
-code, not from a run.
+No conversation was run long enough to compact on its own. A typed `/compact` was then
+watched over ACP for Claude, Codex and OpenCode (see [Watched over ACP](#watched-over-acp)).
+Grok and Copilot had no allowance left to try it. Where a line says *inferred*, it comes from
+the code, not from a run.
 
 ## In short
 
@@ -30,17 +31,17 @@ They differ in what the app sees:
 - **Claude and Codex** tell the app, with ACP's `compaction_update`. The app asks for this by
   advertising `session.compaction`.
 - **Grok** tells it in a message of its own that the app does not read.
-- **OpenCode** shows its summary as ordinary agent text (inferred).
+- **OpenCode** shows its summary as ordinary agent text.
 - **Gemini, Copilot, Cursor and Antigravity** say nothing. At most, the context meter drops.
 
 | Runtime | Version read | On with nothing set | When it fires | What the app sees | `/compact` over ACP | Lever the app could use |
 | --- | --- | --- | --- | --- | --- | --- |
-| **Claude** | adapter 0.85.1, Claude Code 2.1.286 | Yes (`autoCompactEnabled`, default on) | About 83% of a 200K window (window − min(max output, 20K) − 13K) | `compaction_update` with a streamed summary, then a `usage_update` that resets the meter | Yes, advertised | `_meta.claudeCode.options.settings.autoCompactEnabled` / `autoCompactWindow` |
+| **Claude** | adapter 0.85.1, Claude Code 2.1.286 | Yes (`autoCompactEnabled`, default on) | About 83% of a 200K window (window − min(max output, 20K) − 13K) | `compaction_update` with its summary, then a `usage_update` that resets the meter | Yes, advertised | `_meta.claudeCode.options.settings.autoCompactEnabled` / `autoCompactWindow` |
 | **Codex** | codex-acp 1.13.1, Codex 0.156.1 | Yes, with no off switch | 90% of the window: 244,800 of 272,000 tokens for every bundled model | `compaction_update` with status only, no summary | Yes, advertised | `model_auto_compact_token_limit` (lower only) and `compact_prompt` in `CODEX_CONFIG` |
 | **Gemini** | 0.61.0 | Yes (`model.compressionThreshold`, 0.5) | Half the window: about 524K of 1M tokens | Nothing over ACP | No: `/compress` is in its terminal only | `model.compressionThreshold` in the app's system defaults file. 1.0 is in effect off; 0 is not off. |
 | **Antigravity** | agy-acp-server 1.2.1 | Yes, in its Go harness | Its backend's default, not readable. A forum measurement puts it at about 220–260K. | Nothing over ACP | No | None: the ACP server reads no compaction setting |
 | **Grok** | 1.0.46 | Yes ("auto-compact") | 85% by its docs; its bundled grok-4.5 and 4.6 say 80% | Its own `auto_compact_*` updates in `x.ai/session_notification`, which the app drops as unknown | Yes, advertised | `GROK_AUTO_COMPACT_THRESHOLD_PERCENT`, `GROK_COMPACTION_MODE`. There is no off switch. |
-| **OpenCode** | 1.18.33 | Yes (`compaction.auto`, default on) | When the usable window is full: the input limit minus up to 20K reserved | The summary as agent text, then a "continue" turn (inferred). No `compaction_update`. | Works, but not advertised | `compaction.*` in `OPENCODE_CONFIG_CONTENT`; `OPENCODE_DISABLE_AUTOCOMPACT` to turn it off |
+| **OpenCode** | 1.18.33 | Yes (`compaction.auto`, default on) | When the usable window is full: the input limit minus up to 20K reserved | The summary as agent text; after an automatic one, a "continue" turn (inferred). No `compaction_update`. | Works, but not advertised | `compaction.*` in `OPENCODE_CONFIG_CONTENT`; `OPENCODE_DISABLE_AUTOCOMPACT` to turn it off |
 | **Copilot** | 1.0.93-1 | Yes ("infinite sessions") | Background from 80%, blocking at 95% | Nothing over ACP but a falling `usage_update` (inferred) | Yes, since 1.0.39 | Undocumented `COPILOT_BACKGROUND_COMPACTION_THRESHOLD`, `COPILOT_BUFFER_EXHAUSTION_THRESHOLD`; no off switch ([copilot-cli#2333](https://github.com/github/copilot-cli/issues/2333)) |
 | **Cursor** | 2026.10.01-e373342 | Yes (summarization) | Its backend decides; not in the client | Nothing: its ACP layer drops `summary_*` updates, and it sends no `usage_update` | No: `/summarize` is in its terminal only | None |
 
@@ -84,10 +85,11 @@ Codex's rows have no summary under them, because Codex sends none. That is right
   policy beats it. So `{autoCompactEnabled: false}` or `{autoCompactWindow: N}` (100K–1M)
   would set it for one agent. The same `_meta` can also carry `env`, but your settings
   file's own `env` block is applied after it.
-- **Over ACP.** `compaction_update` `in_progress`, then `compaction_summary_chunk`s, then
-  `completed`, `failed` or `cancelled` with a `summary`. It also sends a `usage_update` with
-  the token count after compaction. A loaded session replays an old compaction as a
-  completed update.
+- **Over ACP.** `compaction_update` `in_progress`, then `completed`, `failed` or
+  `cancelled` with a `summary`. Watched, it sent no summary chunks: the whole summary came in
+  the first `completed`, and a second `completed` followed with only `_meta.contextCompaction`
+  (trigger, tokens before and after, duration). Then a `usage_update` with the token count
+  after compaction. A loaded session replays an old compaction as a completed update.
 - **What is kept.** Earlier turns, tool results included, become a summary written by the
   model. Claude Code then attaches references to the plan file, the skills already used and
   the files touched again, and it can keep a recent tail word for word.
@@ -101,7 +103,8 @@ Codex's rows have no summary under them, because Codex sends none. That is right
 - **Lever.** Keys added to the `CODEX_CONFIG` the app already sends, which today holds only
   `features.*`. That reaches servers too.
 - **Over ACP.** `compaction_update` `in_progress`, then `completed`, `failed` or
-  `cancelled`, with no summary.
+  `cancelled`, with no summary. Watched, the `usage_update` with the smaller count came just
+  before the `completed`.
 - **What is kept.** Local compaction keeps the opening context and about 20K tokens of
   recent *user* messages, then a summary. Assistant turns, tool calls and tool output are
   dropped. With a ChatGPT sign-in, compaction happens on OpenAI's side and comes back as an
@@ -161,9 +164,9 @@ Codex's rows have no summary under them, because Codex sends none. That is right
   off, `OPENCODE_DISABLE_AUTOCOMPACT=1`, which wins over every file. With it off, an
   overflow ends the turn as an error.
 - **Over ACP.** No compaction update: the ACP layer does not forward `session.compacted`.
-  The summary is an assistant message, so it should stream as ordinary agent text, followed
-  by more text after OpenCode adds a hidden "continue" prompt (inferred). A typed `/compact`
-  works over ACP but is not in its advertised commands.
+  The summary is an assistant message and streams as ordinary agent text (watched). After an
+  automatic compaction, more text follows when OpenCode adds a hidden "continue" prompt
+  (inferred). A typed `/compact` works over ACP but is not in its advertised commands.
 - **What is kept.** The summary prompt cuts each tool result to 2,000 characters and keeps a
   recent tail word for word. With pruning on, older tool output reads "[Old tool result
   content cleared]".
@@ -193,6 +196,37 @@ Codex's rows have no summary under them, because Codex sends none. That is right
 - **What is kept.** It is lossy. The agent keeps a reference to a chat-history file it can
   search, and your latest message is kept word for word (since 2026.07.06).
 
+## Watched over ACP
+
+On 2026-10-08, each runtime was started over ACP in an empty scratch folder, as the app
+starts it: the app's `session.compaction` capability, your own settings and sign-in, and
+none of your shell's `CLAUDE_*` variables. Each was then sent three prompts:
+
+1. remember a code word and a path;
+2. `/compact`;
+3. say the code word and the path.
+
+| Runtime | Copy | What arrived | Meter before → after | Remembered after |
+| --- | --- | --- | --- | --- |
+| **Claude** | adapter 0.81.2 (`npx`), Opus 5.5 with a 1M window | `in_progress`; 8 s later `completed` with the whole summary; then a second `completed` with only `_meta.contextCompaction` (`trigger: manual`, `preTokens`, `postTokens`, `durationMs`); then a `usage_update` | 23,246 → 3,558 | Yes |
+| **Codex** | codex-acp 1.13.1, the app's toolset, ChatGPT sign-in | `in_progress`; 1.3 s later a `usage_update` and `completed`, with no summary | 16,203 → 4,554 (window 258,400) | Yes |
+| **OpenCode** | 1.18.33, the app's toolset | No `compaction_update`. The summary streamed as agent text, under headings (Objective, Important Details, Work State) | 14,364 → 479 | Yes |
+| **Grok** | 1.0.50 | Not watched: its usage balance was used up. The failed `/compact` ended the prompt with a JSON-RPC error whose `data.kind` is `compact_failed` | — | — |
+| **Copilot** | 1.0.93-1 | Not watched: its monthly quota was used up. `/compact` ended the turn normally, with "Failed to run /compact: Error: Nothing to compact." as agent text | — | — |
+
+What this shows:
+
+- **The app draws Claude's and Codex's compactions as one row.** Claude's second
+  `completed` has no summary, and a later update with no summary keeps the one the row
+  already has (#443). The row is right as it stands.
+- **The meter resets with no work by the app.** Each runtime sends a `usage_update` with the
+  smaller count as part of the compaction.
+- **A short fact survives a manual compaction** in all three. That a decision, a path or a
+  tool result survives in a long conversation is still untested: the summaries here are of a
+  single exchange.
+- **A Claude summary under the row can be long.** This one was a numbered, nine-part record
+  of a two-line conversation.
+
 ## On servers
 
 The levers above travel with the launch, so they reach a server too: `_meta` for Claude,
@@ -204,9 +238,9 @@ Antigravity runs on this Mac only.
 
 ## What this leaves open
 
-- **Watching it happen.** The table comes from reading code. A compaction has not been seen
-  in the app for any runtime. Claude and Codex can be watched cheaply by typing `/compact`
-  in an agent. That also shows the one row (#443) on screen.
+- **Watching it happen on its own.** Only a typed `/compact` has been watched, for Claude,
+  Codex and OpenCode, and over ACP rather than on the app's page. No automatic compaction
+  has been seen. Grok and Copilot have not been seen at all; they need allowance.
 - **Whether to change any defaults.** Nothing needs turning on. Whether the app should *show*
   a switch or a threshold is a product decision. These have a lever the app can reach:
   Claude, Codex (threshold only), Gemini, Grok (threshold only), OpenCode and Copilot
