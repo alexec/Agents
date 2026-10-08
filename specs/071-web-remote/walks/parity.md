@@ -251,6 +251,7 @@ The deltas are tracked by 29 issues:
 | An unreadable workflow file | Its text under *The file is below*: `A/Projects/WorkflowPage.swift:211-218` | Its text under *The file is below*: `R/Projects/WorkflowPage.swift` | *Fix its file*: `W/model/workflows.ts:541` | **delta**: web #260 |
 | Triggers, next runs, last ran (#98, #99) | `A/Projects/WorkflowPage.swift:285-452` | `R/Projects/WorkflowPage.swift` | `W/views/WorkflowPage.tsx` | **same** |
 | An event trigger's words | Its catalogue meaning | n/a | Catalogue meaning, including “An agent here publishes custom.<name>” | **same** |
+| A server's event trigger's words (#383, #424): *When ci reports checks.failed (repo alexec/Agents)*, or *When a server here reports …* | `MCPEventTrigger.summary` | The same | `serverEventSummary` in `W/model/workflows.ts`, held to `Fixtures/web/workflows/summaries.json` | **same** |
 | Recent runs | Asked of the host, archived included, Show more: `A/Projects/WorkflowPage.swift:848-879` | The same: `R/Projects/WorkflowPage.swift:547-567` | Asked of the host, archived included, 3 then Show more | **same** |
 | Enabled switch, in the file (#100, #125) | `A/Projects/WorkflowPage.swift:177-186` | `R/Projects/WorkflowPage.swift:194-196` | `W/views/WorkflowPage.tsx:71-75` | **same** |
 | Approve | Page and row menu: `A/Projects/ProjectWorkRows.swift:166-168` | Page and row menu: `R/Projects/WorkflowPage.swift`, `R/Sidebar/SidebarRows.swift` | Page and row menu: `W/views/WorkflowPage.tsx`, `W/views/WorkflowRow.tsx` | **same** |

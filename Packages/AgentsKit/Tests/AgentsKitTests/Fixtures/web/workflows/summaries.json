@@ -1074,5 +1074,113 @@
       }
     },
     "name" : "a cooldown, triggering, a trigger held"
+  },
+  {
+    "expected" : {
+      "canFire" : true,
+      "needsAPerson" : false,
+      "summary" : "When ci reports checks.failed (repo alexec/Agents), in a new agent"
+    },
+    "input" : {
+      "holdsAFire" : false,
+      "isArchived" : false,
+      "isEnabled" : true,
+      "isRunning" : false,
+      "nextFireAtByTrigger" : [
+
+      ],
+      "queued" : 0,
+      "workflow" : {
+        "folder" : "file:///fixture/project",
+        "mode" : "new",
+        "name" : "Red",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+          {
+            "unrecognised" : {
+              "keys" : {
+                "repo" : "alexec/Agents",
+                "server" : "ci"
+              },
+              "name" : "checks.failed"
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "red"
+      }
+    },
+    "name" : "a server's event, from one server"
+  },
+  {
+    "expected" : {
+      "canFire" : true,
+      "needsAPerson" : false,
+      "summary" : "When a server here reports pr.merged, and When github or gitlab reports pr.opened (draft false, labels [\"bug\"]), in a new agent"
+    },
+    "input" : {
+      "holdsAFire" : false,
+      "isArchived" : false,
+      "isEnabled" : true,
+      "isRunning" : false,
+      "nextFireAtByTrigger" : [
+
+      ],
+      "queued" : 0,
+      "workflow" : {
+        "folder" : "file:///fixture/project",
+        "mode" : "new",
+        "name" : "Prs",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+          {
+            "unrecognised" : {
+              "keys" : {
+
+              },
+              "name" : "pr.merged"
+            }
+          },
+          {
+            "unrecognised" : {
+              "keys" : {
+                "draft" : false,
+                "labels" : [
+                  "bug"
+                ],
+                "server" : [
+                  "github",
+                  "gitlab"
+                ]
+              },
+              "name" : "pr.opened"
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "prs"
+      }
+    },
+    "name" : "a server's event, from any or two"
   }
 ]

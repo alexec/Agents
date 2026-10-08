@@ -1084,8 +1084,9 @@ struct WebFixturesTests {
     }
 
     /// A workflow's row under the sessions: `Workflow.summary`, `canFire`, and
-    /// `WorkflowSummary.needsAPerson`. Event triggers are left out: their words come from
-    /// the event catalogue, which the web remote does not carry.
+    /// `WorkflowSummary.needsAPerson`. The app's own event triggers are left out: their words
+    /// come from the event catalogue, which the web remote does not carry. A server's event
+    /// (#383, #424) is in: its words are its name and arguments.
     @Test func workflows() throws {
         func flow(_ id: String, _ triggers: [WorkflowTrigger], mode: WorkflowMode = .new,
                   problem: WorkflowProblem? = nil, settings: WorkflowSettings = WorkflowSettings(),
@@ -1137,6 +1138,12 @@ struct WebFixturesTests {
                 mode: .triggering, cooldown: 24 * 60 * 60),
                 lastOutcome: .refused(.coolingDown(until: Self.base.addingTimeInterval(600)), at: Self.base, repeats: 3),
                 cooldownEndsAt: Self.base.addingTimeInterval(600), holdsAFire: true)),
+            ("a server's event, from one server", WorkflowSummary(workflow: flow("red", [.serverEvent(
+                MCPEventTrigger(event: "checks.failed", servers: ["ci"], arguments: ["repo": .string("alexec/Agents")]))]))),
+            ("a server's event, from any or two", WorkflowSummary(workflow: flow("prs", [
+                .serverEvent(MCPEventTrigger(event: "pr.merged")),
+                .serverEvent(MCPEventTrigger(event: "pr.opened", servers: ["github", "gitlab"],
+                                             arguments: ["draft": .bool(false), "labels": .array([.string("bug")])]))]))),
         ]
         let cases = try all.map { Case(name: $0.0, input: Self.sortingSets(try Self.encode($0.1))) }
         try pin("workflows/summaries.json", cases) { input in

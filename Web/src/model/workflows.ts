@@ -4,7 +4,8 @@
 //
 // An event trigger (042) arrives as `unrecognised` with a dotted name, which Swift reads back as
 // an event and describes from its catalogue. The page has no catalogue, so it says the event's
-// name and filters instead: "When ci.finished (branch main)".
+// name and filters instead: "When ci.finished (branch main)". A server's event (#383) is said as
+// MCPEventTrigger.summary: "When ci reports checks.failed (repo alexec/Agents)".
 import type {
   JSONValue, MCPTriggerStatus, Weekday, Workflow, WorkflowCause, WorkflowLimit, WorkflowOutcome, WorkflowProblem, WorkflowRefusal,
   WorkflowSchedule, WorkflowSettings, WorkflowSummary, WorkflowTriggerStored,
@@ -82,6 +83,46 @@ const eventMeanings: Record<string, string> = {
   "server.online": "A server came back",
 };
 
+// EventCatalogue.reservedNouns: the app's own subjects, which no server's event may use.
+const reservedNouns = new Set(["agent", "project", "workflow", "branch", "lease", "mac", "machine", "person", "cost", "server", "custom"]);
+
+/** EventCatalogue.isServerEventName: `noun.verbed`, about none of the app's own subjects. */
+function isServerEventName(name: string): boolean {
+  return /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/.test(name) && !reservedNouns.has(name.slice(0, name.indexOf(".")));
+}
+
+/** JSON with its keys sorted, as MCPEventTrigger.canonicalJSON. */
+function canonicalJSON(value: JSONValue): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJSON).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${canonicalJSON(value[k]!)}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+/** A server's event (#383) as MCPEventTrigger(event:keys:) reads it, or null when it is not one. */
+function serverEvent(trigger: WorkflowTriggerStored): { name: string; servers: string[] | null; arguments: Record<string, JSONValue> } | null {
+  if (!("unrecognised" in trigger) || !isServerEventName(trigger.unrecognised.name)) return null;
+  const { server, ...rest } = trigger.unrecognised.keys;
+  let servers: string[] | null = null;
+  if (server !== undefined) {
+    const names = typeof server === "string" ? [server] : Array.isArray(server) ? server : [];
+    if (!names.length || !names.every((n) => typeof n === "string" && /^[A-Za-z0-9_-]+$/.test(n))) return null;
+    servers = names as string[];
+  }
+  return { name: trigger.unrecognised.name, servers, arguments: rest };
+}
+
+/** MCPEventTrigger.summary: "When ci reports checks.failed (repo alexec/Agents)". */
+function serverEventSummary(event: NonNullable<ReturnType<typeof serverEvent>>): string {
+  const who = event.servers ? event.servers.join(" or ") : "a server here";
+  const narrowed = Object.keys(event.arguments).sort().map((k) => {
+    const value = event.arguments[k]!;
+    return `${k} ${typeof value === "string" ? value : canonicalJSON(value)}`;
+  });
+  return `When ${who} reports ${event.name}` + (narrowed.length ? ` (${narrowed.join(", ")})` : "");
+}
+
 function scalar(value: JSONValue): string | null {
   return typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : null;
 }
@@ -99,6 +140,8 @@ export function triggerSummary(trigger: WorkflowTriggerStored,
     return id ? `When ${id} finishes` : "When any workflow finishes";
   }
   const { name } = trigger.unrecognised;
+  const server = serverEvent(trigger);
+  if (server) return serverEventSummary(server);
   if (isEvent(trigger)) {
     const phrases = eventFilters(trigger).map(([k, values]) => filterWords(name, k, values, runtimeName));
     let filters = [...phrases.filter((p) => !p.startsWith("and ")), ...phrases.filter((p) => p.startsWith("and "))].join(", ");
@@ -285,6 +328,7 @@ function filterValues(value: JSONValue): string[] | null {
 /** An event trigger's filters, each with its values, sorted by key. */
 function eventFilters(trigger: WorkflowTriggerStored): [string, string[]][] {
   let found: [string, string[]][] = [];
+  if (serverEvent(trigger)) return found;
   if (isEvent(trigger) && "unrecognised" in trigger) {
     found = Object.entries(trigger.unrecognised.keys).flatMap(([k, v]) => {
       const values = filterValues(v);
@@ -357,6 +401,8 @@ export function listensIn(trigger: WorkflowTriggerStored): "mac" | "project" | "
   if ("schedule" in trigger) return null;
   if (!("unrecognised" in trigger)) return "project";
   if (!isEvent(trigger)) return null;
+  // A server's events are the project's: its servers are found by its folder.
+  if (serverEvent(trigger)) return "project";
   const name = trigger.unrecognised.name;
   if (isCustom(name)) return "project";
   const subject = wholeSubject(name);
@@ -388,6 +434,7 @@ export function resumedAgent(trigger: WorkflowTriggerStored): string {
   if ("agentStopped" in trigger) return "Resumes the agent that stopped";
   if ("workflowCompleted" in trigger) return "Resumes the agent the finished run started";
   if (!isEvent(trigger)) return "Never runs it";
+  if (serverEvent(trigger)) return "A server's events are about no agent, so this never runs it";
   const name = trigger.unrecognised.name;
   const subject = wholeSubject(name);
   if (isCustom(name) || subject === "custom") return "Resumes the agent that published it";
@@ -442,6 +489,8 @@ export function causePhrase(cause: WorkflowCause): string {
   if ("byHand" in cause) return "by hand, with Run now";
   const trigger = cause.trigger._0;
   if ("schedule" in trigger) return "on its schedule";
+  const server = serverEvent(trigger);
+  if (server) return `on ${server.name}`;
   if (isEvent(trigger) && "unrecognised" in trigger) {
     return "on " + [trigger.unrecognised.name, ...eventFilters(trigger).map(([k, v]) => `${k} ${v.join("|")}`)].join(" ");
   }
