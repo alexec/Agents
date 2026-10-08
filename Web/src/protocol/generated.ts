@@ -1575,6 +1575,7 @@ export interface TurnSummary {
   concise?: TranscriptEntry[];
   outcome?: TranscriptEntry[];
   steps?: number;
+  usage?: TurnUsage;
 }
 
 export interface TurnUsage {
@@ -2304,7 +2305,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   TranscriptEntry: { required: ["id", "at", "kind"], optional: ["subagentID"] },
   TranscriptPage: { required: ["firstIndex", "total", "entries"], optional: [] },
   TranscriptRequest: { required: ["agentID", "limit"], optional: ["before", "from"] },
-  TurnSummary: { required: ["id", "start", "end"], optional: ["ask", "last", "concise", "outcome", "steps"] },
+  TurnSummary: { required: ["id", "start", "end"], optional: ["ask", "last", "concise", "outcome", "steps", "usage"] },
   TurnUsage: { required: ["totalTokens", "inputTokens", "outputTokens"], optional: ["thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "cost"] },
   TurnsPage: { required: ["turns", "firstTurn", "openStart"], optional: [] },
   TurnsRequest: { required: ["agentID", "limit"], optional: ["before"] },

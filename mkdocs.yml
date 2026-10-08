@@ -121,3 +121,4 @@ nav:
       - explanation/phone-and-ipad.md
       - explanation/compaction-by-runtime.md
       - explanation/token-compression-tools.md
+      - explanation/token-cost-of-tools.md

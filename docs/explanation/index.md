@@ -28,3 +28,5 @@ Nothing here needs doing; it is for understanding.
   compacts itself in each runtime, what the app sees when it does, and what it could pass.
 - [Token-compression tools](token-compression-tools.md): whether rtk or Headroom would cut
   what agents cost, how either would plug in, and what the app could do instead.
+- [What agents are sent each turn](token-cost-of-tools.md): what the app's own tools add to
+  every request, what is cached, and what was changed to cut it.

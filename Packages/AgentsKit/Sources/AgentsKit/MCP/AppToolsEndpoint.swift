@@ -128,7 +128,10 @@ public final class AppToolsEndpoint: @unchecked Sendable {
         static func json(_ value: JSONValue, session: String? = nil) -> Reply {
             var headers = ["Content-Type": "application/json"]
             if let session { headers["Mcp-Session-Id"] = session }
-            return Reply(200, headers: headers, body: (try? JSONEncoder().encode(value)) ?? Data())
+            // Sorted, so the same tools are the same bytes after a restart (#465).
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            return Reply(200, headers: headers, body: (try? encoder.encode(value)) ?? Data())
         }
     }
 
