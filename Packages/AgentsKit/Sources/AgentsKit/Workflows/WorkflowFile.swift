@@ -54,6 +54,7 @@ public enum WorkflowFile {
                 // Its switch and its archive, so a broken file put away stays put away.
                 workflow.enabled = WorkflowSwitches.flag(mapping["enabled"])
                 workflow.archived = WorkflowSwitches.flag(mapping[WorkflowSwitches.archived])
+                workflow.whenDone = mapping[WorkflowWhenDone.key]?.scalar.flatMap(WorkflowWhenDone.init(rawValue:))
                 // Where it was pinned, when that list can be read, so a broken file
                 // meant for another computer stays off this one's list (#317).
                 if let node = mapping["hosts"], let ids = try? Self.hostIDs(from: node) {
@@ -200,6 +201,18 @@ public enum WorkflowFile {
             }
         }
 
+        // What a run may do with its session when it is done (#433). As strict as
+        // `archived:`: a workflow meant to keep its runs and archiving them is what the
+        // key must never do.
+        var whenDone: WorkflowWhenDone?
+        if let node = mapping[WorkflowWhenDone.key] {
+            guard let text = node.scalar else { return broken(WorkflowWhenDone.unknown) }
+            if !text.isEmpty {
+                guard let known = WorkflowWhenDone(rawValue: text) else { return broken(WorkflowWhenDone.unknown) }
+                whenDone = known
+            }
+        }
+
         // Which computers may run it (#317). Absent, or an empty list, is every host.
         // A list that is not ids is a file to fix: guessing which computer was meant
         // would run it in the wrong place, or hide it from the right one.
@@ -235,7 +248,7 @@ public enum WorkflowFile {
 
         let known: Set<String> = ["on", "agent", "name", "permission-mode", "runtime", "model", "labels",
                                    "effort", "options", "enabled", WorkflowSwitches.archived,
-                                   WorkflowCooldown.key, "hosts"]
+                                   WorkflowCooldown.key, "hosts", WorkflowWhenDone.key]
         let unknown = mapping.filter { !known.contains($0.key) }.mapValues(\.jsonValue)
 
         return Workflow(workflowID: workflowID, folder: project,
@@ -243,7 +256,7 @@ public enum WorkflowFile {
                         triggers: triggers, mode: mode,
                         prompt: body, problem: problem, unknownFields: unknown,
                         settings: settings, cooldown: cooldown, enabled: enabled,
-                        archived: archived, hosts: hosts)
+                        archived: archived, hosts: hosts, whenDone: whenDone)
     }
 
     /// The machine ids under `hosts:`. A bare id and a list of them are the same

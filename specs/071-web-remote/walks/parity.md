@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 212 rows: **142 same**, **42 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 212 rows: **142 same**, **42 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -27,7 +27,7 @@ Of 212 rows: **142 same**, **42 by design**, **28 delta** (after #188, #189, #19
 | Start sheet and new project | 17 | 5 | 0 |
 | Worktrees and Files | 9 | 6 | 6 |
 | Pins | 4 | 1 | 0 |
-| Workflows page | 13 | 1 | 2 |
+| Workflows page | 14 | 1 | 2 |
 | Settings and Project Settings | 1 | 7 | 0 |
 | Pool, runtimes and spending | 7 | 1 | 2 |
 | Events and resources | 2 | 1 | 2 |
@@ -266,6 +266,7 @@ The deltas are tracked by 29 issues:
 | Runs only on the hosts it names (#317) | `S/WorkflowHostsSection.swift` on `A/Projects/WorkflowPage.swift`; the list is the host's | The same section on `R/Projects/WorkflowPage.swift` | `W/views/WorkflowPage.tsx`; the list is the host's | **same** |
 | Workflow page: MCP trigger status, a line per server a trigger hears, with Clear on missed events (#383) | `S/MCPTriggerLines.swift` under the triggers on `A/Projects/WorkflowPage.swift`; words in `S/WorkflowStatus.swift` | The same view on `R/Projects/WorkflowPage.swift` | `W/views/WorkflowPage.tsx`, words in `W/model/workflows.ts` | **same** |
 | Triggers queued behind a run (#422): a count on the status card and row, *Queued for* on the event until it fires | `S/WorkflowStatus.swift`, `A/Projects/WorkflowRow.swift`, `S/Events/EventRow.swift` | The same status card and event row; a tray mark on `R/Sidebar/SidebarRows.swift` | `W/model/workflows.ts`, `W/views/Activity.tsx` | **same** |
+| When done: keep each run, let a run archive itself, or archive each finished run (#433); not for a triggering workflow | A menu under the cooldown: `A/Projects/WorkflowPage.swift`; words in `Model/WorkflowWhenDone.swift` | The same menu and sentence: `R/Projects/WorkflowPage.swift` | `WhenDoneMenu` in `W/views/WorkflowSettings.tsx` on `W/views/WorkflowPage.tsx`; words in `W/model/workflowSettings.ts` | **same** |
 | Writing a workflow | None (the author's) | None | None | **same** |
 
 ## Settings and Project Settings

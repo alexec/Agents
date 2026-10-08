@@ -1,7 +1,7 @@
 // A workflow's settings on its page (#162; the window's WorkflowPage form and the Remote's): the
 // runtime, the permission mode on the left and the model, effort and the runtime's other options
 // on the right, as the prompt's menus are laid out; then its labels, in the tag input sessions
-// use; and, under the triggers, its cooldown. Each control writes its one key in the file through
+// use; and, under the triggers, its cooldown and what a run may do when done (#433). Each control writes its one key in the file through
 // the daemon (`workflows/settings`) and is drawn from what the file says, so a refusal leaves the
 // menu where the file is and the daemon's sentence beside it.
 //
@@ -16,6 +16,7 @@ import { modeOption } from "../model/options";
 import { defaultRuntime } from "../model/workflows";
 import {
   cooldownChoices, cooldownFileText, effortOption, fileValue, modelOption, otherOptions, refusals, selectable, shown, withDefault,
+  whenDoneChoices, whenDoneWords, type WhenDone,
 } from "../model/workflowSettings";
 import { cooldownWords } from "../model/workflows";
 import { labelKey } from "../model/labels";
@@ -152,6 +153,23 @@ export function CooldownMenu({ summary, disabled, change }: {
     <div class="menus" role="group" aria-label="Cooldown">
       <OptionControl option={option} value={current ?? null} disabled={disabled}
         onChange={(v) => change({ cooldown: typeof v === "number" ? cooldownFileText(v) : "" })} />
+    </div>
+  );
+}
+
+/** What a run may do with its session when it is done (#433), writing `when-done:`. */
+export function WhenDoneMenu({ summary, disabled, change }: {
+  summary: WorkflowSummary; disabled: boolean; change: (change: Change) => void;
+}) {
+  const current: WhenDone = summary.workflow.whenDone ?? "park";
+  const option: ConfigOption = {
+    id: "when-done", name: "When done", type: "select", currentValue: null,
+    options: whenDoneChoices.map((w) => ({ value: w, name: whenDoneWords(w) })),
+  };
+  return (
+    <div class="menus" role="group" aria-label="When done">
+      <OptionControl option={option} value={current} disabled={disabled}
+        onChange={(v) => { if (typeof v === "string" && v !== current) change({ whenDone: v as WhenDone }); }} />
     </div>
   );
 }

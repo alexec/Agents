@@ -22,6 +22,7 @@ import { blockLines, openBlock } from "./block";
 import { Drafts } from "./drafts";
 import { scopeRoot, WatchCounts } from "./fileWatch";
 import { workflowRunsOn } from "./workflows";
+import type { WhenDone } from "./workflowSettings";
 import { keyKind, takesKey, wantedRuntime } from "./credentials";
 import type { Method, Params, Result } from "../protocol/methods";
 import { dropboxRefusal, dropboxRequest } from "./dropbox";
@@ -1756,7 +1757,8 @@ export class Store extends Work {
   private settingsInFlight = new Map<string, Promise<unknown>>();
 
   /**
-   * One setting, its label list, its cooldown or the computers it runs on (#162, #317), written
+   * One setting, its label list, its cooldown, the computers it runs on or what a run may do
+   * when done (#162, #317, #433), written
    * to the file through the daemon as the window's page writes it. `change` is applied to what
    * the file says when the call is sent, after any earlier change to the same workflow has been
    * answered, so two quick changes cannot undo each other. The answer replaces the one summary;
@@ -1764,7 +1766,7 @@ export class Store extends Work {
    * the controls, or null.
    */
   setWorkflowSettings(host: string, summary: WorkflowSummary,
-                      change: { settings?: (s: WorkflowSettings) => WorkflowSettings; cooldown?: string; labels?: (labels: string[]) => string[]; hosts?: string[] }): Promise<string | null> {
+                      change: { settings?: (s: WorkflowSettings) => WorkflowSettings; cooldown?: string; labels?: (labels: string[]) => string[]; hosts?: string[]; whenDone?: WhenDone }): Promise<string | null> {
     const { folder, workflowID } = summary.workflow;
     const key = `${host}|${folderKey(folder)}|${workflowID}`;
     const send = async (): Promise<string | null> => {
@@ -1777,6 +1779,7 @@ export class Store extends Work {
           ...(change.cooldown !== undefined ? { cooldown: change.cooldown } : {}),
           ...(change.labels !== undefined ? { labels: change.labels(current.labels) } : {}),
           ...(change.hosts !== undefined ? { hosts: change.hosts } : {}),
+          ...(change.whenDone !== undefined ? { whenDone: change.whenDone } : {}),
         }, host);
         this.placeWorkflow(updated, host);
         return null;

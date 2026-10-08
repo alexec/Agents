@@ -2587,12 +2587,12 @@ final class RemoteModel {
     /// is asked again so the menu goes back to what the file still holds (FR-025).
     func setWorkflowSettings(_ summary: WorkflowSummary, _ settings: WorkflowSettings,
                              cooldown: String? = nil, labels: [String]? = nil,
-                             hosts: [String]? = nil) async {
+                             hosts: [String]? = nil, whenDone: String? = nil) async {
         do {
             let request = DaemonAPI.WorkflowSettingsRequest(folder: summary.folder,
                                                             workflowID: summary.workflowID,
                                                             settings: settings, cooldown: cooldown,
-                                                            labels: labels, hosts: hosts)
+                                                            labels: labels, hosts: hosts, whenDone: whenDone)
             let updated: WorkflowSummary = try await client(for: request).call(
                 DaemonAPI.Method.workflowsSettings, request, returning: WorkflowSummary.self)
             keepWorkflow(updated, named: request)

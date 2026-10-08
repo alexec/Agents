@@ -338,6 +338,7 @@ struct WorkflowPage: View {
                 }, disabled: model.isStale)
             }
             cooldown(summary)
+            whenDone(summary)
             if let at = summary.lastFiredAt {
                 note(["Last ran \(at.formatted(.relative(presentation: .named)))", summary.lastFiredBy?.phrase]
                     .compactMap { $0 }.joined(separator: ", ") + ".")
@@ -372,6 +373,34 @@ struct WorkflowPage: View {
             .pickerStyle(.menu)
             .fixedSize()
             .disabled(summary.workflow.settingsLocked || model.isStale)
+        }
+    }
+
+    /// What a run may do with its session when it is done (#433), as the window's page
+    /// has it. Not for a triggering workflow, whose agent is somebody else's.
+    @ViewBuilder
+    private func whenDone(_ summary: WorkflowSummary) -> some View {
+        if summary.workflow.mode != .triggering {
+            let current = summary.workflow.whenDone ?? .park
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                note(current.sentence)
+                Spacer(minLength: 8)
+                Picker("When done", selection: Binding<WorkflowWhenDone>(
+                    get: { current },
+                    set: { chosen in
+                        guard chosen != current else { return }
+                        Task { await model.setWorkflowSettings(summary, summary.workflow.settings,
+                                                               whenDone: chosen.rawValue) }
+                    })) {
+                    ForEach(WorkflowWhenDone.allCases, id: \.self) { choice in
+                        Text(choice.words).tag(choice)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .fixedSize()
+                .disabled(summary.workflow.settingsLocked || model.isStale)
+            }
         }
     }
 
