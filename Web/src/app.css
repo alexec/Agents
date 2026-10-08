@@ -414,6 +414,7 @@ button.link.reading:hover { text-decoration: underline; }
 .queued p { margin: 0; }
 .working, .more { margin: 0; }
 .more { text-align: center; }
+.load-failure { display: flex; gap: 8px; align-items: baseline; margin: 0 0 12px; opacity: 0.75; font-size: 0.9em; }
 .spinner {
   display: inline-block;
   width: 12px;
@@ -448,8 +449,13 @@ button.link.reading:hover { text-decoration: underline; }
 .background .stop { font-size: 11px; padding: 0 8px; }
 
 /* Cards above the prompt: a question or a permission, answered here or elsewhere. */
-.cards { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+/* In a short window the cards give up height, not the prompt: the foot is never taller than the
+   column, a card shrinks before the prompt does, and a single choice's list scrolls (#381, the
+   window's #371). */
+.cards { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; min-height: 0; overflow-y: auto; }
 .card {
+  min-height: 0;
+  flex-shrink: 1;
   background: var(--paper-raised);
   border: 1px solid var(--paper-rule);
   border-radius: var(--radius-floating);
@@ -461,6 +467,7 @@ button.link.reading:hover { text-decoration: underline; }
 }
 .card .question { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
 .card .options { display: flex; flex-direction: column; gap: 6px; }
+.card .choices { min-height: 0; max-height: 320px; overflow-y: auto; }
 .card .plan-shown { display: flex; align-items: center; gap: 8px; margin: 4px 0 0; }
 .card .plan-text { margin-top: 6px; user-select: text; }
 .card .row-options { flex-direction: row; flex-wrap: wrap; }
@@ -496,7 +503,9 @@ button.link.reading:hover { text-decoration: underline; }
 }
 .card .asked { margin: 0; }
 
-.foot { padding: 0 12px 12px; }
+.foot { padding: 0 12px 12px; max-height: 100%; min-height: 0; display: flex; flex-direction: column; }
+.foot > * { flex-shrink: 0; }
+.foot > .cards { flex-shrink: 1; }
 
 /* The prompt bar, as the window's (#108): where and labels over the input on the left, the runtime
    on the right; attach and send inside the input; the runtime's menus under it. */
@@ -825,6 +834,11 @@ button.remove:hover { opacity: 1; }
 .trigger .filters code { font: 11px var(--font-mono); padding: 0 6px; border-radius: 5px; background: var(--paper-wash); }
 .trigger .unknown { font-size: 11px; font-weight: 600; opacity: 0.6; border: 1px solid var(--paper-rule); border-radius: 999px; padding: 0 6px; margin-left: 6px; }
 .trigger .next { text-align: right; max-width: 180px; }
+/* A line for each server a trigger hears (#383), under the triggers. */
+.mcp-triggers { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.mcp-triggers li { display: flex; flex-direction: column; gap: 2px; }
+.mcp-triggers .glyph { opacity: 0.6; }
+.mcp-triggers .attention { color: var(--tint-attention); }
 .workflow-page .last-ran { margin: 2px 0 0; }
 .workflow-page .prompt-text { margin: 0; white-space: pre-wrap; font: 12.5px/1.5 var(--font-mono); padding: 12px 14px;
   background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }

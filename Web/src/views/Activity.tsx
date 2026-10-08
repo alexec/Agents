@@ -9,6 +9,7 @@ import type { ActivityPage } from "../route";
 import { Resources } from "./Resources";
 import { BackToList } from "./BackToList";
 import { folderKey, projectFolder } from "../model/groups";
+import { runtimeTally } from "../model/runtimes";
 
 function navigate(destination: { host: string; project: string; session?: string; workflow?: string }): void {
   const parts = ["h", destination.host, "p", destination.project];
@@ -143,8 +144,7 @@ export function ActivityRows({ store, chosen, onPick }: {
   const resources = Object.values(store.leases.value).flatMap((s) => s.resources);
   const held = resources.reduce((n, r) => n + (r.holds ?? (r.lease ? [r.lease] : [])).length, 0);
   const waiting = resources.reduce((n, r) => n + r.line.length, 0);
-  const out = Object.values(store.runtimeAllowances.value).flatMap((a) => a.rows)
-    .filter((row) => "out" in row.state.status).length;
+  const tally = runtimeTally(Object.values(store.runtimes.value).flat());
   const costs = store.costs.value;
   const today = totalWords(todayTotals(costs));
   const mac = costs["mac"];
@@ -163,8 +163,12 @@ export function ActivityRows({ store, chosen, onPick }: {
       {row("resources", "Resources", "Who holds the simulators, browsers and screen, and who is waiting",
         held + waiting > 0 && `${held} held · ${waiting} waiting`)}
       {row("runtimes", "Runtimes", "What each runtime can be started on right now",
-        out > 0 && <><span class="dot failure" aria-hidden="true" /> {out} out</>)}
-      {row("spending", "Spending", "What all of the work has cost, and what it cost today",
+        tally && (
+          <span aria-label={tally.working === 0 ? `None of ${tally.total} working` : `${tally.working} of ${tally.total} working`}>
+            {tally.working === 0 && <><span class="dot failure" aria-hidden="true" />{" "}</>}{tally.working}/{tally.total}
+          </span>
+        ))}
+      {row("spending", "Cost", "What all of the work has cost, and what it cost today",
         (today || left) && (
           <span class={`spending${closeToFull(mac) && chosen !== "spending" ? " close" : ""}`}>
             {today && <span>{today}</span>}{left && <span>{left}</span>}
@@ -174,7 +178,7 @@ export function ActivityRows({ store, chosen, onPick }: {
   );
 }
 
-const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", spending: "Spending" };
+const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", spending: "Cost" };
 
 /** An Activity page in the chat's place. */
 export function ActivityPageView({ store, page }: { store: Store; page: ActivityPage }) {

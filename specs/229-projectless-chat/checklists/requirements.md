@@ -1,7 +1,7 @@
-# Specification Quality Checklist: Chat with an agent without a project
+# Specification Quality Checklist: Chat with an agent in a project the app makes
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
-**Created**: 2026-10-04
+**Created**: 2026-10-04 · **Revalidated**: 2026-10-06 (rewrite to Alex's chat-project direction)
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality
@@ -31,7 +31,7 @@
 
 ## Notes
 
-- As in the repo's other specs (for example 073), "Why this feature exists" cites today's code by file and line, to ground the spec. The requirements themselves stay at the level of behaviour.
-- Decisions that are Alex's are not [NEEDS CLARIFICATION] markers. Each has a stated default in the spec, and is listed under "Open questions for Alex" to confirm before `/speckit-plan`.
+- As in the repo's other specs, "Why this feature exists" cites today's code by file and line. The requirements stay at the level of behaviour.
+- Alex's direction comment on #229 and answers of 2026-10-06 settle the earlier open questions: a chat project at `~/.agents/chat`, no per-chat folder, one per host. No [NEEDS CLARIFICATION] remain.
+- #230, the first-turn additional folders, is merged and no longer a dependency.
 - Covers all three clients (Mac, Remote, web), per #233.
-- Nothing was built or tested while writing it. The session was build-free.

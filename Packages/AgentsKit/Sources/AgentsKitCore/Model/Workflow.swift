@@ -266,6 +266,10 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     /// here: `nil` when there is none yet or it has gone, either way the next run
     /// starts one.
     public var standingAgentID: UUID?
+    /// How each server's event trigger is doing (#383): one per server a trigger hears,
+    /// in file order and then by server; nil when it names no server's event this host
+    /// asks for. An older client ignores it.
+    public var mcpTriggers: [MCPTriggerStatus]?
 
     public var id: String { workflow.id }
     public var folder: URL { workflow.folder }
@@ -280,7 +284,9 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
                 lastFiredAt: Date? = nil, lastFiredBy: WorkflowCause? = nil,
                 nextFireAtByTrigger: [Date?] = [],
                 cooldownEndsAt: Date? = nil, holdsAFire: Bool = false,
-                offReason: WorkflowOffReason? = nil, standingAgentID: UUID? = nil) {
+                offReason: WorkflowOffReason? = nil, standingAgentID: UUID? = nil,
+                mcpTriggers: [MCPTriggerStatus]? = nil) {
+        self.mcpTriggers = mcpTriggers
         self.offReason = offReason
         self.standingAgentID = standingAgentID
         self.cooldownEndsAt = cooldownEndsAt

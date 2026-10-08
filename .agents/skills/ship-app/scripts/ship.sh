@@ -1,25 +1,27 @@
 #!/bin/zsh
-# Build main, install the Remote on Alex's paired iPhone/iPad, and put the new build
-# live on this Mac: Agents Host (the control plane and this Mac's host, kept running by
-# launchd) and the window (the App Store build, a client of the control plane like the
-# phone). One script: the relaunch is this file detached (`--restart`), because the host
-# it restarts is usually the one running the session that started it.
+# Build main and install the Remote on Alex's paired iPhone/iPad.
 #
-# Agents Host lives at ~/Applications/Agents Host.app, where its Login Items point. The
-# new build is swapped in whole, and launchd restarts both jobs from it.
+# The Mac copy is off unless --install-mac is passed, and only when Alex has asked to
+# install on this Mac. Without that flag this script does not copy Agents Host or the
+# window into ~/Applications, /Applications or ~/AgentsApps, and it does not restart the
+# login-item jobs. A development run and a merge wave never pass it.
 #
-# The window runs from a copy in ~/Applications/AgentsLive/<sha>-<time>/, never from
-# build/DD-store: every build in the main checkout writes over that.
+# With --install-mac, Agents Host is swapped in at ~/Applications/Agents Host.app, where
+# its Login Items point, and launchd restarts both jobs from it. The window runs from a
+# copy in ~/Applications/AgentsLive/<sha>-<time>/, never from build/DD-store: every build
+# in the main checkout writes over that. The relaunch is this file detached (`--restart`),
+# because the host it restarts is usually the one running the session that started it.
 #
 # Everything is built in the Live configuration (#220): optimised like Release, signed for
 # development like Debug. Release itself is the App Store archive's. Scratch walks
 # (run-app), merge-wave's checks and the tests stay on Debug.
 #
-#   ship.sh                 everything
+#   ship.sh                 the Remote only; the Mac app stays where it is
+#   ship.sh --install-mac   also copy the Mac app into place and restart its login items
 #   ship.sh --no-build      reuse build/DD-host, build/DD-store and build/DD-ios as they are
 #   ship.sh --no-linux      skip rebuilding the Linux hosts in App/Resources/servers
 #   ship.sh --no-devices    skip the iPhone/iPad
-#   ship.sh --no-mac        skip the Mac
+#   ship.sh --no-mac        skip the Mac (the default)
 #   ship.sh --device UDID   only this device (repeatable)
 #   ship.sh --now           relaunch the Mac after 3s instead of 20s
 #   ship.sh --build-only    build in this checkout (a worktree's copy builds the worktree),
@@ -117,13 +119,14 @@ if [[ ${1:-} == --restart ]]; then
   exit
 fi
 
-BUILD=1 DEVICES=1 MAC=1 DELAY=20 LINUX=1 BUILD_ONLY=0
+BUILD=1 DEVICES=1 MAC=0 DELAY=20 LINUX=1 BUILD_ONLY=0
 typeset -a ONLY
 while (( $# )); do
   case $1 in
     --no-build) BUILD=0 ;;
     --no-linux) LINUX=0 ;;
     --no-devices) DEVICES=0 ;;
+    --install-mac) MAC=1 ;;
     --no-mac) MAC=0 ;;
     --device) ONLY+=$2; shift ;;
     --now) DELAY=3 ;;
@@ -282,4 +285,6 @@ if (( MAC )); then
   echo "$(date +%T) staged $LIVE"
   nohup ${0:A} --restart "$LIVE" "$SHA" $DELAY >/dev/null 2>&1 &!
   echo "$(date +%T) Mac relaunch scheduled in ${DELAY}s; log /tmp/main-restart-all-$SHA.log"
+else
+  echo "leaving the Mac app where it is: no copy into Applications, no login-item restart"
 fi

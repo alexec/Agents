@@ -332,6 +332,11 @@ struct WorkflowPage: View {
                 }
                 .paperRaised(in: RoundedRectangle(cornerRadius: 18))
             }
+            if let statuses = summary.mcpTriggers, !statuses.isEmpty {
+                MCPTriggerLines(statuses: statuses) { status in
+                    Task { await model.clearMCPMissed(summary, status) }
+                }
+            }
             cooldown(summary)
         }
     }
@@ -438,6 +443,7 @@ struct WorkflowPage: View {
             case .custom: return "sparkle"
             default: return "desktopcomputer"
             }
+        case .serverEvent: return "antenna.radiowaves.left.and.right"
         case .unrecognised: return "questionmark.circle"
         }
     }

@@ -30,6 +30,9 @@ public enum WorkflowTrigger: Hashable, Sendable {
     /// Any event in the catalogue, a whole subject, or `custom.<name>`, narrowed by
     /// details (042 FR-021): the same pattern a wait uses, so the two cannot drift.
     case event(EventPattern)
+    /// An MCP server's event (#383), named as the server names it (`checks.failed`),
+    /// with the arguments its subscription sends.
+    case serverEvent(MCPEventTrigger)
     /// Understood to be a trigger, and not one this version knows. Kept whole so that
     /// writing the file back does not quietly delete it.
     case unrecognised(name: String, keys: [String: JSONValue])
@@ -44,6 +47,7 @@ public enum WorkflowTrigger: Hashable, Sendable {
         case .agentStopped: return "agent-stopped"
         case .workflowCompleted: return "workflow-completed"
         case .event(let pattern): return pattern.name
+        case .serverEvent(let trigger): return trigger.event
         case .unrecognised(let name, _): return name
         }
     }
@@ -55,6 +59,7 @@ public enum WorkflowTrigger: Hashable, Sendable {
     public var patterns: [EventPattern] {
         switch self {
         case .event(let pattern): return [pattern]
+        case .serverEvent(let trigger): return [EventPattern(trigger.event)]
         case .schedule, .unrecognised: return []
         case .workflowCompleted(let id):
             return [EventPattern("workflow.completed", filters: id.map { ["workflow": DetailFilter($0)] } ?? [:])]
@@ -67,8 +72,11 @@ public enum WorkflowTrigger: Hashable, Sendable {
     /// firing from where they always have (research R7, as built), so matching them here
     /// as well would run them twice.
     public func matches(_ event: Event) -> Bool {
-        if case .event(let pattern) = self { return pattern.matches(event) }
-        return false
+        switch self {
+        case .event(let pattern): return pattern.matches(event)
+        case .serverEvent(let trigger): return trigger.matches(event)
+        default: return false
+        }
     }
 
     /// Whether this version can act on it at all.
@@ -94,6 +102,7 @@ public enum WorkflowTrigger: Hashable, Sendable {
         case .workflowCompleted(let id):
             return id.map { "When \($0) finishes" } ?? "When any workflow finishes"
         case .event(let pattern): return "When " + Self.lowercasedFirst(pattern.summary)
+        case .serverEvent(let trigger): return trigger.summary
         case .unrecognised(let name, _):
             return "Waits for \"\(name)\", which this version does not know about yet"
         }
@@ -162,6 +171,12 @@ extension WorkflowTrigger: Codable {
         case .agentStopped: self = .agentStopped
         case .workflowCompleted(let id): self = .workflowCompleted(id: id)
         case .unrecognised(let name, let keys):
+            // A server's event (#383) goes as an unknown trigger does, and is read back
+            // as one by its name.
+            if EventCatalogue.isServerEventName(name), let trigger = MCPEventTrigger(event: name, keys: keys) {
+                self = .serverEvent(trigger)
+                return
+            }
             // A key whose value is not one value or a list is not dropped: the trigger
             // is then one this version cannot read, and says so (073 SC-002).
             let filters = keys.compactMapValues(Self.filter)
@@ -190,6 +205,8 @@ extension WorkflowTrigger: Codable {
             stored = .unrecognised(name: pattern.name, keys: pattern.filters.mapValues { filter in
                 filter.single.map(JSONValue.string) ?? .array(filter.values.map(JSONValue.string))
             })
+        // The same for a server's event: an older reader lists it as inert.
+        case .serverEvent(let trigger): stored = .unrecognised(name: trigger.event, keys: trigger.keys)
         case .unrecognised(let name, let keys): stored = .unrecognised(name: name, keys: keys)
         }
         try stored.encode(to: encoder)

@@ -1466,7 +1466,7 @@ final class RemoteModel {
         if notification.method == DaemonAPI.Notification.shellOutput,
            let params = notification.params,
            let output = DaemonAPI.ShellOutputNotification(params: params) {
-            self.shells[ShellKey(agentID: output.agentID, shell: output.shell)]?.received(output.bytes)
+            self.shells[ShellKey(agentID: output.agentID, shell: output.shell)]?.received(output.bytes, at: output.offset)
         }
         if notification.method == DaemonAPI.Notification.shellStateChanged,
            let change = try? notification.params?.decode(DaemonAPI.ShellStateNotification.self) {
@@ -2109,6 +2109,77 @@ final class RemoteModel {
         archivedProjects = archived
     }
 
+    // MARK: Chats (#229)
+
+    /// Why New Chat could not open a chat on a host, for the sidebar's alert; `archived`
+    /// carries the folder, so the alert can offer to bring it back.
+    struct ChatProblem: Identifiable {
+        let host: HostID
+        let message: String
+        var archived: URL?
+        var id: String { "\(host)|\(message)" }
+    }
+
+    /// Set by New Chat when there is no chat project to open, taken down by the alert.
+    var chatProblem: ChatProblem?
+
+    /// The chat project a host made for itself (`~/.agents/chat`), as its list marks it;
+    /// nil when there is none, or it is archived.
+    func chatProjectKey(on host: HostID) -> ProjectKey? {
+        work.projects.first { $0.host == host && $0.isChat == true && !$0.project.isArchived }?.key
+    }
+
+    /// Every host New Chat can be for, this Mac first: one item, or a menu of these.
+    var chatHosts: [HostID] {
+        hostSections.isEmpty ? [.mac] : hostSections.map(\.id)
+    }
+
+    /// New Chat, as the window's File ▸ New Chat: the host's chat project's new-session
+    /// page; with none listed, the host is asked why, and `chatProblem` says it.
+    func newChat(on host: HostID = .mac) async {
+        if let key = chatProjectKey(on: host) {
+            sidebarItem = .project(key)
+            return
+        }
+        let name = host == .mac ? "This Mac" : hostLabel(host)
+        let target = host == .mac ? client : otherHosts[host]
+        guard let target,
+              let state = try? await target.call(DaemonAPI.Method.projectsChatState, DaemonAPI.Empty(),
+                                                 returning: DaemonAPI.ChatProjectState.self) else {
+            // An older host does not know the question, or the host is not answering.
+            chatProblem = ChatProblem(host: host, message: "\(name) has no chat project.")
+            return
+        }
+        switch state {
+        case .ready(let folder):
+            sidebarItem = .project(ProjectKey(host: host, folder: folder))
+        case .archived(let folder):
+            chatProblem = ChatProblem(host: host, message: "The chat project on \(host == .mac ? "this Mac" : name) is archived.",
+                                      archived: folder)
+        case .noPersonalHome:
+            chatProblem = ChatProblem(host: host, message: "\(name) has no personal home folder, so it has no chat project.")
+        case .failed(let message):
+            chatProblem = ChatProblem(host: host, message: message)
+        }
+    }
+
+    /// Unarchive from New Chat's alert, then open it.
+    func unarchiveChatProject(_ problem: ChatProblem) async {
+        guard let folder = problem.archived,
+              let target = problem.host == .mac ? client : otherHosts[problem.host] else { return }
+        do {
+            var brought = try await target.call(DaemonAPI.Method.projectsUnarchive,
+                                                DaemonAPI.ProjectRequest(folder: folder),
+                                                returning: DaemonAPI.ProjectSummary.self)
+            brought.host = problem.host
+            work.upsert(brought)
+            archivedProjects.removeAll { $0.key == brought.key }
+            sidebarItem = .project(brought.key)
+        } catch {
+            self.problem = sentence(for: error)
+        }
+    }
+
     /// Bring an archived project back (#343), through its own host, as the window's Bring
     /// Back does: a project again, with its new-session form open.
     func unarchiveProject(_ summary: DaemonAPI.ProjectSummary) async {
@@ -2440,6 +2511,17 @@ final class RemoteModel {
         }
     }
 
+    /// Clear a server's event trigger's missed-events mark (#383).
+    func clearMCPMissed(_ summary: WorkflowSummary, _ status: MCPTriggerStatus) async {
+        do {
+            let request = DaemonAPI.WorkflowMCPClearMissedRequest(folder: summary.folder, workflowID: summary.workflowID,
+                                                                  name: status.name, server: status.server)
+            try await client(for: request).call(DaemonAPI.Method.workflowsClearMCPMissed, request)
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
     /// Change what a workflow is allowed to do. The Mac's daemon writes the file and
     /// answers with what it now says; a refusal has to reach the person, and the list
     /// is asked again so the menu goes back to what the file still holds (FR-025).
@@ -2566,18 +2648,47 @@ final class RemoteModel {
         // The last few finished turns as summaries, as the window opens with (#242), then
         // the turn in progress. A Mac too old to keep turns gives the lot. Both from the
         // chat's own host (058).
+        //
+        // Only the latest load puts its answer on screen: opening the chat and a
+        // catch-up both load it, and the older answer could land last (#400).
+        let load = work.beginTranscriptLoad()
         let turnsRequest = DaemonAPI.TurnsRequest.opening(selection)
-        let turns = (try? await client(for: turnsRequest).call(DaemonAPI.Method.agentsTurns, turnsRequest,
-                                                               returning: TurnsPage.self))
-            ?? TurnsPage(turns: [], firstTurn: 0, openStart: 0)
-        let request = DaemonAPI.TranscriptRequest(agentID: selection, limit: firstPageSize, from: turns.openStart)
-        guard let page = try? await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
-                                                              returning: TranscriptPage.self) else { return }
-        // A chat left before its page arrived does not get that page shown under the
-        // next one's name.
-        guard self.selection == selection else { return }
-        work.replaceTurns(with: turns)
-        work.replaceTranscript(with: page)
+        let pageSize = firstPageSize
+        do {
+            let opening = try await ChatOpening.load(
+                turns: {
+                    try await client(for: turnsRequest).call(DaemonAPI.Method.agentsTurns, turnsRequest,
+                                                             returning: TurnsPage.self)
+                },
+                transcript: { from in
+                    let request = DaemonAPI.TranscriptRequest(agentID: selection, limit: pageSize, from: from)
+                    return try await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
+                                                               returning: TranscriptPage.self)
+                },
+                describe: Self.describeLoadFailure)
+            // A chat left before its page arrived does not get that page shown under the
+            // next one's name.
+            guard self.selection == selection else { return }
+            work.takeOpening(opening, load: load)
+            if let why = opening.turnsFailure { note("chat: turns of \(selection) did not load: \(why)") }
+        } catch {
+            // Said in the chat, with Try Again, where it used to stay blank without a
+            // word until the next reconnect (#400).
+            note("chat: history of \(selection) did not load: \(error)")
+            guard self.selection == selection else { return }
+            work.failOpening(Self.describeLoadFailure(error), load: load)
+        }
+    }
+
+    /// A chat's history that did not come, in words (#400).
+    private static func describeLoadFailure(_ error: any Error) -> String {
+        switch error {
+        case is HostAway: "its host can't be reached right now."
+        case is MacAway: "your Mac can't be reached right now."
+        case is DaemonClient.NoAnswer: "no answer from your Mac in time."
+        case let error as JSONRPCError: error.message
+        default: "the connection to your Mac was lost."
+        }
     }
 
     /// An entry its host sent as a stub, too big to send to every chat (#203), read here.
@@ -2591,13 +2702,18 @@ final class RemoteModel {
 
     /// A finished turn's entries, for the chat to open it: the last page of them when
     /// the turn is longer than a host gives in one answer (#200).
-    func turnEntries(_ agentID: UUID, _ range: Range<Int>) async -> [TranscriptEntry] {
+    /// Nil when they did not come, which the chat says and asks again for (#400).
+    func turnEntries(_ agentID: UUID, _ range: Range<Int>) async -> [TranscriptEntry]? {
         let request = DaemonAPI.TranscriptRequest(agentID: agentID, before: range.upperBound,
                                                   limit: min(range.count, DaemonAPI.TranscriptRequest.limitCeiling),
                                                   from: range.lowerBound)
-        let page = try? await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
-                                                        returning: TranscriptPage.self)
-        return page?.entries ?? []
+        do {
+            return try await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
+                                                       returning: TranscriptPage.self).entries
+        } catch {
+            note("chat: steps of \(agentID) did not load: \(error)")
+            return nil
+        }
     }
 
     /// Another page, backwards. Never the whole history: that is the difference

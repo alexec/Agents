@@ -1,6 +1,7 @@
 import AgentsKitCore
 import Foundation
 import Observation
+import os
 
 /// The window's state, which is a view of the daemon's and never a copy of it.
 ///
@@ -978,6 +979,14 @@ final class AppModel {
                                             enabled: enabled))
     }
 
+    /// Clear a server's event trigger's missed-events mark (#383).
+    func clearMCPMissed(_ summary: WorkflowSummary, _ status: MCPTriggerStatus) async {
+        _ = try? await client(for: selectedProjectHost).call(
+            DaemonAPI.Method.workflowsClearMCPMissed,
+            DaemonAPI.WorkflowMCPClearMissedRequest(folder: summary.folder, workflowID: summary.workflowID,
+                                                    name: status.name, server: status.server))
+    }
+
     // MARK: Pinned pages (#159)
 
     func pins(in folder: URL?) -> [PinView] { work.pins(in: folder) }
@@ -1696,6 +1705,76 @@ final class AppModel {
         settleProjectSelection()
     }
 
+    // MARK: Chats (#229)
+
+    /// Why New Chat could not open a chat on a host, for the alert the projects column
+    /// shows. `archived` carries the folder, so the alert can offer to bring it back.
+    struct ChatProblem: Identifiable {
+        let host: HostID
+        let message: String
+        var archived: URL?
+        var id: String { "\(host)|\(message)" }
+    }
+
+    /// Set by New Chat when there is no chat project to open, taken down by the alert.
+    var chatProblem: ChatProblem?
+
+    /// The chat project a host made for itself (`~/.agents/chat`), as its list marks it;
+    /// nil when there is none, or it is archived.
+    func chatProjectKey(on host: HostID) -> ProjectKey? {
+        projects.first { $0.host == host && $0.isChat == true && !$0.project.isArchived }?.key
+    }
+
+    /// The hosts with a chat project to open, this Mac first.
+    var hostsWithChats: [HostID] {
+        ([HostID.mac] + hosts.servers).filter { chatProjectKey(on: $0) != nil }
+    }
+
+    /// New Chat: the new-session page of the host's chat project. True when it opened;
+    /// otherwise the host is asked why there is none, and `chatProblem` says it.
+    @discardableResult
+    func newChat(on host: HostID = .mac) async -> Bool {
+        if let key = chatProjectKey(on: host) {
+            showProject(key)
+            return true
+        }
+        let state: DaemonAPI.ChatProjectState
+        do {
+            state = try await client(for: host).call(DaemonAPI.Method.projectsChatState, DaemonAPI.Empty(),
+                                                     returning: DaemonAPI.ChatProjectState.self)
+        } catch {
+            // An older host does not know the question.
+            chatProblem = ChatProblem(host: host, message: "\(hostName(host, capitalised: true)) has no chat project.")
+            return false
+        }
+        switch state {
+        case .ready(let folder):
+            showProject(ProjectKey(host: host, folder: folder))
+            return true
+        case .archived(let folder):
+            chatProblem = ChatProblem(host: host, message: "The chat project on \(hostName(host)) is archived.",
+                                      archived: folder)
+        case .noPersonalHome:
+            chatProblem = ChatProblem(host: host, message: "\(hostName(host, capitalised: true)) has no personal home folder, "
+                + "so it has no chat project. A copy started on a scratch root needs AGENTS_PERSONAL_HOME.")
+        case .failed(let message):
+            chatProblem = ChatProblem(host: host, message: message)
+        }
+        return false
+    }
+
+    /// Unarchive from the New Chat alert, then open it.
+    func unarchiveChatProject(_ problem: ChatProblem) async {
+        guard let folder = problem.archived else { return }
+        let key = ProjectKey(host: problem.host, folder: folder)
+        await unarchiveProject(key)
+        if chatProjectKey(on: problem.host) != nil { showProject(key) }
+    }
+
+    private func hostName(_ host: HostID, capitalised: Bool = false) -> String {
+        host == .mac ? (capitalised ? "This Mac" : "this Mac") : hosts.label(host)
+    }
+
     // MARK: Connecting
 
     /// The daemon exits when it has nothing in hand and nobody watching, so a window
@@ -1709,6 +1788,9 @@ final class AppModel {
         // when the next action has waited out a connect.
         if hosts.macDownSince == nil { hosts.macDownSince = Date() }
         listening = nil
+        // The daemon forgot these screens with the connection. Marked, so they attach
+        // again when it comes back rather than looking alive and being dead (#401).
+        for shell in shellClients(on: .mac) { shell.lostConnection() }
         await reconnect()
     }
 
@@ -1871,6 +1953,7 @@ final class AppModel {
             await DaemonClient.$patience.withValue(.seconds(20)) {
                 await serverFilesByHost[.mac]?.reconnected()
                 await refreshEverything()
+                for shell in shellClients(on: .mac) { await shell.reattachIfLost() }
             }
             // Servers the control plane reaches are its clients. HostSet is the old
             // path, and it stays only while this window has no control plane (R7).
@@ -1924,7 +2007,8 @@ final class AppModel {
             // the general path would re-encode every byte of it here on the main
             // actor before decoding it again. See `ShellOutputNotification`.
             guard let params, let notification = DaemonAPI.ShellOutputNotification(params: params) else { return }
-            shellClients[ShellKey(agentID: notification.agentID, shell: notification.shell)]?.received(notification.bytes)
+            shellClients[ShellKey(agentID: notification.agentID, shell: notification.shell)]?
+                .received(notification.bytes, at: notification.offset)
 
         case DaemonAPI.Notification.shellStateChanged:
             guard let notification = try? params?.decode(DaemonAPI.ShellStateNotification.self) else { return }
@@ -2039,6 +2123,7 @@ final class AppModel {
         }
         hosts.onConnected = { [weak self] host in
             await self?.refreshServer(host)
+            await self?.reattachShells(on: host)
         }
         hosts.onReachability = { [weak self] server, online in
             guard let self else { return }
@@ -2146,6 +2231,7 @@ final class AppModel {
                 }
             }
             await refreshServer(id)
+            await reattachShells(on: id)
             // Presence starts with this Mac's host; a control plane with none starts it
             // with its first other host.
             startPresence()
@@ -2812,37 +2898,61 @@ final class AppModel {
                 Perf.end(opening.timing, "failed")
             }
         }
+        // Only the latest load of this chat puts its answer on screen: it is loaded on
+        // opening, on every reconnect and on its host's lists, and these overlap (#400).
+        let load = work.beginTranscriptLoad()
         // Beside the transcript rather than before it: neither waits on the other.
         async let whole: Void = loadWholeAgent(selection)
-        await attempt {
-            let client = self.client(forAgent: selection)
-            // The finished turns first, as summaries; then the transcript from where the
-            // turn in progress starts. A daemon too old to keep turns gives the lot.
-            // A few turns rather than a full page: a screen holds two or three, the rest
-            // come as the reader nears the top, and fifty replies were a quarter of a
-            // megabyte to carry and decode before anything could be drawn (#90).
-            let turns = (try? await client.call(DaemonAPI.Method.agentsTurns,
-                                                DaemonAPI.TurnsRequest.opening(selection),
-                                                returning: TurnsPage.self))
-                ?? TurnsPage(turns: [], firstTurn: 0, openStart: 0)
-            let page = try await client.call(DaemonAPI.Method.agentsTranscript,
-                                             DaemonAPI.TranscriptRequest(agentID: selection, from: turns.openStart),
-                                             returning: TranscriptPage.self)
-            // Clicking through chats quickly can have the answer for the last one
-            // arrive after the next was picked. It is dropped, not shown under the
-            // wrong name.
-            guard self.selection == selection else { return }
-            let dataIn = self.chatOpening.map { Perf.elapsed($0.timing) }
-            self.work.replaceTurns(with: turns)
-            self.work.replaceTranscript(with: page)
-            if let opening = self.chatOpening, opening.agent == selection {
-                self.chatOpening = nil
-                Perf.endWhenDrawn(opening.timing, "\(turns.turns.count) turns, \(page.entries.count) entries, "
-                                  + "data in \(dataIn ?? 0) ms")
+        // The chat's own host, both for the call and for the check that it is up: a
+        // server's chat does not fail because this Mac's host is down (#400).
+        let host = host(ofAgent: selection)
+        var reason: String?
+        let loaded = await attempt(on: host) {
+            let client = self.client(for: host)
+            do {
+                // A few turns rather than a full page: a screen holds two or three, the
+                // rest come as the reader nears the top, and fifty replies were a quarter
+                // of a megabyte to carry and decode before anything could be drawn (#90).
+                let opening = try await ChatOpening.load(
+                    turns: {
+                        try await client.call(DaemonAPI.Method.agentsTurns, DaemonAPI.TurnsRequest.opening(selection),
+                                              returning: TurnsPage.self)
+                    },
+                    transcript: { from in
+                        try await client.call(DaemonAPI.Method.agentsTranscript,
+                                              DaemonAPI.TranscriptRequest(agentID: selection, from: from),
+                                              returning: TranscriptPage.self)
+                    },
+                    describe: { self.describe($0) })
+                // Clicking through chats quickly can have the answer for the last one
+                // arrive after the next was picked. It is dropped, not shown under the
+                // wrong name.
+                guard self.selection == selection else { return }
+                let dataIn = self.chatOpening.map { Perf.elapsed($0.timing) }
+                guard self.work.takeOpening(opening, load: load) else { return }
+                if let why = opening.turnsFailure { Self.chatLog.notice("turns of \(selection) did not load: \(why, privacy: .public)") }
+                if let started = self.chatOpening, started.agent == selection {
+                    self.chatOpening = nil
+                    Perf.endWhenDrawn(started.timing, "\(opening.turns.turns.count) turns, "
+                                      + "\(opening.page.entries.count) entries, data in \(dataIn ?? 0) ms")
+                }
+            } catch {
+                reason = self.describe(error)
+                throw error
             }
+        }
+        // Said in the chat, with Try Again, as well as in the alert: the alert goes and
+        // the blank chat stayed (#400).
+        if !loaded, self.selection == selection {
+            let why = reason ?? (macHostNotice?.action ?? HostSet.macDownProblem)
+            Self.chatLog.notice("history of \(selection) did not load from \(host.rawValue, privacy: .public): \(why, privacy: .public)")
+            work.failOpening(why, load: load)
         }
         await whole
     }
+
+    /// Where a chat that did not open says why (#400).
+    nonisolated private static let chatLog = Logger(subsystem: "com.alexecollins.Agents", category: "chat")
 
     /// An entry its host sent as a stub, too big to send to every chat (#203), read here.
     func loadOversized(_ entryID: UUID, of agentID: UUID, at index: Int?) async {
@@ -2855,14 +2965,20 @@ final class AppModel {
 
     /// A finished turn's entries, for the chat to open it: the last page of them when
     /// the turn is longer than a host gives in one answer (#200).
-    func turnEntries(_ agentID: UUID, _ range: Range<Int>) async -> [TranscriptEntry] {
-        let page = try? await client(forAgent: agentID).call(
-            DaemonAPI.Method.agentsTranscript,
-            DaemonAPI.TranscriptRequest(agentID: agentID, before: range.upperBound,
-                                        limit: min(range.count, DaemonAPI.TranscriptRequest.limitCeiling),
-                                        from: range.lowerBound),
-            returning: TranscriptPage.self)
-        return page?.entries ?? []
+    /// Nil when they did not come, which the chat says and asks again for, rather than
+    /// a turn with no steps for as long as the chat is open (#400).
+    func turnEntries(_ agentID: UUID, _ range: Range<Int>) async -> [TranscriptEntry]? {
+        do {
+            return try await client(forAgent: agentID).call(
+                DaemonAPI.Method.agentsTranscript,
+                DaemonAPI.TranscriptRequest(agentID: agentID, before: range.upperBound,
+                                            limit: min(range.count, DaemonAPI.TranscriptRequest.limitCeiling),
+                                            from: range.lowerBound),
+                returning: TranscriptPage.self).entries
+        } catch {
+            Self.chatLog.notice("steps of \(agentID) did not load: \(self.describe(error), privacy: .public)")
+            return nil
+        }
     }
 
     /// The window only ever asks for a page. A transcript that has been going for hours
@@ -3447,6 +3563,20 @@ final class AppModel {
                                 describe: { [weak self] error in self?.describeForShell(error) ?? "\(error)" })
         shellClients[key] = fresh
         return fresh
+    }
+
+    /// This window's ends of the shells one host holds.
+    private func shellClients(on host: HostID) -> [ShellClient] {
+        shellClients.values.filter { self.host(ofAgent: $0.agentID) == host }
+    }
+
+    /// A server's new connection knows none of this window's screens: they attach
+    /// again, and are given only what they missed (#401).
+    private func reattachShells(on host: HostID) async {
+        for shell in shellClients(on: host) {
+            shell.lostConnection()
+            await shell.reattachIfLost()
+        }
     }
 
     /// The shells the daemon holds for an agent, so the pane opens with the tabs it

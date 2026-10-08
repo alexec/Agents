@@ -14,6 +14,9 @@ struct TerminalPane: View {
     @Environment(AppModel.self) private var model
     let agent: Agent
     let state: AgentPaneState
+    /// Whether the Terminal is the pane on screen. A hidden pane is kept alive, and
+    /// lets go of the keyboard so typing does not reach a shell nobody can see (#401).
+    var isVisible = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,7 +32,7 @@ struct TerminalPane: View {
             // are, so a tab comes back with its screen and scrollback as it was.
             ZStack {
                 ForEach(state.shells, id: \.self) { shell in
-                    ShellScreen(agent: agent, shell: shell, isFront: state.frontShell == shell,
+                    ShellScreen(agent: agent, shell: shell, isFront: isVisible && state.frontShell == shell,
                                 wantsFocus: state.shellToFocus == shell,
                                 focused: { if state.shellToFocus == shell { state.shellToFocus = nil } })
                         .opacity(state.frontShell == shell ? 1 : 0)
@@ -109,6 +112,8 @@ private struct ShellScreen: View {
                     } else if let opened = client.folder, !sameFolder(opened, agent.cwd),
                               cdTypedFor.map({ !sameFolder($0, agent.cwd) }) ?? true {
                         moved(client, from: opened)
+                    } else if let sendProblem = client.sendProblem {
+                        Note(sendProblem)
                     } else if client.dropped > 0 {
                         Note("The earlier part of this session is no longer held.")
                     }
@@ -165,7 +170,7 @@ private struct ShellScreen: View {
             Button("Type cd there") {
                 let path = agent.cwd.path(percentEncoded: false).replacingOccurrences(of: "'", with: "'\\''")
                 cdTypedFor = agent.cwd
-                Task { await client.send(Data("cd '\(path)'\r".utf8)) }
+                client.type(Data("cd '\(path)'\r".utf8))
             }
             .controlSize(.small)
             .help("Types cd \(agent.cwd.path(percentEncoded: false)) into this shell")

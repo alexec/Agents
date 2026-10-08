@@ -255,6 +255,27 @@ struct PTYTests {
         #expect(collector.text.contains("got:hello"))
     }
 
+    @Test func aPasteLargerThanTheTtyTakesArrivesWholeWithoutHoldingTheCaller() async throws {
+        // The tty's input queue holds a few kilobytes. A blocking write held the daemon
+        // until the program read the rest, and a short write gave up on it (#401).
+        let collector = Collector()
+        let pty = try PTY(executable: URL(filePath: "/bin/sh"),
+                          arguments: ["-c", "stty raw -echo; echo READY; head -c 300000 | wc -c"],
+                          cwd: URL(filePath: "/tmp"),
+                          environment: ["PATH": "/usr/bin:/bin"],
+                          onOutput: { collector.append($0) },
+                          onExit: { collector.finish($0) })
+        await eventually("the program is reading") { collector.text.contains("READY") }
+
+        let started = ContinuousClock.now
+        pty.write(Data(repeating: UInt8(ascii: "x"), count: 300_000))
+        #expect(ContinuousClock.now - started < .milliseconds(100))
+
+        _ = await collector.waitForExit()
+        await eventually("every byte reached the program") { collector.text.contains("300000") }
+        withExtendedLifetime(pty) {}
+    }
+
     @Test func resizingAfterTheFactReachesTheProgram() async throws {
         let collector = Collector()
         let pty = try PTY(executable: URL(filePath: "/bin/sh"),

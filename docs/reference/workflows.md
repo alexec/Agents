@@ -106,7 +106,7 @@ Every agent here has stopped. For each agent in the event's ids, check that what
 did landed: its branch merged, its checks green. Remove worktrees whose branch is on main.
 ```
 
-A `new` or `standing` run set off by an event no agent is behind, such as `mac.disk_low`,
+A `new` or `standing` run set off by an event no agent is behind, such as `machine.disk_low`,
 is told the event at the end of its prompt: its sentence and every detail, so the agent can
 act on `level: critical` without looking it up.
 

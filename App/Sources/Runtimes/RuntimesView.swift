@@ -122,27 +122,32 @@ private struct RuntimeStatusRow: View {
     private var isOut: Bool { allowance?.state.isOut == true && allowance?.unusable == nil }
 }
 
-/// The foot of the sidebar's way into Runtimes (065). It says how many are out, which is
-/// the only reason to come here, and a red dot beside it for the same reason. Nothing
-/// when none are: an empty line is not a thing to keep up to date.
+/// The foot of the sidebar's way into Runtimes (065). It says how many runtimes on this
+/// Mac can start a turn, out of how many are installed (#379), and a red dot only when
+/// none can: one being out does not matter, the work goes on on the others.
 struct RuntimesRow: View {
     @Environment(AppModel.self) private var model
 
-    private var outCount: Int {
-        model.runtimeAllowances?.rows.filter { $0.state.isOut }.count ?? 0
+    private var tally: RuntimeTally? {
+        RuntimeTally(model.runtimes, allowances: model.runtimeAllowances)
     }
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             Text("Runtimes").foregroundStyle(.primary)
             Spacer()
-            if outCount > 0 {
+            if let tally {
                 HStack(spacing: 4) {
-                    Circle().fill(StateTint.failure.style(or: .primary)).frame(width: 8, height: 8)
-                    Text("\(outCount) out").monospacedDigit()
+                    if tally.noneWorking {
+                        Circle().fill(StateTint.failure.style(or: .primary)).frame(width: 8, height: 8)
+                    }
+                    Text(tally.words).monospacedDigit()
                 }
                 .appText(.fine)
                 .foregroundStyle(.secondary)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(tally.noneWorking ? "None of \(tally.total) working"
+                                    : "\(tally.working) of \(tally.total) working")
             }
         }
         .help("What each runtime can be started on right now, and where its allowance stands")
