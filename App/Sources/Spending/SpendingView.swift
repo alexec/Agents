@@ -41,7 +41,7 @@ struct SpendingView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(24)
         }
-        .navigationTitle("Spending")
+        .navigationTitle("Cost")
     }
 
     /// The first thing on the page, because it is the question the page answers. One

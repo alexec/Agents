@@ -194,7 +194,7 @@ plan() {
 	echo "  and the swift tests scripts/select-test-suites.sh picks for them, once merged"
 	local all
 	all=$(git diff --name-only "$main" "$tip")
-	echo "ship after: $(echo "$all" | shippable)"
+	echo "mac install: no (product code changed: $(echo "$all" | shippable))"
 }
 
 # --- the wave's state -------------------------------------------------------------------
@@ -647,7 +647,7 @@ summary() {
 		ship=$(git diff --name-only "$(cat "$ST/main")" main | shippable)
 		echo "SHIP=$ship"
 		if [ "$ship" = yes ]; then
-			echo "  something shippable changed: nohup .agents/skills/ship-app/scripts/ship.sh, once, under the build lease"
+			echo "  something shippable changed: do not install. Leave Applications and the login-item jobs alone."
 		else
 			echo "  nothing shippable changed: no ship"
 		fi

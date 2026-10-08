@@ -164,7 +164,7 @@ export function ActivityRows({ store, chosen, onPick }: {
         held + waiting > 0 && `${held} held · ${waiting} waiting`)}
       {row("runtimes", "Runtimes", "What each runtime can be started on right now",
         out > 0 && <><span class="dot failure" aria-hidden="true" /> {out} out</>)}
-      {row("spending", "Spending", "What all of the work has cost, and what it cost today",
+      {row("spending", "Cost", "What all of the work has cost, and what it cost today",
         (today || left) && (
           <span class={`spending${closeToFull(mac) && chosen !== "spending" ? " close" : ""}`}>
             {today && <span>{today}</span>}{left && <span>{left}</span>}
@@ -174,7 +174,7 @@ export function ActivityRows({ store, chosen, onPick }: {
   );
 }
 
-const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", spending: "Spending" };
+const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", spending: "Cost" };
 
 /** An Activity page in the chat's place. */
 export function ActivityPageView({ store, page }: { store: Store; page: ActivityPage }) {

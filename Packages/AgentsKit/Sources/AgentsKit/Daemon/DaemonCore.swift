@@ -495,6 +495,16 @@ public actor DaemonCore {
     var machineWatch: (any MachineWatch)?
     /// Told when the Mac wakes: the uplink dials at once (#82, #113).
     var wakeHandlers: [@Sendable () -> Void] = []
+    /// Whether this host raises the Mac-only events (#372): a Mac does; a Linux server
+    /// has nothing that hears sleep, wake or the person, so it warns about them. A test
+    /// turns it off to be a server.
+    var raisesMacOnlyEvents: Bool = {
+        #if os(macOS)
+        return true
+        #else
+        return false
+        #endif
+    }()
     /// How long a `wait_for_event` call may stay open: the lease call's limit, so there
     /// is one number to measure against the runtimes (research R5). A test shortens it.
     var eventHoldLimit: Duration = LeaseLimits.waitLimit
