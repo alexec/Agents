@@ -1,6 +1,7 @@
 import AgentsKitCore
 import Foundation
 import Observation
+import os
 
 /// The window's state, which is a view of the daemon's and never a copy of it.
 ///
@@ -2802,37 +2803,61 @@ final class AppModel {
                 Perf.end(opening.timing, "failed")
             }
         }
+        // Only the latest load of this chat puts its answer on screen: it is loaded on
+        // opening, on every reconnect and on its host's lists, and these overlap (#400).
+        let load = work.beginTranscriptLoad()
         // Beside the transcript rather than before it: neither waits on the other.
         async let whole: Void = loadWholeAgent(selection)
-        await attempt {
-            let client = self.client(forAgent: selection)
-            // The finished turns first, as summaries; then the transcript from where the
-            // turn in progress starts. A daemon too old to keep turns gives the lot.
-            // A few turns rather than a full page: a screen holds two or three, the rest
-            // come as the reader nears the top, and fifty replies were a quarter of a
-            // megabyte to carry and decode before anything could be drawn (#90).
-            let turns = (try? await client.call(DaemonAPI.Method.agentsTurns,
-                                                DaemonAPI.TurnsRequest.opening(selection),
-                                                returning: TurnsPage.self))
-                ?? TurnsPage(turns: [], firstTurn: 0, openStart: 0)
-            let page = try await client.call(DaemonAPI.Method.agentsTranscript,
-                                             DaemonAPI.TranscriptRequest(agentID: selection, from: turns.openStart),
-                                             returning: TranscriptPage.self)
-            // Clicking through chats quickly can have the answer for the last one
-            // arrive after the next was picked. It is dropped, not shown under the
-            // wrong name.
-            guard self.selection == selection else { return }
-            let dataIn = self.chatOpening.map { Perf.elapsed($0.timing) }
-            self.work.replaceTurns(with: turns)
-            self.work.replaceTranscript(with: page)
-            if let opening = self.chatOpening, opening.agent == selection {
-                self.chatOpening = nil
-                Perf.endWhenDrawn(opening.timing, "\(turns.turns.count) turns, \(page.entries.count) entries, "
-                                  + "data in \(dataIn ?? 0) ms")
+        // The chat's own host, both for the call and for the check that it is up: a
+        // server's chat does not fail because this Mac's host is down (#400).
+        let host = host(ofAgent: selection)
+        var reason: String?
+        let loaded = await attempt(on: host) {
+            let client = self.client(for: host)
+            do {
+                // A few turns rather than a full page: a screen holds two or three, the
+                // rest come as the reader nears the top, and fifty replies were a quarter
+                // of a megabyte to carry and decode before anything could be drawn (#90).
+                let opening = try await ChatOpening.load(
+                    turns: {
+                        try await client.call(DaemonAPI.Method.agentsTurns, DaemonAPI.TurnsRequest.opening(selection),
+                                              returning: TurnsPage.self)
+                    },
+                    transcript: { from in
+                        try await client.call(DaemonAPI.Method.agentsTranscript,
+                                              DaemonAPI.TranscriptRequest(agentID: selection, from: from),
+                                              returning: TranscriptPage.self)
+                    },
+                    describe: { self.describe($0) })
+                // Clicking through chats quickly can have the answer for the last one
+                // arrive after the next was picked. It is dropped, not shown under the
+                // wrong name.
+                guard self.selection == selection else { return }
+                let dataIn = self.chatOpening.map { Perf.elapsed($0.timing) }
+                guard self.work.takeOpening(opening, load: load) else { return }
+                if let why = opening.turnsFailure { Self.chatLog.notice("turns of \(selection) did not load: \(why, privacy: .public)") }
+                if let started = self.chatOpening, started.agent == selection {
+                    self.chatOpening = nil
+                    Perf.endWhenDrawn(started.timing, "\(opening.turns.turns.count) turns, "
+                                      + "\(opening.page.entries.count) entries, data in \(dataIn ?? 0) ms")
+                }
+            } catch {
+                reason = self.describe(error)
+                throw error
             }
+        }
+        // Said in the chat, with Try Again, as well as in the alert: the alert goes and
+        // the blank chat stayed (#400).
+        if !loaded, self.selection == selection {
+            let why = reason ?? (macHostNotice?.action ?? HostSet.macDownProblem)
+            Self.chatLog.notice("history of \(selection) did not load from \(host.rawValue, privacy: .public): \(why, privacy: .public)")
+            work.failOpening(why, load: load)
         }
         await whole
     }
+
+    /// Where a chat that did not open says why (#400).
+    nonisolated private static let chatLog = Logger(subsystem: "com.alexecollins.Agents", category: "chat")
 
     /// An entry its host sent as a stub, too big to send to every chat (#203), read here.
     func loadOversized(_ entryID: UUID, of agentID: UUID, at index: Int?) async {
@@ -2845,14 +2870,20 @@ final class AppModel {
 
     /// A finished turn's entries, for the chat to open it: the last page of them when
     /// the turn is longer than a host gives in one answer (#200).
-    func turnEntries(_ agentID: UUID, _ range: Range<Int>) async -> [TranscriptEntry] {
-        let page = try? await client(forAgent: agentID).call(
-            DaemonAPI.Method.agentsTranscript,
-            DaemonAPI.TranscriptRequest(agentID: agentID, before: range.upperBound,
-                                        limit: min(range.count, DaemonAPI.TranscriptRequest.limitCeiling),
-                                        from: range.lowerBound),
-            returning: TranscriptPage.self)
-        return page?.entries ?? []
+    /// Nil when they did not come, which the chat says and asks again for, rather than
+    /// a turn with no steps for as long as the chat is open (#400).
+    func turnEntries(_ agentID: UUID, _ range: Range<Int>) async -> [TranscriptEntry]? {
+        do {
+            return try await client(forAgent: agentID).call(
+                DaemonAPI.Method.agentsTranscript,
+                DaemonAPI.TranscriptRequest(agentID: agentID, before: range.upperBound,
+                                            limit: min(range.count, DaemonAPI.TranscriptRequest.limitCeiling),
+                                            from: range.lowerBound),
+                returning: TranscriptPage.self).entries
+        } catch {
+            Self.chatLog.notice("steps of \(agentID) did not load: \(self.describe(error), privacy: .public)")
+            return nil
+        }
     }
 
     /// The window only ever asks for a page. A transcript that has been going for hours

@@ -50,6 +50,7 @@ struct RemoteChatView: View {
                                hasMore: model.work.hasMoreOfTheConversation,
                                entryCount: model.entries.count + model.work.turns.count,
                                isComingBack: model.isComingBack(agent),
+                               loadFailure: model.work.transcriptLoadFailure,
                                settleKey: model.selection,
                                loadEarlier: { await model.loadEarlier() },
                                bottomInset: formHeight,
@@ -263,6 +264,7 @@ struct RemoteChatView: View {
             // (057, frame E).
             subagentSteps: { id in subagentOnScreen = id },
             turnEntries: { [model] agentID, range in await model.turnEntries(agentID, range) },
+            reloadTranscript: { [model] in await model.loadTranscript() },
             continueWithoutSandbox: sandboxAnswer(carryOn: true),
             keepStopped: sandboxAnswer(carryOn: false),
             waitingSandbox: waitingSandbox)

@@ -2556,18 +2556,47 @@ final class RemoteModel {
         // The last few finished turns as summaries, as the window opens with (#242), then
         // the turn in progress. A Mac too old to keep turns gives the lot. Both from the
         // chat's own host (058).
+        //
+        // Only the latest load puts its answer on screen: opening the chat and a
+        // catch-up both load it, and the older answer could land last (#400).
+        let load = work.beginTranscriptLoad()
         let turnsRequest = DaemonAPI.TurnsRequest.opening(selection)
-        let turns = (try? await client(for: turnsRequest).call(DaemonAPI.Method.agentsTurns, turnsRequest,
-                                                               returning: TurnsPage.self))
-            ?? TurnsPage(turns: [], firstTurn: 0, openStart: 0)
-        let request = DaemonAPI.TranscriptRequest(agentID: selection, limit: firstPageSize, from: turns.openStart)
-        guard let page = try? await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
-                                                              returning: TranscriptPage.self) else { return }
-        // A chat left before its page arrived does not get that page shown under the
-        // next one's name.
-        guard self.selection == selection else { return }
-        work.replaceTurns(with: turns)
-        work.replaceTranscript(with: page)
+        let pageSize = firstPageSize
+        do {
+            let opening = try await ChatOpening.load(
+                turns: {
+                    try await client(for: turnsRequest).call(DaemonAPI.Method.agentsTurns, turnsRequest,
+                                                             returning: TurnsPage.self)
+                },
+                transcript: { from in
+                    let request = DaemonAPI.TranscriptRequest(agentID: selection, limit: pageSize, from: from)
+                    return try await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
+                                                               returning: TranscriptPage.self)
+                },
+                describe: Self.describeLoadFailure)
+            // A chat left before its page arrived does not get that page shown under the
+            // next one's name.
+            guard self.selection == selection else { return }
+            work.takeOpening(opening, load: load)
+            if let why = opening.turnsFailure { note("chat: turns of \(selection) did not load: \(why)") }
+        } catch {
+            // Said in the chat, with Try Again, where it used to stay blank without a
+            // word until the next reconnect (#400).
+            note("chat: history of \(selection) did not load: \(error)")
+            guard self.selection == selection else { return }
+            work.failOpening(Self.describeLoadFailure(error), load: load)
+        }
+    }
+
+    /// A chat's history that did not come, in words (#400).
+    private static func describeLoadFailure(_ error: any Error) -> String {
+        switch error {
+        case is HostAway: "its host can't be reached right now."
+        case is MacAway: "your Mac can't be reached right now."
+        case is DaemonClient.NoAnswer: "no answer from your Mac in time."
+        case let error as JSONRPCError: error.message
+        default: "the connection to your Mac was lost."
+        }
     }
 
     /// An entry its host sent as a stub, too big to send to every chat (#203), read here.
@@ -2581,13 +2610,18 @@ final class RemoteModel {
 
     /// A finished turn's entries, for the chat to open it: the last page of them when
     /// the turn is longer than a host gives in one answer (#200).
-    func turnEntries(_ agentID: UUID, _ range: Range<Int>) async -> [TranscriptEntry] {
+    /// Nil when they did not come, which the chat says and asks again for (#400).
+    func turnEntries(_ agentID: UUID, _ range: Range<Int>) async -> [TranscriptEntry]? {
         let request = DaemonAPI.TranscriptRequest(agentID: agentID, before: range.upperBound,
                                                   limit: min(range.count, DaemonAPI.TranscriptRequest.limitCeiling),
                                                   from: range.lowerBound)
-        let page = try? await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
-                                                        returning: TranscriptPage.self)
-        return page?.entries ?? []
+        do {
+            return try await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
+                                                       returning: TranscriptPage.self).entries
+        } catch {
+            note("chat: steps of \(agentID) did not load: \(error)")
+            return nil
+        }
     }
 
     /// Another page, backwards. Never the whole history: that is the difference
