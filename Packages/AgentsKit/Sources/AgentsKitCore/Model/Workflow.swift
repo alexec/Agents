@@ -392,6 +392,8 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         holdsAFire = try c.decodeIfPresent(Bool.self, forKey: .holdsAFire) ?? false
         offReason = (try? c.decodeIfPresent(WorkflowOffReason.self, forKey: .offReason)) ?? nil
         standingAgentID = try c.decodeIfPresent(UUID.self, forKey: .standingAgentID)
+        // A state or failure this version does not know costs the lines, not the list (#383).
+        mcpTriggers = (try? c.decodeIfPresent([MCPTriggerStatus].self, forKey: .mcpTriggers)) ?? nil
     }
 
     /// What its cooldown is doing, in one sentence, for the pages that show triggers
