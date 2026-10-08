@@ -193,7 +193,8 @@ setting below can be set by the app for one agent without touching `~/.claude`.
 | Custom config folder | `CLAUDE_CONFIG_DIR` | `~/.claude` | Removed with every `CLAUDE_*` | — | Set, planned: let it through, so your own folder is used |
 | Keep credentials out of commands | `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB` | off | Yes | Yes | Set on servers, planned: the relay's stand-in token stays out of shell commands |
 | Checkpoints | `fileCheckpointingEnabled` | on only when the client reports file changes; the app does not | Off | Off | Leave alone |
-| Compaction, output style, language, system prompt, hooks, MCP loading, subagents | settings, environment | its defaults | Yes | Server's own | Leave alone |
+| Compaction | `autoCompactEnabled`, `autoCompactWindow` | on, about 83% of a 200K window | Yes: `compaction_update` with its summary; `/compact` offered | Yes, through `_meta` | Leave alone: on with nothing set; see [Compaction in each runtime](../explanation/compaction-by-runtime.md) |
+| Output style, language, system prompt, hooks, MCP loading, subagents | settings, environment | its defaults | Yes | Server's own | Leave alone |
 | Command sandbox | `_meta…options.sandbox.enabled` | off, unless your settings | Yes: On and Off measured | Yes; On needs bubblewrap and socat there | Show: **Command sandbox** |
 | Updates, status line, notifications, theme and other terminal settings | settings | — | No: pinned version, no terminal | — | Leave alone |
 
@@ -215,7 +216,8 @@ every turn, so those in your config file only choose the first value, or nothing
 | Browser, computer use, image generation | `features.browser_use`, `computer_use`, `image_generation` | on | Not yet measured | — | Measure: they may be tools that duplicate the app's |
 | Reasoning summaries | `model_reasoning_summary` | auto | No: the adapter chooses | — | Leave alone |
 | Folder trust | `projects.<path>.trust_level` | asks | The adapter trusts every agent's folder, so a project's own Codex config and hooks load | Yes | Leave alone |
-| Verbosity, compaction, subagent limits, profiles, instructions, MCP, hooks | config file | its defaults | Yes | Not read on a relayed server | Leave alone |
+| Compaction | `model_auto_compact_token_limit`, `compact_prompt` | on, 90% of the window, no off switch | Yes: `compaction_update`, no summary; `/compact` offered | Through `CODEX_CONFIG` | Leave alone: on with nothing set; see [Compaction in each runtime](../explanation/compaction-by-runtime.md) |
+| Verbosity, subagent limits, profiles, instructions, MCP, hooks | config file | its defaults | Yes | Not read on a relayed server | Leave alone |
 | Sandbox and network | `sandbox_mode`, `sandbox_workspace_write.network_access` | from the mode: network off except **Full access** | The mode decides; measured | Yes; On needs user namespaces there | Show: **Command sandbox**, Off is **Full access** |
 | Updates, notifications and terminal settings | config file | — | No | — | Leave alone |
 
@@ -233,7 +235,8 @@ is the lowest of them, so yours always win over it.
 | Session retention | `general.sessionRetention` | 30 days, deleted at every start | Yes | Through the app's defaults file | Set, planned: long enough that an idle agent can still be picked back up |
 | Subagents, task tracker | `invoke_agent`, `tracker_*` | on | Yes | Yes | Leave alone |
 | Folder trust | `--skip-trust` | asks | Yes: loads the project's own hooks and settings | Yes | Set today |
-| Compression, turn limit, loop detection, tool output, shell | settings | its defaults | Yes | Server's own | Leave alone |
+| Compression | `model.compressionThreshold` | on, at 0.5 of the window | Yes, but nothing is sent over ACP and `/compress` is not offered | Through the app's defaults file | Leave alone: on with nothing set; see [Compaction in each runtime](../explanation/compaction-by-runtime.md) |
+| Turn limit, loop detection, tool output, shell | settings | its defaults | Yes | Server's own | Leave alone |
 | Checkpoints | `general.checkpointing.enabled` | off | No: only its terminal writes them | — | Leave alone |
 | MCP, hooks, extensions, skills, `.env` files | settings | loaded | Yes | Server's own | Leave alone. A project `.env` can set Gemini's variables. |
 | Telemetry to your own collector | `telemetry.*`, `GEMINI_TELEMETRY_*` | off | Yes | Yes | Leave alone |
@@ -254,7 +257,8 @@ else is an option under the prompt, the tool list the app sends, or its environm
 | Starting model | `AGY_ACP_DEFAULT_MODEL` | flash, high | Yes | — | Leave alone: the model is under the prompt |
 | Project hooks | `.agents/hooks.json` in the project | asks, unless the folder is trusted | Run without asking, because the app trusts the folder | — | Set, planned: stop trusting, so it asks, once its question is measured to reach you as a card |
 | MCP, skills, rules | its home, the project | — | Yes | — | Leave alone |
-| Usage data, compaction, checkpoints, updates | none | — | — | — | Nothing to set |
+| Compaction | none the ACP server reads | on, at its backend's threshold | Yes, but nothing is sent over ACP | Mac only today | Nothing to set; see [Compaction in each runtime](../explanation/compaction-by-runtime.md) |
+| Usage data, checkpoints, updates | none | — | — | — | Nothing to set |
 | Sandbox | the admin's **Sandbox mode**, business accounts only | off | No lever | — | Leave alone: **No sandbox** |
 
 #### OpenCode
@@ -270,7 +274,8 @@ which reaches servers too. Settings your Mac's administrator manages win over bo
 | Sharing, updates, question tool | `share`, `autoupdate`, `OPENCODE_ENABLE_QUESTION_TOOL` | on | Yes | Yes | Set off today |
 | MCP timeout | `experimental.mcp_timeout` | 5 seconds | Yes | Yes | Measure: the app's tools that wait may be cut off |
 | Language servers, formatters | `lsp`, `formatter` | off | Yes | Yes | Leave alone |
-| Compaction, snapshots, instructions, skills, plugins, commands, providers, output limits | `opencode.json` | its defaults | Yes | Server's own, and the app's | Leave alone |
+| Compaction | `compaction.*`; `OPENCODE_DISABLE_AUTOCOMPACT` | on when the window is full; pruning off | Yes: the summary arrives as agent text; `/compact` works but is not offered | Through `OPENCODE_CONFIG_CONTENT` | Leave alone: on with nothing set; see [Compaction in each runtime](../explanation/compaction-by-runtime.md) |
+| Snapshots, instructions, skills, plugins, commands, providers, output limits | `opencode.json` | its defaults | Yes | Server's own, and the app's | Leave alone |
 | Leaving the project folder | `permission.external_directory` | asks | Yes | Yes | Leave alone: a permission, not a sandbox; OpenCode has none |
 | Theme, keys and other terminal settings | `tui.json` | — | No | — | Leave alone |
 
@@ -290,7 +295,8 @@ settings files there are the server's own.
 | Usage data | `GROK_TELEMETRY_ENABLED`, `DISABLE_TELEMETRY` | on | Yes | Yes | Show, planned: the usage data switch |
 | Auto review | `_meta.autoMode` | off | Not measured with the app | Yes | Leave alone until measured |
 | Folder trust | `x.ai/folder_trust/request` | asks | The app does not answer it; a server's untrusted folder may skip the project's own settings | Yes | Measure on a server |
-| Compaction, subagent limits, MCP, plugins, hooks, skills, tool timeouts | config file | its defaults | Yes | Server's own | Leave alone. It also reads Claude's and Cursor's MCP servers, hooks and rules. |
+| Compaction | `[session] auto_compact_threshold_percent`; `GROK_AUTO_COMPACT_THRESHOLD_PERCENT` | on, at 80–85% of the window, no off switch | Yes: its own `x.ai/session_notification`, which the app does not read; `/compact` offered | Yes, by the variable | Leave alone: on with nothing set; see [Compaction in each runtime](../explanation/compaction-by-runtime.md) |
+| Subagent limits, MCP, plugins, hooks, skills, tool timeouts | config file | its defaults | Yes | Server's own | Leave alone. It also reads Claude's and Cursor's MCP servers, hooks and rules. |
 | Permission rules | `permission.*`, and Claude's own settings files | — | Yes, before the app is asked | Server's own | Leave alone |
 | Sandbox | `--sandbox`, before `agent stdio` | off | Yes: the whole process from its start, measured | Yes; Landlock | Show: **Command sandbox** |
 | `--tools`, `--disallowed-tools`, `--max-turns` | flags | — | No: headless only | — | Leave alone |
@@ -315,6 +321,7 @@ server's own.
 | Memory | `memory` | on | Offered as a command | Server's own | Leave alone: no lever under ACP, so the memory switch does not reach it |
 | Instructions, MCP, skills, plugins, hooks, custom agents | files and flags | loaded | Yes | Server's own | Leave alone |
 | Scheduled prompts, fleet, computer use | `/every`, `/after`, `/fleet`, `/computer` | offered | Offered as commands | — | Leave alone: commands you type |
+| Compaction ("infinite sessions") | none documented | on, from 80% of the window, blocking at 95% | Yes, but only the context meter shows it; `/compact` offered | Yes | Leave alone: on with nothing set, no off switch; see [Compaction in each runtime](../explanation/compaction-by-runtime.md) |
 | Usage data | none documented | — | — | — | Nothing to set |
 | Folders and sandbox | `--add-dir`, `--allow-all-paths`, `--sandbox`, `--no-sandbox`, `sandbox.*` | this folder only; sandbox off | Not measured: its quota was spent | — | Leave alone: **Runtime controlled**, until measured |
 | Default mode, theme and other terminal settings | settings | — | No | — | Leave alone |
@@ -331,6 +338,7 @@ not set them.
 | Always approve | `--force` | off | Yes | Yes | Leave alone: the app's **Always-approve** answers for it |
 | Approval mode | `approvalMode` | allowlist | Not measured | Server's own | Leave alone. **Unrestricted** means it never asks, so the app's **Default** cannot hold it back. |
 | Web search | `autoAcceptWebSearch` | asks | Yes | Server's own | Leave alone: no switch the app can reach |
+| Compaction (summarization) | none: its backend decides | on | Yes, but nothing is sent over ACP and `/summarize` is not offered | Yes | Nothing to set; see [Compaction in each runtime](../explanation/compaction-by-runtime.md) |
 | Attribution | `attribution.*` | on | Not measured | Server's own | Leave alone |
 | Model shared with Terminal | — | — | A model picked in the app may become Cursor's default in Terminal too | — | Measure |
 | Permission rules, MCP, hooks, rules, skills | files | — | Yes | Server's own | Leave alone |

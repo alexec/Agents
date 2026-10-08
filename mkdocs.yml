@@ -117,3 +117,4 @@ nav:
       - explanation/projects-hosts-worktrees.md
       - explanation/leases.md
       - explanation/phone-and-ipad.md
+      - explanation/compaction-by-runtime.md
