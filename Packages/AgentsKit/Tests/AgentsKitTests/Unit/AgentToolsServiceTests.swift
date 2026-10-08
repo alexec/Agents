@@ -45,10 +45,12 @@ struct AgentToolsServiceTests {
         await service.close()
     }
 
+    /// All but park_agent, which with no id parks the caller itself (#481).
     @Test func anAgentAnotherAgentStartedIsNotOfferedThem() async throws {
         let (client, service) = await pair(managesAgents: false)
         let listed = try await names(client)
-        for tool in agentTools { #expect(!listed.contains(tool), "\(tool)") }
+        for tool in agentTools where tool != AppService.parkAgentToolName { #expect(!listed.contains(tool), "\(tool)") }
+        #expect(listed.contains(AppService.parkAgentToolName))
         #expect(listed.contains(AppService.finishTurnToolName), "and keeps the rest")
         await service.close()
     }

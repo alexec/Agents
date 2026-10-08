@@ -51,8 +51,8 @@ struct AppServiceTests {
         // The two older names for its halves are gone (023 R5).
         // The four agent tools (028 + park) sit after the workflow tool, for an agent
         // that may use them — which is the default. The three lease tools (036) follow
-        // them, for every agent, then the three event tools (042). Moving (053) rides on
-        // finish_turn. The two session tools (065) sit after the agent tools, for every
+        // them, for every agent, then the three event tools (042). Labels and moving
+        // (053) have tools of their own since #481. The two session tools (065) sit after the agent tools, for every
         // agent. The pin tools (#159, #180) come last, for every agent.
         #expect(tools.compactMap { $0["name"]?.stringValue }
             == [AppService.finishTurnToolName, AppService.showFileToolName,
@@ -60,6 +60,7 @@ struct AppServiceTests {
                 AppService.startAgentToolName, AppService.stopAgentToolName,
                 AppService.parkAgentToolName, AppService.archiveAgentToolName,
                 AppService.listMyAgentsToolName,
+                AppService.setSessionLabelsToolName, AppService.moveWorktreeToolName,
                 AppService.listSessionsToolName, AppService.readSessionToolName,
                 AppService.leaseResourceToolName, AppService.releaseResourceToolName,
                 AppService.listResourcesToolName,
@@ -76,11 +77,8 @@ struct AppServiceTests {
         #expect(finish?["required"]?.arrayValue?.compactMap { $0.stringValue }
             == ["outcome", "message"])
         #expect(finish?["properties"]?["title"]?["type"]?.stringValue == "string")
-        // One suggestion, as an object; the list is read but no longer offered (031).
-        let next = finish?["properties"]?["next_prompt"]
-        #expect(next?["type"]?.stringValue == "object")
-        #expect(next?["required"]?.arrayValue?.compactMap { $0.stringValue }
-            == ["label", "prompt"])
+        // No suggestion offered since #481; one sent is still read (031).
+        #expect(finish?["properties"]?["next_prompt"] == nil)
         #expect(finish?["properties"]?["next_prompts"] == nil)
 
         try #require(tools.count > 2)
@@ -326,15 +324,16 @@ struct AppServiceTests {
 
     // MARK: Blocked (039)
 
-    /// The sixth outcome is offered, with what it carries.
-    @Test func blockedIsOfferedWithWhatItCarries() async throws {
+    /// The sixth outcome is still offered; what it carried is on wait_for_event (#481),
+    /// and still read here for a conversation that sends it.
+    @Test func blockedIsOfferedAndTheWaitIsOnWaitForEvent() async throws {
         let properties = AppService.finishTurnTool["inputSchema"]?["properties"]
         #expect(properties?["outcome"]?["enum"]?.arrayValue?.contains("blocked") == true)
-        #expect(properties?["waiting_on"]?["type"]?.stringValue == "array")
-        #expect(properties?["check_again_in_minutes"]?["maximum"]?.intValue == 1440)
-        #expect(properties?["wake_on"]?["enum"]?.arrayValue == ["any", "all"])
-        #expect(AppService.finishTurnTool["description"]?.stringValue?.contains("blocked") == true)
-        #expect(AppService.finishTurnTool["description"]?.stringValue?.contains("wake_on any") == true)
+        #expect(properties?["waiting_on"] == nil)
+        let wait = AppService.waitForEventTool["inputSchema"]?["properties"]
+        #expect(wait?["agents"]?["type"]?.stringValue == "array")
+        #expect(wait?["wake_on"]?["enum"]?.arrayValue == ["any", "all"])
+        #expect(AppService.finishTurnTool["description"]?.stringValue?.contains("wait_for_event") == true)
     }
 
     /// #152: wake_on rides to the sink as read; left out, it is nil, which is all.
@@ -390,10 +389,12 @@ struct AppServiceTests {
 
     // MARK: Parked or archived once the turn ends
 
-    @Test func afterwardsIsOffered() async throws {
+    /// Not listed since #481 — park_agent with no id does it — and still read.
+    @Test func afterwardsIsReadButNotListed() async throws {
         let properties = AppService.finishTurnTool["inputSchema"]?["properties"]
-        #expect(properties?["afterwards"]?["enum"]?.arrayValue == ["park", "archive"])
-        #expect(AppService.finishTurnTool["description"]?.stringValue?.contains("afterwards") == true)
+        #expect(properties?["afterwards"] == nil)
+        #expect(AppService.finishTurnTool["description"]?.stringValue?.contains("park_agent") == true)
+        #expect(AppService.parkAgentTool["inputSchema"]?["required"] == nil, "no id is yourself")
     }
 
     @Test func anAskThatFitsTheOutcomeReachesTheSink() async throws {
@@ -479,17 +480,12 @@ struct AppServiceTests {
         await service.close()
     }
 
-    @Test func theGuidanceAsksForOneShortSentenceWithExamples() {
-        let description = AppService.finishTurnTool["description"]?.stringValue ?? ""
-        #expect(description.contains("one short sentence"))
-        #expect(!description.contains("one or two sentences"))
+    /// The examples went with #481's cut; the rule they illustrated stays, once.
+    @Test func theGuidanceAsksForOneShortSentence() {
         let message = AppService.finishTurnTool["inputSchema"]?["properties"]?["message"]?["description"]?
             .stringValue ?? ""
         #expect(message.hasPrefix("One short sentence"))
-        for text in [description, message] {
-            #expect(text.contains("\"Login works again; the fix is on its branch, ready to merge.\""))
-            #expect(text.contains("AuthController.swift"))
-        }
+        #expect(message.contains("200 characters"))
     }
 
     /// The chips ride along; their absence is not a fault. Left out or sent empty,
@@ -644,14 +640,10 @@ struct AppServiceTests {
     /// The words an agent reads decide what it names: the goal, kept while it holds,
     /// not the step it just took. On the tool: the briefing says nothing of it since #479.
     @Test func theTitleIsDescribedAsTheGoal() {
-        let description = AppService.finishTurnTool["description"]?.stringValue ?? ""
-        #expect(description.contains("its goal, not the step you just took"))
-        #expect(description.contains("leave it out otherwise and the name stays"))
-        #expect(!description.contains("Give a fresh one every time"))
         let property = AppService.finishTurnTool["inputSchema"]?["properties"]?["title"]?["description"]?
             .stringValue ?? ""
         #expect(property.contains("goal"))
-        #expect(property.contains("leave it out to keep the name"))
+        #expect(property.contains("Only when it changes"))
     }
 
     /// A title is a row's name: one line, spaces collapsed, no longer than a
@@ -681,8 +673,9 @@ struct AppServiceTests {
     @Test func theToolSaysWhatTheTitleIsFor() async throws {
         let (client, service) = await pair()
         let result = try await client.call("tools/list", .object([:]))
-        let description = result["tools"]?.arrayValue?.first?["description"]?.stringValue ?? ""
-        #expect(description.contains("The title is the name on that row"))
+        let title = result["tools"]?.arrayValue?.first?["inputSchema"]?["properties"]?["title"]?["description"]?
+            .stringValue ?? ""
+        #expect(title.contains("naming the conversation's goal"))
         await service.close()
     }
 

@@ -118,7 +118,7 @@ struct WorkflowWhenDoneTests {
         }
         #expect(note(nil).isEmpty)
         #expect(note("park").isEmpty)
-        #expect(note("archive-allowed").contains("afterwards set to archive"))
+        #expect(note("archive-allowed").contains("archive_agent with no id"))
         #expect(note("archive").contains("archives its run"))
         #expect(note("archive", agent: "triggering").isEmpty, "a borrowed agent is somebody else's")
     }

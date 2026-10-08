@@ -30,7 +30,7 @@ before it. With a keyboard, the left arrow moves the cursor onto the labels and
 Delete removes the one it is on. Each label also has its own **×**. Removing it
 from one session leaves the other sessions' labels alone.
 
-Labels you add are yours. An agent may label its own work through `finish_turn`,
+Labels you add are yours. An agent may label its own work with `set_session_labels`,
 and a helper or workflow can start with agent-owned labels. Agent-owned labels
 have an outline; your labels have a filled background. The label's owner is also
 read aloud. You can remove either kind, while an agent cannot remove or claim

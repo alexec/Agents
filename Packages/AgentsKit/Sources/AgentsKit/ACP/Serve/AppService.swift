@@ -50,6 +50,8 @@ public actor AppService {
     public static let publishEventToolName = AppTool.publishEvent
     public static let releaseResourceToolName = AppTool.releaseResource
     public static let listResourcesToolName = AppTool.listResources
+    public static let setSessionLabelsToolName = AppTool.setSessionLabels
+    public static let moveWorktreeToolName = AppTool.moveWorktree
 
     /// The last version of MCP this was written against. A client that asks for one it
     /// knows is answered with its own, which is what the specification says to do and
@@ -156,6 +158,19 @@ public actor AppService {
         case move(target: MoveTarget, removeLeft: Bool, discardChanges: Bool)
     }
 
+    /// What an agent asks of its own session (#481), each once on the tool that does it:
+    /// to be put away once the turn ends (`park_agent` or `archive_agent` with no id), its
+    /// labels, a move (none takes one back), or a wait on agents or a time.
+    public enum SelfCall: Sendable, Equatable {
+        case afterTurn(AfterTurn)
+        case labels(add: [String], remove: [String])
+        case move(MoveCall?)
+        case waitOn(agents: [String], wakeOn: Block.WakeOn?, untilMinutes: Int?, message: String?)
+    }
+
+    /// Where those go.
+    public typealias SelfSink = @Sendable (SelfCall) async -> Outcome
+
     /// `list_sessions` or `read_session` (065), as the agent made it. Neither names a
     /// project: the daemon takes it from the caller.
     public enum SessionCall: Sendable, Equatable {
@@ -175,6 +190,7 @@ public actor AppService {
     private let leasesSink: LeasesSink
     private let eventsSink: EventsSink
     private let sessionsSink: SessionsSink
+    private let selfSink: SelfSink
     private let pinsSink: PinsSink
     private let viewToolSink: ViewToolSink
     /// Whether the test view and its tools are offered (#187).
@@ -182,9 +198,8 @@ public actor AppService {
     /// Whether the agent tools are offered. False for an agent another agent
     /// started (028), which the daemon says by starting this with `--no-agent-tools`.
     private let managesAgents: Bool
-    /// Whether `finish_turn` offers the move arguments. False for an agent on a runtime
-    /// that cannot carry its conversation into another folder (053), said with
-    /// `--no-move-tools`.
+    /// Whether `move_worktree` is offered. False for an agent on a runtime that cannot
+    /// carry its conversation into another folder (053).
     private let movesItself: Bool
     private let box = ServiceBox()
 
@@ -213,6 +228,9 @@ public actor AppService {
                 sessions: @escaping SessionsSink = { _ in
                     .refused("This app cannot read other sessions.")
                 },
+                itself: @escaping SelfSink = { _ in
+                    .refused("This app cannot change this session.")
+                },
                 pins: @escaping PinsSink = { _ in
                     .refused("This app cannot pin pages.")
                 },
@@ -229,6 +247,7 @@ public actor AppService {
         self.leasesSink = leases
         self.eventsSink = events
         self.sessionsSink = sessions
+        self.selfSink = itself
         self.pinsSink = pins
         self.viewToolSink = viewTool
         self.offersTestView = offersTestView
@@ -357,6 +376,13 @@ public actor AppService {
                 return .success(Self.reply(await finishSink(raw, message, prompts, title, words)))
             }
 
+            if let call = Self.selfCall(named: name, arguments, movesItself: movesItself) {
+                switch call {
+                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
+                case .success(let call): return .success(Self.reply(await selfSink(call)))
+                }
+            }
+
             if let tool = AppViewCatalog.tool(named: name, testView: offersTestView) {
                 guard tool.forModel else {
                     return .success(Self.reply("Nothing was done: \(tool.name) is for the view, not for you.",
@@ -447,6 +473,85 @@ public actor AppService {
         default:
             return .failure(.methodNotFound(method))
         }
+    }
+
+    /// Which of the calls on the agent's own session a tool is (#481), with its arguments
+    /// read. `nil` when it is none of them — `park_agent` with an id is a helper's, and a
+    /// `wait_for_event` on events is an event wait.
+    static func selfCall(named name: String, _ arguments: JSONValue?,
+                         movesItself: Bool) -> Result<SelfCall, AgentCallProblem>? {
+        func given(_ key: String) -> Bool {
+            let value = arguments?[key]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return value?.isEmpty == false
+        }
+        func strings(_ key: String) -> Result<[String], AgentCallProblem> {
+            guard let value = arguments?[key], value != .null else { return .success([]) }
+            if let one = value.stringValue { return .success([one]) }
+            guard let list = value.arrayValue, list.allSatisfy({ $0.stringValue != nil }) else {
+                return .failure(AgentCallProblem(stringLiteral: "Nothing changed: `\(key)` must be a list of strings."))
+            }
+            return .success(list.compactMap(\.stringValue))
+        }
+        if name.hasSuffix(parkAgentToolName), !given("id") { return .success(.afterTurn(.park)) }
+        if name.hasSuffix(archiveAgentToolName), !given("id") { return .success(.afterTurn(.archive)) }
+        if name.hasSuffix(setSessionLabelsToolName) {
+            let add: [String], remove: [String]
+            switch strings("add") {
+            case .success(let read): add = read
+            case .failure(let problem): return .failure(problem)
+            }
+            switch strings("remove") {
+            case .success(let read): remove = read
+            case .failure(let problem): return .failure(problem)
+            }
+            guard !add.isEmpty || !remove.isEmpty else {
+                return .failure("Nothing changed: give labels in add, remove, or both.")
+            }
+            return .success(.labels(add: add, remove: remove))
+        }
+        if name.hasSuffix(moveWorktreeToolName) {
+            guard movesItself else {
+                return .failure("""
+                    Nothing was moved: this runtime cannot carry its conversation into \
+                    another folder, so you stay where you are.
+                    """)
+            }
+            return moveCall(arguments).map(SelfCall.move)
+        }
+        if name.hasSuffix(waitForEventToolName) {
+            let action = arguments?["action"]?.stringValue?.lowercased() ?? "wait"
+            let agents: [String]
+            switch strings("agents") {
+            case .success(let read): agents = read.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            case .failure(let problem): return .failure(problem)
+            }
+            let hasEvents = arguments?["events"]?.stringValue != nil
+                || arguments?["events"]?.arrayValue?.isEmpty == false
+            let minutes: Int? = arguments?["until_minutes"].flatMap { value in
+                value.intValue ?? value.stringValue.flatMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+            }
+            guard action == "wait", !hasEvents || !agents.isEmpty, !agents.isEmpty || minutes != nil else { return nil }
+            guard !hasEvents else {
+                return .failure("Nothing is waited for: name agents or events, not both. Wait on agent.finished for events about agents.")
+            }
+            var wakeOn: Block.WakeOn?
+            if let raw = arguments?["wake_on"]?.stringValue {
+                guard let known = Block.WakeOn(rawValue: raw) else {
+                    return .failure(AgentCallProblem(stringLiteral: Block.unknownWakeOn))
+                }
+                wakeOn = known
+            }
+            if let minutes, !Block.checkAgainMinutes.contains(minutes) {
+                return .failure(AgentCallProblem(stringLiteral: """
+                    Nothing is waited for: until_minutes has to be a whole number from \
+                    \(Block.checkAgainMinutes.lowerBound) to \(Block.checkAgainMinutes.upperBound).
+                    """))
+            }
+            let message = arguments?["message"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return .success(.waitOn(agents: agents, wakeOn: wakeOn, untilMinutes: minutes,
+                                    message: message?.isEmpty == false ? message : nil))
+        }
+        return nil
     }
 
     /// Which of the agent calls a tool name is, with its arguments read — or the
@@ -599,10 +704,11 @@ public actor AppService {
         // older names for its halves were retired on 2026-09-29 (023 R5).
         // The agent tools after the workflow tool, and only for an agent that
         // may use them (028).
+        // `park_agent` for every agent, since with no id it parks the caller (#481).
         let agentTools = managesAgents
             ? [Self.startAgentTool, Self.stopAgentTool, Self.parkAgentTool, Self.archiveAgentTool,
                Self.listMyAgentsTool]
-            : []
+            : [Self.parkAgentTool]
         // The three lease tools after those, for every agent: waiting for the
         // simulator is not managing anyone (036).
         let leaseTools = [Self.leaseResourceTool, Self.releaseResourceTool, Self.listResourcesTool]
@@ -613,12 +719,11 @@ public actor AppService {
         // The three for the project's pinned pages and the one for pinning its own
         // session, for every agent (#159, #180).
         let pinTools = [Self.pinPageTool, Self.unpinPageTool, Self.movePinTool, Self.pinSessionTool]
-        // Moving itself rides on the call that ends the turn, since that is when a move
-        // happens (053); not offered on a runtime that would forget the conversation on
-        // the way.
-        return [Self.finishTurnTool(movesItself: movesItself), Self.showFileTool, Self.workflowTool,
-                Self.askFormTool]
-            + agentTools + sessionTools + leaseTools
+        // The agent's own session: labels, and moving, which is not offered on a runtime
+        // that would forget the conversation on the way (053, #481).
+        let selfTools = [Self.setSessionLabelsTool] + (movesItself ? [Self.moveWorktreeTool] : [])
+        return [Self.finishTurnTool, Self.showFileTool, Self.workflowTool, Self.askFormTool]
+            + agentTools + selfTools + sessionTools + leaseTools
             + eventTools + pinTools
     }
 
@@ -776,243 +881,104 @@ public actor AppService {
         }
     }
 
-    /// The one call that ends a turn (023).
-    ///
-    /// It says what 014's outcome tool said, and then asks for the chips the older
-    /// suggestion tool asked for, in the same breath. The paragraph 014 had ordering
-    /// this after `suggest_next_prompts` is gone, because there is nothing left to
-    /// order. The last paragraph is 014's verbatim: the line between ending a turn
-    /// and asking a question that waits still has to be drawn, and this is the one
-    /// place an agent reads it at the moment it matters.
+    /// The call that says how a turn ended (023), slimmed in #481.
     ///
     /// Since #479 nothing tells an agent it must call this: the daemon derives an
-    /// ending the agent did not give. The description's job is to say which of the
-    /// outcomes is true, and what only this tool can do — wait, park and move.
-    static func finishTurnTool(movesItself: Bool) -> JSONValue {
-        guard !movesItself else { return finishTurnTool }
-        guard case .object(var tool) = finishTurnTool,
-              case .object(var schema)? = tool["inputSchema"],
-              case .object(var properties)? = schema["properties"],
-              let description = tool["description"]?.stringValue else { return finishTurnTool }
-        for key in movingArguments { properties.removeValue(forKey: key) }
-        schema["properties"] = .object(properties)
-        tool["inputSchema"] = .object(schema)
-        tool["description"] = .string(description.replacingOccurrences(of: "\n\n" + movingParagraph, with: ""))
-        return .object(tool)
-    }
-
-    /// The arguments that move the agent (053), left out on a runtime that cannot move.
-    static let movingArguments = ["worktree", "leave_worktree", "discard_changes"]
-
-    /// What an agent is told about moving itself. The move happens when the turn ends,
-    /// so asking for it on the call that ends the turn leaves no stretch of the turn in
-    /// which edits land in the folder being left. Words from contracts/move.md.
-    static let movingParagraph = """
-        To move into a git worktree of this project, give worktree: a name for a new \
-        one, or the absolute path of one already there. Do it on your own judgement \
-        when the work turns into a change that should be on its own branch, or when \
-        asked. To go back to the project folder, give leave_worktree: keep leaves the \
-        worktree and its branch as they are; remove takes the worktree away, and its \
-        branch if the app made it and it is merged. An unmerged branch is kept with \
-        its commits, so remove once your work is committed. Remove is refused for a \
-        worktree the app did not make, another agent works in, or that is detached or \
-        whose branch is gone, and, unless discard_changes is true, when anything in it \
-        is uncommitted: ask the person before discarding. You move once this turn ends and are started again there to carry \
-        on, so the outcome is how the work stands now, and a move does not go with \
-        needs_answer, blocked or afterwards. Nothing uncommitted comes with you, and a \
-        new worktree starts from the commit you have checked out: commit first what \
-        you want to bring.
-        """
-
+    /// ending the agent did not give. Since #481 it says only how the turn went and what
+    /// the conversation is called; waiting, parking, moving and labels each have a tool
+    /// of their own, and the description is a tenth of what it was. Every argument it
+    /// took before is still read — `waiting_on`, `afterwards`, `worktree`, `next_prompt`
+    /// and the rest — for prompts and conversations that still send them, but none is
+    /// listed: a fresh agent shown both would send both.
     static let finishTurnTool: JSONValue = [
         "name": .string(finishTurnToolName),
-        "title": "Finish the turn",
-        "description": .string("""
-            Optional. Without it the app works out how your turn ended from how it \
-            stopped and what you last said. Call it, as the last thing you do before \
-            you stop, when you want to say that yourself, or to wait (blocked), park \
-            the conversation, or move it.
+        "title": "Say how the turn ended",
+        "description": """
+            Optional. Without it the app works out how your turn ended from what you last \
+            said. Call it last, to say so yourself. It ends your turn. To ask the person \
+            and carry on with the answer, use your question or form tool instead. To wait \
+            for agents or a time, use wait_for_event; to be parked, park_agent with no id.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "outcome": [
+                    "type": "string",
+                    "enum": .array(["done", "nothing_to_do", "needs_answer",
+                                    "partly_done", "stuck", "blocked"]),
+                    "description": """
+                        done: nothing is left for anyone. partly_done: the rest needs a \
+                        decision that is not yours. needs_answer: you cannot go on until \
+                        the person answers. stuck: you could not, and know why. blocked: \
+                        waiting on something other than the person.
+                        """,
+                ],
+                "message": [
+                    "type": "string",
+                    "description": """
+                        One short sentence, under 200 characters, for someone who has not \
+                        read the conversation: what happened and what it means for them, \
+                        no file names. For needs_answer, the question.
+                        """,
+                ],
+                "title": [
+                    "type": "string",
+                    "description": "A few words naming the conversation's goal. Only when it changes.",
+                ],
+            ],
+            "required": .array(["outcome", "message"]),
+        ],
+    ]
 
-            Pick the one that is true:
-
-              done            You did what was asked. Nothing is left for anyone.
-              nothing_to_do   You looked, and there was nothing that needed doing.
-              needs_answer    You cannot go further until the person answers something.
-              partly_done     You did some of it. The rest needs a decision that is not yours.
-              stuck           You could not do it, and you know why.
-              blocked         You are waiting on something other than the person:
-                              agents you started, another agent's change, a CI run.
-
-            For blocked, name the agents in waiting_on and you will be resumed, with \
-            how each one ended, once they have all finished; with wake_on any, once, \
-            when the first has, told which are still running. For something the app \
-            can't see, say what it is and give check_again_in_minutes; with waiting_on \
-            too, whichever comes first resumes you. Either way the \
-            person sees you under Waiting, knowing you will carry on by yourself; name \
-            nothing and give no time and you sit under Blocked until they carry you on. \
-            It is not for a \
-            question to the person (that is needs_answer) or a dead end (that is stuck). \
-            Your turn ends and costs nothing while you wait — and anything you started \
-            in the background stops with it, so never block on a command of your own: \
-            wait for that in this turn.
-
-            The message is one short sentence in your own words, ideally under about \
-            100 characters, and it is what the person reads on the row before they \
-            open anything — so write it for somebody who has not read the \
-            conversation: what happened and what it means for them, with no mechanism \
-            or file names. The detail belongs in your reply. "Login works again; the \
-            fix is on its branch, ready to merge." is a message. "Fixed the redirect \
-            in AuthController.swift by checking the session token before the cookie, \
-            which the middleware sets on every request, and added two tests." is not. \
-            One over 200 characters is sent back to be shortened. For needs_answer, \
-            the message is the question itself; a longer question goes on a question \
-            card, with your form tool.
-
-            The title is the name on that row: a few words naming what the person \
-            wants from this conversation — its goal, not the step you just took — \
-            like "Login redirect" or "Test account for staging". Send it on your \
-            first turn, and again only when the person moves the conversation on to \
-            a different goal; leave it out otherwise and the name stays as it is. \
-            What you did this turn belongs in the message, not here. Do not put the \
-            outcome in it.
-
-            With it, offer the one thing the person is most likely to want to say next, \
-            which waits in their empty prompt for them to take. Take it from the work \
-            you just did: what you did not do, a check worth running, a decision you \
-            had to guess at, the obvious next step. Write it as a prompt the person \
-            would send you, in the second person ("Run the tests and fix what fails"). \
-            Leave it out only if there is genuinely nothing worth asking next. Say \
-            nothing in your reply about having called this.
-
-            When you have finished and cleaned up after yourself — merged, removed \
-            what you made — you may ask to be parked (put down, to come back to) once \
-            this turn ends, with afterwards set to park. Park goes with done, \
-            nothing_to_do or partly_done. Leave it out and the conversation stays \
-            where its ending puts it. If the person sends something before the turn \
-            is over, the ask is dropped. You cannot archive yourself: the person can, \
-            and so can the agent that started you, if one did. A workflow's run is the \
-            one exception: when its workflow allows it, say archive when the run is \
-            done or had nothing to do and there is nothing for the person to look at.
-
-            If you can carry on once you have an answer, do not use this: ask with your \
-            question or form tool, which stops and waits for them. This one does not \
-            wait. It is how you end.
-
-            \(movingParagraph)
-            """),
+    /// What an agent is told about moving itself (053), on the tool that does it (#481).
+    /// The move happens when the turn ends, so no stretch of the turn has edits landing in
+    /// the folder being left. Words from contracts/move.md.
+    static let moveWorktreeTool: JSONValue = [
+        "name": .string(moveWorktreeToolName),
+        "title": "Move to a worktree or back",
+        "description": """
+            Move once this turn ends: into a git worktree of this project, or back to the \
+            project folder. Do it when the work turns into a change that should be on its \
+            own branch, or when asked. You are started again there to carry on, or stay \
+            parked if you asked to be. Nothing uncommitted comes with you, and a new \
+            worktree starts from the commit you have checked out: commit first. Give \
+            neither argument to take back a move you asked for. Not with a wait.
+            """,
         "inputSchema": [
             "type": "object",
             "properties": [
                 "worktree": [
                     "type": "string",
-                    "description": """
-                        Move into a git worktree of this project once this turn ends: a \
-                        name for a new one, or the absolute path of one already there. \
-                        Not with leave_worktree.
-                        """,
+                    "description": "A name for a new worktree, or the absolute path of one already there.",
                 ],
                 "leave_worktree": [
                     "type": "string",
                     "enum": .array(["keep", "remove"]),
                     "description": """
-                        Move back to the project folder once this turn ends. keep leaves \
-                        the worktree as it is; remove takes it away after you have left.
+                        Back to the project folder. remove takes the worktree away, and its \
+                        branch if the app made it and it is merged; refused if anything is \
+                        uncommitted, or another agent works there.
                         """,
                 ],
                 "discard_changes": [
                     "type": "boolean",
-                    "description": "Only with leave_worktree remove. Remove even though uncommitted changes would be lost. Commits are never lost: the branch keeps them.",
-                ],
-                "outcome": [
-                    "type": "string",
-                    "enum": .array(["done", "nothing_to_do", "needs_answer",
-                                    "partly_done", "stuck", "blocked"]),
-                    "description": "The one that is true.",
-                ],
-                "message": [
-                    "type": "string",
-                    "description": """
-                        One short sentence, ideally under about 100 characters and \
-                        never over 200, for somebody who has not read the \
-                        conversation: what happened and what it means for them, with \
-                        no mechanism or file names. Like "Login works again; the fix \
-                        is on its branch, ready to merge.", not "Fixed the redirect in \
-                        AuthController.swift by checking the session token before the \
-                        cookie, and added two tests." For needs_answer, the question \
-                        itself.
-                        """,
-                ],
-                "title": [
-                    "type": "string",
-                    "description": """
-                        A few words naming the conversation's goal, which becomes \
-                        the name on its row. Send it on the first turn and when the \
-                        goal changes; leave it out to keep the name as it is.
-                        """,
-                ],
-                "waiting_on": [
-                    "type": "array",
-                    "items": ["type": "string"],
-                    "description": """
-                        Only with blocked. The agents in this project you are waiting on, \
-                        by id (as start_agent or list_my_agents gave it) or by exact \
-                        title. You will be resumed once every one has finished, or \
-                        the first has with wake_on any.
-                        """,
-                ],
-                "wake_on": [
-                    "type": "string",
-                    "enum": .array(["any", "all"]),
-                    "description": """
-                        Only with waiting_on. any to be resumed once, when the first \
-                        agent named finishes; all, the default, when every one has.
-                        """,
-                ],
-                "check_again_in_minutes": [
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 1440,
-                    "description": """
-                        Only with blocked. When to be resumed anyway, to check on \
-                        something the app can't see, like a CI run or a review.
-                        """,
-                ],
-                "afterwards": [
-                    "type": "string",
-                    "enum": .array(["park", "archive"]),
-                    "description": """
-                        Once this turn ends: park to put the conversation down to come \
-                        back to. Goes with done, nothing_to_do or partly_done. Leave \
-                        out to stay where the ending puts it. archive only for a \
-                        workflow's run whose workflow allows it, with done or \
-                        nothing_to_do, when there is nothing to look at. Otherwise you \
-                        cannot archive yourself: the person can, and so can the agent \
-                        that started you.
-                        """,
-                ],
-                "add_labels": ["type": "array", "items": ["type": "string"],
-                               "description": "Agent-owned labels to add to this session."],
-                "remove_labels": ["type": "array", "items": ["type": "string"],
-                                  "description": "Agent-owned labels to remove. Person labels are protected."],
-                // One, since 031. The list this replaced is still read by the
-                // handler, for a conversation told about it before, but no longer
-                // offered: a fresh agent shown both would send both.
-                "next_prompt": [
-                    "type": "object",
-                    "description": """
-                        The one thing the person is most likely to say next. Leave out \
-                        if there is nothing worth asking.
-                        """,
-                    "properties": [
-                        "label": ["type": "string",
-                                  "description": "Two to five words naming it, e.g. \"Run the tests\"."],
-                        "prompt": ["type": "string",
-                                   "description": "The prompt itself, addressed to you, which goes into their prompt box when they take it."],
-                    ],
-                    "required": .array(["label", "prompt"]),
+                    "description": "Only with remove: remove even with uncommitted changes. Ask the person first.",
                 ],
             ],
-            "required": .array(["outcome", "message"]),
+        ],
+    ]
+
+    /// The agent's own labels on its session (#481).
+    static let setSessionLabelsTool: JSONValue = [
+        "name": .string(setSessionLabelsToolName),
+        "title": "Label this session",
+        "description": "Add or remove your own labels on this session. The person's labels are theirs.",
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "add": ["type": "array", "items": ["type": "string"]],
+                "remove": ["type": "array", "items": ["type": "string"]],
+            ],
         ],
     ]
 
@@ -1376,20 +1342,31 @@ public actor AppService {
         "inputSchema": agentIDSchema,
     ]
 
+    /// The id park and archive take, which may be left out to mean the caller (#481).
+    private static let ownOrHelperIDSchema: JSONValue = [
+        "type": "object",
+        "properties": [
+            "id": [
+                "type": "string",
+                "description": "The id start_agent or list_my_agents gave. Leave out for yourself.",
+            ],
+        ],
+    ]
+
     static let parkAgentTool: JSONValue = [
         "name": .string(parkAgentToolName),
-        "title": "Park an agent you started",
+        "title": "Park yourself or an agent you started",
         "description": """
-            Park an agent you started with start_agent, as the person's own Park would: \
-            put it down to come back to later. If it is still working, the turn finishes \
-            first and it parks when that ends. It stays in the list under Parked. Parking \
-            frees its running place; it keeps its not-archived place until it is \
-            archived. Parking one that has already finished is fine. Only agents you \
-            started can be parked this way; not yourself (set afterwards to park on \
-            finish_turn), and not anyone else's. To free its not-archived place too, \
-            archive it with archive_agent.
+            With no id: park yourself (put this conversation down to come back to) once \
+            this turn ends, when you have finished and cleaned up. Only if the turn ends \
+            done, nothing_to_do or partly_done; anything the person sends first drops it. \
+            Goes with move_worktree: you move, and stay parked.
+
+            With an id: park an agent you started with start_agent, as the person's own \
+            Park would. If it is still working it parks when its turn ends. Parking frees \
+            its running place; it keeps its not-archived place until it is archived.
             """,
-        "inputSchema": agentIDSchema,
+        "inputSchema": ownOrHelperIDSchema,
     ]
 
     static let archiveAgentTool: JSONValue = [
@@ -1404,11 +1381,13 @@ public actor AppService {
 
             Refused while it is still working: wait for it to finish, or stop it with \
             stop_agent first if its work is no longer wanted. Only agents you started can \
-            be archived; never yourself (set afterwards to park on finish_turn), never \
-            the person's own sessions, and never another agent's. The person can turn \
-            this off for a project in Project Settings.
+            be archived, never the person's own sessions or another agent's. The person \
+            can turn this off for a project in Project Settings.
+
+            With no id, only a workflow's run whose workflow allows it archives itself, \
+            once its turn ends done or nothing_to_do with nothing for the person to see.
             """,
-        "inputSchema": agentIDSchema,
+        "inputSchema": ownOrHelperIDSchema,
     ]
 
 
@@ -1490,6 +1469,12 @@ public actor AppService {
             has happened by then it says you are still waiting and keeps your place. Use \
             this instead of polling. Also lists recent events (action "recent") and every \
             event you can wait on (action "list"). The same names work as workflow triggers.
+
+            To wait for agents, name them in agents instead of events: your turn ends at \
+            once, and you are resumed with how each ended when all have finished (or the \
+            first, with wake_on any). until_minutes, with agents or alone, resumes you then \
+            anyway, to check on something the app can't see, like CI; say what in message. \
+            Anything you started in the background stops when the turn ends.
             """,
         "inputSchema": [
             "type": "object",
@@ -1525,6 +1510,20 @@ public actor AppService {
                 "until_minutes": [
                     "type": "integer",
                     "description": "Give up after this many minutes, 1 to 1440. You are started again either way.",
+                ],
+                "agents": [
+                    "type": "array",
+                    "items": ["type": "string"],
+                    "description": "Agents in this project to wait for, by id or exact title.",
+                ],
+                "wake_on": [
+                    "type": "string",
+                    "enum": ["any", "all"],
+                    "description": "With agents: all (the default) or any.",
+                ],
+                "message": [
+                    "type": "string",
+                    "description": "With agents or until_minutes alone: what you are waiting for, for the person's row.",
                 ],
                 "limit": [
                     "type": "integer",

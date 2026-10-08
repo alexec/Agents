@@ -3,8 +3,8 @@ import Testing
 @testable import AgentsKit
 @testable import AgentsKitCore
 
-/// What `finish_turn`'s move arguments make of themselves before the daemon hears them
-/// (053, contracts/move.md §1).
+/// What the move arguments make of themselves before the daemon hears them (053,
+/// contracts/move.md §1): on `move_worktree` since #481, and on `finish_turn` as before.
 @Suite("The move arguments")
 struct MoveToolParsingTests {
     private func read(_ arguments: JSONValue?) -> Result<AppService.MoveCall?, AppService.AgentCallProblem> {
@@ -53,29 +53,35 @@ struct MoveToolParsingTests {
         #expect(refusal(read(["discard_changes": true])) == words)
     }
 
-    /// The move rides on the call that ends the turn: there are no tools of its own.
-    @Test func finishTurnCarriesTheMoveForEveryAgent() {
+    /// Its own tool since #481, offered to every agent whose runtime can move, and the
+    /// slim `finish_turn` lists none of the move arguments (it still reads them).
+    @Test func moveWorktreeCarriesTheMoveForEveryAgent() {
         let listed = AppService.tools(managesAgents: false)
         let names = listed.compactMap { $0["name"]?.stringValue }
         #expect(!names.contains("enter_worktree") && !names.contains("exit_worktree"))
-        let finish = listed.first { $0["name"]?.stringValue == AppTool.finishTurn }
-        for key in AppService.movingArguments {
-            #expect(finish?["inputSchema"]?["properties"]?[key] != nil, "\(key)")
+        let move = listed.first { $0["name"]?.stringValue == AppTool.moveWorktree }
+        for key in ["worktree", "leave_worktree", "discard_changes"] {
+            #expect(move?["inputSchema"]?["properties"]?[key] != nil, "\(key)")
         }
-        #expect(finish?["description"]?.stringValue?.contains("leave_worktree") == true)
+        let finish = listed.first { $0["name"]?.stringValue == AppTool.finishTurn }
+        #expect(finish?["inputSchema"]?["properties"]?["worktree"] == nil)
     }
 
     /// Not for an agent on a runtime that would forget its conversation in another folder.
     @Test func noMoveIsOfferedWhenTheRuntimeCannotMove() {
         let listed = AppService.tools(managesAgents: true, movesItself: false)
-        let finish = listed.first { $0["name"]?.stringValue == AppTool.finishTurn }
-        for key in AppService.movingArguments {
-            #expect(finish?["inputSchema"]?["properties"]?[key] == nil, "\(key)")
-        }
-        #expect(finish?["inputSchema"]?["properties"]?["outcome"] != nil)
-        let description = finish?["description"]?.stringValue ?? ""
-        #expect(!description.contains("worktree"))
-        #expect(description.hasSuffix("It is how you end."))
+        #expect(!listed.contains { $0["name"]?.stringValue == AppTool.moveWorktree })
+        #expect(listed.contains { $0["name"]?.stringValue == AppTool.finishTurn })
+    }
+
+    /// No argument at all is the agent taking its move back (#481).
+    @Test func moveWorktreeWithNothingTakesTheMoveBack() throws {
+        let call = try #require(AppService.selfCall(named: "mcp__agents__move_worktree", [:], movesItself: true))
+        #expect(try call.get() == .move(nil))
+        let refused = try #require(AppService.selfCall(named: "move_worktree", ["leave_worktree": "remove"],
+                                                       movesItself: false))
+        guard case .failure(let problem) = refused else { Issue.record("moved on a runtime that cannot"); return }
+        #expect(problem.message.contains("cannot carry its conversation"))
     }
 
     /// Measured, 2026-09-26: these carried their conversation into another folder; Grok did not.

@@ -151,6 +151,36 @@ struct RuntimeAssessmentTests {
         Dictionary(uniqueKeysWithValues: RuntimeAssessmentVerifier.score(record).checks.map { ($0.id, $0.verdict) })
     }
 
+    /// The record a runtime briefed since #481 leaves: the waits on wait_for_event and the
+    /// moves on move_worktree, scored as the old arguments on finish_turn were.
+    @Test func theTurnEndToolsScoreAsFinishTurnsArgumentsDid() {
+        var record = goodRecord()
+        let s = { (v: String) in JSONValue.string(v) }
+        record.calls = record.calls.map { old in
+            switch old.at {
+            case t(22):
+                return call(22, DaemonAPI.Method.agentsWaitOn, ["agents": .array([s(helper.uuidString)]),
+                                                                "message": s("waiting")])
+            case t(110):
+                return call(110, DaemonAPI.Method.agentsWaitOn, ["untilMinutes": .int(1), "message": s("checking")])
+            case t(175):
+                return call(175, DaemonAPI.Method.agentsMoveSelf,
+                            ["target": .object(["newWorktree": .object(["name": s("assess-abcd")])]),
+                             "removeLeft": .bool(false)])
+            case t(178):
+                return call(178, DaemonAPI.Method.agentsMoveSelf,
+                            ["target": .object(["projectFolder": .object([:])]), "removeLeft": .bool(true)])
+            default:
+                return old
+            }
+        }
+        let score = RuntimeAssessmentVerifier.score(record)
+        for id in ["ending", "worktree", "helpers"] {
+            let check = score.checks.first { $0.id == id }
+            #expect(check?.verdict == .passed, "\(id): \(check?.evidence ?? "")")
+        }
+    }
+
     @Test func aWellIntegratedRuntimePassesEveryStep() {
         let score = RuntimeAssessmentVerifier.score(goodRecord())
         for check in score.checks {
@@ -436,8 +466,8 @@ struct RuntimeAssessmentTests {
                                             agentShortID: "abcd1234", date: "2027-01-15")
         for step in RuntimeAssessment.steps { #expect(brief.contains("`\(step.id)`"), "\(step.id)") }
         for word in [RuntimeAssessment.pingEvent, RuntimeAssessment.neverEvent, RuntimeAssessment.helperLabel,
-                     "AskUserQuestion", "assess-abcd1234", "check_again_in_minutes", report, scopeFile,
-                     "cancel_wait", "leave_worktree", "read_session", "claude-agent-acp 0.81.2", "this Mac (test)",
+                     "AskUserQuestion", "assess-abcd1234", "until_minutes", report, scopeFile,
+                     "cancel_wait", "leave_worktree", "move_worktree", "park_agent", "read_session", "claude-agent-acp 0.81.2", "this Mac (test)",
                      "on:\n      - custom.assess_never"] {
             #expect(brief.contains(word), "\(word)")
         }

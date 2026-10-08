@@ -287,6 +287,14 @@ public enum DaemonAPI {
         /// helper when an agent calls `finish_turn`. The two above stay for the older
         /// names the helper still relays.
         public static let agentsFinishTurn = "agents/finishTurn"
+        /// `park_agent` or `archive_agent` with no id (#481): the agent asking to be put
+        /// away once its own turn ends.
+        public static let agentsAfterTurn = "agents/afterTurn"
+        /// `set_session_labels` (#481): the agent's own labels on its own session.
+        public static let agentsSetOwnLabels = "agents/setOwnLabels"
+        /// `wait_for_event` naming agents or only a time (#481): a block, as `blocked`
+        /// on `finish_turn` was, which ends the turn.
+        public static let agentsWaitOn = "agents/waitOn"
 
         public static let permissionsPending = "permissions/pending"
         public static let elicitationsPending = "elicitations/pending"
@@ -2445,6 +2453,52 @@ public enum DaemonAPI {
         }
     }
 
+    /// `park_agent` or `archive_agent` on itself (#481): `park` or `archive`, checked at
+    /// the daemon.
+    public struct AfterTurnRequest: Codable, Sendable {
+        public var token: String
+        public var afterwards: String
+
+        public init(token: String, afterwards: String) {
+            self.token = token
+            self.afterwards = afterwards
+        }
+    }
+
+    /// `set_session_labels` (#481).
+    public struct OwnLabelsRequest: Codable, Sendable {
+        public var token: String
+        public var add: [String]
+        public var remove: [String]
+
+        public init(token: String, add: [String] = [], remove: [String] = []) {
+            self.token = token
+            self.add = add
+            self.remove = remove
+        }
+    }
+
+    /// `wait_for_event` on agents or a time (#481): the block `finish_turn` used to carry.
+    public struct WaitOnRequest: Codable, Sendable {
+        public var token: String
+        /// By id or exact title, as `waiting_on` took them.
+        public var agents: [String]
+        /// `any` or `all`; left out is `all`.
+        public var wakeOn: String?
+        public var untilMinutes: Int?
+        /// What the person reads on the row while it waits. Left out, the app says it.
+        public var message: String?
+
+        public init(token: String, agents: [String] = [], wakeOn: String? = nil,
+                    untilMinutes: Int? = nil, message: String? = nil) {
+            self.token = token
+            self.agents = agents
+            self.wakeOn = wakeOn
+            self.untilMinutes = untilMinutes
+            self.message = message
+        }
+    }
+
     /// What an agent passes to `list_my_agents`: nothing but who it is.
     public struct ListHelpersRequest: Codable, Sendable {
         public var token: String
@@ -2868,11 +2922,12 @@ public enum DaemonAPI {
     /// `finish_turn`: what it passed to the `enter_worktree` or `exit_worktree` it had.
     public struct MoveSelfRequest: Codable, Sendable {
         public var token: String
-        public var target: MoveTarget
+        /// None takes back a move the agent asked for earlier in the turn (#481).
+        public var target: MoveTarget?
         public var removeLeft: Bool
         public var discardChanges: Bool
 
-        public init(token: String, target: MoveTarget, removeLeft: Bool = false, discardChanges: Bool = false) {
+        public init(token: String, target: MoveTarget?, removeLeft: Bool = false, discardChanges: Bool = false) {
             self.token = token
             self.target = target
             self.removeLeft = removeLeft

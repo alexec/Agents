@@ -113,15 +113,14 @@ struct MoveTests {
         }
     }
 
-    /// `finish_turn`'s arguments as each runtime listed them over the app's server (#185),
-    /// across every session made or picked up, so a later runtime (the question about a
-    /// silent turn) is counted too.
-    private func finishTurnSchemas(_ launcher: FakeLauncher) async -> [[String]] {
+    /// The app's tools as each runtime listed them over the app's server (#185), by name,
+    /// across every session made or picked up.
+    private func listedTools(_ launcher: FakeLauncher) async -> [[String]] {
         var all: [[String]] = []
         for runtime in launcher.allAgents {
             for tools in [await runtime.newSessionAppToolList, await runtime.continuedSessionAppToolList] {
-                guard let finish = tools?.first(where: { $0["name"]?.stringValue == AppTool.finishTurn }) else { continue }
-                all.append(finish["inputSchema"]?["properties"]?.objectValue.map { Array($0.keys) } ?? [])
+                guard let tools else { continue }
+                all.append(tools.compactMap { $0["name"]?.stringValue })
             }
         }
         return all
@@ -424,7 +423,7 @@ struct MoveTests {
         }
     }
 
-    /// A move carries the agent on, so it does not go with an ending that waits or puts it down.
+    /// A move carries the agent on, so it does not go with an ending that waits or archives it.
     @Test func aMoveWithAnEndingThatWaitsIsRefusedWhole() async throws {
         let repo = try await repository()
         let (launcher, gate) = gatedLauncher()
@@ -432,12 +431,66 @@ struct MoveTests {
         let (id, token) = try await busyAgent(core, repo, gate, launcher)
         let move = DaemonAPI.MoveAsk(target: .newWorktree(name: "nope"))
 
-        for (outcome, afterwards) in [("needs_answer", nil), ("done", "park")] as [(String, String?)] {
+        for (outcome, afterwards) in [("needs_answer", nil), ("done", "archive")] as [(String, String?)] {
             await #expect(throws: JSONRPCError.self) {
                 _ = try await finish(core, token, outcome, afterwards: afterwards, move: move)
             }
         }
         #expect(await core.agent(id)?.report == nil)
+        #expect(await core.agent(id)?.pendingMove == nil)
+        gate.open()
+    }
+
+    // MARK: Moving with the other turn-end tools (#481)
+
+    /// Parked and moved in one turn: it moves, and stays parked there rather than being
+    /// started again. On the old `finish_turn`, which refused the pair, as on the new tools.
+    @Test(arguments: [false, true])
+    func aParkAndAMoveTogetherMoveAndStayParked(_ onFinishTurn: Bool) async throws {
+        let repo = try await repository()
+        let (launcher, gate) = gatedLauncher()
+        let core = try await makeCore(repo, launcher)
+        let (id, token) = try await busyAgent(core, repo, gate, launcher)
+
+        if onFinishTurn {
+            let answer = try await finish(core, token, "done", afterwards: "park",
+                                          move: .init(target: .newWorktree(name: "parked-there")))
+            #expect(answer.contains("will be parked"))
+        } else {
+            let moving = try await core.moveSelf(.init(token: token, target: .newWorktree(name: "parked-there")))
+            #expect(moving.when == .afterTurn)
+            let parking = try await core.askAfterTurn(.init(token: token, afterwards: "park"))
+            #expect(parking.contains("stay parked there"))
+        }
+
+        gate.open()
+        let moved = repo.top.appending(path: ".agents/worktrees/parked-there").path
+        await eventually("moved when the turn ended") { await core.agent(id)?.cwd.path == moved }
+        await eventually("parked") { await core.agent(id)?.parking?.isParked == true }
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(try await !appPrompts(core, id).contains(DaemonCore.carryOn), "not started again")
+    }
+
+    /// A move asked first refuses the wait, and a wait first refuses the move, each saying why.
+    @Test func aMoveAndAWaitDoNotGoTogether() async throws {
+        let repo = try await repository()
+        let (launcher, gate) = gatedLauncher()
+        let core = try await makeCore(repo, launcher)
+        let (id, token) = try await busyAgent(core, repo, gate, launcher)
+
+        _ = try await core.moveSelf(.init(token: token, target: .newWorktree(name: "then-wait")))
+        let waitRefused = await failure { try await core.waitOn(.init(token: token, untilMinutes: 5)) }
+        #expect(waitRefused?.message.contains("move_worktree with neither argument") == true)
+
+        let stayed = try await core.moveSelf(.init(token: token, target: nil))
+        #expect(stayed.message.hasPrefix("Move cancelled"))
+        #expect(await core.agent(id)?.pendingMove == nil)
+
+        _ = try await core.waitOn(.init(token: token, untilMinutes: 5))
+        let moveRefused = await failure {
+            try await core.moveSelf(.init(token: token, target: .newWorktree(name: "after-wait")))
+        }
+        #expect(moveRefused?.message.contains("this turn ended blocked") == true)
         #expect(await core.agent(id)?.pendingMove == nil)
         gate.open()
     }
@@ -841,8 +894,8 @@ struct MoveTests {
         #expect(error?.message.contains("can't carry its conversation into another folder") == true)
         #expect(await core.agent(id)?.cwd == repo.project)
         #expect(worktreesMade(repo).isEmpty)
-        let schemas = await finishTurnSchemas(launcher)
-        #expect(!schemas.isEmpty && schemas.allSatisfy { !$0.contains("worktree") })
+        let listed = await listedTools(launcher)
+        #expect(!listed.isEmpty && listed.allSatisfy { !$0.contains(AppTool.moveWorktree) })
     }
 
     @Test func anAgentOnARuntimeThatCarriesItsConversationIsOfferedTheTools() async throws {
@@ -850,8 +903,8 @@ struct MoveTests {
         let launcher = FakeLauncher()
         let core = try await makeCore(repo, launcher)
         _ = try await idleAgent(core, repo, runtime: "claude")
-        let schemas = await finishTurnSchemas(launcher)
-        #expect(!schemas.isEmpty && schemas.allSatisfy { $0.contains("worktree") })
+        let listed = await listedTools(launcher)
+        #expect(!listed.isEmpty && listed.allSatisfy { $0.contains(AppTool.moveWorktree) })
     }
 
     // MARK: The terminal (T037)

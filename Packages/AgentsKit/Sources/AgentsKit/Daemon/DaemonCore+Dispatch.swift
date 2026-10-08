@@ -887,6 +887,18 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.FinishTurnRequest.self)
                 return .success(["note": .string(try await finishTurn(request))])
 
+            case DaemonAPI.Method.agentsAfterTurn:
+                let request = try require(params, as: DaemonAPI.AfterTurnRequest.self)
+                return .success(["note": .string(try askAfterTurn(request))])
+
+            case DaemonAPI.Method.agentsSetOwnLabels:
+                let request = try require(params, as: DaemonAPI.OwnLabelsRequest.self)
+                return .success(["note": .string(try setSessionLabels(request))])
+
+            case DaemonAPI.Method.agentsWaitOn:
+                let request = try require(params, as: DaemonAPI.WaitOnRequest.self)
+                return .success(["note": .string(try await waitOn(request))])
+
             case DaemonAPI.Method.permissionsPending:
                 return .success(try JSONValue.encoding(pendingPermissionRequests()))
 

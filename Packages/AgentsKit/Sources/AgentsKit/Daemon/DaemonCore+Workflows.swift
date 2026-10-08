@@ -1097,9 +1097,9 @@ extension DaemonCore {
 
 
                 (This workflow lets its run archive itself. If you finish done or with nothing \
-                to do, and there is nothing the person needs to look at, end with \
-                \(AppTool.finishTurn) and afterwards set to archive. Otherwise leave it out, \
-                or say park.)
+                to do, and there is nothing the person needs to look at, call \
+                \(AppTool.archiveAgent) with no id before you end. Otherwise leave it out, \
+                or park with \(AppTool.parkAgent) and no id.)
                 """
         case .archive:
             return """

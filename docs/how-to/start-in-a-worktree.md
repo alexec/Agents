@@ -53,9 +53,10 @@ An agent that started in the project folder can move into a worktree later, or b
 3. Send the next prompt. The agent carries on in the new folder with the whole
    conversation, and the files, changes and row all follow it.
 
-Agents can also move themselves, by naming a worktree when they finish a turn with
-`finish_turn` (see [Tools the app gives agents](../reference/agent-tools.md)). An agent that
-asks is moved when its turn ends and started again there to carry on.
+Agents can also move themselves, with `move_worktree` (see
+[Tools the app gives agents](../reference/agent-tools.md)). An agent that asks is moved when
+its turn ends and started again there to carry on, or left parked there if it also asked
+to be parked.
 
 Nothing uncommitted comes along: a new worktree starts from the last commit of the folder
 the agent is leaving, and what was not committed stays where it was.

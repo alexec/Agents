@@ -28,8 +28,9 @@ public enum Briefing {
     // (023). It went in #479: runtimes forgot it, called it and carried on, wrote too
     // much in it, and a silent ending cost a whole extra turn to ask about. The daemon
     // works the ending out for itself now (`DerivedEnding`), and the tool stays for an
-    // agent that wants to park, wait or move. A project or workflow that still wants
-    // the self-report says so in its own prompt.
+    // agent that wants to say it; waiting, parking and moving have tools of their own
+    // since #481. A project or workflow that still wants the self-report says so in its
+    // own prompt.
 
     /// Show a document once, at the start, so it can be watched being written.
     ///

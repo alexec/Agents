@@ -161,6 +161,21 @@ public struct ToolCall: Codable, Hashable, Sendable {
         (name ?? title).hasSuffix(AppTool.finishTurn)
     }
 
+    /// Whether this is one of the calls that took over a part of `finish_turn` (#481):
+    /// labels, a move, parking or archiving itself, or a wait on agents or a time. What
+    /// `finish_turn` was let do without asking, these are too.
+    public var isOwnSessionCall: Bool {
+        let called = name ?? title
+        if called.hasSuffix(AppTool.setSessionLabels) || called.hasSuffix(AppTool.moveWorktree) { return true }
+        if called.hasSuffix(AppTool.parkAgent) || called.hasSuffix(AppTool.archiveAgent) {
+            return rawInput?["id"]?.stringValue?.isEmpty ?? true
+        }
+        if called.hasSuffix(AppTool.waitForEvent) {
+            return rawInput?["agents"] != nil || (rawInput?["events"] == nil && rawInput?["until_minutes"] != nil)
+        }
+        return false
+    }
+
     /// Whether this is one of the retired names for a half of `finish_turn`, found in a
     /// conversation that called them before they went.
     public var isRetiredEndOfTurn: Bool {

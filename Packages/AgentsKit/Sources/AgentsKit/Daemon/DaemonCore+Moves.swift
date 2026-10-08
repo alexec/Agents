@@ -15,15 +15,49 @@ import AgentsKitCore
 extension DaemonCore {
     // MARK: Asking
 
-    /// An agent moving itself, through `enter_worktree` or `exit_worktree`.
+    /// An agent moving itself, through `move_worktree` (#481), or `enter_worktree` and
+    /// `exit_worktree` from a helper begun before 2026-09-29. No target takes back the
+    /// move it asked for earlier in the turn.
     public func moveSelf(_ request: DaemonAPI.MoveSelfRequest) async throws -> DaemonAPI.MoveAnswer {
-        guard let agentID = appTokens[request.token], agents[agentID] != nil else {
+        guard let agentID = appTokens[request.token], var agent = agents[agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent,
                                message: "That conversation is not open any more, so nothing was moved.")
         }
-        return try await askMove(agentID, PendingMove(target: request.target, removeLeft: request.removeLeft,
-                                                      discardChanges: request.discardChanges,
-                                                      askedBy: .agent, askedAt: now()))
+        guard let target = request.target else {
+            guard agent.pendingMove?.askedBy == .agent else {
+                return DaemonAPI.MoveAnswer(when: .nothing, message: "No move of yours was waiting; you stay where you are.",
+                                            agent: agent)
+            }
+            agent.pendingMove = nil
+            changed(agent)
+            await record(.runtimeNote("Move cancelled."), for: agentID)
+            return DaemonAPI.MoveAnswer(when: .nothing, message: "Move cancelled; you stay where you are.",
+                                        agent: agents[agentID])
+        }
+        // What this turn has already said it waits for: a move starts the agent again
+        // somewhere else, so it goes with neither (053, #481).
+        if let report = agent.report, report != reportBeforeTurn[agentID],
+           [WorkOutcome.needsAnswer, .blocked].contains(report.outcome) {
+            throw JSONRPCError(code: JSONRPCError.invalidParams, message: """
+                Nothing was moved: this turn ended \(report.outcome.rawValue), and a move \
+                starts you again in the new folder rather than waiting.
+                """)
+        }
+        if agent.afterTurn == .archive {
+            throw JSONRPCError(code: JSONRPCError.invalidParams, message: """
+                Nothing was moved: you asked to be archived once this turn ends, and a run \
+                that moves is not archived. Park instead, or do not move.
+                """)
+        }
+        var answer = try await askMove(agentID, PendingMove(target: target, removeLeft: request.removeLeft,
+                                                            discardChanges: request.discardChanges,
+                                                            askedBy: .agent, askedAt: now()))
+        if answer.when == .afterTurn, agents[agentID]?.afterTurn == .park {
+            answer.message = answer.message.replacingOccurrences(
+                of: "you will be started again there to carry on.",
+                with: "you stay parked there, as you asked, rather than being started again.")
+        }
+        return answer
     }
 
     /// The person moving an agent from its page, or taking back a move still waiting.
