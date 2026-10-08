@@ -19,6 +19,8 @@ struct RemoteChatView: View {
     @Environment(\.openURL) private var openURL
     /// The open chat's views (#187), torn down when another chat opens.
     @State private var views = AppViewStore()
+    /// Open File… is up over the chat (#415).
+    @State private var searchingFiles = false
 
     private var agent: Agent? { model.selectedAgent }
 
@@ -34,6 +36,34 @@ struct RemoteChatView: View {
         // What its prompt bar reads: the runtime's capabilities, the cost limit, the
         // sandbox default and what the agent holds (#175).
         .shows([.runtimes, .costs, .sandbox, .leases])
+        .overlay { fileSearch }
+        // ⌘P with a keyboard attached, as on the Mac (#415). A button no one sees, so
+        // the key is there whatever has focus.
+        .background {
+            Button("Open File…") { searchingFiles = true }
+                .keyboardShortcut("p")
+                .disabled(agent == nil)
+                .opacity(0)
+                .accessibilityHidden(true)
+        }
+        .onChange(of: agent?.id) { searchingFiles = false }
+    }
+
+    /// Open File… (#415): the session's files by name, found on its host. The one chosen
+    /// opens where it belongs — a Markdown file on the Page, anything else in Files —
+    /// ready to type in.
+    @ViewBuilder
+    private var fileSearch: some View {
+        if searchingFiles, let agent {
+            let model = model
+            FileSearch(place: agent.cwd.lastPathComponent,
+                       search: { await model.mentions($0, for: agent.id) },
+                       choose: { file in
+                           searchingFiles = false
+                           model.panes.state(for: agent.id).open(file: file.url, line: nil)
+                       },
+                       dismiss: { searchingFiles = false })
+        }
     }
 
     private var conversation: some View {
@@ -184,7 +214,7 @@ struct RemoteChatView: View {
                     .accessibilityHint("Shows the page, files and terminal for this agent")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    ChatMenu(agent: agent)
+                    ChatMenu(agent: agent) { searchingFiles = true }
                 }
             }
         }
@@ -299,6 +329,8 @@ private struct ChatMenu: View {
     @Environment(RemoteModel.self) private var model
     @AppStorage(TurnDetail.phoneDefaultsKey) private var turnDetail = TurnDetail.outcome
     let agent: Agent
+    /// Open File… (#415), over the chat.
+    let openFile: () -> Void
 
     var body: some View {
         Menu {
@@ -310,6 +342,7 @@ private struct ChatMenu: View {
             }
             .pickerStyle(.inline)
             Divider()
+            Button("Open File…", systemImage: "magnifyingglass", action: openFile)
             Button("Exchanged", systemImage: "doc") { model.panes.state(for: agent.id).show(.exchanged) }
             if agent.state != .archived {
                 // As the Mac's Session menu has it (#342).

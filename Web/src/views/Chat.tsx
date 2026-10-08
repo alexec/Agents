@@ -10,7 +10,7 @@ import { openTurnsHeld, rememberOpen, type Store } from "../model/store";
 import { backgroundAge, backgroundEnded, backgroundNoun, isRunning } from "../model/background";
 import { display, isPersonsAsk, isWorking, type ChatTurn, type Item } from "../model/turns";
 import { toWireDate } from "../protocol/dates";
-import type { Agent, AppViewCall, TranscriptEntry } from "../protocol/generated";
+import type { Agent, AppViewCall, FileMentionDTO, TranscriptEntry } from "../protocol/generated";
 import { replace, route } from "../route";
 import { Cards } from "./Cards";
 import { OfflineStrip } from "./OfflineStrip";
@@ -26,7 +26,8 @@ import { SessionMenu } from "./SessionMenu";
 import { drawable } from "../model/options";
 import { projectFolder } from "../model/groups";
 import { CallActionsContext, detailSummaries, detailTitles, TurnView, type CallActions, type TurnDetail } from "./chat/Rows";
-import { setPane } from "./files/paneState";
+import { nameOf, pathOf, setPane } from "./files/paneState";
+import { FileSearch, isOpenFileKey } from "./files/FileSearch";
 import { focusedEntry } from "../model/focus";
 import { ViewLayerContext } from "./chat/AppView";
 import { viewPin } from "./chat/appViewBridge";
@@ -87,6 +88,24 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   }, [host, session]);
   // One search per session, so the prompt's file search is not started afresh on every render.
   const findFiles = useMemo(() => (term: string) => store.mentions(host, session, term), [host, session]);
+  // Open File… (#415): ⌘P or Ctrl+P, wherever the keys are, opens the search over the chat.
+  const searchingFiles = useSignal(false);
+  useEffect(() => {
+    searchingFiles.value = false;
+    const press = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.isComposing || !isOpenFileKey(e)) return;
+      e.preventDefault();
+      if (store.agent(host, session)) searchingFiles.value = true;
+    };
+    document.addEventListener("keydown", press);
+    return () => document.removeEventListener("keydown", press);
+  }, [host, session]);
+  const openFound = (file: FileMentionDTO) => {
+    searchingFiles.value = false;
+    // Markdown on its live page, anything else as source to type in, under Files.
+    setPane(session, { tab: "files", file: file.path, fileLine: undefined, last: file.path });
+    if (!route.peek().files) replace({ ...route.peek(), files: true });
+  };
   // Not held: perhaps retired, and then its page says who it was (051, #253).
   useEffect(() => { if (!store.agent(host, session)) void store.lookUpRetired(host, session); }, [host, session]);
   const level = useSignal<TurnDetail>(defaultDetail.value);
@@ -435,6 +454,9 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
 
   return (
     <section class="chat" aria-label="Chat" ref={chatColumn}>
+      {searchingFiles.value && agent && (
+        <FileSearch place={nameOf(pathOf(agent.cwd))} search={findFiles} choose={openFound} close={() => (searchingFiles.value = false)} />
+      )}
       <header class="column-head">
         <BackToList />
         <h1>{agent?.title ?? "New session"}</h1>
