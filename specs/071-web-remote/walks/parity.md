@@ -15,14 +15,14 @@
 
 ## Counts
 
-Of 209 rows: **141 same**, **40 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 209 rows: **140 same**, **41 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
 | Sidebar and project list | 8 | 2 | 9 |
 | Session rows and states | 16 | 2 | 5 |
 | Chat turns and turn detail | 21 | 3 | 2 |
-| Prompt bar and queued prompts | 19 | 2 | 0 |
+| Prompt bar and queued prompts | 18 | 3 | 0 |
 | Question and permission cards | 13 | 3 | 0 |
 | Start sheet and new project | 17 | 5 | 0 |
 | Worktrees and Files | 9 | 6 | 6 |
@@ -144,7 +144,7 @@ The deltas are tracked by 29 issues:
 | Return and Shift-Return send, Option-Return a new line (#377) | `PromptReturn` (AgentsKitCore): `A/Chat/PromptBar.swift:401` | `PromptReturn` from a hardware keyboard; the on-screen keyboard's Return is a new line: `R/Chat/PromptBar.swift:172` | `returnAction`: `W/views/Prompt.tsx` | **same** |
 | Sending in flight (#87) | Spinner, *telling* after 400 ms: `A/Chat/PromptBar.swift:120-138` | The host's name: `R/Chat/PromptBar.swift:94` | `W/views/Prompt.tsx:119-121` | **same** (#239) |
 | Queued prompts as bubbles, Send now, × (#95) | `S/Chat/TranscriptRows.swift:377-463` | Shared | `W/views/Chat.tsx:277-306` | **same** |
-| Attachments | Picker, drag, paste: `A/Chat/PromptBar.swift:455-463` | `R/Chat/PromptBar.swift:214` | Picker, drop, paste: `W/views/Prompt.tsx:122-171` | **same** |
+| Attachments | Picker, drag; ⌘V in the field attaches pictures and Finder files, words still paste: `A/Chat/PromptBar.swift`, `A/Chat/PasteIntoPrompt.swift`, `K/Model/PromptPaste.swift` | Picker, Paste Picture; ⌘V of a picture in the field on an iPad: `R/StartAgent/PhoneAttachments.swift` (`PastesPictures`) | Picker, drop; paste of clipboard items and files, words still paste: `W/views/Prompt.tsx`, `W/model/attachments.ts` | **by design** (#396: no paste into the field on an iPhone; Paste Picture is its way in) |
 | Dictation (#69) | `S/Chat/Dictation.swift` | Shared | None | **by design** (071) |
 | Slash commands | `S/Chat/CommandList.swift` | Shared | Over the field: `W/views/Prompt.tsx:223`, `W/model/completions.ts` | **same** (#255) |
 | @ file mentions | `A/Chat/PromptBar.swift:644-690` | `R/Chat/PromptBar.swift:418-454` | Asks the host (`files/mention`): `W/views/Prompt.tsx:236`; none on a new session, as the Remote (no agent to ask yet) | **same** (#255) |

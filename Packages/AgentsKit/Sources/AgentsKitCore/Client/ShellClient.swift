@@ -28,6 +28,13 @@ public final class ShellClient {
     /// (053) works somewhere else, and the pane says so.
     public private(set) var folder: URL?
 
+    /// What the program in it calls it (OSC 0/2), for the tab; nil until one says.
+    /// Set by the screen's emulator, which is where the bytes are read (#401).
+    public var title: String?
+    /// Where the shell says it is now (OSC 7), when it says: after a `cd`, the folder
+    /// it was started in is no longer where it is.
+    public var directory: URL?
+
     /// Typing that did not reach the shell, said under the screen rather than lost in
     /// silence (#401). Cleared by the next keystroke that does.
     public private(set) var sendProblem: String?
@@ -155,10 +162,21 @@ public final class ShellClient {
         lost = true
     }
 
-    /// A new connection: attach again if the last one was lost while attached (#401).
+    /// A new connection: attach again if the last one was lost while attached (#401),
+    /// and say this screen's size, which the shell may have lost meanwhile.
     public func reattachIfLost() async {
         guard lost, !isAttached else { return }
         await attach(rows: rows, cols: cols)
+        if isAttached { await resize(rows: rows, cols: cols) }
+    }
+
+    /// A new shell for the agent, numbered by the daemon (#401). Nil from a host before
+    /// #401, which has the caller number it.
+    public static func open(agentID: UUID, on client: DaemonClient) async -> Int? {
+        let response = try? await client.call(DaemonAPI.Method.shellOpen,
+                                              DaemonAPI.ShellAttachRequest(agentID: agentID),
+                                              returning: DaemonAPI.ShellOpenResponse.self)
+        return response?.shell
     }
 
     /// What the person typed, queued and sent in order. Returns at once.
@@ -260,6 +278,8 @@ public final class ShellClient {
 
     /// A new shell in this place: a blank screen, and its output from the start.
     private func beginAgain() {
+        title = nil
+        directory = nil
         onOutput?(Self.reset)
         seen = onOutput == nil ? nil : 0
         dropped = 0

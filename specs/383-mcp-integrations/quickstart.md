@@ -33,10 +33,10 @@ node --test Integrations/ci-watcher/
 Never the real root. Seed synthetic records only, and never copy real agents.
 
 1. Start the CI watcher against a scratch repo Alex owns, or the stand-in mode:
-   `CI_WATCHER_FAKE=fixtures/ci.json node Integrations/ci-watcher/server.ts --port 8792`.
+   `CI_WATCHER_FAKE=fixtures/ci.json node Integrations/ci-watcher/server.ts --port 8796`.
    The fake mode reads runs and PRs from a file, so the walk needs no GitHub.
 2. Launch the app on a scratch root with a project whose `.agents/mcp.json` names
-   `http://127.0.0.1:8792/mcp`. Approve the project's MCP file.
+   `http://127.0.0.1:8796/mcp`. Approve the project's MCP file.
 3. Add `.agents/workflows/fix-failed-checks.md` from
    [contracts/workflow-trigger.md](contracts/workflow-trigger.md) with `enabled: true`, and
    `AGENTS_TEST_RUNTIME=echo` so no real model runs.
@@ -57,7 +57,7 @@ Screenshot steps 4, 5, 7 and 8 on the Mac and the web page. The Remote look is A
 
 ## 2. On this repo, with Alex's go-ahead
 
-1. `Integrations/ci-watcher/run.sh start`, then `curl -s localhost:8791/health`.
+1. `Integrations/ci-watcher/run.sh start`, then `curl -s localhost:8795/health`.
 2. Alex approves `.agents/mcp.json` in the app, and turns **Fix failed checks** on.
 3. Open a draft PR with a failing test. **Expect**: within 2 minutes, an agent on that branch
    (SC-001), and the board shows the PR failing, then running after the agent reruns or pushes.

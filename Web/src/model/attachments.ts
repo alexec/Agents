@@ -109,3 +109,20 @@ export function totalRefusal(attachments: readonly Attachment[]): string | null 
   if (total <= limit) return null;
   return `From a browser, attachments can be 900 KB in all, and these are ${sizeWords(total)}. Remove one to send.`;
 }
+
+/** What a paste brings to attach (#396): its clipboard items that are files — a copied screenshot is
+ * one, though it is not among `files` in every browser — or else its files. */
+export function pastedFiles(clipboard: Pick<DataTransfer, "items" | "files"> | null | undefined): File[] {
+  if (!clipboard) return [];
+  const fromItems = Array.from(clipboard.items ?? [])
+    .filter((item) => item.kind === "file")
+    .map((item) => item.getAsFile())
+    .filter((file): file is File => file !== null);
+  return fromItems.length ? fromItems : Array.from(clipboard.files ?? []);
+}
+
+/** Whether a paste brings words too, which go into the field as any paste's would. A text field
+ * takes only plain text, so a copied picture's `text/html` is not words. */
+export function pastedWords(clipboard: Pick<DataTransfer, "types"> | null | undefined): boolean {
+  return Array.from(clipboard?.types ?? []).includes("text/plain");
+}

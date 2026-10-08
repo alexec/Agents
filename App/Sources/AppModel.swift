@@ -3589,6 +3589,12 @@ final class AppModel {
         return response?.shells
     }
 
+    /// A new terminal tab: the daemon starts the shell and says its number (#401). Nil
+    /// from a host too old to, and the pane numbers it itself.
+    func openShell(for agentID: UUID) async -> Int? {
+        await ShellClient.open(agentID: agentID, on: client(forAgent: agentID))
+    }
+
     /// A shell's screen took this window's end of it: counted, so the end is let go of
     /// when the last screen showing it goes (#213).
     func acquireShell(for agentID: UUID, shell: Int) -> ShellClient {

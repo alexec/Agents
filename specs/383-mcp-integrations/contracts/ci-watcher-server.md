@@ -1,10 +1,10 @@
 # Contract: the CI watcher MCP server
 
-`Integrations/ci-watcher/`, served at `http://127.0.0.1:8791/mcp`. It is set up in the
+`Integrations/ci-watcher/`, served at `http://127.0.0.1:8795/mcp`. It is set up in the
 project's `.agents/mcp.json` as `ci`:
 
 ```json
-{ "mcpServers": { "ci": { "type": "http", "url": "http://127.0.0.1:8791/mcp" } } }
+{ "mcpServers": { "ci": { "type": "http", "url": "http://127.0.0.1:8795/mcp" } } }
 ```
 
 It binds to `127.0.0.1` only, refuses any `Origin` header other than none or `http://127.0.0.1:*`,

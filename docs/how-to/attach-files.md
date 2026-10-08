@@ -1,6 +1,6 @@
 ---
 diataxis: how-to
-devices: [mac, iphone, ipad]
+devices: [mac, iphone, ipad, browser]
 description: Give an agent files and pictures with a prompt, by dragging, pasting, the paperclip or an @ mention.
 ---
 
@@ -22,8 +22,9 @@ take them.
 
 1. Attach in whichever way is closest:
    - **Drag** files from Finder onto the prompt.
-   - **Paste** with **⌘V**: a screenshot or picture you copied, or files copied in
-     Finder.
+   - **Paste** with **⌘V** in the prompt: a screenshot or picture you copied (PNG, JPEG,
+     GIF, HEIC, WebP or any other picture), or files copied in Finder. Words copied with
+     a picture still go into the prompt.
    - Click the **paperclip** (**Attach a file or a picture**) beside the prompt, choose
      one or more files, and click **Attach**.
    - Type **@** and the start of a file's name in the prompt. A list of matching files in
@@ -44,12 +45,25 @@ pictures, and as a file otherwise.
      attached; anything else has to be attached on the Mac.
    - **Paste Picture**, to attach a picture you copied. It is there only when there is a
      picture to paste.
+
+   On an iPad with a keyboard, **⌘V** in the prompt attaches a picture you copied, too.
 2. In a conversation, to attach a file that is already in the project on the Mac, type
    **@** and the start of its name in the prompt, and choose it from the list.
 3. Type the prompt and send it.
 
 Pictures from a phone are made smaller before they go. Everything attached from a phone
 together can be up to 900 KB.
+
+**In a browser**
+
+1. Drop files on the prompt, click the **paperclip**, or paste with **⌘V** or **Ctrl+V**
+   in the prompt: a screenshot or picture you copied, or files. Words copied with them
+   still go into the prompt. Pictures and text files can be attached; anything else has
+   to be attached on the Mac.
+2. Type the prompt and send it.
+
+As from a phone, pictures are made smaller, and everything attached together can be up
+to 900 KB.
 
 ## If it doesn't work
 

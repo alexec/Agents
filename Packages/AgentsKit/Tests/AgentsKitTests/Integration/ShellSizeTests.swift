@@ -124,6 +124,53 @@ struct ShellSizeTests {
         #expect(await heard.output(to: phone, from: id) == 0)
     }
 
+    /// While a Mac window shows the shell it keeps the Mac's size, whoever types; once
+    /// the window lets go, the phone's size is taken (Alex, #401).
+    @Test func theMacsSizeWinsWhileAWindowShowsTheShell() async throws {
+        let (locations, work) = try temporary()
+        let core = try await core(locations: locations, heard: Heard())
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        _ = try await core.attachShell(.init(agentID: id, rows: 30, cols: 120), from: .mac, connection: window)
+        _ = try await core.attachShell(.init(agentID: id, rows: 40, cols: 50),
+                                       from: .device(phone), connection: phone)
+
+        try await core.writeToShell(.init(agentID: id, bytes: Data(" ".utf8), rows: 40, cols: 50), from: .device(phone))
+        await core.resizeShell(.init(agentID: id, rows: 40, cols: 50), from: .device(phone))
+        let whileShown = try #require(await size(core, id))
+        #expect(whileShown == (30, 120))
+
+        await core.detachShell(DaemonAPI.ShellRequest(agentID: id), connection: window)
+        await core.resizeShell(.init(agentID: id, rows: 40, cols: 50), from: .device(phone))
+        let afterwards = try #require(await size(core, id))
+        #expect(afterwards == (40, 50))
+        await core.shells.shutDown()
+    }
+
+    @Test func attachingDoesNotResizeARunningShell() async throws {
+        let (locations, work) = try temporary()
+        let core = try await core(locations: locations, heard: Heard())
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        _ = try await core.attachShell(.init(agentID: id, rows: 30, cols: 120))
+        _ = try await core.attachShell(.init(agentID: id, rows: 24, cols: 80))
+        let after = try #require(await size(core, id))
+        #expect(after == (30, 120))
+        await core.shells.shutDown()
+    }
+
+    /// The daemon numbers new tabs, so two screens opening one at once get two (#401).
+    @Test func theDaemonNumbersNewShells() async throws {
+        let (locations, work) = try temporary()
+        let core = try await core(locations: locations, heard: Heard())
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        _ = try await core.attachShell(.init(agentID: id))
+        let first = try await core.openShell(.init(agentID: id))
+        let second = try await core.openShell(.init(agentID: id))
+        #expect(first.shell == 1)
+        #expect(second.shell == 2)
+        #expect(await core.listShells(id).shells == [0, 1, 2])
+        await core.shells.shutDown()
+    }
+
     @Test func aPhoneThatGoesAwayHearsNothingMore() async throws {
         let (locations, work) = try temporary()
         let core = try await core(locations: locations, heard: Heard())

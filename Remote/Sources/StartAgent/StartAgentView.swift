@@ -120,6 +120,8 @@ struct StartAgentView: View {
                     .focused($focused)
                     .appText(.reading)
                     .accessibilityLabel("What the new agent should do")
+                    // ⌘V of a picture from an iPad's keyboard attaches it (#396).
+                    .modifier(PastesPictures(attachments: $attachments, refusal: $attachNote))
                     // Held, words and all, while they start an agent (#87).
                     .disabled(model.isStarting)
 

@@ -42,7 +42,7 @@ lease.
   - It counts polls per `(name, arguments)` and records each request's cursor.
   - It can be told to be unreachable.
   - Two instances must be installable side by side under different server names, for the two-server tests.
-- [x] T002 [P] Create `Integrations/ci-watcher/` with a `README.md` that says what it is, how to run it (`node server.ts --port 8791`, `run.sh start|stop`), the fake mode (`CI_WATCHER_FAKE=<file>`), and that it needs Node 26 and a signed-in `gh`. Add `Integrations/ci-watcher/fixtures/ci.json`: two open PRs (one passing, one failing), one failed `pull_request` run with two failed jobs, and one merged PR.
+- [x] T002 [P] Create `Integrations/ci-watcher/` with a `README.md` that says what it is, how to run it (`node server.ts --port 8795`, `run.sh start|stop`), the fake mode (`CI_WATCHER_FAKE=<file>`), and that it needs Node 26 and a signed-in `gh`. Add `Integrations/ci-watcher/fixtures/ci.json`: two open PRs (one passing, one failing), one failed `pull_request` run with two failed jobs, and one merged PR.
 
 ---
 
@@ -246,16 +246,16 @@ real repo, a failing PR yields one `checks.failed` with a stable id.
   - `commentOnPR(repo, number, body)`.
   - A fake implementation reads and writes `CI_WATCHER_FAKE`'s JSON instead.
   - `gh` not signed in raises a typed error. A rate limit raises one with `retryAfterMs`.
-- [x] T028 [US3] Create `Integrations/ci-watcher/server.ts`: JSON-RPC over `node:http` at `POST /mcp` on `127.0.0.1` (`--port`, default 8791), with `Mcp-Session-Id`, and `GET /health`. Depends on T027.
+- [x] T028 [US3] Create `Integrations/ci-watcher/server.ts`: JSON-RPC over `node:http` at `POST /mcp` on `127.0.0.1` (`--port`, default 8795), with `Mcp-Session-Id`, and `GET /health`. Depends on T027.
   - Methods: `initialize` (capabilities exactly as in the contract), `tools/list`, `tools/call`, `resources/list`, `resources/read`, `events/list` and `events/poll`.
   - The cursor is base64 of `{since, ids}` (R10). `cursor: null` answers no events and now. `nextPollMs: 30000`. `truncated` follows R10.
   - Errors: `-32012` with `reason: "gh not signed in"`, `-32013` with `retryAfterMs`, and `-32602` for bad arguments.
   - It refuses any `Origin` other than none or `http://127.0.0.1:*`.
 - [x] T029 [P] [US3] Create `Integrations/ci-watcher/run.sh`.
-  - `start` writes and loads a LaunchAgent `~/Library/LaunchAgents/com.agents.ci-watcher.plist` running `node <abs>/server.ts --port 8791`, with logs in `~/Library/Logs/ci-watcher.log`.
+  - `start` writes and loads a LaunchAgent `~/Library/LaunchAgents/com.agents.ci-watcher.plist` running `node <abs>/server.ts --port 8795`, with logs in `~/Library/Logs/ci-watcher.log`.
   - `stop` unloads and deletes it.
-  - `status` prints `launchctl list | grep ci-watcher` and `curl -s 127.0.0.1:8791/health`.
-- [x] T030 [P] [US3] Add `.agents/mcp.json` with `{ "mcpServers": { "ci": { "type": "http", "url": "http://127.0.0.1:8791/mcp" } } }`. Add `.agents/workflows/fix-failed-checks.md`, exactly as the example in [contracts/workflow-trigger.md](contracts/workflow-trigger.md), with `enabled: false`.
+  - `status` prints `launchctl list | grep ci-watcher` and `curl -s 127.0.0.1:8795/health`.
+- [x] T030 [P] [US3] Add `.agents/mcp.json` with `{ "mcpServers": { "ci": { "type": "http", "url": "http://127.0.0.1:8795/mcp" } } }`. Add `.agents/workflows/fix-failed-checks.md`, exactly as the example in [contracts/workflow-trigger.md](contracts/workflow-trigger.md), with `enabled: false`.
 
 **Checkpoint**: T026 passes. Against `run.sh start`, `curl` shows both events.
 
@@ -332,7 +332,7 @@ again, and see it recover by itself.
 - [ ] T041 [P] Write `docs/how-to/start-a-workflow-from-an-mcp-event.md`: set up a server with events (the CI watcher as the example), approve `.agents/mcp.json`, write the workflow, and read its lines on the workflow page. Link it from `docs/how-to/` index if there is one.
 - [ ] T042 [P] Add the row "Workflow page: MCP trigger status · Mac ✓ · Remote ✓ · web ✓" to `specs/071-web-remote/walks/parity.md`.
 - [ ] T043 Run the Lane A suites under the build lease: `scripts/build-cache.sh swift test --package-path Packages/AgentsKit --filter 'MCPEventTrigger|EventCatalogue|EventPattern|MCPClientEvents|JSONSchemaSubset|MCPEventStore|MCPEventWorkflow|ThirdPartyViews|EventWorkflow'`. Build `AgentsHost` and `AgentsStore` for the `Shared/UI` change, and `scripts/web.sh build` for web.
-- [ ] T044 Walk quickstart §1 on a scratch root with the run-app skill: the CI watcher in fake mode on port 8792, `AGENTS_TEST_RUNTIME=echo`, and synthetic records only. Screenshot steps 4, 5, 7 and 8 on the Mac and the web page. The Remote look is Alex's.
+- [ ] T044 Walk quickstart §1 on a scratch root with the run-app skill: the CI watcher in fake mode on port 8796, `AGENTS_TEST_RUNTIME=echo`, and synthetic records only. Screenshot steps 4, 5, 7 and 8 on the Mac and the web page. The Remote look is Alex's.
 - [ ] T045 Commit with parity lines (`mac: same, remote: same, web: same` for T037/T038). Open a PR with squash auto-merge. Quickstart §2 on the real repo waits for Alex's go-ahead.
 
 ---
@@ -408,5 +408,5 @@ Task: "T010 JSONSchemaSubset in PK/AgentsKit/MCP/JSONSchemaSubset.swift"
 - `[P]` means different files with no unfinished dependency.
 - Never edit `Web/src/protocol/generated.ts` by hand (T038 regenerates it).
 - Walks use synthetic records only, never copies of real agents.
-- The real CI watcher (`run.sh start` on port 8791) and turning **Fix failed checks** on are
+- The real CI watcher (`run.sh start` on port 8795) and turning **Fix failed checks** on are
   Alex's go-ahead (quickstart §2).
