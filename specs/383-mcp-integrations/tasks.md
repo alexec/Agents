@@ -42,7 +42,7 @@ lease.
   - It counts polls per `(name, arguments)` and records each request's cursor.
   - It can be told to be unreachable.
   - Two instances must be installable side by side under different server names, for the two-server tests.
-- [ ] T002 [P] Create `Integrations/ci-watcher/` with a `README.md` that says what it is, how to run it (`node server.ts --port 8791`, `run.sh start|stop`), the fake mode (`CI_WATCHER_FAKE=<file>`), and that it needs Node 26 and a signed-in `gh`. Add `Integrations/ci-watcher/fixtures/ci.json`: two open PRs (one passing, one failing), one failed `pull_request` run with two failed jobs, and one merged PR.
+- [x] T002 [P] Create `Integrations/ci-watcher/` with a `README.md` that says what it is, how to run it (`node server.ts --port 8791`, `run.sh start|stop`), the fake mode (`CI_WATCHER_FAKE=<file>`), and that it needs Node 26 and a signed-in `gh`. Add `Integrations/ci-watcher/fixtures/ci.json`: two open PRs (one passing, one failing), one failed `pull_request` run with two failed jobs, and one merged PR.
 
 ---
 
