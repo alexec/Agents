@@ -69,11 +69,11 @@ Paths under `Packages/AgentsKit/Sources/` unless they start with a client folder
 - **Mac**:
   - `CommandGroup(replacing: .newItem)` (`App/Sources/Commands/AgentsCommands.swift:58`) gets **New Chat**, ⇧⌘N (free today: ⌘N is New Session, ⌥⌘N is New Session in a Worktree).
   - When any server lists a chat project, it also gets **New Chat on ▸** with one item per host.
-  - The action is `model.showProject(chatKey)` (`App/Sources/AppModel.swift:337`), which since #366 opens the new-session form.
+  - The action is `model.showProject(chatKey)` (`App/Sources/AppModel.swift:337`), which opens the new-session form (#366; still so after #375, where the New session row calls it).
   - The sidebar's + menu gets the same item.
 - **Remote**:
   - A New Chat toolbar button on `RemoteSidebar` (`Remote/Sources/Sidebar/RemoteSidebar.swift`). It is a menu of hosts when more than one lists a chat project.
-  - It routes to `RemoteRoute.start` for that project, as a project row tap does (#366, parity row).
+  - It routes to `RemoteRoute.start` for that project, as the project's New session row does (#375, parity row).
 - **Web**:
   - **New Chat** at the top of the + menu (`Web/src/views/NewProject.tsx:72`, `NewProjectItems`), with one item per host when several.
   - It goes to `go({ host, project: folder, n: 1 })`, as a project row click does.

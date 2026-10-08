@@ -28,7 +28,7 @@ How the code stands today (paths under `Packages/AgentsKit/Sources/`):
   - Mac: `App/Sources/Chat/PromptBar.swift:302`.
   - Remote: `Remote/Sources/StartAgent/ChoiceRows.swift:16`.
   - Web: `Web/src/views/NewAgent.tsx:252`.
-- **Clicking a project row opens its new-session form** (#366, `4437e1cb`). Clicking the chat project's row is therefore already a New chat. This feature adds a direct way in that doesn't need the row found first.
+- **Each project has a New session row** (#375, after #366): the first row under an unfolded project opens its new-session form. The chat project's New session row is therefore already a way to start a chat. This feature adds a direct way in that doesn't need the project found and unfolded first.
 - **Projects are ordered by when they were added** (#357). A chat project made today would sort after every existing project.
 - **Additional folders on a first turn** were fixed by #230 (`afb43eb8`). Chats don't need them now: the shared folder *is* their working folder.
 
@@ -102,7 +102,7 @@ On the iPhone, Alex taps **New Chat**, picks the Linux server, and asks somethin
 2. **Given** a chat on a server, **then** it runs in that server's `~/.agents/chat`. Files are not copied between hosts. Each host's chat project is its own.
 3. **Given** the Remote, **then** New Chat is on the projects list (the top level), so the chat project's row doesn't have to be found first.
 4. **Given** the web page, **then** New Chat is in the sidebar and opens the new-session form on the chat project.
-5. **Given** a client too old to know New Chat, **then** the chat project still shows as an ordinary project, and a chat can be started from its row.
+5. **Given** a client too old to know New Chat, **then** the chat project still shows as an ordinary project, and a chat can be started from its New session row.
 
 ---
 
