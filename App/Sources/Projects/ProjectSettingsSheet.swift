@@ -251,7 +251,7 @@ private struct ProjectGeneralPane: View {
                             diskLine(\.criticalGB, in: summary, default: DiskThresholds.defaultCriticalGB,
                                      choices: DiskThresholds.criticalChoices)
                             Text("When free space on the disk holding this project or its worktrees falls below "
-                                 + "these, the window says so and mac.disk_low is raised for agents and workflows. "
+                                 + "these, the window says so and machine.disk_low is raised for agents and workflows. "
                                  + "Low is also below \((summary.project.diskSpace ?? DiskThresholds()).effectiveLowPercent)% "
                                  + "of the disk. Saved in .agents/project.json.")
                                 .appText(.fine)

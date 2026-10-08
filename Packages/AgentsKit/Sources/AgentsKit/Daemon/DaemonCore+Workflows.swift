@@ -1018,7 +1018,7 @@ extension DaemonCore {
     /// trigger adds is a sentence saying what happened, so an agent starting fresh has
     /// something to act on rather than being told to review a thing it cannot name.
     /// An event no agent set off says itself, details and all, so a workflow on
-    /// `mac.disk_low` knows whether it is low or critical (#199).
+    /// `machine.disk_low` knows whether it is low or critical (#199).
     private func promptText(for workflow: Workflow, run: WorkflowRun, event: Event? = nil) -> String {
         guard let agentID = run.triggeringAgentID, let agent = agents[agentID] else {
             guard let event else { return workflow.prompt }

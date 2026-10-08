@@ -82,6 +82,8 @@ struct ChatTranscript: View {
     /// Whether there is more conversation than pane. No point offering a way to the
     /// end of something already wholly on screen.
     @State private var canScroll = false
+    /// How tall the pane is, which the foot's margin is held to (#371).
+    @State private var paneHeight: CGFloat?
     /// The tallest honest content height seen for this conversation.
     ///
     /// A lazy stack reports about one screen of height while it is throwing rows
@@ -183,8 +185,17 @@ struct ChatTranscript: View {
             // caught. Two lines rather than one bare `contentMargins`, because the bare
             // one moves the visible area up as well, and the transcript is meant to run
             // on under the glass rather than stop short of it.
-            .contentMargins(.bottom, bottomInset, for: .scrollContent)
-            .contentMargins(.bottom, bottomInset, for: .scrollIndicators)
+            //
+            // Held within the pane, which only a card that fills the pane asks for.
+            .contentMargins(.bottom, footMargin, for: .scrollContent)
+            .contentMargins(.bottom, footMargin, for: .scrollIndicators)
+            // A scroll view will not be shorter than its margins, so the margin above
+            // made the pane at least as tall as the cards and prompt bar it measured,
+            // and they, being given that much, never shrank: a tall question card ran
+            // the prompt bar off the bottom of a short window (#371). The pane takes
+            // the height it is given whatever the margin, and is measured there.
+            .frame(minHeight: 0, maxHeight: .infinity, alignment: .top)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { paneHeight = $0 }
             .onScrollGeometryChange(for: Edges.self) { geometry in
                 // `visibleRect` is the content actually on screen, insets included.
                 // Measuring from `contentOffset` alone counts the top bar as distance
@@ -400,6 +411,16 @@ struct ChatTranscript: View {
     /// forth under the reader.
     private var leftTheEnd: CGFloat { 160 }
     private var atTheEnd: CGFloat { 40 }
+
+    /// The room kept at the foot for what floats over it, within the pane (#371).
+    ///
+    /// A point short of the whole pane at most. With no room at all to scroll in, the
+    /// rows sat from the top down instead of at the end, and showed through the gap
+    /// between the card and the prompt bar; with a point, the end is held at the top
+    /// of the pane, under the card.
+    private var footMargin: CGFloat {
+        paneHeight.map { min(bottomInset, max(0, $0 - 1)) } ?? bottomInset
+    }
 
     /// How far the pane is from either end of the conversation, and how tall it is.
     private struct Edges: Equatable {

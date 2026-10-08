@@ -1,6 +1,6 @@
 ---
 name: merge-wave
-description: Merge a wave of ready lane branches into main together. They are merged in one scratch worktree, verified once on the combined tip by the paths they change, main is fast-forwarded once, and the wave ships once. Use when asked to merge, land or "run merge-wave on" one or more lane branches (agents/…), or to finish a lane's work onto main. Not for shipping on its own (ship-app) or testing one change (run-app).
+description: Merge a wave of ready lane branches into main together. They are merged in one scratch worktree, verified once on the combined tip by the paths they change, and main is fast-forwarded once. The wave does not install the app. Use when asked to merge, land or "run merge-wave on" one or more lane branches (agents/…), or to finish a lane's work onto main. Not for shipping on its own (ship-app) or testing one change (run-app).
 ---
 
 # Merge a wave of lane branches
@@ -33,7 +33,7 @@ $W start agents/fix-github-issue-139@1a2b3c agents/work-github-issue-47@4d5e6f
 ```
 
 `plan` (or `--dry-run`) shows which branch fast-forwards, which merge cleanly, which
-conflicts the wave settles itself, which stop it, the builds, and whether a ship follows.
+conflicts the wave settles itself, which stop it, and the builds. A wave does not install.
 It simulates the merges with `git merge-tree`, so no ref, worktree or file changes.
 
 Then repeat until the step is `finish`:
@@ -58,6 +58,7 @@ $W finish $WAVE     # fast-forwards main, checks merge-base --is-ancestor for ev
 ```
 
 It prints a line per branch (merge sha, checks, or why it was dropped) and `SHIP=yes|no`.
+`SHIP=yes` means product code changed. It does not mean install.
 
 ## What it settles, and what stops it
 
@@ -65,8 +66,8 @@ It prints a line per branch (merge sha, checks, or why it was dropped) and `SHIP
   `rebuild-web` (under the lease). It runs `scripts/web.sh build`, plus `types` for
   `generated.ts`, in the wave, and commits the merge with the rebuilt files.
 - **`specs/071-web-remote/walks/parity.md`:** both sides' rows are kept, as a union. If
-  both lanes edited the same row, both copies stay: read the merged table before the
-  ship and fix it in a follow-up if needed.
+  both lanes edited the same row, both copies stay: read the merged table before
+  you finish and fix it in a follow-up if needed.
 - **Any other conflict stops the wave** (`next` exits 3) and names the files. Either:
   - settle them in `$WAVE`, commit the merge, then run `$W resume $WAVE`; or
   - run `$W drop $WAVE <branch>` to leave it out and go on.
@@ -113,25 +114,21 @@ under load. Then the script bisects over the wave's merge commits, one `bisect` 
 starts the checks over. If the wave's base fails too, it stops: main is broken, not a
 lane. Tell the lead which branch was dropped, and why, with the log path.
 
-## Ship once
+## Do not install
 
-Only if `finish` printed `SHIP=yes`, and once per wave. Lease "build" for 45 minutes, then:
+`SHIP=yes` means product code changed. Stop there. Do not run `ship.sh`. Do not copy a
+build into `~/Applications`, `/Applications` or `~/AgentsApps`, and do not restart the
+login-item jobs (`launchctl kickstart` on `com.alexecollins.agentshost.daemon` or
+`.control`). Putting the app on this Mac is ship-app with `--install-mac`, and only when
+Alex asks for that by name.
 
-```sh
-nohup .agents/skills/ship-app/scripts/ship.sh > /tmp/ship-$(basename $WAVE).log 2>&1 &
-```
-
-Follow the log until `Mac relaunch scheduled`, or until it fails. Then release the lease.
-The relaunch may end your turn. When you come back, read
-`/tmp/main-restart-all-<sha>.log` as the ship-app skill says. If `SHIP=no`, do not ship.
-
-After the ship, `$W clean $WAVE` removes the wave's own worktree and its `lead/wave-*`
-branch. That is the only worktree the wave removes.
+Then `$W clean $WAVE` removes the wave's own worktree and its `lead/wave-*` branch.
+That is the only worktree the wave removes.
 
 ## Standing rules
 
 - **Never edit or build in the main checkout.** The wave builds in `/tmp/wave-*`. `finish`
-  only runs `git merge --ff-only` there, and only ship.sh builds there.
+  only runs `git merge --ff-only` there. It does not build, and it does not install.
 - **Never remove lane worktrees** (#119), and never delete lane branches.
 - **Never close issues.** That is the lead's job.
 - **Never kill Alex's windows.** The smoke check stops only the pids in its own root.
