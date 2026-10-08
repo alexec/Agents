@@ -304,6 +304,21 @@ public enum WorkflowFile {
         case "agent-stopped": return .agentStopped
         case "workflow-completed": return .workflowCompleted(id: keys["id"]?.scalar)
         default:
+            // A server's event (#383): `noun.verbed`, not the app's, its keys the
+            // subscription's arguments rather than details matched here. Whether a server
+            // offers it is known only once one is asked, so that is said on the page,
+            // not here.
+            if EventCatalogue.isServerEventName(name) {
+                let values = keys.mapValues(\.jsonValue)
+                guard let trigger = MCPEventTrigger(event: name, keys: values) else {
+                    throw YAMLNode.Failure("`server:` under \"\(name)\" is a server's name, or a list of them")
+                }
+                guard MCPEventTrigger.canonicalJSON(.object(trigger.arguments)).utf8.count
+                        <= MCPEventTrigger.argumentLimit else {
+                    throw YAMLNode.Failure("The settings under \"\(name)\" are over 2 KB")
+                }
+                return .serverEvent(trigger)
+            }
             // An event (042): a catalogue name, a subject with .*, or custom.<name>,
             // narrowed by details written under it. A name the catalogue knows with a
             // detail it does not carry is a mistake worth saying; a dotted name it does

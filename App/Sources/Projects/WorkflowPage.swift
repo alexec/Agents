@@ -431,6 +431,7 @@ struct WorkflowPage: View {
             case .custom: return "sparkle"
             default: return "desktopcomputer"
             }
+        case .serverEvent: return "antenna.radiowaves.left.and.right"
         case .unrecognised: return "questionmark.circle"
         }
     }
