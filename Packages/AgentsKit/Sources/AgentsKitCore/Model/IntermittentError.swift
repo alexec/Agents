@@ -1,0 +1,49 @@
+import Foundation
+
+/// A runtime's line about a blip it retries on its own (#394).
+///
+/// Cursor writes `Error: RetriableError: [unavailable] getaddrinfo ENOTFOUND api2.cursor.sh`
+/// into its reply when the network drops, then retries and carries on. It arrives as the
+/// agent's own words, so nothing else marks it, and it is not a failed turn: Cursor's only
+/// turn-ending prefix is `Upgrade your plan to continue`.
+///
+/// While the line is the last thing the agent did, it may be what stopped the work, and
+/// it stays. Once the agent carries on, it is a blip already got past, and the page drops
+/// it the way it drops a passing line. The record keeps it either way.
+public enum IntermittentError {
+    /// Whether this text could hold such a line, cheaply, before looking line by line.
+    public static func mayHold(_ text: String) -> Bool {
+        text.contains(marker)
+    }
+
+    /// Whether this one line is a retried error and nothing else.
+    public static func isLine(_ line: Substring) -> Bool {
+        let trimmed = line.drop(while: \.isWhitespace)
+        return trimmed.hasPrefix("Error: \(marker)") || trimmed.hasPrefix(marker)
+    }
+
+    /// The text with its retried errors left out: every one when `all`, otherwise only
+    /// those with something more of the message after them. Nil when nothing goes.
+    public static func without(in text: String, all: Bool) -> String? {
+        guard mayHold(text) else { return nil }
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+        var kept: [Substring] = []
+        var dropped = false
+        // From the end, so "followed" is known: whether anything said comes after.
+        var followed = false
+        for line in lines.reversed() {
+            if isLine(line), all || followed {
+                dropped = true
+                continue
+            }
+            if !isLine(line), !line.allSatisfy(\.isWhitespace) { followed = true }
+            kept.append(line)
+        }
+        guard dropped else { return nil }
+        var result = kept.reversed().joined(separator: "\n")
+        while result.contains("\n\n\n") { result = result.replacingOccurrences(of: "\n\n\n", with: "\n\n") }
+        return result.trimmingCharacters(in: .newlines)
+    }
+
+    private static let marker = "RetriableError"
+}

@@ -1389,5 +1389,267 @@
       "isLive" : false
     },
     "name" : "questions, answers and an ending"
+  },
+  {
+    "expected" : {
+      "items" : [
+        {
+          "entry" : "00000000-0000-0000-0000-000000001001",
+          "kind" : "userMessage",
+          "text" : "Fix it"
+        },
+        {
+          "entry" : "00000000-0000-0000-0000-000000001002",
+          "kind" : "agentMessage",
+          "text" : "Looking."
+        },
+        {
+          "calls" : [
+            {
+              "id" : "t1",
+              "status" : null,
+              "title" : "ls",
+              "turnLine" : "Run command"
+            }
+          ],
+          "run" : "00000000-0000-0000-0000-000000001004"
+        },
+        {
+          "entry" : "00000000-0000-0000-0000-000000001005",
+          "kind" : "agentMessage",
+          "text" : "Half way.\n\nAll done."
+        }
+      ],
+      "omittingThoughts" : [
+        "00000000-0000-0000-0000-000000001001",
+        "00000000-0000-0000-0000-000000001002",
+        "00000000-0000-0000-0000-000000001004",
+        "00000000-0000-0000-0000-000000001005"
+      ],
+      "turns" : [
+        {
+          "ask" : "00000000-0000-0000-0000-000000001001",
+          "id" : "00000000-0000-0000-0000-000000001001",
+          "live" : null,
+          "outcome" : [
+            "00000000-0000-0000-0000-000000001005"
+          ],
+          "stepCount" : 2,
+          "steps" : [
+            "00000000-0000-0000-0000-000000001002",
+            "00000000-0000-0000-0000-000000001004"
+          ]
+        }
+      ]
+    },
+    "input" : {
+      "entries" : [
+        {
+          "at" : 812500006,
+          "id" : "00000000-0000-0000-0000-000000001001",
+          "kind" : {
+            "userMessage" : {
+              "_0" : "Fix it"
+            }
+          }
+        },
+        {
+          "at" : 812500012,
+          "id" : "00000000-0000-0000-0000-000000001002",
+          "kind" : {
+            "agentMessage" : {
+              "messageID" : "a",
+              "text" : "Looking."
+            }
+          }
+        },
+        {
+          "at" : 812500018,
+          "id" : "00000000-0000-0000-0000-000000001003",
+          "kind" : {
+            "agentMessage" : {
+              "messageID" : "e1",
+              "text" : "Error: RetriableError: [aborted] Client network socket disconnected"
+            }
+          }
+        },
+        {
+          "at" : 812500024,
+          "id" : "00000000-0000-0000-0000-000000001004",
+          "kind" : {
+            "toolCall" : {
+              "_0" : {
+                "content" : [
+
+                ],
+                "kind" : "execute",
+                "locations" : [
+
+                ],
+                "title" : "ls",
+                "toolCallID" : "t1"
+              }
+            }
+          }
+        },
+        {
+          "at" : 812500030,
+          "id" : "00000000-0000-0000-0000-000000001005",
+          "kind" : {
+            "agentMessage" : {
+              "messageID" : "b",
+              "text" : "Half way.\nError: RetriableError: [unavailable] getaddrinfo ENOTFOUND api2.cursor.sh\n"
+            }
+          }
+        },
+        {
+          "at" : 812500036,
+          "id" : "00000000-0000-0000-0000-000000001006",
+          "kind" : {
+            "agentMessage" : {
+              "messageID" : "b",
+              "text" : "\nAll done."
+            }
+          }
+        },
+        {
+          "at" : 812500540,
+          "id" : "00000000-0000-0000-0000-000000001090",
+          "kind" : {
+            "stateChanged" : {
+              "_0" : "finished",
+              "reason" : "endTurn"
+            }
+          }
+        }
+      ],
+      "isLive" : false
+    },
+    "name" : "retried errors the agent got past (#394)"
+  },
+  {
+    "expected" : {
+      "items" : [
+        {
+          "entry" : "00000000-0000-0000-0000-000000001001",
+          "kind" : "userMessage",
+          "text" : "Fix it"
+        },
+        {
+          "entry" : "00000000-0000-0000-0000-000000001002",
+          "kind" : "agentMessage",
+          "text" : "Error: RetriableError: [unavailable] getaddrinfo ENOTFOUND api2.cursor.sh"
+        },
+        {
+          "entry" : "00000000-0000-0000-0000-000000001003",
+          "kind" : "userMessage",
+          "text" : "Try again"
+        },
+        {
+          "entry" : "00000000-0000-0000-0000-000000001004",
+          "kind" : "agentMessage",
+          "text" : "Error: RetriableError: [aborted] socket"
+        }
+      ],
+      "omittingThoughts" : [
+        "00000000-0000-0000-0000-000000001001",
+        "00000000-0000-0000-0000-000000001002",
+        "00000000-0000-0000-0000-000000001003",
+        "00000000-0000-0000-0000-000000001004"
+      ],
+      "turns" : [
+        {
+          "ask" : "00000000-0000-0000-0000-000000001001",
+          "id" : "00000000-0000-0000-0000-000000001001",
+          "live" : null,
+          "outcome" : [
+            "00000000-0000-0000-0000-000000001002"
+          ],
+          "stepCount" : 0,
+          "steps" : [
+
+          ]
+        },
+        {
+          "ask" : "00000000-0000-0000-0000-000000001003",
+          "id" : "00000000-0000-0000-0000-000000001003",
+          "live" : null,
+          "outcome" : [
+            "00000000-0000-0000-0000-000000001004"
+          ],
+          "stepCount" : 0,
+          "steps" : [
+
+          ]
+        }
+      ]
+    },
+    "input" : {
+      "entries" : [
+        {
+          "at" : 812500006,
+          "id" : "00000000-0000-0000-0000-000000001001",
+          "kind" : {
+            "userMessage" : {
+              "_0" : "Fix it"
+            }
+          }
+        },
+        {
+          "at" : 812500012,
+          "id" : "00000000-0000-0000-0000-000000001002",
+          "kind" : {
+            "agentMessage" : {
+              "messageID" : "a",
+              "text" : "Error: RetriableError: [unavailable] getaddrinfo ENOTFOUND api2.cursor.sh"
+            }
+          }
+        },
+        {
+          "at" : 812500540,
+          "id" : "00000000-0000-0000-0000-000000001090",
+          "kind" : {
+            "stateChanged" : {
+              "_0" : "finished",
+              "reason" : "endTurn"
+            }
+          }
+        },
+        {
+          "at" : 812500546,
+          "id" : "00000000-0000-0000-0000-000000001091",
+          "kind" : {
+            "usageRecorded" : {
+              "_0" : {
+                "inputTokens" : 6,
+                "outputTokens" : 4,
+                "totalTokens" : 10
+              }
+            }
+          }
+        },
+        {
+          "at" : 812500018,
+          "id" : "00000000-0000-0000-0000-000000001003",
+          "kind" : {
+            "userMessage" : {
+              "_0" : "Try again"
+            }
+          }
+        },
+        {
+          "at" : 812500024,
+          "id" : "00000000-0000-0000-0000-000000001004",
+          "kind" : {
+            "agentMessage" : {
+              "messageID" : "b",
+              "text" : "Error: RetriableError: [aborted] socket"
+            }
+          }
+        }
+      ],
+      "isLive" : true
+    },
+    "name" : "a retried error the turn ended on stays (#394)"
   }
 ]
