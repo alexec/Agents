@@ -2,7 +2,7 @@
 // view, over plain JSON-RPC on http at 127.0.0.1. The contract is
 // specs/383-mcp-integrations/contracts/ci-watcher-server.md.
 //
-//   node server.ts [--port 8791]          gh as the signed-in person
+//   node server.ts [--port 8795]          gh as the signed-in person
 //   CI_WATCHER_FAKE=<file> node server.ts reads and writes <file> instead
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
@@ -388,9 +388,9 @@ function fakePath(): string | undefined {
 
 if (import.meta.main) {
   const i = process.argv.indexOf("--port");
-  const port = i > 0 ? Number(process.argv[i + 1]) : 8791;
+  const port = i > 0 ? Number(process.argv[i + 1]) : 8795;
   if (!Number.isInteger(port) || port < 0 || port > 65535) {
-    console.error("usage: node server.ts [--port 8791]");
+    console.error("usage: node server.ts [--port 8795]");
     process.exit(2);
   }
   const fake = fakePath();

@@ -242,7 +242,7 @@ an error in the file (FR-002), and that subscription is not polled.
 - TypeScript, run directly by Node 26 (`node server.ts`, with built-in type stripping) with no
   dependencies and no build step.
 - Plain JSON-RPC over http (`POST /mcp`, JSON answers, `Mcp-Session-Id`), on
-  `127.0.0.1:8791`.
+  `127.0.0.1:8795`.
 - Started and kept running as a LaunchAgent `com.agents.ci-watcher` by `run.sh start`, and
   removed by `run.sh stop`.
 - It calls `gh api` as the person, so it holds no token.

@@ -37,7 +37,7 @@ So this feature is **one new event source** feeding that call, plus a server of 
 4. **Status** on the workflow's page. `WorkflowSummary` gains `mcpTriggers: [MCPTriggerStatus]`,
    which is drawn by `Shared/UI` (Mac and Remote) and `Web/src`.
 5. **The CI watcher**: a small TypeScript MCP server in `Integrations/ci-watcher/`, run on Node
-   with no build step. It serves http on `127.0.0.1:8791`, uses GitHub through `gh`, and has a
+   with no build step. It serves http on `127.0.0.1:8795`, uses GitHub through `gh`, and has a
    `ui://ci/board` view. The project gets `.agents/mcp.json` and a workflow that is turned off.
 
 ## Technical Context
@@ -140,7 +140,7 @@ Integrations/ci-watcher/                # new
 ├── run.sh           # start/stop as a LaunchAgent (com.agents.ci-watcher)
 └── README.md
 
-.agents/mcp.json                        # new: { "ci": { "type": "http", "url": "http://127.0.0.1:8791/mcp" } }
+.agents/mcp.json                        # new: { "ci": { "type": "http", "url": "http://127.0.0.1:8795/mcp" } }
 .agents/workflows/fix-failed-checks.md  # new, enabled: false
 
 docs/reference/workflows.md, docs/reference/events.md,

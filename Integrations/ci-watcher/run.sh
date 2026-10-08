@@ -2,7 +2,7 @@
 # The CI watcher as a LaunchAgent (#383), so it keeps running and comes back after a login.
 #
 #   run.sh start    write ~/Library/LaunchAgents/com.agents.ci-watcher.plist and load it:
-#                   node <here>/server.ts --port 8791, logging to ~/Library/Logs/ci-watcher.log
+#                   node <here>/server.ts --port 8795, logging to ~/Library/Logs/ci-watcher.log
 #   run.sh stop     unload it and delete the plist
 #   run.sh status   whether launchd has it, and what /health says
 #   run.sh plist    print the plist start would write, and change nothing
@@ -14,7 +14,7 @@ here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 label=com.agents.ci-watcher
 plist="$HOME/Library/LaunchAgents/$label.plist"
 log="$HOME/Library/Logs/ci-watcher.log"
-port=8791
+port=8795
 domain="gui/$(id -u)"
 
 need() {

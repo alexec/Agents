@@ -27,7 +27,7 @@ in the project's `.agents/mcp.json` as `ci`, and the **Fix failed checks** workf
 ## Running it
 
 ```sh
-node Integrations/ci-watcher/server.ts --port 8791    # in the foreground
+node Integrations/ci-watcher/server.ts --port 8795    # in the foreground
 Integrations/ci-watcher/run.sh start                  # as a LaunchAgent, com.agents.ci-watcher
 Integrations/ci-watcher/run.sh status
 Integrations/ci-watcher/run.sh stop                   # unloads and deletes the LaunchAgent
@@ -37,14 +37,15 @@ Integrations/ci-watcher/run.sh plist                  # prints the LaunchAgent, 
 The LaunchAgent runs `server.ts` from the folder `run.sh` is in, so start it from the
 project's main checkout, not from a worktree that will be removed.
 
-It listens on `127.0.0.1` only, at `POST /mcp` (JSON-RPC, JSON answers), with
+Port 8795 because Agents Host holds 8791 (the control plane) and 8792 (the web page), and
+the phone bridge 8790. It listens on `127.0.0.1` only, at `POST /mcp` (JSON-RPC, JSON answers), with
 `GET /health`. It refuses any `Origin` other than none or `http://127.0.0.1:*`. `--port 0`
 picks a free port and prints it. The LaunchAgent logs to `~/Library/Logs/ci-watcher.log`.
 
 ## The fake mode
 
 ```sh
-CI_WATCHER_FAKE=fixtures/ci.json node Integrations/ci-watcher/server.ts --port 8792
+CI_WATCHER_FAKE=fixtures/ci.json node Integrations/ci-watcher/server.ts --port 8796
 ```
 
 With `CI_WATCHER_FAKE` set, nothing calls `gh` or GitHub: pull requests, runs and job logs
