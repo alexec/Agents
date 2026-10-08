@@ -18,6 +18,9 @@ public final class ShellClient {
     public let agentID: UUID
     /// Which of the agent's shells. Zero is the one every agent has.
     public let shell: Int
+    /// The project folder, when this is a project's own shell rather than an agent's
+    /// (#418). `agentID` is then `ProjectShell.id(for:)` it.
+    public let project: URL?
     public private(set) var state: ShellState = .live
     public private(set) var isAttached = false
     public private(set) var problem: String?
@@ -84,10 +87,11 @@ public final class ShellClient {
     /// alternate screen).
     static let reset = Data("\u{1B}c".utf8)
 
-    public init(agentID: UUID, shell: Int = 0, client: DaemonClient,
+    public init(agentID: UUID, shell: Int = 0, project: URL? = nil, client: DaemonClient,
                 describe: @escaping @MainActor (any Error) -> String) {
         self.agentID = agentID
         self.shell = shell
+        self.project = project
         self.client = client
         self.describe = describe
     }
@@ -104,7 +108,8 @@ public final class ShellClient {
                 DaemonAPI.ShellAttachRequest(agentID: agentID, shell: shell,
                                              rows: rows > 0 ? rows : 24, cols: cols > 0 ? cols : 80,
                                              since: onOutput == nil ? nil : seen,
-                                             startedAt: onOutput == nil || seen == nil ? nil : startedAt),
+                                             startedAt: onOutput == nil || seen == nil ? nil : startedAt,
+                                             folder: project),
                 returning: DaemonAPI.ShellAttachResponse.self)
             state = response.state
             dropped = response.dropped
@@ -236,7 +241,8 @@ public final class ShellClient {
         do {
             let response = try await client.call(
                 DaemonAPI.Method.shellRestart,
-                DaemonAPI.ShellAttachRequest(agentID: agentID, shell: shell, rows: rows, cols: cols),
+                DaemonAPI.ShellAttachRequest(agentID: agentID, shell: shell, rows: rows, cols: cols,
+                                             folder: project),
                 returning: DaemonAPI.ShellAttachResponse.self)
             if startedAt != response.startedAt { beginAgain() }
             startedAt = response.startedAt

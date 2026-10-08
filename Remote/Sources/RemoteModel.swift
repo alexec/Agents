@@ -139,6 +139,21 @@ final class RemoteModel {
         return fresh
     }
 
+    /// The project's own shell (#418), on the project's host: the one Control-` opens
+    /// on the Mac, in the project's folder whichever agent is open.
+    func projectShellClient(for folder: URL) -> ShellClient {
+        let id = ProjectShell.id(for: folder)
+        let key = ShellKey(agentID: id, shell: 0)
+        if let existing = shells[key] { return existing }
+        let host = work.projects.first { $0.folder == folder }?.host ?? .mac
+        let target = host == .mac ? client : otherHosts[host] ?? client
+        let fresh = ShellClient(agentID: id, project: folder, client: target, describe: { error in
+            (error as? JSONRPCError)?.message ?? "Your Mac is not answering."
+        })
+        shells[key] = fresh
+        return fresh
+    }
+
     /// The shells the Mac holds for an agent, so the pane opens with the tabs the window
     /// has (055). Nil from a daemon too old to hold more than one, and the pane then
     /// offers only the one.

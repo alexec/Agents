@@ -71,6 +71,8 @@ struct RemoteView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     /// Which column a phone shows: the detail whenever something is picked.
     @State private var compactColumn = NavigationSplitViewColumn.sidebar
+    /// The project's own shell is up (#418).
+    @State private var showsProjectTerminal = false
 
     /// What is open over the project, in the order each was opened from the one before:
     /// a pinned page, a workflow, a conversation. The first is the detail's own page, the
@@ -130,6 +132,12 @@ struct RemoteView: View {
         .task(id: model.selectedProject) {
             if let folder = model.selectedProject { await model.loadLabelVocabulary(in: folder) }
         }
+        .sheet(isPresented: $showsProjectTerminal) {
+            if let folder = model.selectedProject {
+                ProjectTerminalSheet(folder: folder)
+                    .environment(model)
+            }
+        }
         // A server asked for a key on a send, with no start page to ask over (#344).
         .tokenAskSheet(model, shown: model.startingIn == nil)
         // Where this device is, told to the Mac on every change (021).
@@ -168,8 +176,26 @@ struct RemoteView: View {
         }
     }
 
-    @ViewBuilder
+    /// A page of the project, with the way to the project's own shell (#418) on it:
+    /// Control-` from an iPad's keyboard, as on the Mac.
     private func page(_ route: RemoteRoute) -> some View {
+        pageContent(route)
+            .toolbar {
+                if model.selectedProject != nil {
+                    ToolbarItem(placement: .secondaryAction) {
+                        Button {
+                            showsProjectTerminal = true
+                        } label: {
+                            Label("Project Terminal", systemImage: "apple.terminal")
+                        }
+                        .keyboardShortcut("`", modifiers: .control)
+                    }
+                }
+            }
+    }
+
+    @ViewBuilder
+    private func pageContent(_ route: RemoteRoute) -> some View {
         switch route {
         case .agent(let id):
             // Retired (051): nothing left to chat with, only who it was.

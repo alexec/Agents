@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac, iphone, ipad]
-description: Open shells in an agent's folder from the Terminal pane, one per tab, and keep them running.
+description: Open shells in an agent's folder from the Terminal pane, one per tab, or in the project folder with Control-`, and keep them running.
 ---
 
 # Use a shell in an agent's folder
@@ -38,8 +38,24 @@ is in** the old folder, and **Type cd there** types the `cd` to the new one for 
 Open **Terminal** from the conversation. It shows the agent's first shell, **Shell 1**,
 and has no tabs.
 
+## A shell in the project folder
+
+Press Control-` (**View ▸ Project Terminal**) to open a shell in the selected project's
+own folder, on the project's Mac or server, under whatever page is open. It needs no
+agent: it opens with none chosen, and choosing an agent in the project leaves it where it
+is, in the project folder, not the agent's worktree. Another project shows that project's
+shell.
+
+Press Control-` again, or click the down arrow, to hide it; it keeps running. Click its
+**×** to end it. Drag its top edge to make it taller.
+
+On iPhone and iPad, choose **Project Terminal** from a project page's **…** menu, or
+press Control-` on an iPad keyboard. **Done** puts it away; **End Shell** ends it.
+
 ## If it doesn't work
 
+- **The project shell says There is no such agent.** The project is on a server with an
+  older version of Agents. The server updates when nothing is mid-turn there.
 - **The shell is no longer running.** It exited, for example after `exit`. Click **New
   shell** to open another.
 - **+ is greyed out.** On a server with an older version of Agents, which holds one shell

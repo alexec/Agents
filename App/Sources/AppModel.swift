@@ -710,6 +710,10 @@ final class AppModel {
     @ObservationIgnored private var parkedShells: [ShellKey] = []
     private static let parkedShellLimit = 6
 
+    /// The host of each project shell this window has made (#418): it has no agent to
+    /// say which.
+    @ObservationIgnored private var projectShellHosts: [UUID: HostID] = [:]
+
     struct ShellKey: Hashable {
         var agentID: UUID
         var shell: Int
@@ -3571,9 +3575,22 @@ final class AppModel {
         return fresh
     }
 
+    /// The project's own shell (#418), on the project's host, made once per project per
+    /// window and held by the same count as an agent's.
+    func acquireProjectShell(_ project: ProjectKey) -> ShellClient {
+        let id = ProjectShell.id(for: project.folder)
+        let key = ShellKey(agentID: id, shell: 0)
+        projectShellHosts[id] = project.host
+        if shellClients[key] == nil {
+            shellClients[key] = ShellClient(agentID: id, project: project.folder, client: client(for: project.host),
+                                            describe: { [weak self] error in self?.describeForShell(error) ?? "\(error)" })
+        }
+        return acquireShell(for: id, shell: 0)
+    }
+
     /// This window's ends of the shells one host holds.
     private func shellClients(on host: HostID) -> [ShellClient] {
-        shellClients.values.filter { self.host(ofAgent: $0.agentID) == host }
+        shellClients.values.filter { (projectShellHosts[$0.agentID] ?? self.host(ofAgent: $0.agentID)) == host }
     }
 
     /// A server's new connection knows none of this window's screens: they attach

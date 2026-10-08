@@ -8,6 +8,8 @@ struct ContentView: View {
     /// scene's content: see the note in `AgentsApp`.
     let requests: WindowRequests
     let frame: SidebarFrame
+    /// The project's own shell under the page (#418).
+    let terminal: ProjectTerminalFrame
     @State private var sidebarStates = SidebarStates()
     @State private var webHolders = WebHolders()
     /// Which columns are showing. The projects stay put: moving between them is the
@@ -128,6 +130,15 @@ struct ContentView: View {
         }
     }
 
+    /// The project whose shell is under the page, while Control-` has it open (#418):
+    /// the selected project, with an agent chosen or none, but not under the pages
+    /// about all the work, which are no project's.
+    private var projectForTerminal: DaemonAPI.ProjectSummary? {
+        guard terminal.isOpen, !model.showsEvents, !model.showsResources, !model.showsRuntimes,
+              !model.showsSpending, let project = model.selectedProjectSummary, project.exists else { return nil }
+        return project
+    }
+
     /// The detail's toolbar: what a project and its sessions are done with, in reach
     /// whichever of its pages is open (#97).
     @ToolbarContentBuilder
@@ -170,7 +181,13 @@ struct ContentView: View {
                     projects
                 } detail: {
                     GeometryReader { pane in
-                        detail(inPaneOf: pane.size.width)
+                        VStack(spacing: 0) {
+                            detail(inPaneOf: pane.size.width)
+                                .frame(maxHeight: .infinity)
+                            if let project = projectForTerminal {
+                                ProjectTerminalPanel(project: project, pageHeight: pane.size.height)
+                            }
+                        }
                     }
                     // The chat and the inspector share this column, not the window, so
                     // this is the width the inspector measures itself against.
@@ -183,6 +200,7 @@ struct ContentView: View {
         }
         }
         .environment(frame)
+        .environment(terminal)
         .environment(requests)
         .environment(sidebarStates)
         .environment(webHolders)
