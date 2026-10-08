@@ -109,6 +109,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   const runningCalls = (allBackground ?? []).filter(isRunning).map((item) => item.toolCallID ?? "").join(" ");
   const background = useMemo(() => (allBackground ?? []).filter(isRunning), [runningCalls]);
   const live = agent ? isWorking(agent.state) : false;
+  const failure = store.transcriptLoadFailure.value;
 
   // What an open call's links do here (the window's ChatActions): a file it touched opens in the
   // Files pane at the line it named, as the Remote's does, and an edit opens under Changes.
@@ -460,6 +461,13 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       <ViewLayerContext.Provider value={viewHosting}>
       <div class="scroll transcript" ref={scroller} onScroll={onScroll} style={hidden.value ? { visibility: "hidden" } : undefined}>
         <div class="view-layer" ref={(el) => { layer.element = el; }} />
+        {failure && (
+          // The history, or its earlier turns, did not load: said, with the way to ask again (#400).
+          <p class="load-failure" role="status">
+            <span>{failure.nothingLoaded ? "This chat's history did not load: " : "The earlier turns did not load: "}{failure.reason}</span>
+            <button class="link" onClick={() => { void store.reloadTranscript(); }}>Try Again</button>
+          </p>
+        )}
         {store.hasMoreOfTheConversation && <p class="more" aria-label="Loading earlier"><span class="spinner" /></p>}
         {rows.map((turn, index) => (
           <TurnView key={turn.id} turn={turn} detail={chosen.value[turn.id] ?? level.value}

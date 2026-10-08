@@ -77,6 +77,10 @@ public struct WorkflowState: Codable, Hashable, Sendable {
     /// SHA-256 of the file as the person last approved it. Kept here, outside the
     /// project, because the file itself is something an agent can write.
     public var approvedDigest: String?
+    /// SHA-256 of the file as the person denied it on this host (#391): not here, but
+    /// not archived everywhere either. Kept beside the approval and for the same reason;
+    /// a later version of the file waits for an OK again.
+    public var deniedDigest: String?
     /// The trigger its cooldown is holding (#103): the latest to arrive while it was
     /// cooling down or running, replaced by each one after it, and run once when the
     /// cooldown ends. Kept here so a restart in between still runs it.
@@ -106,7 +110,7 @@ public struct WorkflowState: Codable, Hashable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case folder, workflowID, offBy, offDigest, standingAgentID, lastFiredAt, lastFiredBy
-        case lastOutcome, lastCausingEvent, approvedDigest, heldFire, goneSince
+        case lastOutcome, lastCausingEvent, approvedDigest, deniedDigest, heldFire, goneSince
         // Before #125.
         case isArchived, isDisabled, disabledByAgent, enabledChosen, writtenOffByAgent
     }
@@ -135,6 +139,7 @@ public struct WorkflowState: Codable, Hashable, Sendable {
         lastOutcome = (try? c.decodeIfPresent(WorkflowOutcome.self, forKey: .lastOutcome)) ?? nil
         lastCausingEvent = try c.decodeIfPresent(EventPosition.self, forKey: .lastCausingEvent)
         approvedDigest = try c.decodeIfPresent(String.self, forKey: .approvedDigest)
+        deniedDigest = try c.decodeIfPresent(String.self, forKey: .deniedDigest)
         heldFire = try? c.decodeIfPresent(HeldWorkflowFire.self, forKey: .heldFire)
         goneSince = try? c.decodeIfPresent(Date.self, forKey: .goneSince)
     }
@@ -160,6 +165,7 @@ public struct WorkflowState: Codable, Hashable, Sendable {
         try c.encodeIfPresent(lastOutcome, forKey: .lastOutcome)
         try c.encodeIfPresent(lastCausingEvent, forKey: .lastCausingEvent)
         try c.encodeIfPresent(approvedDigest, forKey: .approvedDigest)
+        try c.encodeIfPresent(deniedDigest, forKey: .deniedDigest)
         try c.encodeIfPresent(heldFire, forKey: .heldFire)
         try c.encodeIfPresent(goneSince, forKey: .goneSince)
     }

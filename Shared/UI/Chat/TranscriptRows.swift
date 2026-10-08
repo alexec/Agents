@@ -41,6 +41,8 @@ struct TurnView: View, Equatable {
     let detail: TurnDetail
     /// A stored turn's own entries, once fetched.
     let fetched: [TranscriptItem]?
+    /// They were asked for and did not come (#400).
+    var fetchFailed = false
     /// Whether this is the turn still going.
     let isLive: Bool
     let toggle: () -> Void
@@ -48,7 +50,8 @@ struct TurnView: View, Equatable {
     let fetch: () async -> Void
 
     nonisolated static func == (a: TurnView, b: TurnView) -> Bool {
-        a.turn == b.turn && a.detail == b.detail && a.fetched == b.fetched && a.isLive == b.isLive
+        a.turn == b.turn && a.detail == b.detail && a.fetched == b.fetched && a.fetchFailed == b.fetchFailed
+            && a.isLive == b.isLive
     }
 
     var body: some View {
@@ -73,7 +76,13 @@ struct TurnView: View, Equatable {
                 StepsControl(count: stepCount, isOpen: detail.showsSteps, toggle: toggle)
             }
             if detail.showsSteps, stepCount != 0 {
-                if waiting {
+                if waiting, fetchFailed {
+                    HStack(spacing: 8) {
+                        Text("These steps did not load.").foregroundStyle(.secondary)
+                        Button("Try Again") { Task { await fetch() } }
+                    }
+                    .appText(.fine)
+                } else if waiting {
                     ProgressView().controlSize(.small)
                 } else {
                     // In the turn's own margin: no rule and no indent (#148).

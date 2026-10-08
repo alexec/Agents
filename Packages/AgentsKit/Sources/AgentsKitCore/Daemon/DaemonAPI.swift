@@ -219,6 +219,9 @@ public enum DaemonAPI {
         public static let workflowsEnable = "workflows/enable"
         /// Approve a workflow file as the person was shown it (security review).
         public static let workflowsApprove = "workflows/approve"
+        /// Deny one on this host only (#391): it does not run here, and the file is not
+        /// touched, so other hosts still see it waiting. Takes a `WorkflowApproveRequest`.
+        public static let workflowsDeny = "workflows/deny"
         /// A project's plugins and which are waiting for the person's OK (security review, S2).
         public static let pluginsList = "plugins/list"
         public static let pluginsApprove = "plugins/approve"
@@ -226,6 +229,8 @@ public enum DaemonAPI {
         /// is the writer for the reason it writes every other workflow change: a second
         /// window — or a phone — must not become a second author of the same file.
         public static let workflowsSettings = "workflows/settings"
+        /// Clear a server's event trigger's "events may have been missed" (#383).
+        public static let workflowsClearMCPMissed = "workflows/mcpTrigger/clearMissed"
         /// What the MCP helper relays when an agent calls the workflow tool.
         public static let agentsManageWorkflows = "agents/manageWorkflows"
         /// What the MCP helper relays when an agent calls `start_agent`,
@@ -2238,6 +2243,21 @@ public enum DaemonAPI {
         }
     }
 
+    /// Clear the missed-events mark on one line under a server's event trigger (#383):
+    /// the event's name and the server whose line it is.
+    public struct WorkflowMCPClearMissedRequest: Codable, Sendable {
+        public var folder: URL
+        public var workflowID: String
+        public var name: String
+        public var server: String?
+        public init(folder: URL, workflowID: String, name: String, server: String?) {
+            self.folder = folder
+            self.workflowID = workflowID
+            self.name = name
+            self.server = server
+        }
+    }
+
     /// A project's plugins.
     public struct PluginsListRequest: Codable, Sendable {
         public var folder: URL
@@ -2265,7 +2285,7 @@ public enum DaemonAPI {
     }
 
     /// Approve a workflow's file: `digest` is the one the row carried, so only the file
-    /// the person was shown is approved.
+    /// the person was shown is approved. Deny (#391) sends the same, for the same reason.
     public struct WorkflowApproveRequest: Codable, Sendable {
         public var folder: URL
         public var workflowID: String

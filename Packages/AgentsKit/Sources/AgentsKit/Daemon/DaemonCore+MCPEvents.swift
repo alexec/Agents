@@ -67,6 +67,9 @@ struct MCPEventsState {
     var missedToTell: Set<String> = []
     /// Servers whose badly named events were logged on this connection.
     var loggedBadNames: Set<MCPClientPool.Key> = []
+    /// When each subscription's line was last told to the windows, so "Checked 20 s ago"
+    /// is put right at most once a minute rather than on every poll.
+    var announced: [String: Date] = [:]
     var reconciling = false
     var reconcileAgain = false
     var ticker: Task<Void, Never>?
@@ -308,7 +311,14 @@ extension DaemonCore {
         await mcpEvents.clients.keep(only: Set(mcpEvents.subscriptions.values.map(\.pool)))
         // Records no workflow has named for a day go (a changed filter, a deleted workflow).
         var records = mcpRecords()
-        if records.prune(keeping: Set(mcpEvents.subscriptions.keys), now: at) {
+        var expired = false
+        for (id, record) in records.subscriptions {
+            if let since = record.missedSince, at.timeIntervalSince(since) > MCPSubscriptionRecord.missedFor {
+                records.subscriptions[id]?.missedSince = nil
+                expired = true
+            }
+        }
+        if records.prune(keeping: Set(mcpEvents.subscriptions.keys), now: at) || expired {
             mcpEvents.records = records
             saveMCPRecords()
         } else {
@@ -613,7 +623,9 @@ extension DaemonCore {
         mcpEvents.records = records
         saveMCPRecords()
         guard !fresh.isEmpty else {
-            if result.truncated { announceMCPSubscription(id) }
+            if result.truncated || at.timeIntervalSince(mcpEvents.announced[id] ?? .distantPast) >= 60 {
+                announceMCPSubscription(id)
+            }
             return
         }
         for event in fresh {
@@ -709,10 +721,34 @@ extension DaemonCore {
         keepQuietly("where each server's events have got to") { try mcpEventStore.save(records) }
     }
 
+    // MARK: Clear
+
+    /// The page's Clear on a line's missed events (#383, T036): granted as any change to
+    /// a workflow is.
+    func clearMCPMissed(_ request: DaemonAPI.WorkflowMCPClearMissedRequest) throws -> WorkflowSummary {
+        guard let workflow = workflow(request.workflowID, in: request.folder) else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchWorkflow,
+                               message: "There is no workflow called \(request.workflowID) in this project.")
+        }
+        let ids = (mcpEvents.lines[workflow.id] ?? [])
+            .filter { $0.event == request.name && $0.server == request.server }.compactMap(\.subscription)
+        var records = mcpRecords()
+        for id in ids where records.subscriptions[id]?.missedSince != nil {
+            records.subscriptions[id]?.missedSince = nil
+            mcpEvents.missedToTell.remove(id)
+        }
+        mcpEvents.records = records
+        saveMCPRecords()
+        DaemonLog.shared.write("mcp events: \(request.server ?? "no server") \(request.name) missed events cleared, by the person")
+        for id in ids { announceMCPSubscription(id) }
+        return summary(for: workflow)
+    }
+
     // MARK: Telling the windows
 
     private func announceMCPSubscription(_ id: String) {
         guard let subscription = mcpEvents.subscriptions[id] else { return }
+        mcpEvents.announced[id] = now()
         for workflowID in subscription.workflows {
             if let workflow = workflows[subscription.project]?[workflowID] { announceWorkflow(workflow) }
         }

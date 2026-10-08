@@ -165,6 +165,8 @@ struct PromptBar: View {
                 .lineLimit(1...8)
                 .focused($focused)
                 .onChange(of: focused) { _, now in model.isTyping = now }
+                // ⌘V of a picture from an iPad's keyboard attaches it (#396).
+                .modifier(PastesPictures(attachments: $attachments, refusal: $attachRefusal))
                 .accessibilityLabel("What to say to \(agent.title ?? "this agent")")
                 // The Mac's keys, from an iPad's keyboard. SwiftUI hands these over from
                 // a hardware keyboard only, so the on-screen one is left as iOS has it:

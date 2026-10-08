@@ -138,11 +138,17 @@ public extension DaemonAPI {
                 // Approve, and Archive or Bring Back, on the workflow page (#142), as the window's has them.
                 Row(Method.workflowsApprove, params: WorkflowApproveRequest.self, result: WorkflowSummary.self,
                     kind: .hostRequest),
+                // Deny on this host (#391), beside Approve.
+                Row(Method.workflowsDeny, params: WorkflowApproveRequest.self, result: WorkflowSummary.self,
+                    kind: .hostRequest),
                 Row(Method.workflowsArchive, params: WorkflowArchiveRequest.self, result: WorkflowSummary.self,
                     kind: .hostRequest),
                 // Its settings, labels and cooldown on the page (#162), each control its one key.
                 Row(Method.workflowsSettings, params: WorkflowSettingsRequest.self, result: WorkflowSummary.self,
                     kind: .hostRequest),
+                // Clear on a server's event trigger's missed-events line (#383).
+                Row(Method.workflowsClearMCPMissed, params: WorkflowMCPClearMissedRequest.self,
+                    result: WorkflowSummary.self, kind: .hostRequest),
                 // New project (#115): Add Folder…, browsing the host's folders, and Clone Git URL…,
                 // as the window's projects column has them.
                 Row(Method.filesBrowse, params: FilesBrowseRequest.self, result: DirectoryListing.self, kind: .hostRequest),

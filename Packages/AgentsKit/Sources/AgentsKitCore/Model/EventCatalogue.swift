@@ -243,6 +243,7 @@ public enum EventCatalogue {
         ("day_limit_reached", WorkflowRefusal.dayLimitReached.message),
         ("setting_refused", "a setting it names cannot be had"),
         ("awaiting_approval", WorkflowRefusal.awaitingApproval.message),
+        ("denied_here", WorkflowRefusal.deniedHere.message),
     ]
 
     /// `workflow.refused`'s `reason` (073 FR-010). The messages that vary map by their

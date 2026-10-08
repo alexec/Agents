@@ -126,6 +126,23 @@ test("a waiting workflow past the three says why, with no Approve (#132)", () =>
   assert.equal(w.waitsItsTurn({ ...summary, overLimit: undefined }), false);
 });
 
+test("a workflow denied on this host stays listed, runs nothing here, and can be approved back (#391)", () => {
+  const summary = { workflow: { workflowID: "d", triggers: [schedule], mode: "new", prompt: "", settings: {}, unknownFields: {} },
+    isArchived: false, isEnabled: true, isRunning: false, nextFireAtByTrigger: [],
+    deniedHere: { digest: "x", isNew: true } };
+  assert.equal(w.workflowStatus(summary).words, "Denied on this host");
+  assert.equal(w.workflowNeedsAPerson(summary), false);
+  assert.equal(w.isUnapproved(summary), true);
+  assert.equal(w.canBeApproved(summary), true);
+  assert.equal(w.canBeDenied(summary), false);
+  assert.equal(w.happening(summary), "Denied on this host — it does not run here");
+  assert.equal(w.nextLine(summary, 0), "No next time until you approve it");
+  const waiting = { ...summary, deniedHere: undefined, awaitingApproval: { digest: "x", isNew: true }, overLimit: "project" };
+  assert.equal(w.canBeDenied(waiting), true, "even one waiting its turn can be denied");
+  assert.equal(w.canBeApproved(waiting), false);
+  assert.equal(w.refusalMessage({ deniedHere: {} }), "it is denied on this host");
+});
+
 // Finer matching (073): filters in words, lists included, held to EventPatternFinerTests.swift's
 // summaries, with the page using catalogue meanings as the Mac does.
 test("an event trigger's filters are said in the Mac's words, lists included", () => {
@@ -159,4 +176,31 @@ test("a list is a capsule joined by | and a cause joined by |", () => {
 test("the page says the switch is a line in the workflow's file, in the window's words (#125)", () => {
   assert.equal(w.switchesSentence({ workflow: { workflowID: "nightly" } }),
     "Enabled and Archive are saved in .agents/workflows/nightly.md, a file in this project you may commit");
+});
+
+const dates = await load("src/protocol/dates.ts");
+const at = (text) => dates.toWireDate(new Date(text));
+
+test("a server's event trigger's lines say what the Mac's say (#383)", () => {
+  const now = new Date("2026-10-06T12:05:30Z");
+  assert.equal(w.mcpTriggerWords({ name: "checks.failed", server: "ci", state: "active",
+    lastPolledAt: at("2026-10-06T12:05:10Z"), lastEventAt: at("2026-10-06T11:40:30Z") }, now).text,
+    "ci · checks.failed: Checked 20 s ago · last event 25 min ago");
+  assert.equal(w.mcpTriggerWords({ name: "checks.failed", server: "ci", state: "active",
+    lastPolledAt: at("2026-10-06T12:05:10Z") }, now).text, "ci · checks.failed: Checked 20 s ago · no events yet");
+  assert.equal(w.mcpTriggerWords({ name: "checks.failed", server: "ci", state: "pending" }, now).text,
+    "ci · checks.failed: Connecting to ci…");
+  const retrying = w.mcpTriggerWords({ name: "checks.failed", server: "ci", state: "retrying", retryAt: at("2026-10-06T12:06:10Z"),
+    failure: { code: "unreachable", message: "Can't reach ci: no", since: at("2026-10-06T12:01:00Z") } }, now);
+  assert.match(retrying.text, /^ci · checks\.failed: Can't reach ci since .+ · trying again in 40 s$/);
+  assert.equal(retrying.tint, "attention");
+  const stopped = w.mcpTriggerWords({ name: "brnch.moved", state: "stopped",
+    failure: { code: "serverNotFound", message: "No server here offers brnch.moved.", since: at("2026-10-06T12:01:00Z") } }, now);
+  assert.deepEqual(stopped, { text: "brnch.moved: No server here offers brnch.moved.", tint: "failure" });
+  assert.match(w.mcpMissedWords({ name: "x.y", state: "active", missedSince: at("2026-10-06T09:14:00Z") }), /^Events may have been missed since /);
+  assert.equal(w.mcpMissedWords({ name: "x.y", state: "active" }), null);
+  const [{ input }] = cases("workflows/summaries.json");
+  const lines = w.workflowStatusLines({ ...input, mcpTriggers: [{ name: "checks.failed", server: "b", state: "stopped",
+    failure: { code: "badArguments", message: "b's checks.failed takes project; not repo.", since: at("2026-10-06T12:01:00Z") } }] });
+  assert.ok(lines.some((line) => line.text === "b's checks.failed takes project; not repo." && line.tint === "failure"));
 });

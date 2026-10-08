@@ -13,7 +13,7 @@ import type {
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
-import { describe } from "./errors";
+import { describe, methodNotFound } from "./errors";
 import { log } from "../log";
 import { folderKey, projectFolder, projectView, type ProjectView } from "./groups";
 import { DisplayBuilder, keepingTurns, storedTurn, turns, type ChatTurn, type Item } from "./turns";
@@ -204,6 +204,13 @@ export class Work {
   readonly openTurnStart = signal(0);
   readonly firstEntryIndex = signal(0);
   readonly hasMoreBefore = signal(false);
+  /**
+   * Why the open chat's history did not load, or only its earlier turns (#400), until a page lands
+   * or the chat is left. Said in the chat with Try Again, where a failed load used to leave it blank.
+   */
+  readonly transcriptLoadFailure = signal<{ nothingLoaded: boolean; reason: string } | null>(null);
+  /** The latest load of the open chat: an older answer landing after a newer one is dropped (#400). */
+  protected transcriptLoads = 0;
 
   /** The last file an agent asked to be put in front of the person (`agent/showFile`). */
   readonly shownFile = signal<{ host: string; agentID: string; path: string; line?: number | undefined; at: number } | null>(null);
@@ -720,6 +727,7 @@ export class Work {
     batch(() => {
       this.firstEntryIndex.value = page.firstIndex;
       this.hasMoreBefore.value = page.firstIndex > this.openTurnStart.value;
+      this.transcriptLoadFailure.value = null;
       this.refold(entries);
     });
   }
@@ -738,6 +746,7 @@ export class Work {
   private clearTranscript(): void {
     // A chat chosen is a page on its way.
     this.heardSincePage = [];
+    this.transcriptLoadFailure.value = null;
     this.firstEntryIndex.value = 0;
     this.hasMoreBefore.value = false;
     this.turns.value = [];
@@ -1232,23 +1241,40 @@ export class Store extends Work {
   private async loadTranscript(host: string, session: string): Promise<void> {
     void this.loadWhole(host, session);
     this.heardSincePage ??= [];
+    const load = ++this.transcriptLoads;
     const agentID = session as never;
-    // The last 12, as the window opens a chat (#90); the rest come as the top is reached.
+    // The last 12, as the window opens a chat (#90); the rest come as the top is reached. A host
+    // too old to keep turns gives the lot; any other failure is said, and the chat still opens (#400).
+    const failed: { turns?: string; page?: string } = {};
     const turns = await this.link.call("agents/turns", { agentID, limit: openingTurns }, host)
-      .catch(() => ({ turns: [], firstTurn: 0, openStart: 0 }));
+      .catch((error: unknown) => {
+        if (!(error instanceof CallFailed && error.code === methodNotFound)) failed.turns = describe(error);
+        return { turns: [], firstTurn: 0, openStart: 0 };
+      });
     const page = await this.link.call("agents/transcript", { agentID, limit: 200, from: turns.openStart }, host)
-      .catch(() => null);
-    // A chat opened since is not this one.
+      .catch((error: unknown) => {
+        failed.page = describe(error);
+        log("call.failed", error instanceof CallFailed ? error.code : undefined);
+        return null;
+      });
+    // A chat opened since is not this one, and a newer load of this one has the say.
     const now = this.watching.value;
-    if (now?.host !== host || now.session !== session) return;
+    if (now?.host !== host || now.session !== session || load !== this.transcriptLoads) return;
     if (!page) {
-      this.heardSincePage = null;
+      this.transcriptLoadFailure.value = { nothingLoaded: true, reason: failed.page ?? "no answer." };
       return;
     }
     batch(() => {
       this.replaceTurns(turns);
       this.replaceTranscript(page);
+      if (failed.turns) this.transcriptLoadFailure.value = { nothingLoaded: false, reason: failed.turns };
     });
+  }
+
+  /** Ask again for the open chat's history, after it did not load (#400). */
+  async reloadTranscript(): Promise<void> {
+    const watching = this.watching.value;
+    if (watching) await this.loadTranscript(watching.host, watching.session);
   }
 
   /** An entry its host sent as a stub, read from among its neighbours (#203). */
@@ -1684,11 +1710,30 @@ export class Store extends Work {
     if (changed) this.placeWorkflow(changed, host);
   }
 
+  /** Clear a server's event trigger's missed-events mark (#383). */
+  async clearMCPMissed(host: string, summary: WorkflowSummary, name: string, server: string | undefined): Promise<void> {
+    const changed = await this.act("workflows/mcpTrigger/clearMissed",
+      { folder: summary.workflow.folder, workflowID: summary.workflow.workflowID, name,
+        ...(server !== undefined ? { server } : {}) }, host);
+    if (changed) this.placeWorkflow(changed, host);
+  }
+
   /** Approve (#142): the digest is what the page was showing, so a file changed since still waits. */
   async approveWorkflow(host: string, summary: WorkflowSummary): Promise<void> {
-    if (!summary.awaitingApproval) return;
-    const changed = await this.act("workflows/approve",
-      { folder: summary.workflow.folder, workflowID: summary.workflow.workflowID, digest: summary.awaitingApproval.digest }, host);
+    await this.answerWorkflow(host, summary, "workflows/approve");
+  }
+
+  /** Deny on this host only (#391): it does not run here, its file is untouched, and Approve takes it back. */
+  async denyWorkflow(host: string, summary: WorkflowSummary): Promise<void> {
+    await this.answerWorkflow(host, summary, "workflows/deny");
+  }
+
+  private async answerWorkflow(host: string, summary: WorkflowSummary,
+    method: "workflows/approve" | "workflows/deny"): Promise<void> {
+    const file = summary.awaitingApproval ?? summary.deniedHere;
+    if (!file) return;
+    const changed = await this.act(method,
+      { folder: summary.workflow.folder, workflowID: summary.workflow.workflowID, digest: file.digest }, host);
     if (changed) this.placeWorkflow(changed, host);
   }
 
