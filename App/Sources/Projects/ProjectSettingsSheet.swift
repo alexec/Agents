@@ -44,7 +44,12 @@ struct ProjectSettingsSheet: View {
     @Environment(AppModel.self) private var model
     @Binding var pane: ProjectSettingsPane?
 
+    /// The smallest it can be dragged to, and where it opens the first time (#439).
     static let size = CGSize(width: 760, height: 560)
+
+    /// The size it was last left at, so it opens as the person left it.
+    @AppStorage("projectSettingsWidth") private var width = Double(Self.size.width)
+    @AppStorage("projectSettingsHeight") private var height = Double(Self.size.height)
 
     private var summary: DaemonAPI.ProjectSummary? { model.selectedProjectSummary }
     private var folder: URL? { model.selectedProject }
@@ -78,7 +83,18 @@ struct ProjectSettingsSheet: View {
                 .padding(16)
             }
         }
-        .frame(width: Self.size.width, height: Self.size.height)
+        // Resizable: a range rather than a fixed size, so the sheet can be dragged big
+        // enough to show a whole pane, and the panes fill what it is given (#439).
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(minWidth: Self.size.width, idealWidth: max(width, Self.size.width),
+               maxWidth: .infinity,
+               minHeight: Self.size.height, idealHeight: max(height, Self.size.height),
+               maxHeight: .infinity)
+        .presentationSizing(.fitted)
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+            width = size.width
+            height = size.height
+        }
         // What the panes read: the worktrees are the prompt's list, asked for here in
         // case the sheet opened from a chat, where the prompt is somebody else's.
         .task(id: folder) {
