@@ -135,6 +135,10 @@ final class Dictation {
     /// be written over what has been typed since.
     private var run = 0
 
+    /// The words in the field still being heard, as character offsets, while dictation
+    /// is on. The field underlines them until they settle (#448).
+    var heardWords: Range<Int>? { isListening ? text.heardWords : nil }
+
     /// Whether the system has been asked yet. Used to put our own words in front of
     /// the system's alert the first time.
     var hasBeenAsked: Bool {
