@@ -109,7 +109,11 @@ public struct MCPEventStore: Sendable {
                        meaning: "every subscription to a server's events starts again from now")
     }
 
-    public func save(_ records: MCPEventRecords) throws {
-        try StoreFile.write(StoreCoding.encoder.encode(records), to: url)
+    /// Answers the bytes written.
+    @discardableResult
+    public func save(_ records: MCPEventRecords) throws -> Int {
+        let data = try StoreCoding.encoder.encode(records)
+        try StoreFile.write(data, to: url)
+        return data.count
     }
 }

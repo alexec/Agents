@@ -73,6 +73,9 @@ struct MCPEventsState {
     /// When each subscription's line was last told to the windows, so "Checked 20 s ago"
     /// is put right at most once a minute rather than on every poll.
     var announced: [String: Date] = [:]
+    /// The record's writes and their bytes since the start, for tests to count.
+    var recordWrites = 0
+    var recordBytes = 0
     var reconciling = false
     var reconcileAgain = false
     /// The user each hosted server's event connection is to it (#488), by server.
@@ -972,7 +975,10 @@ extension DaemonCore {
 
     private func saveMCPRecords() {
         guard let records = mcpEvents.records else { return }
-        keepQuietly("where each server's events have got to") { try mcpEventStore.save(records) }
+        keepQuietly("where each server's events have got to") {
+            mcpEvents.recordBytes += try mcpEventStore.save(records)
+            mcpEvents.recordWrites += 1
+        }
     }
 
     // MARK: Clear

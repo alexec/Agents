@@ -728,4 +728,78 @@ struct MCPEventWorkflowTests {
         #expect(stand.pollCount() == 0)
         await core.stopMCPEvents()
     }
+
+    // MARK: What a poll writes (P20261008-1)
+
+    private func writes(_ s: Setup) async -> Int { await s.core.mcpEvents.recordWrites }
+
+    /// An idle poll writes nothing: where it got to is kept in memory and written at most
+    /// once a minute, and on a stop.
+    @Test func idlePollsWriteTheRecordAtMostOnceAMinute() async throws {
+        let s = try await setUp(workflows: [("fix", "  - checks.failed:\n      repo: x")])
+        try await subscribed(s)
+        let before = await writes(s)
+        for _ in 0..<5 { try await tick(s, polls: 1) }
+        #expect(await writes(s) == before, "five idle polls inside a minute")
+        s.now.advance(61)
+        try await tick(s, polls: 1)
+        #expect(await writes(s) == before + 1, "a minute on, once")
+        try await tick(s, polls: 1)
+        #expect(await writes(s) == before + 1)
+        await s.core.stopMCPEvents()
+        let held = try #require(await s.core.mcpRecords().subscriptions.values.first?.nextPollAt)
+        let written = try #require(MCPEventStore(root: s.locations.root).load().subscriptions.values.first?.nextPollAt)
+        #expect(abs(held.timeIntervalSince(written)) < 0.01, "the stop wrote the pace")
+    }
+
+    /// A poll that brings events writes once, ahead of raising them. What it raised is
+    /// written with the next write: the event log is the commit point.
+    @Test func aPollWithEventsWritesOnce() async throws {
+        let s = try await setUp(workflows: [("fix", "  - checks.failed:\n      repo: x")])
+        try await subscribed(s)
+        let before = await writes(s)
+        s.stand.raise("e1")
+        s.stand.raise("e2")
+        try await tick(s, polls: 1)
+        try await eventually("raised") { await raised(s).count == 2 }
+        #expect(await writes(s) == before + 1)
+    }
+
+    /// A daemon that dies after raising, before what it raised is written, raises nothing
+    /// again: the ids written ahead are found in the event log.
+    @Test func aDeathAfterRaisingRaisesNothingAgain() async throws {
+        let first = try await setUp(workflows: [("fix", "  - checks.failed:\n      repo: x")])
+        try await subscribed(first)
+        first.stand.raise("e1")
+        try await tick(first, polls: 1)
+        try await eventually("e1 raised") { await raised(first).count == 1 }
+        // What was on disk at that moment, put back after a stop, as if it had died.
+        let store = MCPEventStore(root: first.locations.root)
+        let atDeath = store.load()
+        await first.core.stopMCPEvents()
+        try store.save(atDeath)
+
+        let second = try await setUp(first.stands, workflows: [], locations: (first.locations, first.project),
+                                     now: first.now)
+        try await eventually("waiting") { second.clock.sleeping > 0 }
+        first.stand.raise("e2")
+        try await tick(second, polls: 1)
+        try await eventually("e2 raised") { await raised(second).count == 2 }
+        #expect(await raised(second).compactMap { $0.details["mcp_event_id"] } == ["e1", "e2"])
+        let record = try #require(await second.core.mcpRecords().subscriptions.values.first)
+        #expect(record.hasSeen("e1") && record.hasSeen("e2") && record.delivering.isEmpty)
+    }
+
+    /// A subscription that goes leaves no note of when its line was last told.
+    @Test func aGoneSubscriptionForgetsWhenItWasTold() async throws {
+        let s = try await setUp(workflows: [("fix", "  - checks.failed:\n      repo: x")])
+        try await subscribed(s)
+        try await tick(s, polls: 1)
+        let old = try #require(await s.core.mcpEvents.subscriptions.keys.first)
+        try await eventually("told") { await s.core.mcpEvents.announced[old] != nil }
+        try write("  - checks.failed:\n      repo: y", as: "fix", in: s.project)
+        await s.core.rescanWorkflows(in: s.project)
+        try await eventually("y subscribed") { await s.core.mcpEvents.subscriptions[old] == nil }
+        #expect(await s.core.mcpEvents.announced[old] == nil)
+    }
 }
