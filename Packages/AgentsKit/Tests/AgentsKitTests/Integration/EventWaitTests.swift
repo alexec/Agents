@@ -316,6 +316,21 @@ struct EventWaitTests {
         #expect(answer.hasPrefix(EventWords.neverHere(["mac.wake"]) + " custom.ping happened at "), "\(answer)")
     }
 
+    /// A server's event nothing here asks for is kept, and the reply says it may never
+    /// come; a mistyped app event, which reads as one, is told its near name.
+    @Test func aWaitOnAServersEventNobodyAsksForIsTold() async throws {
+        let (locations, work, _) = try temporary()
+        let core = try await makeCore(locations, clock: Clock(), hold: .milliseconds(100))
+        let (a, token) = try await agent(core, in: work, "Hopeful")
+        let answer = try await wait(core, token, ["ci.failed", "agnet.finished", "custom.ping"])
+        #expect(answer.hasPrefix(EventWords.unheard(["ci.failed", "agnet.finished"], heard: [])), "\(answer)")
+        #expect(answer.contains("Did you mean agnet.finished → agent.finished?"), "\(answer)")
+        #expect(await isWaiting(core, a))
+
+        let quiet = try await wait(core, token, ["custom.ping", "agent.*"])
+        #expect(!quiet.contains("no workflow in this project"), "\(quiet)")
+    }
+
     /// The disk events' old names still wait (#372).
     @Test func anOldDiskNameWaitsOnTheNewOne() async throws {
         let (locations, work, _) = try temporary()

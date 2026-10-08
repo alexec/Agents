@@ -49,6 +49,20 @@ public enum EventWords {
             + "a Linux server, so \(one ? "it never happens" : "they never happen") here."
     }
 
+    /// A server's event, or a name the app does not know, that nothing in the project is
+    /// asking any server for: it can only end the wait if something starts asking.
+    public static func unheard(_ names: [String], heard: [String]) -> String {
+        let one = names.count == 1
+        let them = one ? "it" : "them"
+        let guesses = names.compactMap { name in EventPatternProblem.closest(to: name).map { "\(name) → \($0)" } }
+        return "\(names.joined(separator: ", ")) \(one ? "is not an event" : "are not events") the app raises, "
+            + "and no workflow in this project triggers on \(them), so no MCP server is asked for \(them) "
+            + "and this wait may never end. A server's event reaches a wait only while a workflow here has it "
+            + "under on:."
+            + (heard.isEmpty ? "" : " Server events heard here now: \(heard.joined(separator: ", ")).")
+            + (guesses.isEmpty ? "" : " Did you mean \(guesses.joined(separator: ", "))?")
+    }
+
     public static let nothingNamed = "Say what to wait for in events, e.g. [\"agent.finished\"]. "
         + "wait_for_event with action \"list\" gives every name."
 

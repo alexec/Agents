@@ -113,6 +113,36 @@ struct MCPEventWorkflowTests {
 
     // MARK: User Story 1
 
+    /// A wait on a server's event a workflow here subscribes to is heard, and says nothing
+    /// of it; one on an event nothing asks for is told so, with what is heard.
+    @Test func aWaitIsToldWhetherAServersEventIsHeard() async throws {
+        let s = try await setUp(workflows: [("fix", "  - checks.failed:\n      repo: alexec/Agents")])
+        try await subscribed(s)
+        let id = try await s.core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: s.project, prompt: "Wait"))
+        let token = UUID().uuidString
+        // The fake's session ending unbinds the token, as in `EventWaitTests.calling`:
+        // bound again, and asked again.
+        func calling<T>(_ body: () async throws -> T) async throws -> T {
+            for _ in 0..<5 {
+                await s.core.bindAppToken(token, to: id)
+                do { return try await body() } catch let error as JSONRPCError
+                    where error.message == LeaseWords.noConversation {}
+            }
+            return try await body()
+        }
+        func answer(_ events: [String]) async throws -> String {
+            let call = Task {
+                try await calling { try await s.core.waitForEvent(.init(token: token, events: events, untilMinutes: 1)) }
+            }
+            try await eventually("held") { await s.core.openEventWaits[id] != nil }
+            _ = try await calling { try await s.core.cancelWait(.init(token: token)) }
+            return try await call.value
+        }
+        #expect(try await !answer(["checks.failed"]).contains("no workflow in this project"))
+        #expect(try await answer(["checks.passed"]).hasPrefix(EventWords.unheard(["checks.passed"],
+                                                                                 heard: ["checks.failed"])))
+    }
+
     /// (a) One event, one run, with the data in a fence marked as the server's.
     @Test func oneEventRunsTheWorkflowOnceWithItsDataFenced() async throws {
         let s = try await setUp(workflows: [("fix", "  - checks.failed:\n      repo: alexec/Agents")])

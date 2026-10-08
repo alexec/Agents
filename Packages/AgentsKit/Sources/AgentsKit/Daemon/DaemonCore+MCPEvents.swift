@@ -89,6 +89,14 @@ extension DaemonCore {
 
     var mcpEventStore: MCPEventStore { MCPEventStore(root: locations.root) }
 
+    /// The servers' events some subscription asks for in a project, sorted: the only
+    /// server events a wait there can hear.
+    func mcpEventsHeard(in project: URL) -> [String] {
+        let folder = Project.standardize(project)
+        return Set(mcpEvents.subscriptions.values.filter { Project.standardize($0.project) == folder }.map(\.event))
+            .sorted()
+    }
+
     // MARK: Starting and stopping
 
     /// Begin hearing servers' events. `http` and `sleep` are for tests: a stand-in server

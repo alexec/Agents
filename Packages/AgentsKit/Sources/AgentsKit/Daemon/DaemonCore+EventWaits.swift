@@ -58,7 +58,16 @@ extension DaemonCore {
         if !neverHere.isEmpty, neverHere.count == patterns.count {
             throw eventRefusal(EventWords.neverHere(neverHere) + " Nothing is waiting.")
         }
-        let warning = neverHere.isEmpty ? "" : EventWords.neverHere(neverHere) + " "
+        // A server's event is raised only while a workflow here subscribes to it (#383):
+        // a wait on one nothing asks for is kept, and told, since a workflow may yet.
+        let heard = mcpEventsHeard(in: caller.projectFolder)
+        let unheard = patterns.map(\.name).filter { name in
+            guard EventCatalogue.isServerEventName(name) || (name.hasSuffix(".*") && EventPattern(name).wholeSubject == nil)
+            else { return false }
+            return !heard.contains { name.hasSuffix(".*") ? $0.hasPrefix(String(name.dropLast())) : $0 == name }
+        }
+        let warning = (neverHere.isEmpty ? "" : EventWords.neverHere(neverHere) + " ")
+            + (unheard.isEmpty ? "" : EventWords.unheard(unheard, heard: heard) + " ")
         let at = now()
         let from = request.from ?? eventLog.head
 
