@@ -110,6 +110,8 @@ extension DaemonCore {
             guard !kept.isEmpty else { return }
             Task { await self?.projectFilesChanged(kept, in: standardized) }
         }
+        // What is in the drop box now was there before the watch (#231).
+        seedDropbox(in: standardized)
     }
 
     /// What a watch's reports are put through before they hop onto the actor (#216).
@@ -263,6 +265,7 @@ extension DaemonCore {
             return inside.contains("/") || inside.hasPrefix(".") ? nil : String(inside)
         }
         if !near.isEmpty { scheduleExclusionCheck(folder, near: near) }
+        if Self.touchesDropbox(changed, in: folder) { scheduleDropboxCheck(in: folder) }
         let agents = folder.appending(path: ".agents").path
         let own = changed.filter { $0.path == agents || $0.path.hasPrefix(agents + "/") }
         guard !own.isEmpty else { return }
@@ -292,6 +295,7 @@ extension DaemonCore {
         projectExclusionChecks.removeAll()
         projectExclusionPending.removeAll()
         for folder in branchFolders { stopWatchingBranches(in: folder) }
+        for folder in Array(dropboxSeen.keys) { stopWatchingDropbox(in: folder) }
     }
 
     /// Let a project's workflows go: an archived project's do not fire.
@@ -325,6 +329,7 @@ extension DaemonCore {
         workflowRescans.removeValue(forKey: standardized)?.cancel()
         // The branches went with the watch; an archived project's moves are not raised.
         stopWatchingBranches(in: standardized)
+        stopWatchingDropbox(in: standardized)
     }
 
     /// A rescan, shortly. FSEvents has already collapsed a burst; this collapses what

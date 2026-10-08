@@ -7,6 +7,8 @@ public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
     case project
     case workflow
     case branch
+    /// A file arriving in a project's drop box, `.agents/dropbox/` (#231).
+    case dropbox
     case lease
     case mac
     /// The machine the host runs on, whatever it is: a Mac or a Linux server (#372).
@@ -27,6 +29,7 @@ public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
         case .agent, .project: return "●"
         case .workflow: return "⟳"
         case .branch: return "⎇"
+        case .dropbox: return "⇣"
         case .mac, .machine, .person, .lease, .cost, .server: return "⌘"
         case .custom: return "✦"
         }
@@ -38,18 +41,20 @@ public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
         case .agent, .project: return .agents
         case .workflow: return .workflows
         case .branch: return .branches
+        case .dropbox: return .dropbox
         case .mac, .machine, .person, .lease, .cost, .server: return .mac
         case .custom: return .custom
         }
     }
 }
 
-/// The page's five filter capsules (042 FR-028, wireframes §1). Several subjects about
+/// The page's six filter capsules (042 FR-028, wireframes §1). Several subjects about
 /// the machine and the person share one, because to the person they are all "This Mac".
 public enum EventGroup: String, Codable, Hashable, Sendable, CaseIterable {
     case agents
     case workflows
     case branches
+    case dropbox
     case mac
     case custom
 
@@ -58,6 +63,7 @@ public enum EventGroup: String, Codable, Hashable, Sendable, CaseIterable {
         case .agents: return "Agents"
         case .workflows: return "Workflows"
         case .branches: return "Branches"
+        case .dropbox: return "Drop box"
         case .mac: return "This Mac"
         case .custom: return "Custom"
         }
@@ -144,6 +150,8 @@ public enum EventCatalogue {
                   "A workflow in this project did not run, and why."),
         EventKind("branch.moved", .project, open("branch", "from", "to"),
                   "A branch moved: the default branch, or one an agent works on."),
+        EventKind("dropbox.file_added", .project, open("path", "name", "folder", "extension", "size"),
+                  "A file arrived in this project's drop box, .agents/dropbox/, or a folder in it."),
         EventKind("lease.granted", .mac, [EventDetail("resource"), agent], "An agent was given a lease."),
         EventKind("lease.released", .mac, [EventDetail("resource"), fixed("how", ["expired", "ended", "released"])],
                   "A lease was given back, ended or ran out."),

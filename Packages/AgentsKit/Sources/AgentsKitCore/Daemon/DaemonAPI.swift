@@ -319,6 +319,10 @@ public enum DaemonAPI {
         /// A file attached on one machine, for an agent on another (037): written into
         /// the agent's folder so it can read it, and the path handed back.
         public static let filesWrite = "files/write"
+        /// A file put into a project's drop box (#231), from any window, phone or page:
+        /// written into `<project>/.agents/dropbox/<folder>/`, where the project's watch
+        /// hears it arrive like any other.
+        public static let dropboxPut = "dropbox/put"
 
         // The user's own shell in an agent's folder. Deliberately not `terminal/*`,
         // which is 003's and belongs to the agent. Different owner, different
@@ -3361,6 +3365,32 @@ public extension DaemonAPI {
 
     /// The most `files/write` takes, and the most the window sends.
     static let attachmentLimit = 25 * 1024 * 1024
+
+    /// `dropbox/put` (#231). `folder` is the project's main folder, never a worktree;
+    /// `subfolder` a path inside the drop box, empty or nil for its top. `data` travels as
+    /// base64 in the JSON, so it is held to `dropboxPutLimit`; a file copied into the
+    /// folder by any other means has no limit.
+    struct DropboxPutRequest: Codable, Hashable, Sendable {
+        public var folder: URL
+        public var subfolder: String?
+        public var name: String
+        public var data: Data
+        public init(folder: URL, subfolder: String? = nil, name: String, data: Data) {
+            self.folder = folder
+            self.subfolder = subfolder
+            self.name = name
+            self.data = data
+        }
+    }
+
+    struct DropboxPutResponse: Codable, Hashable, Sendable {
+        /// Where the file now is, absolute, on the project's host.
+        public var path: String
+        public init(path: String) { self.path = path }
+    }
+
+    /// The most `dropbox/put` carries: what one message over the phone's link takes.
+    static let dropboxPutLimit = attachmentLimit
 
     // MARK: Retiring archived agents (051)
 

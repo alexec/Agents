@@ -94,5 +94,7 @@ something particular done.
   each time an MCP server reports something, such as a pull request's checks failing.
 - [Pin a page to a project](pin-a-page-to-a-project.md): a document or an HTML page
   under its project in the sidebar, live as it changes.
+- [Hand files to a workflow](hand-files-to-a-workflow.md): drop a file into a project's
+  drop box and have a workflow work on it.
 - [Have an agent wait for something](wait-for-something.md): checks passing, another
   agent finishing or the Mac waking, and agents telling each other.

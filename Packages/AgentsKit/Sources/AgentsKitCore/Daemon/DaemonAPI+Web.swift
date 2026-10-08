@@ -122,6 +122,9 @@ public extension DaemonAPI {
                 Row(Method.elicitationsAnswer, params: AnswerElicitationRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsAnswerSandbox, params: AnswerSandboxRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.workflowsRun, params: WorkflowRequest.self, result: WorkflowSummary.self, kind: .hostRequest),
+                // A file put into a project's drop box (#231), as the window's drag and the Remote's pick.
+                Row(Method.dropboxPut, params: DropboxPutRequest.self, result: DropboxPutResponse.self,
+                    kind: .hostRequest),
                 // Pin, Unpin, a drop, and typing on a pinned page (#159), from every client alike.
                 Row(Method.pinsPin, params: PinRequest.self, result: [PinView].self, kind: .hostRequest),
                 Row(Method.pinsUnpin, params: PinPathRequest.self, result: Empty.self, kind: .hostRequest),

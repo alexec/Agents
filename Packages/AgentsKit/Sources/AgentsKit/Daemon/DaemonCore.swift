@@ -504,6 +504,14 @@ public actor DaemonCore {
     /// git processes, with the first list waiting behind them.
     var branchSeeds: [URL] = []
     var branchSeeding: Task<Void, Never>?
+    /// Each watched project's drop box as last seen (#231): its files, by path inside
+    /// `.agents/dropbox/`, with the stamp each had when it was seeded or announced.
+    var dropboxSeen: [URL: [String: DropboxStamp]] = [:]
+    /// Files that are new or changed but not yet still: each is announced once a look
+    /// finds it as the look before did.
+    var dropboxSettling: [URL: [String: DropboxStamp]] = [:]
+    /// The one pending look at each project's drop box.
+    var dropboxChecks: [URL: Task<Void, Never>] = [:]
     /// What says the Mac slept, woke, or was left (042 R10). Nil until started.
     var machineWatch: (any MachineWatch)?
     /// Told when the Mac wakes: the uplink dials at once (#82, #113).

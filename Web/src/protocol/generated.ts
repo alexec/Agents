@@ -628,6 +628,17 @@ export interface DraftOptionsNotification {
   failure?: string;
 }
 
+export interface DropboxPutRequest {
+  folder: URLString;
+  subfolder?: string;
+  name: string;
+  data: Base64;
+}
+
+export interface DropboxPutResponse {
+  path: string;
+}
+
 export type Dropped =
   | { extraArguments: { _0: string[] } }
   | { alwaysAllow: { count: number } }
@@ -722,7 +733,7 @@ export interface Event {
   consequences: Consequence[];
 }
 
-export type EventGroup = "agents" | "workflows" | "branches" | "mac" | "custom";
+export type EventGroup = "agents" | "workflows" | "branches" | "dropbox" | "mac" | "custom";
 
 /**
  * EventPattern (Model/EventPattern.swift), as its encode(to:) writes it (073): `filters` holds
@@ -1980,6 +1991,7 @@ export interface Methods {
   "credentials/lend": { params: CredentialsLend; result: Empty };
   "credentials/offer": { params: CredentialsOffer; result: Empty };
   "disk/state": { params: Empty; result: DiskState };
+  "dropbox/put": { params: DropboxPutRequest; result: DropboxPutResponse };
   "elicitations/answer": { params: AnswerElicitationRequest; result: Empty };
   "elicitations/pending": { params: Empty; result: ElicitationRequest[] };
   "events/list": { params: EventsListRequest; result: EventsPage };
@@ -2075,6 +2087,7 @@ export const MethodTarget = {
   "credentials/lend": "host",
   "credentials/offer": "host",
   "disk/state": "host",
+  "dropbox/put": "host",
   "elicitations/answer": "host",
   "elicitations/pending": "host",
   "events/list": "host",
@@ -2212,6 +2225,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DiskThresholds: { required: [], optional: ["lowGB", "lowPercent", "criticalGB"] },
   DiskWorktree: { required: ["name", "bytes", "partial"], optional: [] },
   DraftOptionsNotification: { required: ["draftID", "options", "commands"], optional: ["failure"] },
+  DropboxPutRequest: { required: ["folder", "name", "data"], optional: ["subfolder"] },
+  DropboxPutResponse: { required: ["path"], optional: [] },
   EffectiveSandbox: { required: ["state", "requested"], optional: ["reason"] },
   ElicitationAnswer: { required: ["question", "answer"], optional: [] },
   ElicitationNotification: { required: ["agentID", "requestID"], optional: ["request"] },
