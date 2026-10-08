@@ -268,7 +268,7 @@ real repo, a failing PR yields one `checks.failed` with a stable id.
 **Independent Test**: pin it, open it on the Mac and the web page, and see the PRs and their
 states. **Rerun** reruns.
 
-- [ ] T031 [US4] Create `Integrations/ci-watcher/board.html`, one self-contained page with no network and an empty `_meta.ui.csp`.
+- [x] T031 [US4] Create `Integrations/ci-watcher/board.html`, one self-contained page with no network and an empty `_meta.ui.csp`.
   - It speaks the MCP Apps `postMessage` bridge: `ui/initialize`, then it takes `tool-input` and `tool-result` for `list_prs`.
   - It draws the PRs (number, title, branch, a check pill), using the host's CSS variables for colour and font.
   - **Rerun** on a failing PR calls `tools/call rerun_failed`, then `list_prs` again.
