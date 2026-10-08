@@ -10,7 +10,7 @@ runtime: claude
 permission-mode: auto
 labels: [review, performance]
 cooldown: 6d
-enabled: false
+hosts: [8AB85821-9D24-59CE-9737-8FC556923733]
 ---
 
 You are the weekly performance review of this project (issue #42). You run with nobody
