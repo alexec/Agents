@@ -15,13 +15,13 @@
 
 ## Counts
 
-Of 208 rows: **139 same**, **40 by design**, **29 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 208 rows: **140 same**, **40 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
 | Sidebar and project list | 8 | 2 | 9 |
 | Session rows and states | 16 | 2 | 5 |
-| Chat turns and turn detail | 19 | 3 | 3 |
+| Chat turns and turn detail | 20 | 3 | 2 |
 | Prompt bar and queued prompts | 19 | 2 | 0 |
 | Question and permission cards | 13 | 3 | 0 |
 | Start sheet and new project | 17 | 5 | 0 |
@@ -112,7 +112,7 @@ The deltas are tracked by 29 issues:
 | Plan; a withdrawn plan; the current-plan strip | `S/Chat/ChatBlocks.swift:177-223`; the strip under the chat's head: `S/Chat/CurrentPlanStrip.swift` in `A/Chat/ChatView.swift` | Shared, the strip in `R/Chat/RemoteChatView.swift` | Withdrawn entries crossed out; *The agent dropped this plan*: `W/views/chat/Rows.tsx`; the strip: `W/views/PlanStrip.tsx` | **same** (#252, #341; `Agent.planInForce` and `Plan.stripSummary`, held to `Fixtures/web/plan/strip.json`) |
 | Switch note and handoff | `S/Chat/SwitchNote.swift:7-24` | Shared | Full switch note: `W/model/switchNote.ts`, drawn by `W/views/chat/Rows.tsx:220-227` | **same** (#252) |
 | Jump to end | Whenever scrolled away, *Something new*: `S/Chat/JumpToEnd.swift:9-43` | Shared | Shown while away; *Something new* when messages arrive: `W/views/Chat.tsx:370-375` | **same** (#252) |
-| Chat scrolling: open at the end, follow it, stay put once scrolled up by any amount, back by hand / Jump to end / sending, earlier pages above with no jump, Page Up/Down, Space, ⌘↑/⌘↓ (Home/End), the place kept on coming back (#378) | Walk pending (#378): `S/Chat/ChatTranscript.swift` | Shared | Walked per frame, all nine pass: `W/views/Chat.tsx`, walk `Web/test/walk/scroll378.mjs` | **delta**: mac and remote to walk and fix, #378 |
+| Chat scrolling: open at the end, follow it, stay put once scrolled up by any amount, back by hand / Jump to end / sending, earlier pages above with no jump, Page Up/Down, Space, ⌘↑/⌘↓ (Home/End), the place kept on coming back (#378) | Walked with real wheel, trackpad and key events: `S/Chat/ChatTranscript.swift`, keys and wheel from `S/Chat/TranscriptInput.swift`; an earlier page and coming back hold the turn at the top of the pane (the line within it may shift) | Shared; keys by design Mac only (touch); the look is Alex's | Walked per frame, all nine pass: `W/views/Chat.tsx`, walk `Web/test/walk/scroll378.mjs` | **same** (#378) |
 | First open: the last 12 turns, earlier ones at the top (#90, #91) | 12: `K/Daemon/DaemonAPI.swift` (`TurnsRequest.opening`, #242) | 12, the same request: `R/RemoteModel.swift` | 12: `W/model/store.ts` (`openingTurns`) | **same** |
 | A finished turn longer than a page | One call for up to the host's ceiling (1,000); eight opened turns kept: `A/AppModel.swift` turnEntries, `S/Chat/ChatTranscript.swift` fetchedTurns | The same call, kept for every turn opened: `R/RemoteModel.swift` turnEntries | The last 200, then Earlier steps; eight open turns kept: `W/model/store.ts` turnEntries, `W/views/Chat.tsx`, `W/views/chat/Rows.tsx` | **delta**: remote #215 |
 | Coming back after a restart, in the chat | `S/Chat/ChatTranscript.swift:135-136` | Shared | Only *Working*: `W/views/Chat.tsx:216-218` | **delta**: web #251 |
