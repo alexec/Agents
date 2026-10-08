@@ -118,3 +118,53 @@ struct SpentAllowanceGroupTests {
         #expect(group == .needsAttention)
     }
 }
+
+/// The sidebar's Runtimes row (#379): working out of installed, and a dot only when none work.
+@Suite("The Runtimes row's count")
+struct RuntimeTallyTests {
+    private let now = Date(timeIntervalSince1970: 1_790_000_000)
+
+    private func status(_ id: String, _ availability: RuntimeAvailability) -> RuntimeStatus {
+        RuntimeStatus(runtime: RuntimeCatalog.runtime(id: id) ?? RuntimeCatalog.claude, availability: availability)
+    }
+
+    private var available: RuntimeAvailability { .available(path: "/x", supportsResume: true) }
+
+    private func allowances(out ids: [String]) -> RuntimeAllowances {
+        RuntimeAllowances(rows: ids.map { id in
+            var state = AllowanceState(credentialKey: "\(id):sign-in", entryID: UUID(), since: now)
+            state.markOut(.allowanceSpent, until: nil, payment: .allowance(label: nil), now: now, from: .typedFailure)
+            return RuntimeAllowances.Row(credentialKey: "\(id):sign-in", state: state)
+        }, at: now)
+    }
+
+    @Test func notYetListedIsNotNone() {
+        #expect(RuntimeTally([], allowances: nil) == nil)
+    }
+
+    @Test func oneOutOfThreeIsTwoWorkingAndNoDot() throws {
+        let tally = try #require(RuntimeTally([status("claude", available), status("codex", available),
+                                               status("grok", available)], allowances: allowances(out: ["grok"])))
+        #expect(tally.words == "2/3")
+        #expect(!tally.noneWorking)
+    }
+
+    @Test func notInstalledIsNotCountedButSignedOutIs() throws {
+        let tally = try #require(RuntimeTally([status("claude", available),
+                                               status("codex", .needsSignIn(authMethods: [], fixCommand: nil)),
+                                               status("grok", .failed(reason: "no")),
+                                               status("gemini", .missing(lookedIn: [])),
+                                               status("cursor", .installing(progress: nil)),
+                                               status("copilot", .installFailed(reason: "no"))], allowances: nil))
+        #expect(tally.words == "1/3")
+    }
+
+    @Test func noneWorkingIsTheDot() throws {
+        var out = status("claude", available)
+        out.isOut = true
+        let tally = try #require(RuntimeTally([out, status("codex", .needsSignIn(authMethods: [], fixCommand: nil))],
+                                              allowances: nil))
+        #expect(tally.words == "0/2")
+        #expect(tally.noneWorking)
+    }
+}
