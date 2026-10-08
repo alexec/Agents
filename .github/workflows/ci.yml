@@ -85,7 +85,7 @@ jobs:
         env:
           MANIFESTS: ${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
         run: |
-          xcode="$(git ls-tree HEAD -- project.yml App Daemon Host Packages Remote RemoteNotify RemoteWidget Shared Web/dist | git hash-object --stdin)"
+          xcode="$(git ls-tree HEAD -- project.yml App Daemon Host Packages Remote RemoteNotify RemoteWidget Shared Web | git hash-object --stdin)"
           swiftpm="$(git ls-tree HEAD -- Daemon Packages/AgentsKit Packages/CodeText | git hash-object --stdin)"
           echo "base=${{ steps.toolchain.outputs.fingerprint }}-${MANIFESTS}" >> "$GITHUB_OUTPUT"
           echo "xcode=${xcode}" >> "$GITHUB_OUTPUT"
@@ -174,6 +174,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash scripts/prune-ci-caches.sh macos-xcode-27-agentskit- 'macos-xcode-27-agentskit-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*') }}' "$GITHUB_REF"
+
+      # Agents Host's build makes Web/dist, which is not checked in (#473), with the pinned
+      # Node; without it the app would build with no web remote.
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: Web/.node-version
 
       - name: Generate the project
         run: xcodegen generate
@@ -329,10 +335,9 @@ jobs:
           run_agentskit_tests
 
   # The web remote's generator and the control plane (071, research R6), in a job of their
-  # own so they never press on the test job's time cap. A protocol type changed without
-  # regenerating Web/src/protocol/generated.ts is not a failure here (#473): main regenerates
-  # it after the merge (web-dist.yml), so the freshness test is off unless
-  # AGENTS_WEB_FRESHNESS=1. ControlPlane links AgentsKit, so it runs on changes to either.
+  # own so they never press on the test job's time cap. WebTypes holds the checked-in
+  # Web/src/protocol/generated.ts to the Swift source: a protocol type changed without
+  # regenerating fails here. ControlPlane links AgentsKit, so it runs on changes to either.
   packages:
     runs-on: xcode-27
     timeout-minutes: 30
@@ -355,7 +360,7 @@ jobs:
           fi
           bash scripts/select-test-suites.sh "$base" >> "$GITHUB_OUTPUT"
 
-      - name: Test WebTypes
+      - name: Generated types are fresh
         if: steps.test-selection.outputs.webtypes != 'skip'
         run: swift test --package-path Packages/WebTypes
 
@@ -364,14 +369,9 @@ jobs:
         timeout-minutes: 20
         run: swift test --package-path Packages/ControlPlane
 
-  # The web remote (071, D7, research R8): tsc, the lint that keeps agent output inert, the
-  # licence list, the web tests, and a build with the pinned Node that must succeed.
-  #
-  # Web/dist and generated.ts are not held to this source here (#473). Main took several
-  # merges per CI run and every PR carried a rebuilt bundle, so each merge left every other
-  # PR in conflict over files nobody writes by hand. A PR now leaves them alone; web-dist.yml
-  # rebuilds and commits them on main after the merge. A PR that still changes them, or
-  # whose bundle is stale, gets a note, never a failure.
+  # The web remote (071, D7, research R8): a build with the pinned Node, then tsc, the lint
+  # that keeps agent output inert, the licence list and the web tests, which hold the build to
+  # its MANIFEST. Web/dist is not checked in (#473), so there is no committed copy to compare.
   web:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -380,25 +380,13 @@ jobs:
         working-directory: Web
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
       - uses: actions/setup-node@v5
         with:
           node-version-file: Web/.node-version
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run build
       - run: npm run check
       - run: npm test
-      - run: npm run build
-      - name: Note a stale or carried bundle (not a failure)
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          if ! git diff --quiet -- dist src/protocol/generated.ts; then
-            echo "::notice::Web/dist is older than this source; main rebuilds it after the merge (web-dist.yml)."
-          fi
-          if [ -n "$BASE_SHA" ] && [ -n "$(git diff --name-only "$BASE_SHA"...HEAD -- dist src/protocol/generated.ts)" ]; then
-            echo "::warning::This PR changes Web/dist or generated.ts. Main rebuilds them after the merge, and carrying them makes other PRs conflict: git checkout origin/main -- Web/dist Web/src/protocol/generated.ts"
-          fi
 
   # Tests that index or force-unwrap after an #expect (#94): a failed check carries on, and
   # the trap after it ends the whole `swift test` run, so every later test goes unreported.

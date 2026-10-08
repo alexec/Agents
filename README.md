@@ -55,22 +55,20 @@ The schemes:
 | `Remote` | the iPhone and iPad app |
 
 The web page lives in `Web/`: Preact and TypeScript, bundled by esbuild. Its build,
-`Web/dist`, is checked in with a `MANIFEST` of hashes, and Agents Host carries it, so
-building Agents needs no Node. So are its protocol types, `Web/src/protocol/generated.ts`,
-generated from the Swift source. Only changing the web app, or a protocol type in Swift,
-needs anything more, and `scripts/web.sh` does it:
+`Web/dist`, is not checked in: Agents Host's build makes it with the Node in
+`Web/.node-version`, writes a `MANIFEST` of hashes, and carries it. Without that Node, Agents
+Host still builds, with a warning, and serves no web page. Its protocol types,
+`Web/src/protocol/generated.ts`, are generated from the Swift source and checked in.
+`scripts/web.sh` does all of it:
 
 ```sh
 scripts/web.sh types   # regenerate the TypeScript types after changing a DaemonAPI type
-scripts/web.sh build   # rebuild Web/dist after changing Web/ (needs the Node in Web/.node-version)
+scripts/web.sh build   # build Web/dist (needs the Node in Web/.node-version); Agents Host's build runs it
 scripts/web.sh check   # what CI checks: types fresh, dist matching its manifest, and with Node, the tests
 ```
 
-A pull request does not commit `Web/dist` or `generated.ts`: after each merge, a workflow on
-main (`.github/workflows/web-dist.yml`) runs `types` and `build` and commits what changed
-(#473). Run them locally to see or test a change, then leave the results out of the commit.
-A test fails, in Swift as well as in Node, when `Web/dist` is not what its build wrote;
-a bundle older than its source fails only `scripts/web.sh check`.
+A test fails, in Swift as well as in Node, when `generated.ts` is out of date with the
+Swift, or a built `Web/dist` is out of date with its source.
 
 From the command line:
 

@@ -6,7 +6,7 @@ description: Merge a wave of ready lane branches into main together. They are me
 # Merge a wave of lane branches
 
 One script does the git work and decides what to build. Do not merge by hand, re-verify
-each branch on its own, or settle `Web/dist` conflicts yourself.
+each branch on its own, or settle `generated.ts` conflicts yourself.
 
 ```sh
 W=.agents/skills/merge-wave/scripts/merge-wave.sh
@@ -62,12 +62,10 @@ It prints a line per branch (merge sha, checks, or why it was dropped) and `SHIP
 
 ## What it settles, and what stops it
 
-- **`Web/dist/*` and `generated.ts` conflicts:** the merge stays open and the next step is
-  `rebuild-web` (under the lease). It runs `scripts/web.sh build`, plus `types` for
-  `generated.ts`, in the wave, and commits the merge with the rebuilt files. Lanes no
-  longer commit these files (#473), so this is rare; the `web` check builds and tests but
-  does not hold the committed bundle to its source, as main's web-dist workflow rebuilds
-  it after the push.
+- **`generated.ts` conflicts:** the merge stays open and the next step is `rebuild-web`
+  (under the lease). It runs `scripts/web.sh types` in the wave and commits the merge with
+  the regenerated file. `Web/dist` is not checked in (#473); a branch from before that which
+  still carries it conflicts with its removal, and the wave keeps it removed.
 - **`specs/071-web-remote/walks/parity.md`:** both sides' rows are kept, as a union. If
   both lanes edited the same row, both copies stay: read the merged table before
   you finish and fix it in a follow-up if needed.
@@ -138,8 +136,8 @@ That is the only worktree the wave removes.
   Do not `pkill`, `killall` or ⌘Q anything.
 - Never run the script against a main you were not told to merge into. To try it out,
   use `scripts/selftest.sh`. It works in a throwaway clone at `/tmp/mw-selftest` and
-  covers two clean branches, a `Web/dist` conflict, a real conflict, a failing check, a
-  docs-only wave, and a wave started again that reuses the first one's passes. Its builds are a stub (`MERGE_WAVE_STUB`), except the real
-  `web.sh build`, so run it under the "build" lease.
+  covers two clean branches, two page changes with no bundle to settle, a real conflict, a failing check, a
+  docs-only wave, and a wave started again that reuses the first one's passes. Its builds are a stub (`MERGE_WAVE_STUB`), except a real
+  `web.sh` step if a wave reaches `rebuild-web`, so run it under the "build" lease.
 - If main moved while the wave ran, `finish` refuses. Start a new wave with the same
   branches.

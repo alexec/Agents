@@ -2,32 +2,22 @@ import Foundation
 import Testing
 @testable import AgentsKitCore
 
-/// The checked-in web remote is what its source builds (071, FR-035a, research R8).
+/// The built web remote is what its source builds (071, FR-035a, research R8).
 ///
 /// `Web/build.mjs` writes `Web/dist/MANIFEST`: a hash of every source input and every built
-/// file. This holds the tree to it with no Node: editing `Web/dist` by hand, or a file the
-/// build did not write, fails in anyone's `swift test`.
-///
-/// A source changed since the build is not a failure here (#473): a pull request leaves
-/// `Web/dist` alone, and main rebuilds and commits it after the merge (web-dist.yml). That
-/// half runs only with `AGENTS_WEB_FRESHNESS=1`, which `scripts/web.sh check` sets.
-@Suite("Web dist manifest")
+/// file. This holds the tree to it with no Node, so changing `Web/src` without rebuilding, or
+/// editing `Web/dist` by hand, fails in anyone's `swift test`. Web/dist is not checked in
+/// (#473): Agents Host's build makes it, so with none built yet there is nothing to check.
+@Suite("Web dist manifest", .enabled(if: FileManager.default.fileExists(atPath: webDistRepo.appending(path: "Web/dist/MANIFEST").path),
+                                     "no Web/dist built here; scripts/web.sh build makes one"))
 struct WebDistManifestTests {
-    static let repo = URL(filePath: #filePath)
-        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    static let repo = webDistRepo
 
     /// The same inputs `Web/build.mjs` hashes. Keep the two in step.
     static let fixedInputs = ["index.html", "sandbox.html", "build.mjs", "tsconfig.json", "package.json", "package-lock.json", ".node-version"]
     static let inputFolders = ["src", "assets"]
 
-    @Test func theCheckedInBuildIsWhatItsManifestRecords() throws {
-        #expect(try Self.problems(in: Self.repo, sources: false) == [])
-    }
-
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["AGENTS_WEB_FRESHNESS"] == "1",
-                   "main rebuilds Web/dist after a merge; set AGENTS_WEB_FRESHNESS=1 to check"))
-    func theCheckedInBuildMatchesItsSource() throws {
+    @Test func theBuiltWebRemoteMatchesItsSource() throws {
         #expect(try Self.problems(in: Self.repo) == [])
     }
 
@@ -36,8 +26,6 @@ struct WebDistManifestTests {
         defer { try? FileManager.default.removeItem(at: copy) }
         try Data("// changed\n".utf8).append(to: copy.appending(path: "Web/src/main.tsx"))
         #expect(try Self.problems(in: copy) == ["Web/src/main.tsx changed since Web/dist was built; run scripts/web.sh build"])
-        // A pull request's stale bundle is main's to rebuild, not a failure (#473).
-        #expect(try Self.problems(in: copy, sources: false) == [])
     }
 
     @Test func aHandEditedBuildIsCaught() throws {
@@ -63,8 +51,7 @@ struct WebDistManifestTests {
 
     // MARK: The check
 
-    /// Every way the tree differs from the manifest; with `sources: false`, only the built files.
-    static func problems(in repo: URL, sources: Bool = true) throws -> [String] {
+    static func problems(in repo: URL) throws -> [String] {
         let web = repo.appending(path: "Web")
         let text = try String(contentsOf: web.appending(path: "dist/MANIFEST"), encoding: .utf8)
         var recordedInputs: [String: String] = [:], recordedOutputs: [String: String] = [:]
@@ -83,7 +70,7 @@ struct WebDistManifestTests {
         let outputs = files(under: "Web/dist", in: repo).filter { $0 != "Web/dist/MANIFEST" }
 
         var problems: [String] = []
-        for path in inputs.sorted() where sources {
+        for path in inputs.sorted() {
             guard let hash = recordedInputs[path] else {
                 problems.append("\(path) is new since Web/dist was built; run scripts/web.sh build"); continue
             }
@@ -91,7 +78,7 @@ struct WebDistManifestTests {
                 problems.append("\(path) changed since Web/dist was built; run scripts/web.sh build")
             }
         }
-        for path in recordedInputs.keys.sorted() where sources && !inputs.contains(path) {
+        for path in recordedInputs.keys.sorted() where !inputs.contains(path) {
             problems.append("\(path) is gone since Web/dist was built; run scripts/web.sh build")
         }
         for path in recordedOutputs.keys.sorted() where !outputs.contains(path) {
@@ -140,6 +127,10 @@ struct WebDistManifestTests {
         return copy
     }
 }
+
+private let webDistRepo = URL(filePath: #filePath)
+    .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
 
 private extension Data {
     func append(to url: URL) throws {

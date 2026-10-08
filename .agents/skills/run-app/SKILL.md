@@ -68,8 +68,8 @@ by `scripts/select-test-suites.sh`). The full suite and every scheme run once, i
 Then it:
 1. starts `agents-control serve --home $ROOT/control` on a free loopback port, with
    no Bonjour (its log is `$ROOT/control/control.log`), serving the web remote (071) from
-   this checkout's `Web/dist` on another free loopback port, printed as `WEB_URL` (never
-   the live 8792);
+   this checkout's `Web/dist` (built by Agents Host's build, not checked in) on another free
+   loopback port, printed as `WEB_URL` (never the live 8792);
 2. starts `agentsd --control-code <host code>` on `$ROOT`, as Agents Host's launch agent
    would, with this session's `CLAUDE_*` and `AGENTS_*` taken out of its environment;
 3. opens the window with `AGENTS_CONTROL=<client code>` and `--walk run-<slug>`: it
@@ -277,8 +277,6 @@ opens it in headless Chrome. Run it once per press, on the same profile.
    that covers the change, or add a scene. Make a fresh browser code for each run; a code is spent once
    used. The control plane reads `Web/dist` once at start, so after rebuilding the page restart only
    your root's control plane (its `control/control.pid`) with the arguments `launch.sh` used.
-   A branch's `Web/dist` is main's until you run `scripts/web.sh build`; walk on the rebuilt
-   one, but leave it out of the commit (main rebuilds it after the merge, #473).
 2. Add or update the change's row in `specs/071-web-remote/walks/parity.md`: the page's shot, the
    window's shot, and has, partly, lacks or by design.
 3. A gap you don't close in the same branch gets a parity issue, named in the commit.

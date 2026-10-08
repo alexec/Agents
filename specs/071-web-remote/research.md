@@ -456,19 +456,19 @@ refuses fixtures it no longer matches, so they cannot be left stale.
 - Comparing only the output in CI: someone who edits `src` without Node, or commits without
   rebuilding, would not find out until CI. The manifest catches it in their own `swift test`.
 
-**Amended (#473, 2026-10-08): main rebuilds, pull requests don't.**
-- Every PR carried a rebuilt `dist` and `generated.ts`, and main took several merges per CI
-  run, so each merge left every other open PR in conflict over these files alone.
-- Both stay checked in, so building from source still needs no Node. A PR no longer commits
-  them: `.github/workflows/web-dist.yml` runs on each push to main that touches `Web/`, the
-  generator or AgentsKitCore, regenerates both and commits what changed. Its own commit is
-  skipped by its `if:`, and a deterministic rebuild of a fresh tree commits nothing, so it
-  cannot loop. Main's branch protection refuses `GITHUB_TOKEN`; the push uses a
-  `WEB_DIST_TOKEN` secret of an account that may bypass it.
-- The checks above change with it: check 1 holds only the outputs to `MANIFEST` (a hand edit
-  still fails); the source half, and WebTypes' `GeneratedIsFreshTests`, run only with
-  `AGENTS_WEB_FRESHNESS=1`, which `scripts/web.sh check` sets. Check 2 builds and tests but
-  only notes a stale bundle. Check 3 is unchanged.
+**Amended (#473, 2026-10-08): `dist` is no longer checked in.**
+- Every PR carried a rebuilt `dist`, and main took several merges per CI run, so each merge
+  left every other open PR in conflict over files nobody writes by hand. Alex chose to stop
+  committing it, which reverses D7's "building from source needs no Node" for the web page.
+- `Web/dist/` is in `.gitignore`. Agents Host's target runs `scripts/web.sh dist` as a
+  pre-build script: it builds when an input is newer than `MANIFEST`, and with no Node (or not
+  the pinned one) it leaves an empty `Web/dist` and an Xcode warning. The app still builds,
+  and with no `MANIFEST` the control plane keeps the web listener off (check 3).
+- CI's test job installs the pinned Node before the Mac builds; `build-linux-control.sh`
+  runs `web.sh build` before copying `dist` into the image.
+- Check 1 runs only when a `dist` has been built. Check 2 builds, then tests; there is no
+  committed copy to compare. `generated.ts` stays checked in and `GeneratedIsFreshTests`
+  still holds it to the Swift.
 
 ## R9 — The web app's libraries
 

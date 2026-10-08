@@ -24,9 +24,8 @@
 
 ## Web/dist and generated.ts
 
-- **A lane never commits `Web/dist/**` or `Web/src/protocol/generated.ts`.** Main rebuilds and commits both after each merge (`.github/workflows/web-dist.yml`), so a PR carrying them only makes every other open PR conflict (#473).
-- **Run `scripts/web.sh types` and `build` when the change needs them** to be seen or tested (a web walk, tsc against a new protocol type), under the "build" lease, then leave the results out: `git checkout origin/main -- Web/dist Web/src/protocol/generated.ts` before committing.
-- **A stale bundle on a branch is not a failure;** CI notes it and moves on. A conflict in either file is settled by taking main's.
+- **`Web/dist` is not checked in** (#473); it is in `.gitignore`. Agents Host's build makes it with `scripts/web.sh dist` (the Node in `Web/.node-version`; without it, an empty one and a warning). Run `scripts/web.sh build`, under the "build" lease, to see a web change without a Mac build.
+- **`Web/src/protocol/generated.ts` is checked in.** A change to a protocol type runs `scripts/web.sh types` and commits the result; a conflict in it is settled by running that again, never by hand.
 
 ## Verifying a lane's work
 
