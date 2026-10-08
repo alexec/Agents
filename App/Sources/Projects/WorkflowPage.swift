@@ -440,6 +440,7 @@ struct WorkflowPage: View {
             case .project: return "person.2"
             case .workflow: return "arrow.triangle.2.circlepath"
             case .branch: return "arrow.triangle.branch"
+            case .dropbox: return "tray.and.arrow.down"
             case .custom: return "sparkle"
             default: return "desktopcomputer"
             }
