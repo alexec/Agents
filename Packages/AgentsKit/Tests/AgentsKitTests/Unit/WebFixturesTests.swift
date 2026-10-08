@@ -480,6 +480,22 @@ struct WebFixturesTests {
                 entry(10, .agentMessage(messageID: "z", text: "Fine.")),
                 finished,
             ], false),
+            ("retried errors the agent got past (#394)", [
+                ask(1, "Fix it"),
+                entry(2, .agentMessage(messageID: "a", text: "Looking.")),
+                entry(3, .agentMessage(messageID: "e1", text: "Error: RetriableError: [aborted] Client network socket disconnected")),
+                entry(4, .toolCall(call("t1", "ls", kind: "execute"))),
+                entry(5, .agentMessage(messageID: "b", text: "Half way.\nError: RetriableError: [unavailable] getaddrinfo ENOTFOUND api2.cursor.sh\n")),
+                entry(6, .agentMessage(messageID: "b", text: "\nAll done.")),
+                finished,
+            ], false),
+            ("a retried error the turn ended on stays (#394)", [
+                ask(1, "Fix it"),
+                entry(2, .agentMessage(messageID: "a", text: "Error: RetriableError: [unavailable] getaddrinfo ENOTFOUND api2.cursor.sh")),
+                finished, usage,
+                ask(3, "Try again"),
+                entry(4, .agentMessage(messageID: "b", text: "Error: RetriableError: [aborted] socket")),
+            ], true),
         ]
     }
 

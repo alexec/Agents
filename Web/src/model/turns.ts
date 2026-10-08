@@ -152,6 +152,53 @@ function join(entry: TranscriptEntry, previous: TranscriptEntry | undefined): Tr
   return undefined;
 }
 
+const retried = "RetriableError";
+
+/** IntermittentError.isLine: a line about a blip the runtime retries on its own (#394). */
+function isRetriedLine(line: string): boolean {
+  const trimmed = line.trimStart();
+  return trimmed.startsWith(`Error: ${retried}`) || trimmed.startsWith(retried);
+}
+
+/** IntermittentError.without: every retried error left out, or only those the message went on past. */
+function withoutRetried(text: string, all: boolean): string | undefined {
+  if (!text.includes(retried)) return undefined;
+  const kept: string[] = [];
+  let dropped = false;
+  let followed = false;
+  for (const line of text.split("\n").reverse()) {
+    const isError = isRetriedLine(line);
+    if (isError && (all || followed)) { dropped = true; continue; }
+    if (!isError && line.trim() !== "") followed = true;
+    kept.push(line);
+  }
+  if (!dropped) return undefined;
+  let result = kept.reverse().join("\n");
+  while (result.includes("\n\n\n")) result = result.replaceAll("\n\n\n", "\n\n");
+  return result.replace(/^\n+|\n+$/g, "");
+}
+
+/** TranscriptEntry.carriesOn: the agent going on with its work. */
+const carriesOnKinds = new Set(["agentMessage", "agentThought", "toolCall", "toolCallUpdate", "appView", "planUpdated",
+  "permissionAsked", "elicitationAsked"]);
+
+/** TranscriptEntry.endsTheWork: the person spoke, or the agent ended. */
+function endsTheWork(entry: TranscriptEntry): boolean {
+  if (kindOf(entry) === "userMessage") return true;
+  const state = fields(entry, "stateChanged");
+  return state !== undefined && state._0 !== "starting" && state._0 !== "running";
+}
+
+/** A message item with its retried errors left out; undefined when it keeps them all. */
+function withoutRetriedItem(item: Item, all: boolean): Item | undefined {
+  if (item.kind !== "entry") return undefined;
+  const message = fields(item.entry, "agentMessage");
+  if (!message || (message.blocks ?? []).length) return undefined;
+  const rest = withoutRetried(message.text, all);
+  if (rest === undefined) return undefined;
+  return { ...item, entry: { ...item.entry, kind: { agentMessage: { ...message, text: rest } } } };
+}
+
 function isRunning(item: BackgroundItem): boolean {
   return item.state === "running" || item.state === "paused";
 }
@@ -166,6 +213,8 @@ export class DisplayBuilder {
   /** Where each view is (#187), by its call's id: drawn once, where the call began. */
   private viewAt = new Map<string, number>();
   private last: TranscriptEntry | undefined;
+  /** How much of `drawn` is past the agent carrying on (#394). */
+  private settled = 0;
 
   constructor(readonly subagent?: string) {}
 
@@ -201,6 +250,7 @@ export class DisplayBuilder {
         this.run.push(call);
       }
       if (this.runID === undefined) this.runID = entry.id;
+      this.resolveRetried();
       return;
     }
     const view = fields(entry, "appView");
@@ -212,6 +262,7 @@ export class DisplayBuilder {
         return;
       }
       this.closeRun();
+      this.resolveRetried();
       this.viewAt.set(view._0.id, this.drawn.length);
       this.drawn.push({ kind: "entry", id: entry.id, entry });
       return;
@@ -225,10 +276,34 @@ export class DisplayBuilder {
     if ((state && state._0 === "finished") || kind === "usageRecorded") {
       this.closeRun();
       while (this.drawn.length && isPassing(this.drawn[this.drawn.length - 1]!)) this.drawn.pop();
+      this.settled = Math.min(this.settled, this.drawn.length);
+      if (state) this.settleRetried();
       return;
     }
     this.closeRun();
+    if (carriesOnKinds.has(kind)) this.resolveRetried();
+    else if (endsTheWork(entry)) this.settleRetried();
     this.drawn.push({ kind: "entry", id: entry.id, entry });
+  }
+
+  /** The work stopped: retried errors stay, unless their message went on past them. */
+  private settleRetried(): void {
+    for (let index = this.settled; index < this.drawn.length; index++) {
+      this.drawn[index] = withoutRetriedItem(this.drawn[index]!, false) ?? this.drawn[index]!;
+    }
+    this.settled = this.drawn.length;
+  }
+
+  /** The agent carried on: every retried error since it last did leaves the page. */
+  private resolveRetried(): void {
+    for (let index = this.drawn.length - 1; index >= this.settled; index--) {
+      const item = this.drawn[index]!;
+      const rest = withoutRetriedItem(item, true);
+      if (!rest || rest.kind !== "entry") continue;
+      if (fields(rest.entry, "agentMessage")!.text === "") this.drawn.splice(index, 1);
+      else this.drawn[index] = rest;
+    }
+    this.settled = this.drawn.length;
   }
 
   private mergeIntoClosedRun(update: ToolCall, id: string): boolean {
@@ -255,6 +330,7 @@ export class DisplayBuilder {
   /** Everything drawn, the open run after it, and passing lines since superseded left out. */
   get items(): Item[] {
     const all = [...this.drawn];
+    for (let index = this.settled; index < all.length; index++) all[index] = withoutRetriedItem(all[index]!, false) ?? all[index]!;
     if (this.run.length && this.runID !== undefined) all.push({ kind: "run", id: this.runID, calls: [...this.run] });
     return withoutSupersededPassingLines(all);
   }

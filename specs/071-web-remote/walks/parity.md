@@ -15,13 +15,13 @@
 
 ## Counts
 
-Of 205 rows: **137 same**, **40 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 206 rows: **138 same**, **40 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #394). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
 | Sidebar and project list | 8 | 2 | 9 |
 | Session rows and states | 16 | 2 | 5 |
-| Chat turns and turn detail | 19 | 3 | 2 |
+| Chat turns and turn detail | 20 | 3 | 2 |
 | Prompt bar and queued prompts | 18 | 2 | 0 |
 | Question and permission cards | 12 | 3 | 0 |
 | Start sheet and new project | 17 | 5 | 0 |
@@ -113,6 +113,7 @@ The deltas are tracked by 29 issues:
 | Jump to end | Whenever scrolled away, *Something new*: `S/Chat/JumpToEnd.swift:9-43` | Shared | Shown while away; *Something new* when messages arrive: `W/views/Chat.tsx:370-375` | **same** (#252) |
 | First open: the last 12 turns, earlier ones at the top (#90, #91) | 12: `K/Daemon/DaemonAPI.swift` (`TurnsRequest.opening`, #242) | 12, the same request: `R/RemoteModel.swift` | 12: `W/model/store.ts` (`openingTurns`) | **same** |
 | A finished turn longer than a page | One call for up to the host's ceiling (1,000); eight opened turns kept: `A/AppModel.swift` turnEntries, `S/Chat/ChatTranscript.swift` fetchedTurns | The same call, kept for every turn opened: `R/RemoteModel.swift` turnEntries | The last 200, then Earlier steps; eight open turns kept: `W/model/store.ts` turnEntries, `W/views/Chat.tsx`, `W/views/chat/Rows.tsx` | **delta**: remote #215 |
+| A retried runtime error (Cursor's `RetriableError`) leaves the page once the agent carries on; kept if the turn ends on it (#394) | `K/Model/IntermittentError.swift`, `K/Model/TranscriptDisplay.swift` | Shared | `W/model/turns.ts` (held to `Fixtures/web/turns/transcripts.json`) | **same** (#394) |
 | Coming back after a restart, in the chat | `S/Chat/ChatTranscript.swift:135-136` | Shared | Only *Working*: `W/views/Chat.tsx:216-218` | **delta**: web #251 |
 | A retired agent | `S/Retired/RetiredAgentPage.swift` with Started by: `A/ContentView.swift:106-108` | With Started by, worded by `K/Client/AgentsModel.swift` (`retiredStarterLabel`, #242) | `W/views/RetiredPage.tsx`, looked up by `W/views/Chat.tsx` | **same** (#253) |
 | Background work over the prompt, its ending line | Stop, Steps, Output: `S/Chat/BackgroundRows.swift:13-45, 228-262`, `A/Sidebar/BackgroundPane.swift` | Stop and Steps: `R/Chat/PromptBar.swift:54-63` | Stop and stopping states: `W/views/Chat.tsx` (`BackgroundRows`); Started/ended lines and failed tint: `W/views/chat/Rows.tsx` | **same** (#253) |

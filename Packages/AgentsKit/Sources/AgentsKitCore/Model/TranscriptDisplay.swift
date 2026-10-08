@@ -168,6 +168,35 @@ extension TranscriptEntry {
     }
 }
 
+extension TranscriptEntry {
+    /// Whether this is the agent going on with its work, which is what makes a retried
+    /// error before it a blip it got past (#394).
+    var carriesOn: Bool {
+        switch kind {
+        case .agentMessage, .agentThought, .toolCall, .toolCallUpdate, .appView, .planUpdated,
+             .permissionAsked, .elicitationAsked:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Whether the work stopped here: the person spoke, or the agent ended. A retried
+    /// error before this is the last thing the agent did, and stays.
+    var endsTheWork: Bool {
+        switch kind {
+        case .userMessage:
+            return true
+        case .stateChanged(.starting, _), .stateChanged(.running, _):
+            return false
+        case .stateChanged:
+            return true
+        default:
+            return false
+        }
+    }
+}
+
 /// The page as the chat draws it, kept up as entries arrive.
 ///
 /// A reply arrives as a dozen chunks a second, and folding the whole page again for
@@ -198,6 +227,10 @@ public struct TranscriptDisplayBuilder: Sendable {
     /// The last entry taken, as it stands after joining, for the chunk that
     /// continues it.
     private var last: TranscriptEntry?
+    /// How much of `drawn` is past the agent carrying on (#394). A retried error after
+    /// this may still be what stopped the work; one before it has been dealt with: left
+    /// out once the agent carried on, or kept because the turn ended on it.
+    private var settled = 0
     /// Whose page this is: nil for the chat, which is the agent's own, or a subagent's
     /// id for that subagent's steps (057). Each leaves out everything the other says.
     public let subagent: String?
@@ -248,6 +281,7 @@ public struct TranscriptDisplayBuilder: Sendable {
                 run.append(call)
             }
             if runID == nil { runID = entry.id }
+            resolveIntermittentErrors()
         case .appView(let call):
             if let at = viewAt[call.id], drawn.indices.contains(at), case .entry(var first) = drawn[at] {
                 first.kind = .appView(call)
@@ -255,6 +289,7 @@ public struct TranscriptDisplayBuilder: Sendable {
                 return
             }
             closeRun()
+            resolveIntermittentErrors()
             viewAt[call.id] = drawn.count
             drawn.append(.entry(entry))
         case .background(let item) where item.isRunning && item.kind == .task && item.toolCallID != nil:
@@ -284,8 +319,14 @@ public struct TranscriptDisplayBuilder: Sendable {
             // any drawn line would do to the page and puts nothing on it.
             closeRun()
             supersedePassingLines()
+            if case .stateChanged = entry.kind { settleIntermittentErrors() }
         default:
             closeRun()
+            if entry.carriesOn {
+                resolveIntermittentErrors()
+            } else if entry.endsTheWork {
+                settleIntermittentErrors()
+            }
             drawn.append(.entry(entry))
         }
     }
@@ -294,6 +335,44 @@ public struct TranscriptDisplayBuilder: Sendable {
     /// is not drawn.
     private mutating func supersedePassingLines() {
         while let last = drawn.last, last.isPassing { drawn.removeLast() }
+        settled = min(settled, drawn.count)
+    }
+
+    /// The work stopped, so every retried error since the agent last carried on stays,
+    /// unless the message it is in went on past it.
+    private mutating func settleIntermittentErrors() {
+        Self.leaveOutErrorsPassedInMessage(&drawn, from: settled)
+        settled = drawn.count
+    }
+
+    /// Each message from `from` on with the retried errors it went on past left out.
+    private static func leaveOutErrorsPassedInMessage(_ all: inout [TranscriptItem], from: Int) {
+        for index in all.indices where index >= from {
+            guard case .entry(var entry) = all[index],
+                  case .agentMessage(let id, let text, let blocks) = entry.kind, blocks.isEmpty,
+                  let rest = IntermittentError.without(in: text, all: false) else { continue }
+            entry.kind = .agentMessage(messageID: id, text: rest, blocks: blocks)
+            all[index] = .entry(entry)
+        }
+    }
+
+    /// The agent has carried on, so every retried error since the last time it did was
+    /// a blip it got past: those lines leave the page, and a message that was nothing
+    /// else leaves with them. Only lines after every run and view are ever taken off,
+    /// since anything that carries on moves `settled` past it, so their places hold.
+    private mutating func resolveIntermittentErrors() {
+        for index in drawn.indices.reversed() where index >= settled {
+            guard case .entry(var entry) = drawn[index],
+                  case .agentMessage(let id, let text, let blocks) = entry.kind, blocks.isEmpty,
+                  let rest = IntermittentError.without(in: text, all: true) else { continue }
+            if rest.isEmpty {
+                drawn.remove(at: index)
+            } else {
+                entry.kind = .agentMessage(messageID: id, text: rest, blocks: blocks)
+                drawn[index] = .entry(entry)
+            }
+        }
+        settled = drawn.count
     }
 
     /// Merge an update into the closed run that holds its call, if one does.
@@ -319,6 +398,7 @@ public struct TranscriptDisplayBuilder: Sendable {
     /// passing lines that something has since superseded left out.
     public var items: [TranscriptItem] {
         var all = drawn
+        Self.leaveOutErrorsPassedInMessage(&all, from: settled)
         if !run.isEmpty, let runID { all.append(.toolRun(id: runID, calls: run)) }
         return TranscriptEntry.withoutSupersededPassingLines(all)
     }
