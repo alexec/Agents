@@ -44,8 +44,11 @@ into `dropbox/review/`.
    On the Mac, you can also drag files from Finder onto the project's row in the sidebar,
    or onto any of its sessions' rows. They go into the top of the project's drop box,
    never into a session's worktree, so a workflow with `folder:` set does not see them
-   there. A file dragged this way can be up to 25 MB; copy a bigger one into the folder
-   in Finder. A folder dragged onto the list is added as a project, as before.
+   there. To put them in a folder such as `review`, right click the project's row,
+   choose **Put Files in Drop Box…**, type the folder, then drag the files onto the
+   sheet or press **Choose Files…**. A file sent from the Mac can be up to 25 MB; copy a
+   bigger one into the folder in Finder. A folder dragged onto the list is added as a
+   project, as before.
 
    On the iPhone or iPad, touch and hold the project in the list, choose **Put Files in
    Drop Box…**, type a folder such as `review` if you want one, then **Choose Files…**.
