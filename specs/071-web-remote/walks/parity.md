@@ -15,14 +15,14 @@
 
 ## Counts
 
-Of 211 rows: **141 same**, **42 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 212 rows: **142 same**, **42 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
 | Sidebar and project list | 8 | 3 | 9 |
 | Session rows and states | 16 | 2 | 5 |
 | Chat turns and turn detail | 22 | 3 | 2 |
-| Prompt bar and queued prompts | 18 | 3 | 0 |
+| Prompt bar and queued prompts | 19 | 3 | 0 |
 | Question and permission cards | 13 | 3 | 0 |
 | Start sheet and new project | 17 | 5 | 0 |
 | Worktrees and Files | 9 | 6 | 6 |
@@ -138,6 +138,7 @@ The deltas are tracked by 29 issues:
 | The bar's head: place, labels, runtime | `A/Chat/PromptBar.swift:246-269, 353-363` | Over the field: the place (said, not offered), labels, runtime: `R/Chat/PromptBar.swift` (`PromptHead`, #242) | `W/views/Chat.tsx:230-271` | **same** (moving a session stays the window's, 053) |
 | Moving a session to another place (053) | Worktree capsule: `A/Chat/PromptBar.swift:1185-1261` | None | Names the place, can't move: `W/views/Chat.tsx:249-264` | **by design** (moving is the window's) |
 | Model and effort | One `ModelPill`: `S/Chat/ModelPill.swift` | One `ModelPill` | One combined disclosure: `W/views/PromptMenus.tsx` | **same** |
+| The order of a menu's choices (#436) | Models: Auto or Default first, then by family (Claude, GPT, Gemini, Grok, the rest by name), newest and most capable first; modes, effort and permissions as the runtime sent them. Sorted once as an option is read: `K/Model/ChoiceOrder.swift` | The same, from the shared model | The same: the daemon sends them in order | **same** (#436) |
 | No-controls note | `OptionsNote`: `S/Chat/PromptPieces.swift` | The same | `W/views/PromptMenus.tsx` | **same** |
 | Sandbox capsule | `S/Chat/SandboxCapsule.swift`, `A/Chat/PromptBar.swift:854-878` | `R/Chat/PromptBar.swift:498-505` | `W/views/PromptStatus.tsx` | **same** |
 | Lease and event-wait capsules | `S/Chat/LeaseRow.swift`, `S/Chat/WaitCapsule.swift` | The same, the wait without ✕ (`WaitCapsule.swift:9-10`) | `W/views/Chat.tsx:472-488` | **same** |

@@ -668,7 +668,8 @@ public actor ACPSession {
             }
             if !choices.isEmpty {
                 made.append(ConfigOption(id: modelOption, name: "Model", category: "model", type: "select",
-                                         currentValue: models["currentModelId"], options: choices))
+                                         currentValue: models["currentModelId"],
+                                         options: ChoiceOrder.sorted(choices)))
             }
         }
         return made
