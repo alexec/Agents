@@ -238,6 +238,9 @@ public actor DaemonCore {
     /// The phones and iPads that have an agent's shell open, by agent (034). A device
     /// hears a shell's output only while it is here; a window on the Mac hears them all.
     var shellWatchers: [UUID: Set<UUID>] = [:]
+    /// The Mac windows attached to each shell. While there is one, the shell keeps the
+    /// Mac's size and a phone's is not taken (#401).
+    var shellMacScreens: [ShellHost.Key: Set<UUID>] = [:]
     /// What each agent found dead on start-up was doing when the last daemon went, held
     /// only until it has been told. See `DaemonCore+Recovery`.
     var interrupted: [UUID: AgentState] = [:]

@@ -20,7 +20,7 @@ struct TerminalPane: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ShellTabs(shells: state.shells, front: state.frontShell,
+            ShellTabs(shells: state.shells, titles: state.shellTitles, front: state.frontShell,
                       canOpenMore: state.canOpenMoreShells,
                       select: { shell in
                           state.frontShell = shell
@@ -34,39 +34,57 @@ struct TerminalPane: View {
                 ForEach(state.shells, id: \.self) { shell in
                     ShellScreen(agent: agent, shell: shell, isFront: isVisible && state.frontShell == shell,
                                 wantsFocus: state.shellToFocus == shell,
-                                focused: { if state.shellToFocus == shell { state.shellToFocus = nil } })
+                                focused: { if state.shellToFocus == shell { state.shellToFocus = nil } },
+                                titled: { state.shellTitles[shell] = $0 },
+                                newTab: open, closeTab: { close(shell) })
                         .opacity(state.frontShell == shell ? 1 : 0)
                         .allowsHitTesting(state.frontShell == shell)
                 }
             }
         }
-        .task(id: agent.id) {
-            guard !state.shellsLoaded else { return }
-            state.shellsLoaded = true
+        // Asked each time the pane comes on screen, not once: a tab opened or closed on
+        // the phone meanwhile is found (#401).
+        .task(id: Refresh(agentID: agent.id, isVisible: isVisible)) {
+            guard isVisible else { return }
             guard let held = await model.shellNumbers(for: agent.id) else {
                 state.canOpenMoreShells = false
                 return
             }
+            state.canOpenMoreShells = true
             state.shells = held
             if !held.contains(state.frontShell) { state.frontShell = held.first ?? 0 }
         }
     }
 
-    private func open() {
-        let next = (state.shells.max() ?? -1) + 1
-        state.shells.append(next)
-        state.frontShell = next
-        state.shellToFocus = next
+    private struct Refresh: Equatable {
+        let agentID: UUID
+        let isVisible: Bool
     }
 
+    /// The daemon numbers the new shell, so a tab opened on the phone at the same
+    /// moment never gets the same one (#401).
+    private func open() {
+        Task {
+            let next = await model.openShell(for: agent.id) ?? ((state.shells.max() ?? -1) + 1)
+            if !state.shells.contains(next) { state.shells.append(next) }
+            state.frontShell = next
+            state.shellToFocus = next
+        }
+    }
+
+    /// Closing the last tab starts a fresh shell in its place: a terminal with no shell
+    /// in it is nothing anyone wants (#401).
     private func close(_ shell: Int) {
-        guard state.shells.count > 1, let index = state.shells.firstIndex(of: shell) else { return }
+        guard let index = state.shells.firstIndex(of: shell) else { return }
         state.shells.remove(at: index)
-        if state.frontShell == shell {
+        state.shellTitles[shell] = nil
+        Task { await model.closeShell(agentID: agent.id, shell: shell) }
+        if state.shells.isEmpty {
+            open()
+        } else if state.frontShell == shell {
             state.frontShell = state.shells[min(index, state.shells.count - 1)]
             state.shellToFocus = state.frontShell
         }
-        Task { await model.closeShell(agentID: agent.id, shell: shell) }
     }
 }
 
@@ -78,6 +96,9 @@ private struct ShellScreen: View {
     let isFront: Bool
     let wantsFocus: Bool
     let focused: () -> Void
+    let titled: (String?) -> Void
+    let newTab: () -> Void
+    let closeTab: () -> Void
 
     @State private var client: ShellClient?
     @State private var rows = 24
@@ -97,7 +118,7 @@ private struct ShellScreen: View {
                     }
                 } else {
                     TerminalHostView(client: client, wantsFocus: wantsFocus, focused: focused,
-                                     isFront: isFront) { newRows, newCols in
+                                     isFront: isFront, newTab: newTab, closeTab: closeTab) { newRows, newCols in
                         rows = newRows
                         cols = newCols
                         Task { await client.resize(rows: newRows, cols: newCols) }
@@ -109,7 +130,7 @@ private struct ShellScreen: View {
                     .background(Paper.ground)
                     if !client.state.isLive {
                         ended(client)
-                    } else if let opened = client.folder, !sameFolder(opened, agent.cwd),
+                    } else if let opened = client.directory ?? client.folder, !sameFolder(opened, agent.cwd),
                               cdTypedFor.map({ !sameFolder($0, agent.cwd) }) ?? true {
                         moved(client, from: opened)
                     } else if let sendProblem = client.sendProblem {
@@ -127,6 +148,7 @@ private struct ShellScreen: View {
             client = held
             await held.attach(rows: rows, cols: cols)
         }
+        .onChange(of: client?.title) { _, title in titled(title) }
         .onDisappear {
             if let client { model.releaseShell(client) }
             client = nil
