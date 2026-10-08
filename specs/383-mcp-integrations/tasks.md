@@ -255,7 +255,7 @@ real repo, a failing PR yields one `checks.failed` with a stable id.
   - `start` writes and loads a LaunchAgent `~/Library/LaunchAgents/com.agents.ci-watcher.plist` running `node <abs>/server.ts --port 8791`, with logs in `~/Library/Logs/ci-watcher.log`.
   - `stop` unloads and deletes it.
   - `status` prints `launchctl list | grep ci-watcher` and `curl -s 127.0.0.1:8791/health`.
-- [ ] T030 [P] [US3] Add `.agents/mcp.json` with `{ "mcpServers": { "ci": { "type": "http", "url": "http://127.0.0.1:8791/mcp" } } }`. Add `.agents/workflows/fix-failed-checks.md`, exactly as the example in [contracts/workflow-trigger.md](contracts/workflow-trigger.md), with `enabled: false`.
+- [x] T030 [P] [US3] Add `.agents/mcp.json` with `{ "mcpServers": { "ci": { "type": "http", "url": "http://127.0.0.1:8791/mcp" } } }`. Add `.agents/workflows/fix-failed-checks.md`, exactly as the example in [contracts/workflow-trigger.md](contracts/workflow-trigger.md), with `enabled: false`.
 
 **Checkpoint**: T026 passes. Against `run.sh start`, `curl` shows both events.
 
