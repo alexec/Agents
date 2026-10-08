@@ -154,6 +154,23 @@ struct WorkflowToolTests {
         #expect(warned.contains("\"max\" is not an effort Claude offers here — it offers low, high"))
     }
 
+    /// On a Linux server a trigger only a Mac raises never fires (#372): written anyway,
+    /// since the file may travel to a Mac, but said on the write and on the list.
+    @Test func aServerSaysAMacOnlyTriggerNeverFiresThere() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let (core, token, agentID) = try await core(locations, in: work)
+        await core.actAsServer()
+        let wake = "---\non:\n  - mac.wake\n  - machine.disk_low\nagent: new\n---\n\nCatch up.\n"
+        let never = EventWords.neverHere(["mac.wake"])
+
+        let written = try await call(core, token, .write, id: "catch-up", content: wake, keepingAlive: agentID)
+        #expect(written.hasPrefix("Created catch-up."))
+        #expect(written.contains(never), "\(written)")
+        let listed = try await call(core, token, .list, keepingAlive: agentID)
+        #expect(listed.contains("[\(never)]"), "\(listed)")
+    }
+
     @Test func listingSaysWhatEachOneIsAndWhatHappenedToIt() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)

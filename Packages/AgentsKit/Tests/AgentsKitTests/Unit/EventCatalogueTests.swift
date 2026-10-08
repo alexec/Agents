@@ -10,16 +10,28 @@ struct EventCatalogueTests {
         // 30 from 042, 051's agent.retired, and 052's switch and two allowance kinds,
         // less the ten pull-request kinds that went with GitHub support, and the switch,
         // which went with the pool (065), and agent.parked and agent.archived (#96), and
-        // mac.disk_low and mac.disk_ok (#195), and project.idle (#360).
+        // mac.disk_low and mac.disk_ok (#195, machine.* since #372), and project.idle (#360).
         #expect(names.count == 28)
         for name in ["cost.allowance_out", "cost.allowance_back", "agent.parked", "agent.archived",
-                     "mac.disk_low", "mac.disk_ok", "project.idle"] {
+                     "machine.disk_low", "machine.disk_ok", "project.idle"] {
             #expect(names.contains(name), "\(name)")
         }
         #expect(!names.contains("agent.runtime_switched"))
         #expect(Set(names).count == names.count)
         for name in names { #expect(EventDraft.isWellFormed(name), "\(name)") }
         for kind in EventCatalogue.all { #expect(EventSubject(name: kind.name) != nil, "\(kind.name)") }
+    }
+
+    /// What a Linux server never raises (#372).
+    @Test func sleepWakeAndThePersonAreMacOnly() {
+        let macOnly = EventCatalogue.all.filter(\.isMacOnly).map(\.name)
+        #expect(macOnly == ["mac.sleep", "mac.wake", "person.away", "person.back"])
+        #expect(EventCatalogue.isMacOnly("person.*"))
+        #expect(EventCatalogue.isMacOnly("mac.*"))
+        #expect(!EventCatalogue.isMacOnly("machine.*"))
+        #expect(!EventCatalogue.isMacOnly("machine.disk_low"))
+        #expect(!EventCatalogue.isMacOnly("custom.mac_wake"))
+        #expect(EventCatalogue.describe().contains("- mac.wake: This Mac woke up. Only a Mac raises it"))
     }
 
     @Test func everyOldTriggerNameAnswersToAKind() {

@@ -69,6 +69,7 @@ nav:
       - how-to/run-the-control-plane-in-the-cloud.md
       - how-to/run-several-copies.md
       - how-to/move-an-existing-set-up.md
+      - how-to/chat-without-a-project.md
       - how-to/add-a-project.md
       - how-to/start-in-a-worktree.md
       - how-to/give-an-agent-more-folders.md

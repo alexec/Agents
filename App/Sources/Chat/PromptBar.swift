@@ -399,10 +399,11 @@ struct PromptBar: View {
                                            attachPicture: attachPicture))
                 // Held, words and all, while they start an agent (#87).
                 .disabled(agent == nil && model.isStarting)
-                // Return sends. Option and Return is left alone, and the field
-                // editor inserts a line break the way it does everywhere else.
+                // Return and Shift-Return send. Option and Return is left alone, and
+                // the field editor inserts a line break the way it does everywhere else
+                // (#377).
                 .onKeyPress(.return, phases: .down) { press in
-                    guard !press.modifiers.contains(.option) else { return .ignored }
+                    guard PromptReturn(option: press.modifiers.contains(.option)) == .send else { return .ignored }
                     // While the list is up, Return takes the command rather than
                     // sending a half-typed one.
                     if isCompleting || isMentioning {

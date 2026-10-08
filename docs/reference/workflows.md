@@ -106,7 +106,7 @@ Every agent here has stopped. For each agent in the event's ids, check that what
 did landed: its branch merged, its checks green. Remove worktrees whose branch is on main.
 ```
 
-A `new` or `standing` run set off by an event no agent is behind, such as `mac.disk_low`,
+A `new` or `standing` run set off by an event no agent is behind, such as `machine.disk_low`,
 is told the event at the end of its prompt: its sentence and every detail, so the agent can
 act on `level: critical` without looking it up.
 
@@ -148,6 +148,7 @@ A workflow does not run, and its page says why, when:
   file as you saw it: a file that changes afterwards waits again. Changes made on the
   workflow's page in Agents count as approved unless the workflow was already waiting,
   and workflows that existed before this version were approved as they stood;
+- you denied it on this Mac or server. See [Approve, Deny and Archive](#approve-deny-and-archive);
 - it is approved but not one of the first ten approved workflows across every project,
   taken in order of project folder and then file name. Archiving one anywhere makes room;
   turning one off does not. See [Limits](#limits);
@@ -161,8 +162,8 @@ A workflow does not run, and its page says why, when:
 - the file cannot be read, or names a trigger or `agent:` value this version does not
   know. The page says what is wrong with the file.
 
-On the Mac, each workflow on the project page has **Open**, **Run now** (**Approve**
-while it is waiting for your OK), **Turn Off** (**Turn On** once off), **Archive**
+On the Mac, each workflow on the project page has **Open**, **Run now** (**Approve** and
+**Deny on This Host** while it is waiting for your OK), **Turn Off** (**Turn On** once off), **Archive**
 (**Bring Back** once archived) and **Show in Finder**. Its page has the **Enabled** switch
 beside **Run now**, and a **Triggers** section listing each trigger on its own line: the
 filters on it, whether it listens in this project or on the whole Mac or server, which
@@ -222,7 +223,36 @@ Two limits, both fixed:
   listed and says *10 workflows are already running, across every project*. Archiving
   one anywhere makes room.
 
-Archived workflows count towards neither. Turned-off ones still count.
+Archived workflows count towards neither, and nor do ones denied on this Mac or server.
+Turned-off ones still count.
+
+## Approve, Deny and Archive
+
+A workflow waiting for your OK offers three answers, on the Mac, the phone and the web
+page:
+
+| | Meaning | Where it is kept |
+| --- | --- | --- |
+| **Approve** | Yes, run here | This Mac or server, outside the project |
+| **Deny on This Host** | Don't run here | This Mac or server, beside the approval. Not in the workflow's file |
+| **Archive** | Don't run anywhere | The workflow's file, as `archived: true` |
+
+Deny is of the file as you saw it, the same way Approve is: a later change to the file
+waits for your OK again. Other Macs and servers are untouched: they still see it waiting,
+and any of them can approve it and run it. Nothing is written into the project, so there
+is nothing to commit.
+
+On the Mac or server that denied it:
+
+- its triggers do not run it, and **Run now** does not either, until it is approved there;
+- it stays in its place on the list, marked **Denied on this host**, not under
+  **Archived workflows**;
+- it no longer counts as waiting, so it frees a place among the three that may wait, and
+  it does not count towards the ten approved workflows that may run;
+- **Approve** is still there, and takes the denial back without bringing an archive back.
+
+`hosts:` in the file is not the same thing: it is a list written into the shared file,
+and taking a computer off it is a change you commit.
 
 ## Off and archived
 
@@ -236,7 +266,7 @@ One still waiting for your OK still waits.
 
 What stays on this Mac or server, and is not written into the project, is the
 workflow's history there: its runs and outcomes, a held trigger, the agent a
-`standing` workflow keeps, what you have approved, and who turned it off. That last is
+`standing` workflow keeps, what you have approved or denied, and who turned it off. That last is
 why a workflow turned off on another clone says **Off: its file says enabled: false**
 here.
 

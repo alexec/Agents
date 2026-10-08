@@ -6,7 +6,7 @@
 // an event and describes from its catalogue. The page has no catalogue, so it says the event's
 // name and filters instead: "When ci.finished (branch main)".
 import type {
-  JSONValue, Weekday, Workflow, WorkflowCause, WorkflowLimit, WorkflowOutcome, WorkflowProblem, WorkflowRefusal,
+  JSONValue, MCPTriggerStatus, Weekday, Workflow, WorkflowCause, WorkflowLimit, WorkflowOutcome, WorkflowProblem, WorkflowRefusal,
   WorkflowSchedule, WorkflowSettings, WorkflowSummary, WorkflowTriggerStored,
 } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
@@ -71,8 +71,8 @@ const eventMeanings: Record<string, string> = {
   "lease.released": "A lease was given back, ended or ran out",
   "mac.sleep": "This Mac is going to sleep",
   "mac.wake": "This Mac woke up",
-  "mac.disk_low": "Free space on a volume holding the Agents root, a project or a worktree fell below its low or critical threshold",
-  "mac.disk_ok": "Free space on a volume that was low climbed back above its threshold",
+  "machine.disk_low": "Free space on a volume holding the Agents root, a project or a worktree fell below its low or critical threshold",
+  "machine.disk_ok": "Free space on a volume that was low climbed back above its threshold",
   "person.away": "You locked the screen or stepped away for 5 minutes",
   "person.back": "You unlocked the screen or came back",
   "cost.limit_reached": "A spending limit was reached",
@@ -200,6 +200,7 @@ export function workflowStatus(s: WorkflowSummary): { mark: string; words: strin
   if (s.isArchived) return { mark: "▣", words: "Archived", tinted };
   if (waitsItsTurn(s)) return { mark: "✋", words: "Over the limit", tinted };
   if (s.awaitingApproval) return { mark: "✋", words: "Waiting for your OK", tinted };
+  if (s.deniedHere) return { mark: "⊘", words: "Denied on this host", tinted };
   if (!isOn(s)) return { mark: "⏸\uFE0E", words: "Turned off", tinted };
   if (s.overLimit) return { mark: "!", words: "Over the limit", tinted };
   if (tinted) return { mark: "!", words: "Needs attention", tinted };
@@ -240,11 +241,11 @@ const catalogue: Record<string, { scope: "mac" | "project" | "either"; details: 
   "lease.released": { scope: "mac", details: ["resource", "how"] },
   "mac.sleep": { scope: "mac", details: [] },
   "mac.wake": { scope: "mac", details: [] },
-  "mac.disk_low": {
+  "machine.disk_low": {
     scope: "mac",
     details: ["volume", "free_bytes", "free_percent", "level", "threshold", "worktrees"],
   },
-  "mac.disk_ok": { scope: "mac", details: ["volume", "free_bytes", "free_percent", "threshold"] },
+  "machine.disk_ok": { scope: "mac", details: ["volume", "free_bytes", "free_percent", "threshold"] },
   "person.away": { scope: "mac", details: ["why"] },
   "person.back": { scope: "mac", details: ["why"] },
   "cost.limit_reached": { scope: "either", details: ["limit", "agent", ...context] },
@@ -318,7 +319,7 @@ const refusedWords: Record<string, string> = {
   no_triggering_agent: "nothing triggered it, so there was no agent to resume",
   missed_while_closed: "the app was closed", folder_gone: "the project folder is not there",
   day_limit_reached: "the day's spending limit has been reached", setting_refused: "a setting it names cannot be had",
-  awaiting_approval: "it is waiting for your OK",
+  awaiting_approval: "it is waiting for your OK", denied_here: "it is denied on this host",
 };
 const codeWords: Record<string, Record<string, string>> = {
   "agent.failed reason": failedWords,
@@ -426,7 +427,7 @@ export function nextLine(summary: WorkflowSummary, index: number, now = new Date
   if (summary.isArchived) return "Archived — no next time";
   if (!isOn(summary)) return "Off — no next time";
   if (summary.workflow.problem) return "Never, until the file is fixed";
-  if (summary.awaitingApproval) return "No next time until you approve it";
+  if (isUnapproved(summary)) return "No next time until you approve it";
   if (summary.overLimit) return "Over the limit — no next time";
   const byTrigger = summary.nextFireAtByTrigger ?? [];
   const schedules = summary.workflow.triggers.filter((t) => "schedule" in t).length;
@@ -460,6 +461,21 @@ const limitAllowed: Record<WorkflowLimit, number> = { project: 3, total: 10 };
 /** WorkflowSummary.waitsItsTurn (#132): waiting behind the three a project may have waiting. */
 export function waitsItsTurn(s: WorkflowSummary): boolean {
   return !!s.awaitingApproval && s.overLimit === "project";
+}
+
+/** WorkflowSummary.isUnapproved (#391): waiting for an OK, or denied on this host. */
+export function isUnapproved(s: WorkflowSummary): boolean {
+  return !!s.awaitingApproval || !!s.deniedHere;
+}
+
+/** WorkflowSummary.canBeApproved: waiting and allowed to, or denied here, where Approve takes it back. */
+export function canBeApproved(s: WorkflowSummary): boolean {
+  return (!!s.awaitingApproval && !waitsItsTurn(s)) || !!s.deniedHere;
+}
+
+/** WorkflowSummary.canBeDenied (#391): waiting, even behind the ones allowed to. */
+export function canBeDenied(s: WorkflowSummary): boolean {
+  return !!s.awaitingApproval && !s.isArchived;
 }
 
 /** WorkflowSummary.turnedOffSentence (#100). */
@@ -517,6 +533,7 @@ export function refusalMessage(refusal: WorkflowRefusal): string {
   if ("folderGone" in refusal) return "the project folder is not there";
   if ("dayLimitReached" in refusal) return "the day's spending limit has been reached";
   if ("settingRefused" in refusal) return refusal.settingRefused.detail;
+  if ("deniedHere" in refusal) return "it is denied on this host";
   return "it is waiting for your OK";
 }
 
@@ -540,6 +557,8 @@ export function happening(summary: WorkflowSummary, now = new Date()): string | 
       : (summary.awaitingApproval.isNew ? "New" : "Changed since you approved it") + " — approve it on its page to let it run";
     const why = offReasonSentence(summary);
     return why ? `${waiting} · ${why}` : waiting;
+  } else if (summary.deniedHere) {
+    return "Denied on this host — it does not run here";
   } else if (!isOn(summary)) parts.push(turnedOffSentenceFor(summary));
   else if (summary.overLimit) parts.push(`${limitSentence(summary.overLimit)}. ${limitRemedy(summary.overLimit)}`);
   else if (summary.nextFireAt !== undefined) parts.push(`Next ${namedRelative(fromWireDate(summary.nextFireAt), now)}`);
@@ -579,6 +598,7 @@ export function workflowStatusLines(s: WorkflowSummary, now = new Date()): Statu
     lines.push({ glyph: "⚠︎", text: problemMessage(w.problem),
       detail: needs ? "Fix its file to let it run" : "Left alone until this version knows it", tint: needs ? "failure" : undefined });
   }
+  lines.push(...mcpArgumentLines(s));
   if (waitsItsTurn(s) && s.overLimit) {
     lines.push({ glyph: "⧗", text: `Waiting its turn: ${limitSentence(s.overLimit)}`, detail: limitRemedy(s.overLimit), tint: "attention" });
   } else if (s.awaitingApproval) {
@@ -586,6 +606,9 @@ export function workflowStatusLines(s: WorkflowSummary, now = new Date()): Statu
     lines.push({ glyph: "✋", text: note !== undefined ? `Waiting for your OK — ${note}`
       : s.awaitingApproval.isNew ? "New — waiting for your OK" : "Changed since you approved it — waiting for your OK",
       detail: "Read the prompt and settings below, then Approve to let it run", tint: "attention" });
+  } else if (s.deniedHere) {
+    lines.push({ glyph: "⊘", text: "Denied on this host — it does not run here",
+      detail: "Other hosts still see it waiting. Approve to let it run here" });
   }
   if (!s.isArchived) lines.push(enabledLine(s));
   if (s.overLimit && !waitsItsTurn(s)) {
@@ -623,7 +646,7 @@ function enabledLine(s: WorkflowSummary): StatusLine {
 }
 
 function nextRunLine(s: WorkflowSummary, now: Date): StatusLine {
-  const blocked = s.isArchived || !isOn(s) || s.workflow.problem !== undefined || !!s.awaitingApproval || !!s.overLimit;
+  const blocked = s.isArchived || !isOn(s) || s.workflow.problem !== undefined || isUnapproved(s) || !!s.overLimit;
   if (s.nextFireAt !== undefined && !blocked) {
     const at = fromWireDate(s.nextFireAt);
     return { glyph: "◷", text: `Next run ${namedRelative(at, now)}`, detail: at.toLocaleString("en", { dateStyle: "medium", timeStyle: "short" }) };
@@ -706,4 +729,67 @@ export function workflowHostChoices(hosts: readonly { id: string; name: string; 
     result.push({ machineID: host.machineID, name: host.id === "mac" ? "This Mac" : (host.name || host.machineID) });
   }
   return result;
+}
+
+// A server's event triggers (#383): MCPTriggerStatus.words and missedWords in Shared/UI's
+// WorkflowStatus.swift, the line under the triggers for each server they hear.
+
+/** 20 s, 25 min, 3 h, 2 d. */
+export function mcpSpan(seconds: number): string {
+  const whole = Math.round(seconds);
+  if (whole < 60) return `${whole} s`;
+  if (whole < 3600) return `${Math.floor(whole / 60)} min`;
+  if (whole < 86_400) return `${Math.floor(whole / 3600)} h`;
+  return `${Math.floor(whole / 86_400)} d`;
+}
+
+function mcpAgo(wire: MCPTriggerStatus["lastPolledAt"], now: Date): string {
+  return `${mcpSpan(Math.max(0, (now.getTime() - fromWireDate(wire!).getTime()) / 1000))} ago`;
+}
+
+/** The line's words at `now`, and its tint: retrying warns, stopped is an error. */
+export function mcpTriggerWords(status: MCPTriggerStatus, now = new Date()): { text: string; tint?: "attention" | "failure" | undefined } {
+  const who = status.server ?? "its server";
+  let body: string;
+  let tint: "attention" | "failure" | undefined;
+  switch (status.state) {
+    case "pending":
+      body = status.failure?.message ?? `Connecting to ${who}…`;
+      break;
+    case "active": {
+      const checked = status.lastPolledAt !== undefined ? `Checked ${mcpAgo(status.lastPolledAt, now)}` : "Not checked yet";
+      const last = status.lastEventAt !== undefined ? `last event ${mcpAgo(status.lastEventAt, now)}` : "no events yet";
+      body = `${checked} · ${last}`;
+      break;
+    }
+    case "retrying": {
+      const again = status.retryAt !== undefined
+        ? ` · trying again in ${mcpSpan(Math.max(0, (fromWireDate(status.retryAt).getTime() - now.getTime()) / 1000))}` : "";
+      body = status.failure?.code === "unreachable"
+        ? `Can't reach ${who} since ${shortTime(fromWireDate(status.failure.since))}${again}`
+        : `${status.failure?.message ?? `Can't reach ${who}`}${again}`;
+      tint = "attention";
+      break;
+    }
+    case "stopped":
+      body = status.failure?.message ?? "Stopped";
+      tint = "failure";
+      break;
+    default:
+      body = "Runs on another host, which asks for its events";
+  }
+  const lead = status.server !== undefined ? `${status.server} · ${status.name}` : status.name;
+  return { text: `${lead}: ${body}`, tint };
+}
+
+/** "Events may have been missed since 09:14", while they may have been. */
+export function mcpMissedWords(status: MCPTriggerStatus): string | null {
+  return status.missedSince !== undefined
+    ? `Events may have been missed since ${shortTime(fromWireDate(status.missedSince))}` : null;
+}
+
+/** Arguments a server's event doesn't take, said where file errors are. */
+export function mcpArgumentLines(s: WorkflowSummary): StatusLine[] {
+  return (s.mcpTriggers ?? []).filter((t) => t.failure?.code === "badArguments")
+    .map((t) => ({ glyph: "⚠︎", text: t.failure?.message ?? "", detail: "Fix its file to let it run", tint: "failure" as const }));
 }

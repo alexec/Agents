@@ -9,6 +9,8 @@ public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
     case branch
     case lease
     case mac
+    /// The machine the host runs on, whatever it is: a Mac or a Linux server (#372).
+    case machine
     case person
     case cost
     case server
@@ -25,7 +27,7 @@ public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
         case .agent, .project: return "●"
         case .workflow: return "⟳"
         case .branch: return "⎇"
-        case .mac, .person, .lease, .cost, .server: return "⌘"
+        case .mac, .machine, .person, .lease, .cost, .server: return "⌘"
         case .custom: return "✦"
         }
     }
@@ -36,7 +38,7 @@ public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
         case .agent, .project: return .agents
         case .workflow: return .workflows
         case .branch: return .branches
-        case .mac, .person, .lease, .cost, .server: return .mac
+        case .mac, .machine, .person, .lease, .cost, .server: return .mac
         case .custom: return .custom
         }
     }
@@ -83,6 +85,8 @@ public struct EventKind: Hashable, Sendable {
     public var meaning: String
     /// Today's trigger names that answer to it (FR-022).
     public var aliases: [String]
+    /// Raised only by a daemon on a Mac: a Linux host has nothing that hears it (#372).
+    public var isMacOnly: Bool
 
     public var subject: EventSubject { EventSubject(name: name)! }
 
@@ -94,8 +98,9 @@ public struct EventKind: Hashable, Sendable {
     }
 
     init(_ name: String, _ scope: EventScopeKind, _ details: [EventDetail], _ meaning: String,
-         aliases: [String] = []) {
+         aliases: [String] = [], macOnly: Bool = false) {
         self.name = name
+        self.isMacOnly = macOnly
         self.scope = scope
         self.detailDescriptions = details
         self.meaning = meaning
@@ -142,17 +147,18 @@ public enum EventCatalogue {
         EventKind("lease.granted", .mac, [EventDetail("resource"), agent], "An agent was given a lease."),
         EventKind("lease.released", .mac, [EventDetail("resource"), fixed("how", ["expired", "ended", "released"])],
                   "A lease was given back, ended or ran out."),
-        EventKind("mac.sleep", .mac, [], "This Mac is going to sleep."),
-        EventKind("mac.wake", .mac, [], "This Mac woke up."),
-        EventKind("mac.disk_low", .mac,
+        EventKind("mac.sleep", .mac, [], "This Mac is going to sleep.", macOnly: true),
+        EventKind("mac.wake", .mac, [], "This Mac woke up.", macOnly: true),
+        EventKind("machine.disk_low", .mac,
                   open("volume", "free_bytes", "free_percent") + [fixed("level", ["low", "critical"])]
                       + open("threshold", "worktrees"),
                   "Free space on a volume holding the Agents root, a project or a worktree fell below its low or critical threshold."),
-        EventKind("mac.disk_ok", .mac, open("volume", "free_bytes", "free_percent", "threshold"),
+        EventKind("machine.disk_ok", .mac, open("volume", "free_bytes", "free_percent", "threshold"),
                   "Free space on a volume that was low climbed back above its threshold."),
         EventKind("person.away", .mac, [fixed("why", ["locked", "idle"])],
-                  "You locked the screen or stepped away for 5 minutes."),
-        EventKind("person.back", .mac, [fixed("why", ["locked", "idle"])], "You unlocked the screen or came back."),
+                  "You locked the screen or stepped away for 5 minutes.", macOnly: true),
+        EventKind("person.back", .mac, [fixed("why", ["locked", "idle"])], "You unlocked the screen or came back.",
+                  macOnly: true),
         EventKind("cost.limit_reached", .either, [EventDetail("limit")] + about(), "A spending limit was reached."),
         EventKind("cost.allowance_out", .mac, [runtime] + open("until", "retry_after", "reason"),
                   "A runtime's allowance ran out."),
@@ -237,6 +243,7 @@ public enum EventCatalogue {
         ("day_limit_reached", WorkflowRefusal.dayLimitReached.message),
         ("setting_refused", "a setting it names cannot be had"),
         ("awaiting_approval", WorkflowRefusal.awaitingApproval.message),
+        ("denied_here", WorkflowRefusal.deniedHere.message),
     ]
 
     /// `workflow.refused`'s `reason` (073 FR-010). The messages that vary map by their
@@ -284,6 +291,29 @@ public enum EventCatalogue {
 
     public static func kind(named name: String) -> EventKind? { byName[name] }
 
+    /// Names an event went by before it was renamed, and what it is called now (#372):
+    /// the disk events fire on a Linux server too, so they are the machine's, not the
+    /// Mac's. A trigger or a wait naming the old one is read as the new one.
+    public static let renamed: [String: String] = [
+        "mac.disk_low": "machine.disk_low",
+        "mac.disk_ok": "machine.disk_ok",
+    ]
+
+    /// The name as the catalogue has it today.
+    public static func currentName(_ name: String) -> String { renamed[name] ?? name }
+
+    /// Whether only a Mac raises what a pattern names: a Mac-only kind, or a subject
+    /// whose every kind is (#372). A custom event or a name the catalogue does not know
+    /// is not.
+    public static func isMacOnly(_ name: String) -> Bool {
+        if name.hasSuffix(".*") {
+            guard let subject = EventSubject(rawValue: String(name.dropLast(2))), subject != .custom else { return false }
+            let kinds = kinds(in: subject)
+            return !kinds.isEmpty && kinds.allSatisfy(\.isMacOnly)
+        }
+        return kind(named: name)?.isMacOnly ?? false
+    }
+
     /// The kinds an old trigger name answers to. Empty for a name that is not one.
     public static func kinds(forAlias alias: String) -> [EventKind] {
         all.filter { $0.aliases.contains(alias) }
@@ -292,6 +322,25 @@ public enum EventCatalogue {
     /// `custom.` and a name of lowercase letters, digits and `_`, up to 40 characters.
     public static func isCustom(_ name: String) -> Bool {
         name.range(of: #"^custom\.[a-z0-9_]{1,40}$"#, options: .regularExpression) != nil
+    }
+
+    // MARK: Events from MCP servers (#383)
+
+    /// The nouns only the app raises events about: every subject, `custom` included. A
+    /// server's event with one of these is refused, so it can never pass for the app's.
+    public static let reservedNouns: Set<String> = Set(EventSubject.allCases.map(\.rawValue))
+
+    /// Whether a name has the one shape every event has, whoever raises it: `noun.verbed`.
+    public static func isEventName(_ name: String) -> Bool {
+        name.range(of: #"^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$"#, options: .regularExpression) != nil
+    }
+
+    /// Whether a name can only be a server's event: shaped `noun.verbed`, not in the
+    /// catalogue (an old name included), and not about one of the app's own subjects.
+    public static func isServerEventName(_ name: String) -> Bool {
+        guard isEventName(name), kind(named: currentName(name)) == nil,
+              let dot = name.firstIndex(of: ".") else { return false }
+        return !reservedNouns.contains(String(name[..<dot]))
     }
 
     /// The kinds in a subject.
@@ -309,7 +358,8 @@ public enum EventCatalogue {
             }
             let context = kind.detailDescriptions.contains(where: \.isContext) ? ["…"] : []
             let details = own.isEmpty && context.isEmpty ? "" : " [\((own + context).joined(separator: ", "))]"
-            lines.append("- \(kind.name)\(details): \(kind.meaning)")
+            let macOnly = kind.isMacOnly ? " Only a Mac raises it, never a Linux server." : ""
+            lines.append("- \(kind.name)\(details): \(kind.meaning)\(macOnly)")
         }
         lines.append("- custom.<name> [publisher, message, and anything published]: \(customMeaning) "
                      + "<name> is lowercase letters, digits and _, up to 40 characters.")

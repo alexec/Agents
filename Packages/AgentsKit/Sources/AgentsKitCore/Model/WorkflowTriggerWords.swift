@@ -25,6 +25,8 @@ extension WorkflowTrigger {
     public var listensIn: EventScopeKind? {
         switch self {
         case .schedule, .unrecognised: return nil
+        // A server's events are the project's: its servers are found by its folder.
+        case .serverEvent: return .project
         case .agentFinished, .agentAskedPermission, .agentAskedForm, .agentStopped, .workflowCompleted:
             return .project
         case .event(let pattern):
@@ -46,6 +48,8 @@ extension WorkflowTrigger {
             return "A clock has no agent to resume, so this never runs it"
         case .unrecognised:
             return "Never runs it"
+        case .serverEvent:
+            return "A server's events are about no agent, so this never runs it"
         case .agentFinished: return "Resumes the agent that finished"
         case .agentAskedPermission: return "Resumes the agent that asked"
         case .agentAskedForm: return "Resumes the agent that raised the form"
@@ -75,6 +79,7 @@ extension WorkflowCause {
             switch trigger {
             case .schedule: return "on its schedule"
             case .event(let pattern): return "on \(pattern.label)"
+            case .serverEvent(let event): return "on \(event.event)"
             default: return WorkflowTrigger.lowercasedFirst(trigger.summary)
             }
         }

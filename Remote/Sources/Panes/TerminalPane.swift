@@ -93,7 +93,9 @@ private struct ShellScreen: View {
                     await client.restart(rows: rows, cols: cols)
                 }
             } else {
-                if client.dropped > 0 {
+                if let sendProblem = client.sendProblem {
+                    Note(sendProblem)
+                } else if client.dropped > 0 {
                     Note("Earlier output was dropped.")
                 }
                 // Only the tab on top takes the keyboard.
@@ -206,7 +208,13 @@ private struct PhoneTerminalView: UIViewRepresentable {
         // through the line discipline, as in any terminal.
         nonisolated func send(source: TerminalView, data: ArraySlice<UInt8>) {
             let bytes = Data(data)
-            Task { @MainActor in await self.client.send(bytes) }
+            // Queued here, on the main thread SwiftTerm calls from, so keystrokes keep
+            // their order: a task each could overtake one another (#401).
+            if Thread.isMainThread {
+                MainActor.assumeIsolated { self.client.type(bytes) }
+            } else {
+                Task { @MainActor in self.client.type(bytes) }
+            }
         }
 
         nonisolated func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {

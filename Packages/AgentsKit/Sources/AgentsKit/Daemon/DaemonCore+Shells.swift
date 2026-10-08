@@ -144,9 +144,9 @@ extension DaemonCore {
         let method: String
         let value: any Encodable & Sendable
         switch event {
-        case .output(let data):
+        case .output(let data, let offset):
             method = DaemonAPI.Notification.shellOutput
-            value = DaemonAPI.ShellOutputNotification(agentID: agentID, shell: key.shell, bytes: data)
+            value = DaemonAPI.ShellOutputNotification(agentID: agentID, shell: key.shell, bytes: data, offset: offset)
         case .state(let state):
             method = DaemonAPI.Notification.shellStateChanged
             value = DaemonAPI.ShellStateNotification(agentID: agentID, shell: key.shell, state: state)

@@ -85,3 +85,15 @@ export function runtimeRuns(runtimes: RuntimeStatus[]): { available: RuntimeStat
     cannot: runtimes.filter((r) => !("available" in r.availability)),
   };
 }
+
+/**
+ * The sidebar's Runtimes row (#379), RuntimeTally (AgentsKitCore): how many runtimes can start a
+ * turn now, out of how many are installed. Installed is found on the host, whether or not it can
+ * start; one that is not there, or is still being installed, was never in. Undefined until a host
+ * has listed its runtimes: not yet known is not none.
+ */
+export function runtimeTally(runtimes: readonly RuntimeStatus[]): { working: number; total: number } | undefined {
+  if (runtimes.length === 0) return undefined;
+  const installed = runtimes.filter((r) => "available" in r.availability || "needsSignIn" in r.availability || "failed" in r.availability);
+  return { working: installed.filter((r) => "available" in r.availability && !r.isOut).length, total: installed.length };
+}

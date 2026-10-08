@@ -48,10 +48,17 @@ struct WorkflowTriggerEventTests {
         #expect(detail.contains("\"workflow.completed\" takes workflow, agent, outcome, not branch"))
     }
 
-    @Test func aDottedNameThisVersionDoesNotKnowStaysInert() {
+    @Test func aNameAboutTheAppsOwnSubjectThisVersionDoesNotKnowStaysInert() {
+        let workflow = triggers("  - branch.created")
+        #expect(workflow.triggers == [.unrecognised(name: "branch.created", keys: [:])])
+        #expect(workflow.problem == .triggerNotSupported("branch.created"))
+    }
+
+    /// Any other `noun.verbed` name is an MCP server's event (#383).
+    @Test func aDottedNameAboutAnythingElseIsAServersEvent() {
         let workflow = triggers("  - calendar.meeting_started")
-        #expect(workflow.triggers == [.unrecognised(name: "calendar.meeting_started", keys: [:])])
-        #expect(workflow.problem == .triggerNotSupported("calendar.meeting_started"))
+        #expect(workflow.triggers == [.serverEvent(MCPEventTrigger(event: "calendar.meeting_started"))])
+        #expect(workflow.problem == nil)
     }
 
     @Test func anEventTriggerTravelsAsOneAnOlderDeviceDoesNotKnow() throws {

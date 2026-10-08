@@ -1,6 +1,6 @@
 // The prompt (071 FR-025): text and attachments, dropped, pasted or picked, sent as the Remote
 // sends them (PhoneAttachment's rules), with the draft kept per session across a reload (#254).
-// Return sends; Shift-Return is a new line, as in the window. While the agent works and nothing
+// Return and Shift-Return send; Option-Return is a new line, as in the window (#377). While the agent works and nothing
 // is typed, Send is Stop; what is typed then is queued, and Send says so. The agent's suggestion
 // is the empty field's placeholder, taken with Tab and put away with Escape, as the window's.
 //
@@ -15,7 +15,7 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { ComponentChildren } from "preact";
 import type { ACPPromptCapabilities, Attachment, FileMentionDTO, SlashCommand, SuggestedPrompt, UUID } from "../protocol/generated";
-import { sendHelp, sendLabel, stopHelp } from "../model/promptWords";
+import { returnAction, sendHelp, sendLabel, stopHelp } from "../model/promptWords";
 import type { Store } from "../model/store";
 import { attach, pastedFiles, pastedWords, refusal, totalRefusal } from "../model/attachments";
 import { Telling } from "./Telling";
@@ -261,9 +261,10 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
               if (text.value) onTyping?.();
             }}
             onKeyDown={(e) => {
+              const field = e.currentTarget as HTMLTextAreaElement;
               if (listing && !e.isComposing) {
                 // While the list is up, Return takes the command rather than sending a half-typed one.
-                if ((e.key === "Enter" && !e.shiftKey) || (e.key === "Tab" && !e.shiftKey)) {
+                if ((e.key === "Enter" && returnAction(e) === "send") || (e.key === "Tab" && !e.shiftKey)) {
                   e.preventDefault();
                   accept(chosenIndex);
                   return;
@@ -279,9 +280,16 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
                   return;
                 }
               }
-              if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+              if (e.key === "Enter" && !e.isComposing) {
                 e.preventDefault();
-                void submit();
+                if (returnAction(e) === "send") {
+                  void submit();
+                } else if (!field.readOnly) {
+                  // Put in by hand: not every browser breaks the line for Option-Return itself.
+                  field.setRangeText("\n", field.selectionStart, field.selectionEnd, "end");
+                  text.value = field.value;
+                  keep();
+                }
               } else if (e.key === "Tab" && !e.shiftKey && offered) {
                 // Taken into the field, not sent: sending it is still the person's move.
                 e.preventDefault();

@@ -60,3 +60,12 @@ test("runtimes: a new session stays on the runtime it opened with (#291)", () =>
   assert.equal(r.formRuntime(undefined, undefined, ["codex"], undefined), "codex");
   assert.equal(r.formRuntime(undefined, undefined, ["codex", "claude"], undefined), "claude");
 });
+
+test("runtimes: the Runtimes row counts working out of installed (#379)", () => {
+  const signedOut = { runtime: { id: "codex", name: "Codex" }, availability: { needsSignIn: { authMethods: [] } } };
+  const installing = { runtime: { id: "cursor", name: "Cursor" }, availability: { installing: {} } };
+  assert.equal(r.runtimeTally([]), undefined, "not yet listed is not none");
+  assert.deepEqual(r.runtimeTally([status("claude", "Claude"), { ...status("grok", "Grok"), isOut: true }, signedOut,
+    status("gemini", "Gemini", false), installing]), { working: 1, total: 3 });
+  assert.deepEqual(r.runtimeTally([{ ...status("claude", "Claude"), isOut: true }, signedOut]), { working: 0, total: 2 });
+});

@@ -206,6 +206,9 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.ProjectRequest.self)
                 return .success(try JSONValue.encoding(try await unarchiveProject(request.folder)))
 
+            case DaemonAPI.Method.projectsChatState:
+                return .success(try JSONValue.encoding(chatProjectState()))
+
             case DaemonAPI.Method.projectsSetDiskSpace:
                 let request = try require(params, as: DaemonAPI.SetDiskSpaceRequest.self)
                 return .success(try JSONValue.encoding(try setDiskSpace(request)))
@@ -238,6 +241,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.WorkflowApproveRequest.self)
                 return .success(try JSONValue.encoding(try approveWorkflow(request)))
 
+            case DaemonAPI.Method.workflowsDeny:
+                let request = try require(params, as: DaemonAPI.WorkflowApproveRequest.self)
+                return .success(try JSONValue.encoding(try denyWorkflow(request)))
+
             case DaemonAPI.Method.workflowsArchive:
                 let request = try require(params, as: DaemonAPI.WorkflowArchiveRequest.self)
                 return .success(try JSONValue.encoding(try archiveWorkflow(request)))
@@ -249,6 +256,10 @@ extension DaemonCore {
             case DaemonAPI.Method.workflowsSettings:
                 let request = try require(params, as: DaemonAPI.WorkflowSettingsRequest.self)
                 return .success(try JSONValue.encoding(try setWorkflowSettings(request)))
+
+            case DaemonAPI.Method.workflowsClearMCPMissed:
+                let request = try require(params, as: DaemonAPI.WorkflowMCPClearMissedRequest.self)
+                return .success(try JSONValue.encoding(try clearMCPMissed(request)))
 
             case DaemonAPI.Method.runtimesList:
                 return .success(try JSONValue.encoding(runtimeStatuses()))

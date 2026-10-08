@@ -7,7 +7,7 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { WorkflowSummary } from "../protocol/generated";
 import type { Store } from "../model/store";
-import { isOn, waitsItsTurn, workflowStatus, workflowSummary } from "../model/workflows";
+import { canBeApproved, canBeDenied, isOn, isUnapproved, workflowStatus, workflowSummary } from "../model/workflows";
 
 export function WorkflowRow({ store, host, summary, disabled, chosen, onPick }: {
   store: Store; host: string; summary: WorkflowSummary; disabled: boolean; chosen: boolean; onPick: () => void;
@@ -24,7 +24,8 @@ export function WorkflowRow({ store, host, summary, disabled, chosen, onPick }: 
             {/* Marked where it stands, rather than moved (#100): off is not put away. */}
             {!isOn(summary) && !summary.isArchived && <span class="faint"> · Off</span>}
           </span>
-          <span class="subtitle">{summary.awaitingApproval ? "Waiting for your OK" : workflowSummary(summary.workflow, name)}</span>
+          <span class="subtitle">{summary.awaitingApproval ? "Waiting for your OK"
+            : summary.deniedHere ? "Denied on this host" : workflowSummary(summary.workflow, name)}</span>
         </span>
       </button>
       <RunNow store={store} host={host} summary={summary} disabled={disabled} />
@@ -38,7 +39,7 @@ export function RunNow({ store, host, summary, disabled, wide }: {
   store: Store; host: string; summary: WorkflowSummary; disabled: boolean; wide?: boolean;
 }) {
   const running = useSignal(false);
-  if (summary.isArchived || summary.awaitingApproval) return null;
+  if (summary.isArchived || isUnapproved(summary)) return null;
   return (
     <button class={`run-now${wide ? " prominent" : ""}`} disabled={disabled || running.value || summary.isRunning}
       title={`Run ${summary.workflow.name} now`} aria-label={`Run ${summary.workflow.name} now`}
@@ -74,8 +75,11 @@ function WorkflowMenu({ store, host, summary, disabled }: {
           {summary.isArchived ? (
             <button role="menuitem" disabled={disabled} onClick={() => { open.value = false; void store.setWorkflowArchived(host, summary, false); }}>Bring Back</button>
           ) : <>
-            {summary.awaitingApproval && !waitsItsTurn(summary) && <button role="menuitem" disabled={disabled || summary.overLimit !== undefined}
+            {canBeApproved(summary) && <button role="menuitem" disabled={disabled || (!summary.deniedHere && summary.overLimit !== undefined)}
               onClick={() => { open.value = false; void store.approveWorkflow(host, summary); }}>Approve</button>}
+            {/* Not on this host, without archiving it everywhere (#391). */}
+            {canBeDenied(summary) && <button role="menuitem" disabled={disabled}
+              onClick={() => { open.value = false; void store.denyWorkflow(host, summary); }}>Deny on This Host</button>}
             <button role="menuitem" disabled={disabled} title={on ? "None of its triggers run it until it is turned on again; Run Now still does"
               : "Let its triggers run it again"}
               onClick={() => { open.value = false; void store.setWorkflowEnabled(host, summary, !on); }}>

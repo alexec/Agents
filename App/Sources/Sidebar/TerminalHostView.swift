@@ -89,7 +89,13 @@ struct TerminalHostView: NSViewRepresentable {
         // rather than through a separate signal call.
         nonisolated func send(source: TerminalView, data: ArraySlice<UInt8>) {
             let bytes = Data(data)
-            Task { @MainActor in await self.client.send(bytes) }
+            // Queued here, on the main thread SwiftTerm calls from, so keystrokes keep
+            // their order: a task each could overtake one another (#401).
+            if Thread.isMainThread {
+                MainActor.assumeIsolated { self.client.type(bytes) }
+            } else {
+                Task { @MainActor in self.client.type(bytes) }
+            }
         }
 
         nonisolated func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {
