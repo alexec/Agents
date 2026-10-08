@@ -143,6 +143,12 @@ final class RemoteModel {
 
     /// The person closed a terminal tab: the shell ends, on the Mac too, and this
     /// device forgets it.
+    /// A new terminal tab: the Mac starts the shell and says its number (#401). Nil from
+    /// a Mac too old to, and the pane numbers it itself.
+    func openShell(for agentID: UUID) async -> Int? {
+        await ShellClient.open(agentID: agentID, on: client)
+    }
+
     func closeShell(agentID: UUID, shell: Int) async {
         let client = shellClient(for: agentID, shell: shell)
         shells[ShellKey(agentID: agentID, shell: shell)] = nil

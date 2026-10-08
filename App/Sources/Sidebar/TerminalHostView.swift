@@ -20,6 +20,9 @@ struct TerminalHostView: NSViewRepresentable {
     var focused: () -> Void = {}
     /// Whether this is the tab on top. One behind lets go of the keyboard.
     var isFront = true
+    /// ⌘T and ⌘W while the terminal has the keyboard (#401).
+    var newTab: () -> Void = {}
+    var closeTab: () -> Void = {}
     /// Told the size whenever the view is laid out, so the pty can be resized and a
     /// full-screen program reflows (FR-021).
     let onSize: (Int, Int) -> Void
@@ -32,7 +35,9 @@ struct TerminalHostView: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> TerminalView {
-        let view = TerminalView(frame: .init(x: 0, y: 0, width: 640, height: 400))
+        let view = KeyedTerminalView(frame: .init(x: 0, y: 0, width: 640, height: 400))
+        view.newTab = newTab
+        view.closeTab = closeTab
         view.terminalDelegate = context.coordinator
         view.configureNativeColors()
         Self.paint(view)
@@ -49,6 +54,10 @@ struct TerminalHostView: NSViewRepresentable {
 
     func updateNSView(_ view: TerminalView, context: Context) {
         context.coordinator.client = client
+        if let view = view as? KeyedTerminalView {
+            view.newTab = newTab
+            view.closeTab = closeTab
+        }
         Self.paint(view)
         if wantsFocus {
             // After this layout pass: a view made in this update has no window yet.
@@ -106,13 +115,26 @@ struct TerminalHostView: NSViewRepresentable {
             }
         }
 
-        nonisolated func setTerminalTitle(source: TerminalView, title: String) {}
-        nonisolated func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
+        // Called as the emulator reads the bytes, on the main thread.
+        nonisolated func setTerminalTitle(source: TerminalView, title: String) {
+            Task { @MainActor in self.client.title = title }
+        }
+
+        nonisolated func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {
+            // OSC 7 says a file: URL; the "This shell is in" strip follows it (#401).
+            Task { @MainActor in
+                self.client.directory = directory.flatMap(URL.init(string:)).flatMap { $0.isFileURL ? $0 : nil }
+            }
+        }
         nonisolated func scrolled(source: TerminalView, position: Double) {}
         nonisolated func rangeChanged(source: TerminalView, startY: Int, endY: Int) {}
         nonisolated func clipboardCopy(source: TerminalView, content: Data) {
             let text = String(decoding: content, as: UTF8.self)
             Task { @MainActor in
+                // Only while the person is at this terminal: a program printing in a
+                // tab nobody is looking at does not get to replace the clipboard (#401).
+                guard let view = self.view, let window = view.window, window.isKeyWindow,
+                      window.firstResponder === view else { return }
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(text, forType: .string)
             }
@@ -127,8 +149,52 @@ struct TerminalHostView: NSViewRepresentable {
             }
         }
 
-        nonisolated func bell(source: TerminalView) {}
+        nonisolated func bell(source: TerminalView) {
+            Task { @MainActor in
+                // Heard only from the terminal on screen in the window in front.
+                guard let view = self.view, let window = view.window, window.isKeyWindow,
+                      window.firstResponder === view else { return }
+                NSSound.beep()
+            }
+        }
 
         nonisolated func iTermContent(source: TerminalView, content: ArraySlice<UInt8>) {}
+    }
+}
+
+/// The terminal, taking the keys a terminal is expected to have ahead of the menus,
+/// but only while it has the keyboard (#401): ⌘. interrupts as in Terminal, ⌘K
+/// clears, ⌘F finds, ⌘T and ⌘W open and close a tab.
+final class KeyedTerminalView: TerminalView {
+    var newTab: () -> Void = {}
+    var closeTab: () -> Void = {}
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        // Every view in the window is asked; only the one with the keyboard answers.
+        guard let window, window.firstResponder === self,
+              event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+              let key = event.charactersIgnoringModifiers?.lowercased() else {
+            return super.performKeyEquivalent(with: event)
+        }
+        switch key {
+        case ".":
+            send([0x03])
+        case "k":
+            // The screen and what scrolled off it, here, and a fresh prompt from the
+            // shell at the top. What the helper holds comes back on the next replay.
+            feed(text: "\u{1B}[H\u{1B}[2J\u{1B}[3J")
+            send([0x0C])
+        case "f":
+            let item = NSMenuItem()
+            item.tag = Int(NSFindPanelAction.showFindPanel.rawValue)
+            performFindPanelAction(item)
+        case "t":
+            newTab()
+        case "w":
+            closeTab()
+        default:
+            return super.performKeyEquivalent(with: event)
+        }
+        return true
     }
 }

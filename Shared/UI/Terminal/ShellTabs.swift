@@ -3,11 +3,17 @@ import SwiftUI
 /// The row of terminal tabs over the screen, with the button that opens another (055).
 ///
 /// Shared since #345: the window and the Remote draw the same tabs over the same
-/// shells, which the daemon holds by number. What a tab is called is its place in the
-/// row, not its number, so closing one renames those after it.
+/// shells, which the daemon holds by number. What a tab is called is what the program
+/// in it says, or else its place in the row, not its number, so closing one renames
+/// those after it.
+///
+/// Every tab can be closed, the last too: the pane opens a fresh shell in its place
+/// (#401).
 struct ShellTabs: View {
     /// The shells, by number, left to right.
     let shells: [Int]
+    /// What the program in each says it is (OSC 0/2), when it says (#401).
+    var titles: [Int: String] = [:]
     let front: Int
     /// False when the agent's daemon holds only one shell — a server not yet updated.
     let canOpenMore: Bool
@@ -23,9 +29,9 @@ struct ShellTabs: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 4) {
                         ForEach(Array(shells.enumerated()), id: \.element) { position, shell in
-                            ShellTab(title: "Shell \(position + 1)",
+                            ShellTab(title: titles[shell].flatMap { $0.isEmpty ? nil : $0 } ?? "Shell \(position + 1)",
                                      isFront: front == shell,
-                                     canClose: shells.count > 1,
+                                     canClose: true,
                                      select: { select(shell) },
                                      close: { close(shell) })
                             .id(shell)
@@ -54,8 +60,7 @@ struct ShellTabs: View {
 }
 
 /// One tab. The whole tab is the button that brings it forward; the close mark shows
-/// on the front tab and under the pointer, and only when there is another to fall
-/// back to.
+/// on the front tab and under the pointer.
 private struct ShellTab: View {
     let title: String
     let isFront: Bool
@@ -69,6 +74,9 @@ private struct ShellTab: View {
         Button(action: select) {
             HStack(spacing: 6) {
                 Text(title)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: 160)
                     .appText(.supporting)
                     .foregroundStyle(isFront ? .primary : .secondary)
                 if canClose {

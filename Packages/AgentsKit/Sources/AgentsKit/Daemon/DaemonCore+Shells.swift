@@ -10,6 +10,7 @@ extension DaemonCore {
     func attachShell(_ request: DaemonAPI.ShellAttachRequest,
                      from surface: Surface? = nil, connection: UUID? = nil) throws -> DaemonAPI.ShellAttachResponse {
         watchShell(request.agentID, from: surface, connection: connection)
+        noteMacScreen(ShellHost.Key(agentID: request.agentID, shell: request.shell), from: surface, connection: connection)
         guard let agent = agents[request.agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "There is no such agent.")
         }
@@ -32,6 +33,9 @@ extension DaemonCore {
     /// The window stopped looking. Nothing is killed (FR-026).
     func detachShell(_ request: DaemonAPI.ShellRequest, connection: UUID? = nil) {
         if let connection {
+            let key = ShellHost.Key(agentID: request.agentID, shell: request.shell)
+            shellMacScreens[key]?.remove(connection)
+            if shellMacScreens[key]?.isEmpty == true { shellMacScreens[key] = nil }
             shellWatchers[request.agentID]?.remove(connection)
             if shellWatchers[request.agentID]?.isEmpty == true { shellWatchers[request.agentID] = nil }
         }
@@ -45,7 +49,39 @@ extension DaemonCore {
 
     /// The user closed a shell's tab. Unlike detaching, this ends it (055).
     func closeShell(_ request: DaemonAPI.ShellRequest) {
+        shellMacScreens[ShellHost.Key(agentID: request.agentID, shell: request.shell)] = nil
         shells.close(agentID: request.agentID, shell: request.shell)
+    }
+
+    /// A new tab: the next number after every shell the agent has, started now, so the
+    /// number is taken before anyone else can pick it (#401).
+    func openShell(_ request: DaemonAPI.ShellAttachRequest) throws -> DaemonAPI.ShellOpenResponse {
+        guard let agent = agents[request.agentID] else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "There is no such agent.")
+        }
+        let next = (shells.shells(for: agent.id).max() ?? 0) + 1
+        do {
+            _ = try shells.attach(agentID: agent.id, shell: next, folder: agent.cwd,
+                                  rows: request.rows, cols: request.cols)
+        } catch ShellHost.Failure.willNotStart(let reason) {
+            throw JSONRPCError(code: DaemonAPI.Failure.shellWillNotStart, message: reason)
+        }
+        return DaemonAPI.ShellOpenResponse(shell: next)
+    }
+
+    /// A Mac window attached to this shell: while it is, the shell keeps the Mac's size
+    /// (#401). A connection that says nothing of itself is a window, as it always was.
+    private func noteMacScreen(_ key: ShellHost.Key, from surface: Surface?, connection: UUID?) {
+        guard let connection else { return }
+        if case .device = surface { return }
+        shellMacScreens[key, default: []].insert(connection)
+    }
+
+    /// Whether this size should be taken: a phone's is not while a Mac window shows the
+    /// shell, so the Mac's lines never wrap to the phone's width (Alex, #401).
+    private func takesSize(for key: ShellHost.Key, from surface: Surface?) -> Bool {
+        guard case .device = surface else { return true }
+        return shellMacScreens[key]?.isEmpty ?? true
     }
 
     /// A device that opened this shell hears it from now on (034). A window hears every
@@ -57,17 +93,23 @@ extension DaemonCore {
 
     /// A connection has gone: it hears no shells now.
     func forgetShellWatcher(_ connection: UUID) {
+        for key in shellMacScreens.keys {
+            shellMacScreens[key]?.remove(connection)
+            if shellMacScreens[key]?.isEmpty == true { shellMacScreens[key] = nil }
+        }
         for agentID in shellWatchers.keys {
             shellWatchers[agentID]?.remove(connection)
             if shellWatchers[agentID]?.isEmpty == true { shellWatchers[agentID] = nil }
         }
     }
 
-    func writeToShell(_ request: DaemonAPI.ShellInputRequest) throws {
-        // The shell takes the size of whoever typed last (034, US4 scenario 5). The
-        // daemon is the one place that knows who that was: two screens on one shell
-        // each send their own size with their keystrokes, and the later wins.
+    func writeToShell(_ request: DaemonAPI.ShellInputRequest, from surface: Surface? = nil) throws {
+        // The shell takes the size of whoever typed last (034, US4 scenario 5), except
+        // that a Mac window showing it wins over a phone (#401). The daemon is the one
+        // place that knows who that was: two screens on one shell each send their own
+        // size with their keystrokes.
         if let rows = request.rows, let cols = request.cols, rows > 0, cols > 0,
+           takesSize(for: ShellHost.Key(agentID: request.agentID, shell: request.shell), from: surface),
            let session = shells.session(for: request.agentID, shell: request.shell),
            session.rows != rows || session.cols != cols {
             shells.resize(agentID: request.agentID, shell: request.shell, rows: rows, cols: cols)
@@ -79,7 +121,8 @@ extension DaemonCore {
         }
     }
 
-    func resizeShell(_ request: DaemonAPI.ShellResizeRequest) {
+    func resizeShell(_ request: DaemonAPI.ShellResizeRequest, from surface: Surface? = nil) {
+        guard takesSize(for: ShellHost.Key(agentID: request.agentID, shell: request.shell), from: surface) else { return }
         shells.resize(agentID: request.agentID, shell: request.shell, rows: request.rows, cols: request.cols)
     }
 
@@ -95,6 +138,7 @@ extension DaemonCore {
     func restartShell(_ request: DaemonAPI.ShellAttachRequest,
                       from surface: Surface? = nil, connection: UUID? = nil) throws -> DaemonAPI.ShellAttachResponse {
         watchShell(request.agentID, from: surface, connection: connection)
+        noteMacScreen(ShellHost.Key(agentID: request.agentID, shell: request.shell), from: surface, connection: connection)
         guard let agent = agents[request.agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "There is no such agent.")
         }

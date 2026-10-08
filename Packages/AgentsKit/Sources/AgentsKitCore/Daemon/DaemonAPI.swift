@@ -334,6 +334,9 @@ public enum DaemonAPI {
         public static let shellList = "shell/list"
         /// End one shell for good and forget it: the tab was closed (055).
         public static let shellClose = "shell/close"
+        /// Start a new shell for an agent, numbered by the daemon, so two screens
+        /// opening a tab at once never pick the same number (#401).
+        public static let shellOpen = "shell/open"
 
         // What the reader will allow to be spent. All three are window calls: none is
         // advertised to `AppService`, added to the MCP tool surface, or named in any
@@ -1868,6 +1871,12 @@ public enum DaemonAPI {
     public struct ShellListResponse: Codable, Sendable {
         public var shells: [Int]
         public init(shells: [Int]) { self.shells = shells }
+    }
+
+    /// The number the daemon gave a shell it opened (#401).
+    public struct ShellOpenResponse: Codable, Sendable {
+        public var shell: Int
+        public init(shell: Int) { self.shell = shell }
     }
 
     /// What a window gets on attach: the state, and the bytes to replay.

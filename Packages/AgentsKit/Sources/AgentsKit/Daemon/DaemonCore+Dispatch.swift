@@ -933,13 +933,17 @@ extension DaemonCore {
 
             case DaemonAPI.Method.shellInput:
                 let request = try require(params, as: DaemonAPI.ShellInputRequest.self)
-                try writeToShell(request)
+                try writeToShell(request, from: surface)
                 return .success([:])
 
             case DaemonAPI.Method.shellResize:
                 let request = try require(params, as: DaemonAPI.ShellResizeRequest.self)
-                resizeShell(request)
+                resizeShell(request, from: surface)
                 return .success([:])
+
+            case DaemonAPI.Method.shellOpen:
+                let request = try require(params, as: DaemonAPI.ShellAttachRequest.self)
+                return .success(try JSONValue.encoding(try openShell(request)))
 
             case DaemonAPI.Method.shellSignal:
                 let request = try require(params, as: DaemonAPI.ShellSignalRequest.self)
