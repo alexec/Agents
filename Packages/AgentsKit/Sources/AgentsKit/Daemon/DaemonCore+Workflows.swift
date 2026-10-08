@@ -443,7 +443,8 @@ extension DaemonCore {
             holdsAFire: state?.heldFire != nil,
             offReason: WorkflowState.offReason(workflow, state,
                                                digest: enabled ? nil : workflowDigest(workflow)),
-            standingAgentID: standingAgent(of: workflow, state: state))
+            standingAgentID: standingAgent(of: workflow, state: state),
+            mcpTriggers: mcpTriggerStatuses(for: workflow))
     }
 
     /// The agent a standing workflow keeps, if it is still here to be sent the next run

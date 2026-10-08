@@ -1710,6 +1710,14 @@ export class Store extends Work {
     if (changed) this.placeWorkflow(changed, host);
   }
 
+  /** Clear a server's event trigger's missed-events mark (#383). */
+  async clearMCPMissed(host: string, summary: WorkflowSummary, name: string, server: string | undefined): Promise<void> {
+    const changed = await this.act("workflows/mcpTrigger/clearMissed",
+      { folder: summary.workflow.folder, workflowID: summary.workflow.workflowID, name,
+        ...(server !== undefined ? { server } : {}) }, host);
+    if (changed) this.placeWorkflow(changed, host);
+  }
+
   /** Approve (#142): the digest is what the page was showing, so a file changed since still waits. */
   async approveWorkflow(host: string, summary: WorkflowSummary): Promise<void> {
     if (!summary.awaitingApproval) return;

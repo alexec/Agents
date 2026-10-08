@@ -2501,6 +2501,17 @@ final class RemoteModel {
         }
     }
 
+    /// Clear a server's event trigger's missed-events mark (#383).
+    func clearMCPMissed(_ summary: WorkflowSummary, _ status: MCPTriggerStatus) async {
+        do {
+            let request = DaemonAPI.WorkflowMCPClearMissedRequest(folder: summary.folder, workflowID: summary.workflowID,
+                                                                  name: status.name, server: status.server)
+            try await client(for: request).call(DaemonAPI.Method.workflowsClearMCPMissed, request)
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
     /// Change what a workflow is allowed to do. The Mac's daemon writes the file and
     /// answers with what it now says; a refusal has to reach the person, and the list
     /// is asked again so the menu goes back to what the file still holds (FR-025).

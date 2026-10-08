@@ -160,3 +160,30 @@ test("the page says the switch is a line in the workflow's file, in the window's
   assert.equal(w.switchesSentence({ workflow: { workflowID: "nightly" } }),
     "Enabled and Archive are saved in .agents/workflows/nightly.md, a file in this project you may commit");
 });
+
+const dates = await load("src/protocol/dates.ts");
+const at = (text) => dates.toWireDate(new Date(text));
+
+test("a server's event trigger's lines say what the Mac's say (#383)", () => {
+  const now = new Date("2026-10-06T12:05:30Z");
+  assert.equal(w.mcpTriggerWords({ name: "checks.failed", server: "ci", state: "active",
+    lastPolledAt: at("2026-10-06T12:05:10Z"), lastEventAt: at("2026-10-06T11:40:30Z") }, now).text,
+    "ci · checks.failed: Checked 20 s ago · last event 25 min ago");
+  assert.equal(w.mcpTriggerWords({ name: "checks.failed", server: "ci", state: "active",
+    lastPolledAt: at("2026-10-06T12:05:10Z") }, now).text, "ci · checks.failed: Checked 20 s ago · no events yet");
+  assert.equal(w.mcpTriggerWords({ name: "checks.failed", server: "ci", state: "pending" }, now).text,
+    "ci · checks.failed: Connecting to ci…");
+  const retrying = w.mcpTriggerWords({ name: "checks.failed", server: "ci", state: "retrying", retryAt: at("2026-10-06T12:06:10Z"),
+    failure: { code: "unreachable", message: "Can't reach ci: no", since: at("2026-10-06T12:01:00Z") } }, now);
+  assert.match(retrying.text, /^ci · checks\.failed: Can't reach ci since .+ · trying again in 40 s$/);
+  assert.equal(retrying.tint, "attention");
+  const stopped = w.mcpTriggerWords({ name: "brnch.moved", state: "stopped",
+    failure: { code: "serverNotFound", message: "No server here offers brnch.moved.", since: at("2026-10-06T12:01:00Z") } }, now);
+  assert.deepEqual(stopped, { text: "brnch.moved: No server here offers brnch.moved.", tint: "failure" });
+  assert.match(w.mcpMissedWords({ name: "x.y", state: "active", missedSince: at("2026-10-06T09:14:00Z") }), /^Events may have been missed since /);
+  assert.equal(w.mcpMissedWords({ name: "x.y", state: "active" }), null);
+  const [{ input }] = cases("workflows/summaries.json");
+  const lines = w.workflowStatusLines({ ...input, mcpTriggers: [{ name: "checks.failed", server: "b", state: "stopped",
+    failure: { code: "badArguments", message: "b's checks.failed takes project; not repo.", since: at("2026-10-06T12:01:00Z") } }] });
+  assert.ok(lines.some((line) => line.text === "b's checks.failed takes project; not repo." && line.tint === "failure"));
+});

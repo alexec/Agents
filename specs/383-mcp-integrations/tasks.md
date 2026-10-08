@@ -289,7 +289,7 @@ again, and see it recover by itself.
 
 ### Tests for User Story 5
 
-- [ ] T033 [P] [US5] Add these tests to `PT/Integration/MCPEventWorkflowTests.swift`:
+- [x] T033 [P] [US5] Add these tests to `PT/Integration/MCPEventWorkflowTests.swift`:
   - Unreachable gives `retrying` with a backoff of 10 s, 20 s, 40 s and so on, up to 5 min. Back again gives `active` within one interval.
   - `-32011` and `-32012` give `stopped` (`eventNotOffered` or `refused`), with no more polls until the workflow file or event list changes.
   - `-32013` honours `retryAfterMs`.
@@ -301,25 +301,25 @@ again, and see it recover by itself.
 
 ### Implementation for User Story 5
 
-- [ ] T034 [P] [US5] Create `PK/AgentsKitCore/Model/MCPTriggerStatus.swift` with these fields:
+- [x] T034 [P] [US5] Create `PK/AgentsKitCore/Model/MCPTriggerStatus.swift` with these fields:
   - `name`, `server: String?`, and `state` (`pending`, `active`, `retrying`, `stopped` or `notThisHost`).
   - `lastPolledAt`, `lastEventAt`, `missedSince`, and `failure: {code, message, since}?`.
   - The codes are `serverNotFound`, `badEventName`, `waitingForApproval`, `secretMissing`, `needsSignIn`, `unreachable`, `noEvents`, `eventNotOffered`, `noPollMode`, `badArguments`, `refused` and `serverError`. `message` is a whole sentence in the app's voice (wording in [contracts/workflow-trigger.md](contracts/workflow-trigger.md)).
   - Add `mcpTriggers: [MCPTriggerStatus]?` to `WorkflowSummary` in `PK/AgentsKitCore/Model/Workflow.swift`.
-- [ ] T035 [US5] In `DaemonCore+MCPEvents.swift`, add the state machine from [data-model.md](data-model.md#mcptriggerstate-states-of-a-subscription) and the R6 error handling. Depends on T034.
+- [x] T035 [US5] In `DaemonCore+MCPEvents.swift`, add the state machine from [data-model.md](data-model.md#mcptriggerstate-states-of-a-subscription) and the R6 error handling. Depends on T034.
   - Backoff for transport errors, timeouts and 5xx.
   - `stopped` waits for a change: the file, the event list, sign-ins or secrets.
   - 401/403 gives `needsSignIn`. Missing secrets give `secretMissing`. An unapproved `mcp.json` gives `waitingForApproval`.
   - Persist `failure` and the timestamps in the record.
   - Fill `summary(for:)` in `DaemonCore+Workflows.swift` with one status per heard server, and push the summary on a change only, never on a timer.
-- [ ] T036 [US5] Add the request `workflows/mcpTrigger/clearMissed` with `{workflowID, name, server}`. It clears `missedSince` and is granted as any other workflow change. Put it in the daemon's request routing beside the other `workflows/*` requests, with a test.
-- [ ] T037 [P] [US5] In `Shared/UI/WorkflowStatus.swift`, under the trigger list, draw one line per `mcpTriggers` entry, prefixed with its server's name, with the wording in [contracts/wire-status.md](contracts/wire-status.md).
+- [x] T036 [US5] Add the request `workflows/mcpTrigger/clearMissed` with `{workflowID, name, server}`. It clears `missedSince` and is granted as any other workflow change. Put it in the daemon's request routing beside the other `workflows/*` requests, with a test.
+- [x] T037 [P] [US5] In `Shared/UI/WorkflowStatus.swift`, under the trigger list, draw one line per `mcpTriggers` entry, prefixed with its server's name, with the wording in [contracts/wire-status.md](contracts/wire-status.md).
   - The warning colour for `retrying`, the error colour for `stopped`, and `badArguments` where file errors are shown.
   - "Checked 20 s ago" is computed on the client from `lastPolledAt`.
   - When `missedSince` is set, add "Events may have been missed since HH:MM" and **Clear** (T036).
   - Check its use in `App/Sources/Projects/WorkflowPage.swift` and `Remote/Sources/Projects/WorkflowPage.swift`.
   - One accessibility element per line.
-- [ ] T038 [P] [US5] Run `scripts/web.sh types` to regenerate `Web/src/protocol/generated.ts`. Add the wording to `Web/src/model/workflows.ts`, and draw the same lines and **Clear** in `Web/src/views/WorkflowPage.tsx`. Depends on T034.
+- [x] T038 [P] [US5] Run `scripts/web.sh types` to regenerate `Web/src/protocol/generated.ts`. Add the wording to `Web/src/model/workflows.ts`, and draw the same lines and **Clear** in `Web/src/views/WorkflowPage.tsx`. Depends on T034.
 
 **Checkpoint**: T033 passes. The lines show on the Mac and the web page on a scratch root.
 
