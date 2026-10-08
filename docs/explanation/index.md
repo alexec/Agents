@@ -24,3 +24,5 @@ Nothing here needs doing; it is for understanding.
   browser or a simulator, and what you can end.
 - [How the phone and iPad reach your agents](phone-and-ipad.md): every host, at home and
   away, grants, and forgetting a device.
+- [Compaction in each runtime](compaction-by-runtime.md): whether a long conversation
+  compacts itself in each runtime, what the app sees when it does, and what it could pass.
