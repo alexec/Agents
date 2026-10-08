@@ -143,6 +143,9 @@ public extension DaemonAPI {
                 // Its settings, labels and cooldown on the page (#162), each control its one key.
                 Row(Method.workflowsSettings, params: WorkflowSettingsRequest.self, result: WorkflowSummary.self,
                     kind: .hostRequest),
+                // Clear on a server's event trigger's missed-events line (#383).
+                Row(Method.workflowsClearMCPMissed, params: WorkflowMCPClearMissedRequest.self,
+                    result: WorkflowSummary.self, kind: .hostRequest),
                 // New project (#115): Add Folder…, browsing the host's folders, and Clone Git URL…,
                 // as the window's projects column has them.
                 Row(Method.filesBrowse, params: FilesBrowseRequest.self, result: DirectoryListing.self, kind: .hostRequest),

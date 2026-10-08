@@ -226,6 +226,8 @@ public enum DaemonAPI {
         /// is the writer for the reason it writes every other workflow change: a second
         /// window — or a phone — must not become a second author of the same file.
         public static let workflowsSettings = "workflows/settings"
+        /// Clear a server's event trigger's "events may have been missed" (#383).
+        public static let workflowsClearMCPMissed = "workflows/mcpTrigger/clearMissed"
         /// What the MCP helper relays when an agent calls the workflow tool.
         public static let agentsManageWorkflows = "agents/manageWorkflows"
         /// What the MCP helper relays when an agent calls `start_agent`,
@@ -2217,6 +2219,21 @@ public enum DaemonAPI {
             self.folder = folder
             self.workflowID = workflowID
             self.enabled = enabled
+        }
+    }
+
+    /// Clear the missed-events mark on one line under a server's event trigger (#383):
+    /// the event's name and the server whose line it is.
+    public struct WorkflowMCPClearMissedRequest: Codable, Sendable {
+        public var folder: URL
+        public var workflowID: String
+        public var name: String
+        public var server: String?
+        public init(folder: URL, workflowID: String, name: String, server: String?) {
+            self.folder = folder
+            self.workflowID = workflowID
+            self.name = name
+            self.server = server
         }
     }
 

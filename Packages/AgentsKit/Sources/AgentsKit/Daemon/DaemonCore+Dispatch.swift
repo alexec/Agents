@@ -253,6 +253,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.WorkflowSettingsRequest.self)
                 return .success(try JSONValue.encoding(try setWorkflowSettings(request)))
 
+            case DaemonAPI.Method.workflowsClearMCPMissed:
+                let request = try require(params, as: DaemonAPI.WorkflowMCPClearMissedRequest.self)
+                return .success(try JSONValue.encoding(try clearMCPMissed(request)))
+
             case DaemonAPI.Method.runtimesList:
                 return .success(try JSONValue.encoding(runtimeStatuses()))
 

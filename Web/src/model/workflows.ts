@@ -6,7 +6,7 @@
 // an event and describes from its catalogue. The page has no catalogue, so it says the event's
 // name and filters instead: "When ci.finished (branch main)".
 import type {
-  JSONValue, Weekday, Workflow, WorkflowCause, WorkflowLimit, WorkflowOutcome, WorkflowProblem, WorkflowRefusal,
+  JSONValue, MCPTriggerStatus, Weekday, Workflow, WorkflowCause, WorkflowLimit, WorkflowOutcome, WorkflowProblem, WorkflowRefusal,
   WorkflowSchedule, WorkflowSettings, WorkflowSummary, WorkflowTriggerStored,
 } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
@@ -579,6 +579,7 @@ export function workflowStatusLines(s: WorkflowSummary, now = new Date()): Statu
     lines.push({ glyph: "⚠︎", text: problemMessage(w.problem),
       detail: needs ? "Fix its file to let it run" : "Left alone until this version knows it", tint: needs ? "failure" : undefined });
   }
+  lines.push(...mcpArgumentLines(s));
   if (waitsItsTurn(s) && s.overLimit) {
     lines.push({ glyph: "⧗", text: `Waiting its turn: ${limitSentence(s.overLimit)}`, detail: limitRemedy(s.overLimit), tint: "attention" });
   } else if (s.awaitingApproval) {
@@ -706,4 +707,67 @@ export function workflowHostChoices(hosts: readonly { id: string; name: string; 
     result.push({ machineID: host.machineID, name: host.id === "mac" ? "This Mac" : (host.name || host.machineID) });
   }
   return result;
+}
+
+// A server's event triggers (#383): MCPTriggerStatus.words and missedWords in Shared/UI's
+// WorkflowStatus.swift, the line under the triggers for each server they hear.
+
+/** 20 s, 25 min, 3 h, 2 d. */
+export function mcpSpan(seconds: number): string {
+  const whole = Math.round(seconds);
+  if (whole < 60) return `${whole} s`;
+  if (whole < 3600) return `${Math.floor(whole / 60)} min`;
+  if (whole < 86_400) return `${Math.floor(whole / 3600)} h`;
+  return `${Math.floor(whole / 86_400)} d`;
+}
+
+function mcpAgo(wire: MCPTriggerStatus["lastPolledAt"], now: Date): string {
+  return `${mcpSpan(Math.max(0, (now.getTime() - fromWireDate(wire!).getTime()) / 1000))} ago`;
+}
+
+/** The line's words at `now`, and its tint: retrying warns, stopped is an error. */
+export function mcpTriggerWords(status: MCPTriggerStatus, now = new Date()): { text: string; tint?: "attention" | "failure" | undefined } {
+  const who = status.server ?? "its server";
+  let body: string;
+  let tint: "attention" | "failure" | undefined;
+  switch (status.state) {
+    case "pending":
+      body = status.failure?.message ?? `Connecting to ${who}…`;
+      break;
+    case "active": {
+      const checked = status.lastPolledAt !== undefined ? `Checked ${mcpAgo(status.lastPolledAt, now)}` : "Not checked yet";
+      const last = status.lastEventAt !== undefined ? `last event ${mcpAgo(status.lastEventAt, now)}` : "no events yet";
+      body = `${checked} · ${last}`;
+      break;
+    }
+    case "retrying": {
+      const again = status.retryAt !== undefined
+        ? ` · trying again in ${mcpSpan(Math.max(0, (fromWireDate(status.retryAt).getTime() - now.getTime()) / 1000))}` : "";
+      body = status.failure?.code === "unreachable"
+        ? `Can't reach ${who} since ${shortTime(fromWireDate(status.failure.since))}${again}`
+        : `${status.failure?.message ?? `Can't reach ${who}`}${again}`;
+      tint = "attention";
+      break;
+    }
+    case "stopped":
+      body = status.failure?.message ?? "Stopped";
+      tint = "failure";
+      break;
+    default:
+      body = "Runs on another host, which asks for its events";
+  }
+  const lead = status.server !== undefined ? `${status.server} · ${status.name}` : status.name;
+  return { text: `${lead}: ${body}`, tint };
+}
+
+/** "Events may have been missed since 09:14", while they may have been. */
+export function mcpMissedWords(status: MCPTriggerStatus): string | null {
+  return status.missedSince !== undefined
+    ? `Events may have been missed since ${shortTime(fromWireDate(status.missedSince))}` : null;
+}
+
+/** Arguments a server's event doesn't take, said where file errors are. */
+export function mcpArgumentLines(s: WorkflowSummary): StatusLine[] {
+  return (s.mcpTriggers ?? []).filter((t) => t.failure?.code === "badArguments")
+    .map((t) => ({ glyph: "⚠︎", text: t.failure?.message ?? "", detail: "Fix its file to let it run", tint: "failure" as const }));
 }

@@ -11,7 +11,7 @@ import { useEffect } from "preact/hooks";
 import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
 import {
-  cooldownSentence, labelsNote, agentModeWords, unknownLines, waitsItsTurn, workflowStatusLines, isOn, isSupportedTrigger, switchesSentence, lastRanLine, nextLine, resumedAgent, scopeLine, triggerFilters, triggerGlyph,
+  cooldownSentence, labelsNote, mcpMissedWords, mcpTriggerWords, agentModeWords, unknownLines, waitsItsTurn, workflowStatusLines, isOn, isSupportedTrigger, switchesSentence, lastRanLine, nextLine, resumedAgent, scopeLine, triggerFilters, triggerGlyph,
   triggerSummary, workflowHostChoices, workflowSummary,
 } from "../model/workflows";
 import { go } from "../route";
@@ -43,6 +43,12 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
   }, [host, folder, workflowID, runLimit.value]);
   // The daemon's refusal of the last change, said beside the controls until the next one.
   const problem = useSignal<{ workflowID: string; text: string } | null>(null);
+  // "Checked 20 s ago" under a server's event trigger (#383) moves on the page's own clock.
+  const now = useSignal(new Date());
+  useEffect(() => {
+    const timer = setInterval(() => { now.value = new Date(); }, 10_000);
+    return () => clearInterval(timer);
+  }, []);
   const back = <BackToList />;
   if (!known) {
     return (
@@ -157,6 +163,25 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
                       {workflow.mode === "triggering" && isSupportedTrigger(trigger) && <span class="quiet small">{resumedAgent(trigger)}</span>}
                     </span>
                     {"schedule" in trigger && <span class="next quiet small">{nextLine(summary, index)}</span>}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {(summary.mcpTriggers ?? []).length > 0 && (
+            <ul class="mcp-triggers">
+              {(summary.mcpTriggers ?? []).map((status, index) => {
+                const words = mcpTriggerWords(status, now.value);
+                const missed = mcpMissedWords(status);
+                return (
+                  <li key={index}>
+                    <span class={`small ${words.tint ?? "quiet"}`}><span class="glyph" aria-hidden="true">⌁</span> {words.text}</span>
+                    {missed && (
+                      <span class="small attention">{missed}{" "}
+                        <button class="link" disabled={down}
+                          onClick={() => void store.clearMCPMissed(host, summary, status.name, status.server)}>Clear</button>
+                      </span>
+                    )}
                   </li>
                 );
               })}

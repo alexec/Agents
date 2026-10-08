@@ -325,6 +325,11 @@ struct WorkflowPage: View {
                 }
                 .paperRaised(in: RoundedRectangle(cornerRadius: 18))
             }
+            if let statuses = summary.mcpTriggers, !statuses.isEmpty {
+                MCPTriggerLines(statuses: statuses, clear: { status in
+                    Task { await model.clearMCPMissed(summary, status) }
+                }, disabled: model.isStale)
+            }
             cooldown(summary)
             if let at = summary.lastFiredAt {
                 note(["Last ran \(at.formatted(.relative(presentation: .named)))", summary.lastFiredBy?.phrase]
