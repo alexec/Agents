@@ -90,7 +90,7 @@ struct HostDetectTests {
         let results = await detect.run()
         #expect(results.map(\.alias) == ["devbox", "bastion", "gpu", "down", "mine", "had"])
         #expect(results.map(\.outcome) == [.added, .bastion, .failed, .unreachable, .known, .known])
-        #expect(results[2].detail == "no host for that system")
+        #expect(results.first { $0.alias == "gpu" }?.detail == "no host for that system")
         #expect(installed.value == ["devbox"])
         // The bastion answers, and is never probed nor added; a known host is left alone.
         #expect(Set(probed.value) == ["devbox", "gpu", "down", "had"])
