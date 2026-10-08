@@ -126,7 +126,16 @@ private struct ShellScreen: View {
                 }
             }
         }
-        .task(id: agent.id) { await client.attach(rows: rows, cols: cols) }
+        .task(id: agent.id) {
+            model.showScreen(of: client)
+            // A kept emulator is not laid out anew: its size is the one to say (#419).
+            if let kept = client.screen as? TerminalView {
+                let terminal = kept.getTerminal()
+                (rows, cols) = (terminal.rows, terminal.cols)
+            }
+            await client.attach(rows: rows, cols: cols)
+            await client.sayScreenSize()
+        }
         .onChange(of: model.isStale) { _, stale in
             // A new connection knows nothing of this screen: attach again, which
             // replays what was printed while the phone was away.
@@ -137,6 +146,7 @@ private struct ShellScreen: View {
             // A closed tab is not detached: the Mac lets a device go of an agent's
             // shells all at once, and the tabs still open would stop hearing theirs.
             guard isOpen() else { return }
+            model.parkScreen(of: client)
             Task { await client.detach() }
         }
     }
@@ -178,7 +188,17 @@ private struct PhoneTerminalView: UIViewRepresentable {
     }
 
     func makeUIView(context: Context) -> TerminalView {
+        // The emulator this shell had on screen before, taken up as it was: no rebuild,
+        // and no replay of everything it printed (#419, as the Mac since #401).
+        if let kept = client.screen as? FocusReportingTerminal {
+            kept.removeFromSuperview()
+            kept.terminalDelegate = context.coordinator
+            kept.onFocus = { context.coordinator.onFocus($0) }
+            Self.paint(kept)
+            return kept
+        }
         let view = FocusReportingTerminal(frame: CGRect(x: 0, y: 0, width: 390, height: 400))
+        client.screen = view
         view.terminalDelegate = context.coordinator
         view.onFocus = { context.coordinator.onFocus($0) }
         view.inputAccessoryView = ShellKeys(terminal: view)
