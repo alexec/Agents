@@ -1656,18 +1656,21 @@ final class AppModel {
         }
     }
 
-    /// Files dragged onto a project's row, or one of its sessions', put into that
-    /// project's drop box (#231): its main folder's, never a session's worktree. Sent to
-    /// the project's host like an attachment, so a server's project gets them too. The
-    /// event that fires is the host's; nothing is said here unless one could not go.
-    func putInDropbox(_ files: [URL], project: ProjectKey) async {
+    /// Files dragged onto a project's row, or one of its sessions', or chosen in its Drop
+    /// Box sheet, put into that project's drop box (#231): its main folder's, never a
+    /// session's worktree, and inside `subfolder` when one is named. Sent to the project's
+    /// host like an attachment, so a server's project gets them too. The event that fires
+    /// is the host's; nothing is said here unless one could not go, and then it is false.
+    @discardableResult
+    func putInDropbox(_ files: [URL], subfolder: String = "", project: ProjectKey) async -> Bool {
+        let folder = subfolder.trimmingCharacters(in: CharacterSet(charactersIn: "/").union(.whitespaces))
         for file in files {
             let name = file.lastPathComponent
             // Looked at before it is read: a film dragged by mistake is not read whole first.
             let size = (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
             guard size <= DaemonAPI.dropboxPutLimit else {
                 problem = "\(name) is too big to send. Copy it into .agents/dropbox/ in \(project.folder.lastPathComponent) instead."
-                return
+                return false
             }
             let data: Data
             do {
@@ -1677,18 +1680,20 @@ final class AppModel {
                 }.value
             } catch {
                 problem = "\(name) could not be read to put in the drop box: \(error.localizedDescription)"
-                return
+                return false
             }
             do {
                 _ = try await client(for: project.host).call(
                     DaemonAPI.Method.dropboxPut,
-                    DaemonAPI.DropboxPutRequest(folder: project.folder, name: name, data: data),
+                    DaemonAPI.DropboxPutRequest(folder: project.folder, subfolder: folder.isEmpty ? nil : folder,
+                                                name: name, data: data),
                     returning: DaemonAPI.DropboxPutResponse.self)
             } catch {
                 problem = describe(error)
-                return
+                return false
             }
         }
+        return true
     }
 
     /// Clone a Git URL into the home folder and select the project it becomes (027).

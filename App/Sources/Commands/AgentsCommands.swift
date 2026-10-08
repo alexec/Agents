@@ -34,6 +34,10 @@ final class WindowRequests {
     /// and taken down by the sheet's Done.
     var projectSettings: ProjectSettingsPane?
 
+    /// The project whose Drop Box sheet is up (#231), or nil. Set by the project's
+    /// context menu, taken down by the sheet's Done.
+    var dropboxProject: ProjectKey?
+
     func focusPrompt() { wantsPromptFocus = true }
     func focusSessionSearch() { wantsSessionSearchFocus = true }
 }
