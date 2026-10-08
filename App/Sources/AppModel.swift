@@ -3659,6 +3659,17 @@ final class AppModel {
         await client.close()
     }
 
+    /// Files under the session's folders whose name or path holds `term`, found by the
+    /// host the session is on (#415): Open File… on a server searches the server.
+    /// Empty when it does not answer, which the search shows as nothing found.
+    func findFiles(_ term: String, for agentID: UUID) async -> [FileMention] {
+        guard !term.isEmpty else { return [] }
+        let found = try? await client(forAgent: agentID).call(DaemonAPI.Method.filesMention,
+                                                              DaemonAPI.FileMentionRequest(agentID: agentID, term: term),
+                                                              returning: [DaemonAPI.FileMentionDTO].self)
+        return (found ?? []).map(\.mention)
+    }
+
     /// What the person typed on a live page, sent to the daemon to put on disk (022).
     /// The daemon writes rather than the window so that it knows the person did. Nil
     /// on success; on failure, the sentence to show beside the passage, with the draft

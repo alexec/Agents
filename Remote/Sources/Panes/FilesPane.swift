@@ -13,7 +13,8 @@ import SwiftUI
 /// place and stay open (#345). A phone's width has no room for the indents, so the
 /// phone keeps one folder at a time, as the page does below 760 points.
 ///
-/// Read-only, as the Mac's is (FR-016). Nothing here can create, rename or delete.
+/// Read-only, as the Mac's is (FR-016), but for a text file's source, which can be typed
+/// in (#415). Nothing here can create, rename or delete.
 struct FilesPane: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.openURL) private var openURL
@@ -497,13 +498,30 @@ struct FilesPane: View {
                         .padding(.vertical, 6)
                     Divider()
                 }
-                // The line at the top, kept on the pane for when it is drawn again.
-                FileLines(text: text, line: state.openLine,
-                          place: Binding(get: { state.scrollAnchor[url.path] },
-                                         set: { state.scrollAnchor[url.path] = $0 }),
-                          path: url.path)
+                if isTruncated {
+                    // The line at the top, kept on the pane for when it is drawn again.
+                    // Only partly read, so not typed in: saving it would cut it short.
+                    FileLines(text: text, line: state.openLine,
+                              place: Binding(get: { state.scrollAnchor[url.path] },
+                                             set: { state.scrollAnchor[url.path] = $0 }),
+                              path: url.path)
+                } else {
+                    // Its source, to type in, saved on the Mac as a page is (#415).
+                    SourceEditor(text: text, path: url.path, line: state.openLine)
+                        .id(url)
+                        .environment(\.pageActions, editActions)
+                }
             }
         }
+    }
+
+    /// A source file's saves go to the Mac; nothing is typed while it is not answering.
+    private var editActions: PageActions {
+        let agentID = agent.id
+        let model = model
+        return PageActions(
+            save: { path, document in await model.writeArtifact(agentID: agentID, path: path, text: document) },
+            canEdit: !model.isStale)
     }
 
     // MARK: Reading

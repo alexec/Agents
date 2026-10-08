@@ -765,6 +765,23 @@ button.remove:hover { opacity: 1; }
 .file-line .nl { display: none; }
 .file-line .code { white-space: pre-wrap; min-width: 0; }
 .file-page { line-height: 1.55; }
+.source-editor {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 60vh;
+  border: 1px solid transparent;
+  color: inherit;
+  resize: vertical;
+  tab-size: 4;
+}
+.source-editor:focus { outline: none; border-color: var(--paper-rule); }
+/* Open File… (#415): a field over the window, and what it found under it. */
+.file-search-backdrop { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, 0.08); display: flex; justify-content: center; align-items: flex-start; }
+.file-search { margin-top: 48px; width: min(520px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 8px; }
+.file-search input { width: 100%; box-sizing: border-box; padding: 10px 12px; font: inherit; font-size: 15px; border-radius: 12px; border: 1px solid var(--paper-rule); background: var(--paper-raised); color: inherit; }
+.file-search .completions { margin: 0; }
+.file-search .hint { margin: 0 12px; }
 .picture { max-width: 100%; height: auto; border-radius: var(--radius-control); background: var(--paper-well); }
 .picture-view { display: flex; flex-direction: column; gap: 8px; }
 .picture-view .picture { max-width: none; cursor: zoom-in; }

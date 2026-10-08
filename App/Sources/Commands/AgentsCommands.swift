@@ -26,6 +26,9 @@ final class WindowRequests {
     /// Set to put the keyboard in the sidebar's search field.
     var wantsSessionSearchFocus = false
 
+    /// Open File… is up over the window (#415), searching the open session's folders.
+    var showsFileSearch = false
+
     /// The Project Settings pane showing, or nil while the sheet is shut (066). Set by
     /// the toolbar, the project's context menu, the menu bar and the project's banner,
     /// and taken down by the sheet's Done.
@@ -174,6 +177,11 @@ struct AgentsCommands: Commands {
         }
 
         CommandMenu("Go") {
+            // ⌘P, as in every editor: the session's files by name (#415). Park is ⌃⌘P.
+            Button("Open File…") { requests.showsFileSearch = true }
+                .keyboardShortcut("p")
+                .disabled(model.selectedAgent == nil)
+            Divider()
             Button("Next Session") { step(by: 1) }
                 .keyboardShortcut(.downArrow, modifiers: [.command, .option])
                 .disabled(sessionsHere.isEmpty)
@@ -193,6 +201,9 @@ struct AgentsCommands: Commands {
                     .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: [.control, .command])
             }
         }
+
+        // ⌘P is Open File…; there is nothing here to print.
+        CommandGroup(replacing: .printItem) {}
 
         CommandGroup(replacing: .help) {
             Button("Agents Help") { NSWorkspace.shared.open(Self.helpURL) }  // store-ok: a web page

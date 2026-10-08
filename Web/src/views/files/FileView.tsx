@@ -1,4 +1,4 @@
-// One file, read through the host (071 FR-029, FR-031, research R12): text numbered, Markdown
+// One file, read through the host (071 FR-029, FR-031, research R12): text as source to type in (#415), Markdown
 // through the renderer, pictures fitted and able to zoom, SVG only as an <img> made from its
 // bytes (which a browser draws with scripts off and nothing loaded), and HTML as its source.
 // Nothing a file holds can run or reach anywhere: no HTML sink, and the page's CSP besides.
@@ -15,6 +15,7 @@ import { bytesOf, mediaType, pictureFromReading } from "../../model/pageImage";
 import { Markdown, type PageImages } from "../../render/markdown";
 import { nameOf, textShownAs } from "./paneState";
 import { FileLines } from "./FileLines";
+import { SourceEditor } from "./SourceEditor";
 import { ZoomPicture } from "./ZoomPicture";
 
 export function FileView({ store, host, agentID, path, line }: {
@@ -94,11 +95,15 @@ export function FileView({ store, host, agentID, path, line }: {
           <>
             <p class="quiet small">HTML is shown as its source here, so nothing in it runs.</p>
             {note}
-            <FileLines text={r.text} line={line} />
+            {r.isTruncated
+              ? <FileLines text={r.text} line={line} />
+              : <SourceEditor key={path} store={store} host={host} agentID={agentID} path={path} text={r.text} line={line} />}
           </>
         );
       }
-      return <>{note}<FileLines text={r.text} line={line} /></>;
+      // Only partly read: numbered, not typed in, since saving it would cut it short.
+      if (r.isTruncated) return <>{note}<FileLines text={r.text} line={line} /></>;
+      return <SourceEditor key={path} store={store} host={host} agentID={agentID} path={path} text={r.text} line={line} />;
     }
   }
 }

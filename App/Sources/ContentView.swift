@@ -37,6 +37,29 @@ struct ContentView: View {
         if !frame.isOpen { frame.open() }
     }
 
+    /// A file chosen in Open File… (#415), open for editing in the session's Files pane.
+    private func openFound(_ file: FileMention) {
+        requests.showsFileSearch = false
+        guard let agentID = model.selection else { return }
+        let state = sidebarStates.state(for: agentID)
+        state.folder = file.url.deletingLastPathComponent()
+        state.openFile = file.url
+        state.openLine = nil
+        frame.pane = .files
+        if !frame.isOpen { frame.open() }
+    }
+
+    /// Open File… over what is being read, while it is asked for and there is a session.
+    @ViewBuilder
+    private var fileSearch: some View {
+        if requests.showsFileSearch, let agent = model.selectedAgent {
+            FileSearch(place: agent.cwd.lastPathComponent,
+                       search: { await model.findFiles($0, for: agent.id) },
+                       choose: openFound,
+                       dismiss: { requests.showsFileSearch = false })
+        }
+    }
+
     /// A conversation and, when it is open and there is room, the sidebar beside it.
     private func chat(inWindowOf width: CGFloat) -> some View {
         HStack(spacing: 0) {
@@ -192,6 +215,7 @@ struct ContentView: View {
                     // The chat and the inspector share this column, not the window, so
                     // this is the width the inspector measures itself against.
                     .onGeometryChange(for: Double.self) { $0.size.width } action: { frame.windowWidth = $0 }
+                    .overlay { fileSearch }
                     .toolbar { detailToolbar }
                     .navigationTitle(title)
                     .navigationSubtitle(model.selectedAgent == nil ? "" : (model.selectedProjectSummary?.name ?? ""))
@@ -223,6 +247,8 @@ struct ContentView: View {
         // and shut means gone: there would be nothing listening.
         .onChange(of: model.filesToShow) { showWhatWasAskedFor() }
         .onChange(of: model.selection) {
+            // Open File… searches the session it was opened over.
+            requests.showsFileSearch = false
             // A chat just started opens on the chat alone (#358); anything it asks
             // to show still opens the column, just below.
             if let id = model.selection, id == model.justStarted {

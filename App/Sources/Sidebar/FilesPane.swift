@@ -3,13 +3,14 @@ import SwiftUI
 
 /// The agent's folder, and what is in it.
 ///
-/// Read-only, deliberately (004 FR-017), with one exception that 022 made: a Markdown
-/// file opens as a live page the person can type on, and what they type goes to disk
-/// through the daemon. Nothing else here creates, renames, deletes or edits; the
-/// terminal pane is still the escape hatch for the rest.
+/// Read-only, deliberately (004 FR-017), with two exceptions: a Markdown file opens as
+/// a live page the person can type on (022), and any other text file opens as its
+/// source, editable (#415). What they type goes to disk through the daemon either way.
+/// Nothing here creates, renames or deletes; the terminal pane is still the escape
+/// hatch for the rest.
 ///
 /// The phone has the same pane since 034, reading through the daemon's `files/*` rather
-/// than this disk, with the same page and the same one exception.
+/// than this disk, with the same page and the same editor.
 struct FilesPane: View {
     @Environment(AppModel.self) private var model
     @Environment(SidebarFrame.self) private var frame
@@ -456,8 +457,17 @@ struct FilesPane: View {
             switch probe.kind {
             case .text:
                 VStack(alignment: .leading, spacing: 0) {
-                    // Everything that is not Markdown: numbered source, as it was.
-                    FileLines(text: probe.text ?? "", line: state.openLine, path: url.path)
+                    if probe.isTruncated {
+                        // Only partly read: numbered source, as it was, since saving
+                        // what is shown would cut the file short.
+                        FileLines(text: probe.text ?? "", line: state.openLine, path: url.path)
+                    } else {
+                        // Everything else that is text: its source, to type in (#415).
+                        SourceEditor(text: probe.text ?? "", path: url.path(percentEncoded: false),
+                                     line: state.openLine)
+                            .id(url)
+                            .environment(\.pageActions, MacPageActions.make(model: model, agentID: agent.id))
+                    }
                     if probe.isTruncated {
                         Divider()
                         Text("Showing the first \(ByteCountFormatter.string(fromByteCount: Int64(probe.prefix.count), countStyle: .file)) of \(ByteCountFormatter.string(fromByteCount: Int64(probe.size), countStyle: .file)).")
