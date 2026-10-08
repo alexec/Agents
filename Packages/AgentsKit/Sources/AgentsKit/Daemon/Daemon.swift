@@ -311,6 +311,7 @@ public final class Daemon: @unchecked Sendable {
         self.uplink = uplink
         await core.deliverNeeds { [uplink] params in uplink.tell(DaemonAPI.Method.attentionNeed, params) }
         await lendAndBorrowSignIns(through: uplink)
+        uplink.setProjectDetector { [core] detection in await core.detectProjects(detection) }
         uplink.start()
         let nudge: @Sendable (ReconnectTriggers.Reason) -> Void = { [uplink] reason in
             let nudged = uplink.goBackNow()

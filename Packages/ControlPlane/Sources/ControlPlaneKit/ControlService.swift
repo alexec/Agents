@@ -275,6 +275,9 @@ public final class ControlService: @unchecked Sendable {
                                           ["name": .string(name), "step": .string(step)])
         }
         hooks.install = { params in try await install.run(params) }
+        // hosts/detect (#429): the servers in the ssh config that answer, installed the same way.
+        let detect = HostDetect(installer: install) { [methods] in await methods.allHosts.map(\.name) }
+        hooks.detect = { try JSONValue.encoding(await detect.run()) }
         // Notices (T097): a need goes to the relay host, wherever it is held.
         hooks.need = { [weak self] _, params in await self?.heard(params) }
         hooks.relayChanged = { [weak self] _ in await self?.syncRelays() }

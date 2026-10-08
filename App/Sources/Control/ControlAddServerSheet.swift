@@ -11,11 +11,13 @@ import SwiftUI
 ///   installs the host once and keeps neither a key nor the session. The key is optional
 ///   when the control plane is on this Mac: its ssh is the person's, with their agent,
 ///   config and default identity (#413). One elsewhere has none of those, so needs a key.
+/// - **From ssh config**, on a control plane on this Mac (#429): every host in
+///   `~/.ssh/config` that answers is added at once, bastions and hosts already here left out.
 struct ControlAddServerSheet: View {
     @Environment(\.dismiss) private var dismiss
     let control: ControlSettingsModel
 
-    enum Way: Hashable { case command, ssh }
+    enum Way: Hashable { case command, ssh, sshConfig }
     @State private var way: Way = .command
 
     // Run a command
@@ -32,17 +34,23 @@ struct ControlAddServerSheet: View {
     @State private var fingerprint: String?
     @State private var outcome: ControlSettingsModel.InstallOutcome?
 
+    // From ssh config
+    @State private var detecting = false
+    @State private var detected: [DaemonAPI.DetectedServer]?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Add a Server").appText(.title).fontWeight(.semibold)
             Picker("How", selection: $way) {
                 Text("Run a command").tag(Way.command)
                 Text("Install over ssh").tag(Way.ssh)
+                if control.isOnThisMac { Text("From ssh config").tag(Way.sshConfig) }
             }
             .pickerStyle(.segmented).labelsHidden().fixedSize()
             switch way {
             case .command: commandPage
             case .ssh: sshPage
+            case .sshConfig: sshConfigPage
             }
         }
         .padding(28)
@@ -120,6 +128,85 @@ struct ControlAddServerSheet: View {
     static func left(until expires: Date, now: Date) -> String {
         let seconds = max(0, Int(expires.timeIntervalSince(now)))
         return String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+
+    // MARK: From ssh config (#429)
+
+    @ViewBuilder
+    private var sshConfigPage: some View {
+        Text("Every host in ~/.ssh/config that ssh can log into without a prompt is added. Hosts other hosts are reached through, hosts already here, and hosts that don't answer are left out.")
+            .appText(.reading).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        if detecting {
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text(control.installStep == nil ? "Looking at each host…" : stepWords(control.installStep))
+                    .appText(.supporting).foregroundStyle(.secondary)
+            }
+        }
+        if let detected {
+            if detected.isEmpty {
+                Text("There are no hosts in ~/.ssh/config to add.").appText(.supporting).foregroundStyle(.secondary)
+            } else {
+                ScrollView {
+                    Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 6) {
+                        ForEach(detected) { server in
+                            GridRow {
+                                Image(systemName: Self.symbol(server.outcome))
+                                    .tinted(server.outcome == .added ? .vouched : server.outcome == .failed ? .failure : .none)
+                                    .foregroundStyle(.secondary)
+                                    .accessibilityHidden(true)
+                                Text(server.alias).appText(.code)
+                                Text(Self.words(server)).appText(.supporting).foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .accessibilityElement(children: .combine)
+                        }
+                    }
+                }
+                .frame(maxHeight: 260)
+            }
+        }
+        if let problem = control.problem, way == .sshConfig, !detecting {
+            Text(problem).appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
+        }
+        HStack {
+            Spacer()
+            Button(detected == nil ? "Cancel" : "Done") { dismiss() }.buttonStyle(.paper)
+            Button(detected == nil ? "Find Servers" : "Look Again") { detect() }
+                .buttonStyle(.paperProminent)
+                .keyboardShortcut(.defaultAction)
+                .disabled(detecting)
+        }
+    }
+
+    private func detect() {
+        detecting = true
+        Task {
+            detected = await control.detectServers()
+            detecting = false
+        }
+    }
+
+    static func symbol(_ outcome: DaemonAPI.DetectedServer.Outcome) -> String {
+        switch outcome {
+        case .added: "checkmark.circle.fill"
+        case .failed: "exclamationmark.triangle.fill"
+        case .known: "circle.fill"
+        case .bastion: "arrow.triangle.branch"
+        case .unreachable: "circle.dashed"
+        }
+    }
+
+    static func words(_ server: DaemonAPI.DetectedServer) -> String {
+        let said: String = switch server.outcome {
+        case .added: "Added · \(server.resolved)"
+        case .known: server.detail ?? "Already a host."
+        case .bastion: "A way in for other hosts, not added."
+        case .unreachable: "Not added: \(server.detail ?? "it did not answer.")"
+        case .failed: "Couldn’t install: \(server.detail ?? "it failed.")"
+        }
+        return said
     }
 
     // MARK: M2 · Install over ssh

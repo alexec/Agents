@@ -16,6 +16,8 @@ public actor ControlMethods: ControlHandling {
         public var startEnroll: @Sendable () async throws -> JSONValue
         /// `hosts/install`, `hosts/update`, `hosts/checkAgain`: the ssh path (US3).
         public var install: @Sendable (JSONValue?) async throws -> JSONValue
+        /// `hosts/detect` (#429): the servers in the ssh config that answer, installed.
+        public var detect: @Sendable () async throws -> JSONValue = { throw ControlMethods.notHere }
         public var update: @Sendable (HostID) async throws -> Void
         public var checkAgain: @Sendable (HostID) async throws -> Void
         /// A need a host raised, for the control plane to choose a device and seal (R6).
@@ -157,8 +159,31 @@ public actor ControlMethods: ControlHandling {
     }
 
     /// A host that has enrolled, or this Mac's own host arriving on the local socket.
+    ///
+    /// One the control plane has not had before is marked to have its projects found
+    /// (#429), when that is on; it is told what to look for once it has said hello.
     public func enroll(_ host: HostRecord) async throws {
+        var host = host
+        if await records.host(host.id) == nil, host.relay != true, detection.enabled {
+            host.detectProjects = true
+        }
         try await records.save(host)
+    }
+
+    /// Where a host added from now on has its projects found (#429).
+    public var detection: ProjectDetection { settings.projectDetection ?? .standard }
+
+    /// Tells a host marked to find its projects where to look, or, with detection turned
+    /// off since it enrolled, lets the mark go.
+    private func detectProjectsIfDue(_ host: HostID) async {
+        guard var record = await records.host(host), record.detectProjects == true else { return }
+        guard detection.enabled, !detection.paths.isEmpty else {
+            record.detectProjects = nil
+            try? await records.save(record)
+            return
+        }
+        guard let params = try? JSONValue.encoding(detection) else { return }
+        _ = await router?.tell(host, DaemonAPI.Method.projectsDetect, params)
     }
 
     /// Where the control plane answers from now on, in order (R16): the list every member
@@ -188,7 +213,7 @@ public actor ControlMethods: ControlHandling {
         DaemonAPI.Method.ping, DaemonAPI.Method.controlStatus, DaemonAPI.Method.hostsList,
         DaemonAPI.Method.hostsStartEnroll, DaemonAPI.Method.hostsInstall, DaemonAPI.Method.hostsCheckAgain,
         DaemonAPI.Method.hostsUpdate, DaemonAPI.Method.hostsRemove, DaemonAPI.Method.hostsSetRelay,
-        DaemonAPI.Method.hostsLendSignIn,
+        DaemonAPI.Method.hostsLendSignIn, DaemonAPI.Method.hostsDetect, DaemonAPI.Method.controlSetProjectDetection,
         DaemonAPI.Method.clientsList, DaemonAPI.Method.clientsStartPairing, DaemonAPI.Method.clientsStopPairing,
         DaemonAPI.Method.clientsSetGrant, DaemonAPI.Method.clientsForget, DaemonAPI.Method.clientsConnections,
         DaemonAPI.Method.clientsForgetSelf,
@@ -218,6 +243,7 @@ public actor ControlMethods: ControlHandling {
     private static let writes: Set<String> = [
         DaemonAPI.Method.hostsStartEnroll, DaemonAPI.Method.hostsInstall, DaemonAPI.Method.hostsUpdate,
         DaemonAPI.Method.hostsRemove, DaemonAPI.Method.hostsSetRelay, DaemonAPI.Method.hostsLendSignIn,
+        DaemonAPI.Method.hostsDetect, DaemonAPI.Method.controlSetProjectDetection,
         DaemonAPI.Method.clientsStartPairing, DaemonAPI.Method.clientsForget,
         DaemonAPI.Method.devicesStartPairing, DaemonAPI.Method.devicesForget,
     ]
@@ -238,6 +264,7 @@ public actor ControlMethods: ControlHandling {
             status.you = caller.client
             status.web = web
             status.thisMacHost = thisMacHost?()
+            status.projectDetection = detection
             status.relayKey = await records.hosts.first { $0.relay == true }?.publicKey
             // A relay host is what takes devices out of the house (T096).
             if status.relayKey != nil { status.awayFromHome = true }
@@ -292,6 +319,13 @@ public actor ControlMethods: ControlHandling {
             return try await hooks.startEnroll()
         case DaemonAPI.Method.hostsInstall:
             return try await hooks.install(params)
+        case DaemonAPI.Method.hostsDetect:
+            return try await hooks.detect()
+        case DaemonAPI.Method.controlSetProjectDetection:
+            var request = try Self.require(params, as: ProjectDetection.self)
+            request.paths = request.paths.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+            settings = try await records.changeSettings { $0.projectDetection = request }
+            return try JSONValue.encoding(request)
         case DaemonAPI.Method.hostsUpdate:
             try await hooks.update(try Self.require(params, as: DaemonAPI.HostRequest.self).host)
             return [:]
@@ -379,6 +413,14 @@ public actor ControlMethods: ControlHandling {
                                                ControlRouter.describe(host, .online))
             }
             if record.relay == true { await hooks.relayChanged(host) }
+            await detectProjectsIfDue(host)
+            return [:]
+        case DaemonAPI.Method.projectsDetected:
+            // Once: from now on its projects are the person's to add and remove (#429).
+            if var record = await records.host(host), record.detectProjects == true {
+                record.detectProjects = nil
+                try await records.save(record)
+            }
             return [:]
         case DaemonAPI.Method.attentionNeed:
             await hooks.need(host, params)

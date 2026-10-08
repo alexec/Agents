@@ -24,6 +24,8 @@ Sent with no `h`. Grant column: which client grant may call it. Params and resul
 | `hosts/list` | any | → `[{id, name, platform, version, state, machineID, relay}]` (no `reach`: every host dials out) |
 | `hosts/startEnroll` | operator | → `{code, command}`: the host code, and the one-line install command for a server (FR-018) |
 | `hosts/install` | operator | `{name, destination, key, trust?}` → `{host}` or `{needsTrust: fingerprint}`. `key`, optional, is a private key for this install only; it is held in memory until the call ends and never stored (FR-018a). Without it, the control plane's ssh logs in as `ssh user@host` would for the person running it: agent, `~/.ssh/config`, default identity (#413). The host key is confirmed either way Progress comes as `control/installProgress`. The copy that takes the call does the install |
+| `hosts/detect` | operator | `{}` → `[{alias, resolved, outcome, detail?}]` (#429): every concrete `Host` in the control plane's `~/.ssh/config` (through `Include`), resolved by `ssh -G`. Bastions (named in another entry's `ProxyJump`, or the `ssh … host` of its `ProxyCommand`) are `bastion`; a host by that name already, or a server with Agents installed, is `known`; the rest are probed (`BatchMode`, the person's known_hosts, 8 at once, 30 s each), and one that answers is installed as `hosts/install` with no key (`added` or `failed`), one that does not is `unreachable`. Only meaningful on the person's own Mac; the window offers it only there |
+| `control/setProjectDetection` | operator | `{enabled, paths}` → the same, blank paths dropped (#429). `control/status` says it as `projectDetection` |
 | `hosts/checkAgain` | operator | `{host}` → `{}` |
 | `hosts/update` | operator | `{host}` → `{}`: asks the host to update itself over its uplink |
 | `hosts/remove` | operator | `{host, purge?: Bool}` → `{}`; revokes key, closes uplink |
@@ -36,6 +38,13 @@ Sent with no `h`. Grant column: which client grant may call it. Params and resul
 | `clients/forgetSelf` | any | `{}` → `{}`: the caller forgets itself (071 **Forget This Browser…**); refuses the last operator; the reply is sent, then every socket of the caller closes with 4403 `forgotten`, on every copy |
 | `presence/report` | any | as today; broadcast to peer copies, and folded for notices (R5, R10) |
 | `hosts/setRelay` | operator | `{host, relay: Bool}` → `{}`: switches a relay host (`agents-relay`) on or off. A host that runs agents cannot be made one: `invalidParams` (R10, T097) |
+
+**Projects found when a host is added (#429).** A host the control plane has not had before
+is marked `detectProjects` when it enrols, if `projectDetection.enabled`. After each `host/hello`
+from a marked host the control plane tells it, on channel 0, `projects/detect {enabled, paths}`; the
+host adds each immediate, non-hidden folder of each path (`~` its own home) that has `.git`, then
+says `projects/detected {added}`, and the mark goes. Nothing asks again, so a project removed
+afterwards stays removed. A host already enrolled is never marked.
 
 Legacy names `devices/list`, `devices/startPairing`, `devices/stopPairing`, `devices/announce`,
 `devices/forget` are accepted as aliases until the Remote and the window move to `clients/*`.
