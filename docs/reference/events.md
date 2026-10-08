@@ -97,18 +97,25 @@ counting again from the next agent that works.
 
 ## This Mac
 
-These belong to the Mac, not to a project. Any agent can wait for them.
+These belong to the machine the host runs on, not to a project. Any agent can wait for them.
+
+`mac.sleep`, `mac.wake`, `person.away` and `person.back` are raised only on a Mac: a Linux
+server has nothing that hears them. On a server, a `wait_for_event` naming only these is
+refused, one naming them with others says so in its answer, and `manage_workflows` says so
+when it writes or lists a workflow that triggers on them. The disk events fire on both, so
+they are `machine.`; their names before, `mac.disk_low` and `mac.disk_ok`, still work in a
+workflow file and a wait, and are read as the new ones.
 
 | Event | Details | What it means |
 | --- | --- | --- |
 | `lease.granted` | resource, agent | An agent was given a lease. See [Leases on shared resources](../explanation/leases.md). |
 | `lease.released` | resource, how | A lease was given back, ended or ran out. `how` is `released`, `ended` or `expired`. |
-| `mac.sleep` | | The Mac is going to sleep. |
-| `mac.wake` | | The Mac woke up. |
-| `mac.disk_low` | volume, free_bytes, free_percent, level, threshold, worktrees | Free space on a volume holding the Agents root, a project or a worktree fell below its threshold. `level` is `low` (below 20 GB or 5% of the disk, whichever is more) or `critical` (below 2 GB, where commands start failing). `threshold` is the line it fell below, in bytes. `worktrees` names the largest worktrees on the volume and their sizes, measured within a budget, so `over` means at least. Raised once per crossing; falling further from low to critical is a second crossing. The window shows a strip across the top while it lasts. |
-| `mac.disk_ok` | volume, free_bytes, free_percent, threshold | Free space on a volume that was low climbed back above its threshold, by a margin of a tenth of it (at least 1 GB) so it does not flap. |
-| `person.away` | why | You locked the screen or stepped away for 5 minutes. `why` is `locked` or `idle`. |
-| `person.back` | why | You unlocked the screen or came back. `why` is `locked` or `idle`. |
+| `mac.sleep` | | The Mac is going to sleep. Mac only. |
+| `mac.wake` | | The Mac woke up. Mac only. |
+| `machine.disk_low` | volume, free_bytes, free_percent, level, threshold, worktrees | Free space on a volume holding the Agents root, a project or a worktree fell below its threshold. `level` is `low` (below 20 GB or 5% of the disk, whichever is more) or `critical` (below 2 GB, where commands start failing). `threshold` is the line it fell below, in bytes. `worktrees` names the largest worktrees on the volume and their sizes, measured within a budget, so `over` means at least. Raised once per crossing; falling further from low to critical is a second crossing. The window shows a strip across the top while it lasts. On a Linux server the volume is called "This server’s disk". |
+| `machine.disk_ok` | volume, free_bytes, free_percent, threshold | Free space on a volume that was low climbed back above its threshold, by a margin of a tenth of it (at least 1 GB) so it does not flap. |
+| `person.away` | why | You locked the screen or stepped away for 5 minutes. `why` is `locked` or `idle`. Mac only. |
+| `person.back` | why | You unlocked the screen or came back. `why` is `locked` or `idle`. Mac only. |
 | `cost.limit_reached` | limit, agent | A spending limit was reached. When it is an agent's, it also carries `labels`, `runtime` and `started_by`. See [Settings and the Resources page](settings.md). |
 | `cost.allowance_out` | runtime, until, retry_after, reason | A runtime's allowance ran out, its credit was used up, or it failed. `until` is the time the provider gave, when it gave one; `retry_after` is when the app next checks it. See [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md). |
 | `cost.allowance_back` | runtime, how | A runtime is back: `check` (the app's check passed), `person` (Mark available), `worked` (a turn on it worked), `time` (a rate limit's wait passed) or `another host` (a server said so). |

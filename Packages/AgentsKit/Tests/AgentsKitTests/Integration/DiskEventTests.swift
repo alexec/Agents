@@ -4,7 +4,7 @@ import Testing
 @testable import AgentsKit
 @testable import AgentsKitCore
 
-/// `mac.disk_low` and `mac.disk_ok` from the daemon (#195), with a reading a test sets
+/// `machine.disk_low` and `machine.disk_ok` from the daemon (#195), with a reading a test sets
 /// rather than a disk it fills.
 @Suite("Disk space events", .timeLimit(.minutes(1)))
 struct DiskEventTests {
@@ -39,7 +39,7 @@ struct DiskEventTests {
     }
 
     private func diskEvents(_ core: DaemonCore) async -> [Event] {
-        await core.eventLog.events.filter { $0.name.hasPrefix("mac.disk_") }
+        await core.eventLog.events.filter { $0.name.hasPrefix("machine.disk_") }
     }
 
     @Test func aDropIsRaisedOnceWithItsDetailsAndTheClimbBackOnce() async throws {
@@ -55,7 +55,7 @@ struct DiskEventTests {
         await core.checkDiskSpace()
         await core.checkDiskSpace()
         var events = await diskEvents(core)
-        #expect(events.map(\.name) == ["mac.disk_low"], "one crossing, one event")
+        #expect(events.map(\.name) == ["machine.disk_low"], "one crossing, one event")
         let low = try #require(events.first)
         #expect(low.scope == .mac)
         #expect(low.details["volume"] == "Work")
@@ -77,7 +77,7 @@ struct DiskEventTests {
         volume.set(60)
         await core.checkDiskSpace()
         events = await diskEvents(core)
-        #expect(events.map(\.name) == ["mac.disk_low", "mac.disk_low", "mac.disk_ok"])
+        #expect(events.map(\.name) == ["machine.disk_low", "machine.disk_low", "machine.disk_ok"])
         #expect(events.last?.details["threshold"] == String(50 * DiskSpace.gigabyte))
         #expect(await core.diskState().alarms.isEmpty)
     }
@@ -87,17 +87,31 @@ struct DiskEventTests {
             WorkflowFile.parse("---\non:\n\(on)\n---\n\nClean up.\n", workflowID: "w",
                                in: URL(fileURLWithPath: "/tmp/project"))
         }
-        let both = parse("  - mac.disk_low:\n      level: critical\n  - mac.disk_ok")
+        let both = parse("  - machine.disk_low:\n      level: critical\n  - machine.disk_ok")
         #expect(both.problem == nil)
-        #expect(both.triggers == [.event(EventPattern("mac.disk_low", filters: ["level": "critical"])),
-                                  .event(EventPattern("mac.disk_ok"))])
-        guard case .unreadable(let detail)? = parse("  - mac.disk_low:\n      level: full").problem else {
+        #expect(both.triggers == [.event(EventPattern("machine.disk_low", filters: ["level": "critical"])),
+                                  .event(EventPattern("machine.disk_ok"))])
+        guard case .unreadable(let detail)? = parse("  - machine.disk_low:\n      level: full").problem else {
             Issue.record("a level it cannot have was taken")
             return
         }
         #expect(detail.contains("low"), "\(detail)")
-        #expect(EventCatalogue.describe().contains("- mac.disk_low [volume, free_bytes, free_percent, "
+        #expect(EventCatalogue.describe().contains("- machine.disk_low [volume, free_bytes, free_percent, "
                                                    + "level=low|critical, threshold, worktrees]"))
+    }
+
+    /// Renamed from mac.* (#372), because a Linux server raises them too: a file written
+    /// before still triggers, as the new name, and so does a wait kept on a record.
+    @Test func theOldNamesAreReadAsTheNewOnes() throws {
+        let old = WorkflowFile.parse("---\non:\n  - mac.disk_low:\n      level: critical\n  - Mac.Disk_OK\n---\n\nGo.\n",
+                                     workflowID: "w", in: URL(fileURLWithPath: "/tmp/project"))
+        #expect(old.problem == nil)
+        #expect(old.triggers == [.event(EventPattern("machine.disk_low", filters: ["level": "critical"])),
+                                 .event(EventPattern("machine.disk_ok"))])
+        let stored = try JSONDecoder().decode(EventPattern.self,
+                                              from: Data(#"{"name":"mac.disk_ok","filters":{}}"#.utf8))
+        #expect(stored == EventPattern("machine.disk_ok"))
+        #expect(EventCatalogue.kind(named: "mac.disk_low") == nil, "the catalogue lists only today's name")
     }
 
     @Test func theProjectsFileMovesTheLine() async throws {

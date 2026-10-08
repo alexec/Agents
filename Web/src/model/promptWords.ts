@@ -24,3 +24,9 @@ export function willQueue(agent: Agent | undefined): boolean {
 export const stopHelp = "Stop this agent and stay on the chat";
 export const sendLabel = (queues: boolean) => (queues ? "Queue" : "Send");
 export const sendHelp = (queues: boolean) => (queues ? "Queue this, to go when the turn ends" : "Send");
+
+/** PromptReturn (AgentsKitCore), the same rule in every client (#377): Return and Shift-Return
+ * send, and only Option-Return is a line break. */
+export function returnAction(key: { altKey: boolean }): "send" | "lineBreak" {
+  return key.altKey ? "lineBreak" : "send";
+}

@@ -53,6 +53,19 @@ struct DotAgentsTests {
         #expect(try read(work, ".claude/skills/x/SKILL.md") == "x")
     }
 
+    // #229 FR-004, FR-014: only the chat project's AGENTS.md says what its folder is for;
+    // every other project's starts as it always has.
+    @Test func onlyTheChatProjectsRouterSaysWhatTheFolderIsFor() throws {
+        let work = try project()
+        let plain = DotAgents.routerContents(for: work)
+        #expect(plain.hasPrefix("# AGENTS.md\n\n## Context routing\n"))
+        #expect(!plain.contains("## This folder"))
+
+        let chat = DotAgents.routerContents(for: work, chat: true)
+        #expect(chat.hasPrefix("# AGENTS.md\n\n## This folder\n\nThis folder is shared by every chat on this host."))
+        #expect(chat.hasSuffix(plain.dropFirst("# AGENTS.md\n".count)))
+    }
+
     @Test func anExistingClaudeFileMovesToAgentsAndIsLinkedBack() throws {
         let work = try project()
         try write(work, "CLAUDE.md", "Be careful.\n")

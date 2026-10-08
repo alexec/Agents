@@ -61,7 +61,9 @@ public final class ShellHost: @unchecked Sendable {
     private var epitaphs: [Key: String] = [:]
 
     public enum ShellEvent: Sendable {
-        case output(Data)
+        /// Bytes the shell printed, and the offset of the first of them in all it has
+        /// printed.
+        case output(Data, offset: Int)
         case state(ShellState)
     }
 
@@ -88,8 +90,10 @@ public final class ShellHost: @unchecked Sendable {
         let epitaph = epitaphs.removeValue(forKey: key)
         lock.unlock()
 
+        // Not resized: a screen attaching has not been laid out yet, and taking the
+        // shell to its guess made a full-screen program redraw twice on every switch.
+        // The screen says its size once it knows it (#401).
         if let existing, existing.state.isLive {
-            existing.resize(rows: rows, cols: cols)
             let buffer = existing.scrollback
             return Attachment(state: existing.state,
                               scrollback: buffer.tail,
@@ -112,10 +116,7 @@ public final class ShellHost: @unchecked Sendable {
         let session = try start(key, folder: folder, rows: rows, cols: cols)
         // The previous shell died with the daemon or the machine. Say so on this first
         // attach rather than pretending this new one is the old one.
-        if let epitaph {
-            let note = "\r\n\u{1B}[2m\(epitaph)\u{1B}[0m\r\n"
-            push(key, .output(Data(note.utf8)))
-        }
+        if let epitaph { session.note(epitaph) }
         let buffer = session.scrollback
         return Attachment(state: session.state,
                           scrollback: buffer.tail,
@@ -157,7 +158,7 @@ public final class ShellHost: @unchecked Sendable {
             folder: folder,
             rows: rows,
             cols: cols,
-            onOutput: { [weak self] data in self?.push(key, .output(data)) },
+            onOutput: { [weak self] data, offset in self?.push(key, .output(data, offset: offset)) },
             onStateChange: { [weak self] state in self?.push(key, .state(state)) })
 
         if case .failed(let reason) = session.state {

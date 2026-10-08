@@ -23,6 +23,7 @@ ones every Mac app has.
 | Escape | In the prompt, with a list of commands or files showing | Closes the list. |
 | Command-N | **File ▸ New Session** | Starts a new session in the selected project, the same as the compose button above the sessions column. |
 | Option-Command-N | **File ▸ New Session in a Worktree** | Starts a new session in the selected project, in a new worktree. |
+| Shift-Command-N | **File ▸ New Chat** | Starts a chat in this Mac's **chat** project, with no project to pick. See [Chat without a project](../how-to/chat-without-a-project.md). |
 | Command-O | **File ▸ Add Folder…** | Adds a folder as a project. |
 | Shift-Command-O | **File ▸ Clone Git URL…** | Clones a Git URL as a project. |
 | Control-Command-O | **File ▸ Add Server…** | Adds a Linux server. |

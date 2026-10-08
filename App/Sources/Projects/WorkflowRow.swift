@@ -64,9 +64,13 @@ struct WorkflowRow: View {
             if summary.isArchived {
                 Button("Bring Back") { Task { await model.setWorkflowArchived(summary, false) } }
             } else {
-                if summary.awaitingApproval != nil {
+                if summary.isUnapproved {
                     if summary.canBeApproved {
                         Button("Approve") { Task { await model.approveWorkflow(summary) } }
+                    }
+                    // Not here, without archiving it everywhere (#391).
+                    if summary.canBeDenied {
+                        Button("Deny on This Host") { Task { await model.denyWorkflow(summary) } }
                     }
                 } else {
                     Button("Run now") { Task { await model.runWorkflow(summary) } }
@@ -165,7 +169,7 @@ struct WorkflowRow: View {
                 Button("Bring Back") { Task { await model.setWorkflowArchived(summary, false) } }
                     .buttonStyle(.paper)
                     .appText(.fine)
-            } else if summary.awaitingApproval != nil {
+            } else if summary.isUnapproved {
                 // The one thing to do with a file nobody has looked at. Open it first —
                 // the row itself opens it — and approve what you read. Not offered to
                 // one waiting its turn behind three others (#132): the row says why.
@@ -198,7 +202,7 @@ struct WorkflowRow: View {
     }
 
     private var nextText: String? {
-        guard !summary.isArchived, summary.overLimit == nil, summary.awaitingApproval == nil else { return nil }
+        guard !summary.isArchived, summary.overLimit == nil, !summary.isUnapproved else { return nil }
         if let next = summary.nextFireAt {
             return "Next \(next.formatted(.relative(presentation: .named)))"
         }
@@ -230,6 +234,7 @@ struct WorkflowRow: View {
             if let note = waiting.note { return "Waiting for your OK — \(note)" }
             return (waiting.isNew ? "New" : "Changed since you approved it") + " — waiting for your OK"
         }
+        if summary.deniedHere != nil { return "Denied on this host — it does not run here" }
         // Ahead of the pause, because unpausing it would change nothing: what has to
         // happen is that something else goes.
         if let limit = summary.overLimit {
@@ -261,6 +266,7 @@ struct WorkflowStatusIcon: View {
     private var name: String {
         if summary.isArchived { return "archivebox" }
         if summary.awaitingApproval != nil { return "hand.raised" }
+        if summary.deniedHere != nil { return "hand.raised.slash" }
         if !summary.isEnabled { return "pause.circle" }
         if summary.needsAPerson { return "exclamationmark.triangle" }
         if summary.isRunning { return "circle.dotted" }
@@ -272,6 +278,7 @@ struct WorkflowStatusIcon: View {
         if summary.isArchived { return "Archived" }
         if summary.waitsItsTurn { return "Over the limit" }
         if summary.awaitingApproval != nil { return "Waiting for your OK" }
+        if summary.deniedHere != nil { return "Denied on this host" }
         if !summary.isEnabled { return "Turned off" }
         if summary.overLimit != nil { return "Over the limit" }
         if summary.needsAPerson { return "Needs attention" }

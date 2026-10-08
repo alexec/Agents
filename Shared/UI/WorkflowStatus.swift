@@ -30,6 +30,7 @@ extension WorkflowSummary {
                                             detail: problem.needsAPerson ? "The file is below" : "Left alone until this version knows it",
                                             tint: problem.needsAPerson ? .failure : .none))
         }
+        lines += mcpArgumentLines
         if waitsItsTurn, let limit = overLimit {
             lines.append(WorkflowStatusLine(symbol: "hourglass", text: "Waiting its turn: \(limit.sentence)",
                                             detail: limit.remedy, tint: .attention))
@@ -39,6 +40,10 @@ extension WorkflowSummary {
                                                 ?? (waiting.isNew ? "New — waiting for your OK" : "Changed since you approved it — waiting for your OK"),
                                             detail: "Read the prompt and settings below, then Approve to let it run",
                                             tint: .attention))
+        } else if deniedHere != nil {
+            lines.append(WorkflowStatusLine(symbol: "hand.raised.slash",
+                                            text: "Denied on this host — it does not run here",
+                                            detail: "Other hosts still see it waiting. Approve to let it run here"))
         }
         if !isArchived {
             lines.append(enabledLine)
@@ -90,7 +95,7 @@ extension WorkflowSummary {
     /// When it next runs, or that nothing will until something changes.
     private var nextLine: WorkflowStatusLine {
         let blocked = isArchived || !isEnabled || workflow.problem != nil
-            || awaitingApproval != nil || overLimit != nil
+            || awaitingApproval != nil || deniedHere != nil || overLimit != nil
         if let next = nextFireAt, !blocked {
             return WorkflowStatusLine(symbol: "calendar",
                                       text: "Next run \(next.formatted(.relative(presentation: .named)))",
@@ -155,5 +160,71 @@ extension Workflow {
             : mode == .new
                 ? "Each run's new agent gets these labels."
                 : "Given to an agent this workflow starts; one it reuses keeps its own."
+    }
+}
+
+extension MCPTriggerStatus {
+    /// The line under the triggers (#383, contracts/wire-status.md), worked out at `now`
+    /// from what the host last said, so "Checked 20 s ago" moves without the host
+    /// sending anything. The web page's `workflows.ts` says the same words.
+    func words(now: Date) -> (text: String, tint: StateTint) {
+        let who = server ?? "its server"
+        let body: String
+        var tint = StateTint.none
+        switch state {
+        case .pending:
+            body = failure?.message ?? "Connecting to \(who)…"
+        case .active:
+            let checked = lastPolledAt.map { "Checked \(Self.ago($0, now: now))" } ?? "Not checked yet"
+            let last = lastEventAt.map { "last event \(Self.ago($0, now: now))" } ?? "no events yet"
+            body = "\(checked) · \(last)"
+        case .retrying:
+            let again = retryAt.map { " · trying again in \(Self.span(max(0, $0.timeIntervalSince(now))))" } ?? ""
+            if let failure, failure.code == .unreachable {
+                body = "Can't reach \(who) since \(Self.clock(failure.since))\(again)"
+            } else {
+                body = (failure?.message ?? "Can't reach \(who)") + again
+            }
+            tint = .attention
+        case .stopped:
+            body = failure?.message ?? "Stopped"
+            tint = .failure
+        case .notThisHost:
+            body = "Runs on another host, which asks for its events"
+        }
+        let lead = server.map { "\($0) · \(name)" } ?? name
+        return ("\(lead): \(body)", tint)
+    }
+
+    /// "Events may have been missed since 09:14", while they may have been.
+    var missedWords: String? {
+        missedSince.map { "Events may have been missed since \(Self.clock($0))" }
+    }
+
+    static func ago(_ date: Date, now: Date) -> String {
+        "\(span(max(0, now.timeIntervalSince(date)))) ago"
+    }
+
+    /// 20 s, 25 min, 3 h, 2 d.
+    static func span(_ seconds: TimeInterval) -> String {
+        let whole = Int(seconds.rounded())
+        if whole < 60 { return "\(whole) s" }
+        if whole < 3600 { return "\(whole / 60) min" }
+        if whole < 86_400 { return "\(whole / 3600) h" }
+        return "\(whole / 86_400) d"
+    }
+
+    static func clock(_ date: Date) -> String {
+        date.formatted(date: .omitted, time: .shortened)
+    }
+}
+
+extension WorkflowSummary {
+    /// Arguments a server's event doesn't take, said where file errors are (#383).
+    var mcpArgumentLines: [WorkflowStatusLine] {
+        (mcpTriggers ?? []).filter { $0.failure?.code == .badArguments }.map {
+            WorkflowStatusLine(symbol: "exclamationmark.triangle", text: $0.failure?.message ?? "",
+                               detail: "The file is below", tint: .failure)
+        }
     }
 }

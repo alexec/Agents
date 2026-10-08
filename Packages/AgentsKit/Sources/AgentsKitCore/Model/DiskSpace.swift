@@ -1,7 +1,7 @@
 import Foundation
 
-/// How full a volume is allowed to get before the app says so (#195): `mac.disk_low` and
-/// `mac.disk_ok`, and the strip in the window.
+/// How full a volume is allowed to get before the app says so (#195): `machine.disk_low` and
+/// `machine.disk_ok`, and the strip in the window.
 ///
 /// Set in a project's `.agents/project.json` beside `helperLimits`, or in Project
 /// Settings. A nil field is its default. A volume holding several projects goes by the

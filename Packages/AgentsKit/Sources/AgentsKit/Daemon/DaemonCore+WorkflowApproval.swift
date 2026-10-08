@@ -34,16 +34,27 @@ extension DaemonCore {
         return digest
     }
 
-    /// What a workflow is waiting on, or nil when the file is the one approved.
+    /// What a workflow is waiting on, or nil when the file is the one approved, or the
+    /// one denied on this host (#391): a denial is an answer, so it no longer waits.
     ///
     /// Nothing waits before approval has begun: everything present then is about to be
     /// approved as it stands, and the daemon begins approval before anything can fire.
     /// A records file that could not be read has begun and approved nothing (#169).
     func awaitingApproval(_ workflow: Workflow, state: WorkflowState?,
                           records: WorkflowRecords) -> WorkflowApproval? {
-        guard records.approvalsBegan != nil, let digest = workflowDigest(workflow), digest != state?.approvedDigest else { return nil }
+        guard records.approvalsBegan != nil, let digest = workflowDigest(workflow), digest != state?.approvedDigest,
+              digest != state?.deniedDigest else { return nil }
         return WorkflowApproval(digest: digest, isNew: state?.approvedDigest == nil,
                                 note: records.unreadable ? ApprovalFile.note(workflowStore.file) : nil)
+    }
+
+    /// The file as the person denied it on this host, while it is still the file and has
+    /// not been approved since (#391), or nil. A denied workflow runs nothing here, by
+    /// trigger or by Run now, and is neither waiting nor among the approved.
+    func deniedHere(_ workflow: Workflow, state: WorkflowState?) -> WorkflowApproval? {
+        guard let denied = state?.deniedDigest, denied != state?.approvedDigest,
+              workflowDigest(workflow) == denied else { return nil }
+        return WorkflowApproval(digest: denied, isNew: state?.approvedDigest == nil)
     }
 
     /// The first start with approval: every file already here is approved as it stands,
@@ -67,8 +78,13 @@ extension DaemonCore {
     func approve(_ workflow: Workflow, digest: String, in records: inout WorkflowRecords) {
         records.update(folder: workflow.folder, workflowID: workflow.workflowID) {
             $0.approvedDigest = digest
-            // A refusal for waiting belonged to the file before this one.
-            if case .refused(.awaitingApproval, _, _) = $0.lastOutcome { $0.lastOutcome = nil }
+            // Approve on this host takes back a denial on it (#391).
+            $0.deniedDigest = nil
+            // A refusal for waiting, or for being denied, belonged to before this.
+            switch $0.lastOutcome {
+            case .refused(.awaitingApproval, _, _), .refused(.deniedHere, _, _): $0.lastOutcome = nil
+            default: break
+            }
         }
     }
 
@@ -96,6 +112,34 @@ extension DaemonCore {
         let summary = summary(for: workflow, records: records)
         announceWorkflow(workflow, records: records)
         // Its place among the waiting is free for the next in line.
+        rebroadcastWorkflows(in: workflow.folder, except: [workflow.workflowID])
+        return summary
+    }
+
+    /// The person's Deny (#391): not on this host. Of the file they were shown, as
+    /// Approve is, and kept beside the approval rather than in the file, so other hosts
+    /// still see it waiting and the project's history shows nothing. A later change to
+    /// the file waits for an OK again.
+    public func denyWorkflow(_ request: DaemonAPI.WorkflowApproveRequest) throws -> WorkflowSummary {
+        guard let workflow = workflow(request.workflowID, in: request.folder) else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchWorkflow,
+                               message: "There is no workflow called \(request.workflowID) in this project.")
+        }
+        guard workflowDigest(workflow) == request.digest else {
+            throw JSONRPCError(code: DaemonAPI.Failure.notChanged,
+                               message: "\(workflow.name) changed after you looked at it, so it was not denied. Look again.")
+        }
+        var records = workflowStore.load()
+        records.update(folder: workflow.folder, workflowID: workflow.workflowID) {
+            $0.deniedDigest = request.digest
+            // Denying an approved file takes the approval back on this host.
+            if $0.approvedDigest == request.digest { $0.approvedDigest = nil }
+            if case .refused(.awaitingApproval, _, _) = $0.lastOutcome { $0.lastOutcome = nil }
+        }
+        try keep("this workflow's settings") { try workflowStore.save(records, replacing: true) }
+        let summary = summary(for: workflow, records: records)
+        announceWorkflow(workflow, records: records)
+        // Like Approve and Archive, it frees a place among the waiting.
         rebroadcastWorkflows(in: workflow.folder, except: [workflow.workflowID])
         return summary
     }

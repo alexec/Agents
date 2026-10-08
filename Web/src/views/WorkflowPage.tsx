@@ -11,7 +11,7 @@ import { useEffect } from "preact/hooks";
 import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
 import {
-  cooldownSentence, labelsNote, agentModeWords, unknownLines, waitsItsTurn, workflowStatusLines, isOn, isSupportedTrigger, switchesSentence, lastRanLine, nextLine, resumedAgent, scopeLine, triggerFilters, triggerGlyph,
+  cooldownSentence, labelsNote, mcpMissedWords, mcpTriggerWords, agentModeWords, unknownLines, isUnapproved, canBeApproved, canBeDenied, workflowStatusLines, isOn, isSupportedTrigger, switchesSentence, lastRanLine, nextLine, resumedAgent, scopeLine, triggerFilters, triggerGlyph,
   triggerSummary, workflowHostChoices, workflowSummary,
 } from "../model/workflows";
 import { go } from "../route";
@@ -43,6 +43,12 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
   }, [host, folder, workflowID, runLimit.value]);
   // The daemon's refusal of the last change, said beside the controls until the next one.
   const problem = useSignal<{ workflowID: string; text: string } | null>(null);
+  // "Checked 20 s ago" under a server's event trigger (#383) moves on the page's own clock.
+  const now = useSignal(new Date());
+  useEffect(() => {
+    const timer = setInterval(() => { now.value = new Date(); }, 10_000);
+    return () => clearInterval(timer);
+  }, []);
   const back = <BackToList />;
   if (!known) {
     return (
@@ -90,11 +96,18 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
             </div>
           ) : (
             <div class="controls">
-              {summary.awaitingApproval
-                ? !waitsItsTurn(summary) && (
-                  <button class="run-now prominent" disabled={down} title="Let this workflow run as its file now reads"
-                    onClick={() => void store.approveWorkflow(host, summary)}>Approve</button>
-                )
+              {isUnapproved(summary)
+                ? <>
+                  {canBeApproved(summary) && (
+                    <button class="run-now prominent" disabled={down} title="Let this workflow run as its file now reads"
+                      onClick={() => void store.approveWorkflow(host, summary)}>Approve</button>
+                  )}
+                  {/* Not on this host, without archiving it everywhere (#391). */}
+                  {canBeDenied(summary) && (
+                    <button class="deny" disabled={down} title="Don't run it on this host. Other hosts still see it waiting; Approve takes this back"
+                      onClick={() => void store.denyWorkflow(host, summary)}>Deny on This Host</button>
+                  )}
+                </>
                 : <RunNow store={store} host={host} summary={summary} disabled={down} wide />}
               {/* Beside Run Now, which still works with it off (#100). */}
               <label class="switch" title={isOn(summary) ? "On: its triggers run it" : "Off: none of its triggers run it; Run Now still does"}>
@@ -157,6 +170,25 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
                       {workflow.mode === "triggering" && isSupportedTrigger(trigger) && <span class="quiet small">{resumedAgent(trigger)}</span>}
                     </span>
                     {"schedule" in trigger && <span class="next quiet small">{nextLine(summary, index)}</span>}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {(summary.mcpTriggers ?? []).length > 0 && (
+            <ul class="mcp-triggers">
+              {(summary.mcpTriggers ?? []).map((status, index) => {
+                const words = mcpTriggerWords(status, now.value);
+                const missed = mcpMissedWords(status);
+                return (
+                  <li key={index}>
+                    <span class={`small ${words.tint ?? "quiet"}`}><span class="glyph" aria-hidden="true">⌁</span> {words.text}</span>
+                    {missed && (
+                      <span class="small attention">{missed}{" "}
+                        <button class="link" disabled={down}
+                          onClick={() => void store.clearMCPMissed(host, summary, status.name, status.server)}>Clear</button>
+                      </span>
+                    )}
                   </li>
                 );
               })}

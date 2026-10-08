@@ -42,6 +42,13 @@ public enum EventWords {
         "until_minutes has to be from \(EventWait.deadlineMinutes.lowerBound) to \(EventWait.deadlineMinutes.upperBound)."
     }
 
+    /// Names only a Mac raises, said on a host that is not one (#372).
+    public static func neverHere(_ names: [String]) -> String {
+        let one = names.count == 1
+        return "\(names.joined(separator: ", ")) \(one ? "is" : "are") only raised on a Mac, and this host is "
+            + "a Linux server, so \(one ? "it never happens" : "they never happen") here."
+    }
+
     public static let nothingNamed = "Say what to wait for in events, e.g. [\"agent.finished\"]. "
         + "wait_for_event with action \"list\" gives every name."
 

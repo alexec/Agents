@@ -157,9 +157,13 @@ private struct WorkflowListRow: View {
             Button("Open") { model.sidebarItem = .workflow(summary.id, in: project) }
             if summary.isArchived {
                 Button("Bring Back") { Task { await model.setWorkflowArchived(summary, false) } }
-            } else if summary.awaitingApproval != nil {
+            } else if summary.isUnapproved {
                 if summary.canBeApproved {
                     Button("Approve") { Task { await model.approveWorkflow(summary) } }
+                }
+                // Not here, without archiving it everywhere (#391).
+                if summary.canBeDenied {
+                    Button("Deny on This Host") { Task { await model.denyWorkflow(summary) } }
                 }
             } else {
                 Button("Run now") { Task { await model.runWorkflow(summary) } }

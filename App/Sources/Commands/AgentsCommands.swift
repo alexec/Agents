@@ -62,6 +62,17 @@ struct AgentsCommands: Commands {
             Button("New Session in a Worktree") { newSession(inWorktree: true) }
                 .keyboardShortcut("n", modifiers: [.command, .option])
                 .disabled(model.selectedProjectSummary == nil || !model.draftWorktrees.canMakeNew)
+            // A chat in the project this Mac made for chats (#229), with no project to pick.
+            Button("New Chat") { newChat(on: .mac) }
+                .keyboardShortcut("n", modifiers: [.command, .shift])
+            let servers = model.hostsWithChats.filter { $0 != .mac }
+            if !servers.isEmpty {
+                Menu("New Chat On") {
+                    ForEach(servers, id: \.self) { host in
+                        Button(model.hosts.label(host)) { newChat(on: host) }
+                    }
+                }
+            }
             Divider()
             Button("Add Folder…") { requests.projectSheet = .chooseFolder }
                 .keyboardShortcut("o")
@@ -96,7 +107,7 @@ struct AgentsCommands: Commands {
                 .keyboardShortcut("l", modifiers: [.command, .option])
             Button("Runtimes") { model.showRuntimes() }
                 .keyboardShortcut("r", modifiers: [.command, .option])
-            Button("Spending") { model.showsSpending = true }
+            Button("Cost") { model.showsSpending = true }
                 .keyboardShortcut("s", modifiers: [.command, .option])
             // Agents as a web page on this Mac, found from here (#109).
             Button("Open in Browser") { openInBrowser() }
@@ -201,6 +212,12 @@ struct AgentsCommands: Commands {
     }
 
     /// The project's page with the keyboard in its prompt, which is where a session starts.
+    private func newChat(on host: HostID) {
+        Task {
+            if await model.newChat(on: host) { requests.focusPrompt() }
+        }
+    }
+
     private func newSession(inWorktree: Bool = false) {
         guard model.selectedProjectKey != nil else { return }
         model.composing = true
