@@ -515,6 +515,18 @@ function limitRemedy(limit: WorkflowLimit): string {
     : "Archive one, in any project, to let it run";
 }
 
+/** WorkflowSummary.queued, read leniently: a host from before #422 sends none, and has none. */
+export function queuedCount(s: WorkflowSummary): number {
+  return (s as { queued?: number }).queued ?? 0;
+}
+
+/** WorkflowSummary.queuedSentence: what its queue holds, for a row. */
+export function queuedSentence(s: WorkflowSummary): string | null {
+  const queued = queuedCount(s);
+  if (queued === 0) return null;
+  return queued === 1 ? "1 trigger queued — it runs when this run ends" : `${queued} triggers queued — each runs in turn`;
+}
+
 /** WorkflowRefusal.message. */
 export function refusalMessage(refusal: WorkflowRefusal): string {
   if ("chainTooDeep" in refusal) return `this chain is already ${refusal.chainTooDeep.depth} deep`;
@@ -534,6 +546,13 @@ export function refusalMessage(refusal: WorkflowRefusal): string {
   if ("dayLimitReached" in refusal) return "the day's spending limit has been reached";
   if ("settingRefused" in refusal) return refusal.settingRefused.detail;
   if ("deniedHere" in refusal) return "it is denied on this host";
+  if ("queued" in refusal) return "a run is still going, and it runs when that ends";
+  if ("queueFull" in refusal) return `${refusal.queueFull.limit} triggers are already queued for it`;
+  if ("coolingDown" in refusal) {
+    return refusal.coolingDown.until !== undefined
+      ? `it is cooling down until ${shortTime(fromWireDate(refusal.coolingDown.until))}, and runs once then`
+      : "a run is still going, and it runs once more when that ends";
+  }
   return "it is waiting for your OK";
 }
 
@@ -541,6 +560,13 @@ export function refusalMessage(refusal: WorkflowRefusal): string {
 function refusedSummary(outcome: Extract<WorkflowOutcome, { refused: unknown }>): string {
   const { _0: refusal, repeats } = outcome.refused;
   const many = repeats > 1;
+  // Held, not dropped: it is going to run, and "did not run" would say otherwise.
+  if ("coolingDown" in refusal) {
+    return many ? `Waiting — ${repeats} triggers held into one run, as ${refusalMessage(refusal)}` : `Waiting — ${refusalMessage(refusal)}`;
+  }
+  if ("queued" in refusal) {
+    return many ? `Queued — ${repeats} triggers, each to run in turn, as ${refusalMessage(refusal)}` : `Queued — ${refusalMessage(refusal)}`;
+  }
   if ("missedWhileClosed" in refusal) return many ? `Missed ${repeats} times — ${refusalMessage(refusal)}` : `Missed — ${refusalMessage(refusal)}`;
   return many ? `Did not run ${repeats} times — ${refusalMessage(refusal)}` : `Did not run — ${refusalMessage(refusal)}`;
 }
@@ -563,7 +589,9 @@ export function happening(summary: WorkflowSummary, now = new Date()): string | 
   else if (summary.overLimit) parts.push(`${limitSentence(summary.overLimit)}. ${limitRemedy(summary.overLimit)}`);
   else if (summary.nextFireAt !== undefined) parts.push(`Next ${namedRelative(fromWireDate(summary.nextFireAt), now)}`);
   const outcome = summary.lastOutcome;
-  if (outcome) {
+  const queued = queuedSentence(summary);
+  if (queued) parts.push(queued);
+  else if (outcome) {
     if ("ran" in outcome) parts.push(`Ran ${namedRelative(fromWireDate(outcome.ran.at), now)}`);
     else parts.push(refusedSummary(outcome));
   }
@@ -618,12 +646,18 @@ export function workflowStatusLines(s: WorkflowSummary, now = new Date()): Statu
     const outcome = s.lastOutcome;
     lines.push({ glyph: "▶︎", text: "Running now", agentID: outcome && "ran" in outcome ? outcome.ran.agentID : undefined });
   }
+  const queued = queuedCount(s);
+  if (queued > 0) {
+    lines.push({ glyph: "☰", text: queued === 1 ? "1 trigger queued" : `${queued} triggers queued`,
+      detail: "Each runs on its own, in the order it came, when the run before it ends" });
+  }
   if (s.cooldownEndsAt !== undefined) {
     lines.push({ glyph: "⧗", text: `Cooling down until ${shortTime(fromWireDate(s.cooldownEndsAt))}`,
       detail: s.holdsAFire ? "A trigger came in meanwhile; it runs once then" : undefined });
   }
   const outcome = s.lastOutcome;
-  if (outcome && "refused" in outcome) {
+  // Not for one queued: the line above says it, with how many (#422).
+  if (outcome && "refused" in outcome && !("queued" in outcome.refused._0)) {
     lines.push({ glyph: "✕", text: refusedSummary(outcome),
       tint: workflowNeedsAPerson(s) && !s.awaitingApproval && !s.overLimit ? "attention" : undefined });
   }

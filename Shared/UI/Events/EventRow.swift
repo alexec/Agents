@@ -86,6 +86,8 @@ private struct ConsequenceLine: View {
         switch consequence {
         case .woke: return "Woke"
         case .fired: return "Fired"
+        // Put off, not refused (#422): what comes of it later takes this line's place.
+        case .refused(_, _, .queued): return "Queued for"
         case .refused: return "Refused by"
         case .couldNotWake: return "Could not wake"
         }

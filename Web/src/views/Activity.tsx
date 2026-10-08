@@ -10,6 +10,7 @@ import { Resources } from "./Resources";
 import { BackToList } from "./BackToList";
 import { folderKey, projectFolder } from "../model/groups";
 import { runtimeTally } from "../model/runtimes";
+import { refusalMessage } from "../model/workflows";
 
 function navigate(destination: { host: string; project: string; session?: string; workflow?: string }): void {
   const parts = ["h", destination.host, "p", destination.project];
@@ -318,8 +319,9 @@ function ConsequenceLine({ consequence, host, store, openAgent }: {
   }
   const item = consequence.refused;
   const openWorkflow = () => navigate({ host, project: item.folder, workflow: item.workflowID });
-  const reason = Object.keys(item.reason)[0]?.replace(/([A-Z])/g, " $1").toLowerCase() ?? "unknown reason";
-  return <span class="quiet small event-consequence">↳ Refused by <button class="link" onClick={openWorkflow}>{item.workflowID}</button> — {reason}</span>;
+  // Put off, not refused (#422): what comes of it later takes this line's place.
+  const verb = "queued" in item.reason ? "Queued for" : "Refused by";
+  return <span class="quiet small event-consequence">↳ {verb} <button class="link" onClick={openWorkflow}>{item.workflowID}</button> — {refusalMessage(item.reason)}</span>;
 }
 
 function SpendingPage({ store, hostName }: { store: Store; hostName: (host: string) => string }) {

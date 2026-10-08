@@ -63,8 +63,16 @@ public enum WorkflowLimit: String, Codable, Hashable, Sendable {
 public enum WorkflowRefusal: Codable, Hashable, Sendable {
     /// The chain that led here is already as deep as it is allowed to get.
     case chainTooDeep(depth: Int)
-    /// The last run has not finished. A second is skipped, never queued.
+    /// The last run has not finished, and Run now was pressed. A trigger is queued
+    /// instead (#422); a person pressing Run now is told, since they are watching.
     case runInFlight
+    /// A run is going, and this trigger waits in the workflow's queue for its turn
+    /// (#422). Like `coolingDown`, not the end of the fire: each queued trigger runs on
+    /// its own, in the order it came, once the run before it ends.
+    case queued
+    /// The queue already holds `limit` triggers, so this one is not kept (#422). Bound
+    /// data: a workflow that cannot keep up should say so, not grow a list for ever.
+    case queueFull(limit: Int)
     /// The person put it away. Unlike every other refusal here, this one is a decision
     /// rather than a circumstance, which is why it is checked before all of them.
     case archived
@@ -116,6 +124,8 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         switch self {
         case .chainTooDeep(let depth): return "this chain is already \(depth) deep"
         case .runInFlight: return "a run is still going"
+        case .queued: return "a run is still going, and it runs when that ends"
+        case .queueFull(let limit): return "\(limit) triggers are already queued for it"
         case .archived: return "it is archived"
         case .disabled: return "it is turned off"
         case .overLimit(let limit): return limit.message
@@ -141,6 +151,8 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         switch self {
         case .chainTooDeep: return "chain_too_deep"
         case .runInFlight: return "run_in_flight"
+        case .queued: return "queued"
+        case .queueFull: return "queue_full"
         case .archived: return "archived"
         case .disabled: return "disabled"
         case .overLimit: return "over_limit"
@@ -178,7 +190,8 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         // Grey, not coloured: midnight resolves it with nobody doing anything, which
         // is the same shape as a fire missed while the app was closed.
         case .runInFlight, .archived, .disabled, .triggerNotSupported, .agentUnavailable,
-             .noTriggeringAgent, .missedWhileClosed, .dayLimitReached, .coolingDown: return false
+             .noTriggeringAgent, .missedWhileClosed, .dayLimitReached, .coolingDown,
+             .queued, .queueFull: return false
         // The person's own answer, as archiving is: nobody else has to act on it.
         case .deniedHere: return false
         }
@@ -194,7 +207,7 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
              (.noTriggeringAgent, .noTriggeringAgent), (.missedWhileClosed, .missedWhileClosed),
              (.folderGone, .folderGone), (.dayLimitReached, .dayLimitReached),
              (.awaitingApproval, .awaitingApproval), (.deniedHere, .deniedHere),
-             (.coolingDown, .coolingDown):
+             (.coolingDown, .coolingDown), (.queued, .queued), (.queueFull, .queueFull):
             return true
         case (.overLimit(let a), .overLimit(let b)): return a == b
         case (.unreadable(let a), .unreadable(let b)): return a == b
@@ -245,6 +258,10 @@ public enum WorkflowOutcome: Codable, Hashable, Sendable {
                 return many ? "Waiting — \(repeats) triggers held into one run, as \(refusal.message)"
                             : "Waiting — \(refusal.message)"
             }
+            if case .queued = refusal {
+                return many ? "Queued — \(repeats) triggers, each to run in turn, as \(refusal.message)"
+                            : "Queued — \(refusal.message)"
+            }
             if case .missedWhileClosed = refusal {
                 return many ? "Missed \(repeats) times — \(refusal.message)"
                             : "Missed — \(refusal.message)"
@@ -262,6 +279,10 @@ extension Workflow {
     /// limit exists to stop a runaway, and a runaway able to raise its own limit is not
     /// stopped by it.
     public static let chainDepthLimit = 3
+
+    /// How many triggers may wait while a run is going (#422). Fixed, like the chain
+    /// limit: ten runs back to back is already an afternoon of one workflow.
+    public static let queueLimit = 10
 
 
     /// Whether this workflow may fire, and why not when it may not.
@@ -288,7 +309,8 @@ extension Workflow {
                                  triggeringAgentIsUsable: Bool? = nil,
                                  lastStartedAt: Date? = nil,
                                  now: Date = Date(),
-                                 byHand: Bool = false) -> WorkflowRefusal? {
+                                 byHand: Bool = false,
+                                 queued: Int = 0) -> WorkflowRefusal? {
         // First, and ahead even of a file that cannot be read: somebody has already
         // said they do not want this one, and that answers every other question.
         if isArchived { return .archived }
@@ -314,7 +336,15 @@ extension Workflow {
             if let end = cooldownEnds(after: lastStartedAt, now: now) { return .coolingDown(until: end) }
             if isRunning { return .coolingDown(until: nil) }
         }
-        if isRunning { return .runInFlight }
+        // Queued rather than refused (#422), after the chain limit for the reason the
+        // cooldown asks it first: waiting makes no chain shallower. `queued` counts the
+        // ones already waiting, which go first even between two runs. Run now is a
+        // person watching, and is told rather than made to wait.
+        if isRunning || (queued > 0 && !byHand) {
+            if byHand { return .runInFlight }
+            if depth > Self.chainDepthLimit { return .chainTooDeep(depth: Self.chainDepthLimit) }
+            return queued >= Self.queueLimit ? .queueFull(limit: Self.queueLimit) : .queued
+        }
         if depth > Self.chainDepthLimit { return .chainTooDeep(depth: Self.chainDepthLimit) }
         if let problem {
             switch problem {

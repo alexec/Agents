@@ -78,6 +78,12 @@ public struct EventLog: Codable, Hashable, Sendable {
     @discardableResult
     public mutating func addConsequence(_ consequence: Consequence, to position: EventPosition) -> Event? {
         guard let index = index(of: position) else { return nil }
+        // What came of a fire that was waiting takes the waiting's place (#422): the line
+        // read "queued" until its turn, and reads "fired" (or why not) from then on.
+        // Here rather than at the caller so the store's replay comes to the same list.
+        if let workflow = consequence.workflow {
+            events[index].consequences.removeAll { $0.isWaiting && $0.workflow == workflow }
+        }
         events[index].consequences.append(consequence)
         return events[index]
     }

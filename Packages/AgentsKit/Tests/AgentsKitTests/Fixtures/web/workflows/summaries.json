@@ -13,6 +13,7 @@
       "nextFireAtByTrigger" : [
 
       ],
+      "queued" : 0,
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -74,6 +75,7 @@
       "nextFireAtByTrigger" : [
 
       ],
+      "queued" : 0,
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "standing",
@@ -134,6 +136,7 @@
       "nextFireAtByTrigger" : [
 
       ],
+      "queued" : 0,
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -189,6 +192,7 @@
       "nextFireAtByTrigger" : [
 
       ],
+      "queued" : 0,
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -242,6 +246,7 @@
       "nextFireAtByTrigger" : [
 
       ],
+      "queued" : 0,
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "triggering",
@@ -290,6 +295,7 @@
       "nextFireAtByTrigger" : [
 
       ],
+      "queued" : 0,
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -338,6 +344,7 @@
       "nextFireAtByTrigger" : [
 
       ],
+      "queued" : 0,
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -383,6 +390,7 @@
       "nextFireAtByTrigger" : [
 
       ],
+      "queued" : 0,
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -421,6 +429,7 @@
       "nextFireAtByTrigger" : [
 
       ],
+      "queued" : 0,
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -464,6 +473,7 @@
       "nextFireAtByTrigger" : [
 
       ],
+      "queued" : 0,
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -511,6 +521,7 @@
       "nextFireAtByTrigger" : [
 
       ],
+      "queued" : 0,
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -555,6 +566,7 @@
 
       ],
       "overLimit" : "project",
+      "queued" : 0,
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -601,6 +613,7 @@
       "nextFireAtByTrigger" : [
 
       ],
+      "queued" : 0,
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -654,6 +667,7 @@
       "nextFireAtByTrigger" : [
 
       ],
+      "queued" : 0,
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -685,6 +699,114 @@
   {
     "expected" : {
       "canFire" : true,
+      "needsAPerson" : false,
+      "summary" : "When an agent finishes, in a new agent"
+    },
+    "input" : {
+      "holdsAFire" : false,
+      "isArchived" : false,
+      "isEnabled" : true,
+      "isRunning" : true,
+      "lastOutcome" : {
+        "refused" : {
+          "_0" : {
+            "queued" : {
+
+            }
+          },
+          "at" : 812500000,
+          "repeats" : 2
+        }
+      },
+      "nextFireAtByTrigger" : [
+
+      ],
+      "queued" : 2,
+      "workflow" : {
+        "folder" : "file:///fixture/project",
+        "mode" : "new",
+        "name" : "Fix checks",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+          {
+            "agentFinished" : {
+
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "fix-checks"
+      }
+    },
+    "name" : "running, two queued"
+  },
+  {
+    "expected" : {
+      "canFire" : true,
+      "needsAPerson" : false,
+      "summary" : "When an agent finishes, in a new agent"
+    },
+    "input" : {
+      "holdsAFire" : false,
+      "isArchived" : false,
+      "isEnabled" : true,
+      "isRunning" : true,
+      "lastOutcome" : {
+        "refused" : {
+          "_0" : {
+            "queueFull" : {
+              "limit" : 10
+            }
+          },
+          "at" : 812500000,
+          "repeats" : 1
+        }
+      },
+      "nextFireAtByTrigger" : [
+
+      ],
+      "queued" : 10,
+      "workflow" : {
+        "folder" : "file:///fixture/project",
+        "mode" : "new",
+        "name" : "Swamped",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+          {
+            "agentFinished" : {
+
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "swamped"
+      }
+    },
+    "name" : "the queue full"
+  },
+  {
+    "expected" : {
+      "canFire" : true,
       "needsAPerson" : true,
       "summary" : "When an agent finishes, in a new agent"
     },
@@ -707,6 +829,7 @@
       "nextFireAtByTrigger" : [
 
       ],
+      "queued" : 0,
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -749,6 +872,7 @@
       "nextFireAtByTrigger" : [
 
       ],
+      "queued" : 0,
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -821,6 +945,7 @@
       "nextFireAtByTrigger" : [
 
       ],
+      "queued" : 0,
       "workflow" : {
         "folder" : "file:///fixture/project",
         "mode" : "new",
@@ -863,6 +988,7 @@
       "nextFireAtByTrigger" : [
 
       ],
+      "queued" : 0,
       "workflow" : {
         "cooldown" : 5400,
         "folder" : "file:///fixture/project",
@@ -919,6 +1045,7 @@
       "nextFireAtByTrigger" : [
 
       ],
+      "queued" : 0,
       "workflow" : {
         "cooldown" : 86400,
         "folder" : "file:///fixture/project",

@@ -240,6 +240,7 @@ struct WorkflowRow: View {
         if let limit = summary.overLimit {
             return "\(limit.sentence). \(limit.remedy)"
         }
+        if let queued = summary.queuedSentence { return queued }
         guard let outcome = summary.lastOutcome else { return nil }
         let when = outcome.at.formatted(.relative(presentation: .named))
         switch outcome {

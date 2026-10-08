@@ -159,6 +159,8 @@ A workflow does not run, and its page says why, when:
   set it off;
 - its cooldown has not ended, or a run is still going and it has one. This trigger is
   held, not dropped, and runs once when the cooldown ends (see [Cooldown](#cooldown));
+- ten triggers are already queued behind a run that is going (see
+  [One run at a time](#one-run-at-a-time));
 - the file cannot be read, or names a trigger or `agent:` value this version does not
   know. The page says what is wrong with the file.
 
@@ -170,6 +172,27 @@ filters on it, whether it listens in this project or on the whole Mac or server,
 agent a `triggering` run resumes, when a schedule is next due, and a trigger this
 version does not know marked **Unknown**. Under them it says when the workflow last ran
 and what set it off. A file that cannot be read still lists the triggers it could read.
+
+## One run at a time
+
+A workflow runs once at a time. A trigger that comes while a run is going is **queued**,
+not refused, and runs when that run ends:
+
+- Each queued trigger runs on its own, oldest first, one after another. Each run is told
+  its own event, with that event's details (and a server's data, for a server's event),
+  so two failed checks for two pull requests give two runs, one for each.
+- Its event reads **Queued for** the workflow on the Events page until its turn, and
+  **Fired** from then on. The workflow's row and page say how many are queued.
+- At most ten wait. One more is refused, as **Did not run — 10 triggers are already
+  queued for it**, and that refusal is put on the log as `workflow.refused` with reason
+  `queue_full`. A queued trigger is not.
+- The queue survives the app restarting. Turning the workflow off or archiving it drops
+  the queue, and each event it held says why.
+- A trigger set off by a chain already three deep is refused, not queued.
+- **Run now** is not queued: it says **a run is still going**, so you can try again.
+- A workflow with a `cooldown:` does not queue. It holds the latest trigger and runs once
+  for it (see [Cooldown](#cooldown)): a cooldown is there to make a burst one run, and
+  queueing each trigger would undo it.
 
 ## Cooldown
 
@@ -199,7 +222,8 @@ cooldown: 15m
 - A trigger set off by a chain already three deep is refused, not held.
 - Turning the workflow off or archiving it drops the held trigger. A held trigger survives
   the app restarting.
-- Without `cooldown:`, every trigger runs it, one run at a time, as before.
+- Without `cooldown:`, every trigger runs it, one run at a time, each queued behind the
+  last (see [One run at a time](#one-run-at-a-time)).
 
 The **Triggers** section of the workflow's page says the cooldown, when it ends, and
 whether a trigger is held for then. Its menu changes the cooldown by rewriting

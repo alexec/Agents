@@ -30,8 +30,35 @@ struct WorkflowOutcomeTests {
         #expect(refusal(workflow()) == nil)
     }
 
-    @Test func aRunStillGoingBlocksTheNextFire() {
-        #expect(refusal(workflow(), isRunning: true) == .runInFlight)
+    @Test func aRunStillGoingQueuesTheNextFire() {
+        #expect(refusal(workflow(), isRunning: true) == .queued)
+        // Run now is told rather than queued: somebody is watching.
+        #expect(workflow().refusalIfBlocked(isRunning: true, depth: 0, byHand: true) == .runInFlight)
+    }
+
+    @Test func theQueueGoesFirstAndIsBounded() {
+        // Waiting ones go ahead of a new trigger even between two runs (#422).
+        #expect(workflow().refusalIfBlocked(isRunning: false, depth: 0, queued: 1) == .queued)
+        #expect(workflow().refusalIfBlocked(isRunning: false, depth: 0, byHand: true, queued: 1) == nil)
+        #expect(workflow().refusalIfBlocked(isRunning: true, depth: 0, queued: Workflow.queueLimit)
+            == .queueFull(limit: Workflow.queueLimit))
+        // A chain too deep stays refused: waiting makes it no shallower.
+        #expect(workflow().refusalIfBlocked(isRunning: true, depth: Workflow.chainDepthLimit + 1)
+            == .chainTooDeep(depth: Workflow.chainDepthLimit))
+    }
+
+    @Test func whatComesOfAQueuedFireTakesItsPlaceOnTheEvent() {
+        var log = EventLog()
+        let folder = URL(filePath: "/tmp/p")
+        let event = log.append(EventDraft(name: "mac.wake", scope: .mac, sentence: "Woke."), position: 1, now: Date()).event
+        log.addConsequence(.woke(agentID: UUID(), title: "A"), to: event.position)
+        log.addConsequence(.refused(workflowID: "w", folder: folder, reason: .queued), to: event.position)
+        log.addConsequence(.refused(workflowID: "other", folder: folder, reason: .queued), to: event.position)
+        let agent = UUID()
+        let after = log.addConsequence(.fired(workflowID: "w", folder: folder, agentID: agent), to: event.position)
+        #expect(after?.consequences.count == 3)
+        #expect(after?.consequences.last == .fired(workflowID: "w", folder: folder, agentID: agent))
+        #expect(after?.consequences.contains(.refused(workflowID: "other", folder: folder, reason: .queued)) == true)
     }
 
     @Test func archivingBlocksIt() {

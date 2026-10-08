@@ -29,6 +29,7 @@ How the code stands today (`PK` = `Packages/AgentsKit/Sources/AgentsKit`, `PKC` 
   - A `new` or `standing` run is told the event and its details at the end of its prompt (`DaemonCore+Workflows.swift:871`).
   - `agent: triggering` needs an agent behind the event, so it can't run on a drop-box event.
 - **One run in flight per workflow.** A second fire is refused as `run_in_flight`. With `cooldown:` it is held, but only the last held trigger is kept (`PKC/Model/WorkflowOutcome.swift:274,308`, `DaemonCore+Workflows.swift:1085`). Five files dropped together would therefore give **one** run today, and four refusals. That is the biggest gap this spec closes.
+  - **Since #422 (2026-10-08)** every trigger of a workflow without `cooldown:` is queued, not refused: `WorkflowState.queuedFires`, oldest first, at most `Workflow.queueLimit` (10), kept across a restart, each with its own causing event, its event reading "queued" until it fires. FR-012 builds on that queue. What is left here is queueing drop-box events under a cooldown too (a cooldown still collapses other events into one run), `file_gone`, and the next file on the page (FR-014).
 - **Uploading.**
   - The only file-writing call today is `files/write` (`PKC/Daemon/DaemonAPI.swift:312`). It belongs to an agent, writes into `<cwd>/.agents/attachments/`, and allows at most 25 MB, sent in one piece.
   - The Remote and the web page attach files to a prompt by value, at most 900 KB a prompt, to fit the relay's 1 MB record (`PKC/Model/PhoneAttachment.swift:22`, `Web/src/model/attachments.ts:11`).
