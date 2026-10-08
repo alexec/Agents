@@ -75,13 +75,16 @@ public enum SessionUpdate: Sendable {
             return .usage(usage)
         case "compaction_update":
             return .entry(.compaction(status: update["status"]?.stringValue ?? "in_progress",
-                                      summary: [ContentBlock](wire: update["summary"])))
+                                      summary: [ContentBlock](wire: update["summary"]),
+                                      id: update["compactionId"]?.stringValue,
+                                      error: update["error"]?.stringValue))
         case "notice":
             guard let notice = SessionNotice(wire: update) else { return .ignored(kind) }
             return .entry(.notice(notice))
         case "compaction_summary_chunk":
             return .entry(.compaction(status: "in_progress",
-                                      summary: [ContentBlock](wire: update["content"])))
+                                      summary: [ContentBlock](wire: update["content"]),
+                                      id: update["compactionId"]?.stringValue))
         case "async_task_spawned", "async_task_progress", "async_task_state_update",
              "subagent_spawned", "subagent_state_update":
             guard let background = BackgroundUpdate.decode(update) else { return .unknown(kind) }

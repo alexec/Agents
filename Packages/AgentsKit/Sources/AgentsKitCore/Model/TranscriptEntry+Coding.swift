@@ -54,7 +54,8 @@ extension TranscriptEntry.Kind {
                                         answers: (try? payload["answers"]?.decode([ElicitationAnswer].self)) ?? [])
         case "compaction":
             return .compaction(status: payload["status"]?.stringValue ?? "",
-                               summary: [ContentBlock](wire: payload["summary"]))
+                               summary: [ContentBlock](wire: payload["summary"]),
+                               id: payload["id"]?.stringValue, error: payload["error"]?.stringValue)
         case "notice":
             guard let notice = try? payload["_0"]?.decode(SessionNotice.self) else { return nil }
             return .notice(notice)
@@ -135,8 +136,11 @@ extension TranscriptEntry.Kind {
             var payload: [String: JSONValue] = ["id": .string(id.uuidString), "summary": .string(summary)]
             if !answers.isEmpty { payload["answers"] = (try? JSONValue.encoding(answers)) ?? .null }
             return ["elicitationAnswered": .object(payload)]
-        case .compaction(let status, let summary):
-            return ["compaction": ["status": .string(status), "summary": summary.wire]]
+        case .compaction(let status, let summary, let id, let error):
+            var payload: [String: JSONValue] = ["status": .string(status), "summary": summary.wire]
+            if let id { payload["id"] = .string(id) }
+            if let error { payload["error"] = .string(error) }
+            return ["compaction": .object(payload)]
         case .notice(let notice):
             return ["notice": ["_0": (try? JSONValue.encoding(notice)) ?? .null]]
         case .permissionAsked(let request):

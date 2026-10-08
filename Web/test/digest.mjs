@@ -12,5 +12,9 @@ export function digest(item) {
   const body = item.entry.kind[out.kind];
   if (out.kind === "agentMessage" || out.kind === "agentThought") out.text = body.text;
   if (out.kind === "userMessage") out.text = body._0;
+  if (out.kind === "compaction") {
+    out.text = turns.compactionLine(body.status, body.error);
+    out.summary = body.summary.map((block) => block.type === "text" ? block.text : "").join("");
+  }
   return out;
 }

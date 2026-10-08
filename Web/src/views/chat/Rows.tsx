@@ -14,7 +14,7 @@ import { backgroundEntryLine } from "../../model/background";
 import { outcomeNeedsAPerson } from "../../model/groups";
 import { outcomeHeadings, queuedLabel, startingLabel } from "../../model/status";
 import {
-  callLine, drawnInTurn, fields, isSummaryOnly, isThought, kindOf, turnLine, turnParts, type ChatTurn, type Item,
+  callLine, compactionLine, drawnInTurn, fields, isSummaryOnly, isThought, kindOf, turnLine, turnParts, type ChatTurn, type Item,
 } from "../../model/turns";
 import { Markdown } from "../../render/markdown";
 import { AppView } from "./AppView";
@@ -312,8 +312,7 @@ function entryBody(entry: TranscriptEntry) {
       const compaction = fields(entry, "compaction")!;
       return (
         <div class="note">
-          <p class="quiet">{compaction.status === "completed" ? "Made room by summarising the conversation so far"
-            : "Summarising the conversation so far…"}</p>
+          <p class="quiet">{compactionLine(compaction.status, compaction.error)}</p>
           {compaction.summary.length > 0 && <div class="quiet"><Blocks blocks={compaction.summary} text="" /></div>}
         </div>
       );

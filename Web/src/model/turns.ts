@@ -152,6 +152,34 @@ function join(entry: TranscriptEntry, previous: TranscriptEntry | undefined): Tr
   return undefined;
 }
 
+/** TranscriptEntry.mergeCompaction: one compaction from the entries it arrived as (#443). */
+function mergeCompaction(entry: TranscriptEntry, earlier: TranscriptEntry): TranscriptEntry | undefined {
+  const first = fields(earlier, "compaction");
+  const next = fields(entry, "compaction");
+  if (!first || !next) return undefined;
+  const id = first.id ?? next.id;
+  const error = next.status === "in_progress" ? first.error : next.error ?? first.error;
+  const summary = next.status === "in_progress" ? [...first.summary, ...next.summary]
+    : next.summary.length ? next.summary : first.summary;
+  const status = next.status === "in_progress" ? first.status : next.status;
+  return { ...earlier, kind: { compaction: { status, summary,
+    ...(id === undefined ? {} : { id }), ...(error === undefined ? {} : { error }) } } };
+}
+
+/** CompactionLine.words: what a compaction's row says, by how it stands (#443). */
+export function compactionLine(status: string, error?: string): string {
+  switch (status) {
+    case "completed": return "Made room by summarising the conversation so far";
+    case "failed": {
+      const reason = error?.trim() ?? "";
+      return reason ? `Could not summarise the conversation to make room: ${reason}`
+        : "Could not summarise the conversation to make room";
+    }
+    case "cancelled": return "Stopped summarising the conversation";
+    default: return "Summarising the conversation so far…";
+  }
+}
+
 const retried = "RetriableError";
 
 /** IntermittentError.isLine: a line about a blip the runtime retries on its own (#394). */
@@ -267,6 +295,19 @@ export class DisplayBuilder {
       this.drawn.push({ kind: "entry", id: entry.id, entry });
       return;
     }
+    const compaction = fields(entry, "compaction");
+    if (compaction) {
+      const at = this.compactionAt(compaction.id);
+      const first = at === undefined ? undefined : this.drawn[at];
+      const merged = first?.kind === "entry" ? mergeCompaction(entry, first.entry) : undefined;
+      if (at !== undefined && merged) {
+        this.drawn[at] = { kind: "entry", id: merged.id, entry: merged };
+        return;
+      }
+      this.closeRun();
+      this.drawn.push({ kind: "entry", id: entry.id, entry });
+      return;
+    }
     const background = fields(entry, "background");
     if (background && isRunning(background._0) && background._0.kind === "task" && background._0.toolCallID !== undefined) return;
     if (kind === "optionChanged") return;
@@ -304,6 +345,20 @@ export class DisplayBuilder {
       else this.drawn[index] = rest;
     }
     this.settled = this.drawn.length;
+  }
+
+  /** TranscriptDisplayBuilder.compactionAt: the row with this id, or for none, a compaction just drawn and still going. */
+  private compactionAt(id: string | undefined): number | undefined {
+    if (id !== undefined) {
+      for (let index = this.drawn.length - 1; index >= 0; index--) {
+        const item = this.drawn[index]!;
+        if (item.kind === "entry" && fields(item.entry, "compaction")?.id === id) return index;
+      }
+      return undefined;
+    }
+    const last = this.drawn[this.drawn.length - 1];
+    if (this.run.length || last?.kind !== "entry") return undefined;
+    return fields(last.entry, "compaction")?.status === "in_progress" ? this.drawn.length - 1 : undefined;
   }
 
   private mergeIntoClosedRun(update: ToolCall, id: string): boolean {

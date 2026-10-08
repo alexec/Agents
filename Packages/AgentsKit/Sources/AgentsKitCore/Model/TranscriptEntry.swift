@@ -53,7 +53,11 @@ public struct TranscriptEntry: Codable, Hashable, Sendable, Identifiable {
         /// `answers` is what was said, question by question, when the form was
         /// answered; empty for a decline, a withdrawal, and every record written before.
         case elicitationAnswered(id: UUID, summary: String, answers: [ElicitationAnswer] = [])
-        case compaction(status: String, summary: [ContentBlock])
+        /// The runtime making room in its context (ACP `compaction_update` and
+        /// `compaction_summary_chunk`, unstable). One compaction arrives as several of
+        /// these under the runtime's `id`, and the page draws them as one (#443).
+        /// `error` says why a `failed` one failed. Both are absent before #443.
+        case compaction(status: String, summary: [ContentBlock], id: String? = nil, error: String? = nil)
         /// The runtime telling the person something beside the reply (ACP `notice`).
         case notice(SessionNotice)
         case permissionAsked(PermissionRequest)
@@ -126,7 +130,7 @@ extension TranscriptEntry {
         switch kind {
         case .userMessage(let text, let blocks, _), .agentMessage(_, let text, let blocks):
             return blocks.isEmpty ? (text.isEmpty ? [] : [.text(text)]) : blocks
-        case .compaction(_, let summary):
+        case .compaction(_, let summary, _, _):
             return summary
         default:
             return nil
@@ -172,6 +176,34 @@ extension TranscriptEntry {
         return result
     }
 
+    /// One compaction, from the entries it arrived as (#443).
+    ///
+    /// A runtime says a compaction started, streams its summary in chunks, and then
+    /// says how it ended, all under one id. A chunk, and any update still in progress,
+    /// adds to the summary; the update that ends it sets the status and, when it brings
+    /// one, the whole summary, which ACP says replaces what came before. Records written
+    /// before #443 have no id, and their chunks were stored as updates in progress, so
+    /// adding is right for those too.
+    public static func mergeCompaction(_ entry: TranscriptEntry, onto earlier: TranscriptEntry) -> TranscriptEntry? {
+        guard case .compaction(let status, let summary, let id, let error) = earlier.kind,
+              case .compaction(let nextStatus, let more, let nextID, let nextError) = entry.kind else { return nil }
+        var merged = earlier
+        if nextStatus == "in_progress" {
+            merged.kind = .compaction(status: status, summary: summary + more, id: id ?? nextID, error: error)
+        } else {
+            merged.kind = .compaction(status: nextStatus, summary: more.isEmpty ? summary : more,
+                                      id: id ?? nextID, error: nextError ?? error)
+        }
+        return merged
+    }
+
+    /// Whether this is a compaction that has not ended yet, for the one after it with
+    /// no id to join.
+    var isCompactionInProgress: Bool {
+        if case .compaction(let status, _, _, _) = kind { return status == "in_progress" }
+        return false
+    }
+
     static func join(_ entry: TranscriptEntry, onto previous: TranscriptEntry?) -> TranscriptEntry? {
         guard let previous else { return nil }
         switch (previous.kind, entry.kind) {
@@ -189,6 +221,24 @@ extension TranscriptEntry {
             return joined
         default:
             return nil
+        }
+    }
+}
+
+/// What a compaction's row says, by how it stands (#443). The same words on the web.
+public enum CompactionLine {
+    public static func words(status: String, error: String?) -> String {
+        switch status {
+        case "completed":
+            return "Made room by summarising the conversation so far"
+        case "failed":
+            let reason = error?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return reason.isEmpty ? "Could not summarise the conversation to make room"
+                                  : "Could not summarise the conversation to make room: \(reason)"
+        case "cancelled":
+            return "Stopped summarising the conversation"
+        default:
+            return "Summarising the conversation so far…"
         }
     }
 }
