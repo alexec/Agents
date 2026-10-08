@@ -15,11 +15,11 @@
 
 ## Counts
 
-Of 210 rows: **141 same**, **41 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 211 rows: **141 same**, **41 by design**, **29 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
-| Sidebar and project list | 8 | 2 | 9 |
+| Sidebar and project list | 8 | 2 | 10 |
 | Session rows and states | 16 | 2 | 5 |
 | Chat turns and turn detail | 22 | 3 | 2 |
 | Prompt bar and queued prompts | 18 | 3 | 0 |
@@ -50,6 +50,7 @@ The deltas are tracked by 29 issues:
 | One sidebar: Activity, projects folding open on their sessions and workflows, `host:Project` names | `A/Projects/ProjectListView.swift:48-96` | Its own project list, then a project page of cards, under host headings: `R/Projects/ProjectListView.swift:18-27`, `R/Projects/ProjectPageView.swift` | From 760 px, as the window: `W/views/Sidebar.tsx:38-104` (#151). Below, one column at a time | **delta**: Remote #226; web at phone width #235 |
 | Project order | Oldest added first, then by folder; this Mac's, then each server's: `K/Sidebar/SidebarProjectFold.swift` (`SidebarOrder.byAdded`), `K/Client/AgentsModel.swift` | The same, from the shared model: `R/Sidebar/RemoteSidebar.swift` | The same: `W/views/Sidebar.tsx` (`byAdded`, `orderedProjects`) | **same** (#357) |
 | Project row subtitle | Needs you (· N unread), else working / unread, else *N complete* / stopped: `A/Projects/ProjectRow.swift:75-96` | No complete / stopped fallback: `R/Projects/ProjectListView.swift:143-151` | As the window: `W/model/groups.ts:176-188` | **delta**: Remote #226 |
+| A file into a project's drop box (#231) | Drag files onto a project's or a session's row: into the project's `.agents/dropbox/`, never a worktree; a folder still adds a project: `A/Projects/ProjectListView.swift` (`DropboxDrop`), `A/AppModel.swift` (`putInDropbox`) | None yet | None yet | **delta**: Remote and web #231 (upload through `dropbox/put`) |
 | Project row menu | New Session, Project Settings…, Archive, Show in Finder: `A/Projects/ProjectListView.swift:511-542` | None: the row is a button | New Session: `W/views/Sidebar.tsx` | Web: **by design** (Settings, Archive and Finder are the Mac's, #151). Remote: **delta** #226 |
 | Clicking a project row (#366, #375) | Folds or unfolds it, nothing else; the detail stays as it was. No New Session or Project Settings button in the toolbar (⌘N, the row's menu and ⌥⌘, keep them): `A/Projects/ProjectRow.swift`, `A/Projects/ProjectListView.swift` (`ProjectFold`) | A tap folds or unfolds it, nothing else: `R/Sidebar/RemoteSidebar.swift` (`RemoteProjectFold`) | A click folds or unfolds it; arrow keys landing on it fold nothing: `W/views/Sidebar.tsx` | **same** (#375). The Dashboard and its menu item are gone on all three |
 | New session row (#375) | First under an unfolded project, above its pinned pages and sessions; starts a new session in it (the empty chat, as ⌘N) and lights while that is open: `A/Projects/ProjectListView.swift` (`NewSessionSidebarRow`), `A/AppModel.swift` (`showProject`) | The same row; opens its New session page in the detail: `R/Sidebar/RemoteSidebar.swift` (`NewSessionRow`), `R/RemoteApp.swift` (`RemoteRoute.start`) | The same row; opens the new-session form (`n=1`): `W/views/Sidebar.tsx` | **same** (#375) |

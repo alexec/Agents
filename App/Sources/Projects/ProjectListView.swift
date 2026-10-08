@@ -144,7 +144,8 @@ struct ProjectListView: View {
             requests.wantsSessionSearchFocus = false
         }
         // A folder dragged in from Finder becomes a project, as File ▸ Add Project
-        // Folder… does. Folders only: a file is not somewhere to work.
+        // Folder… does. Folders only: a file is not somewhere to work. A file dropped on
+        // a project's or a session's row goes into its drop box instead (#231).
         .dropDestination(for: URL.self) { urls, _ in
             let folders = urls.filter { $0.hasDirectoryPath || (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
             guard !folders.isEmpty else { return false }
@@ -369,6 +370,8 @@ private struct ProjectFold: View {
                     // Last known, not current: the server is not answering (037).
                     .foregroundStyle(model.hostUnreachable(summary.host) ? .secondary : .primary)
                     .contextMenu { ProjectMenu(summary: summary) }
+                    // A file dropped here goes into the project's drop box (#231).
+                    .dropsIntoDropbox(of: key)
                     // No tag: the row is not something to open (#375). The project's
                     // `.project` item is its New session row.
             }
@@ -517,6 +520,8 @@ private struct SessionSidebarRow: View {
             .listRowInsets(.vertical, 2)
             .sidebarInk(.session(agent.id))
             .tag(SidebarItem.session(agent.id))
+            // Into its project's drop box, never its worktree (#231).
+            .dropsIntoDropbox(of: ProjectKey(host: agent.host, folder: agent.projectFolder))
             // Pin or Unpin (#180), from the other edge.
             .swipeActions(edge: .leading) {
                 if agent.state != .archived {
@@ -538,6 +543,39 @@ private struct SessionSidebarRow: View {
                     .tint(.gray)
                 }
             }
+    }
+}
+
+/// A project's or a session's row taking files dragged from Finder (#231): each file
+/// goes into the project's drop box, where a workflow can pick it up. A folder dropped
+/// here is added as a project, as one dropped on the list around the rows is.
+private struct DropboxDrop: ViewModifier {
+    @Environment(AppModel.self) private var model
+    let project: ProjectKey
+    @State private var isTargeted = false
+
+    func body(content: Content) -> some View {
+        content
+            .background(isTargeted ? Paper.accent.opacity(0.18) : .clear, in: .rect(cornerRadius: 5))
+            .dropDestination(for: URL.self) { urls, _ in
+                let isFolder: (URL) -> Bool = {
+                    $0.hasDirectoryPath || (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+                }
+                let folders = urls.filter(isFolder)
+                let files = urls.filter { !isFolder($0) }
+                guard !urls.isEmpty else { return false }
+                Task {
+                    for folder in folders { await model.addProject(folder) }
+                    if !files.isEmpty { await model.putInDropbox(files, project: project) }
+                }
+                return true
+            } isTargeted: { isTargeted = $0 }
+    }
+}
+
+private extension View {
+    func dropsIntoDropbox(of project: ProjectKey) -> some View {
+        modifier(DropboxDrop(project: project))
     }
 }
 

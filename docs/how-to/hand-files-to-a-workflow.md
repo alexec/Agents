@@ -38,8 +38,14 @@ into `dropbox/review/`.
    `.agents/dropbox/review/`, and empty for the drop box's top. `extension` is the
    file's extension in lower case, without the dot. Leave either out to take every file.
 
-2. Drop a file into `.agents/dropbox/review/`, from Finder, a script, `cp` or `scp`. Make
+2. Put a file into `.agents/dropbox/review/`, from Finder, a script, `cp` or `scp`. Make
    the folder if it is not there.
+
+   On the Mac, you can also drag files from Finder onto the project's row in the sidebar,
+   or onto any of its sessions' rows. They go into the top of the project's drop box,
+   never into a session's worktree, so a workflow with `folder:` set does not see them
+   there. A file dragged this way can be up to 25 MB; copy a bigger one into the folder
+   in Finder. A folder dragged onto the list is added as a project, as before.
 
 3. Once the file has stopped changing for a moment, the workflow starts an agent. Its
    prompt ends with the event, including `path`, the file's full path, so the agent knows
