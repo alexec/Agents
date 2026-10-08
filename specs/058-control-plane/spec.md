@@ -407,7 +407,8 @@ Mac, and see its projects under their own heading.
   operator client. The command installs the host and enrols it.
 - **FR-018a**: An operator MAY instead have the control plane install the host over ssh. The
   person gives the destination, and a key the control plane may use for that install only. The
-  control plane MUST keep neither the key nor the session afterwards. The host MUST then enrol
+  key MAY be left out when the control plane runs on the person's Mac: its ssh then logs in as
+  `ssh user@host` would there (#413). The control plane MUST keep neither the key nor the session afterwards. The host MUST then enrol
   and connect out like any other.
 - **FR-019**: A host MUST reconnect by itself after the connection drops, to any copy, and MUST
   keep its agents working while disconnected.
