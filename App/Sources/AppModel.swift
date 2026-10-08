@@ -253,16 +253,6 @@ final class AppModel {
         showsRuntimes = false
         if let agent = agents.first(where: { $0.id == agentID }) {
             select(ProjectKey(host: agent.host, folder: agent.projectFolder))
-        } else if let gone = work.tombstones[agentID] {
-            select(ProjectKey(host: gone.host, folder: Project.standardize(gone.project)))
-        } else {
-            // Perhaps retired (051): ask, and open its project once the answer is in.
-            Task { [weak self] in
-                guard let self, let gone = await self.tombstone(for: agentID),
-                      self.selection == agentID else { return }
-                self.select(ProjectKey(host: gone.host, folder: Project.standardize(gone.project)))
-                self.selection = agentID
-            }
         }
         openWorkflow = nil
         selection = agentID
@@ -753,8 +743,6 @@ final class AppModel {
     /// adding them up would be an all-time figure wearing the word "session". Taking
     /// away what was spent before we were watching leaves what this sitting cost.
     var selectedAgent: Agent? { work.agent(selection) }
-    /// What is left of an agent that has been retired, when this window has asked (051).
-    func retiredTombstone(_ id: UUID) -> Tombstone? { work.tombstones[id] }
 
     var permissionsForSelection: [PermissionRequest] { work.permissions(for: selection) }
 
@@ -1426,7 +1414,7 @@ final class AppModel {
     }
 
     /// The person changing how long archived agents are kept. Unconfirmed, a change that
-    /// would retire agents at once comes back unapplied with what it would retire, for
+    /// would delete agents at once comes back unapplied with what it would delete, for
     /// the confirmation; confirmed, it is applied here and then on every server, which
     /// keeps to the Mac's settings the way it keeps to its limits (037 R7).
     func setRetention(_ settings: RetentionSettings, confirmed: Bool) async -> DaemonAPI.RetentionSetResult? {
@@ -1539,32 +1527,20 @@ final class AppModel {
         }
     }
 
-    /// Retire one archived agent now (051, US7). Unconfirmed, the size it frees, or why it
-    /// cannot go yet; confirmed, it is retired and leaves the list by `agent/removed`.
-    func retireNow(_ agentID: UUID, confirmed: Bool) async -> Result<DaemonAPI.RetirePreview, JSONRPCError> {
+    /// Delete one archived agent (#398). It leaves the list by `agent/removed`; a refusal
+    /// says why it cannot go yet.
+    func delete(_ agentID: UUID) async -> Result<Void, JSONRPCError> {
         do {
-            let preview = try await client(for: work.agent(agentID)?.host ?? .mac).call(
-                DaemonAPI.Method.agentsRetire, DaemonAPI.RetireRequest(agentID: agentID, confirmed: confirmed),
-                returning: DaemonAPI.RetirePreview.self)
-            if confirmed, selection == agentID { selection = nil }
-            return .success(preview)
+            _ = try await client(for: work.agent(agentID)?.host ?? .mac).call(
+                DaemonAPI.Method.agentsDelete, DaemonAPI.AgentRequest(agentID: agentID),
+                returning: DaemonAPI.Empty.self)
+            if selection == agentID { selection = nil }
+            return .success(())
         } catch let error as JSONRPCError {
             return .failure(error)
         } catch {
             return .failure(JSONRPCError(code: -1, message: error.localizedDescription))
         }
-    }
-
-    /// What is left of a retired agent, asked of the daemon once and then remembered.
-    func tombstone(for agentID: UUID, on host: HostID = .mac) async -> Tombstone? {
-        if let known = work.tombstones[agentID] { return known }
-        guard let found = try? await client(for: host).call(
-            DaemonAPI.Method.agentsRetired,
-            DaemonAPI.RetiredRequest(ids: [agentID]),
-            returning: [Tombstone].self) else { return nil }
-        let stamped = found.map { var t = $0; t.host = host; return t }
-        work.takeTombstones(stamped)
-        return stamped.first
     }
 
     func setCostLimits(perAgent: Cost?? = nil, daily: Cost?? = nil) async {

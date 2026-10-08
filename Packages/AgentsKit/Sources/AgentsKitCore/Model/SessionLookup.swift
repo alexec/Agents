@@ -11,7 +11,6 @@ public enum SessionLookup {
     }
 
     public static let noValue = "Give a session id or exact title."
-    public static let gone = "That conversation is gone."
     public static let unavailable = "That conversation's history is unavailable."
 
     public static func missing(_ value: String) -> String {
@@ -29,18 +28,14 @@ public enum SessionLookup {
         }
     }
 
-    /// An id before a title; a live session before a retired one; nothing from another
-    /// project, not even that it exists.
-    public static func find(_ value: String, in project: URL, agents: some Sequence<Agent>,
-                            retired: some Sequence<Tombstone>) -> Found {
+    /// An id before a title; nothing from another project, not even that it exists. A
+    /// deleted session is not found, like one that never was (#398).
+    public static func find(_ value: String, in project: URL, agents: some Sequence<Agent>) -> Found {
         let value = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return .refused(noValue) }
         let live = sessions(in: project, agents: agents)
-        let standard = Project.standardize(project)
-        let gone = retired.filter { Project.standardize($0.project) == standard }
-        if let id = UUID(uuidString: value) {
-            if let agent = live.first(where: { $0.id == id }) { return .session(agent) }
-            if gone.contains(where: { $0.id == id }) { return .refused(Self.gone) }
+        if let id = UUID(uuidString: value), let agent = live.first(where: { $0.id == id }) {
+            return .session(agent)
         }
         let titled = live.filter { $0.title == value }
         if titled.count == 1 { return .session(titled[0]) }
@@ -50,7 +45,6 @@ public enum SessionLookup {
             return .refused("More than one session is named \u{201C}\(value)\u{201D}: "
                             + matches.joined(separator: "; ") + ". Read one by id.")
         }
-        if gone.contains(where: { $0.title == value }) { return .refused(Self.gone) }
         return .refused(missing(value))
     }
 
@@ -64,19 +58,13 @@ public enum SessionLookup {
     /// marked. Its worktree and the resources it holds are said too, so the clean-up
     /// workflow (#199) can tell whose build output a folder is and leave a working or
     /// leasing one alone. The ones not archived come first; the page ends with how many
-    /// follow and the `after` that gives them. `leftBehind` are retired sessions whose
-    /// worktree is still there (#211), listed after the last page as `Retired`, so that
-    /// worktree is still somebody's to clean up: a page's worth, newest first, since each
-    /// one cleaned up leaves the list and makes room for the next.
+    /// follow and the `after` that gives them.
     public static func list(in project: URL, agents: some Sequence<Agent>, caller: UUID?,
                             holding: [UUID: [String]] = [:], limit: Int? = nil,
-                            after: String? = nil, leftBehind: [Tombstone] = []) -> String {
+                            after: String? = nil) -> String {
         let size = min(max(1, limit ?? pageSize), largestPage)
-        let retired = retiredLines(leftBehind, limit: size)
         let sorted = sessions(in: project, agents: agents)
-        guard !sorted.isEmpty else {
-            return retired.isEmpty ? "There are no sessions in this project." : retired.joined(separator: "\n")
-        }
+        guard !sorted.isEmpty else { return "There are no sessions in this project." }
         let all = sorted.filter { $0.state != .archived } + sorted.filter { $0.state == .archived }
         var from = 0
         if let after {
@@ -87,9 +75,7 @@ public enum SessionLookup {
             from = at + 1
         }
         let page = all[from..<min(from + size, all.count)]
-        guard !page.isEmpty else {
-            return retired.isEmpty ? "There are no more sessions in this project." : retired.joined(separator: "\n")
-        }
+        guard !page.isEmpty else { return "There are no more sessions in this project." }
         let lines = page.map { agent -> String in
             let name = (agent.title.map { "\u{201C}\($0)\u{201D}" } ?? "Untitled") + (agent.id == caller ? " (you)" : "")
             var line = "- \(agent.id.uuidString): \(name) — \(PoolWords.runtimeName(agent.runtimeID)), "
@@ -113,34 +99,9 @@ public enum SessionLookup {
             text += "\n\n\(rest.count) more"
                 + (archived == 0 ? "" : archived == rest.count ? ", all archived" : ", \(archived) of them archived")
                 + ". For the next page, call list_sessions with after: \"\(last.id.uuidString)\"."
-        } else if !retired.isEmpty {
-            text += "\n\n" + retired.joined(separator: "\n")
         }
         return text
     }
-
-    /// The newest `limit` retired sessions whose worktree is still there, under a line
-    /// saying what they are, and how many more there are; or nothing when there are none.
-    static func retiredLines(_ leftBehind: [Tombstone], limit: Int = largestPage) -> [String] {
-        let all = leftBehind.filter { $0.worktreeRoot != nil }.sorted { $0.retiredAt > $1.retiredAt }
-        var lines = all.prefix(max(1, limit)).compactMap { gone -> String? in
-            guard let root = gone.worktreeRoot else { return nil }
-            let name = gone.title.map { "\u{201C}\($0)\u{201D}" } ?? "Untitled"
-            return "- \(gone.id.uuidString): \(name) — \(PoolWords.runtimeName(gone.runtimeID)), "
-                + "\(retiredStatus), retired \(when(gone.retiredAt)). Worktree: \(root.path)"
-                + (gone.worktreeBranch.map { " on \($0)" } ?? "") + "."
-        }
-        guard !lines.isEmpty else { return [] }
-        if all.count > lines.count {
-            lines.append("\(all.count - lines.count) more retired sessions still have their worktree; "
-                         + "they are listed here as these are cleaned up.")
-        }
-        return ["Retired sessions whose worktree is still there. Their conversations are gone; "
-                + "what is in each worktree was not committed when it retired."] + lines
-    }
-
-    /// What a retired session that left its worktree is, in `list`.
-    public static let retiredStatus = "Retired"
 
     public static func labels(of agent: Agent) -> String {
         guard !agent.labels.isEmpty else { return "" }

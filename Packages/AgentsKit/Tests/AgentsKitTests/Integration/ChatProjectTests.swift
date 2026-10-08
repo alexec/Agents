@@ -227,7 +227,7 @@ struct ChatProjectTests {
         let core = try await core(home: home, seeded: [chat])
         await core.ensureChatProject()
 
-        try await core.retire(chat.id, because: .person)
+        try await core.delete(chat.id, because: .person)
 
         #expect(try String(contentsOf: folder.appending(path: "packing-list.md"), encoding: .utf8) == "socks")
         #expect(await core.allProjects().first?.isChat == true, "the project stays, with its file")

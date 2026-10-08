@@ -222,8 +222,6 @@ public final class AgentsModel {
     /// warning, and the phone's Runtimes list.
     public private(set) var runtimeAllowances: RuntimeAllowances?
     public private(set) var retentionState: DaemonAPI.RetentionState?
-    /// What is left of retired agents this client has asked about, by id (051).
-    public private(set) var tombstones: [UUID: Tombstone] = [:]
     /// Every resource an agent can lease, who holds it and who is waiting (036), as
     /// the daemon last said. Replaced whole by each `leases/changed`, never merged. Nil
     /// from a daemon too old to have leases, which draws nothing.
@@ -559,8 +557,8 @@ public final class AgentsModel {
             runtimeAllowances = allowances
 
         case .agentRemoved(let notification):
-            // Retired (051). Out of every list; a chat that was showing it finds no
-            // agent and shows what is left of it instead.
+            // Deleted (#398). Out of every list; a chat that was showing it finds no
+            // agent and says so.
             unfile(notification.agentID)
             permissions.removeAll { $0.agentID == notification.agentID }
             elicitations.removeAll { $0.agentID == notification.agentID }
@@ -835,10 +833,6 @@ public final class AgentsModel {
     public func replaceCostState(_ state: DaemonAPI.CostState) { costState = state }
     public func replaceRetentionState(_ state: DaemonAPI.RetentionState) { retentionState = state }
     public func replaceRuntimeAllowances(_ allowances: RuntimeAllowances) { runtimeAllowances = allowances }
-    /// Tombstones as `agents/retired` answered, kept for the retired page (051).
-    public func takeTombstones(_ found: [Tombstone]) {
-        for tombstone in found { tombstones[tombstone.id] = tombstone }
-    }
     public func replaceLeases(_ snapshot: DaemonAPI.LeaseSnapshot) {
         leases = snapshot
         reindexLeases()
@@ -1194,24 +1188,13 @@ public final class AgentsModel {
     /// view so the Mac's row and the phone's card cannot word it differently.
     public func startedByAgentLabel(_ agent: Agent) -> String? {
         guard let starter = agent.startedByAgent else { return nil }
-        // A starter that has been retired is named from what is left of it (051).
-        let retired = self.agent(starter) == nil ? tombstones[starter] : nil
-        let title = (self.agent(starter)?.title ?? retired?.title)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = self.agent(starter)?.title?.trimmingCharacters(in: .whitespacesAndNewlines)
         let name = title.flatMap { $0.isEmpty ? nil : "\u{201C}\($0)\u{201D}" } ?? "another agent"
-        return "Started by " + name + (retired != nil ? " (retired)" : "")
+        return "Started by " + name
     }
 
     /// The symbol that mark is drawn with.
     public static let startedByAgentSymbol = "person.2"
-
-    /// Who started a retired agent, for its page's Started by (051): the starter's title,
-    /// or "Another agent". `nil` when the person or a workflow started it. Here so the
-    /// window and the Remote say it alike (#242).
-    public func retiredStarterLabel(_ tombstone: Tombstone) -> String? {
-        guard let starter = tombstone.startedByAgent else { return nil }
-        let title = agent(starter)?.title ?? tombstones[starter]?.title
-        return LeaseWords.agentName(title).replacingOccurrences(of: "another agent", with: "Another agent")
-    }
 
     /// Who is asking, at the head of a question or permission card (#121): the agent's
     /// title and runtime, and for a helper who started it. A card read beside others,
@@ -1509,7 +1492,7 @@ public final class AgentsModel {
         if titlesChanged { noteTitlesChanged() }
     }
 
-    /// One agent out of everything (retired, 051).
+    /// One agent out of everything (deleted, #398).
     private func unfile(_ id: UUID) {
         guard let old = byID.removeValue(forKey: id) else { return }
         if let workflowID = old.startedByWorkflow {

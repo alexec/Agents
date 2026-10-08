@@ -171,17 +171,17 @@ struct SessionToolsTests {
         #expect(try await read(core, caller, " ") == SessionLookup.noValue)
     }
 
-    @Test func aRetiredSessionIsGone() async throws {
+    @Test func aDeletedSessionIsNotThere() async throws {
         let (locations, root) = try temporary()
         let api = try project(root)
         let core = try await makeCore(locations)
-        let source = try await session(core, in: api, title: "Retired work")
+        let source = try await session(core, in: api, title: "Deleted work")
         try await core.archive(source)
-        try await core.retire(source, because: .person)
+        try await core.delete(source, because: .person)
         let caller = try await session(core, in: api, title: nil, prompt: "Carry on")
 
-        #expect(try await read(core, caller, "Retired work") == SessionLookup.gone)
-        #expect(try await read(core, caller, source.uuidString) == SessionLookup.gone)
+        #expect(try await read(core, caller, "Deleted work") == SessionLookup.missing("Deleted work"))
+        #expect(try await read(core, caller, source.uuidString) == SessionLookup.missing(source.uuidString))
     }
 
     @Test func anotherProjectsSessionIsNotThere() async throws {

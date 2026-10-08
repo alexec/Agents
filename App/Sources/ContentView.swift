@@ -132,17 +132,8 @@ struct ContentView: View {
                 }
             }
             .paperGround()
-        } else if let id = model.selection, model.selectedAgent == nil, let gone = model.retiredTombstone(id) {
-            // Retired (051): nothing left to chat with, only who it was.
-            RetiredAgentPage(tombstone: gone, startedBy: model.work.retiredStarterLabel(gone)).paperGround()
         } else if model.selection != nil {
             chat(inWindowOf: width)
-                // Every route to an agent by id comes here — a workflow's run, a pull
-                // request's agent, a menu. One the window has no agent for may have been
-                // retired (051): asked once, and the page above shows when it has been.
-                .task(id: model.selection) {
-                    if let id = model.selection, model.selectedAgent == nil { _ = await model.tombstone(for: id) }
-                }
         } else if model.composing {
             // A new session in the project: the empty chat with its prompt (066).
             ProjectAgentsView(selection: Binding(get: { model.selection },

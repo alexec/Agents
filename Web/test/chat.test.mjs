@@ -7,7 +7,7 @@ const c = await load("src/model/chat.ts");
 const d = await load("src/model/diff.ts");
 const project = (folder, extra = {}) => ({
   project: { folder, addedAt: 0, ...extra.project }, name: folder.split("/").pop(), exists: true,
-  lastActivityAt: 0, counts: {}, costToDate: {}, unmeasuredAgents: 0, retiredCount: 0, ...extra.summary,
+  lastActivityAt: 0, counts: {}, costToDate: {}, unmeasuredAgents: 0, ...extra.summary,
 });
 
 test("the chat project is the one marked isChat, and not when archived", () => {
