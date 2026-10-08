@@ -40,6 +40,10 @@ extension WorkflowSummary {
                                                 ?? (waiting.isNew ? "New — waiting for your OK" : "Changed since you approved it — waiting for your OK"),
                                             detail: "Read the prompt and settings below, then Approve to let it run",
                                             tint: .attention))
+        } else if deniedHere != nil {
+            lines.append(WorkflowStatusLine(symbol: "hand.raised.slash",
+                                            text: "Denied on this host — it does not run here",
+                                            detail: "Other hosts still see it waiting. Approve to let it run here"))
         }
         if !isArchived {
             lines.append(enabledLine)
@@ -91,7 +95,7 @@ extension WorkflowSummary {
     /// When it next runs, or that nothing will until something changes.
     private var nextLine: WorkflowStatusLine {
         let blocked = isArchived || !isEnabled || workflow.problem != nil
-            || awaitingApproval != nil || overLimit != nil
+            || awaitingApproval != nil || deniedHere != nil || overLimit != nil
         if let next = nextFireAt, !blocked {
             return WorkflowStatusLine(symbol: "calendar",
                                       text: "Next run \(next.formatted(.relative(presentation: .named)))",

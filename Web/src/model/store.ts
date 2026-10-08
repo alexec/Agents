@@ -1720,9 +1720,20 @@ export class Store extends Work {
 
   /** Approve (#142): the digest is what the page was showing, so a file changed since still waits. */
   async approveWorkflow(host: string, summary: WorkflowSummary): Promise<void> {
-    if (!summary.awaitingApproval) return;
-    const changed = await this.act("workflows/approve",
-      { folder: summary.workflow.folder, workflowID: summary.workflow.workflowID, digest: summary.awaitingApproval.digest }, host);
+    await this.answerWorkflow(host, summary, "workflows/approve");
+  }
+
+  /** Deny on this host only (#391): it does not run here, its file is untouched, and Approve takes it back. */
+  async denyWorkflow(host: string, summary: WorkflowSummary): Promise<void> {
+    await this.answerWorkflow(host, summary, "workflows/deny");
+  }
+
+  private async answerWorkflow(host: string, summary: WorkflowSummary,
+    method: "workflows/approve" | "workflows/deny"): Promise<void> {
+    const file = summary.awaitingApproval ?? summary.deniedHere;
+    if (!file) return;
+    const changed = await this.act(method,
+      { folder: summary.workflow.folder, workflowID: summary.workflow.workflowID, digest: file.digest }, host);
     if (changed) this.placeWorkflow(changed, host);
   }
 

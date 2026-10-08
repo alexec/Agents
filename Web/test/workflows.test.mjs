@@ -126,6 +126,23 @@ test("a waiting workflow past the three says why, with no Approve (#132)", () =>
   assert.equal(w.waitsItsTurn({ ...summary, overLimit: undefined }), false);
 });
 
+test("a workflow denied on this host stays listed, runs nothing here, and can be approved back (#391)", () => {
+  const summary = { workflow: { workflowID: "d", triggers: [schedule], mode: "new", prompt: "", settings: {}, unknownFields: {} },
+    isArchived: false, isEnabled: true, isRunning: false, nextFireAtByTrigger: [],
+    deniedHere: { digest: "x", isNew: true } };
+  assert.equal(w.workflowStatus(summary).words, "Denied on this host");
+  assert.equal(w.workflowNeedsAPerson(summary), false);
+  assert.equal(w.isUnapproved(summary), true);
+  assert.equal(w.canBeApproved(summary), true);
+  assert.equal(w.canBeDenied(summary), false);
+  assert.equal(w.happening(summary), "Denied on this host — it does not run here");
+  assert.equal(w.nextLine(summary, 0), "No next time until you approve it");
+  const waiting = { ...summary, deniedHere: undefined, awaitingApproval: { digest: "x", isNew: true }, overLimit: "project" };
+  assert.equal(w.canBeDenied(waiting), true, "even one waiting its turn can be denied");
+  assert.equal(w.canBeApproved(waiting), false);
+  assert.equal(w.refusalMessage({ deniedHere: {} }), "it is denied on this host");
+});
+
 // Finer matching (073): filters in words, lists included, held to EventPatternFinerTests.swift's
 // summaries, with the page using catalogue meanings as the Mac does.
 test("an event trigger's filters are said in the Mac's words, lists included", () => {

@@ -200,6 +200,7 @@ export function workflowStatus(s: WorkflowSummary): { mark: string; words: strin
   if (s.isArchived) return { mark: "▣", words: "Archived", tinted };
   if (waitsItsTurn(s)) return { mark: "✋", words: "Over the limit", tinted };
   if (s.awaitingApproval) return { mark: "✋", words: "Waiting for your OK", tinted };
+  if (s.deniedHere) return { mark: "⊘", words: "Denied on this host", tinted };
   if (!isOn(s)) return { mark: "⏸\uFE0E", words: "Turned off", tinted };
   if (s.overLimit) return { mark: "!", words: "Over the limit", tinted };
   if (tinted) return { mark: "!", words: "Needs attention", tinted };
@@ -318,7 +319,7 @@ const refusedWords: Record<string, string> = {
   no_triggering_agent: "nothing triggered it, so there was no agent to resume",
   missed_while_closed: "the app was closed", folder_gone: "the project folder is not there",
   day_limit_reached: "the day's spending limit has been reached", setting_refused: "a setting it names cannot be had",
-  awaiting_approval: "it is waiting for your OK",
+  awaiting_approval: "it is waiting for your OK", denied_here: "it is denied on this host",
 };
 const codeWords: Record<string, Record<string, string>> = {
   "agent.failed reason": failedWords,
@@ -426,7 +427,7 @@ export function nextLine(summary: WorkflowSummary, index: number, now = new Date
   if (summary.isArchived) return "Archived — no next time";
   if (!isOn(summary)) return "Off — no next time";
   if (summary.workflow.problem) return "Never, until the file is fixed";
-  if (summary.awaitingApproval) return "No next time until you approve it";
+  if (isUnapproved(summary)) return "No next time until you approve it";
   if (summary.overLimit) return "Over the limit — no next time";
   const byTrigger = summary.nextFireAtByTrigger ?? [];
   const schedules = summary.workflow.triggers.filter((t) => "schedule" in t).length;
@@ -460,6 +461,21 @@ const limitAllowed: Record<WorkflowLimit, number> = { project: 3, total: 10 };
 /** WorkflowSummary.waitsItsTurn (#132): waiting behind the three a project may have waiting. */
 export function waitsItsTurn(s: WorkflowSummary): boolean {
   return !!s.awaitingApproval && s.overLimit === "project";
+}
+
+/** WorkflowSummary.isUnapproved (#391): waiting for an OK, or denied on this host. */
+export function isUnapproved(s: WorkflowSummary): boolean {
+  return !!s.awaitingApproval || !!s.deniedHere;
+}
+
+/** WorkflowSummary.canBeApproved: waiting and allowed to, or denied here, where Approve takes it back. */
+export function canBeApproved(s: WorkflowSummary): boolean {
+  return (!!s.awaitingApproval && !waitsItsTurn(s)) || !!s.deniedHere;
+}
+
+/** WorkflowSummary.canBeDenied (#391): waiting, even behind the ones allowed to. */
+export function canBeDenied(s: WorkflowSummary): boolean {
+  return !!s.awaitingApproval && !s.isArchived;
 }
 
 /** WorkflowSummary.turnedOffSentence (#100). */
@@ -517,6 +533,7 @@ export function refusalMessage(refusal: WorkflowRefusal): string {
   if ("folderGone" in refusal) return "the project folder is not there";
   if ("dayLimitReached" in refusal) return "the day's spending limit has been reached";
   if ("settingRefused" in refusal) return refusal.settingRefused.detail;
+  if ("deniedHere" in refusal) return "it is denied on this host";
   return "it is waiting for your OK";
 }
 
@@ -540,6 +557,8 @@ export function happening(summary: WorkflowSummary, now = new Date()): string | 
       : (summary.awaitingApproval.isNew ? "New" : "Changed since you approved it") + " — approve it on its page to let it run";
     const why = offReasonSentence(summary);
     return why ? `${waiting} · ${why}` : waiting;
+  } else if (summary.deniedHere) {
+    return "Denied on this host — it does not run here";
   } else if (!isOn(summary)) parts.push(turnedOffSentenceFor(summary));
   else if (summary.overLimit) parts.push(`${limitSentence(summary.overLimit)}. ${limitRemedy(summary.overLimit)}`);
   else if (summary.nextFireAt !== undefined) parts.push(`Next ${namedRelative(fromWireDate(summary.nextFireAt), now)}`);
@@ -587,6 +606,9 @@ export function workflowStatusLines(s: WorkflowSummary, now = new Date()): Statu
     lines.push({ glyph: "✋", text: note !== undefined ? `Waiting for your OK — ${note}`
       : s.awaitingApproval.isNew ? "New — waiting for your OK" : "Changed since you approved it — waiting for your OK",
       detail: "Read the prompt and settings below, then Approve to let it run", tint: "attention" });
+  } else if (s.deniedHere) {
+    lines.push({ glyph: "⊘", text: "Denied on this host — it does not run here",
+      detail: "Other hosts still see it waiting. Approve to let it run here" });
   }
   if (!s.isArchived) lines.push(enabledLine(s));
   if (s.overLimit && !waitsItsTurn(s)) {
@@ -624,7 +646,7 @@ function enabledLine(s: WorkflowSummary): StatusLine {
 }
 
 function nextRunLine(s: WorkflowSummary, now: Date): StatusLine {
-  const blocked = s.isArchived || !isOn(s) || s.workflow.problem !== undefined || !!s.awaitingApproval || !!s.overLimit;
+  const blocked = s.isArchived || !isOn(s) || s.workflow.problem !== undefined || isUnapproved(s) || !!s.overLimit;
   if (s.nextFireAt !== undefined && !blocked) {
     const at = fromWireDate(s.nextFireAt);
     return { glyph: "◷", text: `Next run ${namedRelative(at, now)}`, detail: at.toLocaleString("en", { dateStyle: "medium", timeStyle: "short" }) };

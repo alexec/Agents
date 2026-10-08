@@ -249,6 +249,7 @@ The deltas are tracked by 29 issues:
 | Recent runs | Asked of the host, archived included, Show more: `A/Projects/WorkflowPage.swift:848-879` | The same: `R/Projects/WorkflowPage.swift:547-567` | Asked of the host, archived included, 3 then Show more | **same** |
 | Enabled switch, in the file (#100, #125) | `A/Projects/WorkflowPage.swift:177-186` | `R/Projects/WorkflowPage.swift:194-196` | `W/views/WorkflowPage.tsx:71-75` | **same** |
 | Approve | Page and row menu: `A/Projects/ProjectWorkRows.swift:166-168` | Page and row menu: `R/Projects/WorkflowPage.swift`, `R/Sidebar/SidebarRows.swift` | Page and row menu: `W/views/WorkflowPage.tsx`, `W/views/WorkflowRow.tsx` | **same** |
+| Deny on This Host: not here, without archiving it everywhere; marked *Denied on this host* in place, Approve takes it back (#391) | Page and row menus: `A/Projects/WorkflowPage.swift`, `A/Projects/WorkflowRow.swift`, `A/Projects/ProjectWorkRows.swift`; status line `S/WorkflowStatus.swift` | Page and row menu: `R/Projects/WorkflowPage.swift`, `R/Sidebar/SidebarRows.swift` | Page and row menu: `W/views/WorkflowPage.tsx`, `W/views/WorkflowRow.tsx`; words `W/model/workflows.ts` | **same** |
 | Archive and Bring Back | Page, row menu, swipe | Toolbar, long press | Page and row menu | **same** |
 | Run Now | Page and row menu | Page and long press | Page and the row | **same** |
 | The row's second line | Summary | Next run and last outcome: `R/Projects/WorkflowsSection.swift:142-162` | Summary | **by design** (the card has room) |

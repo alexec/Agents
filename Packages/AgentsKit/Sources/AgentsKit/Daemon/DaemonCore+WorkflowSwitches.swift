@@ -39,6 +39,8 @@ extension DaemonCore {
                 if case .refused(.awaitingApproval, _, _) = $0.lastOutcome { $0.lastOutcome = nil }
             }
             if $0.offDigest == before { $0.offDigest = after }
+            // A denial on this host is of the bytes too (#391), and the person's own.
+            if carryApproval, $0.deniedDigest == before { $0.deniedDigest = after }
         }
         return after
     }

@@ -1815,6 +1815,7 @@ export type WorkflowRefusal =
   | { dayLimitReached: Record<string, never> }
   | { settingRefused: { setting: string; detail: string } }
   | { awaitingApproval: Record<string, never> }
+  | { deniedHere: Record<string, never> }
   | { coolingDown: { until?: WireDate } };
 
 export interface WorkflowRemovedNotification {
@@ -1865,6 +1866,7 @@ export interface WorkflowSummary {
   causingEventName?: string;
   isRunning: boolean;
   awaitingApproval?: WorkflowApproval;
+  deniedHere?: WorkflowApproval;
   lastFiredAt?: WireDate;
   lastFiredBy?: WorkflowCause;
   cooldownEndsAt?: WireDate;
@@ -2020,6 +2022,7 @@ export interface Methods {
   "views/show": { params: ViewShowRequest; result: Empty };
   "workflows/approve": { params: WorkflowApproveRequest; result: WorkflowSummary };
   "workflows/archive": { params: WorkflowArchiveRequest; result: WorkflowSummary };
+  "workflows/deny": { params: WorkflowApproveRequest; result: WorkflowSummary };
   "workflows/enable": { params: WorkflowEnableRequest; result: WorkflowSummary };
   "workflows/list": { params: WorkflowsListRequest; result: WorkflowSummary[] };
   "workflows/mcpTrigger/clearMissed": { params: WorkflowMCPClearMissedRequest; result: WorkflowSummary };
@@ -2114,6 +2117,7 @@ export const MethodTarget = {
   "views/show": "host",
   "workflows/approve": "host",
   "workflows/archive": "host",
+  "workflows/deny": "host",
   "workflows/enable": "host",
   "workflows/list": "host",
   "workflows/mcpTrigger/clearMissed": "host",
@@ -2341,7 +2345,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
   WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort"] },
   WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "hosts"] },
-  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire"], optional: ["overLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
+  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire"], optional: ["overLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
   WorkflowsListRequest: { required: [], optional: ["folder"] },
   WorktreeStatus: { required: ["uncommitted"], optional: ["ahead", "behind", "unmerged"] },
   WorktreeSummary: { required: ["name", "root", "isProjectFolder", "exists", "madeByApp", "agents"], optional: ["branch", "status"] },

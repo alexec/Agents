@@ -2475,13 +2475,23 @@ final class RemoteModel {
     /// Let a waiting one run as its file now reads (#142): the digest is what the page
     /// was showing, so a file changed since is still waiting afterwards.
     func approveWorkflow(_ summary: WorkflowSummary) async {
-        guard let waiting = summary.awaitingApproval else { return }
+        await answerWorkflow(summary, DaemonAPI.Method.workflowsApprove)
+    }
+
+    /// Deny it on its host only (#391): it does not run there, its file is not touched,
+    /// and Approve takes it back.
+    func denyWorkflow(_ summary: WorkflowSummary) async {
+        await answerWorkflow(summary, DaemonAPI.Method.workflowsDeny)
+    }
+
+    private func answerWorkflow(_ summary: WorkflowSummary, _ method: String) async {
+        guard let waiting = summary.approvable else { return }
         do {
             let request = DaemonAPI.WorkflowApproveRequest(folder: summary.folder,
                                                             workflowID: summary.workflowID,
                                                             digest: waiting.digest)
             let updated: WorkflowSummary = try await client(for: request).call(
-                DaemonAPI.Method.workflowsApprove, request, returning: WorkflowSummary.self)
+                method, request, returning: WorkflowSummary.self)
             keepWorkflow(updated, named: request)
         } catch {
             problem = sentence(for: error)

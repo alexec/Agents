@@ -1121,11 +1121,21 @@ final class AppModel {
     /// Approve a workflow's file as the row showed it. Said when it fails: the likely
     /// reason is that the file changed after the person looked, and they should look again.
     func approveWorkflow(_ summary: WorkflowSummary) async {
-        guard let waiting = summary.awaitingApproval else { return }
+        await answerWorkflow(summary, DaemonAPI.Method.workflowsApprove)
+    }
+
+    /// Deny a workflow's file on this host only (#391), as the row showed it: it does not
+    /// run here, its file is not touched, and Approve takes it back.
+    func denyWorkflow(_ summary: WorkflowSummary) async {
+        await answerWorkflow(summary, DaemonAPI.Method.workflowsDeny)
+    }
+
+    private func answerWorkflow(_ summary: WorkflowSummary, _ method: String) async {
+        guard let waiting = summary.approvable else { return }
         do {
             let host = selectedProjectHost
             let updated: WorkflowSummary = try await client(for: host).call(
-                DaemonAPI.Method.workflowsApprove,
+                method,
                 DaemonAPI.WorkflowApproveRequest(folder: summary.folder, workflowID: summary.workflowID,
                                                  digest: waiting.digest),
                 returning: WorkflowSummary.self)

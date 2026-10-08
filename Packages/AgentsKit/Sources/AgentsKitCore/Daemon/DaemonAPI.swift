@@ -219,6 +219,9 @@ public enum DaemonAPI {
         public static let workflowsEnable = "workflows/enable"
         /// Approve a workflow file as the person was shown it (security review).
         public static let workflowsApprove = "workflows/approve"
+        /// Deny one on this host only (#391): it does not run here, and the file is not
+        /// touched, so other hosts still see it waiting. Takes a `WorkflowApproveRequest`.
+        public static let workflowsDeny = "workflows/deny"
         /// A project's plugins and which are waiting for the person's OK (security review, S2).
         public static let pluginsList = "plugins/list"
         public static let pluginsApprove = "plugins/approve"
@@ -2273,7 +2276,7 @@ public enum DaemonAPI {
     }
 
     /// Approve a workflow's file: `digest` is the one the row carried, so only the file
-    /// the person was shown is approved.
+    /// the person was shown is approved. Deny (#391) sends the same, for the same reason.
     public struct WorkflowApproveRequest: Codable, Sendable {
         public var folder: URL
         public var workflowID: String
