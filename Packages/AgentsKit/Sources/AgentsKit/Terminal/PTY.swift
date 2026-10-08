@@ -57,9 +57,17 @@ public final class PTY: @unchecked Sendable {
     private var reader: DispatchSourceRead?
     private let queue = DispatchQueue(label: "com.alexecollins.agents.pty")
     /// Watches the child so the tty is let go even in the case where the revoke above
-    /// does not come. It does not wait for the child: `finish` is the one place the
-    /// child is ever reaped, and two reapers race each other to ECHILD.
+    /// does not come. It does not wait for the child: `finish` reaps it, or `reapOnceGone`
+    /// for a child killed after nothing is reading, and `reaped` says which did.
     private var exitWatcher: (any DispatchSourceProtocol)?
+    /// The child has been waited for, and how it ended (nil when its status could not be
+    /// had). Under `lock`: once set, nobody waits on `pid` again, since a pid already
+    /// reaped may be another child's by now (#442).
+    private var reaped: Int32??
+    private var reaping = false
+    /// Asks after a killed child until it can be collected. Touched only on `queue`.
+    private var reaper: (any DispatchSourceTimer)?
+    private var reaperTries = 0
 
     public private(set) var rows: Int
     public private(set) var cols: Int
@@ -398,13 +406,66 @@ public final class PTY: @unchecked Sendable {
         // The status is only meaningful when waitpid actually returned our child. An
         // earlier version read `status` regardless, and a child killed by a signal
         // reported as a clean exit, because the untouched variable was still zero.
-        var status: Int32 = 0
-        var reaped = waitpid(pid, &status, 0)
-        while reaped == -1 && errno == EINTR {
-            reaped = waitpid(pid, &status, 0)
-        }
-        let code = reaped == pid ? exitCode(from: status) : Self.unknownExitCode
+        let code = collect(blocking: true) ?? Self.unknownExitCode
         onExit(code)
+    }
+
+    /// Wait for the child once, whoever asks first, and say how it ended: nil while it
+    /// is still running (not blocking), or when its status could not be had. The wait
+    /// itself is outside the lock, so a slow exit holds up nothing else.
+    private func collect(blocking: Bool) -> Int32? {
+        lock.lock()
+        if let reaped { lock.unlock(); return reaped }
+        guard pid > 0, !reaping else { lock.unlock(); return nil }
+        reaping = true
+        lock.unlock()
+
+        var status: Int32 = 0
+        var result = waitpid(pid, &status, blocking ? 0 : WNOHANG)
+        while result == -1 && errno == EINTR {
+            result = waitpid(pid, &status, blocking ? 0 : WNOHANG)
+        }
+
+        lock.lock()
+        defer { lock.unlock() }
+        reaping = false
+        if result == 0 { return nil }
+        let code: Int32? = result == pid ? exitCode(from: status) : nil
+        reaped = .some(code)
+        return code
+    }
+
+    /// Whether the child has been waited for, by either reaper.
+    var hasBeenReaped: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return reaped != nil
+    }
+
+    /// Collect the child once it has gone, after `killNow`. Without this a shell ended
+    /// by its tab, the idle reaper or a shut-down stays a zombie for the helper's whole
+    /// life: `finish`, the other reaper, runs only when the master reads end of file,
+    /// and `stopReading` has stopped that (#442). Asked twenty times a second, not
+    /// blocked on, and given up after ten seconds: a killed child is gone in moments.
+    public func reapOnceGone() {
+        guard pid > 0 else { return }
+        // Held strongly until it is done: the shell's owner has usually let go of it
+        // already (a closed tab is forgotten at once), and nobody else will reap it.
+        queue.async { [self] in
+            guard reaper == nil else { return }
+            let timer = DispatchSource.makeTimerSource(queue: queue)
+            timer.schedule(deadline: .now(), repeating: .milliseconds(50))
+            timer.setEventHandler { [self] in
+                self.reaperTries += 1
+                _ = self.collect(blocking: false)
+                if self.hasBeenReaped || self.reaperTries >= 200 {
+                    self.reaper?.cancel()
+                    self.reaper = nil
+                }
+            }
+            self.reaper = timer
+            timer.resume()
+        }
     }
 
     /// Reported when the child is gone but its status could not be collected, which
@@ -487,7 +548,7 @@ public final class PTY: @unchecked Sendable {
     }
 
     public var isRunning: Bool {
-        guard pid > 0, !hasFinished else { return false }
+        guard pid > 0, !hasFinished, !hasBeenReaped else { return false }
         return kill(pid, 0) == 0
     }
 
