@@ -51,11 +51,14 @@ public final class IOKitMachineWatch: MachineWatch, @unchecked Sendable {
         queue.sync {
             self.report = report
             startPower()
+            // Off a Mac there is no lock or idle time to read (#372), so nothing to look at.
+            #if os(macOS)
             let timer = DispatchSource.makeTimerSource(queue: queue)
             timer.schedule(deadline: .now() + Self.lookEvery, repeating: Self.lookEvery)
             timer.setEventHandler { [weak self] in self?.look() }
             timer.resume()
             self.timer = timer
+            #endif
         }
     }
 

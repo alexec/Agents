@@ -168,7 +168,7 @@ export function ActivityRows({ store, chosen, onPick }: {
             {tally.working === 0 && <><span class="dot failure" aria-hidden="true" />{" "}</>}{tally.working}/{tally.total}
           </span>
         ))}
-      {row("spending", "Spending", "What all of the work has cost, and what it cost today",
+      {row("spending", "Cost", "What all of the work has cost, and what it cost today",
         (today || left) && (
           <span class={`spending${closeToFull(mac) && chosen !== "spending" ? " close" : ""}`}>
             {today && <span>{today}</span>}{left && <span>{left}</span>}
@@ -178,7 +178,7 @@ export function ActivityRows({ store, chosen, onPick }: {
   );
 }
 
-const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", spending: "Spending" };
+const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", spending: "Cost" };
 
 /** An Activity page in the chat's place. */
 export function ActivityPageView({ store, page }: { store: Store; page: ActivityPage }) {

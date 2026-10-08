@@ -51,13 +51,21 @@ extension DaemonCore {
             case .failure(let problem): throw eventRefusal(problem.message)
             }
         }
+        // A server never raises what only a Mac does (#372): a wait on nothing else
+        // could only ever time out, so it is refused; one with something else is
+        // kept, and told.
+        let neverHere = raisesMacOnlyEvents ? [] : patterns.map(\.name).filter(EventCatalogue.isMacOnly)
+        if !neverHere.isEmpty, neverHere.count == patterns.count {
+            throw eventRefusal(EventWords.neverHere(neverHere) + " Nothing is waiting.")
+        }
+        let warning = neverHere.isEmpty ? "" : EventWords.neverHere(neverHere) + " "
         let at = now()
         let from = request.from ?? eventLog.head
 
         // Something already after `from`: answered now, and nothing is left waiting.
         if let hit = eventLog.matches(after: from, patterns, scopes: scopes).first {
             let previous = endWait(caller.id, by: .agent, quietly: true)
-            return (previous.map(EventWords.replaced) ?? "") + EventWords.matched(hit)
+            return warning + (previous.map(EventWords.replaced) ?? "") + EventWords.matched(hit)
         }
 
         let previous = endWait(caller.id, by: .agent, quietly: true)
@@ -69,7 +77,7 @@ extension DaemonCore {
         changed(agent)
         broadcastEvents()
         armEventWaitTimer()
-        let prefix = previous.map(EventWords.replaced) ?? ""
+        let prefix = warning + (previous.map(EventWords.replaced) ?? "")
         // Parked before anything is awaited, so an event in the next instant finds the
         // call to answer rather than starting the agent again.
         let answer = await withCheckedContinuation { continuation in
@@ -382,5 +390,10 @@ extension DaemonCore {
     /// For tests: a shorter hold.
     func useForEvents(holdLimit: Duration) {
         eventHoldLimit = holdLimit
+    }
+
+    /// A test's way of being a Linux server, which raises no Mac-only event (#372).
+    func actAsServer() {
+        raisesMacOnlyEvents = false
     }
 }
