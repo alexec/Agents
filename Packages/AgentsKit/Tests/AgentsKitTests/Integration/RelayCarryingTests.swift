@@ -124,15 +124,23 @@ struct RelayCarryingTests {
             _ = try await core.handle(method: DaemonAPI.Method.agentsPrompt,
                                       params: try JSONValue.encoding(request), connection: UUID()).get()
         }
-        await eventually("every prompt is on the record") {
+        // Prompts queued behind a running turn go out together as one, a blank line
+        // between their texts (#346), so what is counted is each change's paragraph
+        // across everything said, not a message of its own.
+        let said: @Sendable () async -> [String] = {
             let entries = (try? await core.transcript(.init(agentID: agent, limit: 500)).entries) ?? []
-            return (0..<10).allSatisfy { change in
-                entries.contains { if case .userMessage("change \(change)", _, _) = $0.kind { true } else { false } }
+            return entries.flatMap { entry -> [String] in
+                guard case .userMessage(let text, _, _) = entry.kind else { return [] }
+                return text.components(separatedBy: "\n\n")
             }
         }
-        let entries = try await core.transcript(.init(agentID: agent, limit: 500)).entries
+        await eventually("every prompt is on the record") {
+            let paragraphs = await said()
+            return (0..<10).allSatisfy { paragraphs.contains("change \($0)") }
+        }
+        let paragraphs = await said()
         for change in 0..<10 {
-            let count = entries.count { if case .userMessage("change \(change)", _, _) = $0.kind { true } else { false } }
+            let count = paragraphs.count { $0 == "change \(change)" }
             #expect(count == 1, "change \(change) was said \(count) times")
         }
     }
