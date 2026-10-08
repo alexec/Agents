@@ -101,7 +101,7 @@ struct SidebarView: View {
                     .allowsHitTesting(frame.pane == .changes)
             }
             if shows(.terminal, state) {
-                TerminalPane(agent: agent, state: state)
+                TerminalPane(agent: agent, state: state, isVisible: frame.pane == .terminal)
                     .opacity(frame.pane == .terminal ? 1 : 0)
                     .allowsHitTesting(frame.pane == .terminal)
             }
@@ -123,6 +123,12 @@ struct SidebarView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onChange(of: frame.pane, initial: true) { _, pane in state.opened.insert(pane) }
+        // Choosing the Terminal is choosing to type in it: the shell on top takes the
+        // keyboard, without a click into it first (#401). Not on an agent switch, which
+        // leaves the keyboard where it was.
+        .onChange(of: frame.pane) { _, pane in
+            if pane == .terminal { state.shellToFocus = state.frontShell }
+        }
     }
 
     private func shows(_ pane: SidebarPane, _ state: AgentPaneState) -> Bool {

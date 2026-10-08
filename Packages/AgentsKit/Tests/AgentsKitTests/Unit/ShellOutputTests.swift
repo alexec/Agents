@@ -34,6 +34,16 @@ struct ShellOutputTests {
         #expect(read.bytes == bytes)
     }
 
+    @Test func theOffsetSurvivesTheTripAndAnOlderHostHasNone() throws {
+        let sent = DaemonAPI.ShellOutputNotification(agentID: UUID(), bytes: Data("x".utf8), offset: 4096)
+        let onTheWire = try JSONValue.encoding(sent)
+        #expect(DaemonAPI.ShellOutputNotification(params: onTheWire)?.offset == 4096)
+        #expect(try onTheWire.decode(DaemonAPI.ShellOutputNotification.self).offset == 4096)
+
+        let older = try JSONValue.encoding(DaemonAPI.ShellOutputNotification(agentID: UUID(), bytes: Data("x".utf8)))
+        #expect(DaemonAPI.ShellOutputNotification(params: older)?.offset == nil)
+    }
+
     @Test func somethingThatIsNotAnOutputNotificationIsRefused() {
         #expect(DaemonAPI.ShellOutputNotification(params: ["agentID": .string("not a uuid")]) == nil)
         #expect(DaemonAPI.ShellOutputNotification(params: .string("nonsense")) == nil)

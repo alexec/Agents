@@ -1769,6 +1769,9 @@ final class AppModel {
         // when the next action has waited out a connect.
         if hosts.macDownSince == nil { hosts.macDownSince = Date() }
         listening = nil
+        // The daemon forgot these screens with the connection. Marked, so they attach
+        // again when it comes back rather than looking alive and being dead (#401).
+        for shell in shellClients(on: .mac) { shell.lostConnection() }
         await reconnect()
     }
 
@@ -1931,6 +1934,7 @@ final class AppModel {
             await DaemonClient.$patience.withValue(.seconds(20)) {
                 await serverFilesByHost[.mac]?.reconnected()
                 await refreshEverything()
+                for shell in shellClients(on: .mac) { await shell.reattachIfLost() }
             }
             // Servers the control plane reaches are its clients. HostSet is the old
             // path, and it stays only while this window has no control plane (R7).
@@ -1984,7 +1988,8 @@ final class AppModel {
             // the general path would re-encode every byte of it here on the main
             // actor before decoding it again. See `ShellOutputNotification`.
             guard let params, let notification = DaemonAPI.ShellOutputNotification(params: params) else { return }
-            shellClients[ShellKey(agentID: notification.agentID, shell: notification.shell)]?.received(notification.bytes)
+            shellClients[ShellKey(agentID: notification.agentID, shell: notification.shell)]?
+                .received(notification.bytes, at: notification.offset)
 
         case DaemonAPI.Notification.shellStateChanged:
             guard let notification = try? params?.decode(DaemonAPI.ShellStateNotification.self) else { return }
@@ -2099,6 +2104,7 @@ final class AppModel {
         }
         hosts.onConnected = { [weak self] host in
             await self?.refreshServer(host)
+            await self?.reattachShells(on: host)
         }
         hosts.onReachability = { [weak self] server, online in
             guard let self else { return }
@@ -2206,6 +2212,7 @@ final class AppModel {
                 }
             }
             await refreshServer(id)
+            await reattachShells(on: id)
             // Presence starts with this Mac's host; a control plane with none starts it
             // with its first other host.
             startPresence()
@@ -3507,6 +3514,20 @@ final class AppModel {
                                 describe: { [weak self] error in self?.describeForShell(error) ?? "\(error)" })
         shellClients[key] = fresh
         return fresh
+    }
+
+    /// This window's ends of the shells one host holds.
+    private func shellClients(on host: HostID) -> [ShellClient] {
+        shellClients.values.filter { self.host(ofAgent: $0.agentID) == host }
+    }
+
+    /// A server's new connection knows none of this window's screens: they attach
+    /// again, and are given only what they missed (#401).
+    private func reattachShells(on host: HostID) async {
+        for shell in shellClients(on: host) {
+            shell.lostConnection()
+            await shell.reattachIfLost()
+        }
     }
 
     /// The shells the daemon holds for an agent, so the pane opens with the tabs it

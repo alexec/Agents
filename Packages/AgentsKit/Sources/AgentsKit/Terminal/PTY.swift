@@ -77,6 +77,15 @@ public final class PTY: @unchecked Sendable {
     private var flushIsScheduled = false
     private var lastFlushAt: UInt64 = 0
 
+    /// What was typed and not yet taken by the tty, and the watch that says when it
+    /// has room again. Touched only on `writeQueue`, so a paste larger than the tty's
+    /// input queue goes in whole and in order, and a slow program never stalls the
+    /// caller (#401). A queue of its own, so typing is not held behind output being
+    /// handed on.
+    private let writeQueue = DispatchQueue(label: "com.alexecollins.agents.pty.write")
+    private var outbox = Data()
+    private var writer: DispatchSourceWrite?
+
     public init(executable: URL,
                 arguments: [String] = [],
                 cwd: URL,
@@ -108,6 +117,9 @@ public final class PTY: @unchecked Sendable {
         // would otherwise walk off with somebody's terminal. The shell started below
         // is given its tty by name, so marking these costs it nothing.
         _ = fcntl(master, F_SETFD, FD_CLOEXEC)
+        // Never block on it: a write to a tty whose input queue is full would hold the
+        // caller, which is the daemon's actor, until the program read (#401).
+        _ = fcntl(master, F_SETFL, fcntl(master, F_GETFL) | O_NONBLOCK)
         _ = fcntl(slave, F_SETFD, FD_CLOEXEC)
         guard let slaveName = ptsname(master).map({ String(cString: $0) }) else {
             POSIX.close(master); master = -1
@@ -199,12 +211,21 @@ public final class PTY: @unchecked Sendable {
         // A pty dropped while its child is still going would otherwise leave the
         // child parked in `exit` for ever, waiting for a reader that has gone.
         exitWatcher?.cancel()
+        writer?.cancel()
         reader?.cancel()
         if slave >= 0 { POSIX.close(slave) }
         if master >= 0 { POSIX.close(master) }
     }
 
     private static let spawnLock = NSLock()
+
+    /// Only ever called on `writeQueue`.
+    private func closeMaster() {
+        lock.lock()
+        if master >= 0 { POSIX.close(master); master = -1 }
+        lock.unlock()
+        outbox = Data()
+    }
 
     private func startReading() {
         let source = DispatchSource.makeReadSource(fileDescriptor: master, queue: queue)
@@ -215,6 +236,9 @@ public final class PTY: @unchecked Sendable {
             if count > 0 {
                 self.pending.append(contentsOf: buffer[0..<count])
                 self.gathered()
+            } else if count < 0, errno == EAGAIN || errno == EINTR {
+                // Woken with nothing to read after all. Not the end of anything.
+                return
             } else {
                 // End of file on the master means the child let go of the tty.
                 self.finish()
@@ -222,9 +246,14 @@ public final class PTY: @unchecked Sendable {
         }
         source.setCancelHandler { [weak self] in
             guard let self else { return }
-            self.lock.lock()
-            if self.master >= 0 { POSIX.close(self.master); self.master = -1 }
-            self.lock.unlock()
+            // A descriptor is closed only once no source watches it, so the write
+            // watch, if there is one, goes first.
+            self.writeQueue.async {
+                guard let writer = self.writer else { return self.closeMaster() }
+                self.writer = nil
+                writer.setCancelHandler { self.closeMaster() }
+                writer.cancel()
+            }
         }
         reader = source
         source.resume()
@@ -390,17 +419,47 @@ public final class PTY: @unchecked Sendable {
 
     // MARK: Talking to it
 
+    /// Typed bytes, queued for the program and written as the tty takes them. Returns
+    /// at once: the write itself happens on the write queue.
     public func write(_ data: Data) {
+        guard !data.isEmpty else { return }
+        writeQueue.async { [weak self] in
+            guard let self else { return }
+            self.outbox.append(data)
+            self.drainOutbox()
+        }
+    }
+
+    /// As much of the outbox as the tty will take now. What it will not take waits for
+    /// it to have room: a short write or EAGAIN is the tty being full, not the end, and
+    /// giving up there lost the rest of a paste. Only ever called on `writeQueue`.
+    private func drainOutbox() {
+        guard writer == nil else { return }
         lock.lock()
-        defer { lock.unlock() }
-        guard master >= 0 else { return }
-        data.withUnsafeBytes { raw in
-            guard let base = raw.baseAddress else { return }
-            var written = 0
-            while written < raw.count {
-                let n = POSIX.write(master, base.advanced(by: written), raw.count - written)
-                if n <= 0 { break }
-                written += n
+        let fd = master
+        lock.unlock()
+        guard fd >= 0 else { outbox = Data(); return }
+        while !outbox.isEmpty {
+            let n = outbox.withUnsafeBytes { raw in POSIX.write(fd, raw.baseAddress!, raw.count) }
+            if n > 0 {
+                outbox.removeFirst(n)
+            } else if n < 0, errno == EINTR {
+                continue
+            } else if n < 0, errno == EAGAIN {
+                let source = DispatchSource.makeWriteSource(fileDescriptor: fd, queue: writeQueue)
+                source.setEventHandler { [weak self] in
+                    guard let self, let writer = self.writer else { return }
+                    self.writer = nil
+                    writer.cancel()
+                    self.drainOutbox()
+                }
+                writer = source
+                source.resume()
+                return
+            } else {
+                // The tty has gone with the program. Nothing typed can reach it now.
+                outbox = Data()
+                return
             }
         }
     }
