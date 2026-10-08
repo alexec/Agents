@@ -53,11 +53,11 @@ extension DaemonCore {
             && isDirectory(dropboxFolder(in: folder))
     }
 
-    /// Look once the drop box has been still for a moment. A file being written keeps
-    /// moving this on, so it is looked at after it stops.
+    /// Look in a moment, unless a look is already due: one waiting is not put off again,
+    /// so a project whose top changes all the time still has its drop box looked at. A file
+    /// still being written is caught by the looks themselves, which go on while it changes.
     func scheduleDropboxCheck(in folder: URL) {
-        guard dropboxSeen[folder] != nil else { return }
-        dropboxChecks[folder]?.cancel()
+        guard dropboxSeen[folder] != nil, dropboxChecks[folder] == nil else { return }
         dropboxChecks[folder] = Task { [weak self] in
             try? await Task.sleep(for: Self.dropboxSettle)
             guard !Task.isCancelled else { return }
