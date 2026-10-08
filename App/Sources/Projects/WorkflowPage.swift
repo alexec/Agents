@@ -181,7 +181,7 @@ struct WorkflowPage: View {
                 Button("Bring Back") { Task { await model.setWorkflowArchived(summary, false) } }
                     .buttonStyle(.paperProminent)
             } else {
-                if summary.awaitingApproval != nil {
+                if summary.isUnapproved {
                     // This page is where the file is read, so this is where approving it
                     // means most. Run now comes back once it is approved. One waiting its
                     // turn behind three others has none yet (#132); the page says why.
@@ -189,6 +189,13 @@ struct WorkflowPage: View {
                         Button("Approve") { Task { await model.approveWorkflow(summary) } }
                             .buttonStyle(.paperProminent)
                             .help("Let this workflow run as its file now reads")
+                    }
+                    // The third answer (#391): not on this host, with nothing written
+                    // into the file, so every other host still sees it waiting.
+                    if summary.canBeDenied {
+                        Button("Deny on This Host") { Task { await model.denyWorkflow(summary) } }
+                            .buttonStyle(.paper)
+                            .help("Don't run it on this host. Other hosts still see it waiting; Approve takes this back")
                     }
                 } else {
                     // Offered even on a workflow that cannot fire on its own. Being able to
@@ -457,7 +464,7 @@ struct WorkflowPage: View {
         if summary.isArchived { return "Archived — no next time" }
         if !summary.isEnabled { return "Off — no next time" }
         if summary.workflow.problem != nil { return "Never, until the file is fixed" }
-        if summary.awaitingApproval != nil { return "No next time until you approve it" }
+        if summary.isUnapproved { return "No next time until you approve it" }
         if summary.overLimit != nil { return "Over the limit — no next time" }
         // A daemon from before #98 sends only the soonest, which is the one schedule's
         // when there is only one.

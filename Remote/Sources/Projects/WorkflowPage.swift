@@ -184,13 +184,20 @@ struct WorkflowPage: View {
                 }
             } else {
                 VStack(spacing: 12) {
-                    if summary.awaitingApproval != nil {
+                    if summary.isUnapproved {
                         // As on the Mac: Run now comes back once it is approved, and one
                         // waiting its turn has neither; the status card says why (#132).
                         if summary.canBeApproved {
                             Button { Task { await model.approveWorkflow(summary) } } label: {
                                 Text("Approve").frame(maxWidth: .infinity)
                             }
+                        }
+                        // Not on this host, without archiving it everywhere (#391).
+                        if summary.canBeDenied {
+                            Button { Task { await model.denyWorkflow(summary) } } label: {
+                                Text("Deny on This Host").frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.paper)
                         }
                     } else {
                         Button { Task { await model.runWorkflow(summary) } } label: {
@@ -408,7 +415,7 @@ struct WorkflowPage: View {
         if summary.isArchived { return "Archived — no next time" }
         if !summary.isEnabled { return "Off — no next time" }
         if summary.workflow.problem != nil { return "Never, until the file is fixed" }
-        if summary.awaitingApproval != nil { return "No next time until you approve it" }
+        if summary.isUnapproved { return "No next time until you approve it" }
         if summary.overLimit != nil { return "Over the limit — no next time" }
         let due = summary.nextFireAtByTrigger.indices.contains(index)
             ? summary.nextFireAtByTrigger[index]

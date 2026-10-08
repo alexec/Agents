@@ -192,7 +192,14 @@ struct SidebarWorkflowRow: View {
                     Button("Approve", systemImage: "checkmark.shield") {
                         Task { await model.approveWorkflow(summary) }
                     }
-                } else if summary.awaitingApproval == nil {
+                }
+                // Not on this host, without archiving it everywhere (#391).
+                if summary.canBeDenied {
+                    Button("Deny on This Host", systemImage: "hand.raised.slash") {
+                        Task { await model.denyWorkflow(summary) }
+                    }
+                }
+                if !summary.isUnapproved {
                     Button("Run now", systemImage: "play") { Task { await model.runWorkflow(summary) } }
                         .disabled(summary.isRunning)
                 }
@@ -229,6 +236,7 @@ struct WorkflowMark: View {
     private var symbol: String {
         if summary.isArchived { return "archivebox" }
         if summary.awaitingApproval != nil { return "hand.raised" }
+        if summary.deniedHere != nil { return "hand.raised.slash" }
         if !summary.isEnabled { return "pause.circle" }
         if case .refused = summary.lastOutcome { return "exclamationmark.triangle" }
         if summary.nextFireAt != nil { return "clock" }

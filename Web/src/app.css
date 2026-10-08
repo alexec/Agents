@@ -830,7 +830,7 @@ button.remove:hover { opacity: 1; }
   background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }
 
 /* The page's status card and what it does (#142), the window's order. */
-.workflow-page .archive { padding: 5px 14px; border-radius: 999px; }
+.workflow-page .archive, .workflow-page .deny { padding: 5px 14px; border-radius: 999px; }
 .status-card { list-style: none; margin: 0; padding: 0; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }
 .status-card li { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; column-gap: 10px; padding: 10px 14px; align-items: start; }
 .status-card li + li { border-top: 1px solid var(--paper-rule); }

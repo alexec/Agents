@@ -101,6 +101,9 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
     /// The file is new, or has changed since the person approved it, and nothing runs
     /// from a file nobody has looked at (security review, workflow approval).
     case awaitingApproval
+    /// The person denied this file on this host (#391): it runs on others that approve
+    /// it, and here only once it is approved here.
+    case deniedHere
     /// Its cooldown has not ended, or a run is going and it has one (#103). Unlike every
     /// other refusal this one is not the end of the fire: the latest held is run once
     /// when the cooldown ends, so a burst of triggers is one run with the last of them.
@@ -125,6 +128,7 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         case .dayLimitReached: return "the day's spending limit has been reached"
         case .settingRefused(_, let detail): return detail
         case .awaitingApproval: return "it is waiting for your OK"
+        case .deniedHere: return "it is denied on this host"
         case .coolingDown(let until?):
             return "it is cooling down until \(until.formatted(date: .omitted, time: .shortened)), and runs once then"
         case .coolingDown(nil): return "a run is still going, and it runs once more when that ends"
@@ -149,6 +153,7 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         case .dayLimitReached: return "day_limit_reached"
         case .settingRefused: return "setting_refused"
         case .awaitingApproval: return "awaiting_approval"
+        case .deniedHere: return "denied_here"
         case .coolingDown: return "cooling_down"
         }
     }
@@ -174,6 +179,8 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         // is the same shape as a fire missed while the app was closed.
         case .runInFlight, .archived, .disabled, .triggerNotSupported, .agentUnavailable,
              .noTriggeringAgent, .missedWhileClosed, .dayLimitReached, .coolingDown: return false
+        // The person's own answer, as archiving is: nobody else has to act on it.
+        case .deniedHere: return false
         }
     }
 
@@ -186,7 +193,8 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
              (.archived, .archived), (.disabled, .disabled), (.agentUnavailable, .agentUnavailable),
              (.noTriggeringAgent, .noTriggeringAgent), (.missedWhileClosed, .missedWhileClosed),
              (.folderGone, .folderGone), (.dayLimitReached, .dayLimitReached),
-             (.awaitingApproval, .awaitingApproval), (.coolingDown, .coolingDown):
+             (.awaitingApproval, .awaitingApproval), (.deniedHere, .deniedHere),
+             (.coolingDown, .coolingDown):
             return true
         case (.overLimit(let a), .overLimit(let b)): return a == b
         case (.unreadable(let a), .unreadable(let b)): return a == b
