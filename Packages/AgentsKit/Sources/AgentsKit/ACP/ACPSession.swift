@@ -908,7 +908,12 @@ public actor ACPSession {
         // second kind left no trace at all. Something will send something new next
         // year. Nothing to act on, but it is said out loud, the way an unrecognised
         // update kind already is.
-        guard method == ACP.ClientMethod.sessionUpdate else {
+        // Grok's own updates come in the same shape under a method of its own (#447).
+        let decode: (JSONValue) -> SessionUpdate
+        switch method {
+        case ACP.ClientMethod.sessionUpdate: decode = SessionUpdate.decode
+        case ACP.ExtensionMethod.grokSessionNotification: decode = SessionUpdate.decodeGrok
+        default:
             eventsContinuation.yield(.unknownNotification(method))
             return
         }
@@ -916,7 +921,7 @@ public actor ACPSession {
             eventsContinuation.yield(.unknownNotification("\(method) with no update"))
             return
         }
-        let decoded = SessionUpdate.decode(update)
+        let decoded = decode(update)
         noteBackgroundCommand(in: update)
         if case .background(var background) = decoded {
             guard !isReplaying || recordsReplay else { return }

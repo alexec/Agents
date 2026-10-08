@@ -94,6 +94,32 @@ public enum SessionUpdate: Sendable {
         }
     }
 
+    /// What one of Grok's own `_x.ai/session_notification` updates turns into (#447).
+    ///
+    /// Grok compacts without ACP's `compaction_update`, saying so in its own updates
+    /// instead: `auto_compact_started` {tokens_used, context_window, percentage}, then
+    /// `auto_compact_completed` {tokens_before, tokens_after, summary_preview},
+    /// `auto_compact_failed` or `auto_compact_cancelled`. They carry no id, so the ending
+    /// joins the row still in progress, as an older record's does (#443). Its other kinds
+    /// are Grok's business and are left alone.
+    public static func decodeGrok(_ update: JSONValue) -> SessionUpdate {
+        guard let kind = update["sessionUpdate"]?.stringValue else { return .unknown("no sessionUpdate") }
+        switch kind {
+        case "auto_compact_started":
+            return .entry(.compaction(status: "in_progress", summary: []))
+        case "auto_compact_completed":
+            let preview = update["summary_preview"]?.stringValue ?? ""
+            return .entry(.compaction(status: "completed", summary: preview.isEmpty ? [] : [.text(preview)]))
+        case "auto_compact_failed":
+            return .entry(.compaction(status: "failed", summary: [],
+                                      error: update["error"]?.stringValue ?? update["message"]?.stringValue))
+        case "auto_compact_cancelled":
+            return .entry(.compaction(status: "cancelled", summary: []))
+        default:
+            return .ignored(kind)
+        }
+    }
+
     private static func entries(in value: JSONValue?) -> [PlanEntry] {
         (value?.arrayValue ?? []).compactMap(PlanEntry.init(wire:))
     }

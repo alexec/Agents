@@ -263,6 +263,40 @@ struct SessionUpdateTests {
         #expect(error == "Too long")
     }
 
+    /// Grok's own compaction updates (#447), in the shape seen on the wire from 1.0.50's
+    /// other `_x.ai/session_notification` kinds, with the fields its embedded docs name.
+    @Test func grokCompactsAsOneRowFromStartedToCompleted() throws {
+        let started = SessionUpdate.decodeGrok(["sessionUpdate": "auto_compact_started", "tokens_used": 210_000,
+                                                "context_window": 256_000, "percentage": 82])
+        let completed = SessionUpdate.decodeGrok(["sessionUpdate": "auto_compact_completed", "tokens_before": 210_000,
+                                                  "tokens_after": 18_000, "summary_preview": "We fixed the parser."])
+        guard case .entry(let first) = started, case .entry(let last) = completed else {
+            Issue.record("expected compaction entries")
+            return
+        }
+        #expect(first == .compaction(status: "in_progress", summary: []))
+        let merged = try #require(TranscriptEntry.mergeCompaction(TranscriptEntry(kind: last),
+                                                                  onto: TranscriptEntry(kind: first)))
+        #expect(merged.kind == .compaction(status: "completed", summary: [.text("We fixed the parser.")]))
+    }
+
+    @Test func grokSaysAFailedOrCancelledCompactionAndLeavesItsOtherUpdatesAlone() {
+        let failed = SessionUpdate.decodeGrok(["sessionUpdate": "auto_compact_failed", "error": "Too long"])
+        guard case .entry(.compaction("failed", _, nil, "Too long")) = failed else {
+            Issue.record("expected a failed compaction")
+            return
+        }
+        guard case .entry(.compaction("cancelled", _, nil, nil)) =
+                SessionUpdate.decodeGrok(["sessionUpdate": "auto_compact_cancelled"]) else {
+            Issue.record("expected a cancelled compaction")
+            return
+        }
+        guard case .ignored("retry_state") = SessionUpdate.decodeGrok(["sessionUpdate": "retry_state", "type": "failed"]) else {
+            Issue.record("expected Grok's other updates to be ignored")
+            return
+        }
+    }
+
     @Test func aCompactionsIDAndErrorSurviveTheRecord() throws {
         let entry = TranscriptEntry(kind: .compaction(status: "failed", summary: [.text("S")], id: "c1", error: "Too long"))
         let read = try JSONDecoder().decode(TranscriptEntry.self, from: JSONEncoder().encode(entry))

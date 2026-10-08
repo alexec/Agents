@@ -222,4 +222,29 @@ struct VendorExtensionTests {
         try await Task.sleep(for: .milliseconds(150))
         #expect(await core.account(for: "claude").signedInAs == nil)
     }
+
+    // MARK: _x.ai/session_notification
+
+    @Test func groksOwnCompactionUpdatesReachTheTranscript() async throws {
+        let (locations, work) = try temporary()
+        var script = FakeACPAgent.Script()
+        script.extensionNotifications = [
+            (ACP.ExtensionMethod.grokSessionNotification,
+             ["sessionId": "s", "update": ["sessionUpdate": "auto_compact_started", "percentage": 82]]),
+            (ACP.ExtensionMethod.grokSessionNotification,
+             ["sessionId": "s", "update": ["sessionUpdate": "model_changed", "model_id": "grok-4.7"]]),
+            (ACP.ExtensionMethod.grokSessionNotification,
+             ["sessionId": "s", "update": ["sessionUpdate": "auto_compact_completed", "tokens_after": 18_000,
+                                           "summary_preview": "We fixed the parser."]]),
+        ]
+        let core = try core(FakeLauncher(script: script, capabilities: .app), locations: locations)
+
+        let id = try await core.start(.init(runtimeID: "grok", cwd: work, prompt: "go"))
+        await eventually("the turn ran on to its end") { await core.agent(id)?.state == .finished }
+        let compactions = try await core.transcript(.init(agentID: id)).entries.compactMap { entry -> String? in
+            guard case .compaction(let status, let summary, _, _) = entry.kind else { return nil }
+            return "\(status): \(summary.plainText)"
+        }
+        #expect(compactions == ["in_progress: ", "completed: We fixed the parser."])
+    }
 }

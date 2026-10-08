@@ -18,6 +18,11 @@ extension ACP {
         /// runtime whose `agentCapabilities._meta.authStatus` is set: the Claude adapter
         /// and codex-acp today, until upstream's `auth/status` replaces it.
         public static let authStatusUpdate = "_auth/status_update"
+        /// Grok's own session updates (#447): `{sessionId, update: {sessionUpdate, …}}`,
+        /// the shape of `session/update` with snake_case fields. Seen on the wire from
+        /// Grok 1.0.50 (`model_changed`, `retry_state`, `turn_completed`); only its
+        /// `auto_compact_*` kinds are read (`SessionUpdate.decodeGrok`).
+        public static let grokSessionNotification = "_x.ai/session_notification"
     }
 }
 
