@@ -478,6 +478,9 @@ public actor DaemonCore {
     var eventWaitTimer: Task<Void, Never>?
     /// Drops the oldest events once an hour.
     var eventPruner: Task<Void, Never>?
+    /// Servers' events as workflow triggers (#383): the subscriptions, their polls and
+    /// what each has got to.
+    var mcpEvents = MCPEventsState()
     /// Events raised before the workflows were read, held for their new-style triggers
     /// until `startWorkflows`, as `deferredLifecycleEvents` holds today's (042).
     var deferredEventsForWorkflows: [Event] = []
@@ -1702,6 +1705,7 @@ public actor DaemonCore {
         machineWatch?.stop()
         machineWatch = nil
         stopWatchingDisk()
+        await stopMCPEvents()
         // The servers the bridge started for Copilot sessions are this daemon's children,
         // not a runtime's, so nobody else ends them (054).
         #if canImport(Network) && canImport(Security)

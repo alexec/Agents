@@ -54,6 +54,22 @@ struct MCPEventTriggerTests {
             arguments: ["repo": "alexec/Agents", "branch": ["main", "release"]]))])
     }
 
+    @Test func anArgumentCanBeAMap() {
+        let workflow = parse("""
+              - ticket.opened:
+                  queue:
+                    name: support
+                    priority: 2
+            """)
+        #expect(workflow.problem == nil)
+        #expect(workflow.triggers == [.serverEvent(MCPEventTrigger(
+            event: "ticket.opened", arguments: ["queue": ["name": "support", "priority": "2"]]))])
+    }
+
+    @Test func aNameThatIsNotNounDotVerbedIsAFileProblem() {
+        #expect(parse("  - checksFailed").problem == .triggerNotSupported("checksFailed"))
+    }
+
     @Test func serverNarrowsItToOneOrAList() {
         let one = parse("""
               - checks.failed:

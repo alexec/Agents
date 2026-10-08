@@ -27,6 +27,11 @@ public struct EventPattern: Hashable, Sendable {
     public func matches(_ event: Event) -> Bool {
         if let subject = wholeSubject {
             guard event.subject == subject else { return false }
+        } else if name.hasSuffix(".*") {
+            // A server's noun (#383): any of its events, never one of the app's.
+            guard event.name.hasPrefix(String(name.dropLast())), EventCatalogue.isServerEventName(event.name) else {
+                return false
+            }
         } else if event.name != name {
             return false
         }
@@ -56,6 +61,8 @@ public struct EventPattern: Hashable, Sendable {
         if name.hasSuffix(".*") {
             let subjectName = String(name.dropLast(2))
             guard let subject = EventSubject(rawValue: subjectName) else {
+                // A server's noun (#383): its details are the server's, so none is checked.
+                if EventCatalogue.isServerEventName(subjectName + ".any") { return .success(EventPattern(name, filters: filters)) }
                 return .failure(.unknown(name))
             }
             if subject != .custom {
@@ -75,6 +82,8 @@ public struct EventPattern: Hashable, Sendable {
             return .failure(.badCustomName(name))
         }
         guard let kind = EventCatalogue.kind(named: name) else {
+            // A server's event (#383): its details are open, as a custom event's are.
+            if EventCatalogue.isServerEventName(name) { return .success(EventPattern(name, filters: filters)) }
             return .failure(.unknown(name))
         }
         if let bad = filters.keys.sorted().first(where: { !kind.details.contains($0) }) {
@@ -258,7 +267,7 @@ public enum EventPatternProblem: Error, Hashable, Sendable {
     }
 
     /// The catalogue name nearest to a mistyped one, if any is near enough to suggest.
-    static func closest(to name: String) -> String? {
+    public static func closest(to name: String) -> String? {
         let scored = EventCatalogue.all.map { ($0.name, distance(name, $0.name)) }
         guard let best = scored.min(by: { $0.1 < $1.1 }), best.1 <= max(2, name.count / 4) else { return nil }
         return best.0

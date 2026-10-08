@@ -101,7 +101,7 @@ public struct MCPEventStore: Sendable {
     public let url: URL
 
     public init(root: URL) {
-        url = root.appending(path: "mcp-events.json")
+        url = StoreLocations(root: root).mcpEvents
     }
 
     public func load() -> MCPEventRecords {
