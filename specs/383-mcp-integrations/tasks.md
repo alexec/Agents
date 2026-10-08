@@ -332,7 +332,7 @@ again, and see it recover by itself.
 - [ ] T041 [P] Write `docs/how-to/start-a-workflow-from-an-mcp-event.md`: set up a server with events (the CI watcher as the example), approve `.agents/mcp.json`, write the workflow, and read its lines on the workflow page. Link it from `docs/how-to/` index if there is one.
 - [ ] T042 [P] Add the row "Workflow page: MCP trigger status · Mac ✓ · Remote ✓ · web ✓" to `specs/071-web-remote/walks/parity.md`.
 - [ ] T043 Run the Lane A suites under the build lease: `scripts/build-cache.sh swift test --package-path Packages/AgentsKit --filter 'MCPEventTrigger|EventCatalogue|EventPattern|MCPClientEvents|JSONSchemaSubset|MCPEventStore|MCPEventWorkflow|ThirdPartyViews|EventWorkflow'`. Build `AgentsHost` and `AgentsStore` for the `Shared/UI` change, and `scripts/web.sh build` for web.
-- [ ] T044 Walk quickstart §1 on a scratch root with the run-app skill: the CI watcher in fake mode on port 8796, `AGENTS_TEST_RUNTIME=echo`, and synthetic records only. Screenshot steps 4, 5, 7 and 8 on the Mac and the web page. The Remote look is Alex's.
+- [x] T044 Walk quickstart §1 on a scratch root with the run-app skill: the CI watcher in fake mode on port 8796, `AGENTS_TEST_RUNTIME=echo`, and synthetic records only. Screenshot steps 4, 5, 7 and 8 on the Mac and the web page. The Remote look is Alex's.
 - [ ] T045 Commit with parity lines (`mac: same, remote: same, web: same` for T037/T038). Open a PR with squash auto-merge. Quickstart §2 on the real repo waits for Alex's go-ahead.
 
 ---
