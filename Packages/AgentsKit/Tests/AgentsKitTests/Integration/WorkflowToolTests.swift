@@ -429,7 +429,7 @@ struct WorkflowToolTests {
         let (core, token, _) = try await core(locations, in: work)
 
         await #expect(throws: JSONRPCError.self) {
-            try await call(core, token, .write, id: "broken", content: "---\nagent: new\n---\n\nGo.")
+            try await call(core, token, .write, id: "broken", content: "---\nagent: new\n---\n\n  \n")
         }
         #expect(FileManager.default.fileExists(
             atPath: WorkflowFile.url(for: "broken", in: work).path) == false)

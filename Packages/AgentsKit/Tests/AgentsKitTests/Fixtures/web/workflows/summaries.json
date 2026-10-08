@@ -380,7 +380,7 @@
     "expected" : {
       "canFire" : false,
       "needsAPerson" : false,
-      "summary" : "Nothing makes this run"
+      "summary" : "By hand, with Run now, in a new agent"
     },
     "input" : {
       "holdsAFire" : false,

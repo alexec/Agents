@@ -271,6 +271,8 @@ struct WorkflowStatusIcon: View {
         if !summary.isEnabled { return "pause.circle" }
         if summary.needsAPerson { return "exclamationmark.triangle" }
         if summary.isRunning { return "circle.dotted" }
+        // Run only by hand (#432): nothing to wait for, and nothing wrong.
+        if summary.workflow.runsOnlyByHand && summary.workflow.problem == nil { return "hand.tap" }
         if !summary.workflow.canFire { return "circle.dashed" }
         return "clock"
     }
@@ -284,6 +286,7 @@ struct WorkflowStatusIcon: View {
         if summary.overLimit != nil { return "Over the limit" }
         if summary.needsAPerson { return "Needs attention" }
         if summary.isRunning { return "Running" }
+        if summary.workflow.runsOnlyByHand && summary.workflow.problem == nil { return "Runs by hand" }
         if !summary.workflow.canFire { return "Not yet supported" }
         return "Waiting for its trigger"
     }

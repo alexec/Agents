@@ -234,6 +234,8 @@ struct WorkflowMark: View {
         if summary.queued > 0 { return "tray.full" }
         if case .refused = summary.lastOutcome { return "exclamationmark.triangle" }
         if summary.nextFireAt != nil { return "clock" }
+        // Run only by hand (#432).
+        if summary.workflow.runsOnlyByHand { return "hand.tap" }
         return "circle.dotted"
     }
 }

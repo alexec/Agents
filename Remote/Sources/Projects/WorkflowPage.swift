@@ -322,7 +322,9 @@ struct WorkflowPage: View {
         return VStack(alignment: .leading, spacing: 10) {
             sectionTitle("Triggers")
             if triggers.isEmpty {
-                note("None could be read from the file.")
+                // Run only by hand (#432), or a broken file whose triggers could not be read.
+                note(summary.workflow.problem == nil ? "None: it runs only by hand, with Run now."
+                                                     : "None could be read from the file.")
             } else {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(triggers.enumerated()), id: \.offset) { index, trigger in

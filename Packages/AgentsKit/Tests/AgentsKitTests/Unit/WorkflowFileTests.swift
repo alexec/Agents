@@ -325,9 +325,30 @@ struct WorkflowFileTests {
         #expect(workflow.problem == .unreadable("The metadata block is never closed"))
     }
 
-    @Test func aMissingOnKeyIsUnreadable() {
+    // MARK: Run only by hand (#432)
+
+    @Test func aMissingOnKeyIsAWorkflowRunOnlyByHand() {
         let workflow = parse("---\nagent: new\n---\n\nGo.")
-        #expect(workflow.problem == .unreadable("The metadata does not say what makes this run"))
+        #expect(workflow.problem == nil)
+        #expect(workflow.triggers.isEmpty)
+        #expect(workflow.runsOnlyByHand)
+        #expect(!workflow.canFire)
+        #expect(workflow.summary == "By hand, with Run now, in a new agent")
+    }
+
+    @Test func onManualAndAnEmptyOnSayTheSame() {
+        for text in ["---\non: manual\n---\n\nGo.", "---\non:\n---\n\nGo.", "---\non: [manual]\n---\n\nGo."] {
+            let workflow = parse(text)
+            #expect(workflow.problem == nil, "\(text)")
+            #expect(workflow.runsOnlyByHand, "\(text)")
+        }
+    }
+
+    @Test func manualBesideATriggerIsJustTheTrigger() {
+        let workflow = parse("---\non: [manual, agent-finished]\n---\n\nGo.")
+        #expect(workflow.problem == nil)
+        #expect(workflow.triggers == [.agentFinished])
+        #expect(!workflow.runsOnlyByHand)
     }
 
     @Test func anEmptyBodyIsUnreadable() {

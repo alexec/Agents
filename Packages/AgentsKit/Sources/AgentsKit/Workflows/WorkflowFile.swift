@@ -89,19 +89,15 @@ public enum WorkflowFile {
             return broken("The metadata could not be read")
         }
 
-        guard let onNode = mapping["on"] else {
-            return broken("The metadata does not say what makes this run")
-        }
+        // No `on:`, an empty one, or `on: manual` is a workflow run only by hand, with
+        // Run now (#432): no triggers, and nothing wrong with it.
         let triggers: [WorkflowTrigger]
         do {
-            triggers = try parseTriggers(onNode)
+            triggers = try mapping["on"].map(parseTriggers) ?? []
         } catch let error as YAMLNode.Failure {
             return broken(error.message)
         } catch {
             return broken("The triggers could not be read")
-        }
-        guard !triggers.isEmpty else {
-            return broken("The metadata does not say what makes this run")
         }
 
         // A mode we do not know is understood but not supported: listed and inert,
@@ -116,7 +112,7 @@ public enum WorkflowFile {
                 problem = .unsupportedMode(named)
             }
         }
-        if problem == nil, triggers.allSatisfy({ !$0.isSupported }) {
+        if problem == nil, !triggers.isEmpty, triggers.allSatisfy({ !$0.isSupported }) {
             problem = .triggerNotSupported(triggers[0].name)
         }
 
@@ -290,7 +286,16 @@ public enum WorkflowFile {
         case .sequence(let items): entries = items
         default: entries = [node]
         }
-        return try entries.map(parseTrigger)
+        // `manual` (#432) says Run now runs it, which it always does: not a trigger.
+        return try entries.filter { !Self.saysManual($0) }.map(parseTrigger)
+    }
+
+    /// The name a file uses for a workflow run only by hand (#432).
+    public static let manualTrigger = "manual"
+
+    private static func saysManual(_ node: YAMLNode) -> Bool {
+        guard let name = node.scalar else { return false }
+        return name.isEmpty || name == manualTrigger
     }
 
     private static func parseTrigger(_ node: YAMLNode) throws -> WorkflowTrigger {

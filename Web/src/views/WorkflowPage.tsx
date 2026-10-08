@@ -150,7 +150,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
           <p class="quiet small">{workflow.problem ? "Its settings can be changed here once its file can be read." : labelsNote(workflow)}</p>
 
           <h2 class="section-head">Triggers</h2>
-          {workflow.triggers.length === 0 ? <p class="hint">None could be read from the file.</p> : (
+          {workflow.triggers.length === 0 ? <p class="hint">{workflow.problem ? "None could be read from the file." : "None: it runs only by hand, with Run Now."}</p> : (
             <ul class="triggers">
               {workflow.triggers.map((trigger, index) => {
                 const filters = triggerFilters(trigger);
