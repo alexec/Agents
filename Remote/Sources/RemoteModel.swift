@@ -114,6 +114,13 @@ final class RemoteModel {
     /// This device's end of each of an agent's shells it has opened (034), one per
     /// terminal tab (055, #345). The shells are the Mac's; these only know how to reach them.
     @ObservationIgnored private var shells: [ShellKey: ShellClient] = [:]
+    /// Shells no screen shows that still hold their emulator, most recent last, so going
+    /// back to an agent's terminal finds it as it was instead of rebuilding it and
+    /// replaying megabytes on the main thread (#419, as the Mac since #401). A few, not
+    /// all: `shells` keeps a client for every shell ever opened, and each emulator holds
+    /// a screen's worth of scrollback.
+    @ObservationIgnored private var parkedScreens: [ShellKey] = []
+    private static let parkedScreenLimit = 6
     /// When this device last asked to warm each session, and why (#183).
     @ObservationIgnored private var prewarmed: [String: Date] = [:]
 
@@ -149,9 +156,28 @@ final class RemoteModel {
         await ShellClient.open(agentID: agentID, on: client)
     }
 
+    /// A shell's screen is showing: its emulator is not one to let go of (#419).
+    func showScreen(of client: ShellClient) {
+        parkedScreens.removeAll { $0 == ShellKey(agentID: client.agentID, shell: client.shell) }
+    }
+
+    /// A shell's screen went: its emulator is kept for a while, and the oldest kept past
+    /// the limit is let go of. That shell's next screen is built again and replayed (#419).
+    func parkScreen(of client: ShellClient) {
+        let key = ShellKey(agentID: client.agentID, shell: client.shell)
+        parkedScreens.removeAll { $0 == key }
+        parkedScreens.append(key)
+        while parkedScreens.count > Self.parkedScreenLimit {
+            guard let parked = shells[parkedScreens.removeFirst()] else { continue }
+            parked.onOutput = nil
+            parked.screen = nil
+        }
+    }
+
     func closeShell(agentID: UUID, shell: Int) async {
         let client = shellClient(for: agentID, shell: shell)
         shells[ShellKey(agentID: agentID, shell: shell)] = nil
+        parkedScreens.removeAll { $0 == ShellKey(agentID: agentID, shell: shell) }
         await client.close()
     }
 
