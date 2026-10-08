@@ -6,7 +6,8 @@ import Foundation
 /// their modes and their effort levels through this one list, in this one shape, while
 /// the older dedicated fields are sent inconsistently and are being retired. Nothing
 /// here is interpreted: the form renders by kind, orders by `category`, and knows
-/// nothing about what a model or a mode is.
+/// nothing about what a model or a mode is, past the order its choices are drawn in
+/// (`ChoiceOrder`, applied as an option is read).
 public struct ConfigOption: Codable, Hashable, Sendable, Identifiable {
     public var id: String
     public var name: String
@@ -137,7 +138,8 @@ public struct ConfigOption: Codable, Hashable, Sendable, Identifiable {
         self.currentValue = wire["currentValue"]
         switch wire["type"]?.stringValue {
         case "select", nil:
-            self.kind = .select(ConfigChoiceGroup.groups(in: wire["options"]))
+            self.kind = .select(ChoiceOrder.sorted(ConfigChoiceGroup.groups(in: wire["options"]),
+                                                   category: category))
         case "boolean":
             self.kind = .boolean
         case .some(let other):
@@ -162,7 +164,7 @@ public struct ConfigOption: Codable, Hashable, Sendable, Identifiable {
         switch type {
         case "select":
             let raw = try c.decodeIfPresent(JSONValue.self, forKey: .options)
-            kind = .select(ConfigChoiceGroup.groups(in: raw))
+            kind = .select(ChoiceOrder.sorted(ConfigChoiceGroup.groups(in: raw), category: category))
         case "boolean":
             kind = .boolean
         default:
