@@ -198,8 +198,10 @@ public final class Daemon: @unchecked Sendable {
         // recovery, so a workflow is never fired at an agent the daemon has not yet
         // worked out is dead.
         await core.startWorkflows()
-        // Servers' events (#383), once the workflows that name them are read.
-        await core.startMCPEvents()
+        // Servers' events (#383), once the workflows that name them are read. Off the
+        // start: asking each server what it offers can take a while, and the socket
+        // must not wait on it.
+        Task { await core.startMCPEvents() }
         try server.start()
         DaemonLog.shared.write("listening on \(locations.socket.path)")
         if let control {
