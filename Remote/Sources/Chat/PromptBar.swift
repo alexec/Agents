@@ -24,6 +24,9 @@ struct PromptBar: View {
     var isQuestionUp = false
 
     @State private var text = ""
+    /// Where the cursor is in `text`, so dictation can write there rather than at the
+    /// end (#427).
+    @State private var selection: TextSelection?
     @State private var attachments: [Attachment] = []
     /// Why something picked could not be attached, said where it was picked.
     @State private var attachRefusal: String?
@@ -138,8 +141,13 @@ struct PromptBar: View {
             if dismissedMentionTerm != mentionQuery?.term { dismissedMentionTerm = nil }
             updateMentions()
             keepDraft()
+            // Typed while dictating: theirs, and never written over (#427).
+            dictation.edited(text)
             // Typing is a prompt coming (#183).
             if !text.isEmpty { Task { await model.prewarm(agent.id, .typing) } }
+        }
+        .onChange(of: selection) {
+            if let range = DictationCursor.range(of: selection, in: text) { dictation.selected(range) }
         }
         .onChange(of: attachments) { keepDraft() }
         // A new one is a new turn's worth, so it comes back from having been dismissed.
@@ -159,7 +167,7 @@ struct PromptBar: View {
 
     private var field: some View {
         HStack(alignment: .bottom, spacing: 8) {
-            TextField(PromptWords.placeholder(for: agent), text: $text, axis: .vertical)
+            TextField(PromptWords.placeholder(for: agent), text: $text, selection: $selection, axis: .vertical)
                 .textFieldStyle(.plain)
                 .appText(.reading)
                 .lineLimit(1...8)
@@ -339,10 +347,11 @@ struct PromptBar: View {
 
     private func beginDictation() {
         focused = true
-        // What is already in the field is the start of the sentence, not something to
-        // be spoken over.
-        dictation.start(appendingTo: text.trimmingCharacters(in: .whitespacesAndNewlines)) { combined in
-            text = combined
+        // What is already in the field stays, and the words go in at the cursor.
+        dictation.start(in: text, selection: DictationCursor.range(of: selection, in: text),
+                        vocabulary: [agent.title].compactMap { $0 }) { field, cursor in
+            text = field
+            selection = DictationCursor.selection(cursor, in: field)
         }
     }
 

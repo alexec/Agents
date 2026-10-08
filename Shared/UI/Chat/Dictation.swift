@@ -1,44 +1,82 @@
 import AgentsKitCore
 import AVFoundation
+import CoreMedia
 import Foundation
 #if os(iOS)
 import UIKit
 #endif
 import Observation
 import Speech
+import SwiftUI
 
-/// Carries audio to the recogniser from the realtime thread that produces it.
+/// Carries audio to the analyser from the realtime thread that produces it, converted
+/// to the format the analyser wants.
 ///
-/// `SFSpeechAudioBufferRecognitionRequest` is not Sendable and appending to it from
-/// the audio thread is exactly what it is for, so the promise is made here in one
-/// place rather than spread through the closure that needs it.
-///
-/// It is pointed at a request rather than given one, because the tap on the microphone
-/// is installed once and outlives any single request: a pause ends the recogniser's
-/// request, not the listening, and the next one takes the same audio.
+/// A converter and a stream's continuation are not things Swift will let a realtime
+/// closure hold on its own, and using them from that thread is exactly what they are
+/// for. So the promise is made here, in one place, rather than spread through the
+/// closure that needs it.
 private final class BufferSink: @unchecked Sendable {
     private let lock = NSLock()
-    private var request: SFSpeechAudioBufferRecognitionRequest?
+    private var continuation: AsyncStream<AnalyzerInput>.Continuation?
+    private var converter: AVAudioConverter?
+    private var target: AVAudioFormat?
 
-    func point(at request: SFSpeechAudioBufferRecognitionRequest?) {
+    func point(at continuation: AsyncStream<AnalyzerInput>.Continuation?, in target: AVAudioFormat? = nil) {
         lock.lock()
         defer { lock.unlock() }
-        self.request = request
+        self.continuation?.finish()
+        self.continuation = continuation
+        self.target = target
+        converter = nil
     }
 
     func append(_ buffer: AVAudioPCMBuffer) {
         lock.lock()
-        let request = self.request
-        lock.unlock()
-        request?.append(buffer)
+        defer { lock.unlock() }
+        guard let continuation else { return }
+        guard let target, buffer.format != target else {
+            continuation.yield(AnalyzerInput(buffer: buffer))
+            return
+        }
+        if converter?.inputFormat != buffer.format {
+            converter = AVAudioConverter(from: buffer.format, to: target)
+        }
+        guard let converter else { return }
+        let ratio = target.sampleRate / buffer.format.sampleRate
+        let capacity = AVAudioFrameCount((Double(buffer.frameLength) * ratio).rounded(.up)) + 1
+        guard let converted = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: capacity) else { return }
+        let given = Given()
+        var error: NSError?
+        let status = converter.convert(to: converted, error: &error) { _, status in
+            if given.done {
+                status.pointee = .noDataNow
+                return nil
+            }
+            given.done = true
+            status.pointee = .haveData
+            return buffer
+        }
+        if status != .error, converted.frameLength > 0 {
+            continuation.yield(AnalyzerInput(buffer: converted))
+        }
     }
+
+    /// Whether the converter has had this buffer yet. It asks until told there is no
+    /// more for now, and the same buffer twice would be heard twice.
+    private final class Given { var done = false }
 }
 
 /// Talking into the prompt instead of typing it.
 ///
-/// Apple's recogniser, running on the device where the device can. It asks for the
-/// microphone and for speech recognition the first time and not again, and it is asked
-/// for at the moment of use rather than at launch.
+/// Apple's dictation transcriber, on the device, as one continuous session for as long
+/// as the button is on: a pause is a pause, not the end of a request (#427). What it
+/// hears goes in at the cursor, the words it is still unsure of are the only ones it
+/// replaces, and the person can go on editing and typing while it listens. `DictationText`
+/// keeps track of all that.
+///
+/// It asks for the microphone and for speech recognition the first time and not again,
+/// and it asks at the moment of use rather than at launch.
 @MainActor
 @Observable
 final class Dictation {
@@ -82,30 +120,20 @@ final class Dictation {
     private(set) var isListening = false
     private(set) var problem: Problem?
 
-    private let recogniser = SFSpeechRecognizer(locale: Locale.current)
     private let engine = AVAudioEngine()
     private let sink = BufferSink()
-    private var request: SFSpeechAudioBufferRecognitionRequest?
-    private var task: SFSpeechRecognitionTask?
-    private var onText: ((String) -> Void)?
+    private var analyzer: SpeechAnalyzer?
+    private var results: Task<Void, Never>?
+    private var onChange: ((String, Range<Int>) -> Void)?
 
-    /// What dictation has put in the field: what was there when this run started,
-    /// every utterance settled since, and the one being heard now. A pause that starts
-    /// a fresh utterance settles the last one first, so nothing said is lost (#69).
-    private var text = DictationText(startingWith: "")
+    /// What is in the field, as far as dictation knows: where the next words go, and
+    /// which words are still being heard.
+    private var text = DictationText("")
 
-    /// Which run of dictation we are on. The recogniser can deliver a last result
-    /// after it has been stopped, and that result belongs to the run that is over: it
-    /// must not be written over what has been said since.
+    /// Which run of dictation we are on. The analyser can deliver a last result after
+    /// it has been stopped, and that result belongs to the run that is over: it must not
+    /// be written over what has been typed since.
     private var run = 0
-
-    /// Utterances that ended with nothing to show, one after another. The recogniser
-    /// reports an error when it has heard nothing for long enough, and beginning again
-    /// for ever would be a spin rather than dictation, so a run of empty ones ends it.
-    private var emptyUtterances = 0
-    private let emptyUtteranceLimit = 3
-
-    var isAvailable: Bool { recogniser?.isAvailable ?? false }
 
     /// Whether the system has been asked yet. Used to put our own words in front of
     /// the system's alert the first time.
@@ -113,15 +141,43 @@ final class Dictation {
         SFSpeechRecognizer.authorizationStatus() != .notDetermined
     }
 
-    func start(appendingTo base: String, onText: @escaping (String) -> Void) {
+    /// Starts listening into `field`, at `selection` (the end, with none). Each time
+    /// what is heard changes the field, `onChange` gets the whole of it and where the
+    /// cursor now belongs. `vocabulary` is words this prompt is likely to hold that a
+    /// dictionary would not: agent, file and runtime names.
+    func start(in field: String, selection: Range<Int>?, vocabulary: [String] = [],
+               onChange: @escaping (String, Range<Int>) -> Void) {
         guard !isListening else { return }
-        text = DictationText(startingWith: base)
-        self.onText = onText
-        emptyUtterances = 0
+        text = DictationText(field, selection: selection)
+        self.onChange = onChange
         run += 1
         problem = nil
         let thisRun = run
-        Task { await requestAccessThenListen(for: thisRun) }
+        Task { await requestAccessThenListen(for: thisRun, vocabulary: vocabulary) }
+    }
+
+    /// The person changed the field while dictation was on. What they wrote is theirs:
+    /// the next result goes around it, never over it.
+    func edited(_ field: String) {
+        guard isListening else { return }
+        let wasDropping = text.isDroppingAdoptedSpeech
+        text.edited(to: field)
+        // They took over words still being heard. Ask for those to be settled now, so
+        // that what they say next starts afresh rather than waiting out the old speech.
+        if text.isDroppingAdoptedSpeech, !wasDropping, let analyzer {
+            Task { try? await analyzer.finalize(through: nil) }
+        }
+    }
+
+    /// The person moved the cursor or selected some words while dictation was on. The
+    /// next words go there.
+    func selected(_ range: Range<Int>) {
+        guard isListening else { return }
+        let wasDropping = text.isDroppingAdoptedSpeech
+        text.selected(range)
+        if text.isDroppingAdoptedSpeech, !wasDropping, let analyzer {
+            Task { try? await analyzer.finalize(through: nil) }
+        }
     }
 
     /// Asking for speech recognition, off the main actor.
@@ -129,7 +185,7 @@ final class Dictation {
     /// The answer comes back on whatever queue the privacy service feels like. A
     /// continuation resumed from a closure that belongs to the main actor fails
     /// Swift's isolation check and takes the app with it, which is exactly what
-    /// happened the first time the microphone button was pressed.
+    /// happened the first time the microphone button was pressed (#48).
     private nonisolated static func askForSpeech() async -> SFSpeechRecognizerAuthorizationStatus {
         await withCheckedContinuation { continuation in
             SFSpeechRecognizer.requestAuthorization { status in
@@ -142,7 +198,7 @@ final class Dictation {
         await AVCaptureDevice.requestAccess(for: .audio)
     }
 
-    private func requestAccessThenListen(for thisRun: Int) async {
+    private func requestAccessThenListen(for thisRun: Int, vocabulary: [String]) async {
         let speech = await Self.askForSpeech()
         guard thisRun == run else { return }
         guard speech == .authorized else {
@@ -157,34 +213,97 @@ final class Dictation {
                               permission: .microphone)
             return
         }
-        await listen(for: thisRun)
+        await listen(for: thisRun, vocabulary: vocabulary)
     }
 
-    private func listen(for thisRun: Int) async {
-        guard thisRun == run else { return }
-        guard let recogniser, recogniser.isAvailable else {
-            problem = Problem(message: "Speech recognition is not available for \(Locale.current.identifier).")
+    private func listen(for thisRun: Int, vocabulary: [String]) async {
+        guard let locale = await DictationTranscriber.supportedLocale(equivalentTo: Locale.current) else {
+            guard thisRun == run else { return }
+            problem = Problem(message: "Dictation is not available for \(Locale.current.identifier).")
             return
         }
+        // Punctuation and capitals as system dictation writes them, and the words still
+        // being heard as they are heard, so they can be shown and settled in place.
+        let transcriber = DictationTranscriber(locale: locale, contentHints: [],
+                                               transcriptionOptions: [.punctuation],
+                                               reportingOptions: [.volatileResults, .frequentFinalization],
+                                               attributeOptions: [])
+        do {
+            // The model for this language, the first time: a download the system shares
+            // with every app, and a no-op once it is there.
+            if let install = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+                try await install.downloadAndInstall()
+            }
+        } catch {
+            guard thisRun == run else { return }
+            problem = Problem(message: "Dictation could not get the speech model for \(locale.identifier): \(error.localizedDescription)")
+            return
+        }
+        guard thisRun == run else { return }
+
+        let analyzer = SpeechAnalyzer(modules: [transcriber])
+        let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber])
+        let (input, feed) = AsyncStream<AnalyzerInput>.makeStream()
+        do {
+            if !vocabulary.isEmpty {
+                let context = AnalysisContext()
+                context.contextualStrings[.general] = vocabulary
+                try await analyzer.setContext(context)
+            }
+            try await analyzer.start(inputSequence: input)
+        } catch {
+            feed.finish()
+            guard thisRun == run else { return }
+            problem = Problem(message: "Dictation would not start: \(error.localizedDescription)")
+            return
+        }
+        sink.point(at: feed, in: format)
+
         do {
             try await openMicrophone()
         } catch let noInput as NoAudioInput {
-            self.problem = Problem(message: noInput.message)
+            await finish(analyzer)
+            guard thisRun == run else { return }
+            problem = Problem(message: noInput.message)
             return
         } catch {
+            await finish(analyzer)
+            guard thisRun == run else { return }
             problem = Problem(message: "The microphone would not start: \(error.localizedDescription)")
             return
         }
-        // `stop()` may have been called while opening the microphone. The engine
-        // cannot be cancelled mid-open, so retire this start before it can listen.
+        // `stop()` may have been called while all that was being set up. None of it can
+        // be cancelled midway, so retire this start before it can listen.
         guard thisRun == run else {
-            engine.inputNode.removeTap(onBus: 0)
-            if engine.isRunning { engine.stop() }
-            sink.point(at: nil)
+            closeMicrophone()
+            await finish(analyzer)
             return
         }
+        self.analyzer = analyzer
         isListening = true
-        listenForAnUtterance(with: recogniser)
+
+        // Called with every result, on the analyser's own schedule. Each is the words for
+        // one stretch of speech, final once the transcriber will not change them again.
+        results = Task { [weak self] in
+            do {
+                for try await result in transcriber.results {
+                    let words = String(result.text.characters)
+                    let start = result.range.start.seconds
+                    let final = result.isFinal
+                    guard let self, thisRun == self.run else { return }
+                    self.heard(words, final: final, from: start.isFinite ? start : 0)
+                }
+            } catch {
+                guard let self, thisRun == self.run else { return }
+                self.problem = Problem(message: "Dictation stopped: \(error.localizedDescription)")
+                self.stop()
+            }
+        }
+    }
+
+    private func heard(_ words: String, final: Bool, from start: Double) {
+        guard text.heard(words, final: final, from: start) else { return }
+        onChange?(text.text, text.selection)
     }
 
     /// The input node would not say what it was listening to, so there was nothing to
@@ -240,57 +359,20 @@ final class Dictation {
         return nil
     }
 
-    /// One utterance: everything said between two pauses.
-    ///
-    /// The recogniser hands back the whole of what it has heard each time, so a result
-    /// replaces what the last one said rather than adding to it — which is right within
-    /// an utterance and wrong between two. When it decides an utterance is over it
-    /// stops, and anything said afterwards belongs to a request that has not been made
-    /// yet, so a new one is made here once what was heard is settled into `text`.
-    private func listenForAnUtterance(with recogniser: SFSpeechRecognizer) {
-        let request = SFSpeechAudioBufferRecognitionRequest()
-        request.shouldReportPartialResults = true
-        // Keep it on the device where the device can do it. What is said to an agent is the
-        // agent's business and nobody else's.
-        request.requiresOnDeviceRecognition = recogniser.supportsOnDeviceRecognition
-        self.request = request
-        sink.point(at: request)
-
-        // Called by the recogniser, on its own thread: @Sendable for the same reason as
-        // the tap above.
-        let thisRun = run
-        let results: @Sendable (SFSpeechRecognitionResult?, (any Error)?) -> Void = { [weak self] result, error in
-            let spoken = result?.bestTranscription.formattedString
-            let over = error != nil || (result?.isFinal ?? false)
-            Task { @MainActor in
-                guard let self, thisRun == self.run else { return }
-                self.heard(spoken, endsTheUtterance: over)
-            }
+    private func closeMicrophone() {
+        if engine.isRunning {
+            engine.inputNode.removeTap(onBus: 0)
+            engine.stop()
         }
-        task = recogniser.recognitionTask(with: request, resultHandler: results)
+        sink.point(at: nil)
+        #if os(iOS)
+        // Give the route back, so whatever was playing before carries on.
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        #endif
     }
 
-    private func heard(_ spoken: String?, endsTheUtterance over: Bool) {
-        let said = spoken ?? ""
-        // An utterance that ends with an error carries no words, but what it showed
-        // before still counts: it is settled, not lost.
-        let hadWords = !said.isEmpty || !text.hearing.isEmpty
-        let shown = text.heard(said, final: over)
-        if !said.isEmpty || over { onText?(shown) }
-        guard over else { return }
-
-        emptyUtterances = hadWords ? 0 : emptyUtterances + 1
-
-        task = nil
-        request = nil
-        sink.point(at: nil)
-
-        // Still on? Then listen for the next one. The microphone never closed.
-        guard isListening, emptyUtterances < emptyUtteranceLimit, let recogniser, engine.isRunning else {
-            stop()
-            return
-        }
-        listenForAnUtterance(with: recogniser)
+    private nonisolated func finish(_ analyzer: SpeechAnalyzer) async {
+        await analyzer.cancelAndFinishNow()
     }
 
     /// The alert has been read. It is shown for as long as there is something to say,
@@ -298,33 +380,36 @@ final class Dictation {
     /// a problem is set there is nothing left running for it to stop.
     func dismissProblem() { problem = nil }
 
+    /// Stops listening. What is in the field stays as it is, words still being heard
+    /// and all: they were shown, so they are kept (#69).
     func stop() {
-        // Retire pending permission/opening work as well as recogniser callbacks.
-        // Results already queued on the main actor carry the old run number.
+        // Retire pending permission and set-up work as well as results still on their
+        // way. Results already queued carry the old run number.
         run += 1
-        onText = nil
+        onChange = nil
         isListening = false
-        guard engine.isRunning else {
-            request?.endAudio()
-            task?.cancel()
-            request = nil
-            task = nil
-            sink.point(at: nil)
-            #if os(iOS)
-            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-            #endif
-            return
+        closeMicrophone()
+        results?.cancel()
+        results = nil
+        if let analyzer {
+            self.analyzer = nil
+            Task { await finish(analyzer) }
         }
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
-        sink.point(at: nil)
-        request?.endAudio()
-        task?.cancel()
-        request = nil
-        task = nil
-        #if os(iOS)
-        // Give the route back, so whatever was playing before carries on.
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        #endif
+    }
+}
+
+/// A field's selection, as the character offsets `DictationText` counts in, and back.
+enum DictationCursor {
+    static func range(of selection: TextSelection?, in text: String) -> Range<Int>? {
+        guard let selection, case .selection(let range) = selection.indices,
+              range.lowerBound >= text.startIndex, range.upperBound <= text.endIndex else { return nil }
+        let lower = text.distance(from: text.startIndex, to: range.lowerBound)
+        return lower..<(lower + text.distance(from: range.lowerBound, to: range.upperBound))
+    }
+
+    static func selection(_ range: Range<Int>, in text: String) -> TextSelection {
+        let lower = text.index(text.startIndex, offsetBy: min(range.lowerBound, text.count))
+        let upper = text.index(lower, offsetBy: min(range.count, text.distance(from: lower, to: text.endIndex)))
+        return range.isEmpty ? TextSelection(insertionPoint: lower) : TextSelection(range: lower..<upper)
     }
 }

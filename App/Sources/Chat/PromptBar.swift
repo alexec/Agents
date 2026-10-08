@@ -17,7 +17,6 @@ struct PromptBar: View {
     /// start the agent under a different one.
     var folderIsFixed = false
     @State private var text = ""
-    @State private var dictation = Dictation()
     @State private var selectedCommand = 0
     @State private var attachments: [Attachment] = []
     @State private var draftLabels: [String] = []
@@ -30,7 +29,6 @@ struct PromptBar: View {
     @State private var dismissedCommandTerm: String?
     /// Whether Escape has put the agent's suggestion away for this turn.
     @State private var dismissedSuggestions = false
-    @State private var isPrimingDictation = false
     @State private var isShowingRuntimeAccount = false
     @State private var isShowingSessions = false
     @State private var isShowingReach = false
@@ -480,16 +478,15 @@ struct PromptBar: View {
             .help("Attach a file or a picture")
             .accessibilityLabel("Attach")
 
-            Button(action: toggleDictation) {
-                Image(systemName: dictation.isListening ? "waveform" : "microphone")
+            Button(action: dictate) {
+                Image(systemName: "microphone")
                     .appText(.reading).fontWeight(.semibold)
                     .frame(width: 22, height: 22)
-                    .symbolEffect(.variableColor, isActive: dictation.isListening)
             }
             .buttonStyle(.paper)
             .buttonBorderShape(.circle)
-            .help(dictation.isListening ? "Stop dictating" : "Dictate")
-            .accessibilityLabel(dictation.isListening ? "Stop dictating" : "Dictate")
+            .help("Dictate, as the Mac does everywhere")
+            .accessibilityLabel("Dictate")
 
             // While it works and nothing is typed, send is stop. Type and it is send
             // again, queueing what is typed for when the turn ends.
@@ -551,62 +548,22 @@ struct PromptBar: View {
         .onPasteCommand(of: [.fileURL] + PromptPaste.pictureTypes + [.image]) { providers in
             for provider in providers { paste(provider) }
         }
-        .sheet(isPresented: $isPrimingDictation) { dictationPrimer.paperSheet() }
-        // Held while open (#101): a second problem waits for this one's button.
-        .heldAlert({ _ in "Dictation" }, item: { dictation.problem },
-                   dismiss: { if dictation.problem?.id == $0.id { dictation.dismissProblem() } }) { problem in
-            // Where a switch would fix it, offer to open the switch.
-            if let permission = problem.permission {
-                Button("Open System Settings") { NSWorkspace.shared.open(permission.settings) }  // store-ok: System Settings, not a path
-            }
-            Button("OK", role: .cancel) {}
-        } message: { problem in
-            Text(problem.message)
-        }
     }
 
-    /// Our own words before the system's alert, the first time only.
-    private var dictationPrimer: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(PromptWords.dictationPrimerTitle).appText(.reading).fontWeight(.semibold)
-            Text("The Mac listens while you hold the button on, and what you say becomes the words in the prompt. It is recognised on this Mac where this Mac can do it.")
-                .foregroundStyle(.secondary)
-            Text("macOS will ask for the microphone and for speech recognition next.")
-                .appText(.supporting)
-                .foregroundStyle(.secondary)
-            HStack {
-                Spacer()
-                Button("Not now") { isPrimingDictation = false }
-                    .keyboardShortcut(.cancelAction)
-                Button("Continue") {
-                    isPrimingDictation = false
-                    beginDictation()
-                }
-                .buttonStyle(.paperProminent)
-                .keyboardShortcut(.defaultAction)
-            }
-        }
-        .padding(20)
-        .frame(width: 420)
-    }
+    // MARK: Said instead of typed
 
-    private func toggleDictation() {
-        if dictation.isListening {
-            dictation.stop()
-        } else if dictation.hasBeenAsked {
-            beginDictation()
-        } else {
-            isPrimingDictation = true
-        }
-    }
-
-    private func beginDictation() {
+    /// The Mac's own dictation, in this field (#427).
+    ///
+    /// It is the same thing pressing the dictation key starts. It writes at the cursor,
+    /// underlines what it is still unsure of, and lets the person type and edit while it
+    /// listens. A recogniser of our own would only be a worse copy of it. The system
+    /// shows its own microphone and stops it the usual ways, and asks for nothing more
+    /// than its own switch in Keyboard settings.
+    private func dictate() {
         focused = true
-        // What is already in the field is the start of the sentence, not something to
-        // be spoken over. Dictation keeps hold of it so that stopping and starting
-        // again carries on rather than beginning afresh.
-        dictation.start(appendingTo: text.trimmingCharacters(in: .whitespacesAndNewlines)) { combined in
-            text = combined
+        // Once the field has focus, so the field editor is the one that listens.
+        DispatchQueue.main.async {
+            NSApp.sendAction(Selector(("startDictation:")), to: nil, from: nil)
         }
     }
 
@@ -1009,7 +966,8 @@ struct PromptBar: View {
             model.show(problem: refused)
             return
         }
-        dictation.stop()
+        // Whatever is said next is not part of what went (#318).
+        NSApp.sendAction(Selector(("stopDictation:")), to: nil, from: nil)
         let outgoing = text
         let going = attachments
         let labels = draftLabels
@@ -1354,9 +1312,4 @@ private struct ScrollingChoices<Content: View>: View {
         }
         .frame(height: min(contentHeight, Self.tallest))
     }
-}
-
-/// One dictation problem from the next, for the alert that holds it (#101).
-extension Dictation.Problem: Identifiable {
-    var id: String { message }
 }
