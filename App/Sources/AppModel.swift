@@ -978,6 +978,14 @@ final class AppModel {
                                             enabled: enabled))
     }
 
+    /// Clear a server's event trigger's missed-events mark (#383).
+    func clearMCPMissed(_ summary: WorkflowSummary, _ status: MCPTriggerStatus) async {
+        _ = try? await client(for: selectedProjectHost).call(
+            DaemonAPI.Method.workflowsClearMCPMissed,
+            DaemonAPI.WorkflowMCPClearMissedRequest(folder: summary.folder, workflowID: summary.workflowID,
+                                                    name: status.name, server: status.server))
+    }
+
     // MARK: Pinned pages (#159)
 
     func pins(in folder: URL?) -> [PinView] { work.pins(in: folder) }

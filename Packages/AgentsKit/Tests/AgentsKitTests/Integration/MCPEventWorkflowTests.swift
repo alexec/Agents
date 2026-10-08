@@ -494,7 +494,7 @@ struct MCPEventWorkflowTests {
         let s = try await setUp([a, b], workflows: [("fix", "  - checks.failed:\n      server: [a, b]\n      repo: x")])
         try await subscribed(s, stands: [a])
         let all = await lines(s)
-        #expect(all.map(\.server) == ["a", "b"])
+        try #require(all.map(\.server) == ["a", "b"])
         #expect(all[0].state == .active)
         #expect(all[1].failure?.code == .eventNotOffered)
         #expect(all[1].failure?.message == "b doesn't offer checks.failed; it offers pr.merged.")

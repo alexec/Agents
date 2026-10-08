@@ -27,7 +27,7 @@ Of 208 rows: **139 same**, **40 by design**, **29 delta** (after #188, #189, #19
 | Start sheet and new project | 17 | 5 | 0 |
 | Worktrees and Files | 9 | 6 | 6 |
 | Pins | 4 | 1 | 0 |
-| Workflows page | 12 | 1 | 2 |
+| Workflows page | 13 | 1 | 2 |
 | Settings and Project Settings | 1 | 7 | 0 |
 | Pool, runtimes and spending | 7 | 1 | 2 |
 | Events and resources | 2 | 1 | 2 |
@@ -253,6 +253,7 @@ The deltas are tracked by 29 issues:
 | Cooldown | A menu: `A/Projects/WorkflowPage.swift:310-339` | A menu and cooldown sentence: `R/Projects/WorkflowPage.swift` | A menu: `W/views/WorkflowSettings.tsx:142-157` | **delta**: web #260 |
 | An unreadable file locks the settings (#179) | `S/WorkflowStatus.swift:144` | `R/Projects/WorkflowPage.swift:296, 333, 510` | `W/views/WorkflowPage.tsx:44` | **same** |
 | Runs only on the hosts it names (#317) | `S/WorkflowHostsSection.swift` on `A/Projects/WorkflowPage.swift`; the list is the host's | The same section on `R/Projects/WorkflowPage.swift` | `W/views/WorkflowPage.tsx`; the list is the host's | **same** |
+| Workflow page: MCP trigger status, a line per server a trigger hears, with Clear on missed events (#383) | `S/MCPTriggerLines.swift` under the triggers on `A/Projects/WorkflowPage.swift`; words in `S/WorkflowStatus.swift` | The same view on `R/Projects/WorkflowPage.swift` | `W/views/WorkflowPage.tsx`, words in `W/model/workflows.ts` | **same** |
 | Writing a workflow | None (the author's) | None | None | **same** |
 
 ## Settings and Project Settings
