@@ -378,6 +378,29 @@ final class RemoteModel {
         }
     }
 
+    /// A file put into a project's drop box (#231), where a workflow on
+    /// `dropbox.file_added` can pick it up. `subfolder` is inside `.agents/dropbox/`, empty
+    /// for its top. Held to what crosses the relayed link in one record, as an attachment
+    /// is. Answers why it did not go, or nil.
+    func putInDropbox(_ data: Data, name: String, subfolder: String, project: ProjectKey) async -> String? {
+        guard !isStale(on: project.host) else { return notAnswering(project.host, "\(name) was not sent.") }
+        guard data.count <= PhoneAttachment.limit else {
+            return "From a phone, a drop box file can be 900 KB, and \(name) is bigger. Copy it into .agents/dropbox/ on the Mac instead."
+        }
+        let folder = subfolder.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
+        let request = DaemonAPI.DropboxPutRequest(folder: project.folder, subfolder: folder.isEmpty ? nil : folder,
+                                                  name: name, data: data)
+        do {
+            _ = try await client(for: request).call(DaemonAPI.Method.dropboxPut, request,
+                                                    returning: DaemonAPI.DropboxPutResponse.self)
+            return nil
+        } catch let error as JSONRPCError {
+            return error.message
+        } catch {
+            return notAnswering(project.host, "\(name) was not sent.")
+        }
+    }
+
     /// The Mac predates the panes, and the phone does what it did before them (FR-029).
     var macLacksPanes: Bool { files.macLacksPanes }
 

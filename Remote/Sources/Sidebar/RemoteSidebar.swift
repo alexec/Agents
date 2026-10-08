@@ -193,6 +193,9 @@ private struct RemoteProjectFold: View {
     var showsAllMatches = false
     var showAllMatches: () -> Void = {}
 
+    /// Put Files in Drop Box… from the row's menu (#231).
+    @State private var fillingDropbox = false
+
     private var key: ProjectKey { summary.key }
 
     var body: some View {
@@ -233,9 +236,12 @@ private struct RemoteProjectFold: View {
                     .accessibilityHint(isOpen ? "Folds the project" : "Unfolds the project")
                     .appText(.supporting)
                     .foregroundStyle(model.hostIsOffline(summary.host) ? .secondary : .primary)
-                    .contextMenu { ProjectMenuItems(summary: summary) }
+                    .contextMenu { ProjectMenuItems(summary: summary) { fillingDropbox = true } }
                     .swipeActions(edge: .leading) {
                         NewSessionButton(folder: summary.folder).tint(Paper.accent)
+                    }
+                    .sheet(isPresented: $fillingDropbox) {
+                        DropboxSheet(project: key, label: label)
                     }
             }
             // The rest of its live sessions when the first page did not hold them all.
@@ -399,9 +405,15 @@ private struct ForgetThisDeviceRow: View {
 private struct ProjectMenuItems: View {
     @Environment(RemoteModel.self) private var model
     let summary: DaemonAPI.ProjectSummary
+    /// Files into the project's drop box (#231), as a drag onto the Mac's row puts them.
+    let putInDropbox: () -> Void
 
     var body: some View {
         NewSessionButton(folder: summary.folder)
+        Button(action: putInDropbox) {
+            Label("Put Files in Drop Box…", systemImage: "tray.and.arrow.down")
+        }
+        .disabled(model.isStale(on: summary.host))
     }
 }
 

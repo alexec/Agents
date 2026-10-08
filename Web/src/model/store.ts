@@ -24,6 +24,7 @@ import { scopeRoot, WatchCounts } from "./fileWatch";
 import { workflowRunsOn } from "./workflows";
 import { keyKind, takesKey, wantedRuntime } from "./credentials";
 import type { Method, Params, Result } from "../protocol/methods";
+import { dropboxRefusal, dropboxRequest } from "./dropbox";
 
 export { folderKey } from "./groups";
 
@@ -1632,6 +1633,25 @@ export class Store extends Work {
   /** What the person typed on a live page, written to the file as the window writes it. */
   async writeArtifact(host: string, agentID: string, path: string, text: string): Promise<boolean> {
     return (await this.act("artifact/write", { agentID: agentID as UUID, path, text }, host)) !== null;
+  }
+
+  /**
+   * Files into a project's drop box (#231), one after another, as the window's drop puts them.
+   * Answers the names sent; the first that could not go is said, and stops the rest.
+   */
+  async putInDropbox(host: string, folder: string, subfolder: string, files: readonly File[]): Promise<string[]> {
+    const sent: string[] = [];
+    for (const file of files) {
+      const refused = dropboxRefusal(file.name, file.size);
+      if (refused) {
+        this.say(refused);
+        break;
+      }
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      if (await this.act("dropbox/put", dropboxRequest(folder, subfolder, file.name, bytes), host) === null) break;
+      sent.push(file.name);
+    }
+    return sent;
   }
 
   // MARK: Pinned pages (#159)

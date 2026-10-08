@@ -16,6 +16,7 @@ import { Chat } from "./Chat";
 import { RetiredPage } from "./RetiredPage";
 import { NewAgent } from "./NewAgent";
 import { NewProjectDialog } from "./NewProject";
+import { DropboxDialog } from "./DropboxDialog";
 import { TokenAskDialog } from "./TokenAsk";
 import { Problem } from "./Errors";
 import { FilesPane } from "./FilesPane";
@@ -67,6 +68,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
         {r.host && r.session && r.files && <FilesPane store={store} host={r.host} session={r.session} />}
       </div>
       <NewProjectDialog store={store} />
+      <DropboxDialog store={store} />
       <TokenAskDialog store={store} />
       <ContextMenu />
     </div>
