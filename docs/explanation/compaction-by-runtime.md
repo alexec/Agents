@@ -30,7 +30,7 @@ They differ in what the app sees:
 
 - **Claude and Codex** tell the app, with ACP's `compaction_update`. The app asks for this by
   advertising `session.compaction`.
-- **Grok** tells it in a message of its own that the app does not read.
+- **Grok** tells it in a message of its own, which the app reads into the same row (#447).
 - **OpenCode** shows its summary as ordinary agent text.
 - **Gemini, Copilot, Cursor and Antigravity** say nothing. At most, the context meter drops.
 
@@ -40,7 +40,7 @@ They differ in what the app sees:
 | **Codex** | codex-acp 1.13.1, Codex 0.156.1 | Yes, with no off switch | 90% of the window: 244,800 of 272,000 tokens for every bundled model | `compaction_update` with status only, no summary | Yes, advertised | `model_auto_compact_token_limit` (lower only) and `compact_prompt` in `CODEX_CONFIG` |
 | **Gemini** | 0.61.0 | Yes (`model.compressionThreshold`, 0.5) | Half the window: about 524K of 1M tokens | Nothing over ACP | No: `/compress` is in its terminal only | `model.compressionThreshold` in the app's system defaults file. 1.0 is in effect off; 0 is not off. |
 | **Antigravity** | agy-acp-server 1.2.1 | Yes, in its Go harness | Its backend's default, not readable. A forum measurement puts it at about 220–260K. | Nothing over ACP | No | None: the ACP server reads no compaction setting |
-| **Grok** | 1.0.46 | Yes ("auto-compact") | 85% by its docs; its bundled grok-4.5 and 4.6 say 80% | Its own `auto_compact_*` updates in `x.ai/session_notification`, which the app drops as unknown | Yes, advertised | `GROK_AUTO_COMPACT_THRESHOLD_PERCENT`, `GROK_COMPACTION_MODE`. There is no off switch. |
+| **Grok** | 1.0.46 | Yes ("auto-compact") | 85% by its docs; its bundled grok-4.5 and 4.6 say 80% | Its own `auto_compact_*` updates in `_x.ai/session_notification`, drawn as the compaction row (#447) | Yes, advertised | `GROK_AUTO_COMPACT_THRESHOLD_PERCENT`, `GROK_COMPACTION_MODE`. There is no off switch. |
 | **OpenCode** | 1.18.33 | Yes (`compaction.auto`, default on) | When the usable window is full: the input limit minus up to 20K reserved | The summary as agent text; after an automatic one, a "continue" turn (inferred). No `compaction_update`. | Works, but not advertised | `compaction.*` in `OPENCODE_CONFIG_CONTENT`; `OPENCODE_DISABLE_AUTOCOMPACT` to turn it off |
 | **Copilot** | 1.0.93-1 | Yes ("infinite sessions") | Background from 80%, blocking at 95% | Nothing over ACP but a falling `usage_update` (inferred) | Yes, since 1.0.39 | Undocumented `COPILOT_BACKGROUND_COMPACTION_THRESHOLD`, `COPILOT_BUFFER_EXHAUSTION_THRESHOLD`; no off switch ([copilot-cli#2333](https://github.com/github/copilot-cli/issues/2333)) |
 | **Cursor** | 2026.10.01-e373342 | Yes (summarization) | Its backend decides; not in the client | Nothing: its ACP layer drops `summary_*` updates, and it sends no `usage_update` | No: `/summarize` is in its terminal only | None |
@@ -148,8 +148,10 @@ Codex's rows have no summary under them, because Codex sends none. That is right
   measured there. There is no off switch; whether 100 turns it off in effect is unverified.
 - **Over ACP.** `auto_compact_started`, `completed` (tokens before and after, a summary
   preview), `failed` and `cancelled`, inside the extension notification
-  `x.ai/session_notification`. The app reads only `_x.ai/billing`, so these are dropped.
-  This comes from its embedded docs; it has not been seen on the wire.
+  `_x.ai/session_notification`, as `{sessionId, update: {sessionUpdate, …}}` with
+  snake_case fields. The app draws them as the compaction row (#447), the preview as its
+  summary. The envelope was seen on the wire from 1.0.50 (its other kinds); the
+  `auto_compact_*` fields come from its embedded docs, as a `/compact` could not be run.
 - **What is kept.** Tool-result pruning is on: the last 3 turns are kept, results over 4,000
   characters are trimmed to their first and last 1,500 characters, and results older than
   10 turns become a placeholder. Before compacting, it writes a summary to its memory.
@@ -242,6 +244,6 @@ Antigravity runs on this Mac only.
   a switch or a threshold is a product decision. These have a lever the app can reach:
   Claude, Codex (threshold only), Gemini, Grok (threshold only), OpenCode and Copilot
   (untested). Antigravity and Cursor have none.
-- **Showing the silent ones.** The app could draw Grok's own updates. For the others, it
+- **Showing the silent ones.** Grok's own updates are drawn (#447). For the others, the app
   could only infer a compaction from a sudden drop in the context meter, and Cursor does
   not even send the meter.

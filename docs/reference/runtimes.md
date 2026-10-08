@@ -295,7 +295,7 @@ settings files there are the server's own.
 | Usage data | `GROK_TELEMETRY_ENABLED`, `DISABLE_TELEMETRY` | on | Yes | Yes | Show, planned: the usage data switch |
 | Auto review | `_meta.autoMode` | off | Not measured with the app | Yes | Leave alone until measured |
 | Folder trust | `x.ai/folder_trust/request` | asks | The app does not answer it; a server's untrusted folder may skip the project's own settings | Yes | Measure on a server |
-| Compaction | `[session] auto_compact_threshold_percent`; `GROK_AUTO_COMPACT_THRESHOLD_PERCENT` | on, at 80–85% of the window, no off switch | Yes: its own `x.ai/session_notification`, which the app does not read; `/compact` offered | Yes, by the variable | Leave alone: on with nothing set; see [Compaction in each runtime](../explanation/compaction-by-runtime.md) |
+| Compaction | `[session] auto_compact_threshold_percent`; `GROK_AUTO_COMPACT_THRESHOLD_PERCENT` | on, at 80–85% of the window, no off switch | Yes: its own `auto_compact_*` updates in `_x.ai/session_notification`, drawn as the compaction row; `/compact` offered | Yes, by the variable | Leave alone: on with nothing set; see [Compaction in each runtime](../explanation/compaction-by-runtime.md) |
 | Subagent limits, MCP, plugins, hooks, skills, tool timeouts | config file | its defaults | Yes | Server's own | Leave alone. It also reads Claude's and Cursor's MCP servers, hooks and rules. |
 | Permission rules | `permission.*`, and Claude's own settings files | — | Yes, before the app is asked | Server's own | Leave alone |
 | Sandbox | `--sandbox`, before `agent stdio` | off | Yes: the whole process from its start, measured | Yes; Landlock | Show: **Command sandbox** |
