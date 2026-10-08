@@ -246,7 +246,7 @@ real repo, a failing PR yields one `checks.failed` with a stable id.
   - `commentOnPR(repo, number, body)`.
   - A fake implementation reads and writes `CI_WATCHER_FAKE`'s JSON instead.
   - `gh` not signed in raises a typed error. A rate limit raises one with `retryAfterMs`.
-- [ ] T028 [US3] Create `Integrations/ci-watcher/server.ts`: JSON-RPC over `node:http` at `POST /mcp` on `127.0.0.1` (`--port`, default 8791), with `Mcp-Session-Id`, and `GET /health`. Depends on T027.
+- [x] T028 [US3] Create `Integrations/ci-watcher/server.ts`: JSON-RPC over `node:http` at `POST /mcp` on `127.0.0.1` (`--port`, default 8791), with `Mcp-Session-Id`, and `GET /health`. Depends on T027.
   - Methods: `initialize` (capabilities exactly as in the contract), `tools/list`, `tools/call`, `resources/list`, `resources/read`, `events/list` and `events/poll`.
   - The cursor is base64 of `{since, ids}` (R10). `cursor: null` answers no events and now. `nextPollMs: 30000`. `truncated` follows R10.
   - Errors: `-32012` with `reason: "gh not signed in"`, `-32013` with `retryAfterMs`, and `-32602` for bad arguments.
