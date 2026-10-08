@@ -200,11 +200,8 @@ Codex's rows have no summary under them, because Codex sends none. That is right
 
 On 2026-10-08, each runtime was started over ACP in an empty scratch folder, as the app
 starts it: the app's `session.compaction` capability, your own settings and sign-in, and
-none of your shell's `CLAUDE_*` variables. Each was then sent three prompts:
-
-1. remember a code word and a path;
-2. `/compact`;
-3. say the code word and the path.
+none of your shell's `CLAUDE_*` variables. Each was told a code word and a path, sent
+`/compact`, and then asked for the code word and the path back.
 
 | Runtime | Copy | What arrived | Meter before → after | Remembered after |
 | --- | --- | --- | --- | --- |
