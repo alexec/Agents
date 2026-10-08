@@ -518,6 +518,7 @@ export interface ControlStatus {
   relayKey?: Base64;
   web?: WebRemoteStatus;
   thisMacHost?: HostJoinStatus;
+  projectDetection?: ProjectDetection;
 }
 
 export interface Cost {
@@ -1143,6 +1144,11 @@ export interface Project {
   layoutVersion?: number;
   helperLimits?: HelperLimits;
   diskSpace?: DiskThresholds;
+}
+
+export interface ProjectDetection {
+  enabled: boolean;
+  paths: string[];
 }
 
 export interface ProjectPins {
@@ -2208,7 +2214,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ContinueInProjectRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
   ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom"] },
-  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "thisMacHost"] },
+  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "thisMacHost", "projectDetection"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily"] },
   CostState: { required: ["limits", "today", "day"], optional: ["note"] },
@@ -2287,6 +2293,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PresenceReport: { required: ["active"], optional: ["watching", "mayNotify", "showing"] },
   PrewarmRequest: { required: ["agentID", "why"], optional: [] },
   Project: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits", "diskSpace"] },
+  ProjectDetection: { required: ["enabled", "paths"], optional: [] },
   ProjectPins: { required: ["folder", "pins"], optional: ["sessions"] },
   ProjectRequest: { required: ["folder"], optional: [] },
   ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: ["isChat"] },

@@ -152,6 +152,30 @@ final class ControlSettingsModel {
         }
     }
 
+    /// The servers in the ssh config that answer, installed (#429): what happened to
+    /// each, or nil with `problem` saying why it could not look.
+    func detectServers() async -> [DaemonAPI.DetectedServer]? {
+        installStep = nil
+        do {
+            let found = try await client.call(DaemonAPI.Method.hostsDetect, returning: [DaemonAPI.DetectedServer].self)
+            problem = nil
+            await refresh()
+            return found
+        } catch let error as JSONRPCError {
+            problem = HostProblem.controlRefusal(error)
+        } catch {
+            problem = "The control plane can’t be reached."
+        }
+        return nil
+    }
+
+    /// Where a host added from now on has its projects found (#429).
+    var projectDetection: ProjectDetection { status?.projectDetection ?? .standard }
+
+    func setProjectDetection(_ detection: ProjectDetection) async {
+        await perform(DaemonAPI.Method.controlSetProjectDetection, detection)
+    }
+
     /// A code for a new client, or for a new host (frame G, Add by Code). A browser's is
     /// good only through the page's own listener (071 R2).
     func startCode(forHost: Bool, browser: Bool = false) async -> DaemonAPI.ControlCodeShown? {
