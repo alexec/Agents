@@ -153,20 +153,20 @@ in `turns.jsonl`.
 
 ## What the app could do
 
-1. **Not ship rtk, or turn it on by default.** Both independent benchmarks found it made
-   agents more expensive. Anyone who wants it can install it for themselves, with
-   `rtk init -g` or as a personal plugin.
-2. **If Headroom is worth trying, make it an opt-in switch per runtime,** off by default.
-   - The app would not install it. It would only point the runtime at a proxy on the Mac.
-   - If the proxy is not running, the runtime would connect directly rather than fail.
-   - Server runs would be left alone, because of the relay.
-   - Keep each turn's token counts, and compare agents with the switch on and off. Judge it
-     on those figures, not on what Headroom reports about itself.
-3. **Cut what is sent instead of compressing it.** These savings are in the app's own hands:
-   - give each agent fewer tools and MCP servers, since their schemas are sent every turn;
-   - keep the start of each prompt the same from turn to turn, so the cache keeps working;
-   - choose when each runtime compacts. All eight compact on their own already
-     (see [Compaction in each runtime](compaction-by-runtime.md)).
+- **Not ship rtk, or turn it on by default.** Both independent benchmarks found it made
+  agents more expensive. Anyone who wants it can install it for themselves, with
+  `rtk init -g` or as a personal plugin.
+- **If Headroom is worth trying, make it an opt-in switch per runtime,** off by default.
+  - The app would not install it. It would only point the runtime at a proxy on the Mac.
+  - If the proxy is not running, the runtime would connect directly rather than fail.
+  - Server runs would be left alone, because of the relay.
+  - Keep each turn's token counts, and compare agents with the switch on and off. Judge it
+    on those figures, not on what Headroom reports about itself.
+- **Cut what is sent instead of compressing it.** These savings are in the app's own hands:
+  - give each agent fewer tools and MCP servers, since their schemas are sent every turn;
+  - keep the start of each prompt the same from turn to turn, so the cache keeps working;
+  - choose when each runtime compacts. All eight compact on their own already
+    (see [Compaction in each runtime](compaction-by-runtime.md)).
 
 ## Sources
 
