@@ -76,7 +76,7 @@ public enum DotAgents {
     public static var untrackedLayout: [String] { [router] + links.map(\.path) + [indexLink.path] }
 
     /// Lay the project out, or bring one laid out by layout `from` up to this one.
-    public static func apply(to project: URL, from: Int = 0) {
+    public static func apply(to project: URL, from: Int = 0, chat: Bool = false) {
         let fileManager = FileManager.default
         guard isLayable(project) else { return }
         for name in resources.filter({ $0.since > from }).map(\.name) {
@@ -93,7 +93,7 @@ public enum DotAgents {
                 if isPlainFile(claudeFile) {
                     try fileManager.moveItem(at: claudeFile, to: routerURL)
                 } else {
-                    try routerContents(for: project).write(to: routerURL, atomically: true, encoding: .utf8)
+                    try routerContents(for: project, chat: chat).write(to: routerURL, atomically: true, encoding: .utf8)
                 }
             }
         }
@@ -147,7 +147,9 @@ public enum DotAgents {
     }
 
     /// A router that points at what the project already has, and at nothing it lacks.
-    static func routerContents(for project: URL) -> String {
+    /// `chat` adds what the chat project's folder is for (#229), once, in the person's own
+    /// file: they may change it, and nothing puts it back.
+    static func routerContents(for project: URL, chat: Bool = false) -> String {
         var routes: [String] = []
         let shared = [
             ("README.md", "For the project's purpose and setup:", "READ"),
@@ -160,9 +162,16 @@ public enum DotAgents {
         routes.append("- **For a task a skill covers:** USE the skill in `.agents/skills/`.")
         routes.append("- **When a task calls for a specialist perspective:** ADOPT a persona from `.agents/personas/`.")
         routes.append("- **For a plugin this project carries:** LOOK in `.agents/plugins/`.")
+        let this = chat ? """
+
+            ## This folder
+
+            This folder is shared by every chat on this host. Save here what a later chat should find.
+
+            """ : ""
         return """
             # AGENTS.md
-
+            \(this)
             ## Context routing
 
             \(routes.joined(separator: "\n"))

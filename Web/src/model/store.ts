@@ -7,7 +7,7 @@ import type {
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, DiskState, StoreNotes,
-  CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
+  ChatProjectState, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
 } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
@@ -1374,6 +1374,11 @@ export class Store extends Work {
     const summary = await this.act("projects/unarchive", { folder: folder as never }, host);
     if (summary) this.upsertProject(summary, host);
     return summary;
+  }
+
+  /** Why `host` has a chat project or not (#229), for a New Chat that found none listed. Throws a refusal. */
+  chatState(host: string): Promise<ChatProjectState> {
+    return this.link.call("projects/chatState", {}, host);
   }
 
   /** The folders at `path` on `host`, for choosing one as a project (037). Throws a refusal. */

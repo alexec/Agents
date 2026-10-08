@@ -364,7 +364,8 @@ function ElicitationCard({ request, asker, hold, answer, active }: {
       body = (
         <>
           {schema.description && <p class="quiet">{schema.description}</p>}
-          <div class="options">
+          {/* The choices scroll on their own in a short window; No answer and No thanks stay under them (#381). */}
+          <div class="options choices">
             {single.choices.map((choice, index) => {
               const b = button(`choice:${choice.value}`, "prominent");
               return (
@@ -375,6 +376,8 @@ function ElicitationCard({ request, asker, hold, answer, active }: {
                 </button>
               );
             })}
+          </div>
+          <div class="options">
             {!single.property.isRequired && (
               <button class={none.class} aria-disabled={none.disabled} {...numbered(single.choices.length)}
                 onClick={() => go("none", "accept", { [single.property.name]: "" })}>No answer{none.telling}</button>

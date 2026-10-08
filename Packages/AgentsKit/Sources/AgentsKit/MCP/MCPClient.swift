@@ -43,8 +43,8 @@ actor MCPClient {
         /// The stdio server ended, or never started.
         case stopped(String)
         case timedOut
-        /// A JSON-RPC error the server answered with.
-        case refused(code: Int, message: String)
+        /// A JSON-RPC error the server answered with, and its `data` when it gave one.
+        case refused(code: Int, message: String, data: JSONValue? = nil)
         /// What came back was not MCP.
         case notMCP
         /// sse, which the app's client does not speak.
@@ -59,7 +59,7 @@ actor MCPClient {
             case .unreachable: "unreachable"
             case .stopped: "stopped"
             case .timedOut: "timed out"
-            case .refused(let code, _): "refused \(code)"
+            case .refused(let code, _, _): "refused \(code)"
             case .notMCP: "not MCP"
             case .transportNotSupported: "transport not supported"
             }
@@ -88,21 +88,32 @@ actor MCPClient {
     private let timeout: Duration
     private let log: @Sendable (String) -> Void
     private let http: HTTPSend
+    /// The protocol versions `initialize` offers, newest first; any of them is taken back.
+    private let protocolVersions: [String]
+    private let onNotification: (@Sendable (String) -> Void)?
     private var stdio: MCPStdioProcess?
     private var sessionID: String?
     private var negotiated: String?
     private var nextID = 1
     private(set) var info: ServerInfo?
+    /// The server's `events` capability (#383), when it declared one.
+    private(set) var eventsCapability: EventsCapability?
 
     /// `cwd` is where a stdio server runs: the project's folder, or the person's home.
+    /// `protocolVersions` is what `initialize` offers: an event connection offers the
+    /// draft's newer version first (#383, research R2). `onNotification` hears the method
+    /// of each notification the server sends, over stdio or in an http answer's stream.
     init(server: MCPServer, cwd: URL, timeout: Duration = .seconds(60),
          log: @escaping @Sendable (String) -> Void = { DaemonLog.shared.write($0) },
-         http: HTTPSend? = nil) {
+         http: HTTPSend? = nil, offering protocolVersions: [String] = [MCPClient.protocolVersion],
+         onNotification: (@Sendable (String) -> Void)? = nil) {
         self.server = server
         self.cwd = cwd
         self.timeout = timeout
         self.log = log
         self.http = http ?? MCPClient.urlSession
+        self.protocolVersions = protocolVersions.isEmpty ? [MCPClient.protocolVersion] : protocolVersions
+        self.onNotification = onNotification
     }
 
     // MARK: Lifecycle
@@ -118,17 +129,21 @@ actor MCPClient {
                 let process = MCPStdioProcess(name: server.name, command: command, args: args, env: env,
                                               cwd: cwd, logPrefix: "mcp client", log: log)
                 stdio = process
+                if let onNotification { process.onNotification(onNotification) }
                 if let why = process.stoppedBecause { throw Failure.stopped(why) }
             case .http:
                 break
             }
             let params: JSONValue = [
-                "protocolVersion": .string(Self.protocolVersion),
+                "protocolVersion": .string(protocolVersions[0]),
                 "capabilities": ["extensions": Self.extensions],
                 "clientInfo": ["name": "Agents", "version": "1"],
             ]
             guard let result = try await request("initialize", params) else { throw Failure.notMCP }
             negotiated = result["protocolVersion"]?.stringValue
+            if let events = result["capabilities"]?[MCPEventsWire.capability], events.objectValue != nil {
+                eventsCapability = EventsCapability(listChanged: events["listChanged"]?.boolValue ?? false)
+            }
             let info = ServerInfo(name: result["serverInfo"]?["name"]?.stringValue,
                                   version: result["serverInfo"]?["version"]?.stringValue,
                                   protocolVersion: negotiated,
@@ -191,12 +206,25 @@ actor MCPClient {
         return result
     }
 
-    private func pages(_ method: String, key: String) async throws -> [JSONValue] {
+    // MARK: Events (#383, contracts/mcp-events-client.md)
+
+    /// Every event the server offers, through `nextCursor`, up to `itemLimit`.
+    func listEvents() async throws -> [EventDefinition] {
+        try await pages(MCPEventsWire.listMethod, key: "events", optional: false).compactMap(EventDefinition.init)
+    }
+
+    /// One `events/poll`.
+    func pollEvents(_ poll: EventsPollRequest) async throws -> EventsPollResult {
+        guard let result = try await request(MCPEventsWire.pollMethod, poll.wire) else { throw Failure.notMCP }
+        return EventsPollResult(result)
+    }
+
+    private func pages(_ method: String, key: String, optional: Bool = true) async throws -> [JSONValue] {
         var items: [JSONValue] = []
         var cursor: String?
         for _ in 0..<Self.pageLimit {
             let params: JSONValue = cursor.map { ["cursor": .string($0)] } ?? [:]
-            guard let result = try await request(method, params, optional: true) else { return items }
+            guard let result = try await request(method, params, optional: optional) else { return items }
             items += result[key]?.arrayValue ?? []
             cursor = result["nextCursor"]?.stringValue
             if cursor == nil || items.count >= Self.itemLimit { break }
@@ -218,7 +246,7 @@ actor MCPClient {
             let code = error["code"]?.intValue ?? 0
             if optional && code == -32601 { return nil }
             if code == -32000, let why = stdio?.stoppedBecause { throw Failure.stopped(why) }
-            throw Failure.refused(code: code, message: error["message"]?.stringValue ?? "")
+            throw Failure.refused(code: code, message: error["message"]?.stringValue ?? "", data: error["data"])
         }
         guard let result = message["result"] else { throw Failure.notMCP }
         return result
@@ -317,6 +345,7 @@ actor MCPClient {
         guard let id else { return nil }
         let type = response.value(forHTTPHeaderField: "Content-Type")?.lowercased() ?? ""
         if type.hasPrefix("text/event-stream") {
+            if let onNotification { for method in Self.notifications(inEvents: data) { onNotification(method) } }
             guard let answer = Self.answer(id, inEvents: data) else { throw Failure.notMCP }
             return answer
         }
@@ -339,6 +368,17 @@ actor MCPClient {
             return payload
         }
         return nil
+    }
+
+    /// The methods of the notifications among an event stream's `data:` events.
+    static func notifications(inEvents data: Data) -> [String] {
+        let text = String(decoding: data, as: UTF8.self).replacingOccurrences(of: "\r\n", with: "\n")
+        return text.components(separatedBy: "\n\n").compactMap { event in
+            let payload = event.split(separator: "\n").filter { $0.hasPrefix("data:") }
+                .map { $0.dropFirst(5).drop(while: { $0 == " " }) }.joined(separator: "\n")
+            guard let message = try? JSONValue.parse(Data(payload.utf8)), message["id"] == nil else { return nil }
+            return message["method"]?.stringValue
+        }
     }
 
     /// `resource_metadata` from a `WWW-Authenticate` header (RFC 9728), quoted or not.

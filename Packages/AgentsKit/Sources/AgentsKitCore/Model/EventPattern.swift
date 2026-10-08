@@ -27,6 +27,11 @@ public struct EventPattern: Hashable, Sendable {
     public func matches(_ event: Event) -> Bool {
         if let subject = wholeSubject {
             guard event.subject == subject else { return false }
+        } else if name.hasSuffix(".*") {
+            // A server's noun (#383): any of its events, never one of the app's.
+            guard event.name.hasPrefix(String(name.dropLast())), EventCatalogue.isServerEventName(event.name) else {
+                return false
+            }
         } else if event.name != name {
             return false
         }
@@ -41,10 +46,12 @@ public struct EventPattern: Hashable, Sendable {
 
     /// A pattern checked against the catalogue, or the sentence saying what is wrong
     /// with it, listing what would have been right. An older build's words for a code
-    /// are read as the code (073 FR-012); a value a detail cannot have is refused
-    /// (FR-019).
+    /// are read as the code (073 FR-012), and an event's old name as its new one (#372);
+    /// a value a detail cannot have is refused (FR-019).
     public static func parse(_ given: String, filters: [String: DetailFilter] = [:]) -> Result<EventPattern, EventPatternProblem> {
-        let name = given.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        // An old name is read as today's (#372), so a file written before a rename
+        // keeps firing.
+        let name = EventCatalogue.currentName(given.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
         let filters = Dictionary(filters.map { key, filter in
             (key.trimmingCharacters(in: .whitespaces),
              DetailFilter(anyOf: filter.values.map { $0.trimmingCharacters(in: .whitespaces) }) ?? filter)
@@ -54,6 +61,8 @@ public struct EventPattern: Hashable, Sendable {
         if name.hasSuffix(".*") {
             let subjectName = String(name.dropLast(2))
             guard let subject = EventSubject(rawValue: subjectName) else {
+                // A server's noun (#383): its details are the server's, so none is checked.
+                if EventCatalogue.isServerEventName(subjectName + ".any") { return .success(EventPattern(name, filters: filters)) }
                 return .failure(.unknown(name))
             }
             if subject != .custom {
@@ -73,6 +82,8 @@ public struct EventPattern: Hashable, Sendable {
             return .failure(.badCustomName(name))
         }
         guard let kind = EventCatalogue.kind(named: name) else {
+            // A server's event (#383): its details are open, as a custom event's are.
+            if EventCatalogue.isServerEventName(name) { return .success(EventPattern(name, filters: filters)) }
             return .failure(.unknown(name))
         }
         if let bad = filters.keys.sorted().first(where: { !kind.details.contains($0) }) {
@@ -211,7 +222,7 @@ extension EventPattern: Codable {
         for (key, values) in try c.decodeIfPresent([String: [String]].self, forKey: .anyOf) ?? [:] {
             if let filter = DetailFilter(anyOf: values) { filters[key] = filter }
         }
-        self = EventPattern(name, filters: filters).withOldWordsMapped()
+        self = EventPattern(EventCatalogue.currentName(name), filters: filters).withOldWordsMapped()
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -256,7 +267,7 @@ public enum EventPatternProblem: Error, Hashable, Sendable {
     }
 
     /// The catalogue name nearest to a mistyped one, if any is near enough to suggest.
-    static func closest(to name: String) -> String? {
+    public static func closest(to name: String) -> String? {
         let scored = EventCatalogue.all.map { ($0.name, distance(name, $0.name)) }
         guard let best = scored.min(by: { $0.1 < $1.1 }), best.1 <= max(2, name.count / 4) else { return nil }
         return best.0

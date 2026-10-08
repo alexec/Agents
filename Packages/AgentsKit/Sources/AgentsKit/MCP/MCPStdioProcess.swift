@@ -26,6 +26,12 @@ final class MCPStdioProcess: @unchecked Sendable {
     private let name: String
     private let logPrefix: String
     private let log: @Sendable (String) -> Void
+    private var onNotification: (@Sendable (String) -> Void)?
+
+    /// Told the method of each notification the server sends (#383's `list_changed`).
+    func onNotification(_ handler: @escaping @Sendable (String) -> Void) {
+        lock.withLock { onNotification = handler }
+    }
 
     /// `logPrefix` starts each line it logs ("bridge", "mcp client"), with `name` after it.
     init(name: String, command: String, args: [String], env: [String: String], cwd: URL,
@@ -150,6 +156,10 @@ final class MCPStdioProcess: @unchecked Sendable {
             if let id = message["id"] {
                 write(Self.error(id: id, code: -32601, message: "Not passed on by the app."))
             } else {
+                if let method = message["method"] as? String, let handler = lock.withLock({ onNotification }) {
+                    handler(method)
+                    return
+                }
                 let count = lock.withLock { dropped += 1; return dropped }
                 if count == 1 || count % 100 == 0 { log("\(logPrefix): \(name) sent \(count) notification(s) not passed on") }
             }

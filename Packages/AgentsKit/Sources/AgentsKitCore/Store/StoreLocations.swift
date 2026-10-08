@@ -106,6 +106,8 @@ public struct StoreLocations: Sendable {
     public var socket: URL { root.appendingPathComponent("daemon.sock") }
     public var lock: URL { root.appendingPathComponent("daemon.lock") }
     public var log: URL { root.appendingPathComponent("daemon.log") }
+    /// Where each subscription to a server's events has got to (#383). The daemon's alone.
+    public var mcpEvents: URL { root.appendingPathComponent("mcp-events.json") }
     /// Which root this is (#228): an id made the first time a daemon starts here, and
     /// the path it was made at, so a whole root copied elsewhere is a new root rather
     /// than the old one. Every agent record is stamped with the id.

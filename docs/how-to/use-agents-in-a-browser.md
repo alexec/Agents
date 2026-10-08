@@ -65,6 +65,8 @@ iPhone and iPad do, on every host:
   permission requests and questions;
 - send a prompt with files or pictures attached, use **Send now** on a queued prompt, and
   change the mode, model or runtime;
+- start a chat with **New Chat** at the top of the **+** menu, in the host's **chat**
+  project (see [Chat without a project](chat-without-a-project.md));
 - add a project with **+** at the head of the projects column: **Add Folder…** chooses a
   folder on the host by typing a path or clicking into folders, and **Clone Git URL…** clones
   an HTTPS or SSH address into the host's home folder. With more than one host, the menu

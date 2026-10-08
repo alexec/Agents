@@ -84,7 +84,7 @@ struct SpendingRow: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(today == nil ? "Spending" : "Today")
+            Text("Cost")
             Spacer()
             VStack(alignment: .trailing, spacing: 1) {
                 if let today {
@@ -99,7 +99,7 @@ struct SpendingRow: View {
             .foregroundStyle((model.costState?.dayIsCloseToFull == true ? StateTint.failure : .none)
                                 .style(or: .secondary))
         }
-        .accessibilityHint("Opens Spending")
+        .accessibilityHint("Opens Cost")
     }
 
     private var today: String? {

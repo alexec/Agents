@@ -63,14 +63,14 @@ struct EventWorkflowTests {
     }
 
     /// A run no agent set off is told the event, details and all: a clean-up on
-    /// `mac.disk_low` reads its level there (#199).
+    /// `machine.disk_low` reads its level there (#199).
     @Test func aNewAgentIsToldTheEventThatStartedIt() async throws {
         let (locations, work) = try temporary()
-        try write("  - mac.disk_low", as: "free-disk-space", in: work)
+        try write("  - machine.disk_low", as: "free-disk-space", in: work)
         let core = try await core(locations)
         await core.rescanWorkflows(in: work)
 
-        await core.raise(EventDraft(name: "mac.disk_low", scope: .mac, sentence: "Macintosh HD is almost full: 1 GB free.",
+        await core.raise(EventDraft(name: "machine.disk_low", scope: .mac, sentence: "Macintosh HD is almost full: 1 GB free.",
                                     details: ["level": "critical", "volume": "Macintosh HD"]))
         try await eventually("the workflow started an agent") { await started(core, by: "free-disk-space").count == 1 }
         let agent = try #require(await started(core, by: "free-disk-space").first)
@@ -84,7 +84,7 @@ struct EventWorkflowTests {
             return prompt != nil
         }
         #expect(prompt?.hasPrefix("Do it.") == true)
-        #expect(prompt?.contains("because of the event mac.disk_low: Macintosh HD is almost full: 1 GB free.") == true)
+        #expect(prompt?.contains("because of the event machine.disk_low: Macintosh HD is almost full: 1 GB free.") == true)
         #expect(prompt?.contains("Its details are level: critical; volume: Macintosh HD.") == true)
     }
 

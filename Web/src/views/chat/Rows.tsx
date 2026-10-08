@@ -444,7 +444,7 @@ export const TurnView = memo(function TurnView({ turn, detail, fetched, hasEarli
     ask();
   }, [open, waiting, auto]);
   return (
-    <article class="turn" aria-label="Turn">
+    <article class="turn" aria-label="Turn" data-turn={turn.id}>
       {turn.ask && <ItemRow item={turn.ask} background={background} />}
       {stepCount !== 0 && (
         <button class="steps-control" aria-expanded={open} onClick={toggle}

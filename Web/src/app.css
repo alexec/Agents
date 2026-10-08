@@ -449,8 +449,13 @@ button.link.reading:hover { text-decoration: underline; }
 .background .stop { font-size: 11px; padding: 0 8px; }
 
 /* Cards above the prompt: a question or a permission, answered here or elsewhere. */
-.cards { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+/* In a short window the cards give up height, not the prompt: the foot is never taller than the
+   column, a card shrinks before the prompt does, and a single choice's list scrolls (#381, the
+   window's #371). */
+.cards { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; min-height: 0; overflow-y: auto; }
 .card {
+  min-height: 0;
+  flex-shrink: 1;
   background: var(--paper-raised);
   border: 1px solid var(--paper-rule);
   border-radius: var(--radius-floating);
@@ -462,6 +467,7 @@ button.link.reading:hover { text-decoration: underline; }
 }
 .card .question { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
 .card .options { display: flex; flex-direction: column; gap: 6px; }
+.card .choices { min-height: 0; max-height: 320px; overflow-y: auto; }
 .card .plan-shown { display: flex; align-items: center; gap: 8px; margin: 4px 0 0; }
 .card .plan-text { margin-top: 6px; user-select: text; }
 .card .row-options { flex-direction: row; flex-wrap: wrap; }
@@ -497,7 +503,9 @@ button.link.reading:hover { text-decoration: underline; }
 }
 .card .asked { margin: 0; }
 
-.foot { padding: 0 12px 12px; }
+.foot { padding: 0 12px 12px; max-height: 100%; min-height: 0; display: flex; flex-direction: column; }
+.foot > * { flex-shrink: 0; }
+.foot > .cards { flex-shrink: 1; }
 
 /* The prompt bar, as the window's (#108): where and labels over the input on the left, the runtime
    on the right; attach and send inside the input; the runtime's menus under it. */

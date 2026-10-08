@@ -127,6 +127,11 @@ Host.app`.
    keep projects under `$ROOT`, as `$ROOT/work` below. It also claims each runtime session
    it runs in `~/Library/Application Support/Agents Session Locks/`, which every daemon on
    this Mac shares, and will not resume a conversation another daemon holds.
+8. **Never install.** Do not copy the app into `~/Applications`, `/Applications` or
+   `~/AgentsApps`, and do not `launchctl kickstart` the login-item jobs
+   (`com.alexecollins.agentshost.daemon` and `.control`). A walk runs from `build/DD`
+   on `/tmp/run-<slug>`. `stop.sh` may boot out only the scratch jobs whose plists sit
+   in that root.
 
 ## Driving it without the screen
 

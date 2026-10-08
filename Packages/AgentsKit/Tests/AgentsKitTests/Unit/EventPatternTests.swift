@@ -49,7 +49,22 @@ struct EventPatternTests {
     }
 
     @Test func anUnknownSubjectIsRefused() {
-        #expect(EventPattern.parse("nope.*").failure == .unknown("nope.*"))
+        #expect(EventPattern.parse("no-pe.*").failure == .unknown("no-pe.*"))
+    }
+
+    /// A server's event (#383): any other `noun.verbed`, its details open, and `noun.*`
+    /// for every one of a noun's, never one of the app's.
+    @Test func aServersEventAndItsNounAreWaitedOn() throws {
+        let failed = try pattern("checks.failed", ["repo": "x"])
+        #expect(failed.matches(event("checks.failed", ["repo": "x", "server": "ci"])))
+        #expect(!failed.matches(event("checks.failed", ["repo": "y"])))
+        let checks = try pattern("checks.*")
+        #expect(checks.matches(event("checks.failed")))
+        #expect(checks.matches(event("checks.passed")))
+        #expect(!checks.matches(event("checksx.failed")))
+        #expect(!checks.matches(event("pr.merged")))
+        #expect(EventPattern.parse("branch.created").failure == .unknown("branch.created"))
+        #expect(EventPattern.parse("checksFailed").failure != nil)
     }
 
     @Test func aFilterTheKindDoesNotCarryIsRefusedNamingWhatItDoes() {
