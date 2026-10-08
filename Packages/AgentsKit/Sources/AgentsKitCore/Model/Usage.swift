@@ -73,6 +73,31 @@ public struct TurnUsage: Codable, Hashable, Sendable {
     }
 }
 
+public extension TurnUsage {
+    /// Every usage report in these entries, added up: what one turn used, when a turn
+    /// carries more than one (#465). Nil when there is none. A count only one report
+    /// carries is kept rather than dropped, and costs in two currencies keep the first.
+    static func total(of entries: [TranscriptEntry]) -> TurnUsage? {
+        let reports = entries.compactMap { entry -> TurnUsage? in
+            if case .usageRecorded(let usage) = entry.kind { return usage } else { return nil }
+        }
+        guard var total = reports.first else { return nil }
+        func add(_ lhs: Int?, _ rhs: Int?) -> Int? {
+            lhs == nil && rhs == nil ? nil : (lhs ?? 0) + (rhs ?? 0)
+        }
+        for usage in reports.dropFirst() {
+            total.totalTokens += usage.totalTokens
+            total.inputTokens += usage.inputTokens
+            total.outputTokens += usage.outputTokens
+            total.thoughtTokens = add(total.thoughtTokens, usage.thoughtTokens)
+            total.cachedReadTokens = add(total.cachedReadTokens, usage.cachedReadTokens)
+            total.cachedWriteTokens = add(total.cachedWriteTokens, usage.cachedWriteTokens)
+            if let cost = usage.cost { total.cost = total.cost.map { $0.adding(cost) ?? $0 } ?? cost }
+        }
+        return total
+    }
+}
+
 /// What a turn cost, in the runtime's own currency. Shown as sent: no conversion, no
 /// estimate, and a total is kept per currency because adding two of them would be a
 /// number nobody could check.

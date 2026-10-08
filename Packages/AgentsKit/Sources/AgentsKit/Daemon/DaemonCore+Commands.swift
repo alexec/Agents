@@ -1317,15 +1317,14 @@ extension DaemonCore {
         // The app carrying the agent on by itself (#149) starts a turn the person did
         // not, so nothing of theirs cleared the last turn's report. It stays where the
         // person sees it until this turn gives its own; what is noted here is that it
-        // is not this turn's, and that this turn's silence has not been asked about.
-        // The question itself is the one app turn that is not a fresh piece of work.
-        if from == .app, text != Self.askForOutcome, var agent = agents[agentID] {
+        // is not this turn's, so a silent ending is accounted for afresh (#479).
+        if from == .app, var agent = agents[agentID] {
             reportBeforeTurn[agentID] = agent.report
             if agent.outcomeAsked {
                 agent.outcomeAsked = false
                 changed(agent)
             }
-        } else if text != Self.askForOutcome {
+        } else {
             reportBeforeTurn[agentID] = nil
         }
         // Stopped or archived while that was written. The move below would otherwise
@@ -1532,6 +1531,10 @@ extension DaemonCore {
                              for: agentID)
             }
         }
+        // A clean end the agent said nothing about is accounted for here, before the
+        // move, so the ending's workflows and waits read it (#479).
+        deriveEnding(agentID: agentID, reason: reason, closingWords: result.evidence.closingWords,
+                     agentRecordedAnEnding: agentRecordedAnEnding)
         await move(agentID, on: .turnEnded(reason))
         // A finished agent's runtime joins the warm pool, if the person is likely to
         // reply soon, so the reply is not a cold start (#183). Otherwise, and on a move
@@ -1542,6 +1545,8 @@ extension DaemonCore {
         // next one starting, and before the stop below is heard: a stopped turn still
         // moves, it just does not carry on by itself (053).
         let movedBy = await applyPendingMove(agentID)
+        // Taken whatever happens next, so it never outlives the turn it was noted for (#433).
+        let archiveNote = archiveWhenDone.removeValue(forKey: agentID)
         // Stopped since this turn ended, while its runtime was being let go. `stop`
         // found nothing running and moved nothing, so this is where it is heard: no
         // question of the app's own, and what is queued stays queued, as stop promises.
@@ -1553,6 +1558,15 @@ extension DaemonCore {
         // them.
         if crossedItsLimit {
             if agents[agentID]?.queuedPrompts.isEmpty == false { await holdForCostLimit(agentID) }
+            return
+        }
+        // A workflow's run, done as its `when-done:` lets it be put away (#433). Not when
+        // it moved, nor when something was queued while the runtime was let go: the
+        // work has moved on, and the run stays where its ending put it.
+        if let archiveNote, movedBy == nil, agents[agentID]?.state == .finished,
+           agents[agentID]?.queuedPrompts.isEmpty == true {
+            await record(.runtimeNote(archiveNote), for: agentID)
+            try? await archive(agentID, by: .itself)
             return
         }
         // The agent moved itself so that it could carry on working there: started again,
@@ -1570,7 +1584,6 @@ extension DaemonCore {
         // after the runtime is let go, and never from inside `move`, where the release
         // still to come would take the new turn's runtime with it.
         await resumeIfCleared(agentID)
-        await askForOutcomeIfSilent(agentID: agentID, reason: reason)
         await drainQueue(after: agentID)
     }
 
@@ -1582,84 +1595,6 @@ extension DaemonCore {
             + "Raise the limit, or let this one agent go on, and it will go."),
                      for: agentID)
     }
-
-    /// A turn ended and said nothing about how it went. Ask, once.
-    ///
-    /// Most silences are an agent that simply forgot, and one question gets an answer
-    /// out of most of them. A second would be an argument, and an unbounded number
-    /// would let a runtime that will never call the tool double the cost of every turn
-    /// it takes — so the flag goes up *before* the prompt is enqueued. The turn this
-    /// question causes comes back through here, finds the flag already set, and stops.
-    /// That is what makes the bound structural rather than a convention somebody has to
-    /// keep.
-    ///
-    /// Nothing is owed after the fact. A daemon that restarts between the ending and
-    /// this leaves `outcomeAsked` false on a record whose turn is long over, which is
-    /// harmless: only a fresh `.endTurn` opens the gate.
-    func askForOutcomeIfSilent(agentID: UUID, reason: EndedReason) async {
-        // The review demo's echo (T092) cannot report, and has always done what it was
-        // asked by the time its turn ends: said so for it, or every turn a reviewer sent
-        // would sit under Needs you.
-        if reason == .endTurn, var agent = agents[agentID], agent.runtimeID == "demo",
-           agent.state == .finished, agent.report == nil {
-            agent.report = WorkReport(outcome: .done, message: "Said back what you typed.", at: now())
-            changed(agent)
-            return
-        }
-        guard willAskForOutcome(agentID: agentID, reason: reason),
-              var agent = agents[agentID] else { return }
-        agent.outcomeAsked = true
-        // A turn the app started that ended under the last turn's report (#149): that
-        // report gives way now, so the question reads as the question and an agent that
-        // will not answer it is an ending nobody accounted for, not the old one.
-        if reportBeforeTurn.removeValue(forKey: agentID) != nil { agent.report = nil }
-        changed(agent)
-        // Through the ordinary path, so it starts the runtime, is recorded, and has
-        // what it costs counted against the agent like any other turn (FR-024).
-        try? await enqueue(DaemonAPI.PromptRequest(agentID: agentID, text: Self.askForOutcome,
-                                                   from: .app), first: false)
-    }
-
-    /// Whether this ending is one the app is about to ask about.
-    ///
-    /// Asked twice, at two moments in the same ending: once by `move`, which holds the
-    /// lifecycle workflows back so they fire on the ending that is accounted for rather
-    /// than on both, and once by `askForOutcomeIfSilent`, which acts on it. The same
-    /// five conditions either time, which is why they are here and not written out
-    /// twice.
-    ///
-    /// An ending short keeps its own wording and is never asked about: this feature
-    /// adds an account of the *work*, not a restatement of how the *turn* ended
-    /// (FR-025). A prompt already waiting means they have moved the work on, and asking
-    /// an agent to account for a turn they have superseded is noise (FR-023).
-    func willAskForOutcome(agentID: UUID, reason: EndedReason?) -> Bool {
-        guard reason == .endTurn, let agent = agents[agentID] else { return false }
-        // The review demo's echo (T092) has no tools to report with.
-        if agent.runtimeID == "demo" { return false }
-        // A report this turn began under is the last turn's, not this one's (#149).
-        let reported = agent.report != nil && agent.report != reportBeforeTurn[agentID]
-        return agent.state == .finished
-            && !reported
-            && !agent.outcomeAsked
-            && agent.queuedPrompts.isEmpty
-    }
-
-    /// The whole of what a silent agent is asked. Short, and closed: an agent invited
-    /// to explain itself in prose would explain itself in prose, and prose is not an
-    /// outcome.
-    ///
-    /// It names the one tool a fresh conversation was told about (023). An agent
-    /// briefed with the older name answers by that name all the same, because the
-    /// older names are accepted everywhere the new one is.
-    ///
-    /// It used to end "and say nothing else", and Opus 5.5 took that literally: after
-    /// the call it still owes a reply, and the nothing it wrote was zero-width spaces —
-    /// one, usually, and once twenty-two thousand of them. Nothing is said about what
-    /// comes after the call now; the call is what is asked for.
-    static let askForOutcome = """
-        That turn ended without a report. Call \(AppTool.finishTurn) now with how it \
-        actually went. If the work is done, that is done.
-        """
 
     private func turnFailed(agentID: UUID, error: any Error) async {
         // A runtime that fell over on the cancel the app sent after finish_turn (#139):
@@ -1804,8 +1739,8 @@ extension DaemonCore {
     public enum StopCause: Sendable, Equatable {
         case person
         case agent(UUID)
-        /// The agent itself, as it asked on the call that ended its turn. Only ever an
-        /// archive, of an agent whose turn is already over.
+        /// A workflow's run itself, done as its workflow's `when-done:` allows (#433).
+        /// Only ever an archive, of an agent whose turn is already over.
         case itself
 
         /// The agent that asked, when one did.
@@ -1961,8 +1896,8 @@ extension DaemonCore {
             await record(.runtimeNote("\(starterName(starter)) archived this agent."), for: agentID)
             await move(agentID, on: .archivedByAgent)
         case .itself:
-            // Unreachable. An agent used to archive its own session when its turn
-            // ended; that ask is now dropped, and only the person archives.
+            // A workflow's run once its turn is over, as the workflow's `when-done:`
+            // allows (#433). The line saying so is already in its transcript.
             await move(agentID, on: .archivedByAgent)
         }
         // Out of Pinned (#180): an archived session is put away, not kept on top.

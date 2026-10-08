@@ -35,6 +35,15 @@ struct JSONRPCTests {
         #expect(params?["prompt"]?.arrayValue?.first?["text"]?.stringValue == "hi")
     }
 
+    /// The same message is the same bytes in every process, whatever order its
+    /// dictionaries hash in, so a runtime's prompt prefix survives a restart (#465).
+    @Test func keysAreWrittenInOneOrder() throws {
+        let line = try JSONRPCCodec.encode(.success(id: .number(1), result: [
+            "tools": [["name": "b", "inputSchema": ["type": "object", "properties": ["z": [:], "a": [:]]]]],
+        ]))
+        #expect(line == #"{"id":1,"jsonrpc":"2.0","result":{"tools":[{"inputSchema":{"properties":{"a":{},"z":{}},"type":"object"},"name":"b"}]}}"#)
+    }
+
     @Test func callsAndRepliesAcrossAPair() async throws {
         let (mine, theirs) = PairedTransport.pair()
         let client = JSONRPCConnection(transport: mine)

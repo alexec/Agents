@@ -44,7 +44,7 @@ struct ServerAllowanceTests {
         let id = try await mac.start(.init(runtimeID: "codex", cwd: macWork, prompt: "one"))
         await eventually("it answered", within: .seconds(30)) {
             let agent = await mac.agent(id)
-            return agent?.state == .finished && agent?.outcomeAsked == true
+            return agent?.state == .finished && agent?.report != nil
         }
         try await Task.sleep(for: .milliseconds(300))
 

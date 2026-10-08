@@ -100,7 +100,10 @@ public enum JSONRPCCodec {
             e.id = id; e.error = error
         }
         let encoder = JSONEncoder()
-        encoder.outputFormatting = [.withoutEscapingSlashes]
+        // Keys in one order, not the process's hash order: a tool list or session `_meta`
+        // written differently after a restart is a new prompt prefix to a runtime that
+        // passes it on as sent, and the provider's cache misses on it (#465).
+        encoder.outputFormatting = [.withoutEscapingSlashes, .sortedKeys]
         let data = try encoder.encode(e)
         return String(decoding: data, as: UTF8.self)
     }

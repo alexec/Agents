@@ -71,7 +71,7 @@ struct HostPaths: Sendable, Equatable {
 
     var helpers: URL { Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers", isDirectory: true) }
     var agentsControl: URL { helpers.appendingPathComponent("agents-control") }
-    /// The built web remote, Web/dist, copied in by project.yml as a folder (071 research R8).
+    /// The built web remote, Web/dist, built and copied in by project.yml (071 research R8, #473).
     var webRemote: URL { Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/dist", isDirectory: true) }
     var agentsd: URL { helpers.appendingPathComponent("agentsd") }
 }

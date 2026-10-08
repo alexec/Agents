@@ -97,7 +97,7 @@ export interface ACPProviderInfo {
   configured?: boolean;
 }
 
-export type AfterTurn = "park";
+export type AfterTurn = "park" | "archive";
 
 export interface Agent {
   id: UUID;
@@ -502,6 +502,7 @@ export interface ControlHost {
   machineID?: string;
   relay?: boolean;
   signInFrom?: Record<string, HostID>;
+  tunnel?: HostTunnel;
 }
 
 export interface ControlStatus {
@@ -869,6 +870,11 @@ export interface HostJoinStatus {
   connected: boolean;
   problem?: string;
   at: WireDate;
+}
+
+export interface HostTunnel {
+  up: boolean;
+  problem?: string;
 }
 
 export interface LabelVocabularyRequest {
@@ -1569,6 +1575,7 @@ export interface TurnSummary {
   concise?: TranscriptEntry[];
   outcome?: TranscriptEntry[];
   steps?: number;
+  usage?: TurnUsage;
 }
 
 export interface TurnUsage {
@@ -1724,6 +1731,7 @@ export interface Workflow {
   enabled?: boolean;
   archived?: boolean;
   hosts?: string[];
+  whenDone?: WorkflowWhenDone;
 }
 
 export interface WorkflowApproval {
@@ -1830,6 +1838,7 @@ export interface WorkflowSettingsRequest {
   cooldown?: string;
   labels?: string[];
   hosts?: string[];
+  whenDone?: string;
 }
 
 export interface WorkflowSummary {
@@ -1865,6 +1874,8 @@ export type WorkflowTriggerStored =
   | { agentStopped: Record<string, never> }
   | { workflowCompleted: { id?: string } }
   | { unrecognised: { name: string; keys: Record<string, JSONValue> } };
+
+export type WorkflowWhenDone = "park" | "archive-allowed" | "archive";
 
 export interface WorkflowsListRequest {
   folder?: URLString;
@@ -2172,7 +2183,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConfigChoiceGroup: { required: ["options"], optional: ["name", "group"] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ContinueInProjectRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
-  ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom"] },
+  ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "tunnel"] },
   ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "thisMacHost", "projectDetection"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily"] },
@@ -2218,6 +2229,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Headline: { required: ["h1", "h2", "h3"], optional: [] },
   HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive"] },
   HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
+  HostTunnel: { required: ["up"], optional: ["problem"] },
   LabelVocabularyRequest: { required: ["folder"], optional: [] },
   Lease: { required: ["resource", "displayName", "holder", "grantedAt", "expiresAt", "warned"], optional: [] },
   LeaseSnapshot: { required: ["resources", "at"], optional: [] },
@@ -2297,7 +2309,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   TranscriptEntry: { required: ["id", "at", "kind"], optional: ["subagentID"] },
   TranscriptPage: { required: ["firstIndex", "total", "entries"], optional: [] },
   TranscriptRequest: { required: ["agentID", "limit"], optional: ["before", "from"] },
-  TurnSummary: { required: ["id", "start", "end"], optional: ["ask", "last", "concise", "outcome", "steps"] },
+  TurnSummary: { required: ["id", "start", "end"], optional: ["ask", "last", "concise", "outcome", "steps", "usage"] },
   TurnUsage: { required: ["totalTokens", "inputTokens", "outputTokens"], optional: ["thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "cost"] },
   TurnsPage: { required: ["turns", "firstTurn", "openStart"], optional: [] },
   TurnsRequest: { required: ["agentID", "limit"], optional: ["before"] },
@@ -2316,7 +2328,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WaitingAgent: { required: ["agentID", "title", "folder", "status"], optional: [] },
   WebRemoteStatus: { required: ["port", "served"], optional: ["reason", "detail"] },
   WorkReport: { required: ["outcome", "message", "at"], optional: ["block"] },
-  Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "enabled", "archived", "hosts"] },
+  Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "enabled", "archived", "hosts", "whenDone"] },
   WorkflowApproval: { required: ["digest", "isNew"], optional: ["note"] },
   WorkflowApproveRequest: { required: ["folder", "workflowID", "digest"], optional: [] },
   WorkflowArchiveRequest: { required: ["folder", "workflowID", "archived"], optional: [] },
@@ -2326,7 +2338,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowRequest: { required: ["folder", "workflowID"], optional: [] },
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
   WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort"] },
-  WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "hosts"] },
+  WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "hosts", "whenDone"] },
   WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["overLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
   WorkflowsListRequest: { required: [], optional: ["folder"] },
   WorktreeStatus: { required: ["uncommitted"], optional: ["ahead", "behind", "unmerged"] },

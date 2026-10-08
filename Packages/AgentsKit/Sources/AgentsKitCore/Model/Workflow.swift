@@ -80,6 +80,9 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
     /// which is a file that does not say. Each id is a `MachineID`: a Mac's hardware
     /// UUID, Linux `/etc/machine-id`, the host name only when neither exists.
     public var hosts: [String]?
+    /// What a run may do with its session when it is done, from the file's
+    /// `when-done:` (#433). `nil` is a file that does not say, which is `park`.
+    public var whenDone: WorkflowWhenDone?
 
     /// Whether it is put away.
     public var isArchived: Bool { archived == true }
@@ -95,8 +98,9 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
                 unknownFields: [String: JSONValue] = [:],
                 settings: WorkflowSettings = WorkflowSettings(),
                 cooldown: TimeInterval? = nil, enabled: Bool? = nil, archived: Bool? = nil,
-                hosts: [String]? = nil) {
+                hosts: [String]? = nil, whenDone: WorkflowWhenDone? = nil) {
         self.hosts = hosts
+        self.whenDone = whenDone
         self.cooldown = cooldown
         self.enabled = enabled
         self.archived = archived

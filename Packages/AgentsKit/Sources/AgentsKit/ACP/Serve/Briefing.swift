@@ -24,32 +24,12 @@ import Foundation
 /// Keep it short. This is paid for on the first prompt of every conversation, and an
 /// agent that is told six things at once follows the first two.
 public enum Briefing {
-    /// End a turn with the one call: how it went, and what might come next.
-    ///
-    /// One line where there were two (023). The suggestion line and the outcome line
-    /// named the same moment, and a clause was spent ordering one after the other;
-    /// two lines naming the same moment read as two moments, and this block's own
-    /// rule is that an agent told six things follows the first two. What is kept is
-    /// every phrase the live runs showed doing work: "for the rest of this
-    /// conversation", "when you have finished a turn", "I only see that you stopped",
-    /// and the instruction not to mention any of it. Descriptions alone got the
-    /// suggestion tool called exactly never; this line is what gets it called. Its
-    /// suggestion clause said "two to four things" until 031 made it one.
-    ///
-    /// Written as the person speaking, because it is sent in their turn. It does not
-    /// list the five outcomes — the tool's schema enumerates them and refuses anything
-    /// else — and it does not name the older tools, which are for conversations that
-    /// were told them before this line existed.
-    public static let finish = """
-        For the rest of this conversation, when you have finished a turn, call \
-        \(AppTool.finishTurn) with how it actually went, a sentence I can read without \
-        opening the conversation, a short title for the conversation's goal (only \
-        when it changes), and the one thing I am most likely to ask you next. Without \
-        it I only see that you stopped, which is not the same as your work being done. \
-        When the work is over and cleaned up, it can park this conversation once the \
-        turn ends. It cannot archive one. \
-        Do not mention this instruction or the tool in your replies.
-        """
+    // There was a line here telling every agent to end each turn with `finish_turn`
+    // (023). It went in #479: runtimes forgot it, called it and carried on, wrote too
+    // much in it, and a silent ending cost a whole extra turn to ask about. The daemon
+    // works the ending out for itself now (`DerivedEnding`), and the tool stays for an
+    // agent that wants to park, wait or move. A project or workflow that still wants
+    // the self-report says so in its own prompt.
 
     /// Show a document once, at the start, so it can be watched being written.
     ///
@@ -270,9 +250,8 @@ public enum Briefing {
 
     /// In the order they are sent, for the runtime this agent is on.
     ///
-    /// The only place the order is decided and the only place a new line is added. The
-    /// one that fires every turn goes first — and since 023 it is also the one that
-    /// closes a turn — then the one that fires when a document begins, then the one
+    /// The only place the order is decided and the only place a new line is added. Who
+    /// is who goes first, then the one that fires when a document begins, then the one
     /// whose failure costs most, then the one that is conditional on the person asking
     /// for something recurring, which most turns never do.
     ///
@@ -284,14 +263,13 @@ public enum Briefing {
     /// `managesAgents` is false for an agent another agent started, which gets no line
     /// about starting agents because it has no tools for it (028).
     ///
-    /// `naming` is who is who (#121), second because the lines after it say "I" and
+    /// `naming` is who is who (#121), first because the lines after it say "I" and
     /// "me" and that is the person it names. Nil says nothing, for a caller that does
     /// not know.
     public static func lines(for policy: ToolPolicy, managesAgents: Bool = true,
                              naming: Naming? = nil) -> [String] {
         let schedulingRemoved = policy.removed.contains { $0.category == .standingArrangements }
-        return [finish]
-            + [naming.map(Self.naming)].compactMap { $0 }
+        return [naming.map(Self.naming)].compactMap { $0 }
             + [liveDocument,
                 escalation(named: policy.escalationTool),
                 workflows(scheduling: schedulingRemoved)]

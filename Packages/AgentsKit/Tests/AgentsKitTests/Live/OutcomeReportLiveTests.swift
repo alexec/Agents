@@ -65,7 +65,7 @@ struct OutcomeReportLiveTests {
             if let agent = await core.agent(id), !agent.state.hasTurnInFlight,
                agent.queuedPrompts.isEmpty,
                // Either it said something, or it was asked and the asked turn is over.
-               agent.report != nil || agent.outcomeAsked {
+               agent.report != nil {
                 // A beat, so the asked turn has begun before this reads "settled".
                 try await Task.sleep(for: .seconds(2))
                 if let settled = await core.agent(id), !settled.state.hasTurnInFlight,

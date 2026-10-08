@@ -133,9 +133,12 @@ struct InterruptionTests {
         let launcher = FakeLauncher(script: costing)
         let core = try core(launcher, locations: locations)
 
-        // The first turn, and the question after it about how it went: two turns,
-        // each in a process of its own.
+        // Two turns, each in a process of its own: the first let go before the second.
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "one"))
+        await settled(core, id, "the first turn ended")
+        // Let go whether or not the warm pool would have kept it.
+        await core.releaseRuntime(for: id)
+        try await core.prompt(.init(agentID: id, text: "two"))
         await eventually("0.5 in each of two processes") {
             await core.agent(id)?.costToDate["USD"] == 1.0
         }

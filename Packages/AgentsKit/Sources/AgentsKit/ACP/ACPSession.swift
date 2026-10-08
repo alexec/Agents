@@ -668,7 +668,8 @@ public actor ACPSession {
             }
             if !choices.isEmpty {
                 made.append(ConfigOption(id: modelOption, name: "Model", category: "model", type: "select",
-                                         currentValue: models["currentModelId"], options: choices))
+                                         currentValue: models["currentModelId"],
+                                         options: ChoiceOrder.sorted(choices)))
             }
         }
         return made
@@ -1325,6 +1326,11 @@ public struct TurnEvidence: Sendable, Hashable {
     /// or an edit, not a search or the app's own tools, which change nothing to repeat.
     public var outputs: [(didWork: Bool, text: String)] = []
     public var reply = ""
+    /// The agent's last message in the turn, whole: what the app reads an ending from
+    /// when the agent said nothing about it (#479).
+    public private(set) var closingWords = ""
+    private var closingID: String?
+    private var speaking = false
     private var seen: Set<String> = []
 
     public init() {}
@@ -1337,14 +1343,22 @@ public struct TurnEvidence: Sendable, Hashable {
     mutating func take(_ kind: TranscriptEntry.Kind) {
         switch kind {
         case .toolCall(let call), .toolCallUpdate(let call):
+            speaking = false
             guard call.status == "completed" || call.status == "failed",
                   let id = call.toolCallID, seen.insert(id).inserted, outputs.count < 200 else { return }
             let changes = ["execute", "edit", "delete", "move"].contains(call.kind ?? "")
             outputs.append((call.status == "completed" && changes, String(call.printedText.suffix(8 * 1024))))
-        case .agentMessage(_, let text, _):
+        case .agentMessage(let id, let text, _):
             reply = String((reply + text).suffix(8 * 1024))
-        default:
+            // Chunks of one message joined; a new message in place of the one before.
+            closingWords = speaking && id == closingID ? String((closingWords + text).suffix(8 * 1024)) : text
+            closingID = id
+            speaking = true
+        // A thought between chunks is not the agent starting over.
+        case .agentThought:
             break
+        default:
+            speaking = false
         }
     }
 }

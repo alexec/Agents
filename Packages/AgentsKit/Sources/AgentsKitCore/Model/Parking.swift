@@ -41,14 +41,17 @@ public extension Agent {
 }
 
 /// Where an agent asked, on the call that ended its turn, to be put once the turn is
-/// over. Parking keeps the chat in the list, to come back to. Archiving is not
-/// something an agent can ask for: a session stays where the person can open it and
+/// over. Parking keeps the chat in the list, to come back to. Archiving is for a
+/// workflow's run alone, and only when the workflow's author allowed it with
+/// `when-done:` (#433): a session a person started stays where they can open it and
 /// see whether it was useful.
 public enum AfterTurn: String, Codable, Hashable, Sendable {
     case park
+    case archive
 
-    /// What an agent sent, if it is `park`. Anything else is refused rather than read
-    /// as nothing: an ask the agent thinks it made and did not is worse than being told.
+    /// What an agent sent, if it is one of the two. Anything else is refused rather
+    /// than read as nothing: an ask the agent thinks it made and did not is worse than
+    /// being told.
     public init?(wire: String) {
         self.init(rawValue: wire.trimmingCharacters(in: .whitespacesAndNewlines))
     }
@@ -56,19 +59,32 @@ public enum AfterTurn: String, Codable, Hashable, Sendable {
     /// Whether it may go with an ending. Parking keeps the chat to come back to, so
     /// `partly_done` may too — but not an ending that asks the person for something
     /// (a parked chat asks for nothing), nor `blocked` (a parked chat never wakes,
-    /// and a blocked one has to).
+    /// and a blocked one has to). Archiving puts the work out of sight, so only an
+    /// ending with nothing left in it goes with it.
     public func goes(with outcome: WorkOutcome) -> Bool {
         switch (self, outcome) {
         case (.park, .done), (.park, .nothingToDo), (.park, .partlyDone): return true
+        case (.archive, .done), (.archive, .nothingToDo): return true
         default: return false
         }
     }
 
     /// Said when `goes(with:)` is false, by both the service and the daemon.
     public var refusal: String {
-        "Nothing was recorded: park only goes with done, nothing_to_do or partly_done."
+        switch self {
+        case .park: "Nothing was recorded: park only goes with done, nothing_to_do or partly_done."
+        case .archive: "Nothing was recorded: archive only goes with done or nothing_to_do."
+        }
     }
 
-    /// Said when `afterwards` is not `park`.
-    public static let unknown = "Nothing was recorded: afterwards has to be park."
+    /// Said when `afterwards` is neither.
+    public static let unknown = "Nothing was recorded: afterwards has to be park or archive."
+
+    /// Said when an agent asks to archive itself and its workflow did not allow it, or
+    /// no workflow started it.
+    public static let archiveNotAllowed = """
+        Nothing was recorded: only a workflow's run can archive itself, and only when \
+        its workflow says when-done: archive-allowed or archive. Leave afterwards out, \
+        or say park.
+        """
 }

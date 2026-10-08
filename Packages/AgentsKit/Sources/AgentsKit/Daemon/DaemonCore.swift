@@ -560,6 +560,10 @@ public actor DaemonCore {
     /// account, kept on the row until this one gives its own, so a turn that ends still
     /// holding it has said nothing about itself.
     var reportBeforeTurn: [UUID: WorkReport] = [:]
+    /// Runs whose turn ended done under a workflow's `when-done:` that archives them
+    /// (#433), with the line their transcript gets. Set by `move` while the run is still
+    /// in flight, and taken once the runtime is let go, as an archive has to be.
+    var archiveWhenDone: [UUID: String] = [:]
     /// The latest plan window each agent's runtime reported (R2).
     var latestRateLimit: [UUID: RateLimitInfo] = [:]
     /// Credentials whose allowance is being asked for now, so opening Agent Runtimes
@@ -1186,21 +1190,28 @@ public actor DaemonCore {
         // An agent's own ask to be parked, made on the call that ended its turn, is the
         // same park at the same moment — but only for the ending it asked about: the
         // turn it made the ask in, ended by its own hand, with nothing the person has
-        // queued since. Any other ending drops the ask. An ask to be archived, from a
-        // conversation told it could, is dropped with it: an agent cannot put a session
-        // away.
+        // queued since. Any other ending drops the ask.
+        //
+        // A workflow's run may be archived instead (#433), when its file's `when-done:`
+        // says so and the run's turn ended done as above: noted here, while the run is
+        // still in flight to say which workflow it is, and archived once the runtime is
+        // let go. Nothing else is archived on an agent's word.
         let wasParked = agent.parking?.isParked == true
+        archiveWhenDone[agentID] = nil
         switch next {
         case .finished, .stopped:
             let pickingUp = event == .foundDead && agent.mayBePickedUpAfterRestart
+            let endedAsAsked = next == .finished && reasonThisEventSet == .endTurn
+                && agent.queuedPrompts.isEmpty && !pickingUp
+            if endedAsAsked, runArchivesWhenDone(agentID, agent: agent, asked: agent.afterTurn) {
+                archiveWhenDone[agentID] = archivedWhenDoneNote(agentID)
+            }
             if case .whenTurnEnds = agent.parking, !pickingUp {
                 agent.parking = .parked(at: now())
                 agent.isUnread = false
             }
             if let after = agent.afterTurn, !pickingUp {
-                let endedAsAsked = next == .finished && reasonThisEventSet == .endTurn
-                    && agent.queuedPrompts.isEmpty
-                if after == .park, endedAsAsked, agent.parking == nil {
+                if after == .park, endedAsAsked, agent.parking == nil, archiveWhenDone[agentID] == nil {
                     agent.parking = .parked(at: now())
                     agent.isUnread = false
                 }
@@ -1242,14 +1253,6 @@ public actor DaemonCore {
         // one does not collide with a run that has in fact finished.
         switch next {
         case .finished, .stopped:
-            // Held back when the app is about to ask this agent how the work went.
-            // That question is a turn of its own and ends of its own accord, so firing
-            // here as well would run every agent-finished workflow twice per agent —
-            // and the run held until the second ending is the better one anyway: by
-            // then the agent's outcome is on the record for the workflow's row to show.
-            if next == .finished, willAskForOutcome(agentID: agentID, reason: reasonThisEventSet) {
-                break
-            }
             // An agent a restarting daemon is about to bring back has not finished
             // stopping — it is about to carry on. Saying "an agent stopped" about it
             // would be false, and would race the pick-up that is seconds away (011,
