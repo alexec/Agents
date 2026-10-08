@@ -90,6 +90,8 @@ something particular done.
 
 - [Set up a workflow](set-up-a-workflow.md): start agents on a schedule, or when another
   agent finishes, stops or asks.
+- [Start a workflow from an MCP event](start-a-workflow-from-an-mcp-event.md): an agent
+  each time an MCP server reports something, such as a pull request's checks failing.
 - [Pin a page to a project](pin-a-page-to-a-project.md): a document or an HTML page
   under its project in the sidebar, live as it changes.
 - [Have an agent wait for something](wait-for-something.md): checks passing, another

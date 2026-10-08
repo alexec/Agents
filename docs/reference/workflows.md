@@ -40,6 +40,7 @@ Check the build and say whether it is green.
 | `on:` `agent-stopped` | No settings | Runs when an agent in this project stops without finishing. |
 | `on:` `workflow-completed` | Optionally `id:`, a workflow's id | Runs when that workflow's run finishes, or when any workflow's run finishes if there is no `id:`. |
 | `on:` an event name, such as `branch.moved` or `custom.build_green` | Optionally the event's details, as filters | Runs when that event happens. Any name on [Events](events.md) works, or a subject with `.*`, such as `agent.*`, for all of its events. Under the name, list details to narrow it, such as `branch: main`. A detail can take a list, meaning any of them, such as `outcome: [done, nothing_to_do]`. A detail the event does not carry, or a value a detail cannot have, is an error in the file, naming the right ones. An event about this Mac runs matching workflows in every project. A name this version does not know is shown on the workflow's page and never runs. |
+| `on:` a server's event, such as `checks.failed` | Optionally `server:`, and the event's own filters | Runs when an MCP server reports that event. Its name is `noun.verbed`, with no prefix, as the server names it. Without `server:`, it hears every MCP server this project can use that offers the name, including one added later. `server:` narrows it to one server's name, or a list of names. Every other key is the event's own filter, sent to the server as it is: a list is a list argument, not "any of". A filter the event doesn't take, or a value of the wrong type, is an error on the workflow's page, naming the filters it takes. A name whose noun is one of the app's subjects, such as `branch.created`, is never a server's event. See [Events from MCP servers](events.md#events-from-mcp-servers). |
 | `agent:` `new` | The default | Each run starts a new agent. |
 | `agent:` `standing` | | Each run goes to the workflow's own agent, which keeps its conversation from run to run. |
 | `agent:` `triggering` | | Each run goes to the agent that set it off. For an event, it is the agent the event is about, or the agent that published a `custom.` event. A schedule, or an event with no agent, has no such agent, so it does not run. |
@@ -105,6 +106,33 @@ agent: new
 Every agent here has stopped. For each agent in the event's ids, check that what it said it
 did landed: its branch merged, its checks green. Remove worktrees whose branch is on main.
 ```
+
+To run on an MCP server's event, name it as the server does, with its filters under it.
+With GitHub and GitLab both set up and offering `pull_request.opened`, the first trigger
+below hears either, and the event's `server` detail says which; the other two hear one
+server each, with that server's own filter:
+
+```markdown
+---
+name: Review new pull requests
+on:
+  - pull_request.opened
+  - pull_request.opened:
+      server: github
+      repo: alexec/Agents
+  - pull_request.opened:
+      server: gitlab
+      project: alexec/agents
+agent: new
+permission-mode: plan
+---
+
+Review the pull request in the event's data, and list anything that looks wrong.
+```
+
+Under **Triggers**, the workflow's page shows a line for each server a trigger hears: when
+the server was last asked and when the last event came, or why not. See
+[Start a workflow from an MCP event](../how-to/start-a-workflow-from-an-mcp-event.md).
 
 A `new` or `standing` run set off by an event no agent is behind, such as `machine.disk_low`,
 is told the event at the end of its prompt: its sentence and every detail, so the agent can
@@ -300,5 +328,6 @@ or while you are away. Archive is for one you are putting away.
 
 - [Set up a workflow](../how-to/set-up-a-workflow.md)
 - [Have an agent wait for something](../how-to/wait-for-something.md)
+- [Start a workflow from an MCP event](../how-to/start-a-workflow-from-an-mcp-event.md)
 - [Events](events.md)
 - [Tools the app gives agents](agent-tools.md)

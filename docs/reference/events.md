@@ -137,6 +137,67 @@ agents and workflows in the same project that something happened.
 
 The publishing agent is told who was woken and which workflows ran.
 
+## Events from MCP servers
+
+An MCP server can offer events of its own, such as `checks.failed` or `pr.merged`. The app
+asks for them the way the MCP events draft (`experimental-ext-triggers-events`) describes,
+in poll mode, and only for servers whose `initialize` declares the `events` capability. See
+[Start a workflow from an MCP event](../how-to/start-a-workflow-from-an-mcp-event.md).
+
+- **Names.** A server's event is `noun.verbed`, lowercase, with no prefix, the same shape as
+  the app's own. A name in the app's catalogue is always the app's. A server's event whose
+  noun is one of the app's subjects (`agent`, `project`, `workflow`, `branch`, `lease`,
+  `mac`, `machine`, `person`, `cost`, `server`, `custom`) is refused, so a server can never
+  pose as the app.
+- **Which servers.** The servers a project's agents get: the project's `.agents/mcp.json`
+  once approved, your `~/.agents/mcp.json`, and plugins. A trigger without `server:` hears
+  every one that offers the name; `server:` narrows it. A local (stdio) server is run by the
+  app, as its own copy, to ask for events.
+- **Filters are the server's.** The keys under a trigger are sent to the server as the
+  subscription's arguments, checked against the event's own filter schema. A list is a list
+  argument, not "any of".
+- **Asked for while something listens.** Only for workflows that are on, not archived,
+  approved, and run on this Mac or server. Two workflows with the same event and filters
+  share one subscription.
+- **Pace.** As often as the server asks, but never more than every 10 seconds, and at least
+  every 5 minutes; every 30 seconds when it doesn't say. Each subscription is asked on its
+  own, so a slow server never holds another up.
+- **Once each.** Each event is recorded once, by the server's event id, and runs each
+  workflow that heard it once, across restarts. The app keeps where each subscription has
+  got to in `mcp-events.json` in its own folder.
+- **Starts from now.** A new subscription, or one whose filters changed, skips events from
+  before it.
+- **Missed events.** When the app was away longer than the server keeps events, the
+  trigger's line says **Events may have been missed since …**, and the next event carries a
+  `missed_since` detail. The events it did get still run.
+- **Data is data.** The event's data is passed to the agent after the workflow's prompt,
+  in a fenced block, marked as coming from the server and not from you. Data over 256 KB is
+  cut, and the event says so.
+- **Push and webhook** delivery are not taken yet. An event offered only that way is shown
+  as not supported.
+
+A server's event carries:
+
+| Detail | What it is |
+| --- | --- |
+| `server` | The server it came from, by its name in `mcp.json` |
+| `event` | Its name, such as `checks.failed` |
+| `subscription` | The subscription's key: a digest of the server, the event and its filters |
+| `mcp_event_id` | The server's id for it |
+| `time` | When the server says it happened |
+| `payload` | The event's data, as compact JSON, at most 256 KB |
+| `payload_cut` | `true` when the data was cut |
+| `missed_since` | On the first event after a gap, when events may have been missed from |
+
+A wait on a server's event, such as `checks.failed` or `checks.*`, hears it while some
+workflow on this Mac or server listens to it. A wait does not ask a server for events by
+itself.
+
+Each workflow page shows a line for each server its event triggers hear, on the Mac, the
+iPhone and iPad and the web page: when it was last asked and when the last event came, or
+why not (**Can't reach ci**, the server no longer offers the event, refused it, or doesn't
+take the filters).
+
 ## Older trigger names
 
 Workflows written before events keep working. Each older name answers to these events:
