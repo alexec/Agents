@@ -95,6 +95,15 @@ counting again from the next agent that works.
 | --- | --- | --- |
 | `branch.moved` | branch, from, to | A branch moved: the default branch, or one an agent works on. |
 
+## Drop box
+
+Each project has a drop box, the folder `.agents/dropbox/` in it. See
+[Hand files to a workflow](../how-to/hand-files-to-a-workflow.md).
+
+| Event | Details | What it means |
+| --- | --- | --- |
+| `dropbox.file_added` | path, name, folder, extension, size | A file arrived in this project's drop box, or a folder in it. `path` is the file's full path on the project's host. `name` is its name. `folder` is where it is inside `.agents/dropbox/`, such as `review` or `review/2026`, and empty at the top. `extension` is in lower case without the dot, and empty when there is none. `size` is in bytes. Raised once, when the file has stopped changing. A file replaced under the same name, or changed where it lies, is raised again. Files there when the app starts, and names starting with a dot, are not. |
+
 ## This Mac
 
 These belong to the machine the host runs on, not to a project. Any agent can wait for them.
@@ -216,7 +225,7 @@ On the Mac, **Events** is a row at the foot of the sidebar, above **Resources** 
 **Spending**. It shows every event, newest first, grouped by day.
 
 - **Filters**: a menu for all projects, this Mac or one project, and a capsule for each
-  subject: **Agents**, **Workflows**, **Branches**, **This Mac** and
+  subject: **Agents**, **Workflows**, **Branches**, **Drop box**, **This Mac** and
   **Custom**.
 - **Each row** shows the time, what happened, and the event's name. Under it, what it led
   to: **Woke** an agent, **Fired** a workflow, **Refused by** a workflow with the reason,
@@ -235,6 +244,7 @@ no **Waiting now**.
 ## See also
 
 - [Have an agent wait for something](../how-to/wait-for-something.md)
+- [Hand files to a workflow](../how-to/hand-files-to-a-workflow.md)
 - [Set up a workflow](../how-to/set-up-a-workflow.md)
 - [Workflow triggers and actions](workflows.md)
 - [Tools the app gives agents](agent-tools.md)

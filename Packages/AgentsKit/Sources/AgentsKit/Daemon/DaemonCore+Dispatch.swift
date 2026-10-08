@@ -101,6 +101,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.FilesWriteRequest.self)
                 return .success(try JSONValue.encoding(try writeAttachment(request)))
 
+            case DaemonAPI.Method.dropboxPut:
+                let request = try require(params, as: DaemonAPI.DropboxPutRequest.self)
+                return .success(try JSONValue.encoding(try putInDropbox(request)))
+
             case DaemonAPI.Method.macReveal:
                 try macReveal(try require(params, as: DaemonAPI.MacPathRequest.self))
                 return .success([:])

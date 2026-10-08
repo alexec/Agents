@@ -5,15 +5,16 @@ import Testing
 /// The one list of what can happen (042 FR-003, FR-022, FR-024).
 @Suite("The event catalogue")
 struct EventCatalogueTests {
-    @Test func thereAreTwentyEightUniqueWellFormedNames() {
+    @Test func thereAreTwentyNineUniqueWellFormedNames() {
         let names = EventCatalogue.all.map(\.name)
         // 30 from 042, 051's agent.retired, and 052's switch and two allowance kinds,
         // less the ten pull-request kinds that went with GitHub support, and the switch,
         // which went with the pool (065), and agent.parked and agent.archived (#96), and
-        // mac.disk_low and mac.disk_ok (#195, machine.* since #372), and project.idle (#360).
-        #expect(names.count == 28)
+        // mac.disk_low and mac.disk_ok (#195, machine.* since #372), project.idle (#360),
+        // and dropbox.file_added (#231).
+        #expect(names.count == 29)
         for name in ["cost.allowance_out", "cost.allowance_back", "agent.parked", "agent.archived",
-                     "machine.disk_low", "machine.disk_ok", "project.idle"] {
+                     "machine.disk_low", "machine.disk_ok", "project.idle", "dropbox.file_added"] {
             #expect(names.contains(name), "\(name)")
         }
         #expect(!names.contains("agent.runtime_switched"))

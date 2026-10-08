@@ -71,6 +71,25 @@ agent: new
 Deploy the docs, then say what you deployed.
 ```
 
+To start a new agent for each PDF or Markdown file dropped into the project's
+`.agents/dropbox/review/` (see [Hand files to a workflow](../how-to/hand-files-to-a-workflow.md)):
+
+```markdown
+---
+name: Review what lands in the drop box
+on:
+  - dropbox.file_added:
+      folder: review
+      extension: [pdf, md]
+agent: new
+---
+
+Read the dropped file and review it. Move it to .agents/dropbox/done/ when finished.
+```
+
+A run started by an event no agent is behind, such as this one, is told the event at the end of
+its prompt, details and all, so the agent reads the file's `path` there.
+
 To narrow by more than one value, give a list. This one runs when an agent labelled `bug`
 finishes and is parked, and when the `nightly` workflow's agent ends `stuck` or
 `partly_done`:
