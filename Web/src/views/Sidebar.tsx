@@ -337,7 +337,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
           })}
           {/* Only with no live session at all, pinned ones counted, as the window's (#250). */}
           {!searching && live.length === 0 && <p class="hint">No sessions yet</p>}
-          {(archived.length > 0 || (project.counts.archived ?? 0) > 0 || project.retiredCount > 0) && (
+          {(archived.length > 0 || (project.counts.archived ?? 0) > 0) && (
             <details class="archived" open={showsArchived}
               onToggle={(e) => {
                 const open = (e.currentTarget as HTMLDetailsElement).open;
@@ -349,10 +349,6 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
               {archived.slice(0, !searching ? archivedShown : showsAllMatches.value ? archived.length : matchesShown).map(row)}
               {searching && !showsAllMatches.value && archived.length > matchesShown && (
                 <button class="link show-all" onClick={() => (showsAllMatches.value = true)}>Show all {archived.length}</button>
-              )}
-              {showsArchived && project.retiredCount > 0 && !searching && (
-                <p class="hint">{project.retiredCount === 1 ? "1 older agent has been retired."
-                  : `${project.retiredCount} older agents have been retired.`}</p>
               )}
             </details>
           )}

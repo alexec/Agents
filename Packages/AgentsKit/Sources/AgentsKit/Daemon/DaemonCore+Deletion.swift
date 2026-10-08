@@ -1,13 +1,13 @@
 import Foundation
 import AgentsKitCore
 
-/// Retiring archived agents (051).
+/// Deleting archived agents (051, #398).
 ///
-/// Archiving says an agent is over. Retiring is what comes after: once it has been
-/// archived long enough, or the archive takes more room than the person allows, its
-/// conversation and record are deleted and a tombstone is left for everything that
-/// names it. The rules are `RetentionPlan`'s; this is the daemon gathering the facts,
-/// acting on the answer and telling the windows.
+/// Archiving says an agent is over. Deleting is what comes after: the person's Delete,
+/// or the age rule once it has been archived long enough. Its conversation, record and
+/// clean worktree go, and nothing is left: anything that named it says it was deleted.
+/// The rule is `RetentionPlan`'s; this is the daemon gathering the facts, acting on the
+/// answer and telling the windows.
 extension DaemonCore {
     /// For the tests: measure folders some other way.
     func setMeasureFolder(_ measure: @escaping @Sendable (URL) -> Int) {
@@ -17,15 +17,11 @@ extension DaemonCore {
 
     // MARK: Loading
 
-    /// The settings and the tombstones, read once. Before the agents, so a start can
-    /// finish a retire the last daemon was cut off in the middle of.
+    /// The settings, read once.
     func loadRetentionIfNeeded() {
         guard !retentionIsLoaded else { return }
         retentionIsLoaded = true
         retention = retentionStore.load()
-        retired = TombstoneTable(retiredStore.loadAll())
-        // A new table counts its folders from nothing: the index is made again.
-        projectIndexCache = nil
     }
 
     // MARK: Reading
@@ -36,9 +32,7 @@ extension DaemonCore {
         let archived = agents.archived.values
         return DaemonAPI.RetentionState(settings: retention.settings,
                                         archivedCount: archived.count,
-                                        archivedBytes: archived.reduce(0) { $0 + size(of: $1.id) },
-                                        retiredCount: retired.count,
-                                        overCap: lastOverCap)
+                                        archivedBytes: archived.reduce(0) { $0 + size(of: $1.id) })
     }
 
     /// What an archived agent takes on disk: from the index when it has it, measured
@@ -53,37 +47,20 @@ extension DaemonCore {
         return size
     }
 
-    /// `agents/retired`: by id, or a project's newest first, or the newest of all.
-    public func retiredTombstones(_ request: DaemonAPI.RetiredRequest) -> [Tombstone] {
-        loadRetentionIfNeeded()
-        let limit = min(max(1, request.limit ?? DaemonAPI.RetiredRequest.limitCeiling),
-                        DaemonAPI.RetiredRequest.limitCeiling)
-        if let ids = request.ids {
-            return ids.prefix(limit).compactMap { retired[$0] }
-        }
-        let folder = request.folder.map(Project.standardize)
-        return retired.values
-            .filter { folder == nil || $0.project == folder }
-            .sorted { $0.retiredAt > $1.retiredAt }
-            .prefix(limit)
-            .map { $0 }
-    }
-
     // MARK: Settings
 
-    /// `retention/set` (FR-011). A change that would retire agents at once is only
-    /// described until the person confirms it; one that retires nothing is applied
+    /// `retention/set` (FR-011). A change that would delete agents at once is only
+    /// described until the person confirms it; one that deletes nothing is applied
     /// straight away. Applied, it is saved, checked at once, and told to every window.
     public func setRetention(_ request: DaemonAPI.RetentionSetRequest) async -> DaemonAPI.RetentionSetResult {
         loadRetentionIfNeeded()
         if !request.confirmed {
             let archived = candidates()
-            let preview = await decideWithHolds(archived, settings: request.settings, saneNow: now())
-            if !preview.retire.isEmpty {
-                let sizes = Dictionary(archived.map { ($0.id, $0.sizeOnDisk) }, uniquingKeysWith: { a, _ in a })
-                let bytes = preview.retire.reduce(0) { $0 + (sizes[$1.id] ?? 0) }
+            let deleting = Set(await decideWithHolds(archived, settings: request.settings, saneNow: now()))
+            if !deleting.isEmpty {
+                let bytes = archived.filter { deleting.contains($0.id) }.reduce(0) { $0 + $1.sizeOnDisk }
                 return DaemonAPI.RetentionSetResult(
-                    applied: false, wouldRetire: DaemonAPI.RetirePreview(count: preview.retire.count, bytes: bytes))
+                    applied: false, wouldDelete: DaemonAPI.DeletePreview(count: deleting.count, bytes: bytes))
             }
         }
         retention.settings = request.settings
@@ -94,9 +71,9 @@ extension DaemonCore {
         return DaemonAPI.RetentionSetResult(applied: true, state: state)
     }
 
-    /// What keeps each of these agents past its time (051, FR-007, research R7): a window
-    /// reading it, a workflow run it belongs to, or work in its worktree. Asked in that
-    /// order, cheapest first; git is only asked when nothing else holds it.
+    /// What keeps each of these agents (051, FR-007, research R7): a window reading it, a
+    /// workflow run it belongs to, or work in its worktree. Asked in that order, cheapest
+    /// first; git is only asked when nothing else holds it.
     func holds(for candidates: [RetentionPlan.Candidate]) async -> [UUID: Hold] {
         var holds: [UUID: Hold] = [:]
         let watched = Set(presences.values.compactMap(\.watching)).union(showing.agents)
@@ -117,22 +94,13 @@ extension DaemonCore {
     /// How long an archived agent stays whole after it was last read (FR-025).
     static let letGoAfter: TimeInterval = 10 * 60
 
-    /// The rules, with holds asked only of the agents the rules would pick. Asking every
-    /// archived agent's worktree every hour would run git hundreds of times for nothing.
-    /// A held agent can leave room under the cap for one that was not picked before, so
-    /// this goes round until nothing new is picked.
+    /// The rule, with holds asked only of the agents it would pick. Asking every archived
+    /// agent's worktree every hour would run git hundreds of times for nothing.
     func decideWithHolds(_ archived: [RetentionPlan.Candidate], settings: RetentionSettings,
-                         saneNow: Date) async -> RetentionPlan.Decision {
-        var holds: [UUID: Hold] = [:]
-        var asked = Set<UUID>()
-        while true {
-            let decision = RetentionPlan.decide(archived: archived, holds: holds, settings: settings, saneNow: saneNow)
-            let retiring = Set(decision.retire.map(\.id))
-            let fresh = archived.filter { !asked.contains($0.id) && retiring.contains($0.id) }
-            if fresh.isEmpty { return decision }
-            asked.formUnion(fresh.map(\.id))
-            holds.merge(await self.holds(for: fresh)) { $1 }
-        }
+                         saneNow: Date) async -> [UUID] {
+        let due = Set(RetentionPlan.decide(archived: archived, holds: [:], settings: settings, saneNow: saneNow))
+        let holds = await self.holds(for: archived.filter { due.contains($0.id) })
+        return RetentionPlan.decide(archived: archived, holds: holds, settings: settings, saneNow: saneNow)
     }
 
     func saveRetention() {
@@ -283,37 +251,22 @@ extension DaemonCore {
         return Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
     }
 
-    /// Decide, retire what the rules say, and update every archived row's note.
+    /// Decide, and delete what the rule says.
     public func checkRetention() async {
         loadRetentionIfNeeded()
         let saneNow = retention.clock.tick(now: now(), uptime: uptime)
         let before = retentionState()
-        let archived = candidates()
-        let decision = await decideWithHolds(archived, settings: retention.settings, saneNow: saneNow)
-        for retiring in decision.retire {
+        for id in await decideWithHolds(candidates(), settings: retention.settings, saneNow: saneNow) {
             do {
-                try await retire(retiring.id, because: retiring.because)
+                try await delete(id, because: .age)
             } catch {
-                DaemonLog.shared.write("could not retire \(retiring.id): \(error)")
+                DaemonLog.shared.write("could not delete \(id): \(error)")
             }
         }
-        lastOverCap = decision.overCap
-        noteRetirements(decision.notes)
         saveRetention()
         saveArchiveIndex()
         let after = retentionState()
         if after != before { broadcast(DaemonAPI.Notification.retentionChanged, after) }
-    }
-
-    /// A heavy archiving day can cross the cap well before the hourly check, so an
-    /// archive asks for one, at most once a minute and only when there is a cap to
-    /// cross. Never for the agent just archived: it is on its first day.
-    func checkSoonAfterArchiving() {
-        loadRetentionIfNeeded()
-        guard retention.settings.cap.bytes != nil else { return }
-        if let last = lastArchiveCheck, now().timeIntervalSince(last) < 60 { return }
-        lastArchiveCheck = now()
-        Task { [weak self] in await self?.checkRetention() }
     }
 
     /// Every archived agent, as the rules see it.
@@ -322,26 +275,6 @@ extension DaemonCore {
             RetentionPlan.Candidate(id: agent.id, archivedAt: agent.archivedAt ?? now(),
                                     lastActivityAt: agent.lastActivityAt, sizeOnDisk: size(of: agent.id))
         }
-    }
-
-    /// Put each archived agent's note on its record, and only where it changed.
-    ///
-    /// Each project is told once at the end rather than once per agent: a settings change
-    /// can note thousands (#164). The agents themselves are not told about one by one
-    /// (#203): that re-sent every archived agent to every client, which filed each one it
-    /// had let go of. A row on screen reads its note when its list is next read.
-    func noteRetirements(_ notes: [UUID: Retirement]) {
-        let noting = agents.archived.values.filter { $0.retirement != notes[$0.id] }
-        guard !noting.isEmpty else { return }
-        heldProjectChanges = []
-        for agent in noting {
-            var noted = agent
-            noted.retirement = notes[agent.id]
-            changed(noted, tellingClients: false)
-        }
-        let held = heldProjectChanges ?? []
-        heldProjectChanges = nil
-        for folder in held { projectChanged(forAgentIn: folder) }
     }
 
     func saveArchiveIndexSoon() {
@@ -368,63 +301,44 @@ extension DaemonCore {
         }
     }
 
-    // MARK: Retiring
+    // MARK: Deleting
 
-    /// `agents/retire`: the person retiring one archived agent now (051, US7). Unconfirmed,
-    /// it says how much that frees. Refused for an agent that is not archived, or whose
-    /// work or workflow still holds it; not for one that is open, since the person asking
-    /// is usually the one looking at it.
-    public func retireNow(_ request: DaemonAPI.RetireRequest) async throws -> DaemonAPI.RetirePreview {
+    /// `agents/delete`: the person deleting one archived agent (#398). Refused for an
+    /// agent that is not archived, or whose work or workflow still holds it; not for one
+    /// that is open, since the person asking is usually the one looking at it.
+    public func deleteNow(_ id: UUID) async throws {
         loadRetentionIfNeeded()
-        let id = request.agentID
-        if agents[id] == nil, let tombstone = retired[id] {
-            throw JSONRPCError(code: DaemonAPI.Failure.agentRetired, message: RetirementWords.retiredSentence(tombstone))
-        }
         guard let agent = agents[id] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
         guard agent.state == .archived else {
-            throw JSONRPCError(code: DaemonAPI.Failure.retireRefused, message: RetirementWords.notArchived)
+            throw JSONRPCError(code: DaemonAPI.Failure.deleteRefused, message: DeletionWords.notArchived)
         }
         let candidate = RetentionPlan.Candidate(id: id, archivedAt: agent.archivedAt ?? now(),
-                                                lastActivityAt: agent.lastActivityAt, sizeOnDisk: size(of: id))
+                                                lastActivityAt: agent.lastActivityAt, sizeOnDisk: 0)
         if let hold = await holds(for: [candidate])[id], hold != .openInWindow {
-            throw JSONRPCError(code: DaemonAPI.Failure.retireRefused, message: RetirementWords.refusal(hold))
+            throw JSONRPCError(code: DaemonAPI.Failure.deleteRefused, message: DeletionWords.refusal(hold))
         }
-        let preview = DaemonAPI.RetirePreview(count: 1, bytes: candidate.sizeOnDisk)
-        guard request.confirmed else { return preview }
-        try await retire(id, because: .person)
-        let state = retentionState()
-        broadcast(DaemonAPI.Notification.retentionChanged, state)
-        return preview
+        try await delete(id, because: .person)
+        broadcast(DaemonAPI.Notification.retentionChanged, retentionState())
     }
 
-    /// The one path every retire takes: the check, a change of setting, and Retire now.
+    /// The one path every delete takes: the age rule and the person's.
     ///
-    /// The tombstone is written and synced first, and nothing is deleted if it cannot
-    /// be (FR-017). Then the worktree, by archiving's own rule, while the agent is still
-    /// here for that rule to read; then the files; then the agent leaves every list.
-    func retire(_ id: UUID, because: RetiredBecause) async throws {
+    /// The worktree first, by archiving's own rule, while the agent is still here for
+    /// that rule to read; then the files; then the agent leaves every list.
+    func delete(_ id: UUID, because: DeletedBecause) async throws {
         guard let agent = agents[id], agent.state == .archived else {
-            throw JSONRPCError(code: DaemonAPI.Failure.retireRefused, message: RetirementWords.notArchived)
+            throw JSONRPCError(code: DaemonAPI.Failure.deleteRefused, message: DeletionWords.notArchived)
         }
-        DaemonLog.shared.write("retiring \(id) (\(because.rawValue))")
-        let tombstone = Tombstone(from: agent, retiredAt: now(), because: because)
-        try retiredStore.append(tombstone)
-        retired[id] = tombstone
-        raiseAgentEvent("agent.retired", id, sentence: "was retired and its conversation deleted.",
-                        details: ["because": because.rawValue])
+        DaemonLog.shared.write("deleting \(id) (\(because.rawValue))")
         await removeWorktreeIfDone(archiving: id)
         if let root = agent.worktree?.root, FileManager.default.fileExists(atPath: root.path) {
-            // The tombstone keeps where it is, and list_sessions names it from there (#211).
-            DaemonLog.shared.write("retired \(id) and left its worktree \(root.path)")
+            DaemonLog.shared.write("deleted \(id) and left its worktree \(root.path)")
         }
-        do {
-            try await store.deleteRetired(id)
-        } catch {
-            // The tombstone is written, so the next start finishes this.
-            DaemonLog.shared.write("retired \(id) but could not delete all of it yet: \(error)")
-        }
+        try await store.delete(id)
+        raiseAgentEvent("agent.deleted", id, sentence: "was deleted with its conversation.",
+                        details: ["because": because.rawValue])
         agents.removeValue(forKey: id)
         archiveIndex.removeValue(forKey: id)
         lastWhole.removeValue(forKey: id)

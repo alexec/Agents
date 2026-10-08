@@ -437,11 +437,9 @@ private struct ProjectFold: View {
         }
     }
 
-    /// Archived sessions, folded under the live ones, with what has been retired from
-    /// here (051) as the last line.
+    /// Archived sessions, folded under the live ones.
     @ViewBuilder
     private func archivedSessions(_ fold: SidebarProjectFold) -> some View {
-        let retiredLine = fold.retiredLine(summary)
         // How many there are is the host's count: the window holds a page of them only
         // while the fold is open (#165).
         let count = fold.archivedCount(summary)
@@ -459,11 +457,6 @@ private struct ProjectFold: View {
                 if isOpen, fold.isSearching, fold.archived.count > shown.count {
                     Button("Show all \(fold.archived.count)", action: showAllMatches)
                         .buttonStyle(.plain)
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                }
-                if isOpen, let retiredLine {
-                    Text(retiredLine)
                         .appText(.fine)
                         .foregroundStyle(.secondary)
                 }

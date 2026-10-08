@@ -62,7 +62,7 @@ const eventMeanings: Record<string, string> = {
   "agent.failed": "An agent in this project ended in an error",
   "agent.parked": "An agent in this project was parked: put down to come back to",
   "agent.archived": "An agent in this project was archived",
-  "agent.retired": "An archived agent was retired and its conversation deleted",
+  "agent.deleted": "An archived agent was deleted with its conversation",
   "project.idle": "Every agent in this project has stopped working",
   "workflow.ran": "A workflow in this project started an agent",
   "workflow.completed": "A workflow's run in this project finished",
@@ -271,7 +271,7 @@ const catalogue: Record<string, { scope: "mac" | "project" | "either"; details: 
   "agent.failed": { scope: "project", details: ["agent", "reason", ...context] },
   "agent.parked": { scope: "project", details: ["agent", "outcome", ...context] },
   "agent.archived": { scope: "project", details: ["agent", "by", "outcome", ...context] },
-  "agent.retired": { scope: "project", details: ["agent", "because", ...context] },
+  "agent.deleted": { scope: "project", details: ["agent", "because", ...context] },
   "project.idle": {
     scope: "project",
     details: ["agents", "finished", "blocked", "waiting_on_you", "stopped", "failed", "since", "ids"],

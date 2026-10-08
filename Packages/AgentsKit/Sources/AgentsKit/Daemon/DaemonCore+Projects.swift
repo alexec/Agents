@@ -16,9 +16,8 @@ import Foundation
 struct ProjectIndex {
     var folders: Set<URL>
     var names: [URL: String]
-    /// `AgentTable.foldersVersion` and `TombstoneTable.foldersVersion` when made.
+    /// `AgentTable.foldersVersion` when made.
     var agentFolders: Int
-    var tombstoneFolders: Int
 }
 
 extension DaemonCore {
@@ -35,8 +34,6 @@ extension DaemonCore {
     }
 
     /// The union: every folder an agent is in, and every folder we kept a record for.
-    /// And every folder a retired agent was in, so a project whose agents have all
-    /// been retired keeps what it cost (051).
     func projectFolders() -> Set<URL> {
         projectIndex().folders
     }
@@ -48,47 +45,37 @@ extension DaemonCore {
 
     /// The folders and their names, made again only when the set of folders has moved
     /// (#204): a folder gaining its first agent or losing its last, a record kept or
-    /// changed, a tombstone in a folder that had none. Until then every project-wide call
+    /// changed. Until then every project-wide call
     /// reads it as it is, rather than each project's summary making it again.
     func projectIndex() -> ProjectIndex {
-        loadRetentionIfNeeded()
         let records = projectRecords()
-        if let projectIndexCache, projectIndexCache.agentFolders == agents.foldersVersion,
-           projectIndexCache.tombstoneFolders == retired.foldersVersion {
+        if let projectIndexCache, projectIndexCache.agentFolders == agents.foldersVersion {
             return projectIndexCache
         }
         projectIndexBuilds += 1
         var folders = Set(agents.tallies.keys)
         folders.formUnion(records.keys)
-        folders.formUnion(retired.tallies.keys)
         let names: [URL: String]
         if let projectIndexCache, projectIndexCache.folders == folders {
             names = projectIndexCache.names
         } else {
             names = ProjectNaming.displayNames(for: Array(folders))
         }
-        let index = ProjectIndex(folders: folders, names: names, agentFolders: agents.foldersVersion,
-                                 tombstoneFolders: retired.foldersVersion)
+        let index = ProjectIndex(folders: folders, names: names, agentFolders: agents.foldersVersion)
         projectIndexCache = index
         return index
     }
 
-    /// One project's summary from its tally, its record and its tombstones: the same
+    /// One project's summary from its tally and its record: the same
     /// thing `rebuiltProjects` says of it, for the cost of one project rather than every
     /// agent there has ever been (#164), and without looking at any other project (#204).
     /// Nil when the folder is not a project.
     func summary(of folder: URL, records: [URL: Project], index: ProjectIndex,
                  freshExistence: Bool = false) -> DaemonAPI.ProjectSummary? {
         let tally = agents.tallies[folder]
-        let gone = retired.tallies[folder]
-        guard tally != nil || records[folder] != nil || gone != nil else { return nil }
-        var project = records[folder]
-            ?? Project(folder: folder, addedAt: tally?.oldestCreated ?? gone?.oldestCreated ?? Date())
-        var costToDate = tally?.costToDate ?? [:]
-        for (currency, amount) in gone?.costToDate ?? [:] {
-            costToDate[currency, default: 0] += amount
-        }
-        let newest = tally?.newestActivity ?? gone?.newestActivity ?? project.addedAt
+        guard tally != nil || records[folder] != nil else { return nil }
+        var project = records[folder] ?? Project(folder: folder, addedAt: tally?.oldestCreated ?? Date())
+        let newest = tally?.newestActivity ?? project.addedAt
         project.helperLimits = configuredHelperLimits(in: project.folder)
         project.diskSpace = configuredDiskSpace(in: project.folder)
         var summary = DaemonAPI.ProjectSummary(
@@ -97,9 +84,8 @@ extension DaemonCore {
             exists: folderExists(folder, fresh: freshExistence),
             lastActivityAt: newest,
             counts: tally?.counts ?? [:],
-            costToDate: costToDate,
+            costToDate: tally?.costToDate ?? [:],
             unmeasuredAgents: tally?.unmeasured ?? 0)
-        summary.retiredCount = gone?.count ?? 0
         if isChatProject(folder) { summary.isChat = true }
         return summary
     }
@@ -133,21 +119,16 @@ extension DaemonCore {
     func rebuiltProjects(includeArchived: Bool = true) -> [DaemonAPI.ProjectSummary] {
         let records = projectRecords()
         let agentsByFolder = Dictionary(grouping: agents.values) { $0.projectFolder }
-        let retiredByFolder = Dictionary(grouping: retired.values) { Project.standardize($0.project) }
 
         // The union: every folder an agent is in, and every folder we kept a record for.
-        // And every folder a retired agent was in, so a project whose agents have all
-        // been retired keeps what it cost (051).
         var folders = Set(agentsByFolder.keys)
         folders.formUnion(records.keys)
-        folders.formUnion(retiredByFolder.keys)
 
         var projects: [Project] = folders.map { folder in
             if let kept = records[folder] { return kept }
             // Derived. A project nobody archived and nobody added by hand is as old as
             // its oldest agent, so the sidebar's order means something on day one.
-            let oldest = agentsByFolder[folder]?.map(\.createdAt).min()
-                ?? retiredByFolder[folder]?.map(\.createdAt).min() ?? Date()
+            let oldest = agentsByFolder[folder]?.map(\.createdAt).min() ?? Date()
             return Project(folder: folder, addedAt: oldest)
         }
         if !includeArchived { projects = projects.filter { !$0.isArchived } }
@@ -158,8 +139,8 @@ extension DaemonCore {
             var counts: [AgentGroup: Int] = [:]
             // What the folder has cost, over the whole life of everything in it.
             // Nothing filters by state, group or archived flag: the daemon holds every
-            // agent there has ever been, and counting all of them is exactly what makes
-            // archiving one change no total. Per currency, because adding two of them
+            // agent it has not deleted, and counting all of them is exactly what makes
+            // archiving one change no total. Deleting one takes its cost with it (#398). Per currency, because adding two of them
             // would be a number nobody could check.
             var costToDate: [String: Decimal] = [:]
             var unmeasured = 0
@@ -176,20 +157,12 @@ extension DaemonCore {
                 }
                 if agent.isUnmeasured { unmeasured += 1 }
             }
-            // A retired agent still cost what it cost: retiring changes no total (051).
-            let gone = retiredByFolder[project.folder] ?? []
-            for tombstone in gone {
-                for (currency, amount) in tombstone.costToDate {
-                    costToDate[currency, default: 0] += amount
-                }
-            }
-            let newest = inFolder.map(\.lastActivityAt).max()
-                ?? gone.map(\.lastActivityAt).max() ?? project.addedAt
+            let newest = inFolder.map(\.lastActivityAt).max() ?? project.addedAt
             // The limits are the project's own file's (#126), not the record's.
             var project = project
             project.helperLimits = configuredHelperLimits(in: project.folder)
             project.diskSpace = configuredDiskSpace(in: project.folder)
-            var summary = DaemonAPI.ProjectSummary(
+            return DaemonAPI.ProjectSummary(
                 project: project,
                 name: names[project.folder] ?? project.folder.lastPathComponent,
                 exists: Self.isDirectory(project.folder),
@@ -197,8 +170,6 @@ extension DaemonCore {
                 counts: counts,
                 costToDate: costToDate,
                 unmeasuredAgents: unmeasured)
-            summary.retiredCount = gone.count
-            return summary
         }
         .sorted { $0.lastActivityAt > $1.lastActivityAt }
     }
@@ -238,14 +209,9 @@ extension DaemonCore {
     /// this notification arriving in a window that is looking somewhere else.
     ///
     /// Only when it says something new (#164): a label or a plan moves the agent and
-    /// nothing in its project's row. While retirements are being noted they are held,
-    /// and each project is told once at the end.
+    /// nothing in its project's row.
     func projectChanged(forAgentIn folder: URL) {
         let folder = Project.standardize(folder)
-        if heldProjectChanges != nil {
-            heldProjectChanges?.insert(folder)
-            return
-        }
         guard let summary = projectSummary(for: folder) else { return }
         guard lastProjectSent[folder] != summary else { return }
         sendProject(summary)

@@ -210,8 +210,6 @@ public struct StoreLocations: Sendable {
     public var retention: URL { root.appendingPathComponent("retention.json") }
     /// Whether this Mac stays awake for agents, and for how long after they stop.
     public var wakeSettings: URL { root.appendingPathComponent("wake.json") }
-    /// What is left of retired agents, one per line, never rewritten (051).
-    public var retired: URL { root.appendingPathComponent("retired.jsonl") }
     /// Which credentials are out, until when, and what credit has been spent (052).
     /// The Mac's is the one that counts: a relayed plan is one allowance (R6).
     public var allowances: URL { root.appendingPathComponent("allowances.json") }

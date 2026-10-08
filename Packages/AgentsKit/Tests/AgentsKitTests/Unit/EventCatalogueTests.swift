@@ -7,7 +7,7 @@ import Testing
 struct EventCatalogueTests {
     @Test func thereAreTwentyNineUniqueWellFormedNames() {
         let names = EventCatalogue.all.map(\.name)
-        // 30 from 042, 051's agent.retired, and 052's switch and two allowance kinds,
+        // 30 from 042, 051's agent.retired (agent.deleted since #398), and 052's switch and two allowance kinds,
         // less the ten pull-request kinds that went with GitHub support, and the switch,
         // which went with the pool (065), and agent.parked and agent.archived (#96), and
         // mac.disk_low and mac.disk_ok (#195, machine.* since #372), project.idle (#360),

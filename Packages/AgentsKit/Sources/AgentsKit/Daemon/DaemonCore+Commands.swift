@@ -1972,7 +1972,6 @@ extension DaemonCore {
         // is usually still showing it. The sweep slims it after that (051).
         lastWhole[agentID] = now()
         dropLiveState(for: agentID)
-        checkSoonAfterArchiving()
     }
 
     /// Drop an agent's ask to be put away once its turn is over. The person has sent
@@ -2158,11 +2157,6 @@ extension DaemonCore {
     public func transcript(_ request: DaemonAPI.TranscriptRequest) async throws -> TranscriptPage {
         // Any client can send any number: nonsense is refused, a huge page is cut (#200).
         let request = try request.bounded()
-        // Deleted with the rest of it (051): say so rather than show an empty page.
-        if agents[request.agentID] == nil, let tombstone = retired[request.agentID] {
-            throw JSONRPCError(code: DaemonAPI.Failure.agentRetired,
-                               message: RetirementWords.retiredSentence(tombstone))
-        }
         // Somebody is reading it: whole while they do (051).
         if agents[request.agentID]?.isSlim == true { await makeWhole(request.agentID) }
         var limit = request.limit
@@ -2174,20 +2168,12 @@ extension DaemonCore {
     }
 
     public func touchedPaths(_ request: DaemonAPI.AgentRequest) async throws -> [String] {
-        if agents[request.agentID] == nil, let tombstone = retired[request.agentID] {
-            throw JSONRPCError(code: DaemonAPI.Failure.agentRetired,
-                               message: RetirementWords.retiredSentence(tombstone))
-        }
         return try await store.touchedPaths(for: request.agentID)
     }
 
     /// The finished turns, as the chat shows them until one is opened.
     public func turns(_ request: DaemonAPI.TurnsRequest) async throws -> TurnsPage {
         let request = try request.bounded()
-        if agents[request.agentID] == nil, let tombstone = retired[request.agentID] {
-            throw JSONRPCError(code: DaemonAPI.Failure.agentRetired,
-                               message: RetirementWords.retiredSentence(tombstone))
-        }
         if agents[request.agentID]?.isSlim == true { await makeWhole(request.agentID) }
         let page = try await store.turns(for: request.agentID, before: request.before, limit: request.limit)
         // The turns before the page are made after it is answered, not before (#91).

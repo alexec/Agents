@@ -1,10 +1,10 @@
 // One session in the sidebar, as the Mac's AgentRow draws it (071 FR-018, #251): the status
 // mark (Coming back after a restart too), the title with who or what started it, the agent's own
 // last report, labels and the worktree, what it holds or waits for, what runs in the background,
-// when an archived one retires, what it waits on, and parking. Only Needs you is ever in colour.
+// what it waits on, and parking. Only Needs you is ever in colour.
 import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
-import { eventWaitMark, leaseMark, retirementNote, startedByAgentLabel, worktreeHelp, type LeaseMark } from "../model/rowLines";
+import { eventWaitMark, leaseMark, startedByAgentLabel, worktreeHelp, type LeaseMark } from "../model/rowLines";
 import { backgroundMark } from "../model/background";
 import { parkedAt, projectFolder, showsUnread } from "../model/groups";
 import { queuedLine, rowStatus, type StatusShape } from "../model/status";
@@ -90,7 +90,6 @@ export function SessionRow({ agent, chosen, onPick, going, waits = [], extras }:
   const park = parkLine(agent);
   const activity = fromWireDate(agent.lastActivityAt);
   const labels = agent.labels ?? [];
-  const retires = retirementNote(agent);
   return (
     <button class={`row session${chosen ? " chosen" : ""}`} aria-current={chosen} onClick={onPick}>
       <StatusMark agent={agent} comingBack={extras?.comingBack ?? false} />
@@ -126,8 +125,6 @@ export function SessionRow({ agent, chosen, onPick, going, waits = [], extras }:
           </span>
         )}
         {running && <span class="subtitle">{running}</span>}
-        {/* When an archived agent will be retired, or why it is kept (051). */}
-        {retires && <span class="subtitle quiet">{retires}</span>}
         {/* Waiting on events (042), then on agents, one line an agent (039, #152). */}
         {extras?.eventWait && <span class="subtitle wait-line">{extras.eventWait}</span>}
         {waits.map((line) => <span key={line} class="subtitle wait-line">{line}</span>)}

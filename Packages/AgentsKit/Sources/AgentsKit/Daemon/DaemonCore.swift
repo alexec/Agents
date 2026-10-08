@@ -306,7 +306,7 @@ public actor DaemonCore {
         didSet { projectIndexCache = nil }
     }
     /// Every project's folder and name, made once and kept until a folder gains or loses
-    /// its last agent, a record or a tombstone (#204). Every project-wide call used to
+    /// its last agent or a record (#204). Every project-wide call used to
     /// make the set again for each project it summarised.
     var projectIndexCache: ProjectIndex?
     /// Why the chat project could not be made at start (#229), in a sentence; nil when it
@@ -404,21 +404,14 @@ public actor DaemonCore {
     /// without a timer of its own. Nil until the first tick.
     var lastSeenDay: String?
 
-    // MARK: Retiring archived agents (051)
+    // MARK: Deleting archived agents (051, #398)
 
-    lazy var retiredStore = RetiredStore(locations: locations)
     lazy var retentionStore = RetentionStore(locations: locations)
     lazy var archiveIndexStore = ArchiveIndex(locations: locations)
-    /// What is left of every retired agent, by id. Read at start, before the agents.
-    /// Each project's share of it kept as it changes (#204).
-    var retired = TombstoneTable()
     /// What each project was last told as, so an agent change that moves nothing in its
     /// project's row says nothing (#164). A window that connects lists them anyway.
     var lastProjectSent: [URL: DaemonAPI.ProjectSummary] = [:]
-    /// Set while many agents change at once (`noteRetirements`): the projects to tell
-    /// when it is over, once each.
-    var heldProjectChanges: Set<URL>?
-    /// The person's settings and the clock retirement counts by, as `retention.json` has them.
+    /// The person's settings and the clock deletion by age counts by, as `retention.json` has them.
     var retention = RetentionStore.File()
     var retentionIsLoaded = false
     /// Sizes and file dates of archived agents, written to `archive.json`.
@@ -428,8 +421,6 @@ public actor DaemonCore {
     /// Whether `archiveIndex` differs from what `archive.json` holds, so the hourly
     /// check writes it only when something did change (#177).
     var archiveIndexChanged = false
-    /// Over the cap with nothing more that could go, as the last check found.
-    var lastOverCap: OverCap?
     /// When each archived agent was last made whole to be read. Gone when it is slim again.
     var lastWhole: [UUID: Date] = [:]
     /// The hourly check, and the sweep that slims what nobody is reading.
@@ -437,12 +428,9 @@ public actor DaemonCore {
     var slimSweep: Task<Void, Never>?
     /// A monotonic origin for `RetentionClock`, taken when the daemon was made.
     let uptimeOrigin = ContinuousClock.now
-    /// How an agent's folder is measured. The tests swap it, so a cap can be crossed
+    /// How an agent's folder is measured. The tests swap it, so a size can be shown
     /// without writing gigabytes.
     var measureFolder: @Sendable (URL) -> Int = { ArchiveIndex.sizeOnDisk($0) }
-    /// The last time an archive asked for a check, so a busy archiving day asks at most
-    /// once a minute.
-    var lastArchiveCheck: Date?
     /// A write of `archive.json` waiting to happen, so a check that changes a hundred
     /// notes writes the index once.
     var indexSave: Task<Void, Never>?
@@ -1045,9 +1033,7 @@ public actor DaemonCore {
         addressed(method, params, to: wanted)
     }
 
-    /// `tellingClients: false` is for a sweep that changes many records at once and tells
-    /// their projects instead: retirement notes (#203).
-    func changed(_ agent: Agent, tellingClients: Bool = true) {
+    func changed(_ agent: Agent) {
         let before = agents[agent.id]
         agents[agent.id] = agent
         saveQuietly(agent)
@@ -1057,7 +1043,7 @@ public actor DaemonCore {
             indexEntry(for: agent.id)
             saveArchiveIndexSoon()
         }
-        if tellingClients { tellChanged(agent, from: before) }
+        tellChanged(agent, from: before)
         // An agent changing state is what moves its project's counts. Sending the
         // project after the agent is what lets a sidebar row say a project needs you
         // in a window that is looking at a different one.
@@ -1232,7 +1218,6 @@ public actor DaemonCore {
             if agents[agentID]?.state != .archived { agent.archivedAt = now() }
         } else {
             agent.archivedAt = nil
-            agent.retirement = nil
         }
         let parkedNow = !wasParked && agent.parking?.isParked == true
         let archivedNow = next == .archived && agents[agentID]?.state != .archived
@@ -1338,14 +1323,14 @@ public actor DaemonCore {
     public func loadFromDisk() async {
         watchStoreNotes()
         loadRetentionIfNeeded()
-        // A retire the last daemon was cut off in: its tombstone is written, so what is
-        // left is deleting, and it is done before anything is listed (051, FR-017).
-        await store.finishRetiring(retired.keys)
+        // A delete the last daemon was cut off in: its folder was set aside, so what is
+        // left is removing it (#398).
+        await store.finishDeleting()
         // Archived agents from the index, slim, without opening their records; the rest,
         // and any archived one the index is behind on, read in full (051, research R3).
         let index = archiveIndexStore.load() ?? [:]
         var toRead: [UUID] = []
-        for id in await store.agentIDs() where retired[id] == nil {
+        for id in await store.agentIDs() {
             if let entry = index[id], entry.agent.state == .archived,
                let modified = ArchiveIndex.modifiedAt(locations.record(id)),
                modified <= entry.fileModifiedAt.addingTimeInterval(Self.indexTolerance) {

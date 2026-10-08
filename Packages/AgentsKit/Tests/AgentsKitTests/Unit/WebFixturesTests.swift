@@ -1198,11 +1198,6 @@ struct WebFixturesTests {
                 ("elicitation", NeedID.elicitation(Self.id(2))),
                 ("report", NeedID.report(Self.id(3), Self.base)),
             ]),
-            ("Retirement", [
-                ("at", Retirement.at(Self.base)),
-                ("next under the cap", Retirement.nextUnderCap),
-                ("held", Retirement.held(.worktreeHasWork)),
-            ]),
             ("RuntimeAvailability", [
                 ("available", RuntimeAvailability.available(path: "/bin/claude", supportsResume: true)),
                 ("missing", RuntimeAvailability.missing(lookedIn: ["/bin"])),

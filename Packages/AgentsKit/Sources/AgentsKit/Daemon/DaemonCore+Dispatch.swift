@@ -32,23 +32,6 @@ extension DaemonCore {
             }
         }
         if let caller { keepAppToolCall(caller, method: method, params: params, answer: answer, began: began) }
-        return retiredInstead(of: answer, params: params)
-    }
-
-    /// "That agent is not here" about an agent that was retired says so instead, with who
-    /// it was and when (051). In one place rather than in each of the thirty-odd methods
-    /// that look an agent up: every one of them answers `noSuchAgent`, and the id is in
-    /// its parameters, under whichever name that method uses.
-    func retiredInstead(of answer: Result<JSONValue, JSONRPCError>,
-                        params: JSONValue?) -> Result<JSONValue, JSONRPCError> {
-        guard case .failure(let error) = answer, error.code == DaemonAPI.Failure.noSuchAgent,
-              let fields = params?.objectValue else { return answer }
-        for value in fields.values {
-            if let id = value.stringValue.flatMap(UUID.init(uuidString:)), let tombstone = retired[id] {
-                return .failure(JSONRPCError(code: DaemonAPI.Failure.agentRetired,
-                                             message: RetirementWords.retiredSentence(tombstone)))
-            }
-        }
         return answer
     }
 
@@ -530,6 +513,11 @@ extension DaemonCore {
                 try await archive(request.agentID)
                 return .success([:])
 
+            case DaemonAPI.Method.agentsDelete:
+                let request = try require(params, as: DaemonAPI.AgentRequest.self)
+                try await deleteNow(request.agentID)
+                return .success([:])
+
             case DaemonAPI.Method.agentsUnarchive:
                 let request = try require(params, as: DaemonAPI.AgentRequest.self)
                 try await unarchive(request.agentID)
@@ -622,8 +610,7 @@ extension DaemonCore {
                 let settings = try require(params, as: WakeSettings.self)
                 return .success(try JSONValue.encoding(setWakeSettings(settings)))
 
-            // Retiring archived agents (051). The two writes are the person's; the
-            // role table keeps devices and agents to the reads.
+            // How long archived agents are kept (051, #398).
             case DaemonAPI.Method.retentionState:
                 return .success(try JSONValue.encoding(retentionState()))
 
@@ -631,13 +618,6 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.RetentionSetRequest.self)
                 return .success(try JSONValue.encoding(await setRetention(request)))
 
-            case DaemonAPI.Method.agentsRetire:
-                let request = try require(params, as: DaemonAPI.RetireRequest.self)
-                return .success(try JSONValue.encoding(try await retireNow(request)))
-
-            case DaemonAPI.Method.agentsRetired:
-                let request = try require(params, as: DaemonAPI.RetiredRequest.self)
-                return .success(try JSONValue.encoding(retiredTombstones(request)))
 
             case DaemonAPI.Method.clientPermissionsState:
                 return .success(try JSONValue.encoding(clientPermissionState()))

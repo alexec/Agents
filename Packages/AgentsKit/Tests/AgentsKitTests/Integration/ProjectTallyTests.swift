@@ -91,7 +91,7 @@ struct ProjectTallyTests {
                 ids.append(agent.id)
                 await core.changed(agent)
             } else if roll == 9 {
-                // Gone altogether, as a retired agent goes.
+                // Gone altogether, as a deleted agent goes.
                 let id = ids.remove(at: Int.random(in: 0..<ids.count, using: &dice))
                 await core.forgetForTest(id)
             } else {
@@ -162,7 +162,7 @@ struct ProjectTallyTests {
 }
 
 extension DaemonCore {
-    /// Out of memory without a tombstone, for a test that only counts.
+    /// Out of memory only, for a test that only counts.
     func forgetForTest(_ id: UUID) {
         guard let agent = agents.removeValue(forKey: id) else { return }
         projectChanged(forAgentIn: agent.projectFolder)

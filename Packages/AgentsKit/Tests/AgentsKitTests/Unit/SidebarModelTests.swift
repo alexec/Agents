@@ -48,8 +48,7 @@ struct SidebarModelTests {
         let model = AgentsModel()
         model.replaceAgents([agent(api, .archived, "old", at: 1)])
         model.replacePins([ProjectPins(folder: api, pins: [], sessions: [])])
-        var held = summary(api, archived: 12)
-        held.retiredCount = 3
+        let held = summary(api, archived: 12)
         let folded = SidebarProjectFold(key, label: "api", in: model, isOpen: false)
         #expect(!folded.isUnfolded)
         #expect(!folded.showsArchivedFold(held))
@@ -139,7 +138,6 @@ struct SidebarModelTests {
 
         let searched = SidebarProjectFold(key, label: "api", in: model, query: "login", isOpen: false)
         #expect(searched.archivedCount(held) == 1)
-        #expect(searched.retiredLine(held) == nil)
     }
 
     @Test func archivedMatchesShowAFewUntilShowAll() {

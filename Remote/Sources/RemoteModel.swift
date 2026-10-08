@@ -2061,16 +2061,6 @@ final class RemoteModel {
     /// The newest `limit` archived agents in a project, for its Archived section when
     /// it is opened. Without their slash commands: an archived chat has no prompt bar
     /// here to use them.
-    /// What is left of an agent that has been retired, when something here leads to an
-    /// agent the Mac no longer lists (051). Remembered once found.
-    func lookUpRetired(_ agentID: UUID) async {
-        guard work.agent(agentID) == nil, work.tombstones[agentID] == nil,
-              let found = try? await client.call(DaemonAPI.Method.agentsRetired,
-                                                 DaemonAPI.RetiredRequest(ids: [agentID]),
-                                                 returning: [Tombstone].self) else { return }
-        work.takeTombstones(found)
-    }
-
     /// The projects whose Archived fold is open in the sidebar (#226): each holds a page
     /// of its archived sessions while it is, as on the Mac (#165).
     private(set) var openArchivedFolds: Set<URL> = []
@@ -3086,6 +3076,25 @@ final class RemoteModel {
         }
     }
     func unarchive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsUnarchive, agentID) }
+
+    /// The archived session a menu's Delete… is asking about, until it is answered (#398).
+    var askingToDelete: Agent?
+
+    /// Delete an archived session (#398), once asked. A refusal says why it cannot go yet.
+    func delete(_ agentID: UUID) async {
+        guard !isStale(on: work.agent(agentID)?.host ?? .mac) else {
+            problem = "Your Mac is not answering, so that could not be sent."
+            return
+        }
+        do {
+            try await sendOnce(DaemonAPI.Method.agentsDelete, DaemonAPI.AgentRequest(agentID: agentID))
+            if selection == agentID { selection = nil }
+        } catch let error as JSONRPCError {
+            problem = error.message
+        } catch {
+            problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
+        }
+    }
     /// Park or unpark, whichever `Agent.parkAction` offers (040). From the card's menu.
     func perform(_ action: ParkAction, on agentID: UUID) async {
         await act(AgentAct(action), on: agentID,

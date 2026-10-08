@@ -4,9 +4,20 @@ import Testing
 @testable import AgentsKitCore
 
 /// A slim archived agent never costs the record its lists (051, research R2), and
-/// retiring leaves either the whole agent or its tombstone, never neither (SC-006).
-@Suite("Slim records and retiring")
+/// deleting never leaves half an agent listed (#398).
+@Suite("Slim records and deleting")
 struct AgentStoreSlimTests {
+    static var fixture: URL {
+        URL(filePath: #filePath)
+            .deletingLastPathComponent()      // Unit
+            .deletingLastPathComponent()      // AgentsKitTests
+            .appending(path: "Fixtures/archived-agent.json")
+    }
+
+    static func archivedAgent() throws -> Agent {
+        try StoreCoding.decoder.decode(Agent.self, from: Data(contentsOf: fixture))
+    }
+
     private func store() throws -> (AgentStore, StoreLocations) {
         let root = FileManager.default.temporaryDirectory.appending(path: "slim-\(UUID().uuidString)")
         let locations = StoreLocations(root: root)
@@ -14,7 +25,7 @@ struct AgentStoreSlimTests {
     }
 
     private func archived() throws -> Agent {
-        var agent = try TombstoneTests.archivedAgent()
+        var agent = try Self.archivedAgent()
         agent.id = UUID()
         agent.archivedAt = Date(timeIntervalSince1970: 1_800_000_000)
         return agent
@@ -57,78 +68,43 @@ struct AgentStoreSlimTests {
         #expect(disk == agent)
     }
 
-    @Test func retirementFieldsGoWhenTheAgentIsNotArchived() async throws {
+    @Test func archivedAtGoesWhenTheAgentIsNotArchived() async throws {
         let (store, locations) = try store()
         var agent = try archived()
-        agent.retirement = .nextUnderCap
         agent.state = .finished
         agent.endedReason = .endTurn
         agent.archivedReason = nil
         try await store.save(agent)
         let disk = try StoreCoding.decoder.decode(Agent.self, from: Data(contentsOf: locations.record(agent.id)))
-        #expect(disk.archivedAt == nil && disk.retirement == nil)
+        #expect(disk.archivedAt == nil)
     }
 
-    // MARK: Retiring
+    // MARK: Deleting
 
-    @Test func stoppedAfterAnyStepTheAgentIsWholeOrHasATombstone() async throws {
-        for step in AgentStore.RetireStep.allCases {
-            let (store, locations) = try store()
-            let retired = RetiredStore(locations: locations)
-            let agent = try archived()
-            try await store.save(agent)
-            try await store.append(TranscriptEntry(kind: .userMessage("hello")), for: agent.id)
-
-            await store.stop(after: step)
-            _ = try? await store.retire(Tombstone(from: agent, retiredAt: Date(), because: .age), into: retired)
-
-            let hasTombstone = retired.loadAll()[agent.id] != nil
-            let loaded = await store.loadAll().agents.contains { $0.id == agent.id }
-            #expect(hasTombstone, "stopped after \(step): the tombstone is written first")
-            if loaded {
-                // Still readable means nothing of it was deleted yet.
-                #expect(FileManager.default.fileExists(atPath: locations.transcript(agent.id).path))
-            }
-            // The next start finishes it.
-            await store.stop(after: nil)
-            await store.finishRetiring([agent.id])
-            #expect(!FileManager.default.fileExists(atPath: locations.agent(agent.id).path))
-            #expect(await !store.loadAll().agents.contains { $0.id == agent.id })
-        }
-    }
-
-    @Test func aTombstoneThatCannotBeWrittenDeletesNothing() async throws {
+    @Test func stoppedPartWayTheAgentIsNeverListedAndTheNextStartFinishes() async throws {
         let (store, locations) = try store()
         let agent = try archived()
         try await store.save(agent)
-        // A folder where the file should be: the append cannot open it.
-        try FileManager.default.createDirectory(at: locations.retired, withIntermediateDirectories: true)
-        await #expect(throws: (any Error).self) {
-            try await store.retire(Tombstone(from: agent, retiredAt: Date(), because: .age),
-                                   into: RetiredStore(locations: locations))
-        }
-        #expect(FileManager.default.fileExists(atPath: locations.record(agent.id).path))
+        try await store.append(TranscriptEntry(kind: .userMessage("hello")), for: agent.id)
+
+        await store.stop(afterSettingAside: true)
+        await #expect(throws: AgentStore.Stopped.self) { try await store.delete(agent.id) }
+        #expect(await !store.loadAll().agents.contains { $0.id == agent.id })
+        #expect(await !store.agentIDs().contains(agent.id))
+
+        await store.finishDeleting()
+        #expect(!FileManager.default.fileExists(atPath: await store.setAside(agent.id).path))
+        #expect(!FileManager.default.fileExists(atPath: locations.agent(agent.id).path))
     }
 
-    @Test func tombstonesReadBackInOrderAndATornLastLineIsSkipped() throws {
-        let (_, locations) = try store()
-        let retired = RetiredStore(locations: locations)
-        var ids: [UUID] = []
-        for _ in 0 ..< 5 {
-            var agent = try archived()
-            agent.id = UUID()
-            ids.append(agent.id)
-            try retired.append(Tombstone(from: agent, retiredAt: Date(), because: .cap))
-        }
-        let handle = try FileHandle(forWritingTo: locations.retired)
-        try handle.seekToEnd()
-        try handle.write(contentsOf: Data("{\"id\":\"torn".utf8))
-        try handle.close()
-        #expect(Set(retired.loadAll().keys) == Set(ids))
-        // And the next append is not glued to the torn line.
-        var next = try archived()
-        next.id = UUID()
-        try retired.append(Tombstone(from: next, retiredAt: Date(), because: .person))
-        #expect(retired.loadAll()[next.id] != nil)
+    @Test func deletingRemovesTheWholeFolder() async throws {
+        let (store, locations) = try store()
+        let agent = try archived()
+        try await store.save(agent)
+        try await store.append(TranscriptEntry(kind: .userMessage("hello")), for: agent.id)
+        try await store.delete(agent.id)
+        #expect(!FileManager.default.fileExists(atPath: locations.agent(agent.id).path))
+        // Twice is nothing.
+        try await store.delete(agent.id)
     }
 }

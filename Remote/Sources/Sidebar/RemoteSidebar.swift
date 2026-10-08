@@ -292,7 +292,7 @@ private struct RemoteProjectFold: View {
     }
 
     /// Archived sessions, folded under the live ones, a page of them held while the fold
-    /// is open (#165), with what has been retired from here (051) as the last line.
+    /// is open (#165).
     @ViewBuilder
     private func archivedSessions(_ fold: SidebarProjectFold) -> some View {
         let isOpen = fold.isSearching || folds.isOpen(key, .archivedSessions)
@@ -305,11 +305,6 @@ private struct RemoteProjectFold: View {
                 }
                 if fold.isSearching, fold.archived.count > shown.count {
                     Button("Show all \(fold.archived.count)", action: showAllMatches)
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                }
-                if let line = fold.retiredLine(summary) {
-                    Text(line)
                         .appText(.fine)
                         .foregroundStyle(.secondary)
                 }
