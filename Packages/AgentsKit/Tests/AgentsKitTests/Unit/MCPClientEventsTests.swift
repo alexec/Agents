@@ -36,8 +36,9 @@ struct MCPClientEventsTests {
         try await client.connect()
         let events = try await client.listEvents()
         #expect(events.map(\.name) == ["checks.failed", "pr.merged"])
-        #expect(events[0].offersPoll)
-        #expect(events[0].inputSchema?["required"] == ["repo"])
+        let failed = try #require(events.first)
+        #expect(failed.offersPoll)
+        #expect(failed.inputSchema?["required"] == ["repo"])
     }
 
     @Test func aNullCursorStartsFromNowAndTheCursorFollows() async throws {
