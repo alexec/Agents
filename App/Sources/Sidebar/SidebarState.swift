@@ -175,15 +175,16 @@ final class AgentPaneState {
     /// The subagent whose steps the Background pane shows (057), by its id. Nil is the
     /// list of everything the agent has had in the background.
     var subagent: String?
-    /// The terminal tabs, by shell number, left to right (055). Filled from the daemon
-    /// the first time the pane is shown, so a window opening finds the shells that are
-    /// still running rather than only the first.
+    /// The terminal tabs, by shell number, left to right (055). Asked of the daemon
+    /// each time the pane comes on screen, so a window finds the shells that are still
+    /// running, and the tabs a phone opened or closed meanwhile (#401).
     var shells: [Int] = [0]
     /// The tab on top.
     var frontShell = 0
     /// A tab the user just chose or opened, whose screen should take the keyboard.
     var shellToFocus: Int?
-    var shellsLoaded = false
+    /// What the program in each tab calls it, as its screen last read (#401).
+    var shellTitles: [Int: String] = [:]
     /// The panes shown for this agent so far. A pane is built the first time it is
     /// chosen and kept from then on, so clicking through agents with the Files pane up
     /// starts no shell and no web view for any of them (#213).

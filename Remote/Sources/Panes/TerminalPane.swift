@@ -22,7 +22,7 @@ struct TerminalPane: View {
     var body: some View {
         let state = state
         VStack(spacing: 0) {
-            ShellTabs(shells: state.shells, front: state.frontShell,
+            ShellTabs(shells: state.shells, titles: titles(state.shells), front: state.frontShell,
                       canOpenMore: state.canOpenMoreShells && !model.isStale,
                       select: { state.frontShell = $0 },
                       open: open, close: close)
@@ -53,21 +53,37 @@ struct TerminalPane: View {
         .onDisappear { model.isTyping = false }
     }
 
-    private func open() {
-        let state = state
-        let next = (state.shells.max() ?? -1) + 1
-        state.shells.append(next)
-        state.frontShell = next
+    /// What the program in each tab calls it, when it says (#401).
+    private func titles(_ shells: [Int]) -> [Int: String] {
+        var titles: [Int: String] = [:]
+        for shell in shells {
+            if let title = model.shellClient(for: agent.id, shell: shell).title { titles[shell] = title }
+        }
+        return titles
     }
 
+    /// The Mac numbers the new shell, so a tab opened on the Mac at the same moment
+    /// never gets the same one (#401).
+    private func open() {
+        let state = state
+        Task {
+            let next = await model.openShell(for: agent.id) ?? ((state.shells.max() ?? -1) + 1)
+            if !state.shells.contains(next) { state.shells.append(next) }
+            state.frontShell = next
+        }
+    }
+
+    /// Closing the last tab starts a fresh shell in its place, as on the Mac (#401).
     private func close(_ shell: Int) {
         let state = state
-        guard state.shells.count > 1, let index = state.shells.firstIndex(of: shell) else { return }
+        guard let index = state.shells.firstIndex(of: shell) else { return }
         state.shells.remove(at: index)
-        if state.frontShell == shell {
+        Task { await model.closeShell(agentID: agent.id, shell: shell) }
+        if state.shells.isEmpty {
+            open()
+        } else if state.frontShell == shell {
             state.frontShell = state.shells[min(index, state.shells.count - 1)]
         }
-        Task { await model.closeShell(agentID: agent.id, shell: shell) }
     }
 }
 
@@ -93,7 +109,9 @@ private struct ShellScreen: View {
                     await client.restart(rows: rows, cols: cols)
                 }
             } else {
-                if client.dropped > 0 {
+                if let sendProblem = client.sendProblem {
+                    Note(sendProblem)
+                } else if client.dropped > 0 {
                     Note("Earlier output was dropped.")
                 }
                 // Only the tab on top takes the keyboard.
@@ -206,7 +224,13 @@ private struct PhoneTerminalView: UIViewRepresentable {
         // through the line discipline, as in any terminal.
         nonisolated func send(source: TerminalView, data: ArraySlice<UInt8>) {
             let bytes = Data(data)
-            Task { @MainActor in await self.client.send(bytes) }
+            // Queued here, on the main thread SwiftTerm calls from, so keystrokes keep
+            // their order: a task each could overtake one another (#401).
+            if Thread.isMainThread {
+                MainActor.assumeIsolated { self.client.type(bytes) }
+            } else {
+                Task { @MainActor in self.client.type(bytes) }
+            }
         }
 
         nonisolated func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {
@@ -217,16 +241,34 @@ private struct PhoneTerminalView: UIViewRepresentable {
             }
         }
 
-        nonisolated func setTerminalTitle(source: TerminalView, title: String) {}
-        nonisolated func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
+        nonisolated func setTerminalTitle(source: TerminalView, title: String) {
+            Task { @MainActor in self.client.title = title }
+        }
+
+        nonisolated func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {
+            Task { @MainActor in
+                self.client.directory = directory.flatMap(URL.init(string:)).flatMap { $0.isFileURL ? $0 : nil }
+            }
+        }
         nonisolated func scrolled(source: TerminalView, position: Double) {}
         nonisolated func rangeChanged(source: TerminalView, startY: Int, endY: Int) {}
-        nonisolated func bell(source: TerminalView) {}
+        nonisolated func bell(source: TerminalView) {
+            // Felt only from the terminal being typed in.
+            Task { @MainActor in
+                guard source.isFirstResponder else { return }
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            }
+        }
         nonisolated func iTermContent(source: TerminalView, content: ArraySlice<UInt8>) {}
 
         nonisolated func clipboardCopy(source: TerminalView, content: Data) {
             let text = String(decoding: content, as: UTF8.self)
-            Task { @MainActor in UIPasteboard.general.string = text }
+            // Only from the terminal being typed in: a program in a tab nobody is
+            // looking at does not get to replace the clipboard (#401).
+            Task { @MainActor in
+                guard source.isFirstResponder else { return }
+                UIPasteboard.general.string = text
+            }
         }
 
         nonisolated func requestOpenLink(source: TerminalView, link: String, params: [String: String]) {

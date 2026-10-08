@@ -90,6 +90,19 @@ export function otherAgentsNote(git: GitView | undefined): string | null {
   return null;
 }
 
+/**
+ * Why git's half of the list is missing, in the Remote's words (RemoteChangesPane.unavailable):
+ * a chat project's folder (#229) is not a repository, and says so rather than nothing.
+ */
+export function unavailableNote(git: GitView | undefined): string | null {
+  if (!git || !("unavailable" in git)) return null;
+  const why = git.unavailable;
+  if ("notARepository" in why) return "This folder is not a Git repository.";
+  if ("gitNotInstalled" in why) return "Git is not installed on the Mac.";
+  if ("folderGone" in why) return "The agent's folder is gone.";
+  return why.failed.message;
+}
+
 /** The first line of each run of changed lines: where Next and Previous go (LineDiff.changeStops). */
 export function changeStops(lines: readonly { kind: string }[]): number[] {
   const stops: number[] = [];

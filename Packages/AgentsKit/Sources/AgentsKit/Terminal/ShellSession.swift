@@ -23,10 +23,12 @@ public final class ShellSession: @unchecked Sendable {
     private var _lastInputAt: Date
     public let startedAt = Date()
 
-    /// New bytes, as the shell produces them. The daemon forwards these to whichever
-    /// windows are attached, and appends them to the buffer first so a window that
-    /// attaches a moment later still sees them.
-    private let onOutput: @Sendable (Data) -> Void
+    /// New bytes, as the shell produces them, with the offset of the first of them in
+    /// everything the shell has printed. The daemon forwards these to whichever windows
+    /// are attached, and appends them to the buffer first so a window that attaches a
+    /// moment later still sees them. A window that has the bytes from its replay knows
+    /// by the offset to drop them (#401).
+    private let onOutput: @Sendable (Data, Int) -> Void
     private let onStateChange: @Sendable (ShellState) -> Void
 
     public init(agentID: UUID,
@@ -35,7 +37,7 @@ public final class ShellSession: @unchecked Sendable {
                 rows: Int = 24,
                 cols: Int = 80,
                 cap: Int = Scrollback.defaultCap,
-                onOutput: @escaping @Sendable (Data) -> Void,
+                onOutput: @escaping @Sendable (Data, Int) -> Void,
                 onStateChange: @escaping @Sendable (ShellState) -> Void) {
         self.agentID = agentID
         self.folder = folder
@@ -62,13 +64,7 @@ public final class ShellSession: @unchecked Sendable {
                           environment: environment,
                           rows: rows,
                           cols: cols,
-                          onOutput: { [weak self] data in
-                              guard let self else { return }
-                              self.lock.lock()
-                              self.buffer.append(data)
-                              self.lock.unlock()
-                              self.onOutput(data)
-                          },
+                          onOutput: { [weak self] data in self?.record(data) },
                           onExit: { [weak self] status in
                               self?.moveTo(.exited(status: status))
                           })
@@ -98,6 +94,22 @@ public final class ShellSession: @unchecked Sendable {
     public var scrollback: Scrollback {
         lock.lock(); defer { lock.unlock() }
         return buffer
+    }
+
+    /// What a screen replays, and the offset of its first byte, taken together under
+    /// the lock. Copied out as bytes: handing over the buffer itself would make the next
+    /// chunk the shell prints copy all of it (#401).
+    public var replay: (bytes: Data, dropped: Int) {
+        lock.lock(); defer { lock.unlock() }
+        return (buffer.tail, buffer.dropped)
+    }
+
+    /// Only what came after `since`, when that much is still held; nil when it is not,
+    /// and the whole replay is wanted.
+    public func replay(since: Int) -> (bytes: Data, offset: Int, dropped: Int)? {
+        lock.lock(); defer { lock.unlock() }
+        guard since >= buffer.dropped, since <= buffer.end else { return nil }
+        return (buffer.tail(limit: buffer.end - since), since, buffer.dropped)
     }
 
     public var rows: Int { pty?.rows ?? 0 }
@@ -134,6 +146,23 @@ public final class ShellSession: @unchecked Sendable {
     }
 
     // MARK: Doing
+
+    /// Held and passed on, under the lock with the offset it was given, so a replay
+    /// taken at any moment ends exactly where the next chunk starts. Called on the
+    /// pty's queue, one chunk at a time.
+    private func record(_ data: Data) {
+        lock.lock()
+        let offset = buffer.end
+        buffer.append(data)
+        lock.unlock()
+        onOutput(data, offset)
+    }
+
+    /// A line of the daemon's own, held in the scrollback like anything the shell
+    /// printed, so a screen that attaches later reads it too.
+    public func note(_ text: String) {
+        record(Data("\r\n\u{1B}[2m\(text)\u{1B}[0m\r\n".utf8))
+    }
 
     public func write(_ data: Data) {
         guard state.isLive else { return }

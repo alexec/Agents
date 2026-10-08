@@ -394,12 +394,16 @@ struct PromptBar: View {
                 .appText(.reading)
                 .lineLimit(2...12)
                 .focused($focused)
+                // ⌘V attaches pictures and files too, and still pastes the words (#396).
+                .modifier(PastesIntoPrompt(isFocused: focused, attachFile: attach,
+                                           attachPicture: attachPicture))
                 // Held, words and all, while they start an agent (#87).
                 .disabled(agent == nil && model.isStarting)
-                // Return sends. Option and Return is left alone, and the field
-                // editor inserts a line break the way it does everywhere else.
+                // Return and Shift-Return send. Option and Return is left alone, and
+                // the field editor inserts a line break the way it does everywhere else
+                // (#377).
                 .onKeyPress(.return, phases: .down) { press in
-                    guard !press.modifiers.contains(.option) else { return .ignored }
+                    guard PromptReturn(option: press.modifiers.contains(.option)) == .send else { return .ignored }
                     // While the list is up, Return takes the command rather than
                     // sending a half-typed one.
                     if isCompleting || isMentioning {
@@ -544,7 +548,7 @@ struct PromptBar: View {
             for url in urls { attach(url) }
             return !urls.isEmpty
         }
-        .onPasteCommand(of: [.png, .tiff, .fileURL]) { providers in
+        .onPasteCommand(of: [.fileURL] + PromptPaste.pictureTypes + [.image]) { providers in
             for provider in providers { paste(provider) }
         }
         .sheet(isPresented: $isPrimingDictation) { dictationPrimer.paperSheet() }
@@ -637,16 +641,17 @@ struct PromptBar: View {
             }
             return
         }
-        for type in [UTType.png, UTType.tiff] where provider.hasItemConformingToTypeIdentifier(type.identifier) {
-            provider.loadDataRepresentation(forTypeIdentifier: type.identifier) { data, _ in
-                guard let data else { return }
-                Task { @MainActor in
-                    attachments.append(.image(data, mimeType: type == .png ? "image/png" : "image/tiff",
-                                              name: "Screenshot"))
-                }
-            }
-            return
+        guard case .picture(let type) = PromptPaste.kind(of: provider.registeredTypeIdentifiers) else { return }
+        provider.loadDataRepresentation(forTypeIdentifier: type.identifier) { data, _ in
+            guard let data else { return }
+            Task { @MainActor in attachPicture(data, type) }
         }
+    }
+
+    /// A pasted picture, by value. A runtime that takes none says so in red under it.
+    private func attachPicture(_ data: Data, _ type: UTType) {
+        let name = type == .png || type == .tiff ? "Screenshot" : "Pasted picture"
+        attachments.append(.image(data, mimeType: PromptPaste.mimeType(for: type), name: name))
     }
 
     private func mimeType(for url: URL) -> String {

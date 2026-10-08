@@ -253,12 +253,25 @@ Each keeps its findings, and the commit of `main` it reviewed through, in its ow
 never pushed (`agents/reviews-security`, `agents/reviews-performance`): a security
 finding is not published before it is fixed. Both arrive turned off; **Run now** tries one.
 
-**Free disk space** (`.agents/workflows/free-disk-space.md`, #199) runs on `mac.disk_low`. It
+**Free disk space** (`.agents/workflows/free-disk-space.md`, #199) runs on `machine.disk_low` (its file still says
+`mac.disk_low`, the name before #372, which a build from before the rename also reads). It
 deletes build output (the folders `.gitignore` ignores and git tracks nothing in, such as
 `build/`, `.build`, `DerivedData` and `Web/node_modules`) from the worktrees of agents that are
 Done, Parked or Archived and hold no lease. At the critical level it also removes archived
 agents' worktrees that have nothing uncommitted, keeping the branch. It never touches the
 project folder, a worktree no session names, or a busy agent's. It too arrives turned off.
+
+**Crash reports** (`.agents/workflows/crash-reports.md`, #392) runs once a day at 07:00. It
+reads the crash reports of Agents, Agents Host, `agentsd` and `agents-control` written on
+this Mac since its last run, with the window's crash notes and any of the Remote's reports
+already on the Mac, and files a `bug` issue for each distinct stack nothing tracks yet, or
+comments on the open one with the new count. It marks each crash live or scratch, changes
+no code, and writes a note a day under `.agents/reviews/crashes/` on the local branch
+`agents/reviews-crashes`. It arrives turned off. To see what it would file, read-only:
+
+```sh
+./scripts/crash-reports.py --days 14 --github --out /tmp/crashes
+```
 
 ## Scoping an agent's tools
 

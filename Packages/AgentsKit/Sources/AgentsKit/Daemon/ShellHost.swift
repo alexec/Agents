@@ -19,13 +19,18 @@ public final class ShellHost: @unchecked Sendable {
         /// The folder the shell was started in. An agent that moved since (053) works
         /// somewhere else, and the pane says so.
         public var folder: URL?
+        /// The offset of the replay's first byte, when it is only the end of the
+        /// buffer: what came after the `since` the screen gave.
+        public var offset: Int?
 
-        public init(state: ShellState, scrollback: Data, dropped: Int, startedAt: Date, folder: URL? = nil) {
+        public init(state: ShellState, scrollback: Data, dropped: Int, startedAt: Date, folder: URL? = nil,
+                    offset: Int? = nil) {
             self.state = state
             self.scrollback = scrollback
             self.dropped = dropped
             self.startedAt = startedAt
             self.folder = folder
+            self.offset = offset
         }
     }
 
@@ -61,7 +66,9 @@ public final class ShellHost: @unchecked Sendable {
     private var epitaphs: [Key: String] = [:]
 
     public enum ShellEvent: Sendable {
-        case output(Data)
+        /// Bytes the shell printed, and the offset of the first of them in all it has
+        /// printed.
+        case output(Data, offset: Int)
         case state(ShellState)
     }
 
@@ -81,45 +88,51 @@ public final class ShellHost: @unchecked Sendable {
                        shell: Int = 0,
                        folder: URL,
                        rows: Int,
-                       cols: Int) throws -> Attachment {
+                       cols: Int,
+                       since: Int? = nil,
+                       startedAt: Date? = nil) throws -> Attachment {
         let key = Key(agentID: agentID, shell: shell)
         lock.lock()
         let existing = sessions[key]
         let epitaph = epitaphs.removeValue(forKey: key)
         lock.unlock()
 
+        // Not resized: a screen attaching has not been laid out yet, and taking the
+        // shell to its guess made a full-screen program redraw twice on every switch.
+        // The screen says its size once it knows it (#401).
         if let existing, existing.state.isLive {
-            existing.resize(rows: rows, cols: cols)
-            let buffer = existing.scrollback
-            return Attachment(state: existing.state,
-                              scrollback: buffer.tail,
-                              dropped: buffer.dropped,
-                              startedAt: existing.startedAt,
-                              folder: existing.folder)
+            return attachment(to: existing, since: since, startedAt: startedAt)
         }
 
         // A shell that is over but whose output is still worth reading stays until the
         // user asks for a new one. Its scrollback is kept readable (FR-029).
         if let existing, !existing.state.isLive {
-            let buffer = existing.scrollback
-            return Attachment(state: existing.state,
-                              scrollback: buffer.tail,
-                              dropped: buffer.dropped,
-                              startedAt: existing.startedAt,
-                              folder: existing.folder)
+            return attachment(to: existing, since: since, startedAt: startedAt)
         }
 
         let session = try start(key, folder: folder, rows: rows, cols: cols)
         // The previous shell died with the daemon or the machine. Say so on this first
         // attach rather than pretending this new one is the old one.
-        if let epitaph {
-            let note = "\r\n\u{1B}[2m\(epitaph)\u{1B}[0m\r\n"
-            push(key, .output(Data(note.utf8)))
-        }
-        let buffer = session.scrollback
+        if let epitaph { session.note(epitaph) }
+        let replay = session.replay
         return Attachment(state: session.state,
-                          scrollback: buffer.tail,
-                          dropped: buffer.dropped,
+                          scrollback: replay.bytes,
+                          dropped: replay.dropped,
+                          startedAt: session.startedAt,
+                          folder: session.folder)
+    }
+
+    /// A held shell's replay: only what came after `since` when the screen already has
+    /// this very shell up to there, and otherwise all of it.
+    private func attachment(to session: ShellSession, since: Int?, startedAt: Date?) -> Attachment {
+        if let since, startedAt == session.startedAt, let part = session.replay(since: since) {
+            return Attachment(state: session.state, scrollback: part.bytes, dropped: part.dropped,
+                              startedAt: session.startedAt, folder: session.folder, offset: part.offset)
+        }
+        let replay = session.replay
+        return Attachment(state: session.state,
+                          scrollback: replay.bytes,
+                          dropped: replay.dropped,
                           startedAt: session.startedAt,
                           folder: session.folder)
     }
@@ -157,7 +170,7 @@ public final class ShellHost: @unchecked Sendable {
             folder: folder,
             rows: rows,
             cols: cols,
-            onOutput: { [weak self] data in self?.push(key, .output(data)) },
+            onOutput: { [weak self] data, offset in self?.push(key, .output(data, offset: offset)) },
             onStateChange: { [weak self] state in self?.push(key, .state(state)) })
 
         if case .failed(let reason) = session.state {

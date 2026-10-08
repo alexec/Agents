@@ -12,12 +12,24 @@ struct ShellTabsTests {
     final class Heard: @unchecked Sendable {
         private let lock = NSLock()
         private var output: [Int: Data] = [:]
+        private var offsets: [Int: [(offset: Int?, count: Int)]] = [:]
 
         func record(_ method: String, _ params: JSONValue?) {
             guard method == DaemonAPI.Notification.shellOutput, let params,
                   let heard = DaemonAPI.ShellOutputNotification(params: params) else { return }
             lock.lock(); defer { lock.unlock() }
             output[heard.shell, default: Data()].append(heard.bytes)
+            offsets[heard.shell, default: []].append((heard.offset, heard.bytes.count))
+        }
+
+        func chunks(of shell: Int) -> [(offset: Int?, count: Int)] {
+            lock.lock(); defer { lock.unlock() }
+            return offsets[shell] ?? []
+        }
+
+        func bytes(of shell: Int) -> Data {
+            lock.lock(); defer { lock.unlock() }
+            return output[shell] ?? Data()
         }
 
         func text(of shell: Int) -> String {
@@ -76,6 +88,55 @@ struct ShellTabsTests {
         #expect(await core.shells.session(for: id, shell: 1) == nil)
         #expect(second?.state.isLive == false)
         #expect(first?.state.isLive == true)
+
+        await core.shells.shutDown()
+    }
+
+    /// Every chunk says where it falls, one after the other, and a replay ends where
+    /// the next chunk will start, so a screen can drop what it already has (#401).
+    @Test func outputCarriesOffsetsThatMeetTheReplay() async throws {
+        let heard = Heard()
+        let (core, work) = try await core(heard: heard)
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        _ = try await core.attachShell(.init(agentID: id))
+
+        let marker = "offsets-\(UUID().uuidString.prefix(8))"
+        try await core.writeToShell(.init(agentID: id, bytes: Data("seq 1 2000; echo \(marker)\n".utf8)))
+        #expect(await eventually { heard.text(of: 0).components(separatedBy: marker).count >= 3 })
+
+        var end = 0
+        for chunk in heard.chunks(of: 0) {
+            #expect(chunk.offset == end)
+            end += chunk.count
+        }
+        let replay = try await core.attachShell(.init(agentID: id))
+        #expect(replay.dropped + replay.scrollback.count == end)
+        #expect(replay.scrollback == heard.bytes(of: 0))
+
+        // A screen that has it up to some point is given only what came after.
+        let part = try await core.attachShell(.init(agentID: id, since: end - 10, startedAt: replay.startedAt))
+        #expect(part.offset == end - 10)
+        #expect(part.scrollback == heard.bytes(of: 0).suffix(10))
+        // Another shell's place is no use: the whole of it.
+        let other = try await core.attachShell(.init(agentID: id, since: end - 10, startedAt: .distantPast))
+        #expect(other.offset == nil)
+        #expect(other.scrollback.count == end)
+
+        await core.shells.shutDown()
+    }
+
+    /// The note that a shell went with the helper is in the replay, not only said once
+    /// to whoever was listening.
+    @Test func theNoteThatAShellWentIsKept() async throws {
+        let heard = Heard()
+        let (core, work) = try await core(heard: heard)
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "go"))
+        _ = try await core.attachShell(.init(agentID: id))
+        await core.shells.shutDown()
+
+        _ = try await core.attachShell(.init(agentID: id))
+        let replay = try await core.attachShell(.init(agentID: id))
+        #expect(String(decoding: replay.scrollback, as: UTF8.self).contains("went when the helper did"))
 
         await core.shells.shutDown()
     }

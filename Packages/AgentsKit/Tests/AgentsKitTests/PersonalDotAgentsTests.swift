@@ -60,6 +60,24 @@ struct PersonalDotAgentsTests {
         #expect(DotAgents.isDirectory(home.appending(path: ".agents/personas")))
     }
 
+    // #229 research R5: the chat project lives in `~/.agents/chat`, and its own `.agents`
+    // is the project's, not the person's. Reconciling the home leaves all of it alone.
+    @Test func theChatProjectInsideTheHomeIsLeftAlone() throws {
+        let home = try home()
+        try skill(home, "shared")
+        try write(home, ".agents/chat/.agents/skills/x/SKILL.md", "chat's own")
+        try write(home, ".agents/chat/AGENTS.md", "# AGENTS.md\n")
+        var record = PersonalDotAgents.Record(home: home.path)
+
+        reconcile(home, record: &record)
+
+        let chat = home.appending(path: ".agents/chat")
+        #expect(try String(contentsOf: chat.appending(path: ".agents/skills/x/SKILL.md"), encoding: .utf8) == "chat's own")
+        #expect(try String(contentsOf: chat.appending(path: "AGENTS.md"), encoding: .utf8) == "# AGENTS.md\n")
+        #expect(link(home, ".agents/chat/.agents/skills/shared") == nil)
+        #expect(!FileManager.default.fileExists(atPath: home.appending(path: ".claude/skills/chat").path))
+    }
+
     // US1 scenario 2, FR-007
     @Test func claudeAISyncedSkillsAreNeverTouched() throws {
         let home = try home()

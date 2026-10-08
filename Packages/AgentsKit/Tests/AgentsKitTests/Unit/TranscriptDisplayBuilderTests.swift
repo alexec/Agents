@@ -116,4 +116,42 @@ struct TranscriptDisplayBuilderTests {
         #expect(builder.items.first?.id == id)
         if case .entry(let entry) = builder.items[0] { #expect(entry.text == "Hello") }
     }
+
+    /// A retried error stays while it is the last thing the agent did, and goes once the
+    /// agent carries on (#394). Its place goes with it, so the run after it keeps taking
+    /// its updates.
+    @Test func aRetriedErrorGoesOnceTheAgentCarriesOn() throws {
+        let error = "Error: RetriableError: [unavailable] getaddrinfo ENOTFOUND api2.cursor.sh"
+        var builder = TranscriptDisplayBuilder()
+        builder.add(TranscriptEntry(kind: .userMessage("do it")))
+        builder.add(message(error, "e1"))
+        #expect(builder.items.count == 2, "still what the agent last did")
+        builder.add(call("t1", "Read"))
+        try #require(builder.items.count == 2)
+        #expect(builder.items[1].latestToolCall?.title == "Read")
+        builder.add(message("Done", "m2"))
+        builder.add(update("t1", status: "completed"))
+        #expect(builder.items[1].latestToolCall?.status == "completed")
+        #expect(builder.items.count == 3)
+    }
+
+    @Test func aRetriedErrorTheTurnEndedOnStays() {
+        let error = message("Error: RetriableError: [aborted] socket", "e1")
+        let items = TranscriptEntry.display([
+            error,
+            TranscriptEntry(kind: .stateChanged(.finished, reason: .endTurn)),
+            TranscriptEntry(kind: .userMessage("again")),
+            message("Trying", "m2"),
+        ])
+        #expect(items.first?.id == error.id, "it is what stopped the work, so it is kept")
+    }
+
+    @Test func onlyErrorLinesLeaveAMessage() {
+        #expect(IntermittentError.without(in: "a\nError: RetriableError: x\nb", all: false) == "a\nb")
+        #expect(IntermittentError.without(in: "a\nError: RetriableError: x", all: false) == nil,
+                "nothing after it yet")
+        #expect(IntermittentError.without(in: "a\nError: RetriableError: x", all: true) == "a")
+        #expect(IntermittentError.without(in: "The RetriableError type retries.", all: true) == nil,
+                "talk about it is not one")
+    }
 }

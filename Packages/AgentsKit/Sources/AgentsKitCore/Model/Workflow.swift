@@ -243,6 +243,11 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     /// Set while the file is not the one the person approved: new since they last
     /// looked, or changed. Nothing fires until they approve it.
     public var awaitingApproval: WorkflowApproval?
+    /// Set while the person has denied the file as it is now on this host (#391): it
+    /// does not run here, by trigger or by Run now, and no longer waits, but stays in
+    /// its place on the list. The digest is what Approve sends to take it back. Other
+    /// hosts, and the file, know nothing of it.
+    public var deniedHere: WorkflowApproval?
     /// When it last started an agent, and what set that run off (#98). Apart from
     /// `lastOutcome`, which a refusal overwrites: a workflow turned off for a week has
     /// a week of refusals on top of the last time it actually ran.
@@ -261,6 +266,10 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     /// here: `nil` when there is none yet or it has gone, either way the next run
     /// starts one.
     public var standingAgentID: UUID?
+    /// How each server's event trigger is doing (#383): one per server a trigger hears,
+    /// in file order and then by server; nil when it names no server's event this host
+    /// asks for. An older client ignores it.
+    public var mcpTriggers: [MCPTriggerStatus]?
 
     public var id: String { workflow.id }
     public var folder: URL { workflow.folder }
@@ -271,16 +280,20 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
                 lastOutcome: WorkflowOutcome? = nil, isRunning: Bool = false,
                 causingEvent: EventPosition? = nil, causingEventName: String? = nil,
                 awaitingApproval: WorkflowApproval? = nil,
+                deniedHere: WorkflowApproval? = nil,
                 lastFiredAt: Date? = nil, lastFiredBy: WorkflowCause? = nil,
                 nextFireAtByTrigger: [Date?] = [],
                 cooldownEndsAt: Date? = nil, holdsAFire: Bool = false,
-                offReason: WorkflowOffReason? = nil, standingAgentID: UUID? = nil) {
+                offReason: WorkflowOffReason? = nil, standingAgentID: UUID? = nil,
+                mcpTriggers: [MCPTriggerStatus]? = nil) {
+        self.mcpTriggers = mcpTriggers
         self.offReason = offReason
         self.standingAgentID = standingAgentID
         self.cooldownEndsAt = cooldownEndsAt
         self.holdsAFire = holdsAFire
         self.nextFireAtByTrigger = nextFireAtByTrigger
         self.awaitingApproval = awaitingApproval
+        self.deniedHere = deniedHere
         self.isEnabled = isEnabled
         self.lastFiredAt = lastFiredAt
         self.lastFiredBy = lastFiredBy
@@ -298,8 +311,20 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     /// and inert, with no Approve until one ahead of it is approved or removed.
     public var waitsItsTurn: Bool { awaitingApproval != nil && overLimit == .project }
 
-    /// Whether Approve is offered: waiting, and one of the ones allowed to wait.
-    public var canBeApproved: Bool { awaitingApproval != nil && !waitsItsTurn }
+    /// Whether Approve is offered: waiting, and one of the ones allowed to wait, or
+    /// denied on this host, where Approve takes the denial back (#391).
+    public var canBeApproved: Bool { (awaitingApproval != nil && !waitsItsTurn) || deniedHere != nil }
+
+    /// Whether Deny is offered (#391): waiting for an OK, even behind the ones allowed
+    /// to wait, since denying runs nothing and only takes it out of the queue here.
+    public var canBeDenied: Bool { awaitingApproval != nil && !isArchived }
+
+    /// Waiting for an OK, or denied on this host: either way it runs nothing here until
+    /// it is approved here, and Approve is where Run now would be.
+    public var isUnapproved: Bool { awaitingApproval != nil || deniedHere != nil }
+
+    /// The file Approve approves: the one waiting, or the one denied here.
+    public var approvable: WorkflowApproval? { awaitingApproval ?? deniedHere }
 
     /// Whether this row is the one thing on the page that wants a person.
     ///
@@ -360,12 +385,15 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         causingEventName = try c.decodeIfPresent(String.self, forKey: .causingEventName)
         isRunning = try c.decodeIfPresent(Bool.self, forKey: .isRunning) ?? false
         awaitingApproval = try? c.decodeIfPresent(WorkflowApproval.self, forKey: .awaitingApproval)
+        deniedHere = try? c.decodeIfPresent(WorkflowApproval.self, forKey: .deniedHere)
         lastFiredAt = try c.decodeIfPresent(Date.self, forKey: .lastFiredAt)
         lastFiredBy = (try? c.decodeIfPresent(WorkflowCause.self, forKey: .lastFiredBy)) ?? nil
         cooldownEndsAt = try c.decodeIfPresent(Date.self, forKey: .cooldownEndsAt)
         holdsAFire = try c.decodeIfPresent(Bool.self, forKey: .holdsAFire) ?? false
         offReason = (try? c.decodeIfPresent(WorkflowOffReason.self, forKey: .offReason)) ?? nil
         standingAgentID = try c.decodeIfPresent(UUID.self, forKey: .standingAgentID)
+        // A state or failure this version does not know costs the lines, not the list (#383).
+        mcpTriggers = (try? c.decodeIfPresent([MCPTriggerStatus].self, forKey: .mcpTriggers)) ?? nil
     }
 
     /// What its cooldown is doing, in one sentence, for the pages that show triggers

@@ -9,7 +9,7 @@ import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import type { ChangedFile, ChangedFileDetail, ChangesList, DiffLine, GitView } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
-import { canOpenInFiles, changeStep, changeStops, lineDiff, offersDiffChoice, otherAgentsNote, shownDiff, type DiffShown } from "../model/diff";
+import { canOpenInFiles, changeStep, changeStops, lineDiff, offersDiffChoice, otherAgentsNote, shownDiff, unavailableNote, type DiffShown } from "../model/diff";
 import { nameOf, paneOf, setPane } from "./files/paneState";
 import { build, lines, sameFile, statusGlyph, statusPhrase, totals, type Totals } from "../model/changeTree";
 
@@ -160,7 +160,16 @@ export function Changes({ store, host, session }: { store: Store; host: string; 
   if (failed.value && !list.value) return <p class="hint">{failed.value}</p>;
   if (!list.value) return <p class="hint">Reading what changed…</p>;
   const changes = list.value;
-  if (!changes.files.length) return <p class="hint">Nothing has changed yet.</p>;
+  // Why git's half is missing, as the Remote says it: a chat (#229) is in no repository.
+  const unavailable = unavailableNote(changes.git);
+  if (!changes.files.length) {
+    return (
+      <>
+        <p class="hint">Nothing has changed yet.</p>
+        {unavailable && <p class="changes-note faint small">{unavailable}</p>}
+      </>
+    );
+  }
   const shown = lines(build(changes.files), collapsed.value);
   const toggle = (key: string) => {
     const next = new Set(collapsed.value);
@@ -176,6 +185,7 @@ export function Changes({ store, host, session }: { store: Store; host: string; 
       {/* "4 files · +33 −0", as the window heads its list. */}
       <p class="changes-head quiet small">{all.files === 1 ? "1 file" : `${all.files} files`} · +{all.added} −{all.removed}</p>
       {note && <p class="changes-note faint small">{note}</p>}
+      {unavailable && <p class="changes-note faint small">{unavailable}</p>}
       <ul class="changed-files tree" aria-label="Changed files">
         {shown.map(({ node, depth }) => node.kind === "folder" ? (
           <li key={`folder:${node.key}`}>

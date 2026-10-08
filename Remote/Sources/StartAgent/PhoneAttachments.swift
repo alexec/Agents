@@ -59,6 +59,10 @@ struct AttachButton: View {
         add(PhoneAttachment.picture(data, name: "Pasted picture"))
     }
 
+    private func add(_ result: Result<Attachment, PhoneAttachment.Refusal>) {
+        PhoneAttachment.add(result, to: &attachments, refusal: &refusal)
+    }
+
     private func take(_ item: PhotosPickerItem) async {
         guard let data = try? await item.loadTransferable(type: Data.self) else {
             refusal = "That picture could not be read."
@@ -79,7 +83,12 @@ struct AttachButton: View {
         add(PhoneAttachment.file(data, name: url.lastPathComponent, type: type))
     }
 
-    private func add(_ result: Result<Attachment, PhoneAttachment.Refusal>) {
+}
+
+extension PhoneAttachment {
+    /// Attached, or why not, said where it was attached.
+    static func add(_ result: Result<Attachment, Refusal>, to attachments: inout [Attachment],
+                    refusal: inout String?) {
         switch result {
         case .success(let attachment):
             attachments.append(attachment)
@@ -87,6 +96,40 @@ struct AttachButton: View {
         case .failure(let refused):
             refusal = refused.sentence
         }
+    }
+}
+
+/// ⌘V from an iPad's keyboard, with the caret in the prompt, attaches a copied picture
+/// as the paperclip's Paste Picture does (#396). The field pastes words itself, and
+/// cannot paste a picture, so the system's paste comes on to here when that is what was
+/// copied. Through the system's paste, so iPadOS asks nothing first. Not on an iPhone:
+/// there, Paste Picture is the way in.
+struct PastesPictures: ViewModifier {
+    @Environment(RemoteModel.self) private var model
+    @Binding var attachments: [Attachment]
+    @Binding var refusal: String?
+
+    func body(content: Content) -> some View {
+        // Away, as the paperclip: a picture is too much to carry through iCloud (046).
+        if UIDevice.current.userInterfaceIdiom == .pad, !model.isAway {
+            content.pasteDestination(for: PastedPicture.self) { pictures in
+                for picture in pictures {
+                    PhoneAttachment.add(PhoneAttachment.picture(picture.data, name: "Pasted picture"),
+                                        to: &attachments, refusal: &refusal)
+                }
+            }
+        } else {
+            content
+        }
+    }
+}
+
+/// A copied picture of any kind, by value; `PhoneAttachment` shrinks it.
+struct PastedPicture: Transferable {
+    let data: Data
+
+    static var transferRepresentation: some TransferRepresentation {
+        DataRepresentation(importedContentType: .image) { PastedPicture(data: $0) }
     }
 }
 

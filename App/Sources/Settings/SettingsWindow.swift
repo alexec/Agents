@@ -132,7 +132,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .general: "General"
         case .runtimes: "Agent Runtimes"
         case .shared: "Shared"
-        case .spending: "Spending"
+        case .spending: "Cost"
         case .resources: "Resources"
         case .controlPlane: "Control plane"
         }

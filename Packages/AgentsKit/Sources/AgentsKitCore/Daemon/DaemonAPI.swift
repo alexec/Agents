@@ -191,6 +191,9 @@ public enum DaemonAPI {
         public static let projectsAdd = "projects/add"
         public static let projectsArchive = "projects/archive"
         public static let projectsUnarchive = "projects/unarchive"
+        /// Why this host has a chat project or not (#229), for a New Chat that found no
+        /// summary marked `isChat` in the list.
+        public static let projectsChatState = "projects/chatState"
         /// The person setting a project's two helper limits (#64), from any window or
         /// paired client (#111). Not in `ConnectionRole.agentMethods`, so no agent and no
         /// workflow can raise a ceiling over agents.
@@ -216,6 +219,9 @@ public enum DaemonAPI {
         public static let workflowsEnable = "workflows/enable"
         /// Approve a workflow file as the person was shown it (security review).
         public static let workflowsApprove = "workflows/approve"
+        /// Deny one on this host only (#391): it does not run here, and the file is not
+        /// touched, so other hosts still see it waiting. Takes a `WorkflowApproveRequest`.
+        public static let workflowsDeny = "workflows/deny"
         /// A project's plugins and which are waiting for the person's OK (security review, S2).
         public static let pluginsList = "plugins/list"
         public static let pluginsApprove = "plugins/approve"
@@ -223,6 +229,8 @@ public enum DaemonAPI {
         /// is the writer for the reason it writes every other workflow change: a second
         /// window — or a phone — must not become a second author of the same file.
         public static let workflowsSettings = "workflows/settings"
+        /// Clear a server's event trigger's "events may have been missed" (#383).
+        public static let workflowsClearMCPMissed = "workflows/mcpTrigger/clearMissed"
         /// What the MCP helper relays when an agent calls the workflow tool.
         public static let agentsManageWorkflows = "agents/manageWorkflows"
         /// What the MCP helper relays when an agent calls `start_agent`,
@@ -326,6 +334,9 @@ public enum DaemonAPI {
         public static let shellList = "shell/list"
         /// End one shell for good and forget it: the tab was closed (055).
         public static let shellClose = "shell/close"
+        /// Start a new shell for an agent, numbered by the daemon, so two screens
+        /// opening a tab at once never pick the same number (#401).
+        public static let shellOpen = "shell/open"
 
         // What the reader will allow to be spent. All three are window calls: none is
         // advertised to `AppService`, added to the MCP tool surface, or named in any
@@ -497,6 +508,20 @@ public enum DaemonAPI {
         }
     }
 
+    /// Whether this host has a chat project, and why not (#229). `projects/list` is a
+    /// bare array, so the reason travels on its own call, asked only when New Chat finds
+    /// no summary marked `isChat`.
+    public enum ChatProjectState: Codable, Hashable, Sendable {
+        /// Laid out and live: New Chat starts in `folder`.
+        case ready(folder: URL)
+        /// The person archived it; the daemon leaves it so. Unarchive brings it back.
+        case archived(folder: URL)
+        /// A root with no personal home (a scratch root, a test) makes none.
+        case noPersonalHome
+        /// Something is in the way, in a sentence: the path is a file, or making it failed.
+        case failed(message: String)
+    }
+
     /// One project, named by its folder, because the folder is the identity.
     public struct ProjectRequest: Codable, Sendable {
         public var folder: URL
@@ -588,6 +613,9 @@ public enum DaemonAPI {
         /// How many agents have been retired from this project (051). Their costs are
         /// still in `costToDate`: retiring an agent changes no total.
         public var retiredCount: Int = 0
+        /// True on the one project this host made for chats (#229), `~/.agents/chat`;
+        /// absent on every other, so an older reader sees an ordinary project.
+        public var isChat: Bool?
         /// Which machine the project is on, stamped by the window that heard of it and
         /// never sent (037). Not in `CodingKeys`.
         public var host: HostID = .mac
@@ -602,7 +630,7 @@ public enum DaemonAPI {
 
         enum CodingKeys: String, CodingKey {
             case project, name, exists, lastActivityAt, counts, costToDate, unmeasuredAgents
-            case retiredCount
+            case retiredCount, isChat
         }
 
         /// Whether anything in this project wants the user.
@@ -641,6 +669,7 @@ public enum DaemonAPI {
             costToDate = try c.decode([String: Decimal].self, forKey: .costToDate)
             unmeasuredAgents = try c.decode(Int.self, forKey: .unmeasuredAgents)
             retiredCount = try c.decode(Int.self, forKey: .retiredCount)
+            isChat = try c.decodeIfPresent(Bool.self, forKey: .isChat)
         }
     }
 
@@ -1804,12 +1833,21 @@ public enum DaemonAPI {
         public var shell: Int
         public var rows: Int
         public var cols: Int
+        /// How far into the shell's output this screen already is, and when the shell
+        /// it has was started. Given both, and the same shell is still there, the
+        /// replay is only what came after: a screen coming back is not sent four
+        /// megabytes it already shows (#401).
+        public var since: Int?
+        public var startedAt: Date?
 
-        public init(agentID: UUID, shell: Int = 0, rows: Int = 24, cols: Int = 80) {
+        public init(agentID: UUID, shell: Int = 0, rows: Int = 24, cols: Int = 80,
+                    since: Int? = nil, startedAt: Date? = nil) {
             self.agentID = agentID
             self.shell = shell
             self.rows = rows
             self.cols = cols
+            self.since = since
+            self.startedAt = startedAt
         }
 
         public init(from decoder: any Decoder) throws {
@@ -1818,6 +1856,8 @@ public enum DaemonAPI {
             shell = try c.decodeIfPresent(Int.self, forKey: .shell) ?? 0
             rows = try c.decodeIfPresent(Int.self, forKey: .rows) ?? 24
             cols = try c.decodeIfPresent(Int.self, forKey: .cols) ?? 80
+            since = try c.decodeIfPresent(Int.self, forKey: .since)
+            startedAt = try c.decodeIfPresent(Date.self, forKey: .startedAt)
         }
     }
 
@@ -1844,6 +1884,12 @@ public enum DaemonAPI {
         public init(shells: [Int]) { self.shells = shells }
     }
 
+    /// The number the daemon gave a shell it opened (#401).
+    public struct ShellOpenResponse: Codable, Sendable {
+        public var shell: Int
+        public init(shell: Int) { self.shell = shell }
+    }
+
     /// What a window gets on attach: the state, and the bytes to replay.
     ///
     /// Bytes, not a screen. The daemon parses nothing; the window feeds these to its
@@ -1852,18 +1898,25 @@ public enum DaemonAPI {
     public struct ShellAttachResponse: Codable, Sendable {
         public var state: ShellState
         public var scrollback: Data
+        /// Bytes dropped off the front of the buffer, which is also the offset of the
+        /// replay's first byte: the replay ends where the next `shell/output` starts.
         public var dropped: Int
         public var startedAt: Date
         /// Where the shell was started. Nil from a daemon before 053, which is after the
         /// #58 cut-off (051), so it stays optional.
         public var folder: URL?
+        /// The offset of the replay's first byte, when it is not the whole buffer: an
+        /// attach that said `since` gets only what came after. Nil means `dropped`.
+        public var offset: Int?
 
-        public init(state: ShellState, scrollback: Data, dropped: Int, startedAt: Date, folder: URL? = nil) {
+        public init(state: ShellState, scrollback: Data, dropped: Int, startedAt: Date, folder: URL? = nil,
+                    offset: Int? = nil) {
             self.state = state
             self.scrollback = scrollback
             self.dropped = dropped
             self.startedAt = startedAt
             self.folder = folder
+            self.offset = offset
         }
     }
 
@@ -1942,11 +1995,16 @@ public enum DaemonAPI {
         public var agentID: UUID
         public var shell: Int
         public var bytes: Data
+        /// Where the first of these bytes falls in everything the shell has printed. A
+        /// screen whose replay already holds them drops them, rather than printing them
+        /// twice (#401). Nil from a host before #401, whose output is shown as it comes.
+        public var offset: Int?
 
-        public init(agentID: UUID, shell: Int = 0, bytes: Data) {
+        public init(agentID: UUID, shell: Int = 0, bytes: Data, offset: Int? = nil) {
             self.agentID = agentID
             self.shell = shell
             self.bytes = bytes
+            self.offset = offset
         }
 
         public init(from decoder: any Decoder) throws {
@@ -1954,6 +2012,7 @@ public enum DaemonAPI {
             agentID = try c.decode(UUID.self, forKey: .agentID)
             shell = try c.decodeIfPresent(Int.self, forKey: .shell) ?? 0
             bytes = try c.decode(Data.self, forKey: .bytes)
+            offset = try c.decodeIfPresent(Int.self, forKey: .offset)
         }
 
         /// Read straight off the value that came in, without the round trip.
@@ -1974,6 +2033,7 @@ public enum DaemonAPI {
             self.agentID = agentID
             self.shell = params["shell"]?.intValue ?? 0
             self.bytes = bytes
+            self.offset = params["offset"]?.intValue
         }
     }
 
@@ -2199,6 +2259,21 @@ public enum DaemonAPI {
         }
     }
 
+    /// Clear the missed-events mark on one line under a server's event trigger (#383):
+    /// the event's name and the server whose line it is.
+    public struct WorkflowMCPClearMissedRequest: Codable, Sendable {
+        public var folder: URL
+        public var workflowID: String
+        public var name: String
+        public var server: String?
+        public init(folder: URL, workflowID: String, name: String, server: String?) {
+            self.folder = folder
+            self.workflowID = workflowID
+            self.name = name
+            self.server = server
+        }
+    }
+
     /// A project's plugins.
     public struct PluginsListRequest: Codable, Sendable {
         public var folder: URL
@@ -2226,7 +2301,7 @@ public enum DaemonAPI {
     }
 
     /// Approve a workflow's file: `digest` is the one the row carried, so only the file
-    /// the person was shown is approved.
+    /// the person was shown is approved. Deny (#391) sends the same, for the same reason.
     public struct WorkflowApproveRequest: Codable, Sendable {
         public var folder: URL
         public var workflowID: String

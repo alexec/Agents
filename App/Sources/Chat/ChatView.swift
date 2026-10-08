@@ -125,6 +125,7 @@ struct ChatView: View {
                 Task { await BackgroundOutput.open(item, of: agent, model: model) }
             },
             turnEntries: { [model] agentID, range in await model.turnEntries(agentID, range) },
+            reloadTranscript: { [model] in await model.loadTranscript() },
             continueWithoutSandbox: sandboxAnswer(carryOn: true),
             keepStopped: sandboxAnswer(carryOn: false),
             waitingSandbox: agent?.pendingSandboxFailure)

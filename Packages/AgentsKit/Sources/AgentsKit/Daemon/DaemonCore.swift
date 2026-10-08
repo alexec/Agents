@@ -238,6 +238,9 @@ public actor DaemonCore {
     /// The phones and iPads that have an agent's shell open, by agent (034). A device
     /// hears a shell's output only while it is here; a window on the Mac hears them all.
     var shellWatchers: [UUID: Set<UUID>] = [:]
+    /// The Mac windows attached to each shell. While there is one, the shell keeps the
+    /// Mac's size and a phone's is not taken (#401).
+    var shellMacScreens: [ShellHost.Key: Set<UUID>] = [:]
     /// What each agent found dead on start-up was doing when the last daemon went, held
     /// only until it has been told. See `DaemonCore+Recovery`.
     var interrupted: [UUID: AgentState] = [:]
@@ -306,6 +309,13 @@ public actor DaemonCore {
     /// its last agent, a record or a tombstone (#204). Every project-wide call used to
     /// make the set again for each project it summarised.
     var projectIndexCache: ProjectIndex?
+    /// Why the chat project could not be made at start (#229), in a sentence; nil when it
+    /// was, or when there was nothing to make. See `DaemonCore+ChatProject`.
+    var chatProjectFailure: String?
+    /// Where a server keeps its chat project (#229): its account's `$HOME`, for that alone.
+    /// A server's daemon has no personal home (054 R8), so nothing else of `~/.agents` is
+    /// laid out there. Nil on this Mac, whose chat project lives in the personal home.
+    var serverChatHome: URL?
     /// Whether each project's folder was there when last looked (#204), so a list of 500
     /// projects is not 500 stats. Dropped for a folder when its watch hears anything, and
     /// old after `folderExistenceFresh` for the moves a watch never hears.
@@ -478,6 +488,9 @@ public actor DaemonCore {
     var eventWaitTimer: Task<Void, Never>?
     /// Drops the oldest events once an hour.
     var eventPruner: Task<Void, Never>?
+    /// Servers' events as workflow triggers (#383): the subscriptions, their polls and
+    /// what each has got to.
+    var mcpEvents = MCPEventsState()
     /// Events raised before the workflows were read, held for their new-style triggers
     /// until `startWorkflows`, as `deferredLifecycleEvents` holds today's (042).
     var deferredEventsForWorkflows: [Event] = []
@@ -495,6 +508,16 @@ public actor DaemonCore {
     var machineWatch: (any MachineWatch)?
     /// Told when the Mac wakes: the uplink dials at once (#82, #113).
     var wakeHandlers: [@Sendable () -> Void] = []
+    /// Whether this host raises the Mac-only events (#372): a Mac does; a Linux server
+    /// has nothing that hears sleep, wake or the person, so it warns about them. A test
+    /// turns it off to be a server.
+    var raisesMacOnlyEvents: Bool = {
+        #if os(macOS)
+        return true
+        #else
+        return false
+        #endif
+    }()
     /// How long a `wait_for_event` call may stay open: the lease call's limit, so there
     /// is one number to measure against the runtimes (research R5). A test shortens it.
     var eventHoldLimit: Duration = LeaseLimits.waitLimit
@@ -1692,6 +1715,7 @@ public actor DaemonCore {
         machineWatch?.stop()
         machineWatch = nil
         stopWatchingDisk()
+        await stopMCPEvents()
         // The servers the bridge started for Copilot sessions are this daemon's children,
         // not a runtime's, so nobody else ends them (054).
         #if canImport(Network) && canImport(Security)
