@@ -1,5 +1,5 @@
 // A session row's lines beyond its report (#251), in the words of LeaseStatus, WaitStatus,
-// RetirementWords.rowNote, AgentsModel.startedByAgentLabel and WorktreeBadge.
+// AgentsModel.startedByAgentLabel and WorktreeBadge.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";
@@ -52,19 +52,6 @@ test("a wait on agents finishing reads as a block does; any other wait by its pa
     anyOf: { outcome: ["done", "failed"] } }]), title), "◷ Waiting for workflow.completed outcome done|failed workflow nightly");
   assert.equal(lines.eventWaitMark(wait([{ name: "agent.finished", filters: { agent: "a" } }], { timedOut: {} }), title), null);
   assert.equal(lines.eventWaitMark({ state: "running" }, title), null);
-});
-
-test("an archived row says when it retires, or why it is kept", () => {
-  const now = new Date(2026, 9, 4, 23, 0);
-  const archived = (retirement) => ({ state: "archived", retirement });
-  assert.equal(lines.retirementNote(archived({ at: wire(new Date(2026, 9, 4, 23, 30)) }), now), "Retires today");
-  assert.equal(lines.retirementNote(archived({ at: wire(new Date(2026, 9, 5, 1, 0)) }), now), "Retires tomorrow");
-  assert.equal(lines.retirementNote(archived({ at: wire(new Date(2026, 9, 9, 1, 0)) }), now), "Retires in 5 days");
-  assert.equal(lines.retirementNote(archived({ nextUnderCap: {} }), now), "Next to be retired to stay under the limit");
-  assert.equal(lines.retirementNote(archived({ held: "worktreeHasWork" }), now), "Kept: its worktree has work in it");
-  assert.equal(lines.retirementNote(archived({ held: "workflowRunning" }), now), "Kept: a workflow run is still going");
-  assert.equal(lines.retirementNote(archived({ held: "openInWindow" }), now), null);
-  assert.equal(lines.retirementNote({ state: "finished", retirement: { nextUnderCap: {} } }, now), null);
 });
 
 test("who started it, and the worktree's help", () => {

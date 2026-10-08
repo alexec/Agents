@@ -73,6 +73,9 @@ an agent finishes.
    - `hosts` is optional. Leave it out and every computer with this project runs the
      workflow. To pin it to one computer, open its page and choose that computer under
      **Runs on**. The page writes the computer's id.
+   - `when-done` is optional. Leave it out and every run stays in the list when it is
+     done. `archive-allowed` lets a run with nothing to show archive itself, and `archive`
+     archives every run that finishes done. The **When done** menu on its page writes it.
 2. Open the project's page and find the workflow under **Workflows**. Its line says what
    it does, such as *When an agent finishes, in a new agent*. A workflow an agent wrote,
    or one you wrote in another editor, shows a raised hand and **New — waiting for your

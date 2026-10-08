@@ -158,6 +158,16 @@ struct RemoteView: View {
         } message: {
             Text(model.problem ?? "")
         }
+        // Delete from a session's menu (#398), asked here: the menu is gone by now.
+        .confirmationDialog(DeletionWords.confirmTitle(model.askingToDelete?.title),
+                            isPresented: Binding(get: { model.askingToDelete != nil },
+                                                 set: { if !$0 { model.askingToDelete = nil } }),
+                            titleVisibility: .visible, presenting: model.askingToDelete) { agent in
+            Button("Delete", role: .destructive) { Task { await model.delete(agent.id) } }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text(DeletionWords.confirmMessage)
+        }
         // A send refused because the folder has gone (#119), with the ways on.
         .alert("This agent’s folder isn’t there",
                isPresented: Binding(get: { model.folderGone != nil && model.problem == nil },
@@ -197,15 +207,8 @@ struct RemoteView: View {
     @ViewBuilder
     private func pageContent(_ route: RemoteRoute) -> some View {
         switch route {
-        case .agent(let id):
-            // Retired (051): nothing left to chat with, only who it was.
-            if model.work.agent(id) == nil, let gone = model.work.tombstones[id] {
-                RetiredAgentPage(tombstone: gone,
-                                 startedBy: model.work.retiredStarterLabel(gone)).paperGround()
-            } else {
-                RemoteChatView().paperGround()
-                    .task(id: id) { await model.lookUpRetired(id) }
-            }
+        case .agent:
+            RemoteChatView().paperGround()
         case .workflow(let id): WorkflowPage(workflowID: id).paperGround()
         case .start:
             if let folder = model.selectedProject {

@@ -130,14 +130,12 @@ public enum DaemonAPI {
         public static let agentsStop = "agents/stop"
         public static let agentsArchive = "agents/archive"
         public static let agentsUnarchive = "agents/unarchive"
-        /// Retire one archived agent now, or with `confirmed: false`, say how much that
-        /// frees (051). The person's alone.
-        public static let agentsRetire = "agents/retire"
-        /// What is left of retired agents, by project or by id (051).
-        public static let agentsRetired = "agents/retired"
+        /// Delete one archived agent: its conversation, record and clean worktree (#398).
+        /// The person's alone; each client asks first.
+        public static let agentsDelete = "agents/delete"
         /// How long archived agents are kept, and how much space they take (051).
         public static let retentionState = "retention/state"
-        /// Change that, confirming first when the change retires agents at once (051).
+        /// Change that, confirming first when the change deletes agents at once (051).
         public static let retentionSet = "retention/set"
         /// Put a chat down to come back to, or pick it back up (040). The person's
         /// word about their own attention: no agent tool reaches either.
@@ -477,7 +475,7 @@ public enum DaemonAPI {
         /// The retention settings, or what the archive holds, changed (051). A
         /// `RetentionState`.
         public static let retentionChanged = "retention/changed"
-        /// An agent was retired and is not in any list any more (051). An
+        /// An agent was deleted and is not in any list any more (051, #398). An
         /// `AgentRemovedNotification`. An older window ignores it and drops the agent at
         /// its next `agents/list`.
         public static let agentRemoved = "agent/removed"
@@ -614,9 +612,9 @@ public enum DaemonAPI {
         /// the ordinary case; non-zero means `costToDate` is a floor rather than the
         /// whole.** Like `counts`, recomputed on every call and never stored.
         public var unmeasuredAgents: Int
-        /// How many agents have been retired from this project (051). Their costs are
-        /// still in `costToDate`: retiring an agent changes no total.
-        public var retiredCount: Int = 0
+        /// Always none since #398, which dropped retiring: sent for a Remote older than
+        /// that, whose summary cannot be read without it.
+        private var retiredCount: Int = 0
         /// True on the one project this host made for chats (#229), `~/.agents/chat`;
         /// absent on every other, so an older reader sees an ordinary project.
         public var isChat: Bool?
@@ -672,7 +670,6 @@ public enum DaemonAPI {
             }
             costToDate = try c.decode([String: Decimal].self, forKey: .costToDate)
             unmeasuredAgents = try c.decode(Int.self, forKey: .unmeasuredAgents)
-            retiredCount = try c.decode(Int.self, forKey: .retiredCount)
             isChat = try c.decodeIfPresent(Bool.self, forKey: .isChat)
         }
     }
@@ -2080,12 +2077,10 @@ public enum DaemonAPI {
         public static let sessionGone = -32003
         public static let folderGone = -32004
         public static let noSuchAgent = -32005
-        /// The agent was retired: only its tombstone is left (051). The message says who
-        /// it was and when, and replaces `noSuchAgent` for that id and nothing else.
-        public static let agentRetired = -32050
-        /// Retire now on an agent that is not archived, or that something still holds
-        /// (051). The message is the reason.
-        public static let retireRefused = -32051
+        /// Delete on an agent that is not archived, or that something still holds (#398).
+        /// The message is the reason. -32050 was a retired agent's tombstone (051), gone
+        /// with tombstones, and is not to be given out again.
+        public static let deleteRefused = -32051
         /// The user's login shell is missing, or the agent's folder has gone (FR-024).
         public static let shellWillNotStart = -32010
         /// A restart was asked for on a shell that is still running.
@@ -2343,8 +2338,12 @@ public enum DaemonAPI {
         /// The `hosts:` to write (#317): machine ids, or empty to take the line out so
         /// every host runs it. Left out means left alone, as the labels are.
         public var hosts: [String]?
+        /// The `when-done:` to write (#433): `park`, `archive-allowed` or `archive`, and
+        /// `park` or empty takes the line out. Left out means left alone, as the hosts are.
+        public var whenDone: String?
         public init(folder: URL, workflowID: String, settings: WorkflowSettings, cooldown: String? = nil,
-                    labels: [String]? = nil, hosts: [String]? = nil) {
+                    labels: [String]? = nil, hosts: [String]? = nil, whenDone: String? = nil) {
+            self.whenDone = whenDone
             self.folder = folder
             self.workflowID = workflowID
             self.settings = settings
@@ -3392,30 +3391,24 @@ public extension DaemonAPI {
     /// The most `dropbox/put` carries: what one message over the phone's link takes.
     static let dropboxPutLimit = attachmentLimit
 
-    // MARK: Retiring archived agents (051)
+    // MARK: Deleting archived agents (051, #398)
 
     /// `retention/state`, and what `retention/changed` carries.
     struct RetentionState: Codable, Hashable, Sendable {
         public var settings: RetentionSettings
         public var archivedCount: Int
         public var archivedBytes: Int
-        public var retiredCount: Int
-        /// Over the cap with nothing more that can be retired yet, and why.
-        public var overCap: OverCap?
 
-        public init(settings: RetentionSettings, archivedCount: Int, archivedBytes: Int,
-                    retiredCount: Int, overCap: OverCap? = nil) {
+        public init(settings: RetentionSettings, archivedCount: Int, archivedBytes: Int) {
             self.settings = settings
             self.archivedCount = archivedCount
             self.archivedBytes = archivedBytes
-            self.retiredCount = retiredCount
-            self.overCap = overCap
         }
     }
 
     struct RetentionSetRequest: Codable, Sendable {
         public var settings: RetentionSettings
-        /// Without it, a change that would retire agents at once is only described.
+        /// Without it, a change that would delete agents at once is only described.
         public var confirmed: Bool
 
         public init(settings: RetentionSettings, confirmed: Bool) {
@@ -3424,57 +3417,28 @@ public extension DaemonAPI {
         }
     }
 
-    /// How much retiring would free.
-    struct RetirePreview: Codable, Hashable, Sendable {
+    /// How many agents a change of setting would delete at once, and what that frees.
+    struct DeletePreview: Codable, Hashable, Sendable {
         public var count: Int
         public var bytes: Int
-        /// Some of them may turn out to be held when the time comes, which a preview
-        /// cannot know; the confirmation then says "up to".
-        public var upTo: Bool
 
-        public init(count: Int, bytes: Int, upTo: Bool = false) {
+        public init(count: Int, bytes: Int) {
             self.count = count
             self.bytes = bytes
-            self.upTo = upTo
         }
     }
 
     struct RetentionSetResult: Codable, Sendable {
         public var applied: Bool
-        /// When not applied: what it would retire.
-        public var wouldRetire: RetirePreview?
+        /// When not applied: what it would delete.
+        public var wouldDelete: DeletePreview?
         /// When applied: the state after.
         public var state: RetentionState?
 
-        public init(applied: Bool, wouldRetire: RetirePreview? = nil, state: RetentionState? = nil) {
+        public init(applied: Bool, wouldDelete: DeletePreview? = nil, state: RetentionState? = nil) {
             self.applied = applied
-            self.wouldRetire = wouldRetire
+            self.wouldDelete = wouldDelete
             self.state = state
-        }
-    }
-
-    struct RetireRequest: Codable, Sendable {
-        public var agentID: UUID
-        public var confirmed: Bool
-
-        public init(agentID: UUID, confirmed: Bool) {
-            self.agentID = agentID
-            self.confirmed = confirmed
-        }
-    }
-
-    struct RetiredRequest: Codable, Sendable {
-        /// The most one answer carries.
-        public static let limitCeiling = 200
-
-        public var folder: URL?
-        public var ids: [UUID]?
-        public var limit: Int?
-
-        public init(folder: URL? = nil, ids: [UUID]? = nil, limit: Int? = nil) {
-            self.folder = folder
-            self.ids = ids
-            self.limit = limit
         }
     }
 

@@ -57,6 +57,10 @@ final class ControlSettingsModel {
                         self.installStep = note.params?["step"]?.stringValue
                         continue
                     }
+                    if note.method == DaemonAPI.Notification.controlTunnelChanged,
+                       let change = try? note.params?.decode(DaemonAPI.HostTunnelChanged.self) {
+                        self.tunnels[change.name] = change.tunnel
+                    }
                     await self.refresh()
                 }
                 // The control plane went; come back when it does.
@@ -123,9 +127,14 @@ final class ControlSettingsModel {
 
     /// The step the control plane says an install is at (`control/installProgress`).
     private(set) var installStep: String?
+    /// How each server's reverse tunnel stands, by name, as the control plane said it
+    /// (`control/tunnelChanged`, #435): before the server has joined, too.
+    private(set) var tunnels: [String: DaemonAPI.HostTunnel] = [:]
 
     enum InstallOutcome: Equatable {
-        case added(name: String)
+        /// `tunnel`: the server is reached through a bastion, so it dials the control plane
+        /// through a reverse tunnel the control plane holds over ssh (#435).
+        case added(name: String, tunnel: Bool)
         /// The server's key is new to this Mac: the person looks at it and says so.
         case needsTrust(fingerprint: String)
         case failed(String)
@@ -144,12 +153,37 @@ final class ControlSettingsModel {
             let answer = try await client.call(DaemonAPI.Method.hostsInstall, JSONValue.object(params))
             await refresh()
             if let fingerprint = answer["needsTrust"]?.stringValue { return .needsTrust(fingerprint: fingerprint) }
-            return .added(name: answer["name"]?.stringValue ?? name ?? destination)
+            return .added(name: answer["name"]?.stringValue ?? name ?? destination,
+                          tunnel: answer["tunnel"]?.boolValue ?? false)
         } catch let error as JSONRPCError {
             return .failed(HostProblem.controlRefusal(error))
         } catch {
             return .failed("The control plane can’t be reached.")
         }
+    }
+
+    /// The servers in the ssh config that answer, installed (#429): what happened to
+    /// each, or nil with `problem` saying why it could not look.
+    func detectServers() async -> [DaemonAPI.DetectedServer]? {
+        installStep = nil
+        do {
+            let found = try await client.call(DaemonAPI.Method.hostsDetect, returning: [DaemonAPI.DetectedServer].self)
+            problem = nil
+            await refresh()
+            return found
+        } catch let error as JSONRPCError {
+            problem = HostProblem.controlRefusal(error)
+        } catch {
+            problem = "The control plane can’t be reached."
+        }
+        return nil
+    }
+
+    /// Where a host added from now on has its projects found (#429).
+    var projectDetection: ProjectDetection { status?.projectDetection ?? .standard }
+
+    func setProjectDetection(_ detection: ProjectDetection) async {
+        await perform(DaemonAPI.Method.controlSetProjectDetection, detection)
     }
 
     /// A code for a new client, or for a new host (frame G, Add by Code). A browser's is

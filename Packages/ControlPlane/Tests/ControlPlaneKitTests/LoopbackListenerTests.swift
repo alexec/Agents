@@ -228,10 +228,24 @@ struct LoopbackListenerTests {
 
     // MARK: The listener on a real copy
 
-    static let dist = URL(filePath: #filePath)
-        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        .deletingLastPathComponent().deletingLastPathComponent()
-        .appending(path: "Web/dist")
+    /// A built page of its own, as `Web/build.mjs` lays one out: Web/dist is not checked in
+    /// (#473), so these tests do not wait on Node to have built it.
+    static let dist: URL = {
+        let folder = FileManager.default.temporaryDirectory.appending(path: "web-dist-\(UUID().uuidString)")
+        try! FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let files = [
+            "index.html": "<!doctype html><html><head><script type=\"module\" src=\"/app.js\"></script></head><body></body></html>\n",
+            "app.js": "console.log(\"agents\");\n",
+        ]
+        var lines = ["agents-web 1"]
+        for (name, text) in files.sorted(by: { $0.key < $1.key }) {
+            let data = Data(text.utf8)
+            try! data.write(to: folder.appending(path: name))
+            lines.append("out \(ControlAgreement.sha256(data).map { String(format: "%02x", $0) }.joined()) Web/dist/\(name)")
+        }
+        try! Data((lines.joined(separator: "\n") + "\n").utf8).write(to: folder.appending(path: "MANIFEST"))
+        return folder
+    }()
 
     func start(web: ControlService.Configuration.Web?) async throws -> (ControlService, Int) {
         let port = try await freePort()

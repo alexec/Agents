@@ -193,11 +193,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     public var restartPickUps: Int
 
     /// When it was last archived (051): the start of the time it is kept before it is
-    /// retired. Cleared on unarchiving.
+    /// deleted. Cleared on unarchiving.
     public var archivedAt: Date?
-    /// What its row says about being retired, set by the daemon's check (051). Only
-    /// ever on an archived agent.
-    public var retirement: Retirement?
 
     /// This agent's own command sandbox choice (064, FR-003b). Nil follows its runtime's
     /// default; set only by the person, or by **Continue without sandbox**.
@@ -371,7 +368,6 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         afterTurn = (try? c.decodeIfPresent(AfterTurn.self, forKey: .afterTurn)) ?? nil
         // Stamped whenever an agent is archived (051), and absent on one that is not.
         archivedAt = try c.decodeIfPresent(Date.self, forKey: .archivedAt)
-        retirement = (try? c.decodeIfPresent(Retirement.self, forKey: .retirement)) ?? nil
         // New in 064. Absent on everything written before it: the runtime's default.
         sandboxOverride = try c.decodeIfPresent(SandboxChoice.self, forKey: .sandboxOverride)
         effectiveSandbox = (try? c.decodeIfPresent(EffectiveSandbox.self, forKey: .effectiveSandbox)) ?? nil
@@ -445,7 +441,6 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(parking, forKey: .parking)
         try c.encodeIfPresent(afterTurn, forKey: .afterTurn)
         try c.encodeIfPresent(archivedAt, forKey: .archivedAt)
-        try c.encodeIfPresent(retirement, forKey: .retirement)
         try c.encodeIfPresent(sandboxOverride, forKey: .sandboxOverride)
         try c.encodeIfPresent(effectiveSandbox, forKey: .effectiveSandbox)
         try c.encodeIfPresent(pendingSandboxFailure, forKey: .pendingSandboxFailure)
@@ -479,7 +474,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case parking
         case afterTurn
         case background
-        case archivedAt, retirement
+        case archivedAt
         case sandboxOverride, effectiveSandbox, pendingSandboxFailure
         case missingFolder
         case listsLeftOut
@@ -536,7 +531,6 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 parking: Parking? = nil,
                 afterTurn: AfterTurn? = nil,
                 archivedAt: Date? = nil,
-                retirement: Retirement? = nil,
                 unknownFields: [String: JSONValue] = [:]) {
         self.id = id
         self.runtimeID = runtimeID
@@ -583,7 +577,6 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.parking = parking
         self.afterTurn = afterTurn
         self.archivedAt = archivedAt
-        self.retirement = retirement
         self.unknownFields = unknownFields
     }
 
@@ -721,8 +714,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
 
 extension Agent {
     /// This agent without the lists that are nearly all of its record, for holding an
-    /// archived agent nobody is reading. Everything the list, the counts and retirement
-    /// need is still here.
+    /// archived agent nobody is reading. Everything the list, the counts and deletion by
+    /// age need is still here.
     public func slimmed() -> Agent {
         var slim = self
         slim.advertisedOptions = []

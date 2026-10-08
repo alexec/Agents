@@ -4,8 +4,8 @@ import Testing
 @testable import AgentsKitCore
 
 /// An agent asking, on the call that ends its turn, to be parked once that turn is
-/// over — driven through the real daemon. An ask to be archived is recognised and
-/// declined: the outcome lands, the session stays where the person can open it.
+/// over — driven through the real daemon. An ask to be archived from a session no
+/// workflow is running is refused whole (#433 covers the runs that may).
 ///
 /// What these are for is the shape of the promise: the ask takes effect only once the
 /// turn has ended as asked, is refused whole when it contradicts the outcome, and is
@@ -155,7 +155,7 @@ struct AfterTurnTests {
 
     @Test(arguments: [("park", "needs_answer"), ("park", "stuck"),
                       ("park", "blocked"), ("later", "done"),
-                      // A word agents were once told they could send; only the person archives.
+                      // Only a workflow's run may archive itself, when its workflow allows (#433).
                       ("archive", "done")])
     func aPairingThatContradictsTheOutcomeRecordsNothing(_ afterwards: String, _ outcome: String) async throws {
         let (locations, work) = try temporary()

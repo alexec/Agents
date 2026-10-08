@@ -175,23 +175,4 @@ struct NotificationBoundsTests {
         #expect(note.whole == true)
         #expect(note.chunk.contains("built"))
     }
-
-    @Test func retirementNotesTellProjectsAndNotEachAgent() async throws {
-        let wire = Wire()
-        let (core, folder) = try await core(wire)
-        var ids: [UUID] = []
-        for n in 0..<5 {
-            let id = try await core.start(.init(runtimeID: "claude", cwd: folder, prompt: "Old \(n)"))
-            try await core.archive(id)
-            ids.append(id)
-        }
-        wire.clear()
-
-        let note = Retirement.nextUnderCap
-        await core.noteRetirements(Dictionary(uniqueKeysWithValues: ids.map { ($0, note) }))
-
-        #expect(wire.heard(DaemonAPI.Notification.agentChanged, by: silent).isEmpty)
-        #expect(wire.heard(DaemonAPI.Notification.projectChanged, by: silent).count == 1)
-        for id in ids { #expect(await core.agent(id)?.retirement == note) }
-    }
 }

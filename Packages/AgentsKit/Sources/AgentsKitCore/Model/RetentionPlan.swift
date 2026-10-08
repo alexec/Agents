@@ -1,15 +1,13 @@
 import Foundation
 
-/// Which archived agents to retire, and what each archived row says (051, research R5).
+/// Which archived agents the age rule deletes (051, #398).
 ///
 /// Pure, like the lease book and the event log: the daemon gathers the facts — the
-/// archived agents, their sizes, what holds any of them, the settings and a clock it
-/// trusts — and every rule about them is a function of those, tested without a daemon.
+/// archived agents, what holds any of them, the settings and a clock it trusts — and the
+/// rule is a function of those, tested without a daemon.
 public enum RetentionPlan {
-    /// Nothing is retired within this long of being archived, by any rule (FR-006).
+    /// Nothing is deleted within this long of being archived (FR-006).
     public static let floor: TimeInterval = 86_400
-    /// A retirement by age is shown on the row once it is this close.
-    public static let notice: TimeInterval = 7 * 86_400
 
     public struct Candidate: Hashable, Sendable {
         public var id: UUID
@@ -25,101 +23,26 @@ public enum RetentionPlan {
         }
     }
 
-    public struct Retiring: Hashable, Sendable {
-        public var id: UUID
-        public var because: RetiredBecause
-
-        public init(id: UUID, because: RetiredBecause) {
-            self.id = id
-            self.because = because
-        }
-    }
-
-    public struct Decision: Hashable, Sendable {
-        /// In the order they should go.
-        public var retire: [Retiring] = []
-        /// Only the agents with something to say. One not here says nothing.
-        public var notes: [UUID: Retirement] = [:]
-        public var overCap: OverCap?
-    }
-
-    /// `saneNow` is the time the rules count from: `RetentionClock`'s, not the wall's.
+    /// The agents to delete, oldest archived first. `saneNow` is the time the rule counts
+    /// from: `RetentionClock`'s, not the wall's.
     public static func decide(archived: [Candidate], holds: [UUID: Hold],
-                              settings: RetentionSettings, saneNow: Date) -> Decision {
-        var decision = Decision()
-        guard !settings.isOff else { return decision }
-
+                              settings: RetentionSettings, saneNow: Date) -> [UUID] {
+        guard let keep = settings.keepFor.interval else { return [] }
         // An archive time in the future is now: a clock that was ahead when the agent
         // was archived must not make it older than it is.
         func age(_ agent: Candidate) -> TimeInterval { max(0, saneNow.timeIntervalSince(agent.archivedAt)) }
-        func pastFloor(_ agent: Candidate) -> Bool { age(agent) >= floor }
-
-        var retired = Set<UUID>()
-
-        // Age.
-        if let keep = settings.keepFor.interval {
-            for agent in archived.sorted(by: capOrder) where pastFloor(agent) && age(agent) >= keep {
-                if let hold = holds[agent.id] {
-                    decision.notes[agent.id] = .held(hold)
-                } else {
-                    decision.retire.append(Retiring(id: agent.id, because: .age))
-                    retired.insert(agent.id)
-                }
-            }
-        }
-
-        // The cap, over what age left.
-        let remaining = archived.filter { !retired.contains($0.id) }.sorted(by: capOrder)
-        var total = remaining.reduce(0) { $0 + $1.sizeOnDisk }
-        if let cap = settings.cap.bytes, total > cap {
-            var holding: [Hold: Int] = [:]
-            for agent in remaining where total > cap {
-                if !pastFloor(agent) {
-                    holding[.firstDay, default: 0] += 1
-                } else if let hold = holds[agent.id] {
-                    decision.notes[agent.id] = .held(hold)
-                    holding[hold, default: 0] += 1
-                } else {
-                    decision.retire.append(Retiring(id: agent.id, because: .cap))
-                    retired.insert(agent.id)
-                    total -= agent.sizeOnDisk
-                }
-            }
-            if total > cap { decision.overCap = OverCap(bytesOver: total - cap, holding: holding) }
-        }
-
-        let kept = archived.filter { !retired.contains($0.id) && decision.notes[$0.id] == nil }
-
-        // Soon by age.
-        if let keep = settings.keepFor.interval {
-            for agent in kept {
-                let due = agent.archivedAt.addingTimeInterval(keep)
-                if due.timeIntervalSince(saneNow) <= notice { decision.notes[agent.id] = .at(due) }
-            }
-        }
-
-        // Next under the cap: one agent, and only when one more archiving of the usual
-        // size would push the archive over. Far under the cap, it would be a warning
-        // about nothing.
-        if let cap = settings.cap.bytes, decision.overCap == nil {
-            let left = kept.sorted(by: capOrder)
-            let sizes = archived.map(\.sizeOnDisk).sorted()
-            let usual = sizes.isEmpty ? 0 : sizes[sizes.count / 2]
-            if total + usual > cap,
-               let next = left.first(where: { pastFloor($0) && decision.notes[$0.id] == nil }) {
-                decision.notes[next.id] = .nextUnderCap
-            }
-        }
-        return decision
+        return archived.sorted(by: order)
+            .filter { age($0) >= max(floor, keep) && holds[$0.id] == nil }
+            .map(\.id)
     }
 
     /// Oldest archived first, and among those archived together, the one idle longest.
-    static func capOrder(_ a: Candidate, _ b: Candidate) -> Bool {
+    static func order(_ a: Candidate, _ b: Candidate) -> Bool {
         a.archivedAt != b.archivedAt ? a.archivedAt < b.archivedAt : a.lastActivityAt < b.lastActivityAt
     }
 }
 
-/// The time retirement counts from (051, research R5).
+/// The time deletion by age counts from (051, research R5).
 ///
 /// The wall clock, unless it jumped forward by more than a day: then only the time that
 /// really passed counts, until a day of it has, so a clock set wrong cannot empty the

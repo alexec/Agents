@@ -45,7 +45,7 @@ public enum RuntimeAssessment {
         Step(id: "wait", area: "Events",
              passesWhen: "wait_for_event with until_minutes timed out, and the agent was started again to be told"),
         Step(id: "ending", area: "Ending a turn",
-             passesWhen: "finish_turn recorded blocked on the helper, blocked with a check-again time, and a last done or needs_answer, with a title and a next prompt; no turn ended without an account"),
+             passesWhen: "finish_turn recorded blocked on the helper, blocked with a check-again time, and a last done or needs_answer"),
         Step(id: "worktree", area: "Worktrees",
              passesWhen: "finish_turn with worktree moved the agent into a new worktree, and finish_turn with leave_worktree remove moved it back and removed it (not offered outside a git repository, or where the runtime cannot move)"),
         Step(id: "sessions", area: "Sessions",
@@ -214,8 +214,8 @@ public enum RuntimeAssessment {
             label `\(helperLabel)`, and the prompt "Reply with the word OK, then call finish_turn \
             with outcome done and the message OK." Then call `list_my_agents`. End this turn with \
             `finish_turn`: outcome `blocked`, `waiting_on` the helper's id, title \
-            "Assess \(runtimeName)", a message saying you are waiting on the helper, and a \
-            `next_prompt`. You are started again when the helper finishes. (If that call is \
+            "Assess \(runtimeName)", and a message saying you are waiting on the helper. You \
+            are started again when the helper finishes. (If that call is \
             refused because the helper has already finished, go straight on to step 8 in \
             this turn.)
 

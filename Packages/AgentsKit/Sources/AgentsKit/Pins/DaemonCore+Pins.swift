@@ -546,7 +546,7 @@ extension DaemonCore {
             return PinnerView(kind: .workflow, id: workflow, name: workflows[project]?[workflow]?.name ?? workflow)
         }
         if let id = pinner.agentID {
-            let name = agents[id]?.title ?? retired[id]?.title ?? "an agent not on this host"
+            let name = agents[id]?.title ?? "an agent not on this host"
             return PinnerView(kind: .agent, id: id.uuidString, name: name)
         }
         return PinnerView(kind: .person, id: "", name: "the person")

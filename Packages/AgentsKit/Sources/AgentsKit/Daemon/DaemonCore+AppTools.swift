@@ -133,6 +133,10 @@ extension DaemonCore {
             guard after.goes(with: checked.report.outcome) else {
                 throw JSONRPCError(code: JSONRPCError.invalidParams, message: after.refusal)
             }
+            // Only a workflow's run, and only when its author allowed it (#433).
+            if after == .archive, whenDone(forRunOf: checked.agentID)?.allowsArchiveAsk != true {
+                throw JSONRPCError(code: JSONRPCError.invalidParams, message: AfterTurn.archiveNotAllowed)
+            }
             afterwards = after
         }
         // A move is the agent carrying on somewhere else, so it does not go with an
@@ -178,7 +182,11 @@ extension DaemonCore {
                                afterwards: afterwards,
                                labels: labels,
                                on: agents[checked.agentID] ?? checked.agent, id: checked.agentID)
-        let asked = afterwards.map { " " + Self.afterTurnNote($0) } ?? ""
+        // A run its workflow archives when done is told so whatever it asked (#433).
+        let archivedAnyway = whenDone(forRunOf: checked.agentID) == .archive
+            && AfterTurn.archive.goes(with: checked.report.outcome) && request.move == nil
+        let asked = archivedAnyway ? " " + Self.afterTurnNote(.archive)
+            : afterwards.map { " " + Self.afterTurnNote($0) } ?? ""
         let moving = moved.map { " " + $0 } ?? ""
         return (prompts.isEmpty ? noted : noted + " " + Self.shownNote) + asked + moving
     }
@@ -323,6 +331,7 @@ extension DaemonCore {
     static func afterTurnNote(_ after: AfterTurn) -> String {
         switch after {
         case .park: return "Once this turn ends, this conversation will be parked."
+        case .archive: return "Once this turn ends, this conversation will be archived, as its workflow allows."
         }
     }
 

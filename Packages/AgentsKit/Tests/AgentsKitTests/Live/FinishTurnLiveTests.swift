@@ -66,7 +66,7 @@ struct FinishTurnLiveTests {
             }
             if let agent = await core.agent(id), !agent.state.hasTurnInFlight,
                agent.queuedPrompts.isEmpty,
-               agent.report != nil || agent.outcomeAsked {
+               agent.report != nil {
                 try await Task.sleep(for: .seconds(2))
                 if let settled = await core.agent(id), !settled.state.hasTurnInFlight,
                    settled.queuedPrompts.isEmpty {

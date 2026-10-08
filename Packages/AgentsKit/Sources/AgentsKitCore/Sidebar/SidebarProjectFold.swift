@@ -70,14 +70,9 @@ public struct SidebarProjectFold {
         isSearching ? archived.count : max(summary?.counts[.archived] ?? 0, archived.count)
     }
 
-    /// What has been retired from here (051), the Archived fold's last line.
-    public func retiredLine(_ summary: DaemonAPI.ProjectSummary?) -> String? {
-        isSearching ? nil : RetirementWords.retiredLine(summary?.retiredCount)
-    }
-
     /// Whether the project has an Archived fold to draw: never while it is folded.
     public func showsArchivedFold(_ summary: DaemonAPI.ProjectSummary?) -> Bool {
-        isUnfolded && (archivedCount(summary) > 0 || retiredLine(summary) != nil)
+        isUnfolded && archivedCount(summary) > 0
     }
 
     /// Whether the project's pinned pages (#159) go first: unfolded, and not while

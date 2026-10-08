@@ -87,3 +87,10 @@ test("the cooldown is written as the file writes it", () => {
   assert.equal(ws.cooldownFileText(90 * 60), "1h30m");
   assert.equal(ws.cooldownFileText(24 * 3600), "1d");
 });
+
+test("when done offers the three choices in the window's words (#433)", () => {
+  assert.deepEqual(ws.whenDoneChoices, ["park", "archive-allowed", "archive"]);
+  assert.deepEqual(ws.whenDoneChoices.map(ws.whenDoneWords),
+    ["Keep each run", "Let a run archive itself", "Archive each finished run"]);
+  assert.match(ws.whenDoneSentence("archive"), /needs you, is stuck or is blocked stays/);
+});

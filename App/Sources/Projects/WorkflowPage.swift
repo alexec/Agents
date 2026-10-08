@@ -338,6 +338,41 @@ struct WorkflowPage: View {
                 }
             }
             cooldown(summary)
+            whenDone(summary)
+        }
+    }
+
+    /// What a run may do with its session when it is done (#433), with a menu that
+    /// writes `when-done:` into the file. Not for a triggering workflow: the agent it
+    /// borrows is somebody else's, and stays theirs.
+    @ViewBuilder
+    private func whenDone(_ summary: WorkflowSummary) -> some View {
+        if summary.workflow.mode != .triggering {
+            let current = summary.workflow.whenDone ?? .park
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "archivebox")
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                note(current.sentence)
+                Spacer(minLength: 12)
+                Picker("When done", selection: Binding(
+                    get: { current },
+                    set: { chosen in
+                        guard chosen != current else { return }
+                        Task {
+                            await model.setWorkflowSettings(summary, summary.workflow.settings,
+                                                            whenDone: chosen.rawValue)
+                        }
+                    })) {
+                    ForEach(WorkflowWhenDone.allCases, id: \.self) { choice in
+                        Text(choice.words).tag(choice)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .fixedSize()
+                .disabled(summary.workflow.settingsLocked)
+            }
         }
     }
 

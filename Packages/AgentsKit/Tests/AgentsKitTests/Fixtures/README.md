@@ -36,4 +36,4 @@ A real-sized archived record (051): a scratch Claude agent's `agent.json` from 2
 `advertisedOptions` and `availableCommands` exactly as the runtime sent them — they are what make an
 archived record 24 KB rather than 1.4 KB. The title and paths are rewritten under `/fixture/`, the
 id replaced, and the state set to archived by the person. `scripts/seed-archived.swift` copies it to
-fill scratch stores, and the slim and tombstone tests read it.
+fill scratch stores, and the slim record tests read it.

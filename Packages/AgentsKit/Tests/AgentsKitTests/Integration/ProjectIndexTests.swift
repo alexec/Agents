@@ -4,8 +4,8 @@ import Testing
 @testable import AgentsKitCore
 
 /// The project index is made once and kept (#204): every project's folder and its name
-/// among the others, let go only when a folder gains or loses its last agent, a record or
-/// a tombstone. These check it against the long way round, `rebuiltProjects`, after every
+/// among the others, let go only when a folder gains or loses its last agent or a record.
+/// These check it against the long way round, `rebuiltProjects`, after every
 /// one of many random changes, and that a project-wide call grows with the projects
 /// rather than with their square.
 @Suite("Project index", .timeLimit(.minutes(3)))
@@ -58,7 +58,7 @@ struct ProjectIndexTests {
         Dictionary(summaries.map { ($0.folder, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
-    @Test func theIndexMatchesTheFullCountThroughAddRemoveRenameAndRetire() async throws {
+    @Test func theIndexMatchesTheFullCountThroughAddRemoveRenameAndDelete() async throws {
         let (locations, root) = try temporary()
         // Two folders called api, so a third arriving renames the others.
         var folders = [try folder(root, "a/api"), try folder(root, "b/api"), try folder(root, "web"),
@@ -68,6 +68,7 @@ struct ProjectIndexTests {
         var dice = Dice(state: 204)
         var ids: [UUID] = []
         var n = 0
+        var deleted = 0
         for step in 0..<400 {
             let roll = Int.random(in: 0..<12, using: &dice)
             switch roll {
@@ -90,18 +91,19 @@ struct ProjectIndexTests {
                     await core.changed(moved)
                 }
             case 4 where !ids.isEmpty:
-                // Remove: gone without a tombstone.
+                // Remove: out of memory only.
                 let id = ids.remove(at: Int.random(in: 0..<ids.count, using: &dice))
                 await core.forgetForTest(id)
             case 5 where !ids.isEmpty:
-                // Tombstone: archived, then retired, as the cap retires one.
+                // Delete: archived, then deleted, as the age rule deletes one.
                 let id = ids.remove(at: Int.random(in: 0..<ids.count, using: &dice))
                 if var archived = await core.agent(id) {
                     archived.state = .archived
                     archived.archivedAt = Self.base
                     archived.archivedReason = .byUser
                     await core.changed(archived)
-                    try await core.retire(id, because: .cap)
+                    try await core.delete(id, because: .age)
+                    deleted += 1
                 }
             case 6:
                 // A record: a folder added before anything ran in it.
@@ -126,45 +128,8 @@ struct ProjectIndexTests {
                 #expect(await core.isProject(folder), "step \(step)")
             }
         }
-        #expect(await core.retired.count > 0, "the walk retired something")
+        #expect(deleted > 0, "the walk deleted something")
         await core.stopWatchingAllWorkflows()
-    }
-
-    @Test func aTombstoneTableKeepsEachProjectsNumbers() {
-        let a = URL(filePath: "/tmp/index-a/"), b = URL(filePath: "/tmp/index-b/")
-        func tombstone(_ folder: URL, _ cents: Int, created: Double, active: Double) -> Tombstone {
-            var agent = Agent(runtimeID: "claude", cwd: folder, title: "gone", state: .archived,
-                              createdAt: Self.base.addingTimeInterval(created),
-                              lastActivityAt: Self.base.addingTimeInterval(active))
-            agent.costToDate["USD"] = Decimal(cents) / 100
-            agent.archivedAt = Self.base
-            return Tombstone(from: agent, retiredAt: Self.base, because: .cap)
-        }
-        var table = TombstoneTable()
-        let first = tombstone(a, 10, created: 5, active: 50)
-        let second = tombstone(a, 20, created: 1, active: 90)
-        table[first.id] = first
-        let version = table.foldersVersion
-        table[second.id] = second
-        #expect(table.foldersVersion == version, "a second tombstone in a folder moves no folder")
-        #expect(table.tallies[Project.standardize(a)] == TombstoneTally(
-            count: 2, costToDate: ["USD": 0.3], oldestCreated: Self.base.addingTimeInterval(1),
-            newestActivity: Self.base.addingTimeInterval(90)))
-
-        // Taken away: the oldest and newest are found again from what is left.
-        table[second.id] = nil
-        #expect(table.tallies[Project.standardize(a)] == TombstoneTally(
-            count: 1, costToDate: ["USD": 0.1], oldestCreated: Self.base.addingTimeInterval(5),
-            newestActivity: Self.base.addingTimeInterval(50)))
-
-        // Moved to another folder: the first has none left, the other has it.
-        var moved = first
-        moved.project = b
-        table[first.id] = moved
-        #expect(table.tallies[Project.standardize(a)] == nil)
-        #expect(table.tallies[Project.standardize(b)]?.count == 1)
-        #expect(table.foldersVersion > version)
-        #expect(table.count == 1)
     }
 
     /// Projects with `perProject` agents each, every one in its own folder.

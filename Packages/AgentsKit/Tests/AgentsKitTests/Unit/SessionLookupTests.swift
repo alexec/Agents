@@ -18,8 +18,8 @@ struct SessionLookupTests {
               lastActivityAt: start.addingTimeInterval(-minutesAgo * 60))
     }
 
-    private func find(_ value: String, _ agents: [Agent], retired: [Tombstone] = []) -> SessionLookup.Found {
-        SessionLookup.find(value, in: project, agents: agents, retired: retired)
+    private func find(_ value: String, _ agents: [Agent]) -> SessionLookup.Found {
+        SessionLookup.find(value, in: project, agents: agents)
     }
 
     private func refusal(_ found: SessionLookup.Found) -> String? {
@@ -79,19 +79,6 @@ struct SessionLookupTests {
         #expect(session(find("Old work", [archived])) == archived.id)
     }
 
-    @Test func aRetiredSessionIsGoneByIdAndByTitle() {
-        let old = agent("Retired work", state: .archived)
-        let tombstone = Tombstone(from: old, retiredAt: start, because: .age)
-        #expect(refusal(find(old.id.uuidString, [], retired: [tombstone])) == "That conversation is gone.")
-        #expect(refusal(find("Retired work", [], retired: [tombstone])) == "That conversation is gone.")
-    }
-
-    @Test func aLiveSessionWinsOverARetiredOneOfTheSameTitle() {
-        let old = Tombstone(from: agent("Same", state: .archived), retiredAt: start, because: .age)
-        let live = agent("Same")
-        #expect(session(find("Same", [live], retired: [old])) == live.id)
-    }
-
     @Test func anotherProjectsSessionIsNotThereById() {
         let elsewhere = agent("Theirs", in: other)
         let sentence = refusal(find(elsewhere.id.uuidString, [elsewhere]))
@@ -100,12 +87,6 @@ struct SessionLookupTests {
 
     @Test func anotherProjectsSessionIsNotThereByTitle() {
         #expect(refusal(find("Theirs", [agent("Theirs", in: other)])) != nil)
-    }
-
-    @Test func anotherProjectsRetiredSessionIsNotSaidToBeGone() {
-        let tombstone = Tombstone(from: agent("Theirs", in: other, state: .archived), retiredAt: start, because: .age)
-        #expect(refusal(find("Theirs", [], retired: [tombstone]))
-                == "There is no session named \u{201C}Theirs\u{201D} in this project.")
     }
 
     @Test func aSessionInAWorktreeBelongsToItsProject() {
@@ -117,22 +98,6 @@ struct SessionLookupTests {
     }
 
     // MARK: Listing
-
-    /// Retired sessions that left a worktree are a page's worth, newest first, and say how
-    /// many more there are: a project with hundreds does not answer with all of them (#211).
-    @Test func retiredWorktreesAreListedAPageAtATime() {
-        let left = (0..<12).map { n -> Tombstone in
-            var gone = Tombstone(from: agent("Left \(n)", state: .archived),
-                                 retiredAt: start.addingTimeInterval(Double(n) * 60), because: .age)
-            gone.worktreeRoot = URL(filePath: "/work/.worktrees/left-\(n)")
-            return gone
-        }
-        let text = SessionLookup.list(in: project, agents: [agent("Live")], caller: nil, limit: 5, leftBehind: left)
-        #expect(text.components(separatedBy: "/work/.worktrees/left-").count - 1 == 5)
-        #expect(text.contains("left-11."))
-        #expect(!text.contains("left-6."))
-        #expect(text.contains("7 more retired sessions still have their worktree"))
-    }
 
     @Test func listIncludesValuesAndOwners() {
         var labeled = agent("Review")

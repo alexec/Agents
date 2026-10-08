@@ -265,6 +265,8 @@ struct ControlHostsPage: View {
             Text("Add a Server gives you one command to run on it, or installs it over ssh with a key you give once. Either way the server connects out, so nothing has to reach it. Add by Code gives another Mac a code to join with. Removing a host stops it connecting. Its agents are left running where they are.")
                 .appText(.supporting).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            SharedSectionLabel("Auto-detect")
+            ProjectDetectionCard(control: control)
         }
         .sheet(isPresented: $addingByCode) { CodeSheet(control: control, purpose: .host).paperSheet() }
         .sheet(isPresented: $addingServer) { ControlAddServerSheet(control: control).paperSheet() }
@@ -306,11 +308,73 @@ struct ControlHostsPage: View {
         if host.state != "online" { parts.append(host.state.capitalized) }
         if !host.platform.isEmpty { parts.append(host.platform.replacingOccurrences(of: " ", with: " · ")) }
         if !host.version.isEmpty { parts.append("Agents \(host.version)") }
-        parts.append("connects out")
+        if let tunnel = host.tunnel {
+            // Behind a bastion (#435): it dials through a session this Mac holds.
+            parts.append(tunnel.up ? "connects through an ssh tunnel"
+                                   : "ssh tunnel down\(tunnel.problem.map { ": \($0)" } ?? "")")
+        } else {
+            parts.append("connects out")
+        }
         // The sign-in relay needs a path back to this Mac, which the control plane does
         // not carry yet (R9). A lent key still works; the relay does not.
         parts.append("Sign-in relay needs this Mac on the same network")
         return parts.joined(separator: " · ")
+    }
+}
+
+/// Auto-detect (#429): where a host added from now on has its projects found, once.
+struct ProjectDetectionCard: View {
+    let control: ControlSettingsModel
+    /// The paths as typed, one a line; saved with Save.
+    @State private var text = ""
+    /// What was last put in `text` from the control plane.
+    @State private var shown = ""
+
+    var body: some View {
+        let detection = control.projectDetection
+        ControlCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Toggle("Find projects on a host when it is added", isOn: Binding(
+                    get: { detection.enabled },
+                    set: { on in Task { await control.setProjectDetection(ProjectDetection(enabled: on, paths: detection.paths)) } }))
+                TextField("Paths", text: $text, axis: .vertical)
+                    .lineLimit(3...10)
+                    .textFieldStyle(.roundedBorder).appText(.code)
+                    .accessibilityLabel("Paths to look in, one a line")
+                    .disabled(!detection.enabled)
+                HStack(spacing: 8) {
+                    Button("Save") {
+                        text = paths.joined(separator: "\n")
+                        shown = text
+                        Task { await control.setProjectDetection(ProjectDetection(enabled: detection.enabled, paths: paths)) }
+                    }
+                    .buttonStyle(.paper)
+                    .disabled(paths == detection.paths)
+                    Button("Use the Defaults") { text = ProjectDetection.defaultPaths.joined(separator: "\n") }
+                        .buttonStyle(.paper)
+                        .disabled(text == ProjectDetection.defaultPaths.joined(separator: "\n"))
+                }
+                .disabled(!detection.enabled)
+            }
+            .padding(16)
+        }
+        Text("Each folder directly inside these paths that is a git repository becomes a project, on a server added over ssh or by command, or this Mac. ~ is the host’s own home. It happens once, when the host is added: a project removed afterwards stays removed.")
+            .appText(.supporting).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .onAppear(perform: load)
+            .onChange(of: detection.paths) { _, _ in load() }
+    }
+
+    private var paths: [String] {
+        text.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    /// The saved paths, unless something has been typed over what was last shown.
+    private func load() {
+        let saved = control.projectDetection.paths.joined(separator: "\n")
+        guard text == shown else { return }
+        text = saved
+        shown = saved
     }
 }
 

@@ -29,7 +29,6 @@ struct BriefingTests {
     /// Named, not described. An agent told "use the workflow tool" has to guess at what
     /// it is called; an agent told the name can call it.
     @Test func theToolsItNamesAreNamedExactly() {
-        #expect(Briefing.finish.contains(AppTool.finishTurn))
         #expect(Briefing.liveDocument.contains(AppTool.showFile))
         #expect(Briefing.workflows(scheduling: false).contains(AppTool.manageWorkflows))
         #expect(Briefing.workflows(scheduling: true).contains(AppTool.manageWorkflows))
@@ -41,25 +40,16 @@ struct BriefingTests {
         #expect(!text.contains("agents__\(AppTool.finishTurn)"))
     }
 
-    /// The older names are retired; a fresh conversation is told the one tool and
-    /// nothing older (023 FR-016, R5).
-    @Test func theFinishLineNamesNeitherOldName() {
-        for retired in AppTool.retiredEndOfTurn {
-            #expect(!Briefing.finish.contains(retired))
-            for policy in ToolPolicyCatalog.builtIn {
-                #expect(!Briefing.text(for: policy).contains(retired))
-            }
-        }
-    }
-
-    /// The file's own rule: the line that fires every turn goes first. 014 put the
-    /// outcome line after `escalation` so an agent read "ask with the tool that waits"
-    /// before "you may end by saying you need an answer"; the merged line does not
-    /// mention `needs_answer` at all, and the tool's description carries that order
-    /// now, at the moment it matters (023 Research R6).
-    @Test func theFinishLineGoesFirst() {
+    /// The older names are retired, and since #479 a fresh conversation is told nothing
+    /// about ending a turn at all: the daemon works the ending out for itself.
+    @Test func aFreshConversationIsToldNothingAboutEndingATurn() {
         for policy in ToolPolicyCatalog.builtIn {
-            #expect(Briefing.lines(for: policy).first == Briefing.finish)
+            let text = Briefing.text(for: policy, naming: Self.alex)
+            for retired in AppTool.retiredEndOfTurn { #expect(!text.contains(retired)) }
+            // Cursor's preface lists every tool's schema; nothing else names it.
+            let said = text.replacingOccurrences(of: AppToolPreface.firstPrompt, with: "")
+            #expect(!said.contains("when you have finished a turn"), "\(policy.runtimeID)")
+            #expect(!said.contains("Without it I only see that you stopped"), "\(policy.runtimeID)")
         }
     }
 
@@ -67,7 +57,7 @@ struct BriefingTests {
 
     static let alex = Briefing.Naming(runtime: "Claude", person: "Alex")
 
-    /// One sentence, second, naming the runtime by its display name and the person by
+    /// One sentence, first, naming the runtime by its display name and the person by
     /// theirs, with the rule for questions only: no bare "I" or "you" there, plain
     /// "I" and "you" anywhere else (#335).
     @Test func theNamingSentenceNamesTheRuntimeAndThePerson() {
@@ -84,8 +74,7 @@ struct BriefingTests {
         #expect(line.split(separator: ". ").count == 1)
         for policy in ToolPolicyCatalog.builtIn {
             let lines = Briefing.lines(for: policy, naming: Self.alex)
-            #expect(lines.first == Briefing.finish)
-            #expect(lines.dropFirst().first == line)
+            #expect(lines.first == line)
             #expect(Briefing.text(for: policy, naming: Self.alex).components(separatedBy: "You are Claude").count == 2)
         }
     }
@@ -377,7 +366,7 @@ struct BriefingTests {
             let text = Briefing.text(for: policy, managesAgents: false)
             #expect(!text.contains(Briefing.helpers), "\(policy.runtimeID)")
             #expect(!text.contains(AppTool.startAgent))
-            #expect(text.contains(Briefing.finish), "and is told everything else")
+            #expect(text.contains(Briefing.leases), "and is told everything else")
         }
     }
 
@@ -386,7 +375,7 @@ struct BriefingTests {
     @Test func theLineComesAfterTheWorkflowLine() {
         for policy in ToolPolicyCatalog.builtIn {
             let lines = Briefing.lines(for: policy)
-            #expect(lines.firstIndex(of: Briefing.helpers) == 4, "\(policy.runtimeID)")
+            #expect(lines.firstIndex(of: Briefing.helpers) == 3, "\(policy.runtimeID)")
         }
     }
 }

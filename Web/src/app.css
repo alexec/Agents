@@ -1009,11 +1009,6 @@ button.plain:hover { opacity: 1; }
 .view-ask .buttons { display: flex; gap: 8px; margin: 0; }
 .view-context { font-size: 12px; }
 .view-box[hidden] { display: none !important; }
-/* A retired agent's page (051, #253): who it was, and nothing to do. */
-.retired-body { max-width: 620px; padding: 24px; display: flex; flex-direction: column; gap: 10px; }
-.retired-body p { margin: 0; }
-.retired-body .facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 4px 0 0; font-size: 13px; }
-.retired-body .facts dd { margin: 0; user-select: text; }
 /* A parked chat's line under its head (040, #253). */
 .park-strip { margin: 0; padding: 4px 16px; font-size: 12px; border-bottom: 1px solid var(--paper-rule); }
 /* The plan in force, one line under the chat's head, opened to every step (#341). */

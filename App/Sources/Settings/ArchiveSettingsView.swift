@@ -1,13 +1,13 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Settings ▸ General ▸ Archived agents (051): how long archived agents are kept, and how
-/// much space they may take, before the oldest are retired.
+/// Settings ▸ General ▸ Archived agents (051, #398): how long archived agents are kept
+/// before they are deleted.
 ///
-/// The pickers show what the daemon holds, not what was last clicked. A change that
-/// would retire agents at once comes back unapplied with what it would retire, and is
-/// only applied when the person confirms, so a cancelled change simply leaves the
-/// picker where it was (FR-011).
+/// The picker shows what the daemon holds, not what was last clicked. A change that would
+/// delete agents at once comes back unapplied with what it would delete, and is only
+/// applied when the person confirms, so a cancelled change simply leaves the picker where
+/// it was (FR-011).
 struct ArchiveSettingsSection: View {
     @Environment(AppModel.self) private var model
     @State private var asking: Asking?
@@ -15,64 +15,50 @@ struct ArchiveSettingsSection: View {
     private struct Asking: Identifiable {
         let id = UUID()
         let settings: RetentionSettings
-        let preview: DaemonAPI.RetirePreview
+        let preview: DaemonAPI.DeletePreview
     }
 
     var body: some View {
         if let state = model.retentionState {
             Section {
-                Text(RetirementWords.settingsSummary(archivedCount: state.archivedCount,
-                                                     archivedBytes: state.archivedBytes,
-                                                     settings: state.settings))
+                Text(DeletionWords.settingsSummary(archivedCount: state.archivedCount,
+                                                   archivedBytes: state.archivedBytes,
+                                                   settings: state.settings))
                     .appText(.reading)
-                Picker("Keep archived agents", selection: binding(\.keepFor, in: state)) {
+                Picker("Delete archived agents after", selection: keepFor(in: state)) {
                     ForEach(RetentionSettings.KeepFor.allCases, id: \.self) { keep in
-                        Text(RetirementWords.keepForLabel(keep)).tag(keep)
+                        Text(DeletionWords.keepForLabel(keep)).tag(keep)
                     }
-                }
-                Picker("Up to", selection: binding(\.cap, in: state)) {
-                    ForEach(RetentionSettings.Cap.allCases, id: \.self) { cap in
-                        Text(RetirementWords.capLabel(cap)).tag(cap)
-                    }
-                }
-                if let over = state.overCap {
-                    Label(RetirementWords.overCapSentence(over, cap: state.settings.cap),
-                          systemImage: "exclamationmark.circle")
-                        .foregroundStyle(.secondary)
                 }
             } header: {
                 Text("Archived agents")
             } footer: {
-                Text("After this long, or once archived agents take more than this, the oldest are "
-                     + "retired: the conversation is deleted and a short record of who the agent was "
-                     + "is kept. Nothing is retired on the day it was archived, and an agent whose "
-                     + "worktree still has work in it is kept until that work is committed and merged."
-                     + (model.hosts.isEmpty ? "" : " Each server keeps to the same settings."))
+                Text("An archived agent is deleted this long after it was archived: its conversation and "
+                     + "record are removed. Nothing is deleted on the day it was archived, and an agent "
+                     + "whose worktree still has work in it is kept until that work is committed and merged."
+                     + (model.hosts.isEmpty ? "" : " Each server keeps to the same setting."))
             }
             .paperListRow()
             // Held while open (#101): a later change's answer waits for this one.
-            .heldAlert({ _ in "Retire archived agents now?" }, item: { asking },
+            .heldAlert({ _ in "Delete archived agents now?" }, item: { asking },
                        dismiss: { if asking?.id == $0.id { asking = nil } }) { ask in
-                Button("Retire", role: .destructive) {
+                Button("Delete", role: .destructive) {
                     Task { _ = await model.setRetention(ask.settings, confirmed: true) }
                 }
                 Button("Cancel", role: .cancel) {}
             } message: { ask in
-                Text(RetirementWords.confirmSettings(count: ask.preview.count, bytes: ask.preview.bytes,
-                                                     upTo: ask.preview.upTo))
+                Text(DeletionWords.confirmSettings(count: ask.preview.count, bytes: ask.preview.bytes))
             }
         }
     }
 
-    /// One setting, read from the daemon's state and changed through it.
-    private func binding<Value>(_ key: WritableKeyPath<RetentionSettings, Value>,
-                                in state: DaemonAPI.RetentionState) -> Binding<Value> {
-        Binding(get: { state.settings[keyPath: key] }, set: { value in
-            var settings = state.settings
-            settings[keyPath: key] = value
+    /// The setting, read from the daemon's state and changed through it.
+    private func keepFor(in state: DaemonAPI.RetentionState) -> Binding<RetentionSettings.KeepFor> {
+        Binding(get: { state.settings.keepFor }, set: { value in
+            let settings = RetentionSettings(keepFor: value)
             Task {
                 guard let result = await model.setRetention(settings, confirmed: false),
-                      !result.applied, let preview = result.wouldRetire else { return }
+                      !result.applied, let preview = result.wouldDelete else { return }
                 asking = Asking(settings: settings, preview: preview)
             }
         })

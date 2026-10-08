@@ -153,16 +153,6 @@ struct AgentCard: View {
                             .accessibilityElement(children: .ignore)
                             .accessibilityLabel(running)
                     }
-                    // When it will be retired, or why it is kept, in the Mac row's
-                    // words (051). The phone has no settings, so the cap goes unnamed.
-                    if agent.state == .archived,
-                       let note = RetirementWords.rowNote(agent.retirement, now: Date(),
-                                                          cap: model.work.retentionState?.settings.cap) {
-                        Text(note)
-                            .appText(.fine)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
                     // What it holds or waits for, in the Mac row's words (036).
                     if let leases = model.work.leaseStatus(of: agent.id) {
                         LeaseMark(status: leases)
@@ -244,8 +234,8 @@ struct AgentCard: View {
 }
 
 /// A session's long-press menu, wherever its row is drawn: Carry on, Park, Mark as Read
-/// or Unread, Pin and where among the pinned, Branch, Archive or Bring Back. The Mac's row
-/// menu, less what the phone leaves to the Mac (Retire, Show in Finder).
+/// or Unread, Pin and where among the pinned, Branch, Archive, or Bring Back and Delete.
+/// The Mac's row menu, less what the phone leaves to the Mac (Show in Finder).
 struct AgentMenuItems: View {
     @Environment(RemoteModel.self) private var model
     let agent: Agent
@@ -293,6 +283,8 @@ struct AgentMenuItems: View {
             ArchiveAgentButton(agent: agent)
         } else {
             BringBackAgentButton(agent: agent)
+            Button("Delete…", systemImage: "trash", role: .destructive) { model.askingToDelete = agent }
+                .disabled(model.isStale(agent))
         }
     }
 

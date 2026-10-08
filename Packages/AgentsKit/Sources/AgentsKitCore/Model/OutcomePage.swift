@@ -151,10 +151,14 @@ public struct TurnSummary: Codable, Hashable, Sendable, Identifiable {
     public var outcome: [TranscriptEntry]?
     /// How many step lines the turn has behind its control (069).
     public var steps: Int?
+    /// What the turn used, as its runtime reported it (#465): every report in the turn,
+    /// added up, so turns can be compared across agents and before and after a change.
+    /// Nil when the runtime reported none, and in a summary written before.
+    public var usage: TurnUsage?
 
     public init(id: UUID, start: Int, end: Int, ask: TranscriptEntry?, last: TranscriptEntry?,
                 concise: [TranscriptEntry]? = nil, outcome: [TranscriptEntry]? = nil,
-                steps: Int? = nil) {
+                steps: Int? = nil, usage: TurnUsage? = nil) {
         self.id = id
         self.start = start
         self.end = end
@@ -163,6 +167,7 @@ public struct TurnSummary: Codable, Hashable, Sendable, Identifiable {
         self.concise = concise
         self.outcome = outcome
         self.steps = steps
+        self.usage = usage
     }
 
     /// The turn made of these entries, the first at `start` in the transcript.
@@ -174,7 +179,8 @@ public struct TurnSummary: Codable, Hashable, Sendable, Identifiable {
         let parts = TurnParts(Array(items.dropFirst(ask == nil ? 0 : 1)), isLive: false)
         return TurnSummary(id: ask?.id ?? entries.first?.id ?? UUID(), start: start,
                            end: start + entries.count, ask: ask, last: last, concise: concise,
-                           outcome: parts.outcome.compactMap(\.concise), steps: parts.stepCount)
+                           outcome: parts.outcome.compactMap(\.concise), steps: parts.stepCount,
+                           usage: TurnUsage.total(of: entries))
     }
 
     /// Cut a run of the transcript, the first entry at `start`, into turns. Each ask

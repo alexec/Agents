@@ -105,7 +105,7 @@ CLEAN=(env -i HOME="$HOME" USER="$USER" LOGNAME="$USER" TMPDIR="${TMPDIR:-/tmp}"
 # The control plane: a single copy on a free loopback port, its store, key and certificate
 # in <root>/control, and no Bonjour, so no window on the network finds it.
 PORT="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
-# The web remote (071): the checked-in Web/dist on a free loopback port of the root's own,
+# The web remote (071): Web/dist, as Agents Host's build left it, on a free loopback port of the root's own,
 # never the live 8792, so a scratch browser's key is bound to a scratch origin.
 WEB_PORT="${WEB_PORT:-$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')}"
 URL="https://127.0.0.1:$PORT"

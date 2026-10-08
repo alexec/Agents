@@ -7,8 +7,8 @@ import Testing
 ///
 /// A block clearing, its time coming round, or a wait timing out starts the agent again
 /// with the last turn's report still on it, because nothing the person did cleared it.
-/// That report is the last turn's account, not this one's: a silent resumed turn is asked
-/// once like any other, and its answer is what the row shows.
+/// That report is the last turn's account, not this one's: a silent resumed turn is
+/// accounted for afresh, as any other is (#479), and nothing is asked.
 @Suite("A silent turn after the app resumed an agent", .timeLimit(.minutes(1)))
 struct ResumedSilenceTests {
     /// Which agent each test token speaks for, bound again before every call: a fake
@@ -81,9 +81,9 @@ struct ResumedSilenceTests {
         }
     }
 
-    /// How many times the app asked how a turn went.
+    /// How many times the app asked how a turn went: the old question named the tool.
     private func asks(_ core: DaemonCore, _ id: UUID) async throws -> Int {
-        try await appPrompts(core, id).count { $0 == DaemonCore.askForOutcome }
+        try await appPrompts(core, id).count { $0.contains(AppTool.finishTurn) }
     }
 
     /// Long enough for anything queued behind a settle to have shown itself.
@@ -92,9 +92,9 @@ struct ResumedSilenceTests {
     // MARK: A block's time coming round
 
     /// The issue's case whole: blocked with a time to check again, resumed when it
-    /// comes, and the resumed turn ends without a word. Asked once, and the answer is
-    /// what is recorded.
-    @Test func aSilentTurnAfterTheTimeCameIsAskedOnceAndItsAnswerRecorded() async throws {
+    /// comes, and the resumed turn ends without a word. Nothing is asked, and the old
+    /// block gives way to the resumed turn's own ending.
+    @Test func aSilentTurnAfterTheTimeCameIsAccountedForWithoutAsking() async throws {
         let (locations, work) = try temporary()
         let gate = TurnGate()
         let core = try await makeCore(locations, FakeLauncher(script: .init(), then: [Self.held(gate)]))
@@ -102,27 +102,18 @@ struct ResumedSilenceTests {
         try await finish(core, token, "blocked", "Waiting on CI.", minutes: 1)
         gate.open()
         await settled(core, id, "the first turn ended blocked")
-        #expect(try await asks(core, id) == 0, "the first turn reported")
         let at = try #require(await core.agent(id)?.report?.block?.checkAgainAt)
 
         await core.tickWorkflows(now: at.addingTimeInterval(1))
-        await eventually("the resumed turn was asked how it went") {
-            (try? await self.asks(core, id)) == 1
+        await eventually("the resumed turn ended under an account of its own") {
+            guard let agent = await core.agent(id) else { return false }
+            return agent.state == .finished && agent.report?.outcome == .done
         }
-        await settled(core, id, "the question's turn ended")
-        let asked = try #require(await core.agent(id))
-        // The old ending gave way to the question rather than standing in for an answer.
-        #expect(asked.report == nil)
-        #expect(asked.outcomeAsked)
-        #expect(asked.endingIsUnaccountedFor)
-        #expect(asked.group(wantsEyes: false) == .needsAttention)
-
-        try await finish(core, token, "done", "CI passed; merged.")
         try await quiet()
         let after = try #require(await core.agent(id))
-        #expect(after.report?.outcome == .done)
-        #expect(after.report?.message == "CI passed; merged.")
-        #expect(try await asks(core, id) == 1, "asked once, never again")
+        #expect(after.report?.message == DerivedEnding.silentDone)
+        #expect(after.endingIsUnaccountedFor == false)
+        #expect(try await asks(core, id) == 0)
     }
 
     /// A resumed turn that does report is not asked: the new report is this turn's.
@@ -151,7 +142,7 @@ struct ResumedSilenceTests {
 
     /// The same through the other road in: a wait on events whose deadline passes after
     /// the turn ended, under a report the agent gave before it ended.
-    @Test func aSilentTurnAfterAWaitTimedOutIsAskedOnce() async throws {
+    @Test func aSilentTurnAfterAWaitTimedOutIsAccountedForWithoutAsking() async throws {
         let clock = Clock()
         let (locations, work) = try temporary()
         let gate = TurnGate()
@@ -165,18 +156,15 @@ struct ResumedSilenceTests {
         try await finish(core, token, "partly_done", "Half of it; waiting on the rest.")
         gate.open()
         await settled(core, id, "the first turn ended")
-        #expect(try await asks(core, id) == 0)
 
         clock.advance(minutes: 2)
         await core.eventWaitDeadlinesPassed()
-        await eventually("the woken turn was asked how it went") {
-            (try? await self.asks(core, id)) == 1
+        await eventually("the woken turn ended under an account of its own") {
+            await core.agent(id)?.report?.outcome == .done
         }
         #expect(try await appPrompts(core, id).contains { $0.hasPrefix("Your wait for custom.never timed out at ") })
-        await settled(core, id, "the question's turn ended")
+        await settled(core, id, "the woken turn ended")
         try await quiet()
-        #expect(try await asks(core, id) == 1)
-        #expect(await core.agent(id)?.report == nil)
-        #expect(await core.agent(id)?.endingIsUnaccountedFor == true)
+        #expect(try await asks(core, id) == 0)
     }
 }

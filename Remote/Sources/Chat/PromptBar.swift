@@ -171,6 +171,7 @@ struct PromptBar: View {
                 .textFieldStyle(.plain)
                 .appText(.reading)
                 .lineLimit(1...8)
+                .overlay(alignment: .topLeading) { heardUnderline }
                 .focused($focused)
                 .onChange(of: focused) { _, now in model.isTyping = now }
                 // ⌘V of a picture from an iPad's keyboard attaches it (#396).
@@ -292,6 +293,34 @@ struct PromptBar: View {
         }
         .padding(14)
         .paperRaised(in: RoundedRectangle(cornerRadius: 18))
+    }
+
+    /// The words dictation is still hearing, underlined as system dictation does until
+    /// they settle (#448). A plain-text field cannot style part of its text, so this is
+    /// the same text laid over the field, invisible but for the underline. The field
+    /// itself is left exactly as it is: its keys, paste, focus and height. Once the text
+    /// is taller than the field, the field scrolls and the copy could not follow it, so
+    /// then nothing is drawn.
+    @ViewBuilder private var heardUnderline: some View {
+        if let heard = dictation.heardWords, heard.upperBound <= text.count {
+            ViewThatFits(in: .vertical) {
+                Text(Self.underlining(heard, of: text))
+                    .appText(.reading)
+                    .fixedSize(horizontal: false, vertical: true)
+                Color.clear
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+
+    private static func underlining(_ heard: Range<Int>, of text: String) -> AttributedString {
+        var styled = AttributedString(text)
+        styled.foregroundColor = .clear
+        let lower = styled.index(styled.startIndex, offsetByCharacters: heard.lowerBound)
+        let upper = styled.index(lower, offsetByCharacters: heard.count)
+        styled[lower..<upper].underlineStyle = Text.LineStyle(pattern: .solid, color: .secondary)
+        return styled
     }
 
     private var canSend: Bool {

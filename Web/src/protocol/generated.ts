@@ -19,7 +19,6 @@ export type URLString = string & { readonly __brand: "URLString" };
 /** DaemonAPI.Failure: the codes a call can fail with. */
 export const Failure = {
   agentLimitReached: -32023,
-  agentRetired: -32050,
   busy: -32040,
   catalogRefused: -32080,
   changedElsewhere: -32093,
@@ -27,6 +26,7 @@ export const Failure = {
   couldNotSave: -32095,
   credentialWanted: -32036,
   dayLimitReached: -32018,
+  deleteRefused: -32051,
   eventRefused: -32050,
   fileGone: -32032,
   fileNotReadable: -32033,
@@ -57,7 +57,6 @@ export const Failure = {
   outsideScratchRoot: -32098,
   pinRefused: -32061,
   projectHasLiveAgents: -32013,
-  retireRefused: -32051,
   runtimeNotFound: -32001,
   runtimeWillNotStart: -32002,
   sandboxWillNotStart: -32061,
@@ -98,7 +97,7 @@ export interface ACPProviderInfo {
   configured?: boolean;
 }
 
-export type AfterTurn = "park";
+export type AfterTurn = "park" | "archive";
 
 export interface Agent {
   id: UUID;
@@ -143,7 +142,6 @@ export interface Agent {
   parking?: Parking;
   afterTurn?: AfterTurn;
   archivedAt?: WireDate;
-  retirement?: Retirement;
   sandboxOverride?: SandboxChoice;
   effectiveSandbox?: EffectiveSandbox;
   pendingSandboxFailure?: SandboxFailureRecord;
@@ -504,6 +502,7 @@ export interface ControlHost {
   machineID?: string;
   relay?: boolean;
   signInFrom?: Record<string, HostID>;
+  tunnel?: HostTunnel;
 }
 
 export interface ControlStatus {
@@ -518,6 +517,7 @@ export interface ControlStatus {
   relayKey?: Base64;
   web?: WebRemoteStatus;
   thisMacHost?: HostJoinStatus;
+  projectDetection?: ProjectDetection;
 }
 
 export interface Cost {
@@ -863,8 +863,6 @@ export interface HelperLimits {
   agentsMayArchive?: boolean;
 }
 
-export type Hold = "firstDay" | "worktreeHasWork" | "workflowRunning" | "openInWindow";
-
 export type HostID = string & { readonly __brand: "HostID" };
 
 export interface HostJoinStatus {
@@ -872,6 +870,11 @@ export interface HostJoinStatus {
   connected: boolean;
   problem?: string;
   at: WireDate;
+}
+
+export interface HostTunnel {
+  up: boolean;
+  problem?: string;
 }
 
 export interface LabelVocabularyRequest {
@@ -1145,6 +1148,11 @@ export interface Project {
   diskSpace?: DiskThresholds;
 }
 
+export interface ProjectDetection {
+  enabled: boolean;
+  paths: string[];
+}
+
 export interface ProjectPins {
   folder: URLString;
   pins: PinView[];
@@ -1262,22 +1270,6 @@ export interface ResumingNotification {
 export interface ResumingResponse {
   agentIDs: UUID[];
 }
-
-export type RetiredBecause = "age" | "cap" | "person";
-
-export interface RetiredRequest {
-  folder?: URLString;
-  ids?: UUID[];
-  limit?: number;
-}
-
-// uses: Hold
-/** Retirement (Model/Retirement.swift): one key, or none for a kind this build can't name. */
-export type Retirement =
-  | { at: WireDate }
-  | { nextUnderCap: Record<string, never> }
-  | { held: Hold }
-  | Record<string, never>;
 
 export interface Runtime {
   id: string;
@@ -1500,27 +1492,6 @@ export interface SwitchRecordSide {
   mode?: JSONValue;
 }
 
-export interface Tombstone {
-  id: UUID;
-  title?: string;
-  project: URLString;
-  runtimeID: string;
-  createdAt: WireDate;
-  lastActivityAt: WireDate;
-  archivedAt: WireDate;
-  retiredAt: WireDate;
-  endedReason?: EndedReason;
-  archivedReason: AgentArchivedReason;
-  costToDate: Record<string, number>;
-  startedByWorkflow?: string;
-  startedByRun?: UUID;
-  startedByAgent?: UUID;
-  worktreeName?: string;
-  worktreeBranch?: string;
-  worktreeRoot?: URLString;
-  retiredBecause: RetiredBecause;
-}
-
 export interface ToolCall {
   toolCallID?: string;
   title: string;
@@ -1604,6 +1575,7 @@ export interface TurnSummary {
   concise?: TranscriptEntry[];
   outcome?: TranscriptEntry[];
   steps?: number;
+  usage?: TurnUsage;
 }
 
 export interface TurnUsage {
@@ -1759,6 +1731,7 @@ export interface Workflow {
   enabled?: boolean;
   archived?: boolean;
   hosts?: string[];
+  whenDone?: WorkflowWhenDone;
 }
 
 export interface WorkflowApproval {
@@ -1865,6 +1838,7 @@ export interface WorkflowSettingsRequest {
   cooldown?: string;
   labels?: string[];
   hosts?: string[];
+  whenDone?: string;
 }
 
 export interface WorkflowSummary {
@@ -1900,6 +1874,8 @@ export type WorkflowTriggerStored =
   | { agentStopped: Record<string, never> }
   | { workflowCompleted: { id?: string } }
   | { unrecognised: { name: string; keys: Record<string, JSONValue> } };
+
+export type WorkflowWhenDone = "park" | "archive-allowed" | "archive";
 
 export interface WorkflowsListRequest {
   folder?: URLString;
@@ -1955,6 +1931,7 @@ export interface Methods {
   "agents/answerSandbox": { params: AnswerSandboxRequest; result: Agent };
   "agents/archive": { params: AgentRequest; result: Empty };
   "agents/continueInProject": { params: ContinueInProjectRequest; result: UUID };
+  "agents/delete": { params: AgentRequest; result: Empty };
   "agents/discardDraft": { params: DiscardDraftRequest; result: Empty };
   "agents/fork": { params: AgentRequest; result: UUID };
   "agents/labelVocabulary": { params: LabelVocabularyRequest; result: string[] };
@@ -1965,7 +1942,6 @@ export interface Methods {
   "agents/prompt": { params: PromptRequest; result: Empty };
   "agents/recreateWorktree": { params: AgentRequest; result: Agent };
   "agents/resuming": { params: Empty; result: ResumingResponse };
-  "agents/retired": { params: RetiredRequest; result: Tombstone[] };
   "agents/sendNow": { params: UnqueueRequest; result: Empty };
   "agents/setCeiling": { params: SetCeilingRequest; result: Agent };
   "agents/setLabels": { params: SetLabelsRequest; result: Agent };
@@ -2051,6 +2027,7 @@ export const MethodTarget = {
   "agents/answerSandbox": "host",
   "agents/archive": "host",
   "agents/continueInProject": "host",
+  "agents/delete": "host",
   "agents/discardDraft": "host",
   "agents/fork": "host",
   "agents/labelVocabulary": "host",
@@ -2061,7 +2038,6 @@ export const MethodTarget = {
   "agents/prompt": "host",
   "agents/recreateWorktree": "host",
   "agents/resuming": "host",
-  "agents/retired": "host",
   "agents/sendNow": "host",
   "agents/setCeiling": "host",
   "agents/setLabels": "host",
@@ -2173,7 +2149,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ACPAuthMethod: { required: ["id"], optional: ["name", "description", "_meta"] },
   ACPPromptCapabilities: { required: [], optional: ["image", "audio", "embeddedContext"] },
   ACPProviderInfo: { required: ["id"], optional: ["name", "protocol", "configured"] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "restartPickUps", "report", "outcomeAsked", "titledByAgent", "parking", "afterTurn", "archivedAt", "retirement", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "madeInRoot", "queuedStart"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "restartPickUps", "report", "outcomeAsked", "titledByAgent", "parking", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "madeInRoot", "queuedStart"] },
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },
   AgentWorktree: { required: ["name", "root", "project", "madeByApp"], optional: ["branch", "base"] },
@@ -2207,8 +2183,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConfigChoiceGroup: { required: ["options"], optional: ["name", "group"] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ContinueInProjectRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
-  ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom"] },
-  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "thisMacHost"] },
+  ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "tunnel"] },
+  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "thisMacHost", "projectDetection"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily"] },
   CostState: { required: ["limits", "today", "day"], optional: ["note"] },
@@ -2253,6 +2229,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Headline: { required: ["h1", "h2", "h3"], optional: [] },
   HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive"] },
   HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
+  HostTunnel: { required: ["up"], optional: ["problem"] },
   LabelVocabularyRequest: { required: ["folder"], optional: [] },
   Lease: { required: ["resource", "displayName", "holder", "grantedAt", "expiresAt", "warned"], optional: [] },
   LeaseSnapshot: { required: ["resources", "at"], optional: [] },
@@ -2287,6 +2264,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PresenceReport: { required: ["active"], optional: ["watching", "mayNotify", "showing"] },
   PrewarmRequest: { required: ["agentID", "why"], optional: [] },
   Project: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits", "diskSpace"] },
+  ProjectDetection: { required: ["enabled", "paths"], optional: [] },
   ProjectPins: { required: ["folder", "pins"], optional: ["sessions"] },
   ProjectRequest: { required: ["folder"], optional: [] },
   ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: ["isChat"] },
@@ -2299,7 +2277,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ReportedEdit: { required: ["path", "newText", "toolCallID", "index", "entryIndex", "replaceAll", "at"], optional: ["oldText"] },
   ResumingNotification: { required: ["agentID", "isResuming"], optional: [] },
   ResumingResponse: { required: ["agentIDs"], optional: [] },
-  RetiredRequest: { required: [], optional: ["folder", "ids", "limit"] },
   Runtime: { required: ["id", "name", "executable", "arguments", "installPage", "usesAppCopyOnly"], optional: ["install"] },
   RuntimeAccount: { required: ["runtimeID", "state", "authMethods", "canLogOut", "providers", "promptCapabilities", "canSteer", "checkedAt"], optional: ["currentProviderID", "signedInAs"] },
   RuntimeAllowances: { required: ["rows", "at"], optional: ["shared"] },
@@ -2327,13 +2304,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SurfaceIdentification: { required: ["id", "name", "kind"], optional: [] },
   SwitchRecord: { required: ["id", "at", "agentID", "from", "to", "reason", "carried", "dropped", "billing"], optional: ["shortened", "fromReturnsAt"] },
   SwitchRecordSide: { required: ["runtimeID"], optional: ["entryID", "model", "mode"] },
-  Tombstone: { required: ["id", "project", "runtimeID", "createdAt", "lastActivityAt", "archivedAt", "retiredAt", "archivedReason", "costToDate", "retiredBecause"], optional: ["title", "endedReason", "startedByWorkflow", "startedByRun", "startedByAgent", "worktreeName", "worktreeBranch", "worktreeRoot"] },
   ToolCall: { required: ["title", "content", "locations"], optional: ["toolCallID", "name", "kind", "status", "rawInput", "rawOutput", "raw"] },
   ToolCallLocation: { required: ["path"], optional: ["line"] },
   TranscriptEntry: { required: ["id", "at", "kind"], optional: ["subagentID"] },
   TranscriptPage: { required: ["firstIndex", "total", "entries"], optional: [] },
   TranscriptRequest: { required: ["agentID", "limit"], optional: ["before", "from"] },
-  TurnSummary: { required: ["id", "start", "end"], optional: ["ask", "last", "concise", "outcome", "steps"] },
+  TurnSummary: { required: ["id", "start", "end"], optional: ["ask", "last", "concise", "outcome", "steps", "usage"] },
   TurnUsage: { required: ["totalTokens", "inputTokens", "outputTokens"], optional: ["thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "cost"] },
   TurnsPage: { required: ["turns", "firstTurn", "openStart"], optional: [] },
   TurnsRequest: { required: ["agentID", "limit"], optional: ["before"] },
@@ -2352,7 +2328,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WaitingAgent: { required: ["agentID", "title", "folder", "status"], optional: [] },
   WebRemoteStatus: { required: ["port", "served"], optional: ["reason", "detail"] },
   WorkReport: { required: ["outcome", "message", "at"], optional: ["block"] },
-  Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "enabled", "archived", "hosts"] },
+  Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "enabled", "archived", "hosts", "whenDone"] },
   WorkflowApproval: { required: ["digest", "isNew"], optional: ["note"] },
   WorkflowApproveRequest: { required: ["folder", "workflowID", "digest"], optional: [] },
   WorkflowArchiveRequest: { required: ["folder", "workflowID", "archived"], optional: [] },
@@ -2362,7 +2338,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowRequest: { required: ["folder", "workflowID"], optional: [] },
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
   WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort"] },
-  WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "hosts"] },
+  WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "hosts", "whenDone"] },
   WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["overLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
   WorkflowsListRequest: { required: [], optional: ["folder"] },
   WorktreeStatus: { required: ["uncommitted"], optional: ["ahead", "behind", "unmerged"] },

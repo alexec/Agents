@@ -324,10 +324,10 @@ struct EventWorkflowTests {
         let answer = try await core.waitForEvent(.init(token: token, events: ["agent.finished"],
                                                        where: ["labels": "deploy"], from: from))
         #expect(answer.hasPrefix("agent.finished happened at "))
-        let woke = await core.eventLog.events.filter {
-            $0.consequences.contains { if case .woke(waiter, _) = $0 { return true } else { return false } }
-        }
-        #expect(woke.map { $0.details["agent"] } == [deploy.uuidString])
+        // Both had finished already, so the wait is answered from the log at once: with
+        // the deploy, not the plain build before it.
+        #expect(answer.contains("agent=Ship"))
+        #expect(!answer.contains("agent=Build"))
     }
 
     /// Codes on the event, today's words in its sentence (073 US3, FR-011).

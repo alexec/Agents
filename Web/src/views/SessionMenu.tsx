@@ -1,7 +1,7 @@
 // A session's actions (071 FR-027): Carry on while it sits in an open block (#250), Stop while it
 // holds a runtime or a block, Park or Unpark
-// (Agent.parkAction), Branch (#342), and Archive or Bring Back. In the chat header's ··· menu,
-// and the sidebar row's menu.
+// (Agent.parkAction), Branch (#342), and Archive, or Bring Back and Delete (#398). In the chat
+// header's ··· menu, and the sidebar row's menu.
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { Agent } from "../protocol/generated";
@@ -11,7 +11,7 @@ import { carryOnHelp, carryOnLabel, carryOnPrompt, openBlock } from "../model/bl
 import { go } from "../route";
 
 export type Action = "carryOn" | "agents/stop" | "agents/park" | "agents/unpark" | "agents/archive" | "agents/unarchive"
-  | "markRead" | "markUnread" | "pin" | "unpin" | "fork";
+  | "markRead" | "markUnread" | "pin" | "unpin" | "fork" | "delete";
 
 /**
  * What the menu offers, in order, with the window's words (ParkWords, AgentRow's menu). Given
@@ -50,9 +50,12 @@ export function sessionActions(agent: Agent, pinned?: boolean): { action: Action
   if (agent.state !== "archived") {
     found.push({ action: "fork", label: "Branch", help: "A new session that carries this one's history so far" });
   }
-  found.push(agent.state === "archived"
-    ? { action: "agents/unarchive", label: "Bring Back", help: "Bring this session back from the archive" }
-    : { action: "agents/archive", label: "Archive", help: "Archive this session" });
+  if (agent.state === "archived") {
+    found.push({ action: "agents/unarchive", label: "Bring Back", help: "Bring this session back from the archive" });
+    found.push({ action: "delete", label: "Delete…", help: "Delete this session and its conversation for good" });
+  } else {
+    found.push({ action: "agents/archive", label: "Archive", help: "Archive this session" });
+  }
   return found;
 }
 
@@ -92,7 +95,22 @@ export function runSessionAction(store: Store, host: string, agent: Agent, actio
   else if (action === "markRead" || action === "markUnread") void store.setUnread(host, agent.id, action === "markUnread");
   else if (action === "pin" || action === "unpin") void store.setPinned(host, projectFolder(agent), agent.id, action === "pin");
   else if (action === "fork") void branch(store, host, agent);
+  else if (action === "delete") { if (confirm(`${deleteTitle(agent.title)}\n\n${deleteMessage}`)) void remove(store, host, agent); }
   else void store.perform(host, agent.id, action);
+}
+
+/** DeletionWords.confirmTitle: "Delete “Fix the build”?". */
+export function deleteTitle(title: string | null | undefined): string {
+  const trimmed = title?.trim();
+  return trimmed ? `Delete \u201C${trimmed}\u201D?` : "Delete this session?";
+}
+
+/** DeletionWords.confirmMessage. */
+export const deleteMessage = "Its conversation and record are removed. This cannot be undone.";
+
+/** Delete, asked first (#398); the host's agent/removed takes it out of every list. */
+async function remove(store: Store, host: string, agent: Agent) {
+  if (await store.act("agents/delete", { agentID: agent.id }, host) !== null) go({ host, project: projectFolder(agent) });
 }
 
 /** Branch, then open the new session, as the window selects it (#342). */

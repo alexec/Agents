@@ -221,8 +221,9 @@ struct EventWaitTests {
         #expect(answer.contains("you can end your turn"))
         #expect(await isWaiting(core, a))
         #expect(await core.eventLog.events.contains { $0.name == "agent.blocked" && $0.details["agent"] == a.uuidString })
-        try await eventually("turn over, unread under Needs you") {
-            await core.agents[a]?.group(wantsEyes: false) == .needsAttention
+        // Its ending is worked out as done (#479), and an open wait puts it under Waiting.
+        try await eventually("turn over, under Waiting") {
+            await core.agents[a]?.group(wantsEyes: false) == .waiting
         }
 
         await core.raise(draft("custom.ping", in: work))

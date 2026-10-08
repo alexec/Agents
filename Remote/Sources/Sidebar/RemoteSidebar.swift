@@ -193,6 +193,9 @@ private struct RemoteProjectFold: View {
     var showsAllMatches = false
     var showAllMatches: () -> Void = {}
 
+    /// Put Files in Drop Box… from the row's menu (#231).
+    @State private var fillingDropbox = false
+
     private var key: ProjectKey { summary.key }
 
     var body: some View {
@@ -233,9 +236,12 @@ private struct RemoteProjectFold: View {
                     .accessibilityHint(isOpen ? "Folds the project" : "Unfolds the project")
                     .appText(.supporting)
                     .foregroundStyle(model.hostIsOffline(summary.host) ? .secondary : .primary)
-                    .contextMenu { ProjectMenuItems(summary: summary) }
+                    .contextMenu { ProjectMenuItems(summary: summary) { fillingDropbox = true } }
                     .swipeActions(edge: .leading) {
                         NewSessionButton(folder: summary.folder).tint(Paper.accent)
+                    }
+                    .sheet(isPresented: $fillingDropbox) {
+                        DropboxSheet(project: key, label: label)
                     }
             }
             // The rest of its live sessions when the first page did not hold them all.
@@ -286,7 +292,7 @@ private struct RemoteProjectFold: View {
     }
 
     /// Archived sessions, folded under the live ones, a page of them held while the fold
-    /// is open (#165), with what has been retired from here (051) as the last line.
+    /// is open (#165).
     @ViewBuilder
     private func archivedSessions(_ fold: SidebarProjectFold) -> some View {
         let isOpen = fold.isSearching || folds.isOpen(key, .archivedSessions)
@@ -299,11 +305,6 @@ private struct RemoteProjectFold: View {
                 }
                 if fold.isSearching, fold.archived.count > shown.count {
                     Button("Show all \(fold.archived.count)", action: showAllMatches)
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                }
-                if let line = fold.retiredLine(summary) {
-                    Text(line)
                         .appText(.fine)
                         .foregroundStyle(.secondary)
                 }
@@ -399,9 +400,15 @@ private struct ForgetThisDeviceRow: View {
 private struct ProjectMenuItems: View {
     @Environment(RemoteModel.self) private var model
     let summary: DaemonAPI.ProjectSummary
+    /// Files into the project's drop box (#231), as a drag onto the Mac's row puts them.
+    let putInDropbox: () -> Void
 
     var body: some View {
         NewSessionButton(folder: summary.folder)
+        Button(action: putInDropbox) {
+            Label("Put Files in Drop Box…", systemImage: "tray.and.arrow.down")
+        }
+        .disabled(model.isStale(on: summary.host))
     }
 }
 

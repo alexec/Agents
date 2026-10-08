@@ -306,7 +306,7 @@ public actor DaemonCore {
         didSet { projectIndexCache = nil }
     }
     /// Every project's folder and name, made once and kept until a folder gains or loses
-    /// its last agent, a record or a tombstone (#204). Every project-wide call used to
+    /// its last agent or a record (#204). Every project-wide call used to
     /// make the set again for each project it summarised.
     var projectIndexCache: ProjectIndex?
     /// Why the chat project could not be made at start (#229), in a sentence; nil when it
@@ -404,21 +404,14 @@ public actor DaemonCore {
     /// without a timer of its own. Nil until the first tick.
     var lastSeenDay: String?
 
-    // MARK: Retiring archived agents (051)
+    // MARK: Deleting archived agents (051, #398)
 
-    lazy var retiredStore = RetiredStore(locations: locations)
     lazy var retentionStore = RetentionStore(locations: locations)
     lazy var archiveIndexStore = ArchiveIndex(locations: locations)
-    /// What is left of every retired agent, by id. Read at start, before the agents.
-    /// Each project's share of it kept as it changes (#204).
-    var retired = TombstoneTable()
     /// What each project was last told as, so an agent change that moves nothing in its
     /// project's row says nothing (#164). A window that connects lists them anyway.
     var lastProjectSent: [URL: DaemonAPI.ProjectSummary] = [:]
-    /// Set while many agents change at once (`noteRetirements`): the projects to tell
-    /// when it is over, once each.
-    var heldProjectChanges: Set<URL>?
-    /// The person's settings and the clock retirement counts by, as `retention.json` has them.
+    /// The person's settings and the clock deletion by age counts by, as `retention.json` has them.
     var retention = RetentionStore.File()
     var retentionIsLoaded = false
     /// Sizes and file dates of archived agents, written to `archive.json`.
@@ -428,8 +421,6 @@ public actor DaemonCore {
     /// Whether `archiveIndex` differs from what `archive.json` holds, so the hourly
     /// check writes it only when something did change (#177).
     var archiveIndexChanged = false
-    /// Over the cap with nothing more that could go, as the last check found.
-    var lastOverCap: OverCap?
     /// When each archived agent was last made whole to be read. Gone when it is slim again.
     var lastWhole: [UUID: Date] = [:]
     /// The hourly check, and the sweep that slims what nobody is reading.
@@ -437,12 +428,9 @@ public actor DaemonCore {
     var slimSweep: Task<Void, Never>?
     /// A monotonic origin for `RetentionClock`, taken when the daemon was made.
     let uptimeOrigin = ContinuousClock.now
-    /// How an agent's folder is measured. The tests swap it, so a cap can be crossed
+    /// How an agent's folder is measured. The tests swap it, so a size can be shown
     /// without writing gigabytes.
     var measureFolder: @Sendable (URL) -> Int = { ArchiveIndex.sizeOnDisk($0) }
-    /// The last time an archive asked for a check, so a busy archiving day asks at most
-    /// once a minute.
-    var lastArchiveCheck: Date?
     /// A write of `archive.json` waiting to happen, so a check that changes a hundred
     /// notes writes the index once.
     var indexSave: Task<Void, Never>?
@@ -572,6 +560,10 @@ public actor DaemonCore {
     /// account, kept on the row until this one gives its own, so a turn that ends still
     /// holding it has said nothing about itself.
     var reportBeforeTurn: [UUID: WorkReport] = [:]
+    /// Runs whose turn ended done under a workflow's `when-done:` that archives them
+    /// (#433), with the line their transcript gets. Set by `move` while the run is still
+    /// in flight, and taken once the runtime is let go, as an archive has to be.
+    var archiveWhenDone: [UUID: String] = [:]
     /// The latest plan window each agent's runtime reported (R2).
     var latestRateLimit: [UUID: RateLimitInfo] = [:]
     /// Credentials whose allowance is being asked for now, so opening Agent Runtimes
@@ -1045,9 +1037,7 @@ public actor DaemonCore {
         addressed(method, params, to: wanted)
     }
 
-    /// `tellingClients: false` is for a sweep that changes many records at once and tells
-    /// their projects instead: retirement notes (#203).
-    func changed(_ agent: Agent, tellingClients: Bool = true) {
+    func changed(_ agent: Agent) {
         let before = agents[agent.id]
         agents[agent.id] = agent
         saveQuietly(agent)
@@ -1057,7 +1047,7 @@ public actor DaemonCore {
             indexEntry(for: agent.id)
             saveArchiveIndexSoon()
         }
-        if tellingClients { tellChanged(agent, from: before) }
+        tellChanged(agent, from: before)
         // An agent changing state is what moves its project's counts. Sending the
         // project after the agent is what lets a sidebar row say a project needs you
         // in a window that is looking at a different one.
@@ -1200,21 +1190,28 @@ public actor DaemonCore {
         // An agent's own ask to be parked, made on the call that ended its turn, is the
         // same park at the same moment — but only for the ending it asked about: the
         // turn it made the ask in, ended by its own hand, with nothing the person has
-        // queued since. Any other ending drops the ask. An ask to be archived, from a
-        // conversation told it could, is dropped with it: an agent cannot put a session
-        // away.
+        // queued since. Any other ending drops the ask.
+        //
+        // A workflow's run may be archived instead (#433), when its file's `when-done:`
+        // says so and the run's turn ended done as above: noted here, while the run is
+        // still in flight to say which workflow it is, and archived once the runtime is
+        // let go. Nothing else is archived on an agent's word.
         let wasParked = agent.parking?.isParked == true
+        archiveWhenDone[agentID] = nil
         switch next {
         case .finished, .stopped:
             let pickingUp = event == .foundDead && agent.mayBePickedUpAfterRestart
+            let endedAsAsked = next == .finished && reasonThisEventSet == .endTurn
+                && agent.queuedPrompts.isEmpty && !pickingUp
+            if endedAsAsked, runArchivesWhenDone(agentID, agent: agent, asked: agent.afterTurn) {
+                archiveWhenDone[agentID] = archivedWhenDoneNote(agentID)
+            }
             if case .whenTurnEnds = agent.parking, !pickingUp {
                 agent.parking = .parked(at: now())
                 agent.isUnread = false
             }
             if let after = agent.afterTurn, !pickingUp {
-                let endedAsAsked = next == .finished && reasonThisEventSet == .endTurn
-                    && agent.queuedPrompts.isEmpty
-                if after == .park, endedAsAsked, agent.parking == nil {
+                if after == .park, endedAsAsked, agent.parking == nil, archiveWhenDone[agentID] == nil {
                     agent.parking = .parked(at: now())
                     agent.isUnread = false
                 }
@@ -1232,7 +1229,6 @@ public actor DaemonCore {
             if agents[agentID]?.state != .archived { agent.archivedAt = now() }
         } else {
             agent.archivedAt = nil
-            agent.retirement = nil
         }
         let parkedNow = !wasParked && agent.parking?.isParked == true
         let archivedNow = next == .archived && agents[agentID]?.state != .archived
@@ -1257,14 +1253,6 @@ public actor DaemonCore {
         // one does not collide with a run that has in fact finished.
         switch next {
         case .finished, .stopped:
-            // Held back when the app is about to ask this agent how the work went.
-            // That question is a turn of its own and ends of its own accord, so firing
-            // here as well would run every agent-finished workflow twice per agent —
-            // and the run held until the second ending is the better one anyway: by
-            // then the agent's outcome is on the record for the workflow's row to show.
-            if next == .finished, willAskForOutcome(agentID: agentID, reason: reasonThisEventSet) {
-                break
-            }
             // An agent a restarting daemon is about to bring back has not finished
             // stopping — it is about to carry on. Saying "an agent stopped" about it
             // would be false, and would race the pick-up that is seconds away (011,
@@ -1338,14 +1326,14 @@ public actor DaemonCore {
     public func loadFromDisk() async {
         watchStoreNotes()
         loadRetentionIfNeeded()
-        // A retire the last daemon was cut off in: its tombstone is written, so what is
-        // left is deleting, and it is done before anything is listed (051, FR-017).
-        await store.finishRetiring(retired.keys)
+        // A delete the last daemon was cut off in: its folder was set aside, so what is
+        // left is removing it (#398).
+        await store.finishDeleting()
         // Archived agents from the index, slim, without opening their records; the rest,
         // and any archived one the index is behind on, read in full (051, research R3).
         let index = archiveIndexStore.load() ?? [:]
         var toRead: [UUID] = []
-        for id in await store.agentIDs() where retired[id] == nil {
+        for id in await store.agentIDs() {
             if let entry = index[id], entry.agent.state == .archived,
                let modified = ArchiveIndex.modifiedAt(locations.record(id)),
                modified <= entry.fileModifiedAt.addingTimeInterval(Self.indexTolerance) {

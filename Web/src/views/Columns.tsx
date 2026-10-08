@@ -13,9 +13,9 @@ import type { Session } from "../session";
 import { Banner } from "./Banner";
 import { DiskStrip } from "./DiskStrip";
 import { Chat } from "./Chat";
-import { RetiredPage } from "./RetiredPage";
 import { NewAgent } from "./NewAgent";
 import { NewProjectDialog } from "./NewProject";
+import { DropboxDialog } from "./DropboxDialog";
 import { TokenAskDialog } from "./TokenAsk";
 import { Problem } from "./Errors";
 import { FilesPane } from "./FilesPane";
@@ -53,8 +53,6 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
       <div class="columns with-sidebar" aria-busy={down}>
         <Sidebar session={session} store={store} linkDown={down} />
         {r.activity ? <ActivityPageView store={store} page={r.activity} />
-          : r.host && r.session && !store.agent(r.host, r.session) && store.tombstones.value[`${r.host}|${r.session}`]
-            ? <RetiredPage tombstone={store.tombstones.value[`${r.host}|${r.session}`]!} />
           : r.host && r.session ? <Chat store={store} host={r.host} session={r.session} down={down} />
           : r.host && r.project && project && r.workflow ? (
             <WorkflowPage store={store} host={r.host} folder={project.project.folder} projectName={project.name}
@@ -67,6 +65,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
         {r.host && r.session && r.files && <FilesPane store={store} host={r.host} session={r.session} />}
       </div>
       <NewProjectDialog store={store} />
+      <DropboxDialog store={store} />
       <TokenAskDialog store={store} />
       <ContextMenu />
     </div>

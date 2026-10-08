@@ -46,7 +46,7 @@ struct SourceEditor: View {
             if let problem {
                 Text(problem)
                     .appText(.fine)
-                    .foregroundStyle(.red)
+                    .tinted(.failure)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                 Divider()

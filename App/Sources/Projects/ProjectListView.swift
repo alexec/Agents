@@ -206,6 +206,10 @@ struct ProjectListView: View {
         }
         .sheet(isPresented: $isCloning) { CloneSheet(host: targetHost).paperSheet() }
         .sheet(isPresented: $isChoosingServerFolder) { RemoteFolderSheet(host: targetHost).paperSheet() }
+        .sheet(isPresented: Binding(get: { requests.dropboxProject != nil },
+                                    set: { if !$0 { requests.dropboxProject = nil } })) {
+            if let project = requests.dropboxProject { DropboxSheet(project: project).paperSheet() }
+        }
         // File ▸ Add Folder…, Clone Git URL… and Add Server…: the same sheets as the +
         // menu, on this Mac.
         .onChange(of: requests.projectSheet) { _, sheet in
@@ -433,11 +437,9 @@ private struct ProjectFold: View {
         }
     }
 
-    /// Archived sessions, folded under the live ones, with what has been retired from
-    /// here (051) as the last line.
+    /// Archived sessions, folded under the live ones.
     @ViewBuilder
     private func archivedSessions(_ fold: SidebarProjectFold) -> some View {
-        let retiredLine = fold.retiredLine(summary)
         // How many there are is the host's count: the window holds a page of them only
         // while the fold is open (#165).
         let count = fold.archivedCount(summary)
@@ -455,11 +457,6 @@ private struct ProjectFold: View {
                 if isOpen, fold.isSearching, fold.archived.count > shown.count {
                     Button("Show all \(fold.archived.count)", action: showAllMatches)
                         .buttonStyle(.plain)
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                }
-                if isOpen, let retiredLine {
-                    Text(retiredLine)
                         .appText(.fine)
                         .foregroundStyle(.secondary)
                 }
@@ -553,8 +550,9 @@ private struct SessionSidebarRow: View {
 }
 
 /// A project's or a session's row taking files dragged from Finder (#231): each file
-/// goes into the project's drop box, where a workflow can pick it up. A folder dropped
-/// here is added as a project, as one dropped on the list around the rows is.
+/// goes into the top of the project's drop box, where a workflow can pick it up; the
+/// project's *Put Files in Drop Box…* names a folder inside it. A folder dropped here is
+/// added as a project, as one dropped on the list around the rows is.
 private struct DropboxDrop: ViewModifier {
     @Environment(AppModel.self) private var model
     let project: ProjectKey
@@ -601,6 +599,9 @@ private struct ProjectMenu: View {
             model.showProject(summary.key)
             requests.projectSettings = .general
         }
+        // A drag onto the row goes to the drop box's top; this names a folder in it.
+        Button("Put Files in Drop Box…") { requests.dropboxProject = summary.key }
+            .disabled(model.hostUnreachable(summary.host) || !summary.exists)
         Divider()
         Button("Archive") {
             Task { await model.archiveProject(summary.key) }

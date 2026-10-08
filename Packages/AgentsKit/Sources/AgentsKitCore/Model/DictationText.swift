@@ -55,6 +55,18 @@ public struct DictationText: Sendable, Equatable {
         return end..<end
     }
 
+    /// The words still being heard, without the spaces put around them: the span the
+    /// field marks as tentative (#448). Nil once they settle, and whenever nothing is
+    /// being heard, so typed and settled text is never marked.
+    public var heardWords: Range<Int>? {
+        guard isHearing else { return nil }
+        let characters = Array(text)
+        var lower = provisional.lowerBound, upper = min(provisional.upperBound, characters.count)
+        while lower < upper, characters[lower].isWhitespace { lower += 1 }
+        while upper > lower, characters[upper - 1].isWhitespace { upper -= 1 }
+        return lower < upper ? lower..<upper : nil
+    }
+
     /// Whether the person has edited words that were still being heard, so the rest of
     /// that speech is being dropped. The recogniser should be asked to finalise what it
     /// has, so that the next words start a new span soon.

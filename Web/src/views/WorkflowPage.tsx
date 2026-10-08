@@ -17,7 +17,8 @@ import {
 import { go } from "../route";
 import { RunNow } from "./WorkflowRow";
 import { rowExtras, SessionRow } from "./SessionRow";
-import { CooldownMenu, RuntimeRow, WorkflowSettingsForm } from "./WorkflowSettings";
+import { CooldownMenu, RuntimeRow, WhenDoneMenu, WorkflowSettingsForm } from "./WorkflowSettings";
+import { whenDoneSentence } from "../model/workflowSettings";
 import { BackToList } from "./BackToList";
 
 export function WorkflowPage({ store, host, folder, projectName, workflowID, down }: {
@@ -196,6 +197,12 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
           )}
           <CooldownMenu summary={summary} disabled={locked} change={change} />
           <p class="quiet small">{cooldown ?? "No cooldown: every trigger runs it, one run at a time."}</p>
+          {workflow.mode !== "triggering" && (
+            <>
+              <WhenDoneMenu summary={summary} disabled={locked} change={change} />
+              <p class="quiet small">{whenDoneSentence(workflow.whenDone ?? "park")}</p>
+            </>
+          )}
 
           <h2 class="section-head">Runs on</h2>
           <p class="quiet small">Every host with this project runs it, unless it is pinned to some of them. The file stores each computer's id, so renaming one does not unpin it.</p>

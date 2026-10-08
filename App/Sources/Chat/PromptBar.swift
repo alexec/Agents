@@ -567,6 +567,29 @@ struct PromptBar: View {
         }
     }
 
+    /// Stops the Mac's dictation before a send, and answers the words the field shows
+    /// when dictation was still unsure of some of them.
+    ///
+    /// Stopping alone is not enough (#449): the words still underlined are the
+    /// system's to finish, and it can write its final copy of them after the field has
+    /// been emptied, bringing #318 back. So while any are underlined they are kept as
+    /// shown, and the field gives up the caret, which ends the session they belong to,
+    /// and takes it back once it has been emptied.
+    private func endDictation() -> String? {
+        NSApp.sendAction(Selector(("stopDictation:")), to: nil, from: nil)
+        guard focused,
+              let window = NSApp.keyWindow,
+              let editor = window.firstResponder as? NSTextView,
+              editor.isFieldEditor,
+              editor.hasMarkedText()
+        else { return nil }
+        editor.unmarkText()
+        let shown = editor.string
+        window.makeFirstResponder(nil)
+        DispatchQueue.main.async { focused = true }
+        return shown
+    }
+
     // MARK: What goes with the words
 
     private func chooseAttachment() {
@@ -967,8 +990,8 @@ struct PromptBar: View {
             return
         }
         // Whatever is said next is not part of what went (#318).
-        NSApp.sendAction(Selector(("stopDictation:")), to: nil, from: nil)
-        let outgoing = text
+        let shown = endDictation()
+        let outgoing = shown ?? text
         let going = attachments
         let labels = draftLabels
         let starting = agent == nil

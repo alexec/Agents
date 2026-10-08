@@ -110,6 +110,22 @@ struct OutcomePageTests {
         #expect(drawn.storedStepCount == 2)
     }
 
+    /// Every report in the turn, added up, so turns can be compared (#465).
+    @Test func aSummaryKeepsWhatTheTurnUsed() {
+        let first = TranscriptEntry(kind: .usageRecorded(TurnUsage(
+            totalTokens: 110, inputTokens: 10, outputTokens: 100, cachedReadTokens: 1000,
+            cost: Cost(amount: 1, currency: "USD"))))
+        let second = TranscriptEntry(kind: .usageRecorded(TurnUsage(
+            totalTokens: 25, inputTokens: 5, outputTokens: 20, cachedWriteTokens: 50,
+            cost: Cost(amount: 2, currency: "USD"))))
+        let usage = TurnSummary.of([ask("Go"), first, said("Done"), second], start: 0).usage
+        #expect(usage?.inputTokens == 15 && usage?.outputTokens == 120 && usage?.totalTokens == 135)
+        #expect(usage?.cachedReadTokens == 1000 && usage?.cachedWriteTokens == 50)
+        #expect(usage?.thoughtTokens == nil)
+        #expect(usage?.cost == Cost(amount: 3, currency: "USD"))
+        #expect(TurnSummary.of([ask("Go"), said("Done")], start: 0).usage == nil)
+    }
+
     @Test func aSummaryKeepsTheAskAndACutDownLastBlock() {
         let entries = [ask("Go"), said("Looking"), call("1", "List files")]
         let summary = TurnSummary.of(entries, start: 10)
