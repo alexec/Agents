@@ -25,6 +25,16 @@ that spans two repositories is ordinary, so a new agent can be given more folder
 and MCP servers of its own, before it starts. It is still listed under the project it
 started in. See [Give an agent more folders and MCP servers](../how-to/give-an-agent-more-folders.md).
 
+A project need not be a Git repository. Worktrees, branches and the git half of an
+agent's changes need one, and are simply not offered in a folder that is not; everything
+else works the same.
+
+One project is made for you: **chat**, at `~/.agents/chat` on each host. A chat is an
+ordinary session of it, so a quick question needs no project picked, and the folder every
+chat shares is where one keeps a file for the next. Each host makes its own the first time
+it starts, and leaves it alone after that: archived stays archived, and its files and
+`AGENTS.md` are yours. See [Chat without a project](../how-to/chat-without-a-project.md).
+
 ## A project lives on one host
 
 A host is a machine where agents can do their work. Your Mac is one, once Agents Host runs

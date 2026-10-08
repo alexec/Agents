@@ -27,6 +27,8 @@ something particular done.
 
 ### Projects
 
+- [Chat without a project](chat-without-a-project.md): start a chat with no folder to
+  pick, and keep a file for a later chat.
 - [Add a project](add-a-project.md): add a folder or clone a Git URL, and archive a
   project you are done with.
 - [Start an agent in its own worktree](start-in-a-worktree.md): give an agent its own
