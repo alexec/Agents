@@ -583,3 +583,61 @@ test("loading a host and reloading it do not list its agents at once (#291)", as
   await wait(30);
   assert.equal(max, 1);
 });
+
+test("a chat's history that did not load is said, and Try Again loads it (#400)", async () => {
+  let down = true;
+  const entry = (id) => ({ id, at: "2026-10-07T00:00:00Z", kind: { agentMessage: { text: id } } });
+  const link = fakeLink((method) => {
+    if (method === "agents/turns") return { turns: [], firstTurn: 0, openStart: 0 };
+    if (method === "agents/transcript") return down ? undefined : { firstIndex: 0, total: 1, entries: [entry("e1")] };
+    return undefined;
+  });
+  const store = new Store(link);
+  await store.openSession("mac", "s");
+  assert.equal(store.transcriptLoadFailure.value?.nothingLoaded, true);
+  down = false;
+  await store.reloadTranscript();
+  assert.equal(store.transcriptLoadFailure.value, null);
+  assert.deepEqual(store.entries.value.map((e) => e.id), ["e1"]);
+  // Leaving the chat forgets what went wrong in it.
+  down = true;
+  await store.reloadTranscript();
+  assert.ok(store.transcriptLoadFailure.value);
+  store.closeSession();
+  assert.equal(store.transcriptLoadFailure.value, null);
+});
+
+test("turns that fail still open the last page, and say so (#400)", async () => {
+  const link = fakeLink((method) => (method === "agents/transcript" ? { firstIndex: 40, total: 41, entries: [] } : undefined));
+  const store = new Store(link);
+  await store.openSession("mac", "s");
+  assert.deepEqual(store.transcriptLoadFailure.value, { nothingLoaded: false, reason: "That didn't work." });
+});
+
+test("of two loads of one chat, an older answer landing last is dropped (#400)", async () => {
+  const entry = (id) => ({ id, at: "2026-10-07T00:00:00Z", kind: { agentMessage: { text: id } } });
+  let pages = 0;
+  const link = heldLink((method) => {
+    if (method === "agents/turns") return { turns: [], firstTurn: 0, openStart: 0 };
+    if (method === "agents/transcript") return { firstIndex: 0, total: 1, entries: [entry(`page${++pages}`)] };
+    return [];
+  });
+  const store = new Store(link);
+  const first = store.openSession("mac", "s");
+  await wait(0);
+  const second = store.reloadTranscript();
+  await wait(0);
+  // Both loads' turns, then the newer load's transcript before the older's.
+  await link.answer("agents/turns");
+  await link.answer("agents/turns");
+  const transcripts = link.out.filter((c) => c.method === "agents/transcript");
+  assert.equal(transcripts.length, 2);
+  link.out.splice(link.out.indexOf(transcripts[1]), 1);
+  transcripts[1].reply();
+  await second;
+  assert.deepEqual(store.entries.value.map((e) => e.id), ["page1"]);
+  link.out.splice(link.out.indexOf(transcripts[0]), 1);
+  transcripts[0].reply();
+  await first;
+  assert.deepEqual(store.entries.value.map((e) => e.id), ["page1"], "the older answer is not shown over the newer");
+});

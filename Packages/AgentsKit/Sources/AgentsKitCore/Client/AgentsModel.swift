@@ -92,6 +92,17 @@ public final class AgentsModel {
     @ObservationIgnored private var heardSincePage: [TranscriptEntry] = []
     private static let heardSincePageLimit = 1_000
 
+    /// Why the open chat's history did not load, or only partly, until a page lands or
+    /// the chat is left (#400). Said in the chat with a way to try again, where a failed
+    /// load used to leave it blank without a word.
+    public private(set) var transcriptLoadFailure: TranscriptLoadFailure?
+
+    /// The latest load of the open chat's first page. A chat is loaded from more than
+    /// one place at once (opening it, a reconnect, a host's lists), and only the last
+    /// one asked for may put its answer on screen: an older answer landing after it
+    /// would replace a newer page and drop what was heard since (#400).
+    @ObservationIgnored private var transcriptLoads = 0
+
     /// Whether the chat is following the end of the conversation, as the chat says.
     ///
     /// The page is trimmed at the front only while it is. A window left on a busy agent
@@ -1052,6 +1063,21 @@ public final class AgentsModel {
         firstTurn += drop
     }
 
+    /// A load of the open chat's first page begins: the token its answer is put on
+    /// screen with, by `isLatestTranscriptLoad`.
+    public func beginTranscriptLoad() -> Int {
+        transcriptLoads += 1
+        return transcriptLoads
+    }
+
+    /// Whether `load` is still the latest asked for, and so the one to show.
+    public func isLatestTranscriptLoad(_ load: Int) -> Bool { load == transcriptLoads }
+
+    /// The open chat's history did not load, or its earlier turns did not.
+    public func noteTranscriptLoadFailed(_ failure: TranscriptLoadFailure) {
+        transcriptLoadFailure = failure
+    }
+
     /// The first page of the conversation being read: the end of it.
     public func replaceTranscript(with page: TranscriptPage) {
         // What was heard was written after the page was read. When an id overlaps, its
@@ -1060,6 +1086,7 @@ public final class AgentsModel {
         heardSincePage = []
         firstEntryIndex = page.firstIndex
         hasMoreBefore = page.firstIndex > openTurnStart
+        transcriptLoadFailure = nil
         refold()
     }
 
@@ -1091,6 +1118,7 @@ public final class AgentsModel {
     public func clearTranscript() {
         entries = []
         heardSincePage = []
+        transcriptLoadFailure = nil
         firstEntryIndex = 0
         hasMoreBefore = false
         turns = []

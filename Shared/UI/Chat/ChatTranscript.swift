@@ -25,6 +25,8 @@ struct ChatTranscript: View {
     let entryCount: Int
     /// Whether the daemon is picking this conversation back up after a restart.
     let isComingBack: Bool
+    /// Why the history did not load, or only partly, said at its top with Try Again (#400).
+    var loadFailure: TranscriptLoadFailure? = nil
     /// Which conversation this is. A change settles the pane at the end again.
     let settleKey: UUID?
     let loadEarlier: () async -> Void
@@ -48,6 +50,9 @@ struct ChatTranscript: View {
     /// opening one lets the oldest opened one go (#285).
     @State private var fetchedTurns: [UUID: [TranscriptItem]] = [:]
     @State private var fetchedOrder: [UUID] = []
+    /// Stored turns whose entries did not come when opened: said, and asked for again
+    /// on Try Again, never kept as a turn with no steps (#400).
+    @State private var failedTurns: Set<UUID> = []
     private static let fetchedKept = 8
     /// Turns already folded. A chunk changes the tail; the turns before it stay the
     /// same values, so those rows are not drawn again (#285). A class, so folding
@@ -156,6 +161,9 @@ struct ChatTranscript: View {
         ScrollViewReader { scroller in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 14) {
+                    if let loadFailure {
+                        LoadFailureLine(sentence: loadFailure.sentence, retry: actions.reloadTranscript)
+                    }
                     if hasMore {
                         // No button. Reaching the top is the ask.
                         ProgressView()
@@ -170,6 +178,7 @@ struct ChatTranscript: View {
                         TurnView(turn: turn,
                                  detail: turnViews[turn.id] ?? defaultDetail,
                                  fetched: fetchedTurns[turn.id],
+                                 fetchFailed: failedTurns.contains(turn.id),
                                  isLive: turn.id == liveID,
                                  toggle: { toggle(turn) },
                                  fetch: { await fetch(turn) })
@@ -459,8 +468,13 @@ struct ChatTranscript: View {
     /// the turn's own and is drawn already.
     private func fetch(_ turn: ChatTurn) async {
         guard turn.isSummaryOnly, let range = turn.range, fetchedTurns[turn.id] == nil else { return }
-        let loaded = await actions.turnEntries(agent.id, range)
+        failedTurns.remove(turn.id)
+        let answer = await actions.turnEntries(agent.id, range)
         guard !Task.isCancelled else { return }
+        guard let loaded = answer else {
+            failedTurns.insert(turn.id)
+            return
+        }
         let items = TranscriptEntry.display(loaded)
         fetchedTurns[turn.id] = items.first?.isPersonsAsk == true ? Array(items.dropFirst()) : items
         fetchedOrder.removeAll { $0 == turn.id }
@@ -689,4 +703,29 @@ struct ChatTranscript: View {
     }
 
     private var bottom: String { "bottom" }
+}
+
+/// The history, or part of it, that did not load, and the way to ask again (#400).
+private struct LoadFailureLine: View {
+    let sentence: String
+    let retry: @MainActor () async -> Void
+    @State private var retrying = false
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Label(sentence, systemImage: "exclamationmark.triangle")
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+            Button("Try Again") {
+                retrying = true
+                Task {
+                    await retry()
+                    retrying = false
+                }
+            }
+            .disabled(retrying)
+        }
+        .appText(.fine)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 }

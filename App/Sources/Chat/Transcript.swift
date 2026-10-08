@@ -23,6 +23,7 @@ struct Transcript: View {
                        // them holds the reader's place as entries do.
                        entryCount: model.entries.count + model.work.turns.count,
                        isComingBack: model.isComingBack(agent),
+                       loadFailure: model.work.transcriptLoadFailure,
                        settleKey: model.selection,
                        loadEarlier: { await model.loadEarlier() },
                        bottomInset: bottomInset,

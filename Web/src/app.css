@@ -414,6 +414,7 @@ button.link.reading:hover { text-decoration: underline; }
 .queued p { margin: 0; }
 .working, .more { margin: 0; }
 .more { text-align: center; }
+.load-failure { display: flex; gap: 8px; align-items: baseline; margin: 0 0 12px; opacity: 0.75; font-size: 0.9em; }
 .spinner {
   display: inline-block;
   width: 12px;
