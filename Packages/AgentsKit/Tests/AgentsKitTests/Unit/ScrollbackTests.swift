@@ -5,6 +5,23 @@ import Testing
 
 @Suite("What a shell has printed, capped")
 struct ScrollbackTests {
+    /// Round and round the ring, in pieces of every size: what comes back is always the
+    /// end of everything appended, and the drops add up (#401).
+    @Test func aFullBufferKeepsTheEndHoweverItIsFed() {
+        var buffer = Scrollback(cap: 97)
+        var everything = Data()
+        var generator = SystemRandomNumberGenerator()
+        for round in 0..<400 {
+            let size = [1, 3, 50, 96, 97, 150][Int.random(in: 0..<6, using: &generator)]
+            let chunk = Data((0..<size).map { UInt8(truncatingIfNeeded: round &+ $0) })
+            buffer.append(chunk)
+            everything.append(chunk)
+            #expect(buffer.tail == everything.suffix(97))
+            #expect(buffer.end == everything.count)
+            #expect(buffer.dropped == max(0, everything.count - 97))
+        }
+    }
+
     @Test func whatGoesInComesOut() {
         var buffer = Scrollback(cap: 1024)
         buffer.append(Data("hello ".utf8))

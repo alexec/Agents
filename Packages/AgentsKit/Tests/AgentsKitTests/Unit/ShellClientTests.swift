@@ -17,6 +17,9 @@ struct ShellClientTests {
         private var _typed: [Data] = []
         private var _slowFirstInput = false
         private var _failInput = false
+        private var _partial = 0
+        /// Attaches answered with only the end of the buffer.
+        var partial: Int { lock.withLock { _partial } }
 
         var scrollback: Data { get { lock.withLock { _scrollback } } set { lock.withLock { _scrollback = newValue } } }
         var dropped: Int { get { lock.withLock { _dropped } } set { lock.withLock { _dropped = newValue } } }
@@ -48,6 +51,14 @@ struct ShellClientTests {
             case DaemonAPI.Method.shellAttach, DaemonAPI.Method.shellRestart:
                 while holdAttach { try? await Task.sleep(for: .milliseconds(5)) }
                 let restarting = method == DaemonAPI.Method.shellRestart
+                let request = try? params?.decode(DaemonAPI.ShellAttachRequest.self)
+                if !restarting, let since = request?.since, request?.startedAt == startedAt,
+                   since >= dropped, since <= dropped + scrollback.count {
+                    lock.withLock { _partial += 1 }
+                    return result(DaemonAPI.ShellAttachResponse(state: .live,
+                                                                scrollback: scrollback.suffix(dropped + scrollback.count - since),
+                                                                dropped: dropped, startedAt: startedAt, offset: since))
+                }
                 return result(DaemonAPI.ShellAttachResponse(state: .live,
                                                             scrollback: restarting ? Data() : scrollback,
                                                             dropped: restarting ? 0 : dropped,
@@ -121,6 +132,21 @@ struct ShellClientTests {
 
         #expect(shell.isAttached)
         #expect(screen.text == "abcdef")
+        // Asked for only what it missed, not the whole buffer again.
+        #expect(daemon.partial == 1)
+    }
+
+    @Test func aScreenKeptWhileAwayIsGivenOnlyWhatItMissed() async throws {
+        let daemon = Daemon()
+        daemon.scrollback = Data("abc".utf8)
+        let (shell, screen) = try await screen(daemon)
+        await shell.attach(rows: 24, cols: 80)
+        await shell.detach()
+
+        daemon.scrollback = Data("abcdef".utf8)
+        await shell.attach(rows: 24, cols: 80)
+        #expect(screen.text == "abcdef")
+        #expect(daemon.partial == 1)
     }
 
     @Test func aShellThatIsNotTheOneOnScreenStartsTheScreenAgain() async throws {

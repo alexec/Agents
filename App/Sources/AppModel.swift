@@ -703,6 +703,12 @@ final class AppModel {
     @ObservationIgnored private var shellClients: [ShellKey: ShellClient] = [:]
     /// How many screens show each of those shells (#213).
     @ObservationIgnored private var shellScreens: [ShellKey: Int] = [:]
+    /// Shells no screen shows, kept with their emulator for a while, most recent last,
+    /// so going back to an agent finds its terminal as it was instead of rebuilding it
+    /// and replaying megabytes on the main thread (#401). A few, not all: each holds a
+    /// screen's worth of emulator.
+    @ObservationIgnored private var parkedShells: [ShellKey] = []
+    private static let parkedShellLimit = 6
 
     struct ShellKey: Hashable {
         var agentID: UUID
@@ -3598,8 +3604,10 @@ final class AppModel {
     /// A shell's screen took this window's end of it: counted, so the end is let go of
     /// when the last screen showing it goes (#213).
     func acquireShell(for agentID: UUID, shell: Int) -> ShellClient {
+        let key = ShellKey(agentID: agentID, shell: shell)
+        parkedShells.removeAll { $0 == key }
         let client = shellClient(for: agentID, shell: shell)
-        shellScreens[ShellKey(agentID: agentID, shell: shell), default: 0] += 1
+        shellScreens[key, default: 0] += 1
         return client
     }
 
@@ -3613,9 +3621,16 @@ final class AppModel {
         let left = (shellScreens[key] ?? 1) - 1
         guard left <= 0 else { shellScreens[key] = left; return }
         shellScreens[key] = nil
-        shellClients[key] = nil
-        client.onOutput = nil
+        // Detached, so the shell is not counted as on the Mac's screen, but kept with
+        // its emulator: coming back asks only for what it missed (#401).
         Task { await client.detach() }
+        parkedShells.append(key)
+        while parkedShells.count > Self.parkedShellLimit {
+            let oldest = parkedShells.removeFirst()
+            guard let parked = shellClients.removeValue(forKey: oldest) else { continue }
+            parked.onOutput = nil
+            parked.screen = nil
+        }
     }
 
     /// The user closed a terminal tab: the shell ends, and this window forgets it.
@@ -3623,6 +3638,7 @@ final class AppModel {
         let client = shellClient(for: agentID, shell: shell)
         shellClients[ShellKey(agentID: agentID, shell: shell)] = nil
         shellScreens[ShellKey(agentID: agentID, shell: shell)] = nil
+        parkedShells.removeAll { $0 == ShellKey(agentID: agentID, shell: shell) }
         await client.close()
     }
 

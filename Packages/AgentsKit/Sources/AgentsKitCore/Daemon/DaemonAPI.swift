@@ -1833,12 +1833,21 @@ public enum DaemonAPI {
         public var shell: Int
         public var rows: Int
         public var cols: Int
+        /// How far into the shell's output this screen already is, and when the shell
+        /// it has was started. Given both, and the same shell is still there, the
+        /// replay is only what came after: a screen coming back is not sent four
+        /// megabytes it already shows (#401).
+        public var since: Int?
+        public var startedAt: Date?
 
-        public init(agentID: UUID, shell: Int = 0, rows: Int = 24, cols: Int = 80) {
+        public init(agentID: UUID, shell: Int = 0, rows: Int = 24, cols: Int = 80,
+                    since: Int? = nil, startedAt: Date? = nil) {
             self.agentID = agentID
             self.shell = shell
             self.rows = rows
             self.cols = cols
+            self.since = since
+            self.startedAt = startedAt
         }
 
         public init(from decoder: any Decoder) throws {
@@ -1847,6 +1856,8 @@ public enum DaemonAPI {
             shell = try c.decodeIfPresent(Int.self, forKey: .shell) ?? 0
             rows = try c.decodeIfPresent(Int.self, forKey: .rows) ?? 24
             cols = try c.decodeIfPresent(Int.self, forKey: .cols) ?? 80
+            since = try c.decodeIfPresent(Int.self, forKey: .since)
+            startedAt = try c.decodeIfPresent(Date.self, forKey: .startedAt)
         }
     }
 
@@ -1894,13 +1905,18 @@ public enum DaemonAPI {
         /// Where the shell was started. Nil from a daemon before 053, which is after the
         /// #58 cut-off (051), so it stays optional.
         public var folder: URL?
+        /// The offset of the replay's first byte, when it is not the whole buffer: an
+        /// attach that said `since` gets only what came after. Nil means `dropped`.
+        public var offset: Int?
 
-        public init(state: ShellState, scrollback: Data, dropped: Int, startedAt: Date, folder: URL? = nil) {
+        public init(state: ShellState, scrollback: Data, dropped: Int, startedAt: Date, folder: URL? = nil,
+                    offset: Int? = nil) {
             self.state = state
             self.scrollback = scrollback
             self.dropped = dropped
             self.startedAt = startedAt
             self.folder = folder
+            self.offset = offset
         }
     }
 

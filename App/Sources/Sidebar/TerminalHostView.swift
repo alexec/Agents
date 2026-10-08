@@ -35,7 +35,19 @@ struct TerminalHostView: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> TerminalView {
+        // The emulator this shell had on screen before, taken up as it was: no rebuild,
+        // and no replay of everything it printed (#401).
+        if let kept = client.screen as? KeyedTerminalView {
+            kept.removeFromSuperview()
+            kept.terminalDelegate = context.coordinator
+            kept.newTab = newTab
+            kept.closeTab = closeTab
+            context.coordinator.view = kept
+            Self.paint(kept)
+            return kept
+        }
         let view = KeyedTerminalView(frame: .init(x: 0, y: 0, width: 640, height: 400))
+        client.screen = view
         view.newTab = newTab
         view.closeTab = closeTab
         view.terminalDelegate = context.coordinator
