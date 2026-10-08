@@ -85,7 +85,7 @@ jobs:
         env:
           MANIFESTS: ${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
         run: |
-          xcode="$(git ls-tree HEAD -- project.yml App Daemon Host Packages Remote RemoteNotify RemoteWidget Shared Web/dist | git hash-object --stdin)"
+          xcode="$(git ls-tree HEAD -- project.yml App Daemon Host Packages Remote RemoteNotify RemoteWidget Shared Web | git hash-object --stdin)"
           swiftpm="$(git ls-tree HEAD -- Daemon Packages/AgentsKit Packages/CodeText | git hash-object --stdin)"
           echo "base=${{ steps.toolchain.outputs.fingerprint }}-${MANIFESTS}" >> "$GITHUB_OUTPUT"
           echo "xcode=${xcode}" >> "$GITHUB_OUTPUT"
@@ -174,6 +174,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash scripts/prune-ci-caches.sh macos-xcode-27-agentskit- 'macos-xcode-27-agentskit-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*') }}' "$GITHUB_REF"
+
+      # Agents Host's build makes Web/dist, which is not checked in (#473), with the pinned
+      # Node; without it the app would build with no web remote.
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: Web/.node-version
 
       - name: Generate the project
         run: xcodegen generate
@@ -363,9 +369,9 @@ jobs:
         timeout-minutes: 20
         run: swift test --package-path Packages/ControlPlane
 
-  # The web remote's checked-in build (071, D7, research R8): built with the pinned Node, it
-  # must be byte for byte what is committed, so building Agents from source never needs Node.
-  # Also tsc, the lint that keeps agent output inert, the licence list and the web tests.
+  # The web remote (071, D7, research R8): a build with the pinned Node, then tsc, the lint
+  # that keeps agent output inert, the licence list and the web tests, which hold the build to
+  # its MANIFEST. Web/dist is not checked in (#473), so there is no committed copy to compare.
   web:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -378,11 +384,9 @@ jobs:
         with:
           node-version-file: Web/.node-version
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run build
       - run: npm run check
       - run: npm test
-      - run: npm run build
-      - name: Web/dist and generated.ts are what this source builds
-        run: git diff --exit-code -- dist src/protocol/generated.ts
 
   # Tests that index or force-unwrap after an #expect (#94): a failed check carries on, and
   # the trap after it ends the whole `swift test` run, so every later test goes unreported.

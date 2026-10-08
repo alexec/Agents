@@ -502,6 +502,7 @@ export interface ControlHost {
   machineID?: string;
   relay?: boolean;
   signInFrom?: Record<string, HostID>;
+  tunnel?: HostTunnel;
 }
 
 export interface ControlStatus {
@@ -869,6 +870,11 @@ export interface HostJoinStatus {
   connected: boolean;
   problem?: string;
   at: WireDate;
+}
+
+export interface HostTunnel {
+  up: boolean;
+  problem?: string;
 }
 
 export interface LabelVocabularyRequest {
@@ -2173,7 +2179,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConfigChoiceGroup: { required: ["options"], optional: ["name", "group"] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ContinueInProjectRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
-  ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom"] },
+  ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "tunnel"] },
   ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "thisMacHost", "projectDetection"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily"] },
@@ -2219,6 +2225,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Headline: { required: ["h1", "h2", "h3"], optional: [] },
   HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive"] },
   HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
+  HostTunnel: { required: ["up"], optional: ["problem"] },
   LabelVocabularyRequest: { required: ["folder"], optional: [] },
   Lease: { required: ["resource", "displayName", "holder", "grantedAt", "expiresAt", "warned"], optional: [] },
   LeaseSnapshot: { required: ["resources", "at"], optional: [] },

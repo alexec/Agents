@@ -2,23 +2,22 @@ import Foundation
 import Testing
 @testable import AgentsKitCore
 
-/// The checked-in web remote is what its source builds (071, FR-035a, research R8).
+/// The built web remote is what its source builds (071, FR-035a, research R8).
 ///
 /// `Web/build.mjs` writes `Web/dist/MANIFEST`: a hash of every source input and every built
 /// file. This holds the tree to it with no Node, so changing `Web/src` without rebuilding, or
-/// editing `Web/dist` by hand, fails in anyone's `swift test`. CI's web job rebuilds with Node
-/// and checks the bytes themselves.
-@Suite("Web dist manifest")
+/// editing `Web/dist` by hand, fails in anyone's `swift test`. Web/dist is not checked in
+/// (#473): Agents Host's build makes it, so with none built yet there is nothing to check.
+@Suite("Web dist manifest", .enabled(if: FileManager.default.fileExists(atPath: webDistRepo.appending(path: "Web/dist/MANIFEST").path),
+                                     "no Web/dist built here; scripts/web.sh build makes one"))
 struct WebDistManifestTests {
-    static let repo = URL(filePath: #filePath)
-        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    static let repo = webDistRepo
 
     /// The same inputs `Web/build.mjs` hashes. Keep the two in step.
     static let fixedInputs = ["index.html", "sandbox.html", "build.mjs", "tsconfig.json", "package.json", "package-lock.json", ".node-version"]
     static let inputFolders = ["src", "assets"]
 
-    @Test func theCheckedInBuildMatchesItsSource() throws {
+    @Test func theBuiltWebRemoteMatchesItsSource() throws {
         #expect(try Self.problems(in: Self.repo) == [])
     }
 
@@ -128,6 +127,10 @@ struct WebDistManifestTests {
         return copy
     }
 }
+
+private let webDistRepo = URL(filePath: #filePath)
+    .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
 
 private extension Data {
     func append(to url: URL) throws {

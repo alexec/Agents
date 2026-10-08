@@ -21,5 +21,7 @@ App/Resources/servers/*
 site/
 .cache/
 
-# The web remote's packages (071). Web/dist is built from them and IS committed.
+# The web remote's packages and its build (071, #473): Web/dist is built by
+# scripts/web.sh dist, which Agents Host's build runs first, never committed.
 Web/node_modules/
+Web/dist/

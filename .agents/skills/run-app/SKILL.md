@@ -68,8 +68,8 @@ by `scripts/select-test-suites.sh`). The full suite and every scheme run once, i
 Then it:
 1. starts `agents-control serve --home $ROOT/control` on a free loopback port, with
    no Bonjour (its log is `$ROOT/control/control.log`), serving the web remote (071) from
-   this checkout's `Web/dist` on another free loopback port, printed as `WEB_URL` (never
-   the live 8792);
+   this checkout's `Web/dist` (built by Agents Host's build, not checked in) on another free
+   loopback port, printed as `WEB_URL` (never the live 8792);
 2. starts `agentsd --control-code <host code>` on `$ROOT`, as Agents Host's launch agent
    would, with this session's `CLAUDE_*` and `AGENTS_*` taken out of its environment;
 3. opens the window with `AGENTS_CONTROL=<client code>` and `--walk run-<slug>`: it
