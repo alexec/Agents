@@ -57,8 +57,8 @@ check_command() { # name [filter]
 	build-host) echo "xcodegen generate >/dev/null && $CACHED xcodebuild -scheme AgentsHost -configuration Debug -destination 'platform=macOS' -derivedDataPath build/DD $XFLAGS build" ;;
 	build-store) echo "xcodegen generate >/dev/null && $CACHED xcodebuild -scheme AgentsStore -configuration Debug -destination 'platform=macOS' -derivedDataPath build/DD $XFLAGS build" ;;
 	build-remote) echo "xcodegen generate >/dev/null && $CACHED xcodebuild -scheme Remote -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath build/DD-sim $XFLAGS build" ;;
-	# What CI's web job runs: check, tests, and a rebuild that must change nothing.
-	web) echo "scripts/web.sh build && git diff --exit-code --stat -- Web/dist Web/src/protocol/generated.ts && cd Web && npm run check && npm test" ;;
+	# What CI's web job runs: a build (Web/dist is not checked in, #473), check and tests.
+	web) echo "scripts/web.sh build && cd Web && npm run check && npm test" ;;
 	test-agentskit) echo "$CACHED swift test --package-path Packages/AgentsKit${2:+ --filter '$2'}" ;;
 	test-codetext) echo "$CACHED swift test --package-path Packages/CodeText${2:+ --filter '$2'}" ;;
 	test-controlplane) echo "$CACHED swift test --package-path Packages/ControlPlane" ;;
@@ -133,7 +133,9 @@ resolve() {
 	echo "$name $tip"
 }
 
-# Conflicted paths a wave settles itself: the web page's build and the parity table.
+# Conflicted paths a wave settles itself: the web page's generated types and the parity
+# table. Web/dist is no longer checked in (#473); a branch from before that still carries
+# it conflicts with its removal, and the removal wins.
 is_web_generated() { case $1 in Web/dist/* | Web/src/protocol/generated.ts) return 0 ;; *) return 1 ;; esac; }
 PARITY=specs/071-web-remote/walks/parity.md
 
@@ -178,7 +180,7 @@ plan() {
 				echo "    (the wave stops there; the branches after it are planned as if it were left out)"
 				continue
 			fi
-			echo "  $name ${sha:0:10}: merges; rebuilds Web/dist or keeps both parity rows for:"
+			echo "  $name ${sha:0:10}: merges; regenerates the web types, drops Web/dist or keeps both parity rows for:"
 			echo "$conflicts" | sed 's/^/      /'
 			tree=$(echo "$tree" | head -1)
 		else
@@ -260,7 +262,7 @@ merge_pending() {
 	[ -s "$ST/checks" ] || plan_checks
 }
 
-# A merge stopped on conflicts: keep both parity rows; leave Web/dist for a rebuild step;
+# A merge stopped on conflicts: keep both parity rows; leave generated web files for a step;
 # anything else stops the wave. Returns 1 when the merge is still open.
 settle() {
 	local name=$1 sha=$2 c web=0 other=""
@@ -285,7 +287,7 @@ settle() {
 	fi
 	if [ $web = 1 ]; then
 		echo "$name $sha" >"$ST/rebuild"
-		say "$name: Web/dist conflicts; rebuilt from the merged source in the next step"
+		say "$name: generated web files conflict; settled from the merged source in the next step"
 		return 1
 	fi
 	g commit -q --no-edit
@@ -342,7 +344,7 @@ decide() {
 		return
 	fi
 	if [ -s "$ST/rebuild" ]; then
-		NEXT=rebuild-web NEXT_LEASE=build NEXT_MIN=15 NEXT_WHAT="rebuild Web/dist from the merged source of $(cut -d' ' -f1 "$ST/rebuild")"
+		NEXT=rebuild-web NEXT_LEASE=build NEXT_MIN=15 NEXT_WHAT="settle the generated web files from the merged source of $(cut -d' ' -f1 "$ST/rebuild")"
 		return
 	fi
 	if [ -s "$ST/pending" ]; then
@@ -457,20 +459,20 @@ rebuild_web() {
 		[ "$c" = Web/src/protocol/generated.ts ] && types=1
 		g checkout -q --ours -- "$c" 2>/dev/null || g rm -q --cached -- "$c"
 	done < <(g diff --name-only --diff-filter=U)
-	local cmd="scripts/web.sh build"
-	[ $types = 0 ] || cmd="scripts/web.sh types && $cmd"
+	local cmd=true
+	[ $types = 0 ] || cmd="scripts/web.sh types"
 	if ! run_logged rebuild-web "$cmd"; then
 		tail -15 "$ST/log.rebuild-web" | sed 's/^/  /' >&2
 		echo "rebuild-web failed for $name; the merge is still open in $WAVE" | tee "$ST/stopped" >&2
 		exit 3
 	fi
-	g add -A -- Web/dist Web/src/protocol/generated.ts
+	g add -A -- Web/src/protocol/generated.ts
 	[ -z "$(g diff --name-only --diff-filter=U)" ] || die "conflicts left after the rebuild"
 	g commit -q --no-edit
 	echo "$name $sha $(g rev-parse HEAD)" >>"$ST/merged"
 	pop_pending
 	rm -f "$ST/rebuild"
-	say "merged $name with Web/dist rebuilt from the merged source"
+	say "merged $name with its generated web files settled from the merged source"
 	merge_pending
 }
 

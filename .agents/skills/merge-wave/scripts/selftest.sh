@@ -6,9 +6,8 @@
 #   selftest.sh [scenario...]   clean, web, conflict, bisect, docs, reuse (all by default)
 #
 # Builds are a stub (MERGE_WAVE_STUB): it fails any step when the tree has a file
-# called WAVE_BREAK, and passes otherwise. The one real build is the web scenario's
-# `scripts/web.sh build` (Node, a few seconds), which is what rebuilds a Web/dist
-# conflict: run this under the "build" lease.
+# called WAVE_BREAK, and passes otherwise. The one real build is `scripts/web.sh build`
+# (Node, a few seconds) if a wave reaches rebuild-web: run this under the "build" lease.
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -85,16 +84,16 @@ scenario_clean() {
 
 scenario_web() {
 	reset
-	# The page source merges cleanly; its built bundle and the parity table cannot.
-	scripts/web.sh build >/dev/null 2>&1 || fail "web.sh build on main"
-	[ -z "$(git status --porcelain Web/dist)" ] || fail "main's Web/dist is not what its source builds"
+	# Web/dist is not checked in (#473), so two page changes merge with no bundle to settle;
+	# only the parity table needs both rows kept.
+	[ -z "$(git ls-files Web/dist)" ] || fail "main tracks Web/dist"
 	row() { sed -i '' "/^| Assess a runtime/a\\
 | wave row $1 | #0 | lacks | has | — | — | self-test |
 " specs/071-web-remote/walks/parity.md; }
-	w1() { sed -i '' '1i\
+	w1() { sed -i '' '1i\\
 console.debug("wave one");
-' Web/src/main.tsx && scripts/web.sh build >/dev/null 2>&1 && row one; }
-	w2() { echo 'console.debug("wave two");' >>Web/src/main.tsx && scripts/web.sh build >/dev/null 2>&1 && row two; }
+' Web/src/main.tsx && row one; }
+	w2() { echo 'console.debug("wave two");' >>Web/src/main.tsx && row two; }
 	branch s2-one w1
 	branch s2-two w2
 	git checkout -q -b s2-base "$M" && git commit -q --allow-empty -m "main moves" && git checkout -q main
@@ -103,19 +102,15 @@ console.debug("wave one");
 	out=$("$MW" start s2-one s2-two); echo "$out"
 	wave=$(wave_of "$out")
 	log=$(run_wave "$wave"); echo "$log"
-	echo "$log" | grep -q 'Web/dist conflicts' || echo "$out" | grep -q 'Web/dist conflicts' || fail "expected a Web/dist conflict"
+	echo "$log$out" | grep -q 'Web/dist conflicts' && fail "no Web/dist to conflict over"
 	git show main:Web/src/main.tsx | grep -q 'wave one' && git show main:Web/src/main.tsx | grep -q 'wave two' || fail "both source changes"
-	grep -q 'wave one' <(git show main:Web/dist/app.js) && grep -q 'wave two' <(git show main:Web/dist/app.js) ||
-		fail "the rebuilt bundle has both"
+	[ -z "$(git ls-tree -r --name-only main -- Web/dist)" ] || fail "the wave committed Web/dist"
 	git show main:specs/071-web-remote/walks/parity.md | grep -q 'wave row one' &&
 		git show main:specs/071-web-remote/walks/parity.md | grep -q 'wave row two' || fail "both parity rows"
-	# The rebuilt dist is exactly what the merged source builds.
-	git checkout -q main && scripts/web.sh build >/dev/null 2>&1
-	[ -z "$(git status --porcelain Web/dist)" ] || fail "merged Web/dist is not what the merged source builds"
 	echo "$log" | grep -q 'SHIP=yes' || fail "a Web change ships"
 	[ "$(git rev-list --merges "$M2"..main | wc -l | tr -d ' ')" = 2 ] || fail "one merge commit per branch"
 	"$MW" clean "$wave"
-	ok "Web/dist conflict rebuilt from merged source, both parity rows kept"
+	ok "two page changes merged with no bundle to settle, both parity rows kept"
 }
 
 scenario_conflict() {

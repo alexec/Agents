@@ -384,6 +384,12 @@ targets:
   AgentsHost:
     type: application
     supportedDestinations: [macOS]
+    # The web remote (071, #473) is not checked in: built here, before it is copied in.
+    # With no Node it is left empty and Agents Host builds without its web page.
+    preBuildScripts:
+      - name: Build the web remote
+        script: sh "$SRCROOT/scripts/web.sh" dist
+        basedOnDependencyAnalysis: false
     sources:
       - path: Host/Sources
       # The pairing sheet's QR code, drawn as the window draws it.
@@ -404,10 +410,11 @@ targets:
         optional: true
       - path: App/Resources/toolsets
         type: folder
-      # The web remote (071), built and checked in: copied as it is, so building Agents Host
-      # needs no Node. agents-control serves only what its MANIFEST lists.
+      # The web remote (071), as the script above left it. agents-control serves only what
+      # its MANIFEST lists, and nothing when there is none.
       - path: Web/dist
         type: folder
+        optional: true
     dependencies:
       - package: AgentsKit
         product: AgentsKit
@@ -451,6 +458,9 @@ targets:
         SUPPORTED_PLATFORMS: macosx
         GENERATE_INFOPLIST_FILE: NO
         ENABLE_HARDENED_RUNTIME: YES
+        # The web remote's build reads Web/ and writes Web/dist, which a sandboxed script
+        # phase may not.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
 
   # The control plane's program (058), built here for Agents Host's bundle; Linux builds it
   # with `swift build` in Packages/ControlPlane.
