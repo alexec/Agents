@@ -97,7 +97,7 @@ export interface ACPProviderInfo {
   configured?: boolean;
 }
 
-export type AfterTurn = "park";
+export type AfterTurn = "park" | "archive";
 
 export interface Agent {
   id: UUID;
@@ -1731,6 +1731,7 @@ export interface Workflow {
   enabled?: boolean;
   archived?: boolean;
   hosts?: string[];
+  whenDone?: WorkflowWhenDone;
 }
 
 export interface WorkflowApproval {
@@ -1837,6 +1838,7 @@ export interface WorkflowSettingsRequest {
   cooldown?: string;
   labels?: string[];
   hosts?: string[];
+  whenDone?: string;
 }
 
 export interface WorkflowSummary {
@@ -1872,6 +1874,8 @@ export type WorkflowTriggerStored =
   | { agentStopped: Record<string, never> }
   | { workflowCompleted: { id?: string } }
   | { unrecognised: { name: string; keys: Record<string, JSONValue> } };
+
+export type WorkflowWhenDone = "park" | "archive-allowed" | "archive";
 
 export interface WorkflowsListRequest {
   folder?: URLString;
@@ -2324,7 +2328,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WaitingAgent: { required: ["agentID", "title", "folder", "status"], optional: [] },
   WebRemoteStatus: { required: ["port", "served"], optional: ["reason", "detail"] },
   WorkReport: { required: ["outcome", "message", "at"], optional: ["block"] },
-  Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "enabled", "archived", "hosts"] },
+  Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "enabled", "archived", "hosts", "whenDone"] },
   WorkflowApproval: { required: ["digest", "isNew"], optional: ["note"] },
   WorkflowApproveRequest: { required: ["folder", "workflowID", "digest"], optional: [] },
   WorkflowArchiveRequest: { required: ["folder", "workflowID", "archived"], optional: [] },
@@ -2334,7 +2338,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowRequest: { required: ["folder", "workflowID"], optional: [] },
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
   WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort"] },
-  WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "hosts"] },
+  WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "hosts", "whenDone"] },
   WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["overLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
   WorkflowsListRequest: { required: [], optional: ["folder"] },
   WorktreeStatus: { required: ["uncommitted"], optional: ["ahead", "behind", "unmerged"] },

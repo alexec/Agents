@@ -828,6 +828,7 @@ extension DaemonCore {
     private func runAgent(for workflow: Workflow, run: WorkflowRun,
                           causingEvent: EventPosition? = nil) async throws -> UUID {
         let prompt = promptText(for: workflow, run: run, event: causingEvent.flatMap { eventLog.event(at: $0) })
+            + Self.whenDoneNote(workflow)
 
         switch workflow.mode {
         case .triggering:
@@ -1083,6 +1084,31 @@ extension DaemonCore {
 
             (You were started by the workflow "\(workflow.name)" because \(name) \(what).)
             """
+    }
+
+    /// What the run is told about putting its session away (#433), when its workflow
+    /// says more than park: the one thing about `when-done:` it could not know.
+    static func whenDoneNote(_ workflow: Workflow) -> String {
+        guard workflow.mode != .triggering else { return "" }
+        switch workflow.whenDone ?? .park {
+        case .park: return ""
+        case .archiveAllowed:
+            return """
+
+
+                (This workflow lets its run archive itself. If you finish done or with nothing \
+                to do, and there is nothing the person needs to look at, end with \
+                \(AppTool.finishTurn) and afterwards set to archive. Otherwise leave it out, \
+                or say park.)
+                """
+        case .archive:
+            return """
+
+
+                (This workflow archives its run when it finishes done or with nothing to do. \
+                Anything the person should see belongs in your report, or in a needs_answer.)
+                """
+        }
     }
 
     /// A server's event (#383, research R7): its details as for any event, then its data in
@@ -1574,6 +1600,17 @@ extension DaemonCore {
                     edited = try writeHosts(hosts, into: edited)
                 }
             }
+            // `park` takes the line out, as a file that never said (#433). Anything that
+            // is not one of the three is refused, never read as the nearest.
+            if let text = request.whenDone {
+                let trimmed = text.trimmingCharacters(in: .whitespaces)
+                guard let chosen = trimmed.isEmpty ? .park : WorkflowWhenDone(rawValue: trimmed) else {
+                    throw JSONRPCError(code: JSONRPCError.invalidParams, message: WorkflowWhenDone.unknown)
+                }
+                if chosen != (existing.whenDone ?? .park) {
+                    edited = try FrontMatterEdit.set(WorkflowWhenDone.key, to: chosen.fileText, in: edited)
+                }
+            }
         } catch let refusal as FrontMatterEdit.Refusal {
             // The editor's own sentence, unchanged. It is the one that knows what it
             // found, and nothing was written (FR-025).
@@ -1716,5 +1753,43 @@ extension DaemonCore {
         }
         records.states = kept
         keepQuietly("workflow history") { try workflowStore.save(records) }
+    }
+}
+
+// MARK: When a run is done (#433)
+
+extension DaemonCore {
+    /// What this agent's run may do with its session, while a workflow that started or
+    /// keeps the agent is running it. `nil` for anything else: a session a person
+    /// started, a run that is over, and an agent a triggering workflow borrowed, which
+    /// is somebody else's and stays park-only.
+    func whenDone(forRunOf agentID: UUID) -> WorkflowWhenDone? {
+        guard let agent = agents[agentID], let (_, run) = runInFlight(for: agentID),
+              run.agentID == agentID, agent.startedByWorkflow == run.workflowID,
+              let workflow = workflow(run.workflowID, in: run.folder),
+              workflow.mode != .triggering, workflow.problem == nil else { return nil }
+        return workflow.whenDone ?? .park
+    }
+
+    /// Whether the turn ending now is a run's, done as its workflow lets the daemon put
+    /// it away: ended by the agent's own hand, with nothing queued since, and with a
+    /// report from this turn that has nothing left in it. `asked` is the agent's ask
+    /// as the turn ended, which `archive-allowed` waits for and `archive` does not.
+    func runArchivesWhenDone(_ agentID: UUID, agent: Agent, asked: AfterTurn?) -> Bool {
+        guard let whenDone = whenDone(forRunOf: agentID) else { return false }
+        // A report this turn began under is the last turn's, not this one's (#149).
+        guard let report = agent.report, report != reportBeforeTurn[agentID],
+              AfterTurn.archive.goes(with: report.outcome) else { return false }
+        switch whenDone {
+        case .park: return false
+        case .archiveAllowed: return asked == .archive
+        case .archive: return true
+        }
+    }
+
+    /// The line a run archived when done leaves in its transcript.
+    func archivedWhenDoneNote(_ agentID: UUID) -> String {
+        let name = runInFlight(for: agentID).flatMap { workflow($0.run.workflowID, in: $0.run.folder)?.name }
+        return "Archived when its run was done, as the workflow\(name.map { " \u{201C}\($0)\u{201D}" } ?? "") allows."
     }
 }

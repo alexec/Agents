@@ -1542,6 +1542,8 @@ extension DaemonCore {
         // next one starting, and before the stop below is heard: a stopped turn still
         // moves, it just does not carry on by itself (053).
         let movedBy = await applyPendingMove(agentID)
+        // Taken whatever happens next, so it never outlives the turn it was noted for (#433).
+        let archiveNote = archiveWhenDone.removeValue(forKey: agentID)
         // Stopped since this turn ended, while its runtime was being let go. `stop`
         // found nothing running and moved nothing, so this is where it is heard: no
         // question of the app's own, and what is queued stays queued, as stop promises.
@@ -1553,6 +1555,15 @@ extension DaemonCore {
         // them.
         if crossedItsLimit {
             if agents[agentID]?.queuedPrompts.isEmpty == false { await holdForCostLimit(agentID) }
+            return
+        }
+        // A workflow's run, done as its `when-done:` lets it be put away (#433). Not when
+        // it moved, nor when something was queued while the runtime was let go: the
+        // work has moved on, and the run stays where its ending put it.
+        if let archiveNote, movedBy == nil, agents[agentID]?.state == .finished,
+           agents[agentID]?.queuedPrompts.isEmpty == true {
+            await record(.runtimeNote(archiveNote), for: agentID)
+            try? await archive(agentID, by: .itself)
             return
         }
         // The agent moved itself so that it could carry on working there: started again,
@@ -1804,8 +1815,8 @@ extension DaemonCore {
     public enum StopCause: Sendable, Equatable {
         case person
         case agent(UUID)
-        /// The agent itself, as it asked on the call that ended its turn. Only ever an
-        /// archive, of an agent whose turn is already over.
+        /// A workflow's run itself, done as its workflow's `when-done:` allows (#433).
+        /// Only ever an archive, of an agent whose turn is already over.
         case itself
 
         /// The agent that asked, when one did.
@@ -1961,8 +1972,8 @@ extension DaemonCore {
             await record(.runtimeNote("\(starterName(starter)) archived this agent."), for: agentID)
             await move(agentID, on: .archivedByAgent)
         case .itself:
-            // Unreachable. An agent used to archive its own session when its turn
-            // ended; that ask is now dropped, and only the person archives.
+            // A workflow's run once its turn is over, as the workflow's `when-done:`
+            // allows (#433). The line saying so is already in its transcript.
             await move(agentID, on: .archivedByAgent)
         }
         // Out of Pinned (#180): an archived session is put away, not kept on top.
