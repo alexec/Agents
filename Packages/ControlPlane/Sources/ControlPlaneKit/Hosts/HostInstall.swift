@@ -14,6 +14,10 @@ import Foundation
 ///   fingerprint comes back; it goes into the same folder, not the person's known_hosts.
 /// - No master connection and no forward are kept (FR-018a). The host starts with a host
 ///   code and enrols over its own connection out, like one added by command.
+/// - Except for a server the person's ssh reaches through a bastion (`ProxyJump` or
+///   `ProxyCommand`), which can rarely dial back (#435): its code's address is its own
+///   loopback, and `HostTunnels` holds a reverse tunnel there for as long as it is a host.
+///   A server on the same network dials the control plane's address, with no tunnel.
 public struct HostInstall: Sendable {
     public struct Request: Codable, Sendable {
         /// `user@host`, `user@host:port`, or a name from the ssh config.
@@ -34,11 +38,16 @@ public struct HostInstall: Sendable {
 
     let codes: ControlCodes
     let servers: URL?
+    /// Where a server behind a bastion's tunnel is held, and the port it reaches here;
+    /// nil where this copy holds none (several copies, whose ssh is no person's).
+    let tunnels: (holder: HostTunnels, port: Int)?
     let progress: @Sendable (String, String) async -> Void
 
-    public init(codes: ControlCodes, servers: URL?, progress: @escaping @Sendable (String, String) async -> Void = { _, _ in }) {
+    public init(codes: ControlCodes, servers: URL?, tunnels: (holder: HostTunnels, port: Int)? = nil,
+                progress: @escaping @Sendable (String, String) async -> Void = { _, _ in }) {
         self.codes = codes
         self.servers = servers
+        self.tunnels = tunnels
         self.progress = progress
     }
 
@@ -107,15 +116,37 @@ public struct HostInstall: Sendable {
         try await Self.words(keyGiven: keyGiven) { try await installer.install(binary: binary.file, sha256: binary.sha256, firstInstall: true) }
         try await Self.words(keyGiven: keyGiven) { try await installer.swapCurrent(to: binary.sha256, version: binary.version, installedBy: "control plane") }
         // A host code, left in the host's root and read once: never on its command line,
-        // where `ps` would show it.
-        let code = try await codes.issue(.host).text
+        // where `ps` would show it. Behind a bastion, it names the server's end of the
+        // tunnel, which is held from now so the host's first dial finds it (#435).
+        let code: String
+        var tunnelled = false
+        if let tunnels, await Self.throughBastion(ssh) {
+            let issued = try await codes.issue(.host, url: "https://127.0.0.1:\(tunnels.port)")
+            let record = HostTunnels.Record(id: UUID().uuidString.lowercased(), destination: destination, name: name,
+                                            port: tunnels.port, code: issued.id, host: nil,
+                                            knownHosts: (try? String(contentsOf: knownHosts, encoding: .utf8)) ?? "",
+                                            made: Date())
+            try await tunnels.holder.add(record)
+            code = issued.shown.text
+            tunnelled = true
+        } else {
+            code = try await codes.issue(.host).text
+        }
         try await Self.words(keyGiven: keyGiven) {
             try await installer.leaveJoinCode(code)
             try await installer.startDaemon(extra: ["--control-network", "--host-name", name])
         }
         await progress(name, "started")
         // The host enrols over its own connection; `control/hostChanged` says when it is on.
-        return ["started": true, "name": .string(name), "platform": .string("\(facts.system) \(facts.architecture.display)")]
+        return ["started": true, "name": .string(name), "platform": .string("\(facts.system) \(facts.architecture.display)"),
+                "tunnel": .bool(tunnelled)]
+    }
+
+    /// Whether the person's ssh config reaches this server through another machine. A
+    /// config ssh cannot read is taken as no bastion: the install says what went wrong.
+    static func throughBastion(_ ssh: SSHCommand) async -> Bool {
+        guard let resolved = try? await ssh.run(ssh.options + ssh.resolveArguments), resolved.status == 0 else { return false }
+        return SSHCommand.throughBastion(resolved.stdout)
     }
 
     /// `agents@devbox.lan:2222` → `devbox.lan`.

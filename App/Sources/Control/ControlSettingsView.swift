@@ -308,7 +308,13 @@ struct ControlHostsPage: View {
         if host.state != "online" { parts.append(host.state.capitalized) }
         if !host.platform.isEmpty { parts.append(host.platform.replacingOccurrences(of: " ", with: " · ")) }
         if !host.version.isEmpty { parts.append("Agents \(host.version)") }
-        parts.append("connects out")
+        if let tunnel = host.tunnel {
+            // Behind a bastion (#435): it dials through a session this Mac holds.
+            parts.append(tunnel.up ? "connects through an ssh tunnel"
+                                   : "ssh tunnel down\(tunnel.problem.map { ": \($0)" } ?? "")")
+        } else {
+            parts.append("connects out")
+        }
         // The sign-in relay needs a path back to this Mac, which the control plane does
         // not carry yet (R9). A lent key still works; the relay does not.
         parts.append("Sign-in relay needs this Mac on the same network")

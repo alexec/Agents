@@ -66,6 +66,8 @@ public extension DaemonAPI.Notification {
     /// `HostJoinStatus`: this Mac's host's join changed, as it said it (#113).
     static let controlThisMacHostChanged = "control/thisMacHostChanged"
     static let controlInstallProgress = "control/installProgress"
+    /// `HostTunnelChanged`: a server's reverse tunnel over ssh came up or went down (#435).
+    static let controlTunnelChanged = "control/tunnelChanged"
     /// To a device on the old way, after the move (058, T085): `ControlMoved`.
     static let controlMoved = "control/moved"
 }
@@ -159,6 +161,10 @@ public extension DaemonAPI {
         public var relay: Bool?
         /// The hosts whose sign-in this one may use, by runtime (T091).
         public var signInFrom: [String: HostID]?
+        /// A server behind a bastion dials the control plane through a reverse tunnel the
+        /// control plane holds over ssh (#435): how that session stands. Nil for a host
+        /// that dials it directly.
+        public var tunnel: HostTunnel?
 
         public init(id: HostID, name: String, platform: String, version: String, state: String,
                     reach: String, machineID: String?, relay: Bool? = nil) {
@@ -204,6 +210,32 @@ public extension DaemonAPI {
             self.resolved = resolved
             self.outcome = outcome
             self.detail = detail
+        }
+    }
+
+    /// A reverse tunnel over ssh to the control plane, held for one server (#435).
+    struct HostTunnel: Codable, Sendable, Hashable {
+        /// Whether ssh has the server's end of the tunnel open now.
+        public var up: Bool
+        /// Why it is down, in ssh's words, when it said any.
+        public var problem: String?
+
+        public init(up: Bool, problem: String? = nil) {
+            self.up = up
+            self.problem = problem
+        }
+    }
+
+    /// `control/tunnelChanged`: by name, since a server's tunnel is up before it joins.
+    struct HostTunnelChanged: Codable, Sendable, Hashable {
+        public var name: String
+        public var host: HostID?
+        public var tunnel: HostTunnel
+
+        public init(name: String, host: HostID?, tunnel: HostTunnel) {
+            self.name = name
+            self.host = host
+            self.tunnel = tunnel
         }
     }
 
