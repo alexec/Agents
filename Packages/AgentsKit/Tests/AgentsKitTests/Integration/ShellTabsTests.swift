@@ -113,6 +113,15 @@ struct ShellTabsTests {
         #expect(replay.dropped + replay.scrollback.count == end)
         #expect(replay.scrollback == heard.bytes(of: 0))
 
+        // A screen that has it up to some point is given only what came after.
+        let part = try await core.attachShell(.init(agentID: id, since: end - 10, startedAt: replay.startedAt))
+        #expect(part.offset == end - 10)
+        #expect(part.scrollback == heard.bytes(of: 0).suffix(10))
+        // Another shell's place is no use: the whole of it.
+        let other = try await core.attachShell(.init(agentID: id, since: end - 10, startedAt: .distantPast))
+        #expect(other.offset == nil)
+        #expect(other.scrollback.count == end)
+
         await core.shells.shutDown()
     }
 

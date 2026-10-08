@@ -19,12 +19,15 @@ extension DaemonCore {
                                                shell: request.shell,
                                                folder: agent.cwd,
                                                rows: request.rows,
-                                               cols: request.cols)
+                                               cols: request.cols,
+                                               since: request.since,
+                                               startedAt: request.startedAt)
             return DaemonAPI.ShellAttachResponse(state: attachment.state,
                                                  scrollback: attachment.scrollback,
                                                  dropped: attachment.dropped,
                                                  startedAt: attachment.startedAt,
-                                                 folder: attachment.folder)
+                                                 folder: attachment.folder,
+                                                 offset: attachment.offset)
         } catch ShellHost.Failure.willNotStart(let reason) {
             throw JSONRPCError(code: DaemonAPI.Failure.shellWillNotStart, message: reason)
         }

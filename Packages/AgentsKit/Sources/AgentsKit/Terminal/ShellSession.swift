@@ -96,6 +96,22 @@ public final class ShellSession: @unchecked Sendable {
         return buffer
     }
 
+    /// What a screen replays, and the offset of its first byte, taken together under
+    /// the lock. Copied out as bytes: handing over the buffer itself would make the next
+    /// chunk the shell prints copy all of it (#401).
+    public var replay: (bytes: Data, dropped: Int) {
+        lock.lock(); defer { lock.unlock() }
+        return (buffer.tail, buffer.dropped)
+    }
+
+    /// Only what came after `since`, when that much is still held; nil when it is not,
+    /// and the whole replay is wanted.
+    public func replay(since: Int) -> (bytes: Data, offset: Int, dropped: Int)? {
+        lock.lock(); defer { lock.unlock() }
+        guard since >= buffer.dropped, since <= buffer.end else { return nil }
+        return (buffer.tail(limit: buffer.end - since), since, buffer.dropped)
+    }
+
     public var rows: Int { pty?.rows ?? 0 }
     public var cols: Int { pty?.cols ?? 0 }
 

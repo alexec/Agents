@@ -39,6 +39,11 @@ public final class ShellClient {
     /// silence (#401). Cleared by the next keystroke that does.
     public private(set) var sendProblem: String?
 
+    /// The emulator a screen made for this shell, kept with it so a screen coming back
+    /// takes it up as it was rather than building and replaying it again (#401). The
+    /// app's own view type; nothing here looks inside it.
+    @ObservationIgnored public var screen: AnyObject?
+
     /// Where incoming bytes go: the emulator, set by the pane once its view exists. A
     /// new emulator is a blank screen, so it is caught up from the daemon's replay.
     @ObservationIgnored public var onOutput: ((Data) -> Void)? {
@@ -97,7 +102,9 @@ public final class ShellClient {
             let response = try await client.call(
                 DaemonAPI.Method.shellAttach,
                 DaemonAPI.ShellAttachRequest(agentID: agentID, shell: shell,
-                                             rows: rows > 0 ? rows : 24, cols: cols > 0 ? cols : 80),
+                                             rows: rows > 0 ? rows : 24, cols: cols > 0 ? cols : 80,
+                                             since: onOutput == nil ? nil : seen,
+                                             startedAt: onOutput == nil || seen == nil ? nil : startedAt),
                 returning: DaemonAPI.ShellAttachResponse.self)
             state = response.state
             dropped = response.dropped
@@ -105,7 +112,7 @@ public final class ShellClient {
             isAttached = true
             lost = false
             problem = nil
-            catchUp(response.scrollback, from: response.dropped, startedAt: response.startedAt)
+            catchUp(response.scrollback, from: response.offset ?? response.dropped, startedAt: response.startedAt)
             showHeld()
         } catch {
             held = nil
@@ -150,6 +157,7 @@ public final class ShellClient {
         isAttached = false
         lost = false
         onOutput = nil
+        screen = nil
         _ = try? await client.call(DaemonAPI.Method.shellClose, DaemonAPI.ShellRequest(agentID: agentID, shell: shell))
     }
 
@@ -204,6 +212,12 @@ public final class ShellClient {
             }
         }
         sender = nil
+    }
+
+    /// Say this screen's size again, as last laid out: a kept emulator coming back on
+    /// screen is not laid out anew, and the shell may have taken another size meanwhile.
+    public func sayScreenSize() async {
+        await resize(rows: rows, cols: cols)
     }
 
     public func resize(rows: Int, cols: Int) async {

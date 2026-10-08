@@ -147,6 +147,7 @@ private struct ShellScreen: View {
             let held = client ?? model.acquireShell(for: agent.id, shell: shell)
             client = held
             await held.attach(rows: rows, cols: cols)
+            await held.sayScreenSize()
         }
         .onChange(of: client?.title) { _, title in titled(title) }
         .onDisappear {
