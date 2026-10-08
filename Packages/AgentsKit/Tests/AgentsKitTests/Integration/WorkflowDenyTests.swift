@@ -87,7 +87,8 @@ struct WorkflowDenyTests {
         }
 
         let workflow = try #require(await core.workflow("deploy", in: work))
-        let refusal = await core.fire(workflow, on: workflow.triggers[0])
+        let trigger = try #require(workflow.triggers.first)
+        let refusal = await core.fire(workflow, on: trigger)
         #expect(refusal == .deniedHere)
         #expect(await core.allAgents().isEmpty, "its trigger started nothing")
     }
