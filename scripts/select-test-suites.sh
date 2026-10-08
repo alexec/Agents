@@ -10,7 +10,9 @@
 # ControlPlane runs on any change to it or to AgentsKit, which it links. A change under
 # Web/ alone runs AgentsKit's three suites that hold Web/ to Swift: the dist manifest, the
 # ported rules' fixtures and the key vectors. CI's web job checks the rest of Web/ with Node,
-# on every run.
+# on every run. A change to App/Sources, Remote/Sources or Shared/UI runs the suites that
+# scan those views (ConsistencyTests, OneGroupingTests), and one to App/Resources/toolsets
+# the two that read the bundled toolsets.
 #
 # Usage: scripts/select-test-suites.sh <base-commit> >> "$GITHUB_OUTPUT"
 set -euo pipefail
@@ -44,6 +46,8 @@ else
 		agentskit_touched=false
 		codetext_touched=false
 		web_touched=false
+		views_touched=false
+		toolsets_touched=false
 		agentskit_source_touched=false
 		codetext_source_touched=false
 		agentskit_full_required=false
@@ -102,6 +106,22 @@ else
 						web_touched=true
 					fi
 					;;
+				# AgentsKit's source scans read the apps' views and the bundled toolsets from
+				# disk (#475): a view edit alone must still run the scans that hold it.
+				App/Sources/*|Remote/Sources/*|Shared/UI/*)
+					agentskit_touched=true
+					if ! $views_touched; then
+						agentskit_suites+=(ConsistencyTests OneGroupingTests)
+						views_touched=true
+					fi
+					;;
+				App/Resources/toolsets/*)
+					agentskit_touched=true
+					if ! $toolsets_touched; then
+						agentskit_suites+=(ToolsetTests ArchiveToolsetTests)
+						toolsets_touched=true
+					fi
+					;;
 				Packages/CodeText/Tests/*)
 					codetext_touched=true
 					name=${path##*/}
@@ -125,7 +145,7 @@ else
 					codetext_full_required=true
 					;;
 				# These areas cannot affect either SwiftPM package's tests.
-				App/*|Host/*|Remote/*|RemoteNotify/*|RemoteWidget/*|Shared/UI/*|docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|.github/workflows/*|scripts/select-test-suites.sh|scripts/check-agentsd-links-no-parsers.sh|scripts/web.sh|scripts/slow-tests.sh|scripts/flaky-tests.sh|scripts/normalize-metaltoolchain-cache.py)
+				App/*|Host/*|Remote/*|RemoteNotify/*|RemoteWidget/*|docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|.github/workflows/*|scripts/select-test-suites.sh|scripts/check-agentsd-links-no-parsers.sh|scripts/web.sh|scripts/slow-tests.sh|scripts/flaky-tests.sh|scripts/normalize-metaltoolchain-cache.py)
 					;;
 				*)
 					# Root config, CI, scripts, or a new area may change test behavior.

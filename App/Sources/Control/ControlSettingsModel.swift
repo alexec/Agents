@@ -57,6 +57,10 @@ final class ControlSettingsModel {
                         self.installStep = note.params?["step"]?.stringValue
                         continue
                     }
+                    if note.method == DaemonAPI.Notification.controlTunnelChanged,
+                       let change = try? note.params?.decode(DaemonAPI.HostTunnelChanged.self) {
+                        self.tunnels[change.name] = change.tunnel
+                    }
                     await self.refresh()
                 }
                 // The control plane went; come back when it does.
@@ -123,9 +127,14 @@ final class ControlSettingsModel {
 
     /// The step the control plane says an install is at (`control/installProgress`).
     private(set) var installStep: String?
+    /// How each server's reverse tunnel stands, by name, as the control plane said it
+    /// (`control/tunnelChanged`, #435): before the server has joined, too.
+    private(set) var tunnels: [String: DaemonAPI.HostTunnel] = [:]
 
     enum InstallOutcome: Equatable {
-        case added(name: String)
+        /// `tunnel`: the server is reached through a bastion, so it dials the control plane
+        /// through a reverse tunnel the control plane holds over ssh (#435).
+        case added(name: String, tunnel: Bool)
         /// The server's key is new to this Mac: the person looks at it and says so.
         case needsTrust(fingerprint: String)
         case failed(String)
@@ -144,7 +153,8 @@ final class ControlSettingsModel {
             let answer = try await client.call(DaemonAPI.Method.hostsInstall, JSONValue.object(params))
             await refresh()
             if let fingerprint = answer["needsTrust"]?.stringValue { return .needsTrust(fingerprint: fingerprint) }
-            return .added(name: answer["name"]?.stringValue ?? name ?? destination)
+            return .added(name: answer["name"]?.stringValue ?? name ?? destination,
+                          tunnel: answer["tunnel"]?.boolValue ?? false)
         } catch let error as JSONRPCError {
             return .failed(HostProblem.controlRefusal(error))
         } catch {

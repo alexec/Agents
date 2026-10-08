@@ -75,6 +75,27 @@ public struct SSHCommand: Sendable {
         control + ["-O", "forward", "-R", "\(remote):\(local)", "--", destination]
     }
 
+    /// Whether `ssh -G` says this name is reached through another machine: a `ProxyJump`
+    /// or a `ProxyCommand` (#435). Such a server can rarely dial back to this Mac.
+    public static func throughBastion(_ resolved: String) -> Bool {
+        resolved.split(whereSeparator: \.isNewline).contains { line in
+            let words = line.split(separator: " ", maxSplits: 1)
+            guard words.count == 2, ["proxyjump", "proxycommand"].contains(words[0].lowercased()) else { return false }
+            return words[1].trimmingCharacters(in: .whitespaces).lowercased() != "none"
+        }
+    }
+
+    /// A reverse tunnel and nothing else (#435): the server's `127.0.0.1:remote` reaches
+    /// this machine's `127.0.0.1:local`. A connection of its own, never a shared master, so
+    /// a `ControlPersist` in the person's config cannot end it; `-v` is how the holder
+    /// hears the forward is open (`remote forward success`).
+    public func reverseTunnelArguments(remotePort: Int, localPort: Int) -> [String] {
+        Self.batch + options + [
+            "-N", "-v", "-o", "ControlMaster=no", "-o", "ControlPath=none",
+            "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3", "-o", "ExitOnForwardFailure=yes",
+            "-R", "127.0.0.1:\(remotePort):127.0.0.1:\(localPort)", "--", destination]
+    }
+
     /// `-O check` or `-O exit`, asked of the master.
     public func controlArguments(_ operation: String) -> [String] {
         control + ["-O", operation, "--", destination]

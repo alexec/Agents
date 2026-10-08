@@ -8,7 +8,9 @@ import SwiftUI
 ///   nothing has to reach it. The command carries a one-time host code, and the sheet
 ///   closes by itself when the server joins.
 /// - **Install over ssh**, for a server the person can already ssh to: the control plane
-///   installs the host once and keeps neither a key nor the session. The key is optional
+///   installs the host once and keeps neither a key nor the session. A server ssh reaches
+///   through a bastion is the exception (#435): it cannot dial back, so the control plane
+///   holds a reverse tunnel to it over ssh, and the sheet says when that is down. The key is optional
 ///   when the control plane is on this Mac: its ssh is the person's, with their agent,
 ///   config and default identity (#413). One elsewhere has none of those, so needs a key.
 /// - **From ssh config**, on a control plane on this Mac (#429): every host in
@@ -255,9 +257,10 @@ struct ControlAddServerSheet: View {
             }
         }
         switch outcome {
-        case .added(let named)?:
+        case .added(let named, let tunnel)?:
             Text(joined.map { "\($0) joined." } ?? "Installed on \(named). Waiting for it to connect…")
                 .appText(.supporting).tinted(.vouched)
+            if tunnel { tunnelLine(named) }
         case .failed(let why)?:
             Text(why).appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
         default:
@@ -272,6 +275,20 @@ struct ControlAddServerSheet: View {
                     .keyboardShortcut(.defaultAction)
                     .disabled(working || destination.trimmingCharacters(in: .whitespaces).isEmpty || (keyPath.isEmpty && !keyOptional))
             }
+        }
+    }
+
+    /// A server behind a bastion: how the tunnel it dials through stands (#435).
+    @ViewBuilder
+    private func tunnelLine(_ named: String) -> some View {
+        let lead = "\(named) is reached through a bastion, so it connects through a tunnel the control plane holds over ssh."
+        switch control.tunnels[named] {
+        case let state? where !state.up:
+            Text("\(lead) That ssh session is down\(state.problem.map { ": \($0)" } ?? ""). It is tried again by itself.")
+                .appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
+        default:
+            Text("\(lead) It is offline whenever that session is down, as when this Mac sleeps.")
+                .appText(.supporting).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
     }
 

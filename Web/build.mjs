@@ -1,10 +1,10 @@
 // Builds the web remote into dist/, the same bytes every time, and writes dist/MANIFEST
 // (spec 071, research R8).
 //
-// dist/ is checked in, so building Agents from source needs no Node. MANIFEST holds a hash of
-// every source input and every output: WebDistManifestTests (Swift, no Node) fails when a
-// source changed without a rebuild or dist was edited by hand, and CI rebuilds and fails on
-// any byte of difference. The control plane serves only what MANIFEST lists.
+// dist/ is not checked in (#473): Agents Host's build runs scripts/web.sh dist first. MANIFEST
+// holds a hash of every source input and every output: WebDistManifestTests (Swift, no Node)
+// fails when a source changed without a rebuild or dist was edited by hand. The control plane
+// serves only what MANIFEST lists.
 
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";

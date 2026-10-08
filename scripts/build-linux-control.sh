@@ -25,8 +25,9 @@ for arch in $arches; do
     print "  $out/agents-control-linux-${docker[$arch]} ($(( $(stat -f %z $bin) / 1048576 )) MB)"
 done
 
-# The web remote (071), as checked in, so the image can serve it when asked to: the
-# listener stays off unless the container is given --web /web and --web-port.
+# The web remote (071), built here as it is not checked in (#473), so the image can serve it
+# when asked to: the listener stays off unless the container is given --web /web and --web-port.
+$root/scripts/web.sh build
 rm -rf $root/deploy/web
 cp -R $root/Web/dist $root/deploy/web
 print "  $root/deploy/web (the web remote, off unless asked for)"

@@ -1,6 +1,4 @@
-# The web remote's built files and generated protocol types (071, research R8). Both are
-# checked in so building from source needs no Node, and both are made only by their
-# generators: scripts/web.sh build and scripts/web.sh types. On a merge conflict,
-# regenerate them; never resolve them by hand.
-Web/dist/** linguist-generated=true -diff
+# The web remote's generated protocol types (071, research R6), made only by
+# scripts/web.sh types. On a merge conflict, regenerate; never resolve by hand.
+# (Web/dist is built, not checked in: .gitignore, #473.)
 Web/src/protocol/generated.ts linguist-generated=true -diff

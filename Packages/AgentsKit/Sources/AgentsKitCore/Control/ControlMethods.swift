@@ -31,6 +31,8 @@ public actor ControlMethods: ControlHandling {
         public var changed: @Sendable (ControlEvent) async -> Void = { _ in }
         /// A host started or stopped relaying, or a relay host said hello (T096).
         public var relayChanged: @Sendable (HostID) async -> Void = { _ in }
+        /// How a server's reverse tunnel stands, for one behind a bastion (#435).
+        public var tunnel: @Sendable (HostID) async -> DaemonAPI.HostTunnel? = { _ in nil }
 
         public init(startPairing: @escaping @Sendable (Bool) async throws -> JSONValue = { _ in throw ControlMethods.notHere },
                     stopPairing: @escaping @Sendable () async -> Void = {},
@@ -458,6 +460,8 @@ public actor ControlMethods: ControlHandling {
 
     private func hostList() async -> [DaemonAPI.ControlHost] {
         let states = await router?.hostStates ?? [:]
+        var tunnels: [HostID: DaemonAPI.HostTunnel] = [:]
+        for record in await records.hosts { tunnels[record.id] = await hooks.tunnel(record.id) }
         return await records.hosts.map { record in
             let state = states[record.id] ?? .offline(since: Date())
             var listed = DaemonAPI.ControlHost(id: record.id, name: record.name, platform: record.platform,
@@ -465,6 +469,7 @@ public actor ControlMethods: ControlHandling {
                                                state: ControlRouter.describe(record.id, state)["state"]?.stringValue ?? "offline",
                                                reach: "dialOut", machineID: record.machineID, relay: record.relay)
             listed.signInFrom = record.signInFrom
+            listed.tunnel = tunnels[record.id]
             return listed
         }
     }
