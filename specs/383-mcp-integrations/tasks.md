@@ -222,7 +222,7 @@ real repo, a failing PR yields one `checks.failed` with a stable id.
 
 ### Tests for User Story 3
 
-- [ ] T026 [P] [US3] Create `Integrations/ci-watcher/server.test.ts` with `node:test` against the server in fake mode (`CI_WATCHER_FAKE=fixtures/ci.json`), on a random port. Test:
+- [x] T026 [P] [US3] Create `Integrations/ci-watcher/server.test.ts` with `node:test` against the server in fake mode (`CI_WATCHER_FAKE=fixtures/ci.json`), on a random port. Test:
   - `initialize` capabilities.
   - `events/list` gives both events, `delivery: ["poll"]`, and their schemas.
   - `cursor: null` gives no events and a cursor.
