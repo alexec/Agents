@@ -531,4 +531,37 @@ struct MCPEventWorkflowTests {
         #expect(await lines(s).first?.missedSince == nil)
         #expect(await s.core.mcpRecords().subscriptions.values.first?.missedSince == nil)
     }
+
+    /// The window and the Remote read the summary through its lenient decoder: the lines
+    /// must survive it (found on the T044 walk).
+    @Test func theLinesSurviveTheClientsDecoder() async throws {
+        let s = try await setUp(workflows: [("fix", "  - checks.failed:\n      repo: x")])
+        try await subscribed(s)
+        let summary = try #require(await s.core.allWorkflows(in: s.project).first)
+        let decoded = try JSONDecoder().decode(WorkflowSummary.self, from: JSONEncoder().encode(summary))
+        #expect(decoded.mcpTriggers == summary.mcpTriggers)
+        #expect(decoded.mcpTriggers?.first?.state == .active)
+    }
+
+    /// A trigger without `server:` whose only server waits for approval says so, rather
+    /// than that no server offers it (found on the T044 walk).
+    @Test func aServerWaitingForApprovalIsSaidSo() async throws {
+        let (locations, project) = try temporary()
+        let stand = EventsServerStandIn()
+        try write("  - checks.failed:\n      repo: x", as: "fix", in: project)
+        let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
+                              discovery: .findsEverything, launcher: FakeLauncher())
+        await core.loadFromDisk()
+        await core.beginMCPApprovalsIfNeeded()
+        try writeServers([stand], in: project)
+        await core.rescanWorkflows(in: project)
+        await core.startMCPEvents(http: EventsServerStandIn.route([stand]), sleep: PollClock().sleep)
+        let workflow = try #require(await core.workflow("fix", in: project))
+        let line = try #require(await core.mcpTriggerStatuses(for: workflow)?.first)
+        #expect(line.failure?.code == .waitingForApproval)
+        #expect(line.failure?.message
+            == "ci is waiting for approval in this project's MCP servers, so checks.failed is not asked for yet.")
+        #expect(stand.pollCount() == 0)
+        await core.stopMCPEvents()
+    }
 }

@@ -192,6 +192,7 @@ extension DaemonCore {
                 guard case .serverEvent(let trigger) = trigger else { continue }
                 var triggerLines: [MCPEventsState.Line] = []
                 var unreachable: [String] = []
+                var waiting: [String] = []
                 let named = trigger.servers != nil
                 for name in (trigger.servers ?? names).sorted() {
                     func fixed(_ code: MCPTriggerFailure.Code, _ message: String,
@@ -209,6 +210,7 @@ extension DaemonCore {
                     switch found {
                     case .success(let ready): server = ready
                     case .failure(.waiting):
+                        waiting.append(name)
                         fixed(.waitingForApproval, "\(name) is waiting for approval in this project's MCP servers.")
                         continue
                     case .failure(.missingSecret):
@@ -271,6 +273,18 @@ extension DaemonCore {
                     triggerLines.append(.init(event: trigger.event, server: name, subscription: id))
                     let definitionText = MCPEventTrigger.canonicalJSON(definition.wire)
                     wanted[id]?.fingerprint = definitionText + "\n" + server.entry
+                }
+                if triggerLines.isEmpty, !waiting.isEmpty {
+                    // It may well be offered by a server nobody has approved yet: say that,
+                    // not that no server offers it.
+                    let names = waiting.joined(separator: ", ")
+                    triggerLines.append(.init(event: trigger.event, server: nil, fixed: MCPTriggerStatus(
+                        name: trigger.event, server: nil, state: .stopped,
+                        failure: MCPTriggerFailure(code: .waitingForApproval,
+                                                   message: "\(names) \(waiting.count == 1 ? "is" : "are") waiting for "
+                                                       + "approval in this project's MCP servers, so \(trigger.event) "
+                                                       + "is not asked for yet.",
+                                                   since: at))))
                 }
                 if triggerLines.isEmpty {
                     let guess = EventPatternProblem.closest(to: trigger.event).map { " Did you mean \($0)?" } ?? ""
