@@ -445,6 +445,7 @@ extension DaemonCore {
             nextFireAtByTrigger: runs ? workflow.triggers.map { $0.schedule?.nextDue(after: now) } : [],
             cooldownEndsAt: workflow.cooldownEnds(after: state?.lastFiredAt, now: now),
             holdsAFire: state?.heldFire != nil,
+            queued: state?.queuedFires.count ?? 0,
             offReason: WorkflowState.offReason(workflow, state,
                                                digest: enabled ? nil : workflowDigest(workflow)),
             standingAgentID: standingAgent(of: workflow, state: state),
@@ -653,6 +654,7 @@ extension DaemonCore {
         // Before the guard below, like the blocks above: a fire held across a restart is
         // still owed its one run, and the first tick after starting is when to give it.
         await releaseHeldWorkflowFires(now: now)
+        await releaseQueuedWorkflowFires(now: now)
 
         // Held at once and written at most once a minute (#218): a value that always
         // differs used to rewrite the whole file every fifteen seconds for ever.
@@ -710,7 +712,8 @@ extension DaemonCore {
               triggeringAgentID: UUID? = nil, depth: Int = 0,
               at when: Date? = nil,
               causingEvent: EventPosition? = nil,
-              byHand: Bool = false) async -> WorkflowRefusal? {
+              byHand: Bool = false,
+              fromQueue: Bool = false) async -> WorkflowRefusal? {
         // Before any record. A workflow pinned elsewhere must not fire here, and must
         // not leave a refusal that would look like this computer's own workflow failing.
         guard workflow.runs(on: MachineID.current) else { return nil }
@@ -754,7 +757,15 @@ extension DaemonCore {
             triggeringAgentIsUsable: triggeringAgentIsUsable,
             lastStartedAt: state?.lastFiredAt,
             now: now,
-            byHand: byHand) {
+            byHand: byHand,
+            // The one let out of the queue is its turn, not one more behind the rest.
+            queued: fromQueue ? 0 : state?.queuedFires.count ?? 0) {
+            if case .queued = refusal {
+                // Kept, each with its own cause (#422): every event gets its own run,
+                // told its own data, in the order they came.
+                enqueue(HeldWorkflowFire(trigger: trigger, triggeringAgentID: triggeringAgentID, depth: depth,
+                                         causingEvent: causingEvent, heldAt: now), for: workflow)
+            }
             if case .coolingDown = refusal {
                 // Held rather than dropped (#103): this one replaces any held before it,
                 // so a burst comes to one run with the last of its triggers, which is
@@ -1123,6 +1134,8 @@ extension DaemonCore {
             // put off, and its run says so when it happens.
             guard refusal != .disabled else { return }
             if case .coolingDown = refusal { return }
+            // Nor for one queued behind a run (#422): its run says so when it comes.
+            if case .queued = refusal { return }
             raise(EventDraft(name: "workflow.refused", at: now(), scope: .project(folder: workflow.folder),
                              sentence: "Workflow \(workflow.name) did not run: \(refusal.message).",
                              details: ["workflow": workflow.workflowID, "reason": refusal.code],
@@ -1247,6 +1260,10 @@ extension DaemonCore {
         guard let (key, run) = runInFlight(for: agentID) else { return }
         workflowRuns.removeValue(forKey: key)
         persistWorkflowRuns()
+        // The next in its queue, now rather than at the next tick (#422). Detached for
+        // the reason the chained fires below are; `fire` counts the queue as a run, so
+        // nothing arriving in between goes ahead of it.
+        Task { [weak self] in await self?.releaseQueuedWorkflowFires(now: nil) }
         if let workflow = workflow(run.workflowID, in: run.folder) {
             announceWorkflow(workflow)
         }
@@ -1311,6 +1328,56 @@ extension DaemonCore {
         }
     }
 
+    // MARK: Queues (#422)
+
+    /// Keep this trigger behind the run going now and any already waiting.
+    func enqueue(_ fire: HeldWorkflowFire, for workflow: Workflow) {
+        var records = workflowStore.load()
+        records.update(folder: workflow.folder, workflowID: workflow.workflowID) { $0.queuedFires.append(fire) }
+        keepQuietly("workflow history") { try workflowStore.save(records) }
+    }
+
+    /// Start the oldest queued trigger of each workflow whose run has ended. One each:
+    /// the one started is a run, and the rest wait for it. Queued for a workflow since
+    /// put away, turned off or removed, they are let go, and each event says why.
+    func releaseQueuedWorkflowFires(now when: Date?) async {
+        let now = when ?? self.now()
+        var records = workflowStore.load()
+        var due: [(Workflow, HeldWorkflowFire)] = []
+        var dropped: [(state: WorkflowState, reason: WorkflowRefusal)] = []
+        for state in records.states where !state.queuedFires.isEmpty {
+            guard let workflow = workflows[state.folder]?[state.workflowID] else {
+                dropped.append((state, .unreadable("the workflow's file is gone")))
+                records.update(folder: state.folder, workflowID: state.workflowID) { $0.queuedFires = [] }
+                continue
+            }
+            guard workflow.runs(on: MachineID.current) else { continue }
+            if workflow.isArchived || workflow.isOff {
+                dropped.append((state, workflow.isArchived ? .archived : .disabled))
+                records.update(folder: state.folder, workflowID: state.workflowID) { $0.queuedFires = [] }
+                continue
+            }
+            guard !isRunning(workflow) else { continue }
+            records.update(folder: state.folder, workflowID: state.workflowID) { $0.queuedFires.removeFirst() }
+            due.append((workflow, state.queuedFires[0]))
+        }
+        guard !dropped.isEmpty || !due.isEmpty else { return }
+        keepQuietly("workflow history") { try workflowStore.save(records) }
+        for (state, reason) in dropped { sayQueueDropped(state, reason: reason) }
+        for (workflow, queued) in due {
+            await fire(workflow, on: queued.trigger, triggeringAgentID: queued.triggeringAgentID,
+                       depth: queued.depth, at: now, causingEvent: queued.causingEvent, fromQueue: true)
+        }
+    }
+
+    /// Each event a dropped queue held now says it will not run, in place of "queued".
+    func sayQueueDropped(_ state: WorkflowState, reason: WorkflowRefusal) {
+        for queued in state.queuedFires {
+            guard let position = queued.causingEvent else { continue }
+            addConsequence(.refused(workflowID: state.workflowID, folder: state.folder, reason: reason), to: position)
+        }
+    }
+
     // MARK: What the app asks for
 
     /// Run now.
@@ -1356,7 +1423,17 @@ extension DaemonCore {
             // A held trigger was a trigger, and none run an off workflow.
             if !request.enabled { $0.heldFire = nil }
         }
+        // Queued ones too (#422), each event told so.
+        let dropped = request.enabled ? nil : records.state(folder: request.folder, workflowID: request.workflowID)
+        if dropped != nil {
+            records.update(folder: request.folder, workflowID: request.workflowID) {
+                $0.queuedFires = []
+                // "Queued" would be a promise nothing keeps now.
+                if case .refused(.queued, _, _)? = $0.lastOutcome { $0.lastOutcome = nil }
+            }
+        }
         try keep("this workflow's settings") { try workflowStore.save(records) }
+        if let dropped { sayQueueDropped(dropped, reason: .disabled) }
         return try rereadAfterWrite(workflow)
     }
 
@@ -1382,7 +1459,12 @@ extension DaemonCore {
             $0.lastOutcome = nil
             $0.heldFire = nil
         }
+        let dropped = request.archived ? records.state(folder: request.folder, workflowID: request.workflowID) : nil
+        if dropped != nil {
+            records.update(folder: request.folder, workflowID: request.workflowID) { $0.queuedFires = [] }
+        }
         try keep("this workflow's settings") { try workflowStore.save(records) }
+        if let dropped { sayQueueDropped(dropped, reason: .archived) }
         // The rescan tells every window, and every other workflow in the project:
         // putting a waiting one away lets the next in line be approved (#132).
         return try rereadAfterWrite(workflow)

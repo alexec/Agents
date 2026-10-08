@@ -238,6 +238,8 @@ struct WorkflowMark: View {
         if summary.awaitingApproval != nil { return "hand.raised" }
         if summary.deniedHere != nil { return "hand.raised.slash" }
         if !summary.isEnabled { return "pause.circle" }
+        // Waiting behind a run is not something wrong (#422).
+        if summary.queued > 0 { return "tray.full" }
         if case .refused = summary.lastOutcome { return "exclamationmark.triangle" }
         if summary.nextFireAt != nil { return "clock" }
         return "circle.dotted"

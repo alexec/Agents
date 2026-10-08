@@ -76,9 +76,9 @@ struct WorkflowCooldownTests {
     @Test func aRunStillGoingPastTheCooldownHoldsRatherThanDrops() {
         #expect(refusal(file("15m"), isRunning: true, lastStartedAt: start, now: start.addingTimeInterval(3_600))
             == .coolingDown(until: nil))
-        // Without a cooldown, as before: dropped.
+        // Without a cooldown: queued, each to run on its own (#422).
         let plain = WorkflowFile.parse("---\non:\n  - agent-finished\n---\n\nGo.\n", workflowID: "w", in: project)
-        #expect(refusal(plain, isRunning: true, lastStartedAt: start, now: start.addingTimeInterval(60)) == .runInFlight)
+        #expect(refusal(plain, isRunning: true, lastStartedAt: start, now: start.addingTimeInterval(60)) == .queued)
     }
 
     @Test func runNowIgnoresTheCooldownButNotARunInFlight() {

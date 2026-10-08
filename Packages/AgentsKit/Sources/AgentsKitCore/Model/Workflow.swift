@@ -259,6 +259,9 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     /// Whether a trigger is being held for when the cooldown ends, or the run in flight
     /// does: the one run the fires that arrived meanwhile collapse into.
     public var holdsAFire: Bool
+    /// How many triggers wait behind the run going now (#422), each to run on its own.
+    /// An older host sends none, and has none.
+    public var queued: Int
     /// Why it is off, while it is (#124): what the page says beside the switch, so a
     /// workflow that started off reads as waiting for somebody rather than as broken.
     public var offReason: WorkflowOffReason?
@@ -283,7 +286,7 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
                 deniedHere: WorkflowApproval? = nil,
                 lastFiredAt: Date? = nil, lastFiredBy: WorkflowCause? = nil,
                 nextFireAtByTrigger: [Date?] = [],
-                cooldownEndsAt: Date? = nil, holdsAFire: Bool = false,
+                cooldownEndsAt: Date? = nil, holdsAFire: Bool = false, queued: Int = 0,
                 offReason: WorkflowOffReason? = nil, standingAgentID: UUID? = nil,
                 mcpTriggers: [MCPTriggerStatus]? = nil) {
         self.mcpTriggers = mcpTriggers
@@ -291,6 +294,7 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         self.standingAgentID = standingAgentID
         self.cooldownEndsAt = cooldownEndsAt
         self.holdsAFire = holdsAFire
+        self.queued = queued
         self.nextFireAtByTrigger = nextFireAtByTrigger
         self.awaitingApproval = awaitingApproval
         self.deniedHere = deniedHere
@@ -305,6 +309,15 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         self.nextFireAt = nextFireAt
         self.lastOutcome = lastOutcome
         self.isRunning = isRunning
+    }
+
+    /// What its queue holds, for a row, while it holds anything (#422).
+    public var queuedSentence: String? {
+        switch queued {
+        case 0: return nil
+        case 1: return "1 trigger queued — it runs when this run ends"
+        default: return "\(queued) triggers queued — each runs in turn"
+        }
     }
 
     /// Waiting for approval behind the three a project may have waiting (#132): listed
@@ -390,6 +403,7 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         lastFiredBy = (try? c.decodeIfPresent(WorkflowCause.self, forKey: .lastFiredBy)) ?? nil
         cooldownEndsAt = try c.decodeIfPresent(Date.self, forKey: .cooldownEndsAt)
         holdsAFire = try c.decodeIfPresent(Bool.self, forKey: .holdsAFire) ?? false
+        queued = (try? c.decodeIfPresent(Int.self, forKey: .queued)) ?? 0
         offReason = (try? c.decodeIfPresent(WorkflowOffReason.self, forKey: .offReason)) ?? nil
         standingAgentID = try c.decodeIfPresent(UUID.self, forKey: .standingAgentID)
         // A state or failure this version does not know costs the lines, not the list (#383).

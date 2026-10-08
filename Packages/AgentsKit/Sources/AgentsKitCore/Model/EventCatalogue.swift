@@ -227,10 +227,11 @@ public enum EventCatalogue {
             ($0.code, $0.summary?.lowercased() ?? $0.code)
         })))
 
-    /// The refusals `workflow.refused` is raised for: a workflow turned off or cooling
-    /// down is not news (#100, #103).
+    /// The refusals `workflow.refused` is raised for: a workflow turned off, cooling
+    /// down or queued is not news (#100, #103, #422).
     public static let refusedReasons: [(code: String, words: String)] = [
         ("run_in_flight", WorkflowRefusal.runInFlight.message),
+        ("queue_full", "too many triggers were already queued for it"),
         ("chain_too_deep", "its chain was too deep"),
         ("archived", WorkflowRefusal.archived.message),
         ("over_limit", "over a workflow limit"),
@@ -257,6 +258,7 @@ public enum EventCatalogue {
             + [.starting("this chain is already ", code: "chain_too_deep"),
                .starting("this project already runs its ", code: "over_limit"),
                .starting("this project already has ", code: "over_limit"),
+               .ending(" triggers are already queued for it", code: "queue_full"),
                .ending(" workflows are already running, across every project", code: "over_limit"),
                .ending(" is not something this version can watch for", code: "trigger_not_supported")],
         wording: .codes(Dictionary(uniqueKeysWithValues: refusedReasons.map { ($0.code, $0.words) })))

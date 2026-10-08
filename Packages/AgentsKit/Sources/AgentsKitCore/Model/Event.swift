@@ -44,6 +44,26 @@ public enum Consequence: Codable, Hashable, Sendable {
     case couldNotWake(agentID: UUID, title: String, reason: String)
 }
 
+extension Consequence {
+    /// The workflow it is about, by folder and id, when it is about one.
+    public var workflow: String? {
+        switch self {
+        case .fired(let id, let folder, _), .refused(let id, let folder, _): return folder.path + "/" + id
+        case .woke, .couldNotWake: return nil
+        }
+    }
+
+    /// A fire put off rather than refused: queued behind a run (#422) or held by a
+    /// cooldown (#103). What comes of it later replaces it.
+    public var isWaiting: Bool {
+        guard case .refused(_, _, let reason) = self else { return false }
+        switch reason {
+        case .queued, .coolingDown: return true
+        default: return false
+        }
+    }
+}
+
 /// A named, recorded fact that something happened (042).
 ///
 /// Workflows trigger on these, agents wait on them, and the person reads them. Nothing

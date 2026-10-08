@@ -259,6 +259,7 @@ The deltas are tracked by 29 issues:
 | An unreadable file locks the settings (#179) | `S/WorkflowStatus.swift:144` | `R/Projects/WorkflowPage.swift:296, 333, 510` | `W/views/WorkflowPage.tsx:44` | **same** |
 | Runs only on the hosts it names (#317) | `S/WorkflowHostsSection.swift` on `A/Projects/WorkflowPage.swift`; the list is the host's | The same section on `R/Projects/WorkflowPage.swift` | `W/views/WorkflowPage.tsx`; the list is the host's | **same** |
 | Workflow page: MCP trigger status, a line per server a trigger hears, with Clear on missed events (#383) | `S/MCPTriggerLines.swift` under the triggers on `A/Projects/WorkflowPage.swift`; words in `S/WorkflowStatus.swift` | The same view on `R/Projects/WorkflowPage.swift` | `W/views/WorkflowPage.tsx`, words in `W/model/workflows.ts` | **same** |
+| Triggers queued behind a run (#422): a count on the status card and row, *Queued for* on the event until it fires | `S/WorkflowStatus.swift`, `A/Projects/WorkflowRow.swift`, `S/Events/EventRow.swift` | The same status card and event row; a tray mark on `R/Sidebar/SidebarRows.swift` | `W/model/workflows.ts`, `W/views/Activity.tsx` | **same** |
 | Writing a workflow | None (the author's) | None | None | **same** |
 
 ## Settings and Project Settings

@@ -1,6 +1,7 @@
 import Foundation
 
-/// One trigger a cooldown is holding, with what `fire` needs to run it later.
+/// One trigger a cooldown is holding, or a run in flight has queued (#422), with what
+/// `fire` needs to run it later.
 public struct HeldWorkflowFire: Codable, Hashable, Sendable {
     public var trigger: WorkflowTrigger
     public var triggeringAgentID: UUID?
@@ -85,6 +86,10 @@ public struct WorkflowState: Codable, Hashable, Sendable {
     /// cooling down or running, replaced by each one after it, and run once when the
     /// cooldown ends. Kept here so a restart in between still runs it.
     public var heldFire: HeldWorkflowFire?
+    /// The triggers that came while a run was going, oldest first (#422): each runs on
+    /// its own, with its own cause, once the run before it ends. At most
+    /// `Workflow.queueLimit`; kept here so a restart in between still runs them.
+    public var queuedFires: [HeldWorkflowFire] = []
     /// When this host first saw its project without the file (#218). Cleared when the
     /// file is back; past `WorkflowRecords.goneKept`, the state is let go, so a
     /// workflow deleted for good does not stay in this file for ever. A branch
@@ -110,7 +115,7 @@ public struct WorkflowState: Codable, Hashable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case folder, workflowID, offBy, offDigest, standingAgentID, lastFiredAt, lastFiredBy
-        case lastOutcome, lastCausingEvent, approvedDigest, deniedDigest, heldFire, goneSince
+        case lastOutcome, lastCausingEvent, approvedDigest, deniedDigest, heldFire, queuedFires, goneSince
         // Before #125.
         case isArchived, isDisabled, disabledByAgent, enabledChosen, writtenOffByAgent
     }
@@ -141,6 +146,7 @@ public struct WorkflowState: Codable, Hashable, Sendable {
         approvedDigest = try c.decodeIfPresent(String.self, forKey: .approvedDigest)
         deniedDigest = try c.decodeIfPresent(String.self, forKey: .deniedDigest)
         heldFire = try? c.decodeIfPresent(HeldWorkflowFire.self, forKey: .heldFire)
+        queuedFires = (try? c.decodeIfPresent([HeldWorkflowFire].self, forKey: .queuedFires)) ?? []
         goneSince = try? c.decodeIfPresent(Date.self, forKey: .goneSince)
     }
 
@@ -167,6 +173,7 @@ public struct WorkflowState: Codable, Hashable, Sendable {
         try c.encodeIfPresent(approvedDigest, forKey: .approvedDigest)
         try c.encodeIfPresent(deniedDigest, forKey: .deniedDigest)
         try c.encodeIfPresent(heldFire, forKey: .heldFire)
+        if !queuedFires.isEmpty { try c.encode(queuedFires, forKey: .queuedFires) }
         try c.encodeIfPresent(goneSince, forKey: .goneSince)
     }
 

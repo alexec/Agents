@@ -57,12 +57,18 @@ extension WorkflowSummary {
             if case .ran(let ran, _) = lastOutcome { agentID = ran }
             lines.append(WorkflowStatusLine(symbol: "play.circle", text: "Running now", agentID: agentID))
         }
+        if queued > 0 {
+            lines.append(WorkflowStatusLine(symbol: "tray.full",
+                                            text: queued == 1 ? "1 trigger queued" : "\(queued) triggers queued",
+                                            detail: "Each runs on its own, in the order it came, when the run before it ends"))
+        }
         if let end = cooldownEndsAt {
             lines.append(WorkflowStatusLine(symbol: "hourglass",
                                             text: "Cooling down until \(end.formatted(date: .omitted, time: .shortened))",
                                             detail: holdsAFire ? "A trigger came in meanwhile; it runs once then" : nil))
         }
-        if case .refused = lastOutcome, let outcome = lastOutcome {
+        // Not for one queued: the line above says it, with how many (#422).
+        if case .refused(let refusal, _, _) = lastOutcome, refusal != .queued, let outcome = lastOutcome {
             lines.append(WorkflowStatusLine(symbol: "xmark.circle", text: outcome.summary,
                                             tint: needsAPerson && awaitingApproval == nil && overLimit == nil
                                                 ? .attention : .none))

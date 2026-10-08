@@ -1090,6 +1090,13 @@ struct WebFixturesTests {
                                                      awaitingApproval: WorkflowApproval(digest: "abc", isNew: true))),
             ("refused, sorting itself out", WorkflowSummary(workflow: flow("busy", [.agentFinished]),
                                                             lastOutcome: .refused(.runInFlight, at: Self.base, repeats: 2))),
+            // Queued behind a run (#422): said as a count, and grey.
+            ("running, two queued", WorkflowSummary(workflow: flow("fix-checks", [.agentFinished]),
+                                                    lastOutcome: .refused(.queued, at: Self.base, repeats: 2),
+                                                    isRunning: true, queued: 2)),
+            ("the queue full", WorkflowSummary(workflow: flow("swamped", [.agentFinished]),
+                                               lastOutcome: .refused(.queueFull(limit: Workflow.queueLimit), at: Self.base, repeats: 1),
+                                               isRunning: true, queued: Workflow.queueLimit)),
             ("refused, needing a person", WorkflowSummary(workflow: flow("deep", [.agentFinished]),
                                                           lastOutcome: .refused(.chainTooDeep(depth: 3), at: Self.base, repeats: 1))),
             // Turned off (#100): grey, and so is the refusal it gives a trigger.

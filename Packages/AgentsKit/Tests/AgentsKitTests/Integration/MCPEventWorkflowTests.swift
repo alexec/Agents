@@ -133,6 +133,32 @@ struct MCPEventWorkflowTests {
         #expect(!prompt.contains("payload:"), "the data is in the fence, not among the details")
     }
 
+    /// Two events in one poll are two runs, each told its own data (#422): the second
+    /// waits for the first rather than being refused, as the #383 walk found it.
+    @Test func twoEventsInOnePollAreTwoRunsEachWithItsOwnData() async throws {
+        let s = try await setUp(workflows: [("fix", "  - checks.failed:\n      repo: x")])
+        try await subscribed(s)
+        s.stand.raise("e1", data: ["pr": 7])
+        s.stand.raise("e2", data: ["pr": 8])
+        try await tick(s, polls: 1)
+        try await eventually("both ran") { await fired(s, "fix") == 2 }
+        #expect(await raised(s).allSatisfy { $0.consequences.count == 1 }, "each event says fired, once")
+        var prompts: [String] = []
+        try await eventually("both prompts") {
+            prompts = []
+            for agent in await s.core.allAgents() where agent.startedByWorkflow == "fix" {
+                let page = try await s.core.transcript(.init(agentID: agent.id, before: nil, limit: 50))
+                if let text = page.entries.lazy.compactMap({ entry -> String? in
+                    if case .userMessage(let text, _, _) = entry.kind { return text }
+                    return nil
+                }).first { prompts.append(text) }
+            }
+            return prompts.count == 2
+        }
+        #expect(prompts.contains { $0.contains(#"{"pr":7}"#) })
+        #expect(prompts.contains { $0.contains(#"{"pr":8}"#) })
+    }
+
     /// (b) The same id twice is one run.
     @Test func theSameEventIdTwiceIsOneRun() async throws {
         let s = try await setUp(workflows: [("fix", "  - checks.failed:\n      repo: x")])

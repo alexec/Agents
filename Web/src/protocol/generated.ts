@@ -1803,6 +1803,8 @@ export type WorkflowProblem =
 export type WorkflowRefusal =
   | { chainTooDeep: { depth: number } }
   | { runInFlight: Record<string, never> }
+  | { queued: Record<string, never> }
+  | { queueFull: { limit: number } }
   | { archived: Record<string, never> }
   | { disabled: Record<string, never> }
   | { overLimit: { _0: WorkflowLimit } }
@@ -1871,6 +1873,7 @@ export interface WorkflowSummary {
   lastFiredBy?: WorkflowCause;
   cooldownEndsAt?: WireDate;
   holdsAFire: boolean;
+  queued: number;
   offReason?: WorkflowOffReason;
   standingAgentID?: UUID;
   mcpTriggers?: MCPTriggerStatus[];
@@ -2345,7 +2348,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
   WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort"] },
   WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "hosts"] },
-  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire"], optional: ["overLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
+  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["overLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
   WorkflowsListRequest: { required: [], optional: ["folder"] },
   WorktreeStatus: { required: ["uncommitted"], optional: ["ahead", "behind", "unmerged"] },
   WorktreeSummary: { required: ["name", "root", "isProjectFolder", "exists", "madeByApp", "agents"], optional: ["branch", "status"] },
