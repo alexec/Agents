@@ -2507,6 +2507,39 @@ final class RemoteModel {
         }
     }
 
+    // MARK: Pinned workflows (#432)
+
+    func pinnedWorkflows(in folder: URL?) -> [String] { work.pinnedWorkflows(in: folder) }
+
+    func isPinned(_ summary: WorkflowSummary) -> Bool {
+        pinnedWorkflows(in: summary.folder).contains(summary.workflowID)
+    }
+
+    /// Pin or Unpin from a workflow's menu, swipe or page: shown at once, then the host told.
+    func setPinned(_ summary: WorkflowSummary, _ pinned: Bool) async {
+        let folder = summary.folder
+        let held = pinnedWorkflows(in: folder).filter { $0 != summary.workflowID }
+        work.setWorkflowPins(pinned ? held + [summary.workflowID] : held, in: folder)
+        do {
+            let request = DaemonAPI.WorkflowRequest(folder: folder, workflowID: summary.workflowID)
+            try await client(for: request).call(
+                pinned ? DaemonAPI.Method.pinsPinWorkflow : DaemonAPI.Method.pinsUnpinWorkflow, request)
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
+    /// Move Up or Move Down among the pinned workflows: shown at once, the order sent once.
+    func arrangeWorkflowPins(_ ids: [String], in folder: URL) async {
+        work.setWorkflowPins(ids, in: folder)
+        do {
+            let request = DaemonAPI.PinArrangeWorkflowsRequest(folder: folder, workflowIDs: ids)
+            try await client(for: request).call(DaemonAPI.Method.pinsArrangeWorkflows, request)
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
     // MARK: Driving a workflow
 
     /// Run one now. The Mac still applies the in-flight, ceiling and archive rules and

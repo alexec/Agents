@@ -219,6 +219,16 @@ struct WorkflowPage: View {
                           ? "Turn this workflow off: its triggers stop, and it stays on the list. Writes enabled: false into its file"
                           : "Turn this workflow back on. Takes enabled: false out of its file")
                     .accessibilityLabel("Enabled")
+                // Pinned to the top of its project in the sidebar (#432), as a session can be.
+                let pinned = model.isPinned(summary)
+                Button {
+                    Task { await model.setPinned(summary, !pinned, on: model.selectedProjectHost) }
+                } label: {
+                    Label(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin")
+                }
+                .buttonStyle(.paper)
+                .help(pinned ? "Take this workflow out of Pinned in the sidebar"
+                             : "Keep this workflow in Pinned, at the top of its project in the sidebar")
                 // One click, and back to the project: the same thing the archive
                 // button on a chat does, so putting a thing away is one gesture
                 // wherever it is.

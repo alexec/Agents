@@ -1496,6 +1496,8 @@ extension DaemonCore {
         }
         try keep("this workflow's settings") { try workflowStore.save(records) }
         if let dropped { sayQueueDropped(dropped, reason: .archived) }
+        // Out of Pinned (#432), as an archived session is.
+        if request.archived { unpinArchivedWorkflow(request.workflowID, in: request.folder) }
         // The rescan tells every window, and every other workflow in the project:
         // putting a waiting one away lets the next in line be approved (#132).
         return try rereadAfterWrite(workflow)

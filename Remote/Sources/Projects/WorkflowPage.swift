@@ -57,6 +57,10 @@ struct WorkflowPage: View {
         .refreshable { await model.catchUp() }
         .toolbar {
             if let summary {
+                // Pin or Unpin (#432), beside Archive, as the Mac's page has it.
+                if !summary.isArchived {
+                    ToolbarItem(placement: .topBarTrailing) { PinWorkflowButton(summary: summary) }
+                }
                 ToolbarItem(placement: .topBarTrailing) { archiveButton(summary) }
             }
         }

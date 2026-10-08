@@ -162,6 +162,12 @@ struct SidebarWorkflowRow: View {
         }
         .accessibilityElement(children: .combine)
         .tag(SidebarItem.workflow(summary.id, in: project))
+        // Pin or Unpin (#432), from the leading edge, as a session's row has it.
+        .swipeActions(edge: .leading) {
+            if !summary.isArchived {
+                PinWorkflowButton(summary: summary).tint(Paper.accent)
+            }
+        }
         .swipeActions(edge: .trailing) {
             if summary.isArchived {
                 Button("Bring Back", systemImage: "arrow.uturn.backward") {
@@ -195,6 +201,14 @@ struct SidebarWorkflowRow: View {
                     Button("Run now", systemImage: "play") { Task { await model.runWorkflow(summary) } }
                         .disabled(summary.isRunning)
                 }
+                PinWorkflowButton(summary: summary)
+                if model.isPinned(summary) {
+                    let ids = model.pinnedWorkflows(in: summary.folder)
+                    Button("Move Up", systemImage: "arrow.up") { step(-1, in: ids) }
+                        .disabled(ids.first == summary.workflowID || model.isStale)
+                    Button("Move Down", systemImage: "arrow.down") { step(1, in: ids) }
+                        .disabled(ids.last == summary.workflowID || model.isStale)
+                }
                 Button(summary.isEnabled ? "Turn Off" : "Turn On",
                        systemImage: summary.isEnabled ? "pause.circle" : "play.circle") {
                     Task { await model.setWorkflowEnabled(summary, !summary.isEnabled) }
@@ -202,6 +216,29 @@ struct SidebarWorkflowRow: View {
                 Button("Archive", systemImage: "archivebox") { Task { await model.setWorkflowArchived(summary, true) } }
             }
         }
+    }
+
+    private func step(_ by: Int, in ids: [String]) {
+        var ids = ids
+        guard let index = ids.firstIndex(of: summary.workflowID), ids.indices.contains(index + by) else { return }
+        ids.swapAt(index, index + by)
+        Task { await model.arrangeWorkflowPins(ids, in: summary.folder) }
+    }
+}
+
+/// Pin or Unpin a workflow (#432): in its row's menu, its leading swipe, and its page.
+struct PinWorkflowButton: View {
+    @Environment(RemoteModel.self) private var model
+    let summary: WorkflowSummary
+
+    var body: some View {
+        let pinned = model.isPinned(summary)
+        Button {
+            Task { await model.setPinned(summary, !pinned) }
+        } label: {
+            Label(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin")
+        }
+        .disabled(model.isStale)
     }
 }
 

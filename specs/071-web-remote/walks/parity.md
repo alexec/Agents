@@ -15,11 +15,11 @@
 
 ## Counts
 
-Of 212 rows: **142 same**, **42 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 214 rows: **143 same**, **43 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
-| Sidebar and project list | 8 | 3 | 9 |
+| Sidebar and project list | 8 | 4 | 9 |
 | Session rows and states | 16 | 2 | 5 |
 | Chat turns and turn detail | 22 | 3 | 2 |
 | Prompt bar and queued prompts | 19 | 3 | 0 |
@@ -27,7 +27,7 @@ Of 212 rows: **142 same**, **42 by design**, **28 delta** (after #188, #189, #19
 | Start sheet and new project | 17 | 5 | 0 |
 | Worktrees and Files | 9 | 6 | 6 |
 | Pins | 4 | 1 | 0 |
-| Workflows page | 14 | 1 | 2 |
+| Workflows page | 15 | 1 | 2 |
 | Settings and Project Settings | 1 | 7 | 0 |
 | Pool, runtimes and spending | 7 | 1 | 2 |
 | Events and resources | 2 | 1 | 2 |
@@ -61,6 +61,7 @@ The deltas are tracked by 29 issues:
 | Session groups and their folds, counts and tint when folded (#181) | `A/Projects/ProjectListView.swift:356-397` | The same rules on the project page: `R/Projects/ProjectPageView.swift:94-124` | `W/views/Sidebar.tsx:230-263` | **same** (where the Remote draws them: #226) |
 | Group order: by start, newest first (#182) | `ProjectShelf` | `ProjectShelf` | `W/model/groups.ts` (`byStart`), held to `Fixtures/web/groups/panels.json` | **same** |
 | Pinned sessions (#180) | Pinned group; order by drag: `A/Projects/ProjectListView.swift:383-390` | Move Up / Down in the long press: `R/Projects/AgentCard.swift:209-218` | Move Up / Down in the row menu: `W/views/Sidebar.tsx:339-348` | **by design** (drag on the window; menus where there's no drag) |
+| Pinned workflows (#432) | In the Pinned group after the pinned sessions, out of Workflows; Pin / Unpin in the row's menu, a leading swipe and the page; order by drag: `A/Projects/ProjectListView.swift` (`pinnedSessions`), `A/Projects/ProjectWorkRows.swift` (`WorkflowListRow`), `A/Projects/WorkflowPage.swift` | The same group; Pin / Unpin in the long press, a leading swipe and the page's bar; Move Up / Down in the long press: `R/Sidebar/RemoteSidebar.swift`, `R/Sidebar/SidebarRows.swift` (`PinWorkflowButton`), `R/Projects/WorkflowPage.swift` | The same group; Pin / Unpin and Move Up / Down in the row's ···, Pin / Unpin on the page: `W/views/Sidebar.tsx`, `W/views/WorkflowRow.tsx`, `W/views/WorkflowPage.tsx` | **by design** (drag on the window; menus where there's no drag); unwalked |
 | "No sessions yet" | Only with no live session at all, pinned included: `A/Projects/ProjectListView.swift:319, 452` | n/a | Also under a Pinned group when every live session is pinned: `W/views/Sidebar.tsx:177-179, 264` | **delta**: web #250 |
 | Archived sessions fold | *Archived sessions*, 50, *Show all N* while searching: `A/Projects/ProjectListView.swift:401-441` | *Archived*, 10 at a time: `R/Projects/ProjectPageView.swift:207-234` | As the window: `W/views/Sidebar.tsx:265-283` | **delta**: Remote #226 |
 | Workflows and Archived workflows folds | Siblings: `A/Projects/ProjectWorkRows.swift:33-55` | `R/Projects/WorkflowsSection.swift` | Archived nested inside Workflows: `W/views/Sidebar.tsx:284-314` | **delta**: web #250 |
@@ -251,6 +252,7 @@ The deltas are tracked by 29 issues:
 | Status card (#142) | `A/Projects/WorkflowPage.swift:225-273`, `S/WorkflowStatus.swift` | `R/Projects/WorkflowPage.swift:120-165` | `W/views/WorkflowPage.tsx:83-95` | **same** |
 | An unreadable workflow file | Its text under *The file is below*: `A/Projects/WorkflowPage.swift:211-218` | Its text under *The file is below*: `R/Projects/WorkflowPage.swift` | *Fix its file*: `W/model/workflows.ts:541` | **delta**: web #260 |
 | Triggers, next runs, last ran (#98, #99) | `A/Projects/WorkflowPage.swift:285-452` | `R/Projects/WorkflowPage.swift` | `W/views/WorkflowPage.tsx` | **same** |
+| A workflow run only by hand (#432) | `on: manual` or no `on:`: "By hand, with Run now" on the row, a hand mark, Triggers "None: it runs only by hand", the status line "Runs only by hand": `A/Projects/WorkflowRow.swift`, `A/Projects/WorkflowPage.swift`, `S/WorkflowStatus.swift` | The same words and mark: `R/Sidebar/SidebarRows.swift` (`WorkflowMark`), `R/Projects/WorkflowPage.swift` | The same words, a ☝ mark: `W/model/workflows.ts`, `W/views/WorkflowPage.tsx` | **same**; unwalked |
 | An event trigger's words | Its catalogue meaning | n/a | Catalogue meaning, including “An agent here publishes custom.<name>” | **same** |
 | A server's event trigger's words (#383, #424): *When ci reports checks.failed (repo alexec/Agents)*, or *When a server here reports …* | `MCPEventTrigger.summary` | The same | `serverEventSummary` in `W/model/workflows.ts`, held to `Fixtures/web/workflows/summaries.json` | **same** |
 | Recent runs | Asked of the host, archived included, Show more: `A/Projects/WorkflowPage.swift:848-879` | The same: `R/Projects/WorkflowPage.swift:547-567` | Asked of the host, archived included, 3 then Show more | **same** |

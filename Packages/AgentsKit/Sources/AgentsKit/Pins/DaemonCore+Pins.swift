@@ -4,6 +4,7 @@ import AgentsKitCore
 /// A project's pinned pages (#159): the agents' `pin_page`, `unpin_page` and `move_pin`,
 /// the person's Pin, Unpin and drag, and the pages themselves, read for every screen.
 /// And its pinned sessions (#180): `pin_session`, and the person's Pin, Unpin and drag.
+/// And its pinned workflows (#432): the person's Pin, Unpin and drag, from every client.
 ///
 /// The pins are one file in the project folder, `.agents/pins.json`, written whole and
 /// only here, inside the actor, never in a worktree; nothing is committed.
@@ -110,8 +111,11 @@ extension DaemonCore {
         allProjects(includeArchived: false).compactMap { project in
             let folder = Project.standardize(project.folder)
             let pins = pinViews(folder)
-            let sessions = readPins(folder).sessionPins.map(\.session)
-            return pins.isEmpty && sessions.isEmpty ? nil : ProjectPins(folder: folder, pins: pins, sessions: sessions)
+            let file = readPins(folder)
+            let sessions = file.sessionPins.map(\.session)
+            let workflows = file.workflowPins.map(\.workflow)
+            return pins.isEmpty && sessions.isEmpty && workflows.isEmpty ? nil
+                : ProjectPins(folder: folder, pins: pins, sessions: sessions, workflows: workflows)
         }
     }
 
@@ -297,6 +301,64 @@ extension DaemonCore {
             + lines).joined(separator: "\n")
     }
 
+    // MARK: Pinned workflows (#432)
+
+    /// Pin, from any client: any workflow of the project that is not archived. Only the
+    /// person pins one; no agent tool does.
+    public func pinWorkflowByPerson(_ request: DaemonAPI.WorkflowRequest) throws {
+        let project = try knownPinProject(request.folder)
+        let lead = "Nothing was pinned: "
+        guard let workflow = workflow(request.workflowID, in: project) else {
+            throw pinRefusal(lead + "there is no workflow called \(request.workflowID) in this project.")
+        }
+        guard !workflow.isArchived else { throw pinRefusal(lead + "an archived workflow can't be pinned.") }
+        var file = try readPinsToChange(project)
+        guard !file.workflowPins.contains(where: { $0.workflow == request.workflowID }) else { return }
+        guard file.workflowPins.count < PinLimits.workflowsPerProject else {
+            throw pinRefusal(lead + "this project already has \(PinLimits.workflowsPerProject) pinned workflows, "
+                + "the most it can have. Unpin one first.")
+        }
+        file.workflowPins.append(WorkflowPinEntry(workflow: request.workflowID, pinnedBy: .thePerson))
+        try writePins(file, in: project)
+    }
+
+    /// Unpin, from any client: any pinned workflow.
+    public func unpinWorkflowByPerson(_ request: DaemonAPI.WorkflowRequest) throws {
+        let project = try knownPinProject(request.folder)
+        guard readPins(project).workflowPins.contains(where: { $0.workflow == request.workflowID }) else { return }
+        var file = try readPinsToChange(project)
+        file.workflowPins.removeAll { $0.workflow == request.workflowID }
+        try writePins(file, in: project)
+    }
+
+    /// A drop or a Move item among the pinned workflows: the whole order, as for sessions.
+    public func arrangeWorkflowPins(_ request: DaemonAPI.PinArrangeWorkflowsRequest) throws {
+        let project = try knownPinProject(request.folder)
+        var file = try readPinsToChange(project)
+        var placed: [WorkflowPinEntry] = []
+        for id in request.workflowIDs {
+            if let entry = file.workflowPins.first(where: { $0.workflow == id }), !placed.contains(entry) {
+                placed.append(entry)
+            }
+        }
+        file.workflowPins = placed + file.workflowPins.filter { !placed.contains($0) }
+        try writePins(file, in: project)
+    }
+
+    /// Archiving a workflow unpins it, as archiving a session does; Bring Back does not
+    /// pin it again.
+    func unpinArchivedWorkflow(_ workflowID: String, in folder: URL) {
+        let project = Project.standardize(folder)
+        guard readPins(project).workflowPins.contains(where: { $0.workflow == workflowID }) else { return }
+        do {
+            var file = try readPinsToChange(project)
+            file.workflowPins.removeAll { $0.workflow == workflowID }
+            try writePins(file, in: project)
+        } catch {
+            DaemonLog.shared.write("archived workflow \(workflowID) but could not unpin it: \(error)")
+        }
+    }
+
     // MARK: Changes
 
     /// Something changed under a project: its pins file, a pinned page or one beside it.
@@ -364,9 +426,11 @@ extension DaemonCore {
         pinBroadcasts[project] = nil
         let pins = pinViews(project)
         pinsSent[project] = pins
+        let file = readPins(project)
         broadcast(DaemonAPI.Notification.pinsChanged,
                   DaemonAPI.PinsChangedNotification(folder: project, pins: pins,
-                                                    sessions: readPins(project).sessionPins.map(\.session)))
+                                                    sessions: file.sessionPins.map(\.session),
+                                                    workflows: file.workflowPins.map(\.workflow)))
     }
 
     func pagesChanged(_ project: URL, folders: Set<String>) {
@@ -450,7 +514,7 @@ extension DaemonCore {
     func writePins(_ file: PinsFile, in project: URL) throws {
         let url = Self.pinsFileURL(project)
         do {
-            if file.pins.isEmpty, file.sessionPins.isEmpty, file.unread.isEmpty {
+            if file.isEmpty {
                 try StoreFile.requireWritable(url)
                 if FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) {
                     try FileManager.default.removeItem(at: url)

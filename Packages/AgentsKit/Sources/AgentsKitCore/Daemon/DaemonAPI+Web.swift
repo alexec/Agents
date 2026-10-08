@@ -134,6 +134,11 @@ public extension DaemonAPI {
                 Row(Method.pinsUnpinSession, params: PinSessionRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.pinsArrangeSessions, params: PinArrangeSessionsRequest.self, result: Empty.self,
                     kind: .hostRequest),
+                // And on a workflow (#432).
+                Row(Method.pinsPinWorkflow, params: WorkflowRequest.self, result: Empty.self, kind: .hostRequest),
+                Row(Method.pinsUnpinWorkflow, params: WorkflowRequest.self, result: Empty.self, kind: .hostRequest),
+                Row(Method.pinsArrangeWorkflows, params: PinArrangeWorkflowsRequest.self, result: Empty.self,
+                    kind: .hostRequest),
                 // Turn Off / Turn On (#100), as the window's and the Remote's rows have it.
                 Row(Method.workflowsEnable, params: WorkflowEnableRequest.self, result: WorkflowSummary.self,
                     kind: .hostRequest),

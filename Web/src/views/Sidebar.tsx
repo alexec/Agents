@@ -13,7 +13,7 @@ import { actDoing, type Store } from "../model/store";
 import { folderKey, groupOf, showsUnread } from "../model/groups";
 import { folds } from "../model/folds";
 import { parseQuery, queryMatches } from "../model/labels";
-import { namedRelative, workflowSummary } from "../model/workflows";
+import { namedRelative, workflowNeedsAPerson, workflowSummary } from "../model/workflows";
 import { fromWireDate } from "../protocol/dates";
 import type { Agent, ControlHost, ProjectSummary } from "../protocol/generated";
 import { go, route, type ActivityPage } from "../route";
@@ -242,7 +242,10 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
     .filter((w) => !searching || parsed.label === null && (!parsed.text
       || [w.workflow.name, workflowSummary(w.workflow, runtimeName)].some((t) => t.toLowerCase().includes(parsed.text.toLowerCase()))))
     .sort((a, b) => a.workflow.name.localeCompare(b.workflow.name));
-  const workflows = allWorkflows.filter((w) => !w.isArchived);
+  // The pinned workflows (#432), not archived, in their order, after the pinned sessions; they leave Workflows.
+  const pinnedFlowIDs = store.workflowPinsIn(host.id, folder);
+  const pinnedFlows = pinnedFlowIDs.flatMap((id) => allWorkflows.filter((w) => w.workflow.workflowID === id && !w.isArchived));
+  const workflows = allWorkflows.filter((w) => !w.isArchived && !pinnedFlows.includes(w));
   const archivedWorkflows = allWorkflows.filter((w) => w.isArchived);
   const nameMatches = label.toLowerCase().includes(query.toLowerCase());
   if (searching && groups.length === 0 && archived.length === 0 && allWorkflows.length === 0 && !nameMatches) return null;
@@ -301,19 +304,26 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
               chosen={r.host === host.id && r.project !== undefined && folderKey(r.project) === folderKey(folder) ? r.page : undefined} />
           )}
           {/* Then the pinned sessions (#180), whatever their state, moved by their menus' Move Up and Down. */}
-          {pinned.length > 0 && (
+          {(pinned.length > 0 || pinnedFlows.length > 0) && (
             <details class="group pinned" role="group" aria-label="Pinned" open={showsPinned}
               onToggle={(e) => {
                 const now = (e.currentTarget as HTMLDetailsElement).open;
                 if (!searching && now !== showsPinned) folds.set(host.id, folder, now, "pinned");
               }}>
-              <summary class={`subhead${pinned.some((a) => groupOf(a) === "needsAttention") ? " needs" : ""}`} data-fold="pinned">
-                Pinned <span class="count">{pinned.length}</span>
+              <summary class={`subhead${pinned.some((a) => groupOf(a) === "needsAttention") || pinnedFlows.some(workflowNeedsAPerson) ? " needs" : ""}`} data-fold="pinned">
+                Pinned <span class="count">{pinned.length + pinnedFlows.length}</span>
                 {pinned.some(showsUnread) && <span class="count"> · {pinned.filter(showsUnread).length} unread</span>}
               </summary>
               {showsPinned && pinned.map((agent) => (
                 <SidebarSession key={agent.id} store={store} host={host.id} folder={folder} agent={agent}
                   chosen={r.session === agent.id} down={down} pinnedAt={searching ? undefined : pinnedIDs} />
+              ))}
+              {showsPinned && pinnedFlows.map((summary) => (
+                <div class="nav-item" key={summary.workflow.workflowID}>
+                  <WorkflowRow store={store} host={host.id} summary={summary} disabled={down}
+                    chosen={r.workflow === summary.workflow.workflowID} pinnedAt={searching ? undefined : pinnedFlowIDs}
+                    onPick={() => go({ host: host.id, project: folder, workflow: summary.workflow.workflowID })} />
+                </div>
               ))}
             </details>
           )}

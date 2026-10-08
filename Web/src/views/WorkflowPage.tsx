@@ -116,6 +116,15 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
                   onChange={(e) => void store.setWorkflowEnabled(host, summary, (e.currentTarget as HTMLInputElement).checked)} />
                 Enabled
               </label>
+              {/* Pinned to the top of its project in the sidebar (#432), as the window's page has it. */}
+              {(() => {
+                const pinned = store.workflowPinsIn(host, folder).includes(workflow.workflowID);
+                return (
+                  <button class="archive" disabled={down}
+                    title={pinned ? "Take this workflow out of Pinned in the sidebar" : "Keep this workflow in Pinned, at the top of its project in the sidebar"}
+                    onClick={() => void store.setWorkflowPinned(host, folder, workflow.workflowID, !pinned)}>{pinned ? "Unpin" : "Pin"}</button>
+                );
+              })()}
               <button class="archive" disabled={down} title="Archive this workflow and go back to the project. Writes archived: true into its file"
                 onClick={async () => { await store.setWorkflowArchived(host, summary, true); go({ host, project: folder }); }}>Archive</button>
             </div>

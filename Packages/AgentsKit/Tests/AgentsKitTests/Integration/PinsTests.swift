@@ -382,6 +382,69 @@ struct PinsTests {
         #expect(read.skipped == 4)
     }
 
+    // MARK: Pinned workflows (#432)
+
+    private func writeWorkflow(_ s: Setup, _ id: String) throws {
+        try write(s.project, ".agents/workflows/\(id).md", "---\non: manual\n---\n\nGo.\n")
+    }
+
+    private func pinFlow(_ s: Setup, _ id: String) async throws {
+        try await s.core.pinWorkflowByPerson(DaemonAPI.WorkflowRequest(folder: s.project, workflowID: id))
+    }
+
+    @Test func workflowsArePinnedBesideTheSessionsInTheSameFile() async throws {
+        let s = try await setUp([("Lead", false, nil)])
+        for id in ["release-notes", "triage", "tidy"] { try writeWorkflow(s, id) }
+        await s.core.rescanWorkflows(in: s.project)
+        _ = try await pinSelf(s, "Lead")
+        let sessionsOnly = try Data(contentsOf: s.project.appending(path: PinsFile.path))
+        #expect(!String(decoding: sessionsOnly, as: UTF8.self).contains("workflows"), "a file without them is as it was")
+
+        try await pinFlow(s, "release-notes")
+        try await pinFlow(s, "triage")
+        try await pinFlow(s, "release-notes")
+        #expect(try pinsFile(s).workflowPins.map(\.workflow) == ["release-notes", "triage"])
+        #expect(try pinsFile(s).workflowPins.first?.pinnedBy == .thePerson)
+        #expect(try pinsFile(s).sessionPins.count == 1, "the sessions are untouched")
+        #expect(await s.core.pinsList().first?.workflows == ["release-notes", "triage"])
+
+        try await s.core.arrangeWorkflowPins(DaemonAPI.PinArrangeWorkflowsRequest(
+            folder: s.project, workflowIDs: ["triage", "gone", "release-notes"]))
+        #expect(try pinsFile(s).workflowPins.map(\.workflow) == ["triage", "release-notes"])
+
+        try await s.core.unpinWorkflowByPerson(DaemonAPI.WorkflowRequest(folder: s.project, workflowID: "triage"))
+        #expect(try pinsFile(s).workflowPins.map(\.workflow) == ["release-notes"])
+        let missing = await refusal { try await pinFlow(s, "nothing-here") }
+        #expect(missing == "Nothing was pinned: there is no workflow called nothing-here in this project.")
+    }
+
+    @Test func archivingAWorkflowUnpinsItAndBringingItBackDoesNotPinAgain() async throws {
+        let s = try await setUp([])
+        try writeWorkflow(s, "release-notes")
+        try writeWorkflow(s, "triage")
+        await s.core.rescanWorkflows(in: s.project)
+        try await pinFlow(s, "release-notes")
+        try await pinFlow(s, "triage")
+        _ = try await s.core.archiveWorkflow(DaemonAPI.WorkflowArchiveRequest(
+            folder: s.project, workflowID: "release-notes", archived: true))
+        #expect(try pinsFile(s).workflowPins.map(\.workflow) == ["triage"])
+        let archived = await refusal { try await pinFlow(s, "release-notes") }
+        #expect(archived == "Nothing was pinned: an archived workflow can't be pinned.")
+        _ = try await s.core.archiveWorkflow(DaemonAPI.WorkflowArchiveRequest(
+            folder: s.project, workflowID: "release-notes", archived: false))
+        #expect(try pinsFile(s).workflowPins.map(\.workflow) == ["triage"])
+    }
+
+    @Test func aWorkflowPinReadBackKeepsEachOnceAndUnderTheLimit() throws {
+        let raw = PinsFile(workflows: [WorkflowPinEntry(workflow: "a", pinnedBy: .thePerson),
+                                       WorkflowPinEntry(workflow: "a", pinnedBy: .thePerson)]
+            + (0..<12).map { WorkflowPinEntry(workflow: "w\($0)", pinnedBy: .thePerson) })
+        let read = try PinsFile.read(raw.fileData())
+        #expect(read.file.workflowPins.count == PinLimits.workflowsPerProject)
+        #expect(read.file.workflowPins.first?.workflow == "a")
+        #expect(read.skipped == 4)
+    }
+
     // MARK: Views (#189)
 
     private let testView: JSONValue = ["server": "agents", "uri": "ui://agents/test-view", "tool": "show_test_view",
