@@ -8,8 +8,9 @@ import SwiftUI
 ///   nothing has to reach it. The command carries a one-time host code, and the sheet
 ///   closes by itself when the server joins.
 /// - **Install over ssh**, for a server the person can already ssh to: the control plane
-///   installs the host once with the key given here, and keeps neither the key nor the
-///   session.
+///   installs the host once and keeps neither a key nor the session. The key is optional
+///   when the control plane is on this Mac: its ssh is the person's, with their agent,
+///   config and default identity (#413). One elsewhere has none of those, so needs a key.
 struct ControlAddServerSheet: View {
     @Environment(\.dismiss) private var dismiss
     let control: ControlSettingsModel
@@ -139,13 +140,16 @@ struct ControlAddServerSheet: View {
             GridRow {
                 Text("Key").foregroundStyle(.secondary)
                 HStack {
-                    TextField("~/.ssh/id_ed25519", text: $keyPath).textFieldStyle(.roundedBorder).appText(.code)
+                    TextField(keyOptional ? "Optional" : "~/.ssh/id_ed25519", text: $keyPath)
+                        .textFieldStyle(.roundedBorder).appText(.code)
                         .accessibilityLabel("Key").disabled(working)
                     Button("Choose…") { chooseKey() }.buttonStyle(.paper).disabled(working)
                 }
             }
         }
-        Text("The key is used for this install only. The control plane doesn’t keep it, and afterwards the server connects to the control plane by itself.")
+        Text(keyOptional
+             ? "With no key, ssh logs in as it does from Terminal: your agent, ~/.ssh/config or default key. A key chosen here is used instead, for this install only. Afterwards the server connects to the control plane by itself."
+             : "The control plane runs on another machine, so it needs the key: it is used for this install only and not kept. Afterwards the server connects to the control plane by itself.")
             .appText(.supporting).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         if let fingerprint {
@@ -179,10 +183,13 @@ struct ControlAddServerSheet: View {
                 Button(fingerprint == nil ? "Install" : "Trust and Install") { install() }
                     .buttonStyle(.paperProminent)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(working || destination.trimmingCharacters(in: .whitespaces).isEmpty || keyPath.isEmpty)
+                    .disabled(working || destination.trimmingCharacters(in: .whitespaces).isEmpty || (keyPath.isEmpty && !keyOptional))
             }
         }
     }
+
+    /// Only a control plane on this Mac has the person's ssh to fall back on.
+    private var keyOptional: Bool { control.isOnThisMac }
 
     private var isDone: Bool { if case .added = outcome { true } else { false } }
 
@@ -197,15 +204,18 @@ struct ControlAddServerSheet: View {
         keyPath = url.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
     }
 
-    /// Reads the key now, sends it in the one call, and keeps no copy.
+    /// Reads the key now, if one is named, sends it in the one call, and keeps no copy.
     private func install() {
-        let url = keyURL ?? URL(fileURLWithPath: (keyPath as NSString).expandingTildeInPath)
-        let scoped = url.startAccessingSecurityScopedResource()
-        let key = try? String(contentsOf: url, encoding: .utf8)  // store-ok: a file the person chose in the open panel
-        if scoped { url.stopAccessingSecurityScopedResource() }
-        guard let key, !key.isEmpty else {
-            outcome = .failed("That key could not be read. Choose it with Choose….")
-            return
+        var key: String?
+        if !keyPath.isEmpty {
+            let url = keyURL ?? URL(fileURLWithPath: (keyPath as NSString).expandingTildeInPath)
+            let scoped = url.startAccessingSecurityScopedResource()
+            key = try? String(contentsOf: url, encoding: .utf8)  // store-ok: a file the person chose in the open panel
+            if scoped { url.stopAccessingSecurityScopedResource() }
+            guard let key, !key.isEmpty else {
+                outcome = .failed("That key could not be read. Choose it with Choose….")
+                return
+            }
         }
         working = true
         outcome = nil
