@@ -101,6 +101,8 @@ public final class ControlService: @unchecked Sendable {
     /// The loopback listener's port once it is up, or nil (071).
     public var webPort: Int? { loopback.port == 0 ? nil : loopback.port }
     private var refresher: Task<Void, Never>?
+    /// The reverse tunnels this copy holds for servers behind a bastion (#435).
+    private var tunnels: HostTunnels?
     private var sweeper: Task<Void, Never>?
     /// When the store was last read again to admit a member it didn't know (#174).
     private let readAgainAt = DateBox()
@@ -269,8 +271,21 @@ public final class ControlService: @unchecked Sendable {
             startPairing: { browser in try JSONValue.encoding(try await codes.issue(.client, browser: browser)) },
             startEnroll: { try JSONValue.encoding(try await codes.issue(.host)) })
         hooks.changed = { [weak self] event in await self?.announce(event) }
+        // Reverse tunnels for servers behind a bastion (#435): held by a single copy only,
+        // whose ssh is the person's on this machine; the same holder when taken up again.
+        let tunnels: HostTunnels? = self.tunnels ?? (mesh == nil ? HostTunnels(
+            store: configuration.store, executable: HostInstall.sshExecutable,
+            environment: HostInstall.environment(keepAgent: true),
+            hosts: { [methods] in await methods.allHosts },
+            changed: { [router = self.router] change in
+                await router.broadcastControl(DaemonAPI.Notification.controlTunnelChanged,
+                                              (try? JSONValue.encoding(change)) ?? [:])
+            },
+            log: { [weak self] in self?.log($0) }) : nil)
+        self.tunnels = tunnels
         // hosts/install (T072): once over ssh with the key given, then the host is on its own.
-        let install = HostInstall(codes: codes, servers: ServerFiles.folder()) { [router = self.router] name, step in
+        let install = HostInstall(codes: codes, servers: ServerFiles.folder(),
+                                  tunnels: tunnels.map { ($0, configuration.port) }) { [router = self.router] name, step in
             await router.broadcastControl(DaemonAPI.Notification.controlInstallProgress,
                                           ["name": .string(name), "step": .string(step)])
         }
@@ -278,11 +293,13 @@ public final class ControlService: @unchecked Sendable {
         // hosts/detect (#429): the servers in the ssh config that answer, installed the same way.
         let detect = HostDetect(installer: install) { [methods] in await methods.allHosts.map(\.name) }
         hooks.detect = { try JSONValue.encoding(await detect.run()) }
+        hooks.tunnel = { host in await tunnels?.state(for: host) }
         // Notices (T097): a need goes to the relay host, wherever it is held.
         hooks.need = { [weak self] _, params in await self?.heard(params) }
         hooks.relayChanged = { [weak self] _ in await self?.syncRelays() }
         hooks.clientsChanged = { [weak self] _ in await self?.tellRelayDevices() }
         await methods.setHooks(hooks)
+        await tunnels?.start()
         await readiness.set(true)
 
         // Leases (T063): a host whose uplink ends here, or whose lease another copy took.
@@ -325,6 +342,7 @@ public final class ControlService: @unchecked Sendable {
     public func stop() async {
         refresher?.cancel()
         sweeper?.cancel()
+        await tunnels?.stop()
         await leases.stop()
         await mesh?.stop()
         for server in servers { try? await server.close() }
@@ -933,6 +951,14 @@ public actor ControlCodes {
     /// or `agents-control code`.
     public func issue(_ purpose: ControlCode.Purpose, lifetime: TimeInterval = ControlCode.lifetime,
                       browser: Bool = false) async throws -> DaemonAPI.ControlCodeShown {
+        try await issue(purpose, lifetime: lifetime, browser: browser, url: url).shown
+    }
+
+    /// A code that carries another address than the control plane's own, with its id: a
+    /// server behind a bastion dials `https://127.0.0.1:<port>`, its end of a reverse
+    /// tunnel (#435), and the tunnel learns which host it carries from the code's spend.
+    func issue(_ purpose: ControlCode.Purpose, lifetime: TimeInterval = ControlCode.lifetime, browser: Bool = false,
+               url: String) async throws -> (shown: DaemonAPI.ControlCodeShown, id: String) {
         let (id, secret) = ControlAuth.makeCodeSecret(controlPrivateKey: privateKey)
         let expires = Date().addingTimeInterval(lifetime)
         let stored: Stored = switch purpose {
@@ -942,7 +968,7 @@ public actor ControlCodes {
         _ = try await store.put(Self.key(id), try ControlRecords.encoder.encode(stored), when: .absent)
         let code = ControlCode(purpose: purpose, controlKey: publicKey, secret: secret, url: url, pin: pin, name: name)
         let command: String? = if case .host = purpose { HostInstallScript.command(url: url, pin: pin, code: code.text) } else { nil }
-        return DaemonAPI.ControlCodeShown(text: code.text, expires: expires, command: command)
+        return (DaemonAPI.ControlCodeShown(text: code.text, expires: expires, command: command), id)
     }
 
     /// Who spent a code, and as what (#212), so the same join tried again while the code
