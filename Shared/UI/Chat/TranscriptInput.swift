@@ -24,8 +24,9 @@ import AppKit
 ///
 /// The transcript never holds the focus — a click on it leaves the focus where it was,
 /// usually the sidebar — so the keys are taken from the window as they arrive, before the
-/// sidebar's list can read ⌘↑ as a move to the session above. Not while a text field or
-/// editor has the focus: the prompt and the search field keep their own keys.
+/// sidebar's list can read ⌘↑ as a move to the session above. Not while a text field,
+/// editor or terminal has the focus: the prompt, the search field and the shell keep their
+/// own keys.
 private struct TranscriptInput: ViewModifier {
     let key: (TranscriptKey) -> Void
     let hand: (TranscriptHand) -> Void
@@ -74,8 +75,9 @@ private struct TranscriptInput: ViewModifier {
     }
 
     private static func key(for event: NSEvent, responder: NSResponder?) -> TranscriptKey? {
-        // The field editor and every text view are NSText: the prompt, the search field.
-        if responder is NSText { return nil }
+        // Whatever takes typing keeps every key: the field editor and text views (the
+        // prompt, the search field) and a terminal (#482), all NSTextInputClient.
+        if responder is NSText || responder is NSTextInputClient { return nil }
         let modifiers = event.modifierFlags.intersection([.command, .shift, .option, .control])
         switch (event.keyCode, modifiers) {
         case (116, []): return .pageUp
