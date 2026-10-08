@@ -400,4 +400,135 @@ struct MCPEventWorkflowTests {
         #expect(first.stand.polls.last?.cursor != nil)
         _ = second
     }
+
+    // MARK: User Story 5
+
+    private func lines(_ s: Setup, _ workflowID: String = "fix") async -> [MCPTriggerStatus] {
+        await s.core.allWorkflows(in: s.project).first { $0.workflowID == workflowID }?.mcpTriggers ?? []
+    }
+
+    /// Unreachable is retrying, waiting 10 s, 20 s, 40 s; back again is active by itself.
+    @Test func anUnreachableServerIsRetriedWithBackoffAndRecovers() async throws {
+        let s = try await setUp(workflows: [("fix", "  - checks.failed:\n      repo: x")])
+        try await subscribed(s)
+        #expect(await lines(s).first?.state == .active)
+        s.stand.goDown()
+        for expected in [10, 20, 40] {
+            s.clock.tick()
+            try await eventually("waits \(expected) s") { s.clock.asked.last == .seconds(expected) && s.clock.sleeping > 0 }
+        }
+        let down = try #require(await lines(s).first)
+        #expect(down.state == .retrying)
+        #expect(down.failure?.code == .unreachable)
+        #expect(down.failure?.message.hasPrefix("Can't reach ci") == true)
+        #expect(down.retryAt != nil)
+        s.stand.recover()
+        try await tick(s, polls: 1)
+        try await eventually("active again") { await lines(s).first?.state == .active }
+        #expect(await lines(s).first?.failure == nil)
+    }
+
+    @Test func notFoundAndForbiddenStopPolling() async throws {
+        for (code, expected) in [(-32011, MCPTriggerFailure.Code.eventNotOffered), (-32012, .refused)] {
+            let s = try await setUp(workflows: [("fix", "  - checks.failed:\n      repo: x")])
+            try await subscribed(s)
+            s.stand.fail(code: code, message: "no")
+            s.clock.tick()
+            try await eventually("stopped") { await lines(s).first?.state == .stopped }
+            #expect(await lines(s).first?.failure?.code == expected)
+            let polls = s.stand.pollCount()
+            s.clock.tick()
+            try await Task.sleep(for: .milliseconds(100))
+            #expect(s.stand.pollCount() == polls, "no more polls")
+            await s.core.stopMCPEvents()
+        }
+    }
+
+    @Test func aStoppedSubscriptionStartsAgainWhenItsFileChanges() async throws {
+        let s = try await setUp(workflows: [("fix", "  - checks.failed:\n      repo: x")])
+        try await subscribed(s)
+        s.stand.fail(code: -32012, message: "no")
+        s.clock.tick()
+        try await eventually("stopped") { await lines(s).first?.state == .stopped }
+        s.stand.recover()
+        try write("  - checks.failed:\n      repo: x", as: "fix", extra: "cooldown: 5m\n", in: s.project)
+        await s.core.rescanWorkflows(in: s.project)
+        try await eventually("active again") {
+            s.clock.tick()
+            return await lines(s).first?.state == .active
+        }
+    }
+
+    @Test func rateLimitedHonoursRetryAfter() async throws {
+        let s = try await setUp(workflows: [("fix", "  - checks.failed:\n      repo: x")])
+        try await subscribed(s)
+        s.stand.fail(code: -32013, data: ["retryAfterMs": 120_000], once: true)
+        s.clock.tick()
+        try await eventually("waits as asked") { s.clock.asked.last == .seconds(120) && s.clock.sleeping > 0 }
+        #expect(await lines(s).first?.state == .retrying)
+    }
+
+    @Test func schemaChangedListsAgain() async throws {
+        let s = try await setUp(workflows: [("fix", "  - checks.failed:\n      repo: x")])
+        try await subscribed(s)
+        let lists = s.stand.listCount
+        s.stand.fail(code: -32014, message: "changed", data: ["reason": "schema_changed"], once: true)
+        s.clock.tick()
+        try await eventually("listed again") { s.stand.listCount > lists }
+    }
+
+    @Test func noServerOfferingItIsOneLineWithAGuess() async throws {
+        let s = try await setUp(workflows: [("fix", "  - brnch.moved")])
+        try await eventually("a line") { await !lines(s).isEmpty }
+        let line = try #require(await lines(s).first)
+        #expect(await lines(s).count == 1)
+        #expect(line.server == nil)
+        #expect(line.state == .stopped)
+        #expect(line.failure?.code == .serverNotFound)
+        #expect(line.failure?.message == "No server here offers brnch.moved. Did you mean branch.moved?")
+    }
+
+    @Test func aNamedServerNotOfferingItHasItsOwnLine() async throws {
+        let a = EventsServerStandIn(name: "a")
+        let b = EventsServerStandIn(name: "b", events: [EventsServerStandIn.prMerged])
+        let s = try await setUp([a, b], workflows: [("fix", "  - checks.failed:\n      server: [a, b]\n      repo: x")])
+        try await subscribed(s, stands: [a])
+        let all = await lines(s)
+        #expect(all.map(\.server) == ["a", "b"])
+        #expect(all[0].state == .active)
+        #expect(all[1].failure?.code == .eventNotOffered)
+        #expect(all[1].failure?.message == "b doesn't offer checks.failed; it offers pr.merged.")
+        #expect(b.pollCount() == 0)
+    }
+
+    @Test func linesAreInFileOrderThenByServer() async throws {
+        let a = EventsServerStandIn(name: "a", events: [EventsServerStandIn.checksFailed, EventsServerStandIn.prMerged])
+        let b = EventsServerStandIn(name: "b")
+        let s = try await setUp([a, b], workflows: [("fix", """
+              - pr.merged:
+                  server: a
+              - checks.failed:
+                  repo: x
+            """)])
+        try await subscribed(s)
+        try await eventually("three lines") { await lines(s).count == 3 }
+        let all = await lines(s)
+        #expect(all.map(\.name) == ["pr.merged", "checks.failed", "checks.failed"])
+        #expect(all.map(\.server) == ["a", "a", "b"])
+    }
+
+    /// T036: Clear takes the missed-events mark off the line.
+    @Test func clearTakesOffTheMissedMark() async throws {
+        let s = try await setUp(workflows: [("fix", "  - checks.failed:\n      repo: x")])
+        try await subscribed(s)
+        s.stand.truncateNextPoll()
+        try await tick(s, polls: 1)
+        try await eventually("marked") { await lines(s).first?.missedSince != nil }
+        let params = try JSONValue.encoding(DaemonAPI.WorkflowMCPClearMissedRequest(
+            folder: s.project, workflowID: "fix", name: "checks.failed", server: "ci"))
+        let answer = await s.core.handle(method: DaemonAPI.Method.workflowsClearMCPMissed, params: params)
+        guard case .success = answer else { Issue.record("refused: \(answer)"); return }
+        #expect(await lines(s).first?.missedSince == nil)
+        #expect(await s.core.mcpRecords().subscriptions.values.first?.missedSince == nil)
+    }
 }
