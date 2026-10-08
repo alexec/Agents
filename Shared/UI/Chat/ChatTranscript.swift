@@ -101,6 +101,33 @@ struct ChatTranscript: View {
     /// entry's id. The next id that is still there is the line they were reading.
     @State private var restoreIDs: [UUID] = []
     @State private var restoreFollowing = false
+    /// How the pane last moved, and the turn at its top: read on every scroll, so kept
+    /// where writing them does not draw the pane again.
+    @State private var motion = Motion()
+    /// The turn to go back to in a conversation opened again, until it is drawn (#378).
+    @State private var restoreTurn: UUID?
+    @State private var restorePages = 0
+    @State private var isRestoreLoading = false
+    /// Asks for another try once a page has come, from a pass that holds the new rows.
+    @State private var restoreTick = 0
+    /// Whether the conversation's first page is in hand since it was chosen.
+    @State private var hasFirstPage = false
+
+    private final class Motion {
+        /// Whether the hand last moved the pane down it, rather than up.
+        var wentDown = false
+        /// Where the pane was when a finger went down on it, and where it is.
+        var handStart: CGFloat = 0
+        var offset: CGFloat = 0
+        /// The first turn on screen, for coming back to this conversation.
+        var topTurn: UUID?
+        /// Which conversation the pane holds, to say where it was left.
+        var key: UUID?
+        /// How far down the conversation the pane last was.
+        var fromTop: CGFloat = .infinity
+        /// The turns on screen, top first: what a key pages from.
+        var shown: [UUID] = []
+    }
 
     /// Send now is for a turn that is running, on a runtime that said it takes words
     /// mid-turn. Starting is not running: there is no turn yet to send them into.
@@ -170,6 +197,17 @@ struct ChatTranscript: View {
                 // one place (FR-021).
                 .chatColumn()
                 .padding(.vertical, 20)
+                .scrollTargetLayout()
+            }
+            // Hidden while it pages back to where the reader left it, so the end does not
+            // show first and then jump (#378).
+            .opacity(restoreTurn == nil ? 1 : 0)
+            .onScrollTargetVisibilityChange(idType: UUID.self, threshold: 0.01) { visible in
+                guard settleKey == motion.key else { return }
+                let visible = Set(visible)
+                motion.shown = rows.lazy.map(\.id).filter(visible.contains)
+                motion.topTurn = motion.shown.first
+                rememberPlace()
             }
             // Open at the foot. A lazy stack built from the top and then jumped to the
             // end placed the rows it made on the way (the accessibility tree had them,
@@ -179,6 +217,11 @@ struct ChatTranscript: View {
             // that did not survive the jump. Only where it opens: a transcript shorter
             // than the pane still sits at the top of it.
             .defaultScrollAnchor(.bottom, for: .initialOffset)
+            // And held there as it grows, while following: the scroll view keeps the foot
+            // where it is as rows are measured, rather than a move asked for from an estimate
+            // of where the foot will be (#378). Reading back, nothing holds the foot.
+            .defaultScrollAnchor(isFollowing ? .bottom : nil, for: .sizeChanges)
+            .transcriptInput(key: { read($0, scroller) }, hand: hand)
             // The text stops above the floating prompt, and so does the scrollbar.
             // Insetting the content alone left the bar running the whole height of the
             // pane and disappearing under the glass, where it could be neither read nor
@@ -205,26 +248,52 @@ struct ChatTranscript: View {
                       fromBottom: max(0, geometry.contentSize.height - geometry.visibleRect.maxY),
                       canScroll: geometry.contentSize.height > geometry.containerSize.height + 1,
                       height: geometry.containerSize.height,
-                      contentHeight: geometry.contentSize.height)
-            } action: { _, edges in
+                      contentHeight: geometry.contentSize.height,
+                      offset: geometry.contentOffset.y,
+                      pastTheEnd: geometry.contentOffset.y - (geometry.contentSize.height
+                          + geometry.contentInsets.bottom - geometry.containerSize.height))
+            } action: { was, edges in
+                // Another conversation chosen, and not yet settled into: what the pane
+                // measures is the old one emptied or the new one arriving, and says nothing
+                // about where the reader is. Taken for the end, it once resumed following and
+                // lost the place they were leaving (#378).
+                guard settleKey == motion.key else { return }
                 onHeight?(edges.height)
+                motion.fromTop = edges.fromTop
+                motion.offset = edges.offset
+                // Near the top, the page above. How far down the pane is does not depend
+                // on the content's height, so it is asked for whatever that reads.
+                if edges.contentHeight > 1, edges.fromTop < 400 { askForEarlier() }
                 // A lazy stack's content size can collapse to the rows it has made
                 // for the length of a flick. Even when that sample still exceeds the
-                // viewport, treating it as a real shorter page can resume following
-                // or ask for an earlier page. Keep the tallest reliable measurement
-                // and ignore a sample that falls materially below it.
-                let collapsed = trustedContentHeight > edges.height + 80
+                // viewport, treating it as a real shorter page can resume following.
+                // Keep the tallest measurement while their hand is on it, and ignore a
+                // sample that falls materially below it.
+                //
+                // Only then. Outside a flick a shorter page is a real one — the front let
+                // go while following, an estimate settled — and holding the tallest ever
+                // seen took every later sample for a collapse: the pane stopped following
+                // short of the end and never asked for the page above (#378).
+                let collapsed = isUserScrolling && trustedContentHeight > edges.height + 80
                     && edges.contentHeight < trustedContentHeight - 80
                 if collapsed {
-                    // Their hand is on it and the measurement cannot be believed.
-                    // Stop following now; the honest sample arrives as they let go,
-                    // and waiting for it is how a flick ends at the foot.
-                    if isUserScrolling { isFollowing = false }
+                    // The measurement cannot be believed. Stop following now; the honest
+                    // sample arrives as they let go, and waiting for it is how a flick
+                    // ends at the foot.
+                    isFollowing = false
                     return
                 }
-                trustedContentHeight = max(trustedContentHeight, edges.contentHeight)
+                trustedContentHeight = isUserScrolling
+                    ? max(trustedContentHeight, edges.contentHeight) : edges.contentHeight
                 canScroll = edges.canScroll
-                guard !isLoadingEarlier else { return }
+                guard !isLoadingEarlier, restoreTurn == nil else { return }
+                // A finger on the pane that has moved it up, by any amount, ends following at
+                // once (#378); one that has moved it down is on its way back. A wheel says so
+                // itself (`hand`), and so do the keys.
+                if isUserScrolling, hasSettled {
+                    if edges.offset < motion.handStart - 4 { hand(.up) }
+                    else if edges.offset > motion.handStart + 4 { motion.wentDown = true }
+                }
                 // Geometry moves for two reasons: the reader scrolled, or the
                 // conversation grew. Only the first may end follow mode. Reading the
                 // distance on its own got this wrong — a new line puts the end below the
@@ -235,21 +304,15 @@ struct ChatTranscript: View {
                 if isUserScrolling, edges.fromBottom > leftTheEnd {
                     isFollowing = false
                 }
-                // A move up the page that is not the page growing. The scroll
-                // phase is not always delivered for it — a wheel tick can land
-                // while the phase is idle — and without this the foot is pinned
-                // again the moment the hand lets go, which is the jump.
-                if let pinned = lastPinnedHeight, let was = lastPinnedDistance,
-                   abs(edges.contentHeight - pinned) < 0.5,
-                   edges.fromBottom > was + leftTheEnd {
-                    isFollowing = false
-                }
                 // Back at the foot under their own steam. Generous on the way in and
                 // strict on the way out: following again a moment early is a small
                 // wrong, and being left behind a live conversation is the bug.
                 // Not while their hand is still on it: one frame of a flick reads as
                 // the end, and resuming follow then pulls them there as they let go.
-                if !isUserScrolling, edges.fromBottom < atTheEnd {
+                // On the way down, or right at it: a reader a few points up from the end
+                // stays where they put themselves (#378).
+                if !isUserScrolling, edges.fromBottom < atTheEnd, motion.wentDown || edges.pastTheEnd > -1 {
+                    motion.wentDown = false
                     isFollowing = true
                     hasNewBelow = false
                     lastPinnedDistance = 0
@@ -274,12 +337,19 @@ struct ChatTranscript: View {
                 // shrinks. A distance that stays put — the top bar, counted as though
                 // it were content below the fold — used to be chased on every tick,
                 // and the pane bounced.
-                if isFollowing, !isUserScrolling, edges.fromBottom > 1 {
+                //
+                // Short of the furthest the pane can rest, not merely with the end somewhere in
+                // the pane: the foot of the pane is under the prompt, and an end that had only
+                // reached the glass was left there, the last lines unread (#378).
+                if isFollowing, !isUserScrolling, edges.pastTheEnd < -1 {
                     let grown = edges.contentHeight != lastPinnedHeight
-                    let closer = lastPinnedDistance.map { edges.fromBottom < $0 - 0.5 } ?? true
-                    if grown || closer {
+                    // Again whenever the distance changes, not only when it shrinks: the
+                    // stack can throw the pane back up as it measures, and no hand did that.
+                    // A distance that stays put is not chased, or the pane bounces.
+                    let moved = lastPinnedDistance.map { abs(-edges.pastTheEnd - $0) > 0.5 } ?? true
+                    if grown || moved {
                         lastPinnedHeight = edges.contentHeight
-                        lastPinnedDistance = edges.fromBottom
+                        lastPinnedDistance = -edges.pastTheEnd
                         place(scroller, on: bottom, anchor: .bottom)
                     }
                 }
@@ -287,7 +357,7 @@ struct ChatTranscript: View {
                 // many entries it took, so a page can come back shorter than the
                 // pane. Nothing to scroll means nothing would ever ask for the rest,
                 // so a page that does not fill the pane asks for another itself.
-                if edges.contentHeight > 1, edges.fromTop < 400 || !edges.canScroll {
+                if edges.contentHeight > 1, !edges.canScroll {
                     askForEarlier()
                 }
             }
@@ -296,8 +366,14 @@ struct ChatTranscript: View {
             // neither is a reason to stop following.
             .onScrollPhaseChange { _, phase in
                 switch phase {
-                case .tracking, .interacting, .decelerating: isUserScrolling = true
-                default: isUserScrolling = false
+                case .tracking, .interacting:
+                    if !isUserScrolling { motion.handStart = motion.offset }
+                    isUserScrolling = true
+                case .decelerating: isUserScrolling = true
+                default:
+                    isUserScrolling = false
+                    // A flick that ended at the top may leave nothing more to measure.
+                    if motion.fromTop < 400 { askForEarlier() }
                 }
             }
             .onChange(of: entryCount) { before, after in
@@ -305,14 +381,18 @@ struct ChatTranscript: View {
                 // foot, if they were following it. Doing it here rather than in the
                 // load is what makes the rows exist to hold: the load's own view
                 // value still has the page from before.
+                if after > 0 { hasFirstPage = true }
                 if isLoadingEarlier, after != before { holdPlace(scroller) }
+                if restoreTurn != nil { restore(scroller); return }
                 // Nothing here moves the pane otherwise; the geometry does that. This
                 // is only the word to the reader who is not watching. Loading earlier
                 // adds to the top, and that must not read as something new having arrived.
-                guard after > before, !isLoadingEarlier, !isFollowing else { return }
+                guard after > before, !isLoadingEarlier, restoreTurn == nil, !isFollowing else { return }
                 hasNewBelow = true
             }
             .task(id: settleKey) { await settle(scroller) }
+            .onChange(of: restoreTurn) { _, now in if now != nil { restore(scroller) } }
+            .onChange(of: restoreTick) { restore(scroller) }
             // Asked for from elsewhere. A message entry is drawn with its own id, so
             // this lands on it.
             .onChange(of: focusedEntry) {
@@ -329,7 +409,10 @@ struct ChatTranscript: View {
                 clearFocus()
             }
             .onChange(of: scrollToEndToken) { goToEnd(scroller) }
-            .onChange(of: isFollowing) { _, now in onFollowing(now) }
+            .onChange(of: isFollowing) { _, now in
+                onFollowing(now)
+                rememberPlace()
+            }
             // Nobody is reading a chat that is not on screen, so it may be trimmed again.
             .onDisappear { onFollowing(true) }
             // The floor rose: a question or a permission card appeared above the
@@ -399,6 +482,45 @@ struct ChatTranscript: View {
         }
     }
 
+    /// A key that moves the pane, a turn at a time being what the pane can be sent to: a
+    /// pane down puts the last turn on screen at the top, a pane up puts the first at the
+    /// foot. Going up is reading back, and ends following as a hand would.
+    private func read(_ key: TranscriptKey, _ scroller: ScrollViewProxy) {
+        let ids = rows.map(\.id)
+        let shown = motion.shown
+        func go(_ id: UUID, _ anchor: UnitPoint) {
+            withAnimation(.easeOut(duration: 0.2)) { scroller.scrollTo(id, anchor: anchor) }
+        }
+        switch key {
+        case .end:
+            goToEnd(scroller)
+        case .top:
+            isFollowing = false
+            if let first = ids.first { go(first, .top) }
+        case .pageUp:
+            guard let first = shown.first, let at = ids.firstIndex(of: first) else { return }
+            isFollowing = false
+            // One turn taller than the pane: the one above it, so the key still moves.
+            if shown.count > 1 { go(first, .bottom) } else if at > 0 { go(ids[at - 1], .bottom) } else { go(first, .top) }
+        case .pageDown:
+            guard let last = shown.last, let at = ids.firstIndex(of: last) else { return }
+            if shown.count > 1 { go(last, .top) } else if at + 1 < ids.count { go(ids[at + 1], .top) } else { goToEnd(scroller) }
+        }
+    }
+
+    /// A hand moved the pane. Up it, by any amount, is reading back: following ends at
+    /// once, and nothing that arrives moves the pane after that (#378).
+    private func hand(_ way: TranscriptHand) {
+        switch way {
+        case .up:
+            guard hasSettled, canScroll else { return }
+            isFollowing = false
+            motion.wentDown = false
+        case .down:
+            motion.wentDown = true
+        }
+    }
+
     private func goToEnd(_ scroller: ScrollViewProxy) {
         hasNewBelow = false
         isFollowing = true
@@ -429,6 +551,10 @@ struct ChatTranscript: View {
         var canScroll: Bool
         var height: CGFloat
         var contentHeight: CGFloat
+        /// Where the pane is scrolled to, and how far past the furthest it can rest at
+        /// (negative short of it, positive in a bounce).
+        var offset: CGFloat
+        var pastTheEnd: CGFloat
     }
 
     /// Move without animating. An animated move restarts on the next fragment, which
@@ -443,6 +569,11 @@ struct ChatTranscript: View {
     /// Open at the end, the way every chat does, and only then let reaching the top
     /// mean something.
     private func settle(_ scroller: ScrollViewProxy) async {
+        motion.key = settleKey
+        motion.topTurn = nil
+        motion.wentDown = false
+        restoreTurn = nil
+        restorePages = 0
         turnViews = [:]
         fetchedTurns = [:]
         fetchedOrder = []
@@ -458,15 +589,67 @@ struct ChatTranscript: View {
         // The first page arrives a moment after the selection does. Waiting for it
         // rather than guessing at a delay is what keeps a big transcript from
         // opening halfway up itself.
+        //
+        // Told by `entryCount` changing, and read from state: this task holds the view as
+        // it was when the conversation was chosen, so its own `entryCount` never moved,
+        // and every open waited out the whole deadline at the top of the page (#378).
+        hasFirstPage = entryCount > 0
         let deadline = ContinuousClock.now.advanced(by: .seconds(3))
-        while entryCount == 0, ContinuousClock.now < deadline, !Task.isCancelled {
+        while !hasFirstPage, ContinuousClock.now < deadline, !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(30))
         }
         guard !Task.isCancelled else { return }
+        // Read back through before, and left there: back to that turn (#378).
+        if let key = settleKey, let turn = Self.readingPlaces[key] {
+            isFollowing = false
+            restoreTurn = turn
+            return
+        }
         place(scroller, on: bottom, anchor: .bottom)
         try? await Task.sleep(for: .milliseconds(400))
         guard !Task.isCancelled else { return }
         hasSettled = true
+    }
+
+    /// Where the reader was in each conversation they left, by conversation: the turn at the
+    /// top of the pane, or nothing if they were following the end (#378). For the life of
+    /// the app, as the window's other choices for a chat are. Kept as they move rather than
+    /// as they leave: by the time the pane hears it has been left, it holds the next one.
+    @MainActor private static var readingPlaces: [UUID: UUID] = [:]
+
+    private func rememberPlace() {
+        guard let key = motion.key, hasSettled, restoreTurn == nil else { return }
+        Self.readingPlaces[key] = isFollowing ? nil : motion.topTurn
+    }
+
+    /// Back to the turn the reader left this conversation on. It opens on its last page, so
+    /// the pages before come in until that turn is in hand; if it never is, the end.
+    private func restore(_ scroller: ScrollViewProxy) {
+        guard let turn = restoreTurn, !isRestoreLoading else { return }
+        if rows.contains(where: { $0.id == turn }) {
+            place(scroller, on: turn, anchor: .top)
+        } else if hasMore, restorePages < 40 {
+            restorePages += 1
+            isRestoreLoading = true
+            Task {
+                await loadEarlier()
+                isRestoreLoading = false
+                // From the next pass, which has the page's rows: this one's are as they
+                // were when it was asked for.
+                restoreTick += 1
+            }
+            return
+        } else {
+            isFollowing = true
+            place(scroller, on: bottom, anchor: .bottom)
+        }
+        Task { @MainActor in
+            // A turn of the run loop for the move to land before the pane is shown.
+            try? await Task.sleep(for: .milliseconds(50))
+            restoreTurn = nil
+            try? await Task.sleep(for: .milliseconds(350))
+            hasSettled = true
+        }
     }
 
     /// Another page, and the reader left looking at the same line they were.
@@ -477,10 +660,12 @@ struct ChatTranscript: View {
     /// move itself happens when the rows land (`entryCount`), because a scroll
     /// asked for before they exist does not land on them.
     private func askForEarlier() {
-        guard hasSettled, !isLoadingEarlier, hasMore else { return }
+        guard hasSettled, !isLoadingEarlier, restoreTurn == nil, hasMore else { return }
         isLoadingEarlier = true
         restoreFollowing = isFollowing
-        restoreIDs = rows.prefix(8).map(\.id)
+        // The turn at the top of the pane first: the first row in hand can sit a screen
+        // above what they are reading, and putting it at the top moved them by that much.
+        restoreIDs = (motion.topTurn.map { [$0] } ?? []) + rows.prefix(8).map(\.id)
         Task {
             await loadEarlier()
             // A beat before the next one can start, so one flick does not swallow
