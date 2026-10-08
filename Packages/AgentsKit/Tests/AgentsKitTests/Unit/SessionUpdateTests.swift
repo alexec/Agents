@@ -231,12 +231,44 @@ struct SessionUpdateTests {
         let update = SessionUpdate.decode(["sessionUpdate": "compaction_update",
                                            "compactionId": "c1", "status": "completed",
                                            "summary": [["type": "text", "text": "We did three things."]]])
-        guard case .entry(.compaction(let status, let summary)) = update else {
+        guard case .entry(.compaction(let status, let summary, let id, _)) = update else {
             Issue.record("expected compaction")
             return
         }
         #expect(status == "completed")
         #expect(summary.plainText == "We did three things.")
+        #expect(id == "c1")
+    }
+
+    /// A chunk and a failure keep the compaction's id, and the failure its reason, so the
+    /// page can draw one compaction as one row (#443).
+    @Test func aCompactionsChunksAndFailureKeepItsID() {
+        let chunk = SessionUpdate.decode(["sessionUpdate": "compaction_summary_chunk", "compactionId": "c1",
+                                          "content": ["type": "text", "text": "Some of it"]])
+        guard case .entry(.compaction(let status, let summary, let id, _)) = chunk else {
+            Issue.record("expected compaction")
+            return
+        }
+        #expect(status == "in_progress")
+        #expect(summary.plainText == "Some of it")
+        #expect(id == "c1")
+
+        let failed = SessionUpdate.decode(["sessionUpdate": "compaction_update", "compactionId": "c1",
+                                           "status": "failed", "error": "Too long"])
+        guard case .entry(.compaction(let failedStatus, _, _, let error)) = failed else {
+            Issue.record("expected compaction")
+            return
+        }
+        #expect(failedStatus == "failed")
+        #expect(error == "Too long")
+    }
+
+    @Test func aCompactionsIDAndErrorSurviveTheRecord() throws {
+        let entry = TranscriptEntry(kind: .compaction(status: "failed", summary: [.text("S")], id: "c1", error: "Too long"))
+        let read = try JSONDecoder().decode(TranscriptEntry.self, from: JSONEncoder().encode(entry))
+        #expect(read.kind == entry.kind)
+        let older = TranscriptEntry(kind: .compaction(status: "completed", summary: []))
+        #expect(try JSONDecoder().decode(TranscriptEntry.self, from: JSONEncoder().encode(older)).kind == older.kind)
     }
 
     // MARK: Notices

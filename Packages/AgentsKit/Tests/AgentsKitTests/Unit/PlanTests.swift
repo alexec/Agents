@@ -82,7 +82,7 @@ struct PlanTests {
         @Sendable func compactionsSoFar() async -> [(String, [ContentBlock])] {
             guard let page = try? await core.transcript(.init(agentID: id)) else { return [] }
             return page.entries.compactMap { entry in
-                if case .compaction(let status, let summary) = entry.kind { return (status, summary) }
+                if case .compaction(let status, let summary, _, _) = entry.kind { return (status, summary) }
                 return nil
             }
         }

@@ -53,22 +53,23 @@ not reach Claude. `DISABLE_AUTO_COMPACT` does reach it, and so do your own setti
 
 ## What the app shows
 
-The app advertises `session.compaction` (`ClientCapabilities.app`, `ACPTypes.swift`) and
-turns `compaction_update` and `compaction_summary_chunk` into a transcript row: **Summarising
-the conversation so far…**, and then **Made room by summarising the conversation so far**.
-Both updates are ACP **unstable**: the ACP SDK marks them "not part of the spec yet".
+The app advertises `session.compaction` (`ClientCapabilities.app`, `ACPTypes.swift`).
+Both updates it asks for are ACP **unstable**: the ACP SDK marks them "not part of the spec
+yet".
 
-How the app reads them is wrong in two ways (`SessionUpdate.swift`, `TranscriptRows.swift`,
-`Web/src/views/chat/Rows.tsx`). This is inferred from the code and has not been seen on
-screen:
+A runtime sends one compaction as several updates under one `compactionId`: one when it
+starts, the chunks of its summary, and one when it ends. The record keeps each of them. The
+page draws them as **one row** (#443), which says how the compaction stands:
 
-- **One compaction draws many rows** (#443). Each update and each summary chunk becomes a new
-  `.compaction` entry. `compactionId`, which ties them together, is thrown away, and
-  `TranscriptEntry.coalesced` merges only agent messages and thoughts. So one Claude
-  compaction draws a "Summarising…" row, one row per chunk of its summary, and then a
-  "Made room…" row.
-- **A failed or cancelled compaction reads as still in progress**, because anything that is
-  not `completed` is drawn as "Summarising…". Its `error` is dropped.
+- **Summarising the conversation so far…** while it runs;
+- **Made room by summarising the conversation so far** when it is done;
+- **Could not summarise the conversation to make room**, with the runtime's reason, when it
+  failed;
+- **Stopped summarising the conversation** when it was cancelled.
+
+The summary sits under the row. A summary sent with the ending replaces the chunks, as ACP
+says it should. A record written before #443 has no ids, and its updates are joined while
+the row is still in progress.
 
 Codex's rows have no summary under them, because Codex sends none. That is right as it is.
 
@@ -205,7 +206,7 @@ Antigravity runs on this Mac only.
 
 - **Watching it happen.** The table comes from reading code. A compaction has not been seen
   in the app for any runtime. Claude and Codex can be watched cheaply by typing `/compact`
-  in an agent. That also shows the extra-rows problem above, if it is real.
+  in an agent. That also shows the one row (#443) on screen.
 - **Whether to change any defaults.** Nothing needs turning on. Whether the app should *show*
   a switch or a threshold is a product decision. These have a lever the app can reach:
   Claude, Codex (threshold only), Gemini, Grok (threshold only), OpenCode and Copilot

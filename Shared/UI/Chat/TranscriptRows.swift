@@ -267,10 +267,9 @@ private struct EntryRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-        case .compaction(let status, let summary):
+        case .compaction(let status, let summary, _, let error):
             VStack(alignment: .leading, spacing: 6) {
-                Text(status == "completed" ? "Made room by summarising the conversation so far"
-                                           : "Summarising the conversation so far…")
+                Text(CompactionLine.words(status: status, error: error))
                     .appText(.reading)
                     .foregroundStyle(.secondary)
                 if !summary.isEmpty {

@@ -489,6 +489,30 @@ struct WebFixturesTests {
                 entry(6, .agentMessage(messageID: "b", text: "\nAll done.")),
                 finished,
             ], false),
+            ("one compaction is one row (#443)", [
+                ask(1, "Keep going"),
+                entry(2, .agentMessage(messageID: "a", text: "Working.")),
+                entry(3, .compaction(status: "in_progress", summary: [], id: "c1")),
+                entry(4, .compaction(status: "in_progress", summary: [.text("Earlier: ")], id: "c1")),
+                entry(5, .compaction(status: "in_progress", summary: [.text("read the code.")], id: "c1")),
+                entry(6, .compaction(status: "completed", summary: [.text("Earlier: read the code, chose a fix.")], id: "c1")),
+                entry(7, .agentMessage(messageID: "b", text: "Carrying on.")),
+                entry(8, .compaction(status: "in_progress", summary: [], id: "c2")),
+                entry(9, .compaction(status: "failed", summary: [], id: "c2", error: "The model refused.")),
+                entry(10, .compaction(status: "in_progress", summary: [], id: "c3")),
+                entry(11, .toolCall(call("t1", "ls", kind: "execute"))),
+                entry(12, .compaction(status: "cancelled", summary: [], id: "c3")),
+                finished,
+            ], false),
+            ("a compaction written before #443 is one row too", [
+                ask(1, "Keep going"),
+                entry(2, .compaction(status: "in_progress", summary: [])),
+                entry(3, .compaction(status: "in_progress", summary: [.text("Some ")])),
+                entry(4, .compaction(status: "in_progress", summary: [.text("summary.")])),
+                entry(5, .compaction(status: "completed", summary: [])),
+                entry(6, .compaction(status: "in_progress", summary: [])),
+                finished,
+            ], false),
             ("a retried error the turn ended on stays (#394)", [
                 ask(1, "Fix it"),
                 entry(2, .agentMessage(messageID: "a", text: "Error: RetriableError: [unavailable] getaddrinfo ENOTFOUND api2.cursor.sh")),
@@ -507,6 +531,9 @@ struct WebFixturesTests {
             switch entry.kind {
             case .agentMessage(_, let text, _), .agentThought(_, let text), .userMessage(let text, _, _):
                 fields["text"] = .string(text)
+            case .compaction(let status, let summary, _, let error):
+                fields["text"] = .string(CompactionLine.words(status: status, error: error))
+                fields["summary"] = .string(summary.map { if case .text(let text) = $0 { text } else { "" } }.joined())
             default: break
             }
             return .object(fields)

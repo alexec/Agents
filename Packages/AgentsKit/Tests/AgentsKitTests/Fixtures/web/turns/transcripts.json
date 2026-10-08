@@ -1533,6 +1533,395 @@
         {
           "entry" : "00000000-0000-0000-0000-000000001001",
           "kind" : "userMessage",
+          "text" : "Keep going"
+        },
+        {
+          "entry" : "00000000-0000-0000-0000-000000001002",
+          "kind" : "agentMessage",
+          "text" : "Working."
+        },
+        {
+          "entry" : "00000000-0000-0000-0000-000000001003",
+          "kind" : "compaction",
+          "summary" : "Earlier: read the code, chose a fix.",
+          "text" : "Made room by summarising the conversation so far"
+        },
+        {
+          "entry" : "00000000-0000-0000-0000-000000001007",
+          "kind" : "agentMessage",
+          "text" : "Carrying on."
+        },
+        {
+          "entry" : "00000000-0000-0000-0000-000000001008",
+          "kind" : "compaction",
+          "summary" : "",
+          "text" : "Could not summarise the conversation to make room: The model refused."
+        },
+        {
+          "entry" : "00000000-0000-0000-0000-000000001010",
+          "kind" : "compaction",
+          "summary" : "",
+          "text" : "Stopped summarising the conversation"
+        },
+        {
+          "calls" : [
+            {
+              "id" : "t1",
+              "status" : null,
+              "title" : "ls",
+              "turnLine" : "Run command"
+            }
+          ],
+          "run" : "00000000-0000-0000-0000-000000001011"
+        }
+      ],
+      "omittingThoughts" : [
+        "00000000-0000-0000-0000-000000001001",
+        "00000000-0000-0000-0000-000000001002",
+        "00000000-0000-0000-0000-000000001003",
+        "00000000-0000-0000-0000-000000001007",
+        "00000000-0000-0000-0000-000000001008",
+        "00000000-0000-0000-0000-000000001010",
+        "00000000-0000-0000-0000-000000001011"
+      ],
+      "turns" : [
+        {
+          "ask" : "00000000-0000-0000-0000-000000001001",
+          "id" : "00000000-0000-0000-0000-000000001001",
+          "live" : null,
+          "outcome" : [
+            "00000000-0000-0000-0000-000000001007"
+          ],
+          "stepCount" : 5,
+          "steps" : [
+            "00000000-0000-0000-0000-000000001002",
+            "00000000-0000-0000-0000-000000001003",
+            "00000000-0000-0000-0000-000000001008",
+            "00000000-0000-0000-0000-000000001010",
+            "00000000-0000-0000-0000-000000001011"
+          ]
+        }
+      ]
+    },
+    "input" : {
+      "entries" : [
+        {
+          "at" : 812500006,
+          "id" : "00000000-0000-0000-0000-000000001001",
+          "kind" : {
+            "userMessage" : {
+              "_0" : "Keep going"
+            }
+          }
+        },
+        {
+          "at" : 812500012,
+          "id" : "00000000-0000-0000-0000-000000001002",
+          "kind" : {
+            "agentMessage" : {
+              "messageID" : "a",
+              "text" : "Working."
+            }
+          }
+        },
+        {
+          "at" : 812500018,
+          "id" : "00000000-0000-0000-0000-000000001003",
+          "kind" : {
+            "compaction" : {
+              "id" : "c1",
+              "status" : "in_progress",
+              "summary" : [
+
+              ]
+            }
+          }
+        },
+        {
+          "at" : 812500024,
+          "id" : "00000000-0000-0000-0000-000000001004",
+          "kind" : {
+            "compaction" : {
+              "id" : "c1",
+              "status" : "in_progress",
+              "summary" : [
+                {
+                  "text" : "Earlier: ",
+                  "type" : "text"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "at" : 812500030,
+          "id" : "00000000-0000-0000-0000-000000001005",
+          "kind" : {
+            "compaction" : {
+              "id" : "c1",
+              "status" : "in_progress",
+              "summary" : [
+                {
+                  "text" : "read the code.",
+                  "type" : "text"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "at" : 812500036,
+          "id" : "00000000-0000-0000-0000-000000001006",
+          "kind" : {
+            "compaction" : {
+              "id" : "c1",
+              "status" : "completed",
+              "summary" : [
+                {
+                  "text" : "Earlier: read the code, chose a fix.",
+                  "type" : "text"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "at" : 812500042,
+          "id" : "00000000-0000-0000-0000-000000001007",
+          "kind" : {
+            "agentMessage" : {
+              "messageID" : "b",
+              "text" : "Carrying on."
+            }
+          }
+        },
+        {
+          "at" : 812500048,
+          "id" : "00000000-0000-0000-0000-000000001008",
+          "kind" : {
+            "compaction" : {
+              "id" : "c2",
+              "status" : "in_progress",
+              "summary" : [
+
+              ]
+            }
+          }
+        },
+        {
+          "at" : 812500054,
+          "id" : "00000000-0000-0000-0000-000000001009",
+          "kind" : {
+            "compaction" : {
+              "error" : "The model refused.",
+              "id" : "c2",
+              "status" : "failed",
+              "summary" : [
+
+              ]
+            }
+          }
+        },
+        {
+          "at" : 812500060,
+          "id" : "00000000-0000-0000-0000-000000001010",
+          "kind" : {
+            "compaction" : {
+              "id" : "c3",
+              "status" : "in_progress",
+              "summary" : [
+
+              ]
+            }
+          }
+        },
+        {
+          "at" : 812500066,
+          "id" : "00000000-0000-0000-0000-000000001011",
+          "kind" : {
+            "toolCall" : {
+              "_0" : {
+                "content" : [
+
+                ],
+                "kind" : "execute",
+                "locations" : [
+
+                ],
+                "title" : "ls",
+                "toolCallID" : "t1"
+              }
+            }
+          }
+        },
+        {
+          "at" : 812500072,
+          "id" : "00000000-0000-0000-0000-000000001012",
+          "kind" : {
+            "compaction" : {
+              "id" : "c3",
+              "status" : "cancelled",
+              "summary" : [
+
+              ]
+            }
+          }
+        },
+        {
+          "at" : 812500540,
+          "id" : "00000000-0000-0000-0000-000000001090",
+          "kind" : {
+            "stateChanged" : {
+              "_0" : "finished",
+              "reason" : "endTurn"
+            }
+          }
+        }
+      ],
+      "isLive" : false
+    },
+    "name" : "one compaction is one row (#443)"
+  },
+  {
+    "expected" : {
+      "items" : [
+        {
+          "entry" : "00000000-0000-0000-0000-000000001001",
+          "kind" : "userMessage",
+          "text" : "Keep going"
+        },
+        {
+          "entry" : "00000000-0000-0000-0000-000000001002",
+          "kind" : "compaction",
+          "summary" : "Some summary.",
+          "text" : "Made room by summarising the conversation so far"
+        },
+        {
+          "entry" : "00000000-0000-0000-0000-000000001006",
+          "kind" : "compaction",
+          "summary" : "",
+          "text" : "Summarising the conversation so far…"
+        }
+      ],
+      "omittingThoughts" : [
+        "00000000-0000-0000-0000-000000001001",
+        "00000000-0000-0000-0000-000000001002",
+        "00000000-0000-0000-0000-000000001006"
+      ],
+      "turns" : [
+        {
+          "ask" : "00000000-0000-0000-0000-000000001001",
+          "id" : "00000000-0000-0000-0000-000000001001",
+          "live" : null,
+          "outcome" : [
+
+          ],
+          "stepCount" : 2,
+          "steps" : [
+            "00000000-0000-0000-0000-000000001002",
+            "00000000-0000-0000-0000-000000001006"
+          ]
+        }
+      ]
+    },
+    "input" : {
+      "entries" : [
+        {
+          "at" : 812500006,
+          "id" : "00000000-0000-0000-0000-000000001001",
+          "kind" : {
+            "userMessage" : {
+              "_0" : "Keep going"
+            }
+          }
+        },
+        {
+          "at" : 812500012,
+          "id" : "00000000-0000-0000-0000-000000001002",
+          "kind" : {
+            "compaction" : {
+              "status" : "in_progress",
+              "summary" : [
+
+              ]
+            }
+          }
+        },
+        {
+          "at" : 812500018,
+          "id" : "00000000-0000-0000-0000-000000001003",
+          "kind" : {
+            "compaction" : {
+              "status" : "in_progress",
+              "summary" : [
+                {
+                  "text" : "Some ",
+                  "type" : "text"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "at" : 812500024,
+          "id" : "00000000-0000-0000-0000-000000001004",
+          "kind" : {
+            "compaction" : {
+              "status" : "in_progress",
+              "summary" : [
+                {
+                  "text" : "summary.",
+                  "type" : "text"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "at" : 812500030,
+          "id" : "00000000-0000-0000-0000-000000001005",
+          "kind" : {
+            "compaction" : {
+              "status" : "completed",
+              "summary" : [
+
+              ]
+            }
+          }
+        },
+        {
+          "at" : 812500036,
+          "id" : "00000000-0000-0000-0000-000000001006",
+          "kind" : {
+            "compaction" : {
+              "status" : "in_progress",
+              "summary" : [
+
+              ]
+            }
+          }
+        },
+        {
+          "at" : 812500540,
+          "id" : "00000000-0000-0000-0000-000000001090",
+          "kind" : {
+            "stateChanged" : {
+              "_0" : "finished",
+              "reason" : "endTurn"
+            }
+          }
+        }
+      ],
+      "isLive" : false
+    },
+    "name" : "a compaction written before #443 is one row too"
+  },
+  {
+    "expected" : {
+      "items" : [
+        {
+          "entry" : "00000000-0000-0000-0000-000000001001",
+          "kind" : "userMessage",
           "text" : "Fix it"
         },
         {

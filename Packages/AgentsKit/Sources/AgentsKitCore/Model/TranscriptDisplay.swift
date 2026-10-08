@@ -292,6 +292,14 @@ public struct TranscriptDisplayBuilder: Sendable {
             resolveIntermittentErrors()
             viewAt[call.id] = drawn.count
             drawn.append(.entry(entry))
+        case .compaction(_, _, let id, _):
+            if let at = compactionAt(for: id), case .entry(let first) = drawn[at],
+               let merged = TranscriptEntry.mergeCompaction(entry, onto: first) {
+                drawn[at] = .entry(merged)
+                return
+            }
+            closeRun()
+            drawn.append(.entry(entry))
         case .background(let item) where item.isRunning && item.kind == .task && item.toolCallID != nil:
             // A task starting from a tool call: the call is already on the page, and
             // says it runs on while it does (057). Not a break in the run either.
@@ -373,6 +381,21 @@ public struct TranscriptDisplayBuilder: Sendable {
             }
         }
         settled = drawn.count
+    }
+
+    /// The row a compaction's later entry belongs on (#443): the one with its id, or,
+    /// for an entry with none (every record before #443), the line just drawn when that
+    /// is a compaction still going. Found by looking rather than kept by place, since a
+    /// retried error before it can leave the page; a page holds few compactions.
+    private func compactionAt(for id: String?) -> Int? {
+        if let id {
+            return drawn.lastIndex {
+                guard case .entry(let entry) = $0, case .compaction(_, _, let drawnID, _) = entry.kind else { return false }
+                return drawnID == id
+            }
+        }
+        guard run.isEmpty, case .entry(let last) = drawn.last, last.isCompactionInProgress else { return nil }
+        return drawn.count - 1
     }
 
     /// Merge an update into the closed run that holds its call, if one does.

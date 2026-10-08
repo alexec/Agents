@@ -1567,7 +1567,7 @@ export type TranscriptEntryKind =
   | { servedRequest: { _0: ServedRequest } }
   | { elicitationAsked: { _0: ElicitationRequest } }
   | { elicitationAnswered: { id: UUID; summary: string; answers?: ElicitationAnswer[] } }
-  | { compaction: { status: string; summary: ContentBlock[] } }
+  | { compaction: { status: string; summary: ContentBlock[]; id?: string; error?: string } }
   | { notice: { _0: SessionNotice } }
   | { permissionAsked: { _0: PermissionRequest } }
   | { permissionAnswered: { optionID: string; optionName?: string } }
