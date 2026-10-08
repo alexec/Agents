@@ -17,7 +17,7 @@ import type { ComponentChildren } from "preact";
 import type { ACPPromptCapabilities, Attachment, FileMentionDTO, SlashCommand, SuggestedPrompt, UUID } from "../protocol/generated";
 import { sendHelp, sendLabel, stopHelp } from "../model/promptWords";
 import type { Store } from "../model/store";
-import { attach, refusal, totalRefusal } from "../model/attachments";
+import { attach, pastedFiles, pastedWords, refusal, totalRefusal } from "../model/attachments";
 import { Telling } from "./Telling";
 import { commandQuery, completeCommand, completeMention, fileName, fileURL, matchingCommands, mentionQuery } from "../model/completions";
 
@@ -292,9 +292,11 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
               }
             }}
             onPaste={(e) => {
-              const files = Array.from(e.clipboardData?.files ?? []);
+              // Pictures and files attach, as dropped or picked ones do (#396); words copied with
+              // them still go into the field, so the paste is only held back when there are none.
+              const files = pastedFiles(e.clipboardData);
               if (files.length && !disabled) {
-                e.preventDefault();
+                if (!pastedWords(e.clipboardData)) e.preventDefault();
                 void take(files);
               }
             }} />

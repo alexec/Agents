@@ -35,3 +35,25 @@ test("900 KB in all", () => {
   assert.equal(a.totalRefusal([big, big]),
     "From a browser, attachments can be 900 KB in all, and these are 1.2 MB. Remove one to send.");
 });
+
+// A clipboard as a browser hands it to a paste: items, files and types.
+const clipboard = ({ items = [], files = [], types = [] }) => ({ items, files, types });
+const item = (kind, file = null) => ({ kind, getAsFile: () => file });
+
+test("a copied screenshot is a clipboard item, and attaches (#396)", () => {
+  const shot = new File([new Uint8Array([1])], "image.png", { type: "image/png" });
+  assert.deepEqual(a.pastedFiles(clipboard({ items: [item("string"), item("file", shot)] })), [shot]);
+});
+
+test("pasted files attach when there are no file items", () => {
+  const file = new File(["x"], "notes.md", { type: "text/markdown" });
+  assert.deepEqual(a.pastedFiles(clipboard({ files: [file] })), [file]);
+  assert.deepEqual(a.pastedFiles(clipboard({ items: [item("string")] })), []);
+  assert.deepEqual(a.pastedFiles(null), []);
+});
+
+test("words pasted with a picture still go into the field", () => {
+  assert.equal(a.pastedWords(clipboard({ types: ["Files", "text/plain"] })), true);
+  assert.equal(a.pastedWords(clipboard({ types: ["Files", "text/html"] })), false);
+  assert.equal(a.pastedWords(undefined), false);
+});
