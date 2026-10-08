@@ -237,7 +237,7 @@ real repo, a failing PR yields one `checks.failed` with a stable id.
 
 ### Implementation for User Story 3
 
-- [ ] T027 [US3] Create `Integrations/ci-watcher/github.ts`, the GitHub side, using `node:child_process` `execFile('gh', …)`. Use ETag-conditional `gh api` where possible.
+- [x] T027 [US3] Create `Integrations/ci-watcher/github.ts`, the GitHub side, using `node:child_process` `execFile('gh', …)`. Use ETag-conditional `gh api` where possible.
   - `failedRuns(repo, branch?, since)`: `gh api repos/{repo}/actions/runs`, filtered to `event=pull_request`, `status=completed`, `conclusion=failure`, and `updated_at` after `since`, with the PR and failed jobs from `/runs/{id}/jobs?filter=latest`.
   - `mergedPRs(repo, since)`.
   - `listPRs(repo)`: `gh pr list --json number,title,headRefName,statusCheckRollup,url`, mapped to `passing`, `failing`, `running` or `none`.
