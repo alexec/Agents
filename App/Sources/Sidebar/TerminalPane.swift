@@ -32,7 +32,9 @@ struct TerminalPane: View {
             // are, so a tab comes back with its screen and scrollback as it was.
             ZStack {
                 ForEach(state.shells, id: \.self) { shell in
-                    ShellScreen(agent: agent, shell: shell, isFront: isVisible && state.frontShell == shell,
+                    ShellScreen(id: agent.id, home: (agent.cwd, agent.worktree?.name ?? agent.cwd.lastPathComponent),
+                                acquire: { model.acquireShell(for: agent.id, shell: shell) },
+                                isFront: isVisible && state.frontShell == shell,
                                 wantsFocus: state.shellToFocus == shell,
                                 focused: { if state.shellToFocus == shell { state.shellToFocus = nil } },
                                 titled: { state.shellTitles[shell] = $0 },
@@ -89,10 +91,17 @@ struct TerminalPane: View {
 }
 
 /// One shell's screen, and what it says when that shell will not start or has ended.
-private struct ShellScreen: View {
+/// An agent's tab's, or the project's own shell (#418).
+struct ShellScreen: View {
     @Environment(AppModel.self) private var model
-    let agent: Agent
-    let shell: Int
+    /// Whose shell: the agent's, or the project's shell's id. Attached again when it changes.
+    let id: UUID
+    /// Where its owner works now, and what to call that, for the strip that offers the
+    /// `cd` once the agent has moved (053). Nil for the project's shell, which is
+    /// not going anywhere.
+    let home: (folder: URL, name: String)?
+    /// This window's end of the shell, counted until the screen goes.
+    let acquire: () -> ShellClient
     let isFront: Bool
     let wantsFocus: Bool
     let focused: () -> Void
@@ -130,9 +139,9 @@ private struct ShellScreen: View {
                     .background(Paper.ground)
                     if !client.state.isLive {
                         ended(client)
-                    } else if let opened = client.directory ?? client.folder, !sameFolder(opened, agent.cwd),
-                              cdTypedFor.map({ !sameFolder($0, agent.cwd) }) ?? true {
-                        moved(client, from: opened)
+                    } else if let home, let opened = client.directory ?? client.folder, !sameFolder(opened, home.folder),
+                              cdTypedFor.map({ !sameFolder($0, home.folder) }) ?? true {
+                        moved(client, from: opened, to: home)
                     } else if let sendProblem = client.sendProblem {
                         Note(sendProblem)
                     } else if client.dropped > 0 {
@@ -143,8 +152,8 @@ private struct ShellScreen: View {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .task(id: agent.id) {
-            let held = client ?? model.acquireShell(for: agent.id, shell: shell)
+        .task(id: id) {
+            let held = client ?? acquire()
             client = held
             await held.attach(rows: rows, cols: cols)
             await held.sayScreenSize()
@@ -181,22 +190,22 @@ private struct ShellScreen: View {
     /// The agent moved (053) while this shell went on in the folder it was started in.
     /// The shell is the person's and may be running something, so nothing ends it: the
     /// strip says where each of them is, and offers to type the `cd` for them.
-    private func moved(_ client: ShellClient, from opened: URL) -> some View {
+    private func moved(_ client: ShellClient, from opened: URL, to home: (folder: URL, name: String)) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "arrow.triangle.branch")
                 .foregroundStyle(.secondary)
-            Text("This shell is in \(opened.lastPathComponent). The agent now works in \(agent.worktree?.name ?? agent.cwd.lastPathComponent).")
+            Text("This shell is in \(opened.lastPathComponent). The agent now works in \(home.name).")
                 .appText(.fine)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
             Spacer()
             Button("Type cd there") {
-                let path = agent.cwd.path(percentEncoded: false).replacingOccurrences(of: "'", with: "'\\''")
-                cdTypedFor = agent.cwd
+                let path = home.folder.path(percentEncoded: false).replacingOccurrences(of: "'", with: "'\\''")
+                cdTypedFor = home.folder
                 client.type(Data("cd '\(path)'\r".utf8))
             }
             .controlSize(.small)
-            .help("Types cd \(agent.cwd.path(percentEncoded: false)) into this shell")
+            .help("Types cd \(home.folder.path(percentEncoded: false)) into this shell")
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)

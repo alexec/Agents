@@ -11,13 +11,11 @@ extension DaemonCore {
                      from surface: Surface? = nil, connection: UUID? = nil) throws -> DaemonAPI.ShellAttachResponse {
         watchShell(request.agentID, from: surface, connection: connection)
         noteMacScreen(ShellHost.Key(agentID: request.agentID, shell: request.shell), from: surface, connection: connection)
-        guard let agent = agents[request.agentID] else {
-            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "There is no such agent.")
-        }
+        let folder = try shellFolder(request)
         do {
-            let attachment = try shells.attach(agentID: agent.id,
+            let attachment = try shells.attach(agentID: request.agentID,
                                                shell: request.shell,
-                                               folder: agent.cwd,
+                                               folder: folder,
                                                rows: request.rows,
                                                cols: request.cols,
                                                since: request.since,
@@ -31,6 +29,22 @@ extension DaemonCore {
         } catch ShellHost.Failure.willNotStart(let reason) {
             throw JSONRPCError(code: DaemonAPI.Failure.shellWillNotStart, message: reason)
         }
+    }
+
+    /// Where a shell starts: the agent's folder, or a project's own for the project's
+    /// shell (#418). A project's shell goes by the id made from its folder, so a request
+    /// cannot start one under an agent's id or in a folder that is not a project.
+    private func shellFolder(_ request: DaemonAPI.ShellAttachRequest) throws -> URL {
+        if let agent = agents[request.agentID] { return agent.cwd }
+        if let asked = request.folder {
+            let folder = Project.standardize(asked)
+            if isProject(folder), ProjectShell.id(for: folder) == request.agentID
+                || ProjectShell.id(for: asked) == request.agentID {
+                return folder
+            }
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "There is no such project here.")
+        }
+        throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "There is no such agent.")
     }
 
     /// The window stopped looking. Nothing is killed (FR-026).
@@ -142,13 +156,11 @@ extension DaemonCore {
                       from surface: Surface? = nil, connection: UUID? = nil) throws -> DaemonAPI.ShellAttachResponse {
         watchShell(request.agentID, from: surface, connection: connection)
         noteMacScreen(ShellHost.Key(agentID: request.agentID, shell: request.shell), from: surface, connection: connection)
-        guard let agent = agents[request.agentID] else {
-            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "There is no such agent.")
-        }
+        let folder = try shellFolder(request)
         do {
-            let attachment = try shells.restart(agentID: agent.id,
+            let attachment = try shells.restart(agentID: request.agentID,
                                                 shell: request.shell,
-                                                folder: agent.cwd,
+                                                folder: folder,
                                                 rows: request.rows,
                                                 cols: request.cols)
             return DaemonAPI.ShellAttachResponse(state: attachment.state,

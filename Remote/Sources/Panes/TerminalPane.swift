@@ -31,7 +31,7 @@ struct TerminalPane: View {
             // so a tab comes back with its screen and scrollback as it was.
             ZStack {
                 ForEach(state.shells, id: \.self) { shell in
-                    ShellScreen(agent: agent, shell: shell, isFront: state.frontShell == shell,
+                    ShellScreen(id: agent.id, shell: shell, isFront: state.frontShell == shell,
                                 isOpen: { state.shells.contains(shell) })
                         .opacity(state.frontShell == shell ? 1 : 0)
                         .allowsHitTesting(state.frontShell == shell)
@@ -87,10 +87,12 @@ struct TerminalPane: View {
     }
 }
 
-/// One tab's screen, and what it says when that shell will not start or has ended.
-private struct ShellScreen: View {
+/// One tab's screen, and what it says when that shell will not start or has ended. An
+/// agent's tab's, or the project's own shell (#418), whose client the model has made.
+struct ShellScreen: View {
     @Environment(RemoteModel.self) private var model
-    let agent: Agent
+    /// The agent's id, or the project's shell's.
+    let id: UUID
     let shell: Int
     let isFront: Bool
     /// Whether the tab is still in the row. A closed tab's shell has ended.
@@ -99,7 +101,7 @@ private struct ShellScreen: View {
     @State private var rows = 24
     @State private var cols = 60
 
-    private var client: ShellClient { model.shellClient(for: agent.id, shell: shell) }
+    private var client: ShellClient { model.shellClient(for: id, shell: shell) }
 
     var body: some View {
         let client = client
@@ -126,7 +128,7 @@ private struct ShellScreen: View {
                 }
             }
         }
-        .task(id: agent.id) {
+        .task(id: id) {
             model.showScreen(of: client)
             // A kept emulator is not laid out anew: its size is the one to say (#419).
             if let kept = client.screen as? TerminalView {

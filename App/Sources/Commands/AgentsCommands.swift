@@ -45,6 +45,7 @@ struct AgentsCommands: Commands {
     let model: AppModel
     let requests: WindowRequests
     let frame: SidebarFrame
+    let terminal: ProjectTerminalFrame
 
     /// Off unless asked for. The session draws thinking only while this is on.
     @AppStorage(TurnDisplay.defaultsKey) private var turnDetail = TurnDisplay.initial
@@ -100,6 +101,11 @@ struct AgentsCommands: Commands {
                     // Off while a question card is up: ⌘1…n answer that card instead.
                     .disabled(model.selectedAgent == nil || !inspectorFits || answeringCard)
             }
+            // The project's own shell (#418), the editor's key for a terminal. ⌘J,
+            // the usual panel key, is Next Needing Attention.
+            Button(terminal.isOpen ? "Hide Project Terminal" : "Project Terminal") { terminal.toggle() }
+                .keyboardShortcut("`", modifiers: .control)
+                .disabled(!terminal.isOpen && model.selectedProjectSummary?.exists != true)
             Divider()
             Button("Events") { model.showEvents() }
                 .keyboardShortcut("e", modifiers: [.command, .option])

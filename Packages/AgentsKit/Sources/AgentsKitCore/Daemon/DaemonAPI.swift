@@ -1839,15 +1839,20 @@ public enum DaemonAPI {
         /// megabytes it already shows (#401).
         public var since: Int?
         public var startedAt: Date?
+        /// The project whose own shell this is (#418), when it is not an agent's: the
+        /// daemon starts it in this folder, and `agentID` is `ProjectShell.id(for:)` it.
+        /// A daemon from before #418 knows no such agent and says so.
+        public var folder: URL?
 
         public init(agentID: UUID, shell: Int = 0, rows: Int = 24, cols: Int = 80,
-                    since: Int? = nil, startedAt: Date? = nil) {
+                    since: Int? = nil, startedAt: Date? = nil, folder: URL? = nil) {
             self.agentID = agentID
             self.shell = shell
             self.rows = rows
             self.cols = cols
             self.since = since
             self.startedAt = startedAt
+            self.folder = folder
         }
 
         public init(from decoder: any Decoder) throws {
@@ -1858,6 +1863,7 @@ public enum DaemonAPI {
             cols = try c.decodeIfPresent(Int.self, forKey: .cols) ?? 80
             since = try c.decodeIfPresent(Int.self, forKey: .since)
             startedAt = try c.decodeIfPresent(Date.self, forKey: .startedAt)
+            folder = try c.decodeIfPresent(URL.self, forKey: .folder)
         }
     }
 
