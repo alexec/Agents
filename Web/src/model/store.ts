@@ -3,7 +3,7 @@
 // (research R7). Nothing here decides anything; the hosts do.
 import { batch, computed, signal, type ReadonlySignal, type Signal } from "@preact/signals";
 import type {
-  Agent, AgentRemovedNotification, ResumingNotification, Tombstone, ControlHost, ElicitationNotification, ElicitationRequest, EntryNotification,
+  Agent, AgentRemovedNotification, ResumingNotification, ControlHost, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, DiskState, StoreNotes,
@@ -24,6 +24,7 @@ import { scopeRoot, WatchCounts } from "./fileWatch";
 import { workflowRunsOn } from "./workflows";
 import { keyKind, takesKey, wantedRuntime } from "./credentials";
 import type { Method, Params, Result } from "../protocol/methods";
+import { dropboxRefusal, dropboxRequest } from "./dropbox";
 
 export { folderKey } from "./groups";
 
@@ -296,8 +297,6 @@ export class Work {
   readonly draftOptions = signal<DraftOptionsNotification | null>(null);
   /** Each host's resources and who holds them (036, #116): read-only on the page. */
   readonly leases = signal<Record<string, LeaseSnapshot>>({});
-  /** Retired agents a link led to, by `host|id`: who they were, for the retired page (051, #253). */
-  readonly tombstones = signal<Record<string, Tombstone>>({});
   /** Each host's chats it is bringing back by itself after a restart: Coming back (#251). */
   readonly resuming = signal<Record<string, readonly string[]>>({});
   /** Each host's volumes low on space (#196), replaced whole by each disk/changed, never merged. */
@@ -990,7 +989,6 @@ export class Store extends Work {
       this.accounts.value = without(this.accounts.value);
       this.sandboxDefaults.value = without(this.sandboxDefaults.value);
       this.rememberedModes.value = without(this.rememberedModes.value);
-      this.tombstones.value = notOf(this.tombstones.value);
       this.resuming.value = without(this.resuming.value);
       this.events.value = without(this.events.value);
       this.costs.value = without(this.costs.value);
@@ -1537,14 +1535,6 @@ export class Store extends Work {
     await this.act("agents/unqueue", { agentID: agentID as UUID, promptID: promptID as UUID }, host);
   }
 
-  /** Who an agent was, when it is not held and may have been retired; nothing when it wasn't. */
-  async lookUpRetired(host: string, agentID: string): Promise<void> {
-    if (this.tombstones.peek()[`${host}|${agentID}`]) return;
-    const found = await this.link.call("agents/retired", { ids: [agentID as UUID] }, host).catch(() => null);
-    const gone = found?.find((t) => t.id === agentID);
-    if (gone) this.tombstones.value = { ...this.tombstones.value, [`${host}|${agentID}`]: gone };
-  }
-
   /** One task an agent left running, and nothing else it is doing (057, #253). */
   async stopBackground(host: string, agentID: string, itemID: string): Promise<void> {
     await this.act("agents/stopBackground", { agentID: agentID as UUID, itemID }, host);
@@ -1632,6 +1622,25 @@ export class Store extends Work {
   /** What the person typed on a live page, written to the file as the window writes it. */
   async writeArtifact(host: string, agentID: string, path: string, text: string): Promise<boolean> {
     return (await this.act("artifact/write", { agentID: agentID as UUID, path, text }, host)) !== null;
+  }
+
+  /**
+   * Files into a project's drop box (#231), one after another, as the window's drop puts them.
+   * Answers the names sent; the first that could not go is said, and stops the rest.
+   */
+  async putInDropbox(host: string, folder: string, subfolder: string, files: readonly File[]): Promise<string[]> {
+    const sent: string[] = [];
+    for (const file of files) {
+      const refused = dropboxRefusal(file.name, file.size);
+      if (refused) {
+        this.say(refused);
+        break;
+      }
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      if (await this.act("dropbox/put", dropboxRequest(folder, subfolder, file.name, bytes), host) === null) break;
+      sent.push(file.name);
+    }
+    return sent;
   }
 
   // MARK: Pinned pages (#159)

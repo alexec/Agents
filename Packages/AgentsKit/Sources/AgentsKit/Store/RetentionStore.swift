@@ -4,8 +4,8 @@ import AgentsKitCore
 /// How long archived agents are kept, and the clock that counts it (051).
 ///
 /// One small file, read whole and written whole, on `LimitStore`'s pattern. A missing
-/// file is the defaults; an unreadable one is set aside and is the defaults. Retirement
-/// is on by default, so a daemon that loses its file keeps retiring, and never starts
+/// file is the defaults; an unreadable one is set aside and is the defaults. Deletion by age
+/// is on by default, so a daemon that loses its file keeps deleting, and never starts
 /// keeping everything for ever because of a bad read.
 public struct RetentionStore: Sendable {
     public struct File: Codable, Hashable, Sendable {

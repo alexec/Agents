@@ -21,6 +21,7 @@ import { browserName, type Session } from "../session";
 import { ActivityRows } from "./Activity";
 import { isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
 import { CloningRows, EmptyProjects, NewProjectMenu } from "./NewProject";
+import { putFilesInDropbox, useDropboxDrop } from "./DropboxDialog";
 import { rowExtras, SessionRow } from "./SessionRow";
 import { runSessionAction, sessionActions } from "./SessionMenu";
 import { WorkflowRow } from "./WorkflowRow";
@@ -205,6 +206,9 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   useEffect(() => { showsAllMatches.value = false; }, [query]);
   const showsWorkflows = searching || folds.isOpen(host.id, folder, "workflows");
   const online = store.hostIsOnline(host.id);
+  // A file dragged onto the row goes into the project's drop box (#231). Before any early return:
+  // it is a hook.
+  const drop = useDropboxDrop(store, host.id, folder, down);
   // The list is held while the project is open, and let go when it folds (#291).
   useEffect(() => {
     if (!unfolded || !online) return;
@@ -251,6 +255,8 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   const projectMenu: MenuItem[] = [
     { label: "New Session", disabled: down, help: "Start a new session in this project",
       run: () => go({ host: host.id, project: folder, compose: true }) },
+    { label: "Put Files in Drop Box…", disabled: down, help: "Put files into this project's .agents/dropbox/ (#231)",
+      run: () => putFilesInDropbox(host.id, folder, label) },
   ];
   const row = (agent: Agent) => (
     <SidebarSession key={agent.id} store={store} host={host.id} folder={folder} agent={agent}
@@ -259,7 +265,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   return (
     <div class={`project-fold${down && !linkDown ? " greyed" : ""}`} role="group" aria-label={label}
       data-host={host.id} data-folder={folder}>
-      <div class="row project">
+      <div class={`row project${drop.targeted ? " drop-target" : ""}`} {...drop.props}>
         <button class="disclosure" aria-label={unfolded ? `Fold ${label}` : `Unfold ${label}`} aria-expanded={unfolded}
           tabIndex={-1} disabled={searching} onClick={() => fold(!unfolded)}>{unfolded ? "⌄" : "›"}</button>
         <button class="pick" aria-expanded={unfolded} data-fold="project" title={folderPath(folder)}
@@ -331,7 +337,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
           })}
           {/* Only with no live session at all, pinned ones counted, as the window's (#250). */}
           {!searching && live.length === 0 && <p class="hint">No sessions yet</p>}
-          {(archived.length > 0 || (project.counts.archived ?? 0) > 0 || project.retiredCount > 0) && (
+          {(archived.length > 0 || (project.counts.archived ?? 0) > 0) && (
             <details class="archived" open={showsArchived}
               onToggle={(e) => {
                 const open = (e.currentTarget as HTMLDetailsElement).open;
@@ -343,10 +349,6 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
               {archived.slice(0, !searching ? archivedShown : showsAllMatches.value ? archived.length : matchesShown).map(row)}
               {searching && !showsAllMatches.value && archived.length > matchesShown && (
                 <button class="link show-all" onClick={() => (showsAllMatches.value = true)}>Show all {archived.length}</button>
-              )}
-              {showsArchived && project.retiredCount > 0 && !searching && (
-                <p class="hint">{project.retiredCount === 1 ? "1 older agent has been retired."
-                  : `${project.retiredCount} older agents have been retired.`}</p>
               )}
             </details>
           )}
@@ -440,9 +442,11 @@ const SidebarSession = memo(function SidebarSession({ store, host, folder, agent
       { label: "Move Down", disabled: down || pinnedAt[pinnedAt.length - 1] === agent.id, run: () => move(1) },
     ] : []),
   ];
+  // Into its project's drop box, never its worktree (#231).
+  const drop = useDropboxDrop(store, host, folder, down);
   return (
-    <div class="nav-item" onContextMenu={(e) => openContextMenu(e, menu())}
-      onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }}>
+    <div class={`nav-item${drop.targeted ? " drop-target" : ""}`} onContextMenu={(e) => openContextMenu(e, menu())}
+      onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }} {...drop.props}>
       <SessionRow agent={agent} chosen={chosen} onPick={() => go({ host, project: folder, session: agent.id })} going={going}
         waits={store.waitsOf(host, agent)} extras={rowExtras(store, host, agent)} />
     </div>

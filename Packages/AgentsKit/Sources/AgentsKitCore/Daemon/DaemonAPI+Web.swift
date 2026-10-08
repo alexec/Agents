@@ -62,8 +62,6 @@ public extension DaemonAPI {
                 Row(Method.attentionPending, params: Empty.self, result: AttentionPending.self, kind: .hostRequest),
                 // Which chats the host is bringing back after a restart, for Coming back (#251).
                 Row(Method.agentsResuming, params: Empty.self, result: ResumingResponse.self, kind: .hostRequest),
-                // Who a retired agent was, for the page a link to it opens (051, #253).
-                Row(Method.agentsRetired, params: RetiredRequest.self, result: [Tombstone].self, kind: .hostRequest),
                 Row(Method.worktreesList, params: WorktreesListRequest.self, result: WorktreesListResponse.self,
                     kind: .hostRequest),
                 Row(Method.workflowsList, params: WorkflowsListRequest.self, result: [WorkflowSummary].self, kind: .hostRequest),
@@ -105,6 +103,7 @@ public extension DaemonAPI {
                 Row(Method.agentsPark, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsUnpark, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsArchive, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
+                Row(Method.agentsDelete, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
                 // The ways on from a missing folder (#119), as the window's header has them.
                 Row(Method.agentsContinueInProject, params: ContinueInProjectRequest.self, result: UUID.self,
                     kind: .hostRequest),

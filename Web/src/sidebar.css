@@ -142,3 +142,6 @@
   .with-sidebar .sidebar-head h1.narrow-only { flex-basis: 100%; margin: 10px 0 2px; text-align: left; font-size: 22px; }
   .with-sidebar .sidebar-head .search { flex: 1; }
 }
+
+/* A row with files dragged over it, which a drop puts in the project's drop box (#231). */
+.with-sidebar .sidebar .drop-target { outline: 2px dashed var(--accent); outline-offset: -2px; border-radius: 6px; }

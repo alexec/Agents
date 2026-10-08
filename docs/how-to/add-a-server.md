@@ -68,6 +68,23 @@ it and no port needs opening. See [Projects, hosts and worktrees](../explanation
 The key is read once, for this install. The control plane keeps neither the key nor the ssh
 connection, and afterwards the server connects out by itself like any other.
 
+#### A server behind a bastion
+
+A server your `~/.ssh/config` reaches through a `ProxyJump` or `ProxyCommand`, such as a
+cloud workspace behind a bastion, usually cannot dial back to this Mac. Install it over ssh
+the same way. The sheet then says the server **is reached through a bastion, so it connects
+through a tunnel the control plane holds over ssh**.
+
+The control plane keeps an ssh session open to the server, logging in as `ssh` does for you
+from Terminal. That session forwards port 8791 on the server's loopback back to the control
+plane. The server's host dials `https://127.0.0.1:8791`, and the certificate is still
+checked by its pin. The key, if you chose one, is still read only for the install.
+
+If the session drops, for example while this Mac sleeps, the server goes offline. Under
+**Hosts** its line says **ssh tunnel down** and why. The control plane starts the session
+again by itself. When you remove the server, the tunnel closes. A server on the same network
+is set up as before, with no tunnel.
+
 ### Put a project on it
 
 1. Click **+** (**New project**) at the top of the **Projects** list, choose the server's

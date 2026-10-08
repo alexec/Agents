@@ -85,14 +85,6 @@ struct SidebarSessionRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-                if agent.state == .archived,
-                   let note = RetirementWords.rowNote(agent.retirement, now: Date(),
-                                                      cap: model.work.retentionState?.settings.cap) {
-                    Text(note)
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
                 if agent.eventWait?.isOpen == true, let wait = model.work.waitStatus(of: agent) {
                     Text(wait.mark)
                         .appText(.fine)

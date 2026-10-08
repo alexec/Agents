@@ -15,6 +15,12 @@ public extension DaemonAPI.Method {
     /// runtime, relayed through the control plane (058, T091). An operator's, after the
     /// window asked the person.
     static let hostsLendSignIn = "hosts/lendSignIn"
+    /// `hosts/detect` (#429): every server in the control plane's `~/.ssh/config` that
+    /// answers, added as `hosts/install` would with no key. `[DetectedServer]`.
+    static let hostsDetect = "hosts/detect"
+    /// `ProjectDetection` (#429): whether a host added from now on arrives with its
+    /// projects, and where they are looked for.
+    static let controlSetProjectDetection = "control/setProjectDetection"
     /// A host, on its channel 0 (T091): a tunnel to the host that lends it a sign-in.
     static let tunnelOpen = "tunnel/open"
     /// On the Mac's host (T091): start relaying a runtime's sign-in, and say what a server
@@ -38,6 +44,11 @@ public extension DaemonAPI.Method {
     static let hostHello = "host/hello"
     static let attentionNeed = "attention/need"
     static let controlPing = "control/ping"
+    /// To a host just added, on its channel 0 (#429), never answered: `ProjectDetection`,
+    /// the paths to add projects from, once.
+    static let projectsDetect = "projects/detect"
+    /// A host, on its channel 0 (#429): it has added the projects it found. `{added}`.
+    static let projectsDetected = "projects/detected"
 
     // To a relay host, on its channel 0 (058, T096–T097): notifications, never answered.
     /// `RelayDevices`: the devices it may carry for, with their keys.
@@ -55,6 +66,8 @@ public extension DaemonAPI.Notification {
     /// `HostJoinStatus`: this Mac's host's join changed, as it said it (#113).
     static let controlThisMacHostChanged = "control/thisMacHostChanged"
     static let controlInstallProgress = "control/installProgress"
+    /// `HostTunnelChanged`: a server's reverse tunnel over ssh came up or went down (#435).
+    static let controlTunnelChanged = "control/tunnelChanged"
     /// To a device on the old way, after the move (058, T085): `ControlMoved`.
     static let controlMoved = "control/moved"
 }
@@ -83,6 +96,9 @@ public extension DaemonAPI {
         /// This Mac's host, as it says its join stands (#113), when the control plane runs
         /// beside it: "Couldn't join the control plane: …". Nil elsewhere.
         public var thisMacHost: HostJoinStatus?
+        /// Where a host added from now on has its projects found (#429). Nil from a control
+        /// plane older than that.
+        public var projectDetection: ProjectDetection?
 
         public init(name: String, version: String, homeHost: HostID?, machineID: String,
                     startedAt: Date? = nil, port: Int? = nil, awayFromHome: Bool? = nil) {
@@ -145,6 +161,10 @@ public extension DaemonAPI {
         public var relay: Bool?
         /// The hosts whose sign-in this one may use, by runtime (T091).
         public var signInFrom: [String: HostID]?
+        /// A server behind a bastion dials the control plane through a reverse tunnel the
+        /// control plane holds over ssh (#435): how that session stands. Nil for a host
+        /// that dials it directly.
+        public var tunnel: HostTunnel?
 
         public init(id: HostID, name: String, platform: String, version: String, state: String,
                     reach: String, machineID: String?, relay: Bool? = nil) {
@@ -156,6 +176,66 @@ public extension DaemonAPI {
             self.state = state
             self.reach = reach
             self.machineID = machineID
+        }
+    }
+
+    /// One host in the ssh config, and what `hosts/detect` did with it (#429).
+    struct DetectedServer: Codable, Sendable, Hashable, Identifiable {
+        public enum Outcome: String, Codable, Sendable {
+            /// It answered, and was installed: it joins by itself.
+            case added
+            /// A host by that name is already on the control plane, or the server has
+            /// Agents installed already.
+            case known
+            /// Another host's `ProxyJump` or `ProxyCommand` goes through it.
+            case bastion
+            /// It did not answer, or would not let ssh in without a prompt.
+            case unreachable
+            /// It answered, and the install failed.
+            case failed
+        }
+
+        /// The `Host` name in the config.
+        public var alias: String
+        /// `user@hostname:port`, as `ssh -G` resolved it.
+        public var resolved: String
+        public var outcome: Outcome
+        /// Why, in words, when it was not added.
+        public var detail: String?
+
+        public var id: String { alias }
+
+        public init(alias: String, resolved: String, outcome: Outcome, detail: String? = nil) {
+            self.alias = alias
+            self.resolved = resolved
+            self.outcome = outcome
+            self.detail = detail
+        }
+    }
+
+    /// A reverse tunnel over ssh to the control plane, held for one server (#435).
+    struct HostTunnel: Codable, Sendable, Hashable {
+        /// Whether ssh has the server's end of the tunnel open now.
+        public var up: Bool
+        /// Why it is down, in ssh's words, when it said any.
+        public var problem: String?
+
+        public init(up: Bool, problem: String? = nil) {
+            self.up = up
+            self.problem = problem
+        }
+    }
+
+    /// `control/tunnelChanged`: by name, since a server's tunnel is up before it joins.
+    struct HostTunnelChanged: Codable, Sendable, Hashable {
+        public var name: String
+        public var host: HostID?
+        public var tunnel: HostTunnel
+
+        public init(name: String, host: HostID?, tunnel: HostTunnel) {
+            self.name = name
+            self.host = host
+            self.tunnel = tunnel
         }
     }
 

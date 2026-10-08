@@ -253,16 +253,6 @@ final class AppModel {
         showsRuntimes = false
         if let agent = agents.first(where: { $0.id == agentID }) {
             select(ProjectKey(host: agent.host, folder: agent.projectFolder))
-        } else if let gone = work.tombstones[agentID] {
-            select(ProjectKey(host: gone.host, folder: Project.standardize(gone.project)))
-        } else {
-            // Perhaps retired (051): ask, and open its project once the answer is in.
-            Task { [weak self] in
-                guard let self, let gone = await self.tombstone(for: agentID),
-                      self.selection == agentID else { return }
-                self.select(ProjectKey(host: gone.host, folder: Project.standardize(gone.project)))
-                self.selection = agentID
-            }
         }
         openWorkflow = nil
         selection = agentID
@@ -520,9 +510,15 @@ final class AppModel {
 
     /// This Mac's host: through the control plane when the window has one (058). Set
     /// once more when first run chooses one.
-    private var client = ControlConfig.macClient()
+    private var client = DaemonClient(link: UnreachableLink())
     /// The one connection to the control plane every host's client is carried on (058).
     private var controlLink: ControlLink? = ControlConfig.endpoint.flatMap(ControlConfig.link)
+
+    init() {
+        // On `controlLink` itself, not a link of its own (#445): a second connection that
+        // nothing else knew of was never let go of, so a wedged one stayed for good.
+        if let controlLink { client = DaemonClient(link: controlLink.link(for: .mac)) }
+    }
     /// Every host the control plane has besides this Mac's, each with a client of its own
     /// over `controlLink` (058, US3): what `HostSet` is for servers reached by ssh from
     /// here, with the ssh on the control plane's side.
@@ -625,9 +621,24 @@ final class AppModel {
         guard controlLink != nil else { return hosts.isOffline(.mac) ? .notAnswering : nil }
         guard controlPlaneListed else { return nil }
         return MacHostNotice.decide(planeOnThisMac: controlPlaneMachine == MachineID.current,
-                                    macState: controlPlaneHosts?.first { $0.id == .mac }?.state,
-                                    join: macHostJoin)
+                                    macState: macHostState,
+                                    join: macHostJoin,
+                                    windowMissed: hosts.macDownSince != nil)
     }
+
+    /// This Mac's row in the control plane's last list, `online` or not.
+    private var macHostState: String? { controlPlaneHosts?.first { $0.id == .mac }?.state }
+
+    /// The control plane answers and says this Mac's host is up, so a window that cannot
+    /// reach it has lost its own way there, not the host (#445).
+    private var macHostUpAtControlPlane: Bool {
+        guard controlLink != nil, controlPlaneReachable else { return false }
+        if let join = macHostJoin { return join.member && join.connected && (macHostState ?? "online") == "online" }
+        return macHostState == "online"
+    }
+
+    /// Tries in a row this Mac's host failed while the control plane said it was up (#445).
+    @ObservationIgnored private var missesWithHostUp = 0
 
     /// A button's tooltip when `host` cannot be asked. This Mac's names the reason (#303).
     func offlineHelp(for host: HostID) -> String {
@@ -651,7 +662,14 @@ final class AppModel {
     }
 
     /// This Mac's host strip's Try Again: the same as the control plane's (#83).
-    func tryMacHostAgain() { tryControlPlaneAgain() }
+    /// The host notice's Try Again. With a control plane, the connection to it is let go
+    /// first, so the try is on a fresh one with fresh routes at the host: the old one can
+    /// answer for the control plane and still carry nothing to or from the host (#445).
+    func tryMacHostAgain() {
+        if !isConnected { controlLink?.disconnect() }
+        missesWithHostUp = 0
+        tryControlPlaneAgain()
+    }
 
     /// The away strip's Try Again: one attempt now, then the usual backoff.
     func tryControlPlaneAgain() {
@@ -725,8 +743,6 @@ final class AppModel {
     /// adding them up would be an all-time figure wearing the word "session". Taking
     /// away what was spent before we were watching leaves what this sitting cost.
     var selectedAgent: Agent? { work.agent(selection) }
-    /// What is left of an agent that has been retired, when this window has asked (051).
-    func retiredTombstone(_ id: UUID) -> Tombstone? { work.tombstones[id] }
 
     var permissionsForSelection: [PermissionRequest] { work.permissions(for: selection) }
 
@@ -1398,7 +1414,7 @@ final class AppModel {
     }
 
     /// The person changing how long archived agents are kept. Unconfirmed, a change that
-    /// would retire agents at once comes back unapplied with what it would retire, for
+    /// would delete agents at once comes back unapplied with what it would delete, for
     /// the confirmation; confirmed, it is applied here and then on every server, which
     /// keeps to the Mac's settings the way it keeps to its limits (037 R7).
     func setRetention(_ settings: RetentionSettings, confirmed: Bool) async -> DaemonAPI.RetentionSetResult? {
@@ -1511,32 +1527,20 @@ final class AppModel {
         }
     }
 
-    /// Retire one archived agent now (051, US7). Unconfirmed, the size it frees, or why it
-    /// cannot go yet; confirmed, it is retired and leaves the list by `agent/removed`.
-    func retireNow(_ agentID: UUID, confirmed: Bool) async -> Result<DaemonAPI.RetirePreview, JSONRPCError> {
+    /// Delete one archived agent (#398). It leaves the list by `agent/removed`; a refusal
+    /// says why it cannot go yet.
+    func delete(_ agentID: UUID) async -> Result<Void, JSONRPCError> {
         do {
-            let preview = try await client(for: work.agent(agentID)?.host ?? .mac).call(
-                DaemonAPI.Method.agentsRetire, DaemonAPI.RetireRequest(agentID: agentID, confirmed: confirmed),
-                returning: DaemonAPI.RetirePreview.self)
-            if confirmed, selection == agentID { selection = nil }
-            return .success(preview)
+            _ = try await client(for: work.agent(agentID)?.host ?? .mac).call(
+                DaemonAPI.Method.agentsDelete, DaemonAPI.AgentRequest(agentID: agentID),
+                returning: DaemonAPI.Empty.self)
+            if selection == agentID { selection = nil }
+            return .success(())
         } catch let error as JSONRPCError {
             return .failure(error)
         } catch {
             return .failure(JSONRPCError(code: -1, message: error.localizedDescription))
         }
-    }
-
-    /// What is left of a retired agent, asked of the daemon once and then remembered.
-    func tombstone(for agentID: UUID, on host: HostID = .mac) async -> Tombstone? {
-        if let known = work.tombstones[agentID] { return known }
-        guard let found = try? await client(for: host).call(
-            DaemonAPI.Method.agentsRetired,
-            DaemonAPI.RetiredRequest(ids: [agentID]),
-            returning: [Tombstone].self) else { return nil }
-        let stamped = found.map { var t = $0; t.host = host; return t }
-        work.takeTombstones(stamped)
-        return stamped.first
     }
 
     func setCostLimits(perAgent: Cost?? = nil, daily: Cost?? = nil) async {
@@ -1628,18 +1632,21 @@ final class AppModel {
         }
     }
 
-    /// Files dragged onto a project's row, or one of its sessions', put into that
-    /// project's drop box (#231): its main folder's, never a session's worktree. Sent to
-    /// the project's host like an attachment, so a server's project gets them too. The
-    /// event that fires is the host's; nothing is said here unless one could not go.
-    func putInDropbox(_ files: [URL], project: ProjectKey) async {
+    /// Files dragged onto a project's row, or one of its sessions', or chosen in its Drop
+    /// Box sheet, put into that project's drop box (#231): its main folder's, never a
+    /// session's worktree, and inside `subfolder` when one is named. Sent to the project's
+    /// host like an attachment, so a server's project gets them too. The event that fires
+    /// is the host's; nothing is said here unless one could not go, and then it is false.
+    @discardableResult
+    func putInDropbox(_ files: [URL], subfolder: String = "", project: ProjectKey) async -> Bool {
+        let folder = subfolder.trimmingCharacters(in: CharacterSet(charactersIn: "/").union(.whitespaces))
         for file in files {
             let name = file.lastPathComponent
             // Looked at before it is read: a film dragged by mistake is not read whole first.
             let size = (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
             guard size <= DaemonAPI.dropboxPutLimit else {
                 problem = "\(name) is too big to send. Copy it into .agents/dropbox/ in \(project.folder.lastPathComponent) instead."
-                return
+                return false
             }
             let data: Data
             do {
@@ -1649,18 +1656,20 @@ final class AppModel {
                 }.value
             } catch {
                 problem = "\(name) could not be read to put in the drop box: \(error.localizedDescription)"
-                return
+                return false
             }
             do {
                 _ = try await client(for: project.host).call(
                     DaemonAPI.Method.dropboxPut,
-                    DaemonAPI.DropboxPutRequest(folder: project.folder, name: name, data: data),
+                    DaemonAPI.DropboxPutRequest(folder: project.folder, subfolder: folder.isEmpty ? nil : folder,
+                                                name: name, data: data),
                     returning: DaemonAPI.DropboxPutResponse.self)
             } catch {
                 problem = describe(error)
-                return
+                return false
             }
         }
+        return true
     }
 
     /// Clone a Git URL into the home folder and select the project it becomes (027).
@@ -1983,6 +1992,7 @@ final class AppModel {
             try await client.connect()
             isConnected = true
             hosts.macDownSince = nil
+            missesWithHostUp = 0
             problem = nil
             await client.setCredentialLender { [weak self] wanted in
                 await self?.answerMacCredentialWanted(wanted) ?? false
@@ -2009,6 +2019,19 @@ final class AppModel {
             if hosts.macDownSince == nil { hosts.macDownSince = Date() }
             // A control plane that cannot be reached is the strip, not an alert.
             if controlLink == nil { problem = describe(error) }
+            // The control plane answers and says the host is up, and the host still does
+            // not: the connection under them is wedged on the way to the host (#445). Let
+            // it go, so the next try dials a fresh one rather than waiting on it for good.
+            if macHostUpAtControlPlane {
+                missesWithHostUp += 1
+                if missesWithHostUp >= 2 {
+                    missesWithHostUp = 0
+                    WakeAndNetwork.log.info("reconnect: this Mac's host is up and not reached; dialling the control plane afresh")
+                    controlLink?.disconnect()
+                }
+            } else {
+                missesWithHostUp = 0
+            }
         }
     }
 

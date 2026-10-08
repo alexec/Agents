@@ -7,7 +7,7 @@ import { cases } from "./fixtures.mjs";
 // Branch opens the new session (#342), so the menu reads the page's address as it loads.
 globalThis.location = { hash: "" };
 globalThis.addEventListener = () => {};
-const { sessionActions } = await load("src/views/SessionMenu.tsx");
+const { sessionActions, deleteTitle, deleteMessage } = await load("src/views/SessionMenu.tsx");
 delete globalThis.location;
 delete globalThis.addEventListener;
 const agents = Object.fromEntries(cases("groups/agents.json").map((c) => [c.name, c.input.agent]));
@@ -33,12 +33,18 @@ test("parked, or parking when the turn ends, offers Unpark", () => {
   assert.deepEqual(labels("parked when the turn ends, running"), ["Stop", "Unpark", "Branch", "Archive"]);
 });
 
-test("archived offers Bring Back, and no Park or Branch", () => {
-  assert.deepEqual(labels("archived"), ["Bring Back"]);
+test("archived offers Bring Back and Delete, and no Park or Branch (#398)", () => {
+  assert.deepEqual(labels("archived"), ["Bring Back", "Delete…"]);
+});
+
+test("Delete asks with the window's words", () => {
+  assert.equal(deleteTitle("Fix the build"), "Delete \u201CFix the build\u201D?");
+  assert.equal(deleteTitle("  "), "Delete this session?");
+  assert.equal(deleteMessage, "Its conversation and record are removed. This cannot be undone.");
 });
 
 test("given whether it is pinned, Pin or Unpin before Branch and Archive; never on archived (#180, #342)", () => {
   assert.deepEqual(sessionActions(agents["running"], false).map((a) => a.label), ["Stop", "Park", "Pin", "Branch", "Archive"]);
   assert.deepEqual(sessionActions(agents["done"], true).map((a) => a.label), ["Park", "Mark as Unread", "Unpin", "Branch", "Archive"]);
-  assert.deepEqual(sessionActions(agents["archived"], true).map((a) => a.label), ["Bring Back"]);
+  assert.deepEqual(sessionActions(agents["archived"], true).map((a) => a.label), ["Bring Back", "Delete…"]);
 });

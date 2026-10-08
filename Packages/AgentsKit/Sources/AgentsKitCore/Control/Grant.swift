@@ -182,6 +182,10 @@ public struct HostRecord: Codable, Hashable, Sendable, Identifiable {
     public var forgottenAt: Date?
     /// As `ClientRecord.knownEpoch`.
     public var knownEpoch: Int?
+    /// True from when it enrolled until it says it has added the projects it found
+    /// (#429): told `projects/detect` each time it connects until then. Nil for a host
+    /// that enrolled before, or while detection was off, so it is never told.
+    public var detectProjects: Bool?
 
     public init(id: HostID, name: String, publicKey: Data? = nil, reach: HostReach = .dialOut,
                 platform: String = "", version: String = "", installed: Bool = false,
@@ -261,6 +265,8 @@ public struct ControlSettings: Codable, Hashable, Sendable {
     public var owner: PersonID?
     public var created: Date?
     public var rev: Int?
+    /// Where a host added from now on has its projects found (#429). Nil: the default.
+    public var projectDetection: ProjectDetection?
 
     public init(name: String, port: Int = 8790, homeHost: HostID? = nil, machineID: String,
                 url: String? = nil, pin: String? = nil, controlKey: Data? = nil,
@@ -275,6 +281,22 @@ public struct ControlSettings: Codable, Hashable, Sendable {
         self.owner = owner
         self.created = created
     }
+}
+
+/// Projects found on a host when it is added (#429), once: every immediate folder of
+/// each path that has `.git` in it. `~` is the host's own home. After that, projects are
+/// the person's to add and remove; nothing looks again.
+public struct ProjectDetection: Codable, Hashable, Sendable {
+    public var enabled: Bool
+    public var paths: [String]
+
+    public init(enabled: Bool = true, paths: [String] = ProjectDetection.defaultPaths) {
+        self.enabled = enabled
+        self.paths = paths
+    }
+
+    public static let defaultPaths = ["~", "~/src", "~/code", "~/projects", "~/Developer", "~/dev", "~/git"]
+    public static let standard = ProjectDetection()
 }
 
 /// Whom records belong to (FR-012). One person per control plane for now; the id is

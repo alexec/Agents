@@ -153,13 +153,10 @@ public actor AgentStore {
             throw refusal
         }
         var agent = agent
-        // Retirement's two fields mean something only on an archived agent (051). A
-        // path that forgets to clear them on the way out of archived is put right here
-        // rather than refused: nothing else in the record depends on them.
-        if agent.state != .archived {
-            agent.archivedAt = nil
-            agent.retirement = nil
-        }
+        // When it was archived means something only on an archived agent (051). A path
+        // that forgets to clear it on the way out of archived is put right here rather
+        // than refused: nothing else in the record depends on it.
+        if agent.state != .archived { agent.archivedAt = nil }
         // A slim copy never reaches the disk (051, research R2). Its lists are read back
         // from the record first, and without a record to read them from, the save is
         // refused: writing it as it is would throw them away for good.
@@ -395,63 +392,48 @@ public actor AgentStore {
         try? appendHandles.removeValue(forKey: agentID)?.close()
     }
 
-    // MARK: Retiring (051)
+    // MARK: Deleting (#398)
 
-    /// The steps of retiring an agent, after the tombstone, in the order they run. A
-    /// daemon stopped between any two leaves either the whole agent or its tombstone,
-    /// and `finishRetiring` completes the rest (FR-017).
-    enum RetireStep: Int, CaseIterable {
-        case tombstone, closeTranscript, deleteRecord, deleteTranscript, removeFolder
+    /// Where an agent's folder is set aside while it is deleted: a name `agentIDs` does
+    /// not read as an agent.
+    func setAside(_ id: UUID) -> URL {
+        locations.agents.appendingPathComponent(Self.setAsidePrefix + id.uuidString, isDirectory: true)
     }
 
-    /// For the tests: stop after this step, as a kill would.
-    var failAfter: RetireStep?
-    func stop(after step: RetireStep?) { failAfter = step }
+    static let setAsidePrefix = ".deleting-"
+
+    /// For the tests: stop after the folder is set aside, as a kill would.
+    var stopAfterSettingAside = false
+    func stop(afterSettingAside: Bool) { stopAfterSettingAside = afterSettingAside }
     struct Stopped: Error {}
 
-    /// Retire one agent: write its tombstone and sync it, then delete what the app kept
-    /// for it. Nothing is deleted if the tombstone cannot be written.
-    public func retire(_ tombstone: Tombstone, into retired: RetiredStore) throws {
-        try retired.append(tombstone)
-        try check(.tombstone)
-        try deleteRetiredFiles(tombstone.id)
-    }
-
-    /// Finish what a stopped retire began: for each of these ids that still has a
-    /// folder, the tombstone is already written, so what is left is deleting.
-    public func finishRetiring(_ ids: some Sequence<UUID>) {
-        for id in ids where FileManager.default.fileExists(atPath: locations.agent(id).path) {
-            DaemonLog.shared.write("finishing the retirement of \(id), cut off last time")
-            try? deleteRetiredFiles(id)
-        }
-    }
-
-    /// Delete what the app kept for an agent whose tombstone is already written. The
-    /// daemon's path: it writes the tombstone itself, and does the worktree in between.
-    public func deleteRetired(_ id: UUID) throws {
-        try deleteRetiredFiles(id)
-    }
-
-    /// The record first, then the transcript, then the folder: a folder with no record
-    /// is one `loadAll` cannot read, so a half-deleted agent is never listed as whole.
-    private func deleteRetiredFiles(_ id: UUID) throws {
+    /// Delete everything the app kept for an agent. Its folder is renamed out of the list
+    /// in one step first, so a daemon stopped part way never lists half an agent, and
+    /// `finishDeleting` removes what is left at the next start.
+    public func delete(_ id: UUID) throws {
         closeTranscript(for: id)
         held[id] = nil
         syncedStates[id] = nil
         lineIndexes.remove(id)
         historyMarks.remove(id)
-        try check(.closeTranscript)
-        try removeIfThere(locations.record(id))
-        try check(.deleteRecord)
-        try removeIfThere(locations.transcript(id))
         turnCache.remove(id)
-        try check(.deleteTranscript)
-        try removeIfThere(locations.agent(id))
-        try check(.removeFolder)
+        let folder = locations.agent(id)
+        guard FileManager.default.fileExists(atPath: folder.path) else { return }
+        let aside = setAside(id)
+        try removeIfThere(aside)
+        try FileManager.default.moveItem(at: folder, to: aside)
+        if stopAfterSettingAside { throw Stopped() }
+        try FileManager.default.removeItem(at: aside)
     }
 
-    private func check(_ step: RetireStep) throws {
-        if failAfter == step { throw Stopped() }
+    /// Remove the folders a stopped delete set aside.
+    public func finishDeleting() {
+        let contents = (try? FileManager.default.contentsOfDirectory(
+            at: locations.agents, includingPropertiesForKeys: nil)) ?? []
+        for url in contents where url.lastPathComponent.hasPrefix(Self.setAsidePrefix) {
+            DaemonLog.shared.write("finishing the delete of \(url.lastPathComponent), cut off last time")
+            try? FileManager.default.removeItem(at: url)
+        }
     }
 
     private func removeIfThere(_ url: URL) throws {

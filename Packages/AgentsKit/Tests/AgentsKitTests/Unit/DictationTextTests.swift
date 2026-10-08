@@ -174,4 +174,31 @@ struct DictationTextTests {
         text.heard("Hello there friend.", final: true, from: 0)
         #expect(text.text == "Hello there friend.")
     }
+
+    // MARK: Marked as tentative (#448)
+
+    @Test func onlyTheWordsBeingHeardAreMarked() {
+        var text = DictationText("Look at", selection: 7..<7)
+        #expect(text.heardWords == nil)
+        text.heard("the files", final: false, from: 0)
+        // Not the space put before them, and not what was typed.
+        #expect(text.text == "Look at the files")
+        #expect(text.heardWords == 8..<17)
+        text.heard("the files pane.", final: true, from: 0)
+        #expect(text.heardWords == nil)
+    }
+
+    @Test func theSpaceAfterTheHeardWordsIsNotMarked() {
+        var text = DictationText("Fix bug", selection: 4..<4)
+        text.heard("the", final: false, from: 0)
+        #expect(text.text == "Fix the bug")
+        #expect(text.heardWords == 4..<7)
+    }
+
+    @Test func wordsTheyEditAreNoLongerMarked() {
+        var text = DictationText("")
+        text.heard("Hello there", final: false, from: 0)
+        text.edited(to: "Hello")
+        #expect(text.heardWords == nil)
+    }
 }

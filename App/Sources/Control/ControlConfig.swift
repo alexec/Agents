@@ -62,11 +62,6 @@ enum ControlConfig {
         }
     }
 
-    static func macClient() -> DaemonClient {
-        guard let endpoint, let link = link(endpoint) else { return DaemonClient(link: UnreachableLink()) }
-        return DaemonClient(link: link.link(for: .mac))
-    }
-
     /// Forget This Mac (#344): the pairing goes, so the window asks how to work again, as
     /// at first run. Its key stays, as the Remote's does; a new pairing names it afresh.
     static func forget() {

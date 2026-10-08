@@ -120,10 +120,12 @@ extension View {
     /// here would override the tint every link and control draws in.
     func paperGround() -> some View {
         #if os(macOS)
+        // The ground runs on up under the window's toolbar, which draws none of its
+        // own. A painted toolbar background is a view of SwiftUI's across the whole
+        // title bar, and over the detail it kept the window from being dragged (#456).
         self
             .background(Paper.ground)
-            .toolbarBackground(Paper.ground, for: .windowToolbar)
-            .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
+            .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         #else
         self
             .background(Paper.ground)

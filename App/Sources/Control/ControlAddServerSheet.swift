@@ -8,14 +8,18 @@ import SwiftUI
 ///   nothing has to reach it. The command carries a one-time host code, and the sheet
 ///   closes by itself when the server joins.
 /// - **Install over ssh**, for a server the person can already ssh to: the control plane
-///   installs the host once and keeps neither a key nor the session. The key is optional
+///   installs the host once and keeps neither a key nor the session. A server ssh reaches
+///   through a bastion is the exception (#435): it cannot dial back, so the control plane
+///   holds a reverse tunnel to it over ssh, and the sheet says when that is down. The key is optional
 ///   when the control plane is on this Mac: its ssh is the person's, with their agent,
 ///   config and default identity (#413). One elsewhere has none of those, so needs a key.
+/// - **From ssh config**, on a control plane on this Mac (#429): every host in
+///   `~/.ssh/config` that answers is added at once, bastions and hosts already here left out.
 struct ControlAddServerSheet: View {
     @Environment(\.dismiss) private var dismiss
     let control: ControlSettingsModel
 
-    enum Way: Hashable { case command, ssh }
+    enum Way: Hashable { case command, ssh, sshConfig }
     @State private var way: Way = .command
 
     // Run a command
@@ -32,17 +36,23 @@ struct ControlAddServerSheet: View {
     @State private var fingerprint: String?
     @State private var outcome: ControlSettingsModel.InstallOutcome?
 
+    // From ssh config
+    @State private var detecting = false
+    @State private var detected: [DaemonAPI.DetectedServer]?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Add a Server").appText(.title).fontWeight(.semibold)
             Picker("How", selection: $way) {
                 Text("Run a command").tag(Way.command)
                 Text("Install over ssh").tag(Way.ssh)
+                if control.isOnThisMac { Text("From ssh config").tag(Way.sshConfig) }
             }
             .pickerStyle(.segmented).labelsHidden().fixedSize()
             switch way {
             case .command: commandPage
             case .ssh: sshPage
+            case .sshConfig: sshConfigPage
             }
         }
         .padding(28)
@@ -122,6 +132,85 @@ struct ControlAddServerSheet: View {
         return String(format: "%d:%02d", seconds / 60, seconds % 60)
     }
 
+    // MARK: From ssh config (#429)
+
+    @ViewBuilder
+    private var sshConfigPage: some View {
+        Text("Every host in ~/.ssh/config that ssh can log into without a prompt is added. Hosts other hosts are reached through, hosts already here, and hosts that don't answer are left out.")
+            .appText(.reading).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        if detecting {
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text(control.installStep == nil ? "Looking at each host…" : stepWords(control.installStep))
+                    .appText(.supporting).foregroundStyle(.secondary)
+            }
+        }
+        if let detected {
+            if detected.isEmpty {
+                Text("There are no hosts in ~/.ssh/config to add.").appText(.supporting).foregroundStyle(.secondary)
+            } else {
+                ScrollView {
+                    Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 6) {
+                        ForEach(detected) { server in
+                            GridRow {
+                                Image(systemName: Self.symbol(server.outcome))
+                                    .tinted(server.outcome == .added ? .vouched : server.outcome == .failed ? .failure : .none)
+                                    .foregroundStyle(.secondary)
+                                    .accessibilityHidden(true)
+                                Text(server.alias).appText(.code)
+                                Text(Self.words(server)).appText(.supporting).foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .accessibilityElement(children: .combine)
+                        }
+                    }
+                }
+                .frame(maxHeight: 260)
+            }
+        }
+        if let problem = control.problem, way == .sshConfig, !detecting {
+            Text(problem).appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
+        }
+        HStack {
+            Spacer()
+            Button(detected == nil ? "Cancel" : "Done") { dismiss() }.buttonStyle(.paper)
+            Button(detected == nil ? "Find Servers" : "Look Again") { detect() }
+                .buttonStyle(.paperProminent)
+                .keyboardShortcut(.defaultAction)
+                .disabled(detecting)
+        }
+    }
+
+    private func detect() {
+        detecting = true
+        Task {
+            detected = await control.detectServers()
+            detecting = false
+        }
+    }
+
+    static func symbol(_ outcome: DaemonAPI.DetectedServer.Outcome) -> String {
+        switch outcome {
+        case .added: "checkmark.circle.fill"
+        case .failed: "exclamationmark.triangle.fill"
+        case .known: "circle.fill"
+        case .bastion: "arrow.triangle.branch"
+        case .unreachable: "circle.dashed"
+        }
+    }
+
+    static func words(_ server: DaemonAPI.DetectedServer) -> String {
+        let said: String = switch server.outcome {
+        case .added: "Added · \(server.resolved)"
+        case .known: server.detail ?? "Already a host."
+        case .bastion: "A way in for other hosts, not added."
+        case .unreachable: "Not added: \(server.detail ?? "it did not answer.")"
+        case .failed: "Couldn’t install: \(server.detail ?? "it failed.")"
+        }
+        return said
+    }
+
     // MARK: M2 · Install over ssh
 
     @ViewBuilder
@@ -168,9 +257,10 @@ struct ControlAddServerSheet: View {
             }
         }
         switch outcome {
-        case .added(let named)?:
+        case .added(let named, let tunnel)?:
             Text(joined.map { "\($0) joined." } ?? "Installed on \(named). Waiting for it to connect…")
                 .appText(.supporting).tinted(.vouched)
+            if tunnel { tunnelLine(named) }
         case .failed(let why)?:
             Text(why).appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
         default:
@@ -185,6 +275,20 @@ struct ControlAddServerSheet: View {
                     .keyboardShortcut(.defaultAction)
                     .disabled(working || destination.trimmingCharacters(in: .whitespaces).isEmpty || (keyPath.isEmpty && !keyOptional))
             }
+        }
+    }
+
+    /// A server behind a bastion: how the tunnel it dials through stands (#435).
+    @ViewBuilder
+    private func tunnelLine(_ named: String) -> some View {
+        let lead = "\(named) is reached through a bastion, so it connects through a tunnel the control plane holds over ssh."
+        switch control.tunnels[named] {
+        case let state? where !state.up:
+            Text("\(lead) That ssh session is down\(state.problem.map { ": \($0)" } ?? ""). It is tried again by itself.")
+                .appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
+        default:
+            Text("\(lead) It is offline whenever that session is down, as when this Mac sleeps.")
+                .appText(.supporting).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
     }
 

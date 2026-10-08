@@ -45,18 +45,7 @@ extension DaemonCore {
             if !held.isEmpty { holding[agent.id] = held }
         }
         return SessionLookup.list(in: caller.projectFolder, agents: sessions, caller: caller.id, holding: holding,
-                                  limit: request.limit, after: request.after,
-                                  leftBehind: worktreesLeftByRetired(in: caller.projectFolder))
-    }
-
-    /// The project's retired sessions whose worktree folder is still on disk (#211):
-    /// retiring keeps a worktree with anything uncommitted in it, and nothing else names it.
-    func worktreesLeftByRetired(in project: URL) -> [Tombstone] {
-        loadRetentionIfNeeded()
-        return retired.inProject(project).filter {
-            guard let root = $0.worktreeRoot else { return false }
-            return FileManager.default.fileExists(atPath: root.path)
-        }
+                                  limit: request.limit, after: request.after)
     }
 
     /// The history, or the sentence saying why not. A refusal is a normal result the
@@ -64,7 +53,7 @@ extension DaemonCore {
     public func readSession(_ request: DaemonAPI.ReadSessionRequest) async throws -> String {
         let caller = try sessionCaller(token: request.token)
         switch SessionLookup.find(request.session, in: caller.projectFolder,
-                                  agents: agents.inProject(caller.projectFolder), retired: retired.values) {
+                                  agents: agents.inProject(caller.projectFolder)) {
         case .refused(let sentence):
             return sentence
         case .session(let agent):

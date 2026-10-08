@@ -38,10 +38,10 @@ parked, archived, labelled and searched the same way.
 
 Ask the agent to save it, for example "save this packing list so I can find it next time".
 It writes into `~/.agents/chat`. A later chat, in the same folder, can read and change it,
-even after the first chat has been archived and retired. The project's `AGENTS.md` says so to
+even after the first chat has been archived and deleted. The project's `AGENTS.md` says so to
 every chat; it is yours to change.
 
-Nothing in the folder is deleted by the app. Retiring a chat removes its conversation, not
+Nothing in the folder is deleted by the app. Deleting a chat removes its conversation, not
 the files it saved.
 
 **Chat on a server**

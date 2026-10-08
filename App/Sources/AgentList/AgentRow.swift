@@ -36,21 +36,21 @@ struct AgentRow: View {
             // Last known, not current: its host is not answering (037), or the control
             // plane that would carry the answer is away (058, frame H).
             .opacity(model.hostUnreachable(agent.host) ? 0.55 : 1)
-            .confirmationDialog("Retire this agent?",
-                                isPresented: Binding(get: { retiring != nil }, set: { if !$0 { retiring = nil } }),
-                                presenting: retiring) { preview in
-                Button("Retire", role: .destructive) {
-                    Task { _ = await model.retireNow(agent.id, confirmed: true) }
+            .confirmationDialog(DeletionWords.confirmTitle(agent.title), isPresented: $deleting) {
+                Button("Delete", role: .destructive) {
+                    Task {
+                        if case .failure(let refusal) = await model.delete(agent.id) { cannotDelete = refusal.message }
+                    }
                 }
                 Button("Cancel", role: .cancel) {}
-            } message: { preview in
-                Text(RetirementWords.confirmRetire(title: agent.title, bytes: preview.bytes))
+            } message: {
+                Text(DeletionWords.confirmMessage)
             }
-            .alert("This agent cannot be retired yet",
-                   isPresented: Binding(get: { cannotRetire != nil }, set: { if !$0 { cannotRetire = nil } })) {
+            .alert("This session cannot be deleted yet",
+                   isPresented: Binding(get: { cannotDelete != nil }, set: { if !$0 { cannotDelete = nil } })) {
                 Button("OK") {}
             } message: {
-                Text(cannotRetire ?? "")
+                Text(cannotDelete ?? "")
             }
     }
 
@@ -170,17 +170,6 @@ struct AgentRow: View {
                         .accessibilityLabel(running)
                 }
 
-                // When an archived agent will be retired, or why it is being kept
-                // (051): on the same kind of line, only when there is something to say.
-                if agent.state == .archived,
-                   let note = RetirementWords.rowNote(agent.retirement, now: Date(),
-                                                      cap: model.retentionState?.settings.cap) {
-                    Text(note)
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
                 // Waiting on events (042), on the same kind of line.
                 if agent.eventWait?.isOpen == true, let wait = model.work.waitStatus(of: agent) {
                     Text(wait.mark)
@@ -230,16 +219,8 @@ struct AgentRow: View {
             }
             if agent.state == .archived {
                 Button("Bring Back") { Task { await model.unarchive(agent.id) } }
-                // Now rather than when its time comes (051, US7). Asked first: the daemon
-                // says how much goes, or why it cannot yet.
-                Button("Retire Now…") {
-                    Task {
-                        switch await model.retireNow(agent.id, confirmed: false) {
-                        case .success(let preview): retiring = preview
-                        case .failure(let refusal): cannotRetire = refusal.message
-                        }
-                    }
-                }
+                // Gone for good (#398), asked first; the daemon says why not when it cannot.
+                Button("Delete…", role: .destructive) { deleting = true }
             } else {
                 // The person's own mark (#70): leave something to come back to, or
                 // clear it without opening it.
@@ -281,8 +262,8 @@ struct AgentRow: View {
     /// Something is on its way to this agent; its menu holds until it is back (#87).
     private var isActing: Bool { model.acting(agent.id) != nil }
 
-    @State private var retiring: DaemonAPI.RetirePreview?
-    @State private var cannotRetire: String?
+    @State private var deleting = false
+    @State private var cannotDelete: String?
     /// Whether the daemon is bringing this chat back by itself after a restart.
     private var isComingBack: Bool { model.isComingBack(agent) }
 

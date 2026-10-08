@@ -378,6 +378,29 @@ final class RemoteModel {
         }
     }
 
+    /// A file put into a project's drop box (#231), where a workflow on
+    /// `dropbox.file_added` can pick it up. `subfolder` is inside `.agents/dropbox/`, empty
+    /// for its top. Held to what crosses the relayed link in one record, as an attachment
+    /// is. Answers why it did not go, or nil.
+    func putInDropbox(_ data: Data, name: String, subfolder: String, project: ProjectKey) async -> String? {
+        guard !isStale(on: project.host) else { return notAnswering(project.host, "\(name) was not sent.") }
+        guard data.count <= PhoneAttachment.limit else {
+            return "From a phone, a drop box file can be 900 KB, and \(name) is bigger. Copy it into .agents/dropbox/ on the Mac instead."
+        }
+        let folder = subfolder.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
+        let request = DaemonAPI.DropboxPutRequest(folder: project.folder, subfolder: folder.isEmpty ? nil : folder,
+                                                  name: name, data: data)
+        do {
+            _ = try await client(for: request).call(DaemonAPI.Method.dropboxPut, request,
+                                                    returning: DaemonAPI.DropboxPutResponse.self)
+            return nil
+        } catch let error as JSONRPCError {
+            return error.message
+        } catch {
+            return notAnswering(project.host, "\(name) was not sent.")
+        }
+    }
+
     /// The Mac predates the panes, and the phone does what it did before them (FR-029).
     var macLacksPanes: Bool { files.macLacksPanes }
 
@@ -2038,16 +2061,6 @@ final class RemoteModel {
     /// The newest `limit` archived agents in a project, for its Archived section when
     /// it is opened. Without their slash commands: an archived chat has no prompt bar
     /// here to use them.
-    /// What is left of an agent that has been retired, when something here leads to an
-    /// agent the Mac no longer lists (051). Remembered once found.
-    func lookUpRetired(_ agentID: UUID) async {
-        guard work.agent(agentID) == nil, work.tombstones[agentID] == nil,
-              let found = try? await client.call(DaemonAPI.Method.agentsRetired,
-                                                 DaemonAPI.RetiredRequest(ids: [agentID]),
-                                                 returning: [Tombstone].self) else { return }
-        work.takeTombstones(found)
-    }
-
     /// The projects whose Archived fold is open in the sidebar (#226): each holds a page
     /// of its archived sessions while it is, as on the Mac (#165).
     private(set) var openArchivedFolds: Set<URL> = []
@@ -3063,6 +3076,25 @@ final class RemoteModel {
         }
     }
     func unarchive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsUnarchive, agentID) }
+
+    /// The archived session a menu's Delete… is asking about, until it is answered (#398).
+    var askingToDelete: Agent?
+
+    /// Delete an archived session (#398), once asked. A refusal says why it cannot go yet.
+    func delete(_ agentID: UUID) async {
+        guard !isStale(on: work.agent(agentID)?.host ?? .mac) else {
+            problem = "Your Mac is not answering, so that could not be sent."
+            return
+        }
+        do {
+            try await sendOnce(DaemonAPI.Method.agentsDelete, DaemonAPI.AgentRequest(agentID: agentID))
+            if selection == agentID { selection = nil }
+        } catch let error as JSONRPCError {
+            problem = error.message
+        } catch {
+            problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
+        }
+    }
     /// Park or unpark, whichever `Agent.parkAction` offers (040). From the card's menu.
     func perform(_ action: ParkAction, on agentID: UUID) async {
         await act(AgentAct(action), on: agentID,

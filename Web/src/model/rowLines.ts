@@ -1,7 +1,6 @@
 // The lines a session's row has under its report, in the window's and the Remote's words (#251):
-// what it holds or waits for (LeaseStatus, 036), what events it waits on (WaitStatus, 042), when
-// an archived one retires (RetirementWords.rowNote, 051), who started it (028), and its
-// worktree's help (WorktreeBadge). Worked out here, so the row only draws them.
+// what it holds or waits for (LeaseStatus, 036), what events it waits on (WaitStatus, 042), who
+// started it (028), and its worktree's help (WorktreeBadge). Worked out here, so the row only draws them.
 import type { Agent, AgentWorktree, EventPattern, LeaseSnapshot, ResourceKind } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 
@@ -120,30 +119,6 @@ export function eventWaitMark(agent: Agent, title: (id: string) => string | unde
   const what = agents.length > 0 && agents.every((a) => a !== undefined)
     ? finishing(agents as string[]) : wait.patterns.map(patternLabel).join(" or ");
   return `◷ Waiting for ${what}`;
-}
-
-/**
- * RetirementWords.rowNote: when an archived agent retires, or why it is kept. The page doesn't
- * hold the retention limit, so the next-to-go note names "the limit", as the window's does
- * before it has read it.
- */
-export function retirementNote(agent: Agent, now = new Date()): string | null {
-  if (agent.state !== "archived") return null;
-  const retirement = agent.retirement;
-  if (!retirement) return null;
-  if ("at" in retirement) {
-    const day = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-    const days = Math.round((day(fromWireDate(retirement.at)) - day(now)) / 86_400_000);
-    if (days <= 0) return "Retires today";
-    if (days === 1) return "Retires tomorrow";
-    return `Retires in ${days} days`;
-  }
-  if ("nextUnderCap" in retirement) return "Next to be retired to stay under the limit";
-  if ("held" in retirement) {
-    if (retirement.held === "worktreeHasWork") return "Kept: its worktree has work in it";
-    if (retirement.held === "workflowRunning") return "Kept: a workflow run is still going";
-  }
-  return null;
 }
 
 /** AgentsModel.startedByAgentLabel: who started an agent another agent started. */
