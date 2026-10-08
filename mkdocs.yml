@@ -120,3 +120,4 @@ nav:
       - explanation/leases.md
       - explanation/phone-and-ipad.md
       - explanation/compaction-by-runtime.md
+      - explanation/token-compression-tools.md
