@@ -57,6 +57,21 @@ struct ChatProjectTests {
         #expect(await core.chatProjectState() == .noPersonalHome)
     }
 
+    // FR-006 (Alex, 2026-10-07): a server has no personal home, and keeps its chat project
+    // in its account's home, for that alone.
+    @Test func aServerKeepsItsChatProjectInItsAccountsHome() async throws {
+        let home = try temporary("server-home")
+        let core = try await core(home: nil)
+        await core.setServerChatHome(home)
+        await core.ensureChatProject()
+
+        let folder = chatFolder(home)
+        #expect(await core.allProjects().first { $0.isChat == true }?.folder == folder)
+        #expect(await core.chatProjectState() == .ready(folder: folder))
+        #expect(await core.locations.personalHome == nil, "nothing else of ~/.agents is laid out")
+        #expect(!fileManager.fileExists(atPath: home.appending(path: ".claude").path))
+    }
+
     // US1 scenario 1, FR-001, FR-004, FR-010
     @Test func aFreshHomeGetsTheChatProjectMarked() async throws {
         let home = try temporary("home")

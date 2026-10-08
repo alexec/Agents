@@ -64,9 +64,13 @@ extension DaemonCore {
     /// exist keeps its symlinks, so `/var/…/chat` before it is made and `/private/var/…/chat`
     /// after would be two projects.
     func chatProjectFolder() -> URL? {
-        guard let home = locations.personalHome else { return nil }
+        guard let home = locations.personalHome ?? serverChatHome else { return nil }
         return Project.standardize(Project.standardize(home).appending(path: ".agents/chat"))
     }
+
+    /// A server's chat home (Alex, 2026-10-07): its account's home, for the chat project
+    /// only. Set before `ensureChatProject`.
+    func setServerChatHome(_ home: URL?) { serverChatHome = home }
 
     private func chatProjectFailed(_ sentence: String) {
         chatProjectFailure = sentence

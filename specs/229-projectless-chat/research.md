@@ -79,6 +79,13 @@ Paths under `Packages/AgentsKit/Sources/` unless they start with a client folder
   - It goes to `go({ host, project: folder, n: 1 })`, as a project row click does.
 - **Not available**: when no host lists a chat project, New Chat stays visible on all three but disabled, with the reason as its help text (FR-011). The client asks the new `projects/chatState` for the reason: `noPersonalHome`, `archived` or `failed(message)`. It is a separate call because `projects/list` is a bare array (`DaemonCore+Dispatch.swift:185`), which a wrapper would break for older clients. For `archived`, the item is enabled and offers Unarchive (existing `projects/unarchive`).
 
+## R9. A server's chat home (found in the server walk, 2026-10-07)
+
+- **Finding**: a server's daemon runs on `~/.agents-server/root` with `--serve`, and `StoreLocations.personalHome` is nil for every root but the Mac's standard one. 054 left servers' personal `~/.agents` for later (054 research R8). So the walk's server answered `noPersonalHome` and made no chat project.
+- **Decision** (Alex): a `--serve` daemon with no personal home takes its account's `$HOME` (`ServerSignIn.home`, the server's shell's) as the chat home only: `DaemonCore.serverChatHome`, set in `Daemon.start` before `ensureChatProject`. 054's reconcile stays off on servers.
+- **Why it is safe**: only the install script starts `--serve` (`HostInstallScript.swift`); no test does; the fake ssh sets `HOME` to its own folder.
+- **Alternatives considered**: a full personal home on servers (054's whole reconcile on the server account's runtime folders); this Mac only.
+
 ## R8. Testing set-up
 
 - Daemon tests sit in `Packages/AgentsKit/Tests/AgentsKitTests/Integration/` beside `ProjectsTests.swift`, with a temp root and `AGENTS_PERSONAL_HOME`, or by passing a `StoreLocations` with `personalHome` set.

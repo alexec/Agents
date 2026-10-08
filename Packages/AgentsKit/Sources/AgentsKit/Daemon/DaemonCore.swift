@@ -309,6 +309,10 @@ public actor DaemonCore {
     /// Why the chat project could not be made at start (#229), in a sentence; nil when it
     /// was, or when there was nothing to make. See `DaemonCore+ChatProject`.
     var chatProjectFailure: String?
+    /// Where a server keeps its chat project (#229): its account's `$HOME`, for that alone.
+    /// A server's daemon has no personal home (054 R8), so nothing else of `~/.agents` is
+    /// laid out there. Nil on this Mac, whose chat project lives in the personal home.
+    var serverChatHome: URL?
     /// Whether each project's folder was there when last looked (#204), so a list of 500
     /// projects is not 500 stats. Dropped for a folder when its watch hears anything, and
     /// old after `folderExistenceFresh` for the moves a watch never hears.

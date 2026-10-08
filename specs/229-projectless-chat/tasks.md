@@ -118,7 +118,7 @@ description: "Tasks for #229: chat with an agent in a project the app makes"
 
   Thread `chat:` through `apply(to:from:)` (`:79`).
 - [X] T017 [US2] In `AK/Daemon/DaemonCore+Projects.swift`, add a `layOutOnce(_:chat:)` overload, or a parameter on `layOutOnce` (`:298`), that passes `chat` to `DotAgents.apply`. `ensureChatProject` (T005) uses it. Every other caller is unchanged.
-- [ ] T018 [P] [US2] In `T/Integration/ChatProjectTests.swift`, add these tests:
+- [X] T018 [P] [US2] In `T/Integration/ChatProjectTests.swift`, add these tests:
   - **agentsMdNamesTheSharedFolder**: the first layout's `AGENTS.md` contains the sentence.
   - **editedAgentsMdIsLeft**: delete the sentence, run `ensureChatProject()` again, and the sentence is not back.
   - **fileOutlivesRetire**: start an echo agent in the chat project, write a file into the folder, archive the agent and retire it (`retire(_:because:)`, `AK/Daemon/DaemonCore+Retention.swift:407`), and the file is still there.
@@ -132,12 +132,12 @@ description: "Tasks for #229: chat with an agent in a project the app makes"
 
 **Independent Test**: quickstart section 2, step 5. Section 1, archived case.
 
-- [ ] T020 [P] [US3] In `T/Integration/ChatProjectTests.swift`, add these tests:
+- [X] T020 [P] [US3] In `T/Integration/ChatProjectTests.swift`, add these tests:
   - **archivedIsHonoured**: archive the chat project and run `ensureChatProject()`. It is still archived, nothing on disk changed, `chatProjectState == .archived`, and `projects/chatState` answers `archived`.
   - **unarchiveMakesItReady**: after `projects/unarchive`, `projects/chatState` answers `ready`.
   - **liveRecordFolderGoneIsRemade**: delete the folder, run `ensureChatProject()`, and the folder exists again, with no `AGENTS.md` written.
   - **pathIsAFile**: put a file at the path. The state is `failed`, `ensureChatProject` returns, and `allProjects()` still lists other projects.
-- [ ] T021 [US3] Check, without changing anything, that the chat project gets no special position in `App/Sources/Projects/ProjectListView.swift`, `Remote/Sources/Sidebar/RemoteSidebar.swift` or `Web/src/views/Sidebar.tsx`. Ordering is by date added (#357). Record the finding in the T015 parity row's notes.
+- [X] T021 [US3] Check, without changing anything, that the chat project gets no special position in `App/Sources/Projects/ProjectListView.swift`, `Remote/Sources/Sidebar/RemoteSidebar.swift` or `Web/src/views/Sidebar.tsx`. Ordering is by date added (#357). Record the finding in the T015 parity row's notes.
 
 ---
 
@@ -149,20 +149,20 @@ description: "Tasks for #229: chat with an agent in a project the app makes"
 
 ### Web
 
-- [ ] T022 [P] [US4] In `Web/src/model/` (new `chat.ts`), add `chatProjects(store)`. It returns `{ host, folder }[]` for every online host whose project list has a summary with `isChat` and no `archivedAt`, with this Mac first.
+- [X] T022 [P] [US4] In `Web/src/model/` (new `chat.ts`), add `chatProjects(store)`. It returns `{ host, folder }[]` for every online host whose project list has a summary with `isChat` and no `archivedAt`, with this Mac first.
   - Add `Web/test/chat.test.mjs` covering: none, this Mac only, this Mac plus a server, and an archived chat project excluded.
-- [ ] T023 [US4] In `Web/src/views/NewProject.tsx`, add **New Chat** at the top of `NewProjectItems`:
+- [X] T023 [US4] In `Web/src/views/NewProject.tsx`, add **New Chat** at the top of `NewProjectItems`:
   - With one chat project, it is a single item going to `go({ host, project: folder, n: 1 })`.
   - With several, it is one item per host, reading "New Chat on <host>".
   - With none, it is a disabled item. On choosing, it asks `projects/chatState` on this Mac and shows the reason, with an Unarchive button for `archived`.
   - Depends on T022.
-- [ ] T024 [US4] In `specs/071-web-remote/walks/parity.md`, fill the web cell of the New Chat row.
+- [X] T024 [US4] In `specs/071-web-remote/walks/parity.md`, fill the web cell of the New Chat row.
 
 ### Remote
 
-- [ ] T025 [P] [US4] In `Remote/Sources/RemoteModel.swift`, add `chatProjects` (the same rule as T022: hosts with an unarchived `isChat` summary, this Mac first) and `chatProjectState(on:)`, calling `projects/chatState`.
-- [ ] T026 [US4] In `Remote/Sources/Sidebar/RemoteSidebar.swift`, add a toolbar item **New Chat** (`square.and.pencil`). With one chat project, it routes to `RemoteRoute.start` for it, as a project row tap does (#366). With several, it is a `Menu` of hosts. With none, it shows the reason as a sheet, with Unarchive for `archived`. Depends on T025.
-- [ ] T027 [US4] In `specs/071-web-remote/walks/parity.md`, fill the Remote cell of the New Chat row.
+- [X] T025 [P] [US4] In `Remote/Sources/RemoteModel.swift`, add `chatProjects` (the same rule as T022: hosts with an unarchived `isChat` summary, this Mac first) and `chatProjectState(on:)`, calling `projects/chatState`.
+- [X] T026 [US4] In `Remote/Sources/Sidebar/RemoteSidebar.swift`, add a toolbar item **New Chat** (`square.and.pencil`). With one chat project, it routes to `RemoteRoute.start` for it, as a project row tap does (#366). With several, it is a `Menu` of hosts. With none, it shows the reason as a sheet, with Unarchive for `archived`. Depends on T025.
+- [X] T027 [US4] In `specs/071-web-remote/walks/parity.md`, fill the Remote cell of the New Chat row.
 
 ### Mac servers
 
@@ -176,24 +176,24 @@ description: "Tasks for #229: chat with an agent in a project the app makes"
 
 **Independent Test**: quickstart section 2, step 4. Section 3, step 2. The move test.
 
-- [ ] T029 [P] [US5] In `Web/src/views/Changes.tsx`, when `list.git` is `{ unavailable: { notARepository: {} } }`, show the one-line state "This folder is not a Git repository." in place of the empty list, in the Remote's wording (`Remote/Sources/Panes/RemoteChangesPane.swift:116`). Show the other `ChangesUnavailable` cases with the same words the Remote uses.
+- [X] T029 [P] [US5] In `Web/src/views/Changes.tsx`, when `list.git` is `{ unavailable: { notARepository: {} } }`, show the one-line state "This folder is not a Git repository." in place of the empty list, in the Remote's wording (`Remote/Sources/Panes/RemoteChangesPane.swift:116`). Show the other `ChangesUnavailable` cases with the same words the Remote uses.
   - Add a case to `Web/test/` (the module the words live in) for each case.
-- [ ] T030 [P] [US5] In `T/Integration/ChatProjectTests.swift`, add these tests:
+- [X] T030 [P] [US5] In `T/Integration/ChatProjectTests.swift`, add these tests:
   - **moveIntoWorktreeIsRefused**: a move into a worktree from an agent in the chat project fails with "Moving needs a git repository, and chat is not in one." (`AK/Daemon/DaemonCore+Moves.swift:66-68`).
   - **worktreesListSaysNotARepository**: `listWorktrees(for: chatFolder)` returns `.notARepository`.
-- [ ] T031 [US5] In `specs/071-web-remote/walks/parity.md`, update the Changes pane row: the web now shows the not-a-repository line, matching the Mac and Remote.
+- [X] T031 [US5] In `specs/071-web-remote/walks/parity.md`, update the Changes pane row: the web now shows the not-a-repository line, matching the Mac and Remote.
 
 ---
 
 ## Phase 8: Polish and cross-cutting
 
-- [ ] T032 [P] Write `docs/how-to/chat-without-a-project.md` (new): New Chat on each client and its key, where files go, keeping a file for a later chat, chats on a server, and what an archived chat project means. Link it from `docs/how-to/index.md`.
-- [ ] T033 [P] Update `docs/explanation/projects-hosts-worktrees.md`: the chat project, one per host and made by the app, and that a project need not be a repository.
-- [ ] T034 [P] Update `docs/how-to/add-a-project.md`: the chat project is already there, and archiving it is honoured.
-- [ ] T035 [P] Update `docs/how-to/start-in-a-worktree.md`: worktrees aren't offered in a folder that isn't a repository, the chat project included.
-- [ ] T036 [P] Update `docs/reference/keyboard-shortcuts.md`: New Chat, ⇧⌘N.
-- [ ] T037 [P] Update `docs/how-to/use-agents-in-a-browser.md`: New Chat in the + menu.
-- [ ] T038 Run the quickstart:
+- [X] T032 [P] Write `docs/how-to/chat-without-a-project.md` (new): New Chat on each client and its key, where files go, keeping a file for a later chat, chats on a server, and what an archived chat project means. Link it from `docs/how-to/index.md`.
+- [X] T033 [P] Update `docs/explanation/projects-hosts-worktrees.md`: the chat project, one per host and made by the app, and that a project need not be a repository.
+- [X] T034 [P] Update `docs/how-to/add-a-project.md`: the chat project is already there, and archiving it is honoured.
+- [X] T035 [P] Update `docs/how-to/start-in-a-worktree.md`: worktrees aren't offered in a folder that isn't a repository, the chat project included.
+- [X] T036 [P] Update `docs/reference/keyboard-shortcuts.md`: New Chat, ⇧⌘N.
+- [X] T037 [P] Update `docs/how-to/use-agents-in-a-browser.md`: New Chat in the + menu.
+- [X] T038 *(Run 2026-10-07: 95 daemon tests, 497 web, 134 ControlPlane, WebTypes and WebFixtures pass; Remote, AgentsHost and AgentsStore build; the Mac walk (run-app), the web walk (`Web/test/walk/chat229.mjs`, all ok) and the devbox server walk (chat project made in the server account's home, marked, ready) pass. The server walk first found no chat project on servers; fixed per research R9.)* Run the quickstart:
   1. Daemon tests: `scripts/build-cache.sh swift test --package-path Packages/AgentsKit --filter "ChatProject|PersonalDotAgents|DotAgents"`, leasing "build".
   2. `scripts/web.sh` checks.
   3. Build `AgentsHost` and `AgentsStore`, and the Remote for the generic simulator.
@@ -201,7 +201,7 @@ description: "Tasks for #229: chat with an agent in a project the app makes"
   5. The test-servers walk.
 
   Record what was and wasn't run.
-- [ ] T039 Delete `/tmp/run-229` and the worktree's `build/` and `.build`.
+- [X] T039 Delete `/tmp/run-229` and the worktree's `build/` and `.build`.
 
 ---
 

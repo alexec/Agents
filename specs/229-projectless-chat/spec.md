@@ -144,7 +144,7 @@ On the iPhone, Alex taps **New Chat**, picks the Linux server, and asks somethin
 - **FR-003**: The daemon MUST NOT make the chat project again, unarchive it, or change its files, when a record of it already exists, archived or not.
 - **FR-004**: When the chat project is laid out the first time, its `AGENTS.md` MUST say, in one sentence, that this folder is shared by every chat on this host and is the place to save what a later chat should find.
 - **FR-005**: Making the chat project MUST NOT delay the daemon's start beyond a folder check. A failure to make it MUST be logged and MUST NOT stop the daemon.
-- **FR-006**: Every host's daemon (Mac and Linux) MUST do FR-001 to FR-005.
+- **FR-006**: Every host's daemon (Mac and Linux) MUST do FR-001 to FR-005. A server's daemon has no personal home (054 research R8), so it MUST use its account's `$HOME` as the home for the chat project, and for nothing else of `~/.agents` (Alex, 2026-10-07).
 
 **Starting a chat**
 
@@ -190,7 +190,7 @@ On the iPhone, Alex taps **New Chat**, picks the Linux server, and asks somethin
 ## Assumptions
 
 - **No per-chat folder** (Alex, 2026-10-06). Every chat works directly in `~/.agents/chat`. Nothing in the chat project is deleted by the app. Retention removes conversations, as everywhere.
-- **One chat project per host** (Alex, 2026-10-06), each in that host's own personal home.
+- **One chat project per host** (Alex, 2026-10-06), each in that host's own personal home. On a server, which has none, it is the server account's home, for the chat project alone (Alex, 2026-10-07, after the server walk found servers made none).
 - **The folder is `chat`, singular**, as in Alex's direction comment.
 - **Nothing chat-specific in the session model.** A chat is a session of a project the app made, so labels, unread, retention, workflows, pins and helper limits need no new rules. The only new state is the host's "this is the chat project" mark (FR-010).
 - **Where it sits in the sidebar**: like any project, by date added (#357). If Alex later wants it pinned first, that is a small follow-up.
