@@ -32,15 +32,14 @@ struct WarmPoolTests {
         return core
     }
 
-    /// Wait until the agent's turns are over, the app's own question after a silent
-    /// ending included, and nothing is on its way to a runtime.
+    /// Wait until the agent's turns are over and nothing is on its way to a runtime.
     private func settled(_ core: DaemonCore, _ id: UUID) async {
         await eventually("the agent settled") {
             guard let agent = await core.agent(id) else { return false }
             let busy = await core.isBusyForTest(id)
             let decided = await core.decidedForTest(id)
             return !agent.state.hasTurnInFlight && agent.queuedPrompts.isEmpty && !busy
-                && (agent.report != nil || agent.outcomeAsked) && decided
+                && decided
         }
     }
 

@@ -115,20 +115,6 @@ struct InChatRefusalTests {
         #expect(!entries.contains { if case .userMessage(_, _, .app) = $0 { true } else { false } })
     }
 
-    /// A first turn that worked, and the app's own ask for a report after it (023), both
-    /// over: the chat is quiet, with `launches` runtimes started so far.
-    private func quiet(_ core: DaemonCore, _ id: UUID, _ launcher: FakeLauncher, launches: Int) async {
-        // Both turns ended: the one asked for, and the app's ask for a report.
-        await eventually("the chat is quiet", within: .seconds(30)) {
-            let agent = await core.agent(id)
-            let endings = (try? await core.transcript(.init(agentID: id)).entries.count {
-                if case .stateChanged(.finished, _) = $0.kind { true } else { false }
-            }) ?? 0
-            return agent?.outcomeAsked == true && agent?.state == .finished && endings == 2
-                && launcher.launchCount == launches
-        }
-    }
-
     @Test(arguments: ["budget-exhausted", "auth-required", "overloaded"])
     func otherFailuresNeverMove(fixture: String) async throws {
         var script = FakeACPAgent.Script()

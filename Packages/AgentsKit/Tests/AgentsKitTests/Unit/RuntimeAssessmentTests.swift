@@ -221,13 +221,24 @@ struct RuntimeAssessmentTests {
         #expect(verdicts(record)["own_ask"] == .failed)
     }
 
-    @Test func aTurnThatEndsWithoutAnAccountFails() {
+    /// The daemon accounts for a silent ending itself now (#479), so it is not scored.
+    @Test func aTurnThatEndsWithoutAnAccountStillPasses() {
         var record = goodRecord()
         record.transcript.removeAll { if case .workReported = $0.kind, $0.at == t(90) { return true } else { return false } }
-        let score = RuntimeAssessmentVerifier.score(record)
-        let ending = score.checks.first { $0.id == "ending" }!
-        #expect(ending.verdict == .failed)
-        #expect(ending.evidence.contains("1 turn ended without an account"))
+        #expect(verdicts(record)["ending"] == .passed)
+    }
+
+    /// Nor are a title and a next prompt: both are the agent's to give or not (#479).
+    @Test func anEndingWithNoTitleOrNextPromptStillPasses() {
+        var record = goodRecord()
+        for i in record.calls.indices where record.calls[i].method == DaemonAPI.Method.agentsFinishTurn {
+            if case .object(var arguments)? = record.calls[i].arguments {
+                arguments["title"] = nil
+                arguments["prompts"] = nil
+                record.calls[i].arguments = .object(arguments)
+            }
+        }
+        #expect(verdicts(record)["ending"] == .passed)
     }
 
     @Test func noCheckAgainTimeFails() {

@@ -135,14 +135,15 @@ struct BlockedTests {
         #expect(waits.filter { $0.ending != nil }.map(\.agentID) == [first])
 
         secondGate.open()
-        await settled(core, second, "the second helper finished, and was asked how")
+        await settled(core, second, "the second helper finished")
         await eventually("the lead was resumed") { (try? await self.resumes(core, lead).count) == 1 }
         await settled(core, lead, "the lead's resumed turn ended")
         try await quiet()
         let sent = try await resumes(core, lead)
         #expect(sent.count == 1)
         #expect(sent.first?.contains("\u{201C}Port the model\u{201D} (id \(first.uuidString)): finished: complete — Ported.") == true)
-        #expect(sent.first?.contains("\u{201C}Update the tests\u{201D} (id \(second.uuidString)): finished without saying how it went") == true)
+        // It said nothing, so its ending was worked out for it (#479).
+        #expect(sent.first?.contains("\u{201C}Update the tests\u{201D} (id \(second.uuidString)): finished: complete — \(DerivedEnding.silentDone)") == true)
         #expect(sent.first?.contains("You said you were waiting on: Waiting on both helpers.") == true)
     }
 
