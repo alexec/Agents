@@ -1694,6 +1694,76 @@ final class AppModel {
         settleProjectSelection()
     }
 
+    // MARK: Chats (#229)
+
+    /// Why New Chat could not open a chat on a host, for the alert the projects column
+    /// shows. `archived` carries the folder, so the alert can offer to bring it back.
+    struct ChatProblem: Identifiable {
+        let host: HostID
+        let message: String
+        var archived: URL?
+        var id: String { "\(host)|\(message)" }
+    }
+
+    /// Set by New Chat when there is no chat project to open, taken down by the alert.
+    var chatProblem: ChatProblem?
+
+    /// The chat project a host made for itself (`~/.agents/chat`), as its list marks it;
+    /// nil when there is none, or it is archived.
+    func chatProjectKey(on host: HostID) -> ProjectKey? {
+        projects.first { $0.host == host && $0.isChat == true && !$0.project.isArchived }?.key
+    }
+
+    /// The hosts with a chat project to open, this Mac first.
+    var hostsWithChats: [HostID] {
+        ([HostID.mac] + hosts.servers).filter { chatProjectKey(on: $0) != nil }
+    }
+
+    /// New Chat: the new-session page of the host's chat project. True when it opened;
+    /// otherwise the host is asked why there is none, and `chatProblem` says it.
+    @discardableResult
+    func newChat(on host: HostID = .mac) async -> Bool {
+        if let key = chatProjectKey(on: host) {
+            showProject(key)
+            return true
+        }
+        let state: DaemonAPI.ChatProjectState
+        do {
+            state = try await client(for: host).call(DaemonAPI.Method.projectsChatState, DaemonAPI.Empty(),
+                                                     returning: DaemonAPI.ChatProjectState.self)
+        } catch {
+            // An older host does not know the question.
+            chatProblem = ChatProblem(host: host, message: "\(hostName(host, capitalised: true)) has no chat project.")
+            return false
+        }
+        switch state {
+        case .ready(let folder):
+            showProject(ProjectKey(host: host, folder: folder))
+            return true
+        case .archived(let folder):
+            chatProblem = ChatProblem(host: host, message: "The chat project on \(hostName(host)) is archived.",
+                                      archived: folder)
+        case .noPersonalHome:
+            chatProblem = ChatProblem(host: host, message: "\(hostName(host, capitalised: true)) has no personal home folder, "
+                + "so it has no chat project. A copy started on a scratch root needs AGENTS_PERSONAL_HOME.")
+        case .failed(let message):
+            chatProblem = ChatProblem(host: host, message: message)
+        }
+        return false
+    }
+
+    /// Unarchive from the New Chat alert, then open it.
+    func unarchiveChatProject(_ problem: ChatProblem) async {
+        guard let folder = problem.archived else { return }
+        let key = ProjectKey(host: problem.host, folder: folder)
+        await unarchiveProject(key)
+        if chatProjectKey(on: problem.host) != nil { showProject(key) }
+    }
+
+    private func hostName(_ host: HostID, capitalised: Bool = false) -> String {
+        host == .mac ? (capitalised ? "This Mac" : "this Mac") : hosts.label(host)
+    }
+
     // MARK: Connecting
 
     /// The daemon exits when it has nothing in hand and nobody watching, so a window

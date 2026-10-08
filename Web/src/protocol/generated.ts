@@ -403,6 +403,12 @@ export type ChangesUnavailable =
   | { folderGone: Record<string, never> }
   | { failed: { message: string } };
 
+export type ChatProjectState =
+  | { ready: { folder: URLString } }
+  | { archived: { folder: URLString } }
+  | { noPersonalHome: Record<string, never> }
+  | { failed: { message: string } };
+
 export interface CloneNotification {
   clone: CloneSummary;
   finished: boolean;
@@ -1147,6 +1153,7 @@ export interface ProjectSummary {
   costToDate: Record<string, number>;
   unmeasuredAgents: number;
   retiredCount: number;
+  isChat?: boolean;
 }
 
 export interface ProjectsListRequest {
@@ -1994,6 +2001,7 @@ export interface Methods {
   "pins/write": { params: PinWriteRequest; result: Empty };
   "presence/report": { params: PresenceReport; result: Empty };
   "projects/add": { params: ProjectRequest; result: ProjectSummary };
+  "projects/chatState": { params: Empty; result: ChatProjectState };
   "projects/clone": { params: CloneRequest; result: ProjectSummary };
   "projects/clones": { params: Empty; result: CloneSummary[] };
   "projects/list": { params: ProjectsListRequest; result: ProjectSummary[] };
@@ -2087,6 +2095,7 @@ export const MethodTarget = {
   "pins/write": "host",
   "presence/report": "host",
   "projects/add": "host",
+  "projects/chatState": "host",
   "projects/clone": "host",
   "projects/clones": "host",
   "projects/list": "host",
@@ -2258,7 +2267,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Project: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits", "diskSpace"] },
   ProjectPins: { required: ["folder", "pins"], optional: ["sessions"] },
   ProjectRequest: { required: ["folder"], optional: [] },
-  ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: [] },
+  ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: ["isChat"] },
   ProjectsListRequest: { required: ["includeArchived"], optional: [] },
   PromptRequest: { required: ["agentID", "text", "attachments", "from"], optional: ["sendID"] },
   QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface"] },

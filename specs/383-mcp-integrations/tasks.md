@@ -42,7 +42,7 @@ lease.
   - It counts polls per `(name, arguments)` and records each request's cursor.
   - It can be told to be unreachable.
   - Two instances must be installable side by side under different server names, for the two-server tests.
-- [ ] T002 [P] Create `Integrations/ci-watcher/` with a `README.md` that says what it is, how to run it (`node server.ts --port 8791`, `run.sh start|stop`), the fake mode (`CI_WATCHER_FAKE=<file>`), and that it needs Node 26 and a signed-in `gh`. Add `Integrations/ci-watcher/fixtures/ci.json`: two open PRs (one passing, one failing), one failed `pull_request` run with two failed jobs, and one merged PR.
+- [x] T002 [P] Create `Integrations/ci-watcher/` with a `README.md` that says what it is, how to run it (`node server.ts --port 8791`, `run.sh start|stop`), the fake mode (`CI_WATCHER_FAKE=<file>`), and that it needs Node 26 and a signed-in `gh`. Add `Integrations/ci-watcher/fixtures/ci.json`: two open PRs (one passing, one failing), one failed `pull_request` run with two failed jobs, and one merged PR.
 
 ---
 
@@ -222,7 +222,7 @@ real repo, a failing PR yields one `checks.failed` with a stable id.
 
 ### Tests for User Story 3
 
-- [ ] T026 [P] [US3] Create `Integrations/ci-watcher/server.test.ts` with `node:test` against the server in fake mode (`CI_WATCHER_FAKE=fixtures/ci.json`), on a random port. Test:
+- [x] T026 [P] [US3] Create `Integrations/ci-watcher/server.test.ts` with `node:test` against the server in fake mode (`CI_WATCHER_FAKE=fixtures/ci.json`), on a random port. Test:
   - `initialize` capabilities.
   - `events/list` gives both events, `delivery: ["poll"]`, and their schemas.
   - `cursor: null` gives no events and a cursor.
@@ -237,7 +237,7 @@ real repo, a failing PR yields one `checks.failed` with a stable id.
 
 ### Implementation for User Story 3
 
-- [ ] T027 [US3] Create `Integrations/ci-watcher/github.ts`, the GitHub side, using `node:child_process` `execFile('gh', …)`. Use ETag-conditional `gh api` where possible.
+- [x] T027 [US3] Create `Integrations/ci-watcher/github.ts`, the GitHub side, using `node:child_process` `execFile('gh', …)`. Use ETag-conditional `gh api` where possible.
   - `failedRuns(repo, branch?, since)`: `gh api repos/{repo}/actions/runs`, filtered to `event=pull_request`, `status=completed`, `conclusion=failure`, and `updated_at` after `since`, with the PR and failed jobs from `/runs/{id}/jobs?filter=latest`.
   - `mergedPRs(repo, since)`.
   - `listPRs(repo)`: `gh pr list --json number,title,headRefName,statusCheckRollup,url`, mapped to `passing`, `failing`, `running` or `none`.
@@ -246,16 +246,16 @@ real repo, a failing PR yields one `checks.failed` with a stable id.
   - `commentOnPR(repo, number, body)`.
   - A fake implementation reads and writes `CI_WATCHER_FAKE`'s JSON instead.
   - `gh` not signed in raises a typed error. A rate limit raises one with `retryAfterMs`.
-- [ ] T028 [US3] Create `Integrations/ci-watcher/server.ts`: JSON-RPC over `node:http` at `POST /mcp` on `127.0.0.1` (`--port`, default 8791), with `Mcp-Session-Id`, and `GET /health`. Depends on T027.
+- [x] T028 [US3] Create `Integrations/ci-watcher/server.ts`: JSON-RPC over `node:http` at `POST /mcp` on `127.0.0.1` (`--port`, default 8791), with `Mcp-Session-Id`, and `GET /health`. Depends on T027.
   - Methods: `initialize` (capabilities exactly as in the contract), `tools/list`, `tools/call`, `resources/list`, `resources/read`, `events/list` and `events/poll`.
   - The cursor is base64 of `{since, ids}` (R10). `cursor: null` answers no events and now. `nextPollMs: 30000`. `truncated` follows R10.
   - Errors: `-32012` with `reason: "gh not signed in"`, `-32013` with `retryAfterMs`, and `-32602` for bad arguments.
   - It refuses any `Origin` other than none or `http://127.0.0.1:*`.
-- [ ] T029 [P] [US3] Create `Integrations/ci-watcher/run.sh`.
+- [x] T029 [P] [US3] Create `Integrations/ci-watcher/run.sh`.
   - `start` writes and loads a LaunchAgent `~/Library/LaunchAgents/com.agents.ci-watcher.plist` running `node <abs>/server.ts --port 8791`, with logs in `~/Library/Logs/ci-watcher.log`.
   - `stop` unloads and deletes it.
   - `status` prints `launchctl list | grep ci-watcher` and `curl -s 127.0.0.1:8791/health`.
-- [ ] T030 [P] [US3] Add `.agents/mcp.json` with `{ "mcpServers": { "ci": { "type": "http", "url": "http://127.0.0.1:8791/mcp" } } }`. Add `.agents/workflows/fix-failed-checks.md`, exactly as the example in [contracts/workflow-trigger.md](contracts/workflow-trigger.md), with `enabled: false`.
+- [x] T030 [P] [US3] Add `.agents/mcp.json` with `{ "mcpServers": { "ci": { "type": "http", "url": "http://127.0.0.1:8791/mcp" } } }`. Add `.agents/workflows/fix-failed-checks.md`, exactly as the example in [contracts/workflow-trigger.md](contracts/workflow-trigger.md), with `enabled: false`.
 
 **Checkpoint**: T026 passes. Against `run.sh start`, `curl` shows both events.
 
@@ -268,12 +268,12 @@ real repo, a failing PR yields one `checks.failed` with a stable id.
 **Independent Test**: pin it, open it on the Mac and the web page, and see the PRs and their
 states. **Rerun** reruns.
 
-- [ ] T031 [US4] Create `Integrations/ci-watcher/board.html`, one self-contained page with no network and an empty `_meta.ui.csp`.
+- [x] T031 [US4] Create `Integrations/ci-watcher/board.html`, one self-contained page with no network and an empty `_meta.ui.csp`.
   - It speaks the MCP Apps `postMessage` bridge: `ui/initialize`, then it takes `tool-input` and `tool-result` for `list_prs`.
   - It draws the PRs (number, title, branch, a check pill), using the host's CSS variables for colour and font.
   - **Rerun** on a failing PR calls `tools/call rerun_failed`, then `list_prs` again.
   - Links go through `ui/open-link`.
-- [ ] T032 [US4] In `Integrations/ci-watcher/server.ts`, serve `ui://ci/board` from `resources/list` and `resources/read` as `text/html;profile=mcp-app`. Give `list_prs` `_meta.ui.resourceUri: "ui://ci/board"`, `annotations.readOnlyHint: true` and visibility `["model","app"]`, and `rerun_failed` visibility `["model","app"]`. Extend `server.test.ts` to read the resource and check `list_prs`'s `_meta`. Depends on T028 and T031.
+- [x] T032 [US4] In `Integrations/ci-watcher/server.ts`, serve `ui://ci/board` from `resources/list` and `resources/read` as `text/html;profile=mcp-app`. Give `list_prs` `_meta.ui.resourceUri: "ui://ci/board"`, `annotations.readOnlyHint: true` and visibility `["model","app"]`, and `rerun_failed` visibility `["model","app"]`. Extend `server.test.ts` to read the resource and check `list_prs`'s `_meta`. Depends on T028 and T031.
 
 **Checkpoint**: the board draws in the chat and as a pin (quickstart §1 step 8).
 
