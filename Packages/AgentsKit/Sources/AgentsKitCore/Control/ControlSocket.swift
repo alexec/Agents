@@ -81,28 +81,31 @@ public extension ControlAuth {
     static func join(_ transport: any LineTransport, origin: String, as credentials: Credentials,
                      within seconds: Double = 15) async throws -> (transport: PrefixReader, hello: Hello, ok: OK) {
         let reader = PrefixReader(transport)
-        guard let line = try await reader.next(within: seconds), case .hello(let hello)? = Message(line: line) else {
+        // Every way out but the one that hands it on closes it: a socket left open by a
+        // failed join is one more connection the control plane keeps for nothing (#445).
+        do {
+            guard let line = try await reader.next(within: seconds), case .hello(let hello)? = Message(line: line) else {
+                throw Refusal(.badMessage)
+            }
+            let (auth, expect) = try answer(hello, identity: credentials.identity, key: credentials.key, origin: origin,
+                                            kind: credentials.kind, expecting: credentials.controlKey,
+                                            for: credentials.relayingFor, epoch: credentials.epoch)
+            try reader.write(line: Message.auth(auth).line)
+            guard let reply = try await reader.next(within: seconds), let message = Message(line: reply) else {
+                throw Refusal(.badMessage)
+            }
+            switch message {
+            case .ok(let ok):
+                try check(ok, expect: expect)
+                return (reader, hello, ok)
+            case .refused(let reason):
+                throw Refusal(reason)
+            default:
+                throw Refusal(.badMessage)
+            }
+        } catch {
             reader.close()
-            throw Refusal(.badMessage)
-        }
-        let (auth, expect) = try answer(hello, identity: credentials.identity, key: credentials.key, origin: origin,
-                                        kind: credentials.kind, expecting: credentials.controlKey,
-                                        for: credentials.relayingFor, epoch: credentials.epoch)
-        try reader.write(line: Message.auth(auth).line)
-        guard let reply = try await reader.next(within: seconds), let message = Message(line: reply) else {
-            reader.close()
-            throw Refusal(.badMessage)
-        }
-        switch message {
-        case .ok(let ok):
-            try check(ok, expect: expect)
-            return (reader, hello, ok)
-        case .refused(let reason):
-            reader.close()
-            throw Refusal(reason)
-        default:
-            reader.close()
-            throw Refusal(.badMessage)
+            throw error
         }
     }
 }
