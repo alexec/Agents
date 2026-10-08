@@ -1,6 +1,6 @@
 ---
 diataxis: how-to
-devices: [mac, iphone, ipad]
+devices: [mac, iphone, ipad, browser, server]
 description: Drop a file into a project's drop box, and have a workflow pick it up and work on it.
 ---
 
@@ -46,6 +46,17 @@ into `dropbox/review/`.
    never into a session's worktree, so a workflow with `folder:` set does not see them
    there. A file dragged this way can be up to 25 MB; copy a bigger one into the folder
    in Finder. A folder dragged onto the list is added as a project, as before.
+
+   On the iPhone or iPad, touch and hold the project in the list, choose **Put Files in
+   Drop Box…**, type a folder such as `review` if you want one, then **Choose Files…**.
+
+   On the web page, open the project's menu (right click, or the menu key) and choose
+   **Put Files in Drop Box…**, type a folder if you want one, choose files and press
+   **Put in Drop Box**. You can also drag files onto a project's or a session's row, which
+   puts them at the drop box's top.
+
+   From the phone or the web page, a file can be up to 900 KB, the most that crosses the
+   link in one go.
 
 3. Once the file has stopped changing for a moment, the workflow starts an agent. Its
    prompt ends with the event, including `path`, the file's full path, so the agent knows
