@@ -785,10 +785,9 @@ public actor AppService {
     /// and asking a question that waits still has to be drawn, and this is the one
     /// place an agent reads it at the moment it matters.
     ///
-    /// `Briefing` says the harder truth about descriptions — one alone got the
-    /// suggestion tool called exactly never — so this is written for an agent already
-    /// told, in the briefing, to call it. The description's job is to say which of
-    /// the five is true and what the chips are for.
+    /// Since #479 nothing tells an agent it must call this: the daemon derives an
+    /// ending the agent did not give. The description's job is to say which of the
+    /// outcomes is true, and what only this tool can do — wait, park and move.
     static func finishTurnTool(movesItself: Bool) -> JSONValue {
         guard !movesItself else { return finishTurnTool }
         guard case .object(var tool) = finishTurnTool,
@@ -829,10 +828,10 @@ public actor AppService {
         "name": .string(finishTurnToolName),
         "title": "Finish the turn",
         "description": .string("""
-            Call this once, as the very last thing you do before you stop. It says how \
-            the work actually went, and it is the only thing that does: without it the \
-            app can only say your turn ended, which it will show as an ending nobody \
-            accounted for.
+            Optional. Without it the app works out how your turn ended from how it \
+            stopped and what you last said. Call it, as the last thing you do before \
+            you stop, when you want to say that yourself, or to wait (blocked), park \
+            the conversation, or move it.
 
             Pick the one that is true:
 

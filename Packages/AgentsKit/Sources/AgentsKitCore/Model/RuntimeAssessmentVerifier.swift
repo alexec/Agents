@@ -333,52 +333,20 @@ private struct Scorer {
             || blockFoundHelperDone(nil)
         let withTime = blocked.contains { $0.arguments?["checkAgainInMinutes"]?.intValue != nil }
         let last = finished.last?.arguments?["outcome"]?.stringValue
-        // A block refused only because the helper had already ended still carried what it said.
-        let sent = finished + calls(DaemonAPI.Method.agentsFinishTurn).filter {
-            !$0.ok && ($0.answer ?? "").contains("has already ended")
-        }
-        let titled = sent.contains { !($0.arguments?["title"]?.stringValue ?? "").isEmpty }
-        let prompted = sent.contains { !($0.arguments?["prompts"]?.arrayValue ?? []).isEmpty }
         let outcomes = finished.compactMap { $0.arguments?["outcome"]?.stringValue }.joined(separator: ", ")
+        // A title, a next prompt and an account of every turn are not asked of an agent
+        // any more (#479): the daemon works out a silent ending for itself. What is
+        // scored is the tool still doing what only it can — waiting and its outcomes.
         var missing: [String] = []
         if !onHelper { missing.append("blocked on the helper") }
         if !withTime { missing.append("blocked with a check-again time") }
         if last != "done" && last != "needs_answer" { missing.append("a last done or needs_answer") }
-        if !titled { missing.append("a title") }
-        if !prompted { missing.append("a next prompt") }
-        let silent = silentEndings()
-        if silent > 0 { missing.append("\(silent) turn\(silent == 1 ? "" : "s") ended without an account") }
         let refused = calls(DaemonAPI.Method.agentsFinishTurn).filter { !$0.ok }.count
         let note = refused > 0 ? " (\(refused) refused first)" : ""
         guard missing.isEmpty else {
             return (.failed, "recorded: \(outcomes.isEmpty ? "nothing" : outcomes)\(note); missing: " + missing.joined(separator: ", "))
         }
-        return (.passed, "recorded: \(outcomes)\(note); every turn ended with an account")
-    }
-
-    /// Turns that ended (`finished`) with no report recorded since they began.
-    func silentEndings() -> Int {
-        var reported = true
-        var silent = 0
-        var last: AgentState?
-        for entry in record.transcript {
-            defer { if case .stateChanged(let state, _) = entry.kind { last = state } }
-            switch entry.kind {
-            // Running again after a card is the same turn going on, not a new one.
-            case .stateChanged(.running, _) where last == .waitingOnUser:
-                break
-            case .stateChanged(.running, _), .stateChanged(.starting, _):
-                reported = false
-            case .workReported:
-                reported = true
-            case .stateChanged(.finished, _):
-                if !reported { silent += 1 }
-                reported = true
-            default:
-                break
-            }
-        }
-        return silent
+        return (.passed, "recorded: \(outcomes)\(note)")
     }
 
     /// The `move` a `finish_turn` carried, by where it went: into a worktree, or back.

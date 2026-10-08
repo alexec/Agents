@@ -330,13 +330,12 @@ struct HelperAgentTests {
         _ = try await start(core, token, "Gamma")
         _ = try await start(core, token, "Delta")
         _ = try await start(core, token, "Epsilon")
-        // Settled for good: finished, asked how its work went (a fake agent never
-        // says), and let go. Archiving before that ask lands would see the ask's
-        // prompt pick the agent back up, which is not what this test is about.
+        // Settled for good: finished, its ending accounted for (a fake agent never
+        // says, so the app works it out), and let go.
         _ = await eventually("Alpha settled") {
             let agent = await core.agent(alpha)
             let released = await core.live[alpha] == nil
-            return agent?.outcomeAsked == true && agent?.state.holdsRuntime == false && released
+            return agent?.report != nil && agent?.state.holdsRuntime == false && released
         }
 
         try await core.archive(alpha)   // by the person
@@ -556,7 +555,7 @@ struct HelperAgentTests {
             _ = await eventually("\(name) settled") {
                 let agent = await core.agent(id)
                 let released = await core.live[id] == nil
-                return agent?.outcomeAsked == true && agent?.state.holdsRuntime == false && released
+                return agent?.report != nil && agent?.state.holdsRuntime == false && released
             }
             // Blocked on a time an hour off: the app will check again by itself.
             var agent = try #require(await core.agent(id))
@@ -718,6 +717,8 @@ struct HelperAgentTests {
         let work = try project(root)
         let core = try await makeCore(locations, FakeLauncher())
         let (lead, token) = try await caller(core, in: work)
+        // Its own first turn over, so that ending does not let the run go.
+        await settled(core, lead, "the lead's first turn ended")
         let run = WorkflowRun(workflowID: "nightly", folder: work, trigger: .agentFinished,
                               depth: 2, agentID: lead)
         await core.setWorkflowRunForTesting(run)
@@ -916,12 +917,7 @@ struct HelperAgentTests {
 
     // MARK: Archiving (#120)
 
-    /// A helper of its own, finished and let go, so an archive is not undone by the
-    /// outcome ask picking it back up.
-    ///
-    /// Past the ask's own turn, not only the ask: the flag goes up with the question on
-    /// the queue and the runtime still to start, and a busy machine leaves the helper
-    /// looking finished there for long enough to archive it under the question.
+    /// A helper of its own, finished, its ending accounted for, and let go.
     private func settledHelper(_ core: DaemonCore, _ token: String, _ name: String) async throws -> UUID {
         let id = try await start(core, token, name)
         _ = await eventually("\(name) settled") {
@@ -929,7 +925,7 @@ struct HelperAgentTests {
             let turning = await core.turnTasks[id] != nil
             let sending = await core.sending.contains(id)
             let released = await core.live[id] == nil
-            return agent.outcomeAsked && !agent.state.holdsRuntime && agent.queuedPrompts.isEmpty
+            return agent.report != nil && !agent.state.holdsRuntime && agent.queuedPrompts.isEmpty
                 && !turning && !sending && released
         }
         return id

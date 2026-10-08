@@ -1253,14 +1253,6 @@ public actor DaemonCore {
         // one does not collide with a run that has in fact finished.
         switch next {
         case .finished, .stopped:
-            // Held back when the app is about to ask this agent how the work went.
-            // That question is a turn of its own and ends of its own accord, so firing
-            // here as well would run every agent-finished workflow twice per agent —
-            // and the run held until the second ending is the better one anyway: by
-            // then the agent's outcome is on the record for the workflow's row to show.
-            if next == .finished, willAskForOutcome(agentID: agentID, reason: reasonThisEventSet) {
-                break
-            }
             // An agent a restarting daemon is about to bring back has not finished
             // stopping — it is about to carry on. Saying "an agent stopped" about it
             // would be false, and would race the pick-up that is seconds away (011,
