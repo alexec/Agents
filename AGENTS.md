@@ -22,6 +22,12 @@
 - **For example,** a Mac sidebar change ends with `remote: #226` and `web: same`; a web-only fix ends with `mac: same, remote: same` when both already do it. A change to docs only says `mac: docs only, remote: docs only, web: docs only`.
 - **The table of where each client stands** is `specs/071-web-remote/walks/parity.md` (Mac / Remote / web, a row per screen and feature). A parity line that changes a row updates it in the same branch.
 
+## Web/dist and generated.ts
+
+- **A lane never commits `Web/dist/**` or `Web/src/protocol/generated.ts`.** Main rebuilds and commits both after each merge (`.github/workflows/web-dist.yml`), so a PR carrying them only makes every other open PR conflict (#473).
+- **Run `scripts/web.sh types` and `build` when the change needs them** to be seen or tested (a web walk, tsc against a new protocol type), under the "build" lease, then leave the results out: `git checkout origin/main -- Web/dist Web/src/protocol/generated.ts` before committing.
+- **A stale bundle on a branch is not a failure;** CI notes it and moves on. A conflict in either file is settled by taking main's.
+
 ## Verifying a lane's work
 
 - **A lane verifies only what it touched:** the schemes and tests for the paths its branch changes, as `merge-wave.sh plan` lists them. An `App/` change builds `AgentsHost` and `AgentsStore`; a `Remote/` change builds the Remote; a package change runs that package's tests, filtered by `scripts/select-test-suites.sh`. The full AgentsKit suite and every scheme run once, in the merge wave, which also skips any check that already passed at the same tree.

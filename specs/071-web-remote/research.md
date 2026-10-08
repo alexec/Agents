@@ -456,6 +456,20 @@ refuses fixtures it no longer matches, so they cannot be left stale.
 - Comparing only the output in CI: someone who edits `src` without Node, or commits without
   rebuilding, would not find out until CI. The manifest catches it in their own `swift test`.
 
+**Amended (#473, 2026-10-08): main rebuilds, pull requests don't.**
+- Every PR carried a rebuilt `dist` and `generated.ts`, and main took several merges per CI
+  run, so each merge left every other open PR in conflict over these files alone.
+- Both stay checked in, so building from source still needs no Node. A PR no longer commits
+  them: `.github/workflows/web-dist.yml` runs on each push to main that touches `Web/`, the
+  generator or AgentsKitCore, regenerates both and commits what changed. Its own commit is
+  skipped by its `if:`, and a deterministic rebuild of a fresh tree commits nothing, so it
+  cannot loop. Main's branch protection refuses `GITHUB_TOKEN`; the push uses a
+  `WEB_DIST_TOKEN` secret of an account that may bypass it.
+- The checks above change with it: check 1 holds only the outputs to `MANIFEST` (a hand edit
+  still fails); the source half, and WebTypes' `GeneratedIsFreshTests`, run only with
+  `AGENTS_WEB_FRESHNESS=1`, which `scripts/web.sh check` sets. Check 2 builds and tests but
+  only notes a stale bundle. Check 3 is unchanged.
+
 ## R9 — The web app's libraries
 
 **Decision**: Preact with `@preact/signals`, markdown-it, esbuild and TypeScript. Nothing else

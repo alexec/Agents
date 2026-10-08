@@ -4,12 +4,14 @@
 #   scripts/web.sh types   regenerate Web/src/protocol/generated.ts from AgentsKitCore's source
 #   scripts/web.sh build   install the pinned packages and rebuild Web/dist (needs Node)
 #   scripts/web.sh test    the web app's tests (needs Node)
-#   scripts/web.sh check   everything CI checks: types fresh, Web/dist matches its manifest,
-#                          and, when Node is here, tsc, lint, licences, tests and a rebuild
-#                          that must change nothing
+#   scripts/web.sh check   is this tree fresh: types, Web/dist matching its manifest and
+#                          sources, and, when Node is here, tsc, lint, licences, tests and a
+#                          rebuild that must change nothing
 #
 # Building Agents from source needs none of this: Web/dist and generated.ts are checked in.
-# Only changing the web app, or a protocol type in Swift, does.
+# A pull request does not commit them (#473): main rebuilds and commits both after each merge
+# (.github/workflows/web-dist.yml), so a lane runs types and build only to see or test its
+# change, and leaves the results out of its commits. A stale bundle on a branch is no failure.
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -41,7 +43,7 @@ test)
 	;;
 check)
 	scripts/build-cache.sh swift run --package-path Packages/WebTypes agents-webtypes --root "$root" --check
-	scripts/build-cache.sh swift test --package-path Packages/AgentsKit --filter 'WebDistManifestTests|ControlAgreementVectorTests'
+	AGENTS_WEB_FRESHNESS=1 scripts/build-cache.sh swift test --package-path Packages/AgentsKit --filter 'WebDistManifestTests|ControlAgreementVectorTests'
 	if have_node; then
 		# What is on disk now, then what this source builds: they must be the same bytes.
 		before=$(find Web/dist Web/src/protocol/generated.ts -type f -exec shasum -a 256 {} + | sort)

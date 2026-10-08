@@ -64,7 +64,10 @@ It prints a line per branch (merge sha, checks, or why it was dropped) and `SHIP
 
 - **`Web/dist/*` and `generated.ts` conflicts:** the merge stays open and the next step is
   `rebuild-web` (under the lease). It runs `scripts/web.sh build`, plus `types` for
-  `generated.ts`, in the wave, and commits the merge with the rebuilt files.
+  `generated.ts`, in the wave, and commits the merge with the rebuilt files. Lanes no
+  longer commit these files (#473), so this is rare; the `web` check builds and tests but
+  does not hold the committed bundle to its source, as main's web-dist workflow rebuilds
+  it after the push.
 - **`specs/071-web-remote/walks/parity.md`:** both sides' rows are kept, as a union. If
   both lanes edited the same row, both copies stay: read the merged table before
   you finish and fix it in a follow-up if needed.

@@ -57,8 +57,9 @@ check_command() { # name [filter]
 	build-host) echo "xcodegen generate >/dev/null && $CACHED xcodebuild -scheme AgentsHost -configuration Debug -destination 'platform=macOS' -derivedDataPath build/DD $XFLAGS build" ;;
 	build-store) echo "xcodegen generate >/dev/null && $CACHED xcodebuild -scheme AgentsStore -configuration Debug -destination 'platform=macOS' -derivedDataPath build/DD $XFLAGS build" ;;
 	build-remote) echo "xcodegen generate >/dev/null && $CACHED xcodebuild -scheme Remote -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath build/DD-sim $XFLAGS build" ;;
-	# What CI's web job runs: check, tests, and a rebuild that must change nothing.
-	web) echo "scripts/web.sh build && git diff --exit-code --stat -- Web/dist Web/src/protocol/generated.ts && cd Web && npm run check && npm test" ;;
+	# What CI's web job runs: a build that must succeed, check and tests. A stale Web/dist is
+	# no failure (#473): main rebuilds and commits it after the push, so the wave leaves it.
+	web) echo "scripts/web.sh build && (cd Web && npm run check && npm test); s=\$?; git checkout -q -- Web/dist; git clean -fdq -- Web/dist; exit \$s" ;;
 	test-agentskit) echo "$CACHED swift test --package-path Packages/AgentsKit${2:+ --filter '$2'}" ;;
 	test-codetext) echo "$CACHED swift test --package-path Packages/CodeText${2:+ --filter '$2'}" ;;
 	test-controlplane) echo "$CACHED swift test --package-path Packages/ControlPlane" ;;

@@ -66,8 +66,11 @@ scripts/web.sh build   # rebuild Web/dist after changing Web/ (needs the Node in
 scripts/web.sh check   # what CI checks: types fresh, dist matching its manifest, and with Node, the tests
 ```
 
-A test fails, in Swift as well as in Node, when `Web/dist` or `generated.ts` is out of
-date with its source.
+A pull request does not commit `Web/dist` or `generated.ts`: after each merge, a workflow on
+main (`.github/workflows/web-dist.yml`) runs `types` and `build` and commits what changed
+(#473). Run them locally to see or test a change, then leave the results out of the commit.
+A test fails, in Swift as well as in Node, when `Web/dist` is not what its build wrote;
+a bundle older than its source fails only `scripts/web.sh check`.
 
 From the command line:
 

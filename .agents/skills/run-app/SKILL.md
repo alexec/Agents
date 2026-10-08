@@ -277,6 +277,8 @@ opens it in headless Chrome. Run it once per press, on the same profile.
    that covers the change, or add a scene. Make a fresh browser code for each run; a code is spent once
    used. The control plane reads `Web/dist` once at start, so after rebuilding the page restart only
    your root's control plane (its `control/control.pid`) with the arguments `launch.sh` used.
+   A branch's `Web/dist` is main's until you run `scripts/web.sh build`; walk on the rebuilt
+   one, but leave it out of the commit (main rebuilds it after the merge, #473).
 2. Add or update the change's row in `specs/071-web-remote/walks/parity.md`: the page's shot, the
    window's shot, and has, partly, lacks or by design.
 3. A gap you don't close in the same branch gets a parity issue, named in the commit.
