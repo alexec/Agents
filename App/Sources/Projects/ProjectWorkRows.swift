@@ -23,25 +23,29 @@ struct ProjectWorkflowRows: View {
         if !workflows.isEmpty || !archived.isEmpty {
             // Folds as a session group does (#181); a search unfolds it to show what matched.
             let workflowsOpen = fold.isSearching || folds.isOpen(project, .workflows)
-            DisclosureGroup(isExpanded: Binding(
+            let workflowsFold = Binding(
                 get: { workflowsOpen },
-                set: { folds.set(project, .workflows, open: $0) })) {
+                set: { folds.set(project, .workflows, open: $0) })
+            DisclosureGroup(isExpanded: workflowsFold) {
                 ForEach(FoldedRow.rows(workflowsOpen ? workflows : [], in: .workflows)) { row in
                     WorkflowListRow(summary: row.item, project: project)
                 }
             } label: {
                 SidebarSubheading(title: "Workflows", count: workflows.count)
+                    .togglesFold(workflowsFold)
             }
             if !archived.isEmpty {
                 let archivedOpen = fold.isSearching || folds.isOpen(project, .archivedWorkflows)
-                DisclosureGroup(isExpanded: Binding(
+                let archivedFold = Binding(
                     get: { archivedOpen },
-                    set: { folds.set(project, .archivedWorkflows, open: $0) })) {
+                    set: { folds.set(project, .archivedWorkflows, open: $0) })
+                DisclosureGroup(isExpanded: archivedFold) {
                     ForEach(FoldedRow.rows(archivedOpen ? archived : [], in: .archivedWorkflows)) { row in
                         WorkflowListRow(summary: row.item, project: project)
                     }
                 } label: {
                     SidebarSubheading(title: "Archived workflows", count: archived.count)
+                        .togglesFold(archivedFold)
                 }
             }
         }
@@ -52,7 +56,7 @@ struct ProjectWorkflowRows: View {
 /// many under it are unread (#70), so finished work is not missed now it sits in Done.
 /// One accessibility element, so VoiceOver reads it as one line.
 ///
-/// Each folds (#181), and folded it still says its count and unread. A folded group of
+/// Each folds (#181), at its chevron or its label (#440), and folded it still says its count and unread. A folded group of
 /// sessions that need a person keeps its count in the attention tint, so folding Needs
 /// you never hides that somebody is waiting.
 struct SidebarSubheading: View {

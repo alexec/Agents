@@ -40,6 +40,7 @@ struct HandoffLine: View {
         } label: {
             Text("What it was handed (\(characters.formatted()) characters)")
                 .appText(.reading).foregroundStyle(.tertiary)
+                .togglesFold($isOpen)
         }
     }
 }

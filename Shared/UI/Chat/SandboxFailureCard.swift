@@ -31,6 +31,7 @@ struct SandboxFailureCard: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } label: {
                     Text("Show error details").appText(.reading).foregroundStyle(.secondary)
+                        .togglesFold($showsDetail)
                 }
             }
             if isWaiting || !record.recoveryOffered {
