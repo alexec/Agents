@@ -323,6 +323,25 @@ public enum EventCatalogue {
         name.range(of: #"^custom\.[a-z0-9_]{1,40}$"#, options: .regularExpression) != nil
     }
 
+    // MARK: Events from MCP servers (#383)
+
+    /// The nouns only the app raises events about: every subject, `custom` included. A
+    /// server's event with one of these is refused, so it can never pass for the app's.
+    public static let reservedNouns: Set<String> = Set(EventSubject.allCases.map(\.rawValue))
+
+    /// Whether a name has the one shape every event has, whoever raises it: `noun.verbed`.
+    public static func isEventName(_ name: String) -> Bool {
+        name.range(of: #"^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$"#, options: .regularExpression) != nil
+    }
+
+    /// Whether a name can only be a server's event: shaped `noun.verbed`, not in the
+    /// catalogue (an old name included), and not about one of the app's own subjects.
+    public static func isServerEventName(_ name: String) -> Bool {
+        guard isEventName(name), kind(named: currentName(name)) == nil,
+              let dot = name.firstIndex(of: ".") else { return false }
+        return !reservedNouns.contains(String(name[..<dot]))
+    }
+
     /// The kinds in a subject.
     public static func kinds(in subject: EventSubject) -> [EventKind] {
         all.filter { $0.subject == subject }

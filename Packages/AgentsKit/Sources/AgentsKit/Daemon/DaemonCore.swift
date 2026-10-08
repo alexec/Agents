@@ -306,6 +306,13 @@ public actor DaemonCore {
     /// its last agent, a record or a tombstone (#204). Every project-wide call used to
     /// make the set again for each project it summarised.
     var projectIndexCache: ProjectIndex?
+    /// Why the chat project could not be made at start (#229), in a sentence; nil when it
+    /// was, or when there was nothing to make. See `DaemonCore+ChatProject`.
+    var chatProjectFailure: String?
+    /// Where a server keeps its chat project (#229): its account's `$HOME`, for that alone.
+    /// A server's daemon has no personal home (054 R8), so nothing else of `~/.agents` is
+    /// laid out there. Nil on this Mac, whose chat project lives in the personal home.
+    var serverChatHome: URL?
     /// Whether each project's folder was there when last looked (#204), so a list of 500
     /// projects is not 500 stats. Dropped for a folder when its watch hears anything, and
     /// old after `folderExistenceFresh` for the moves a watch never hears.
@@ -478,6 +485,9 @@ public actor DaemonCore {
     var eventWaitTimer: Task<Void, Never>?
     /// Drops the oldest events once an hour.
     var eventPruner: Task<Void, Never>?
+    /// Servers' events as workflow triggers (#383): the subscriptions, their polls and
+    /// what each has got to.
+    var mcpEvents = MCPEventsState()
     /// Events raised before the workflows were read, held for their new-style triggers
     /// until `startWorkflows`, as `deferredLifecycleEvents` holds today's (042).
     var deferredEventsForWorkflows: [Event] = []
@@ -1702,6 +1712,7 @@ public actor DaemonCore {
         machineWatch?.stop()
         machineWatch = nil
         stopWatchingDisk()
+        await stopMCPEvents()
         // The servers the bridge started for Copilot sessions are this daemon's children,
         // not a runtime's, so nobody else ends them (054).
         #if canImport(Network) && canImport(Security)

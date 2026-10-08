@@ -111,7 +111,7 @@ struct MCPHandEntry: Sendable {
         case .stopped(let why) where why == "The server stopped.": "The server stopped before it answered."
         case .stopped(let why): why
         case .timedOut: "It did not answer within \(timeout) seconds."
-        case .refused(_, let message): message.isEmpty ? "It refused to start a session." : "It refused: \(message)"
+        case .refused(_, let message, _): message.isEmpty ? "It refused to start a session." : "It refused: \(message)"
         case .notMCP: "What came back was not MCP."
         case .transportNotSupported: "The app can't connect to a server of that kind."
         }

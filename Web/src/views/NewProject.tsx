@@ -8,6 +8,7 @@ import { useEffect, useRef } from "preact/hooks";
 import type { ControlHost, DirectoryEntry, DirectoryListing, RuntimeStatus } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { gitRemote } from "../model/gitRemote";
+import { chatProblem, chatProject } from "../model/chat";
 import { describe } from "../model/errors";
 import { emptyListRuntimeLine, noAgentRuntime } from "../model/runtimes";
 import { isSafeLink } from "../render/markdown";
@@ -17,6 +18,33 @@ type Adding = { kind: "folder" | "clone"; host: string };
 
 /** The dialog open now, if any: one at a time, from the + menu, the empty list or the projects menu. */
 const adding = signal<Adding | null>(null);
+
+/** Why New Chat found no chat project on a host (#229), and its folder when Unarchive would fix it. */
+const noChat = signal<{ host: string; message: string; archived?: string } | null>(null);
+
+/**
+ * New Chat (#229): the new-session form on the host's chat project, as File ▸ New Chat opens it
+ * in the window. With none listed, the host says why, and the dialog says it.
+ */
+export async function newChat(store: Store, host: string): Promise<void> {
+  const chat = chatProject(store.projects.value[host]);
+  if (chat) {
+    go({ host, project: chat.project.folder, compose: true });
+    return;
+  }
+  let state = null;
+  try {
+    state = await store.chatState(host);
+  } catch {
+    state = null;
+  }
+  if (state && "ready" in state) {
+    go({ host, project: state.ready.folder, compose: true });
+    return;
+  }
+  const message = chatProblem(state, hostLabel(store, host)) ?? "";
+  noChat.value = { host, message, ...(state && "archived" in state ? { archived: state.archived.folder } : {}) };
+}
 
 /** "This Mac" for the host on this Mac; otherwise its name, as the window labels them. */
 export function hostLabel(store: Store, host: string): string {
@@ -46,6 +74,7 @@ export function NewProjectItems({ store, onChoose }: { store: Store; onChoose?: 
         return (
           <div class="new-project-host" role="group" aria-label={hostItem(host)} key={host.id}>
             {hosts.length > 1 && <p class="menu-head">{hostItem(host)}</p>}
+            <button role="menuitem" disabled={offline} onClick={() => { onChoose?.(); void newChat(store, host.id); }}>New Chat</button>
             <button role="menuitem" disabled={offline} onClick={() => choose("folder", host.id)}>Add Folder…</button>
             <button role="menuitem" disabled={offline} onClick={() => choose("clone", host.id)}>Clone Git URL…</button>
           </div>
@@ -69,7 +98,7 @@ export function NewProjectMenu({ store }: { store: Store }) {
   }, [open.value]);
   return (
     <span class="menu-anchor new-project" ref={anchor}>
-      <button class="icon" aria-label="New project" title="Add Folder…, or Clone Git URL…, as a project"
+      <button class="icon" aria-label="New project" title="New Chat, or Add Folder… or Clone Git URL… as a project"
         aria-haspopup="menu" aria-expanded={open.value} onClick={() => (open.value = !open.value)}>+</button>
       {open.value && (
         <div class="popover right" role="menu" aria-label="New project">
@@ -159,6 +188,30 @@ function NoAgentRuntime({ runtimes }: { runtimes: RuntimeStatus[] }) {
 /** Whichever dialog is open. Drawn once, by the columns. */
 export function NewProjectDialog({ store }: { store: Store }) {
   const open = adding.value;
+  const problem = noChat.value;
+  if (problem) {
+    const close = () => (noChat.value = null);
+    return (
+      <Modal label="No chat project" close={close}>
+        <div class="sheet-body">
+          <h2>No chat project</h2>
+          <p class="sheet-note">{problem.message}</p>
+          <div class="sheet-actions">
+            {problem.archived !== undefined ? (
+              <>
+                <button type="button" onClick={close}>Cancel</button>
+                <button type="button" class="prominent" onClick={async () => {
+                  close();
+                  const summary = await store.unarchiveProject(problem.host, problem.archived!);
+                  if (summary) go({ host: problem.host, project: summary.project.folder, compose: true });
+                }}>Unarchive</button>
+              </>
+            ) : <button type="button" class="prominent" onClick={close}>OK</button>}
+          </div>
+        </div>
+      </Modal>
+    );
+  }
   if (!open) return null;
   const close = () => (adding.value = null);
   return open.kind === "folder"

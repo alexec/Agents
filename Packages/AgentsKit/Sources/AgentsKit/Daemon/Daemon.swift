@@ -143,6 +143,13 @@ public final class Daemon: @unchecked Sendable {
         #endif
         // The person's `~/.agents`, laid out before anything is picked up (054).
         await core.reconcileHome()
+        // The chat project (#229), after the home it lives in and before recovery, so it
+        // is listed before any client asks. A server has no personal home (054 R8), so its
+        // chat project goes in its account's `$HOME`, as the server's shell has it.
+        if serve, core.locations.personalHome == nil {
+            await core.setServerChatHome(URL(fileURLWithPath: ServerSignIn.home, isDirectory: true))
+        }
+        await core.ensureChatProject()
         // An add the last daemon died in the middle of is undone before anyone looks (059).
         #if canImport(CryptoKit)
         await core.recoverCatalog()
@@ -198,6 +205,10 @@ public final class Daemon: @unchecked Sendable {
         // recovery, so a workflow is never fired at an agent the daemon has not yet
         // worked out is dead.
         await core.startWorkflows()
+        // Servers' events (#383), once the workflows that name them are read. Off the
+        // start: asking each server what it offers can take a while, and the socket
+        // must not wait on it.
+        Task { await core.startMCPEvents() }
         try server.start()
         DaemonLog.shared.write("listening on \(locations.socket.path)")
         if let control {

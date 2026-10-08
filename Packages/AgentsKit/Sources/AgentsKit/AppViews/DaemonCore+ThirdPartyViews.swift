@@ -72,18 +72,29 @@ extension DaemonCore {
 
     // MARK: Which server
 
-    /// `name` as a session in `project` is given it: the project's approved entries, then
-    /// the person's, then plugins' (the first of a name wins, as for sessions).
+    /// The transports a caller of `mcpServer` can use.
+    enum MCPTransportKind: Sendable { case http, stdio }
+
+    /// `name` as a session in `project` is given it, for views: http only.
     func viewServer(_ name: String, project: URL) -> Result<ViewServer, ViewServerProblem> {
+        mcpServer(name, project: project, allowing: [.http])
+    }
+
+    /// `name` as a session in `project` is given it: the project's approved entries, then
+    /// the person's, then plugins' (the first of a name wins, as for sessions), secrets
+    /// filled. A transport not in `allowing` is refused for what it is (#383 lets events
+    /// run their own copy of a stdio server; views do not).
+    func mcpServer(_ name: String, project: URL, allowing transports: Set<MCPTransportKind>)
+        -> Result<ViewServer, ViewServerProblem> {
         guard name != AppTool.serverName else { return .failure(.notSetUp) }
         let folder = Project.standardize(project)
         let secrets: SecretsEnv = locations.personalHome.map { SecretsEnv.load(from: SecretsEnv.url(home: $0)) }
             ?? SecretsEnv(lines: [])
         func ready(_ server: MCPServer, scope: String, cwd: URL) -> Result<ViewServer, ViewServerProblem> {
             switch server.transport {
-            case .stdio: return .failure(.localServer)
+            case .stdio: if !transports.contains(.stdio) { return .failure(.localServer) }
             case .sse: return .failure(.oldTransport)
-            case .http: break
+            case .http: if !transports.contains(.http) { return .failure(.notSetUp) }
             }
             guard let filled = secrets.filled(server) else { return .failure(.missingSecret) }
             return .success(ViewServer(name: name, scope: scope, filled: filled, cwd: cwd,
@@ -116,6 +127,10 @@ extension DaemonCore {
         }
         return .failure(.notSetUp)
     }
+
+    /// Every server name a session in `project` could have been given, for event discovery
+    /// (#383): the same list views read.
+    func mcpServerNames(project: URL) -> [String] { viewServerNames(project: project) }
 
     /// Every server name a session in `project` could have been given, but the app's own.
     func viewServerNames(project: URL) -> [String] {
@@ -344,7 +359,7 @@ extension DaemonCore {
             DaemonLog.shared.write("mcp views: \(server.name) did not answer (\(failure.logWord))")
             let words: String
             switch failure {
-            case .refused(_, let message) where !message.isEmpty: words = "\(server.name) refused: \(message.prefix(300))"
+            case .refused(_, let message, _) where !message.isEmpty: words = "\(server.name) refused: \(message.prefix(300))"
             default: words = ViewServerProblem.unreachable(MCPHandEntry.sentence(failure, timeout: 60)).words(server.name)
             }
             throw JSONRPCError(code: DaemonAPI.Failure.viewRefused, message: words)

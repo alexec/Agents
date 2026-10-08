@@ -151,6 +151,8 @@ public extension DaemonAPI {
                 Row(Method.projectsClones, params: Empty.self, result: [CloneSummary].self, kind: .hostRequest),
                 // Bring Back in the Archived projects fold (#343), as the window's sidebar has it.
                 Row(Method.projectsUnarchive, params: ProjectRequest.self, result: ProjectSummary.self, kind: .hostRequest),
+                // New Chat (#229): why a host has no chat project, asked only when none is listed.
+                Row(Method.projectsChatState, params: Empty.self, result: ChatProjectState.self, kind: .hostRequest),
                 Row(Method.filesWatch, params: FilesWatchRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.filesUnwatch, params: FilesWatchRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.artifactWrite, params: ArtifactWriteRequest.self, result: Empty.self, kind: .hostRequest),

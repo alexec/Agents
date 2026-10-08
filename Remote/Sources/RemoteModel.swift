@@ -2109,6 +2109,77 @@ final class RemoteModel {
         archivedProjects = archived
     }
 
+    // MARK: Chats (#229)
+
+    /// Why New Chat could not open a chat on a host, for the sidebar's alert; `archived`
+    /// carries the folder, so the alert can offer to bring it back.
+    struct ChatProblem: Identifiable {
+        let host: HostID
+        let message: String
+        var archived: URL?
+        var id: String { "\(host)|\(message)" }
+    }
+
+    /// Set by New Chat when there is no chat project to open, taken down by the alert.
+    var chatProblem: ChatProblem?
+
+    /// The chat project a host made for itself (`~/.agents/chat`), as its list marks it;
+    /// nil when there is none, or it is archived.
+    func chatProjectKey(on host: HostID) -> ProjectKey? {
+        work.projects.first { $0.host == host && $0.isChat == true && !$0.project.isArchived }?.key
+    }
+
+    /// Every host New Chat can be for, this Mac first: one item, or a menu of these.
+    var chatHosts: [HostID] {
+        hostSections.isEmpty ? [.mac] : hostSections.map(\.id)
+    }
+
+    /// New Chat, as the window's File ▸ New Chat: the host's chat project's new-session
+    /// page; with none listed, the host is asked why, and `chatProblem` says it.
+    func newChat(on host: HostID = .mac) async {
+        if let key = chatProjectKey(on: host) {
+            sidebarItem = .project(key)
+            return
+        }
+        let name = host == .mac ? "This Mac" : hostLabel(host)
+        let target = host == .mac ? client : otherHosts[host]
+        guard let target,
+              let state = try? await target.call(DaemonAPI.Method.projectsChatState, DaemonAPI.Empty(),
+                                                 returning: DaemonAPI.ChatProjectState.self) else {
+            // An older host does not know the question, or the host is not answering.
+            chatProblem = ChatProblem(host: host, message: "\(name) has no chat project.")
+            return
+        }
+        switch state {
+        case .ready(let folder):
+            sidebarItem = .project(ProjectKey(host: host, folder: folder))
+        case .archived(let folder):
+            chatProblem = ChatProblem(host: host, message: "The chat project on \(host == .mac ? "this Mac" : name) is archived.",
+                                      archived: folder)
+        case .noPersonalHome:
+            chatProblem = ChatProblem(host: host, message: "\(name) has no personal home folder, so it has no chat project.")
+        case .failed(let message):
+            chatProblem = ChatProblem(host: host, message: message)
+        }
+    }
+
+    /// Unarchive from New Chat's alert, then open it.
+    func unarchiveChatProject(_ problem: ChatProblem) async {
+        guard let folder = problem.archived,
+              let target = problem.host == .mac ? client : otherHosts[problem.host] else { return }
+        do {
+            var brought = try await target.call(DaemonAPI.Method.projectsUnarchive,
+                                                DaemonAPI.ProjectRequest(folder: folder),
+                                                returning: DaemonAPI.ProjectSummary.self)
+            brought.host = problem.host
+            work.upsert(brought)
+            archivedProjects.removeAll { $0.key == brought.key }
+            sidebarItem = .project(brought.key)
+        } catch {
+            self.problem = sentence(for: error)
+        }
+    }
+
     /// Bring an archived project back (#343), through its own host, as the window's Bring
     /// Back does: a project again, with its new-session form open.
     func unarchiveProject(_ summary: DaemonAPI.ProjectSummary) async {

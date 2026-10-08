@@ -1,0 +1,74 @@
+{
+  "repos": {
+    "alexec/Agents": {
+      "prs": [
+        {
+          "number": 401,
+          "title": "Make the sidebar fold faster",
+          "branch": "agents/fold-faster",
+          "url": "https://github.com/alexec/Agents/pull/401",
+          "state": "open",
+          "checks": "passing",
+          "updatedAt": "2026-10-01T09:00:00Z"
+        },
+        {
+          "number": 402,
+          "title": "Queue helpers past the limit",
+          "branch": "agents/queue-helpers",
+          "url": "https://github.com/alexec/Agents/pull/402",
+          "state": "open",
+          "checks": "failing",
+          "failedRunId": 9001,
+          "updatedAt": "2026-10-01T10:00:00Z"
+        },
+        {
+          "number": 400,
+          "title": "Tasks for MCP integrations",
+          "branch": "agents/tasks-383",
+          "url": "https://github.com/alexec/Agents/pull/400",
+          "state": "merged",
+          "mergedAt": "2026-10-01T08:00:00Z",
+          "mergeSha": "08e15f4c0000000000000000000000000000beef",
+          "updatedAt": "2026-10-01T08:00:00Z"
+        }
+      ],
+      "runs": [
+        {
+          "id": 9001,
+          "attempt": 1,
+          "name": "CI",
+          "url": "https://github.com/alexec/Agents/actions/runs/9001",
+          "event": "pull_request",
+          "status": "completed",
+          "conclusion": "failure",
+          "branch": "agents/queue-helpers",
+          "headSha": "26cc3f7a0000000000000000000000000000cafe",
+          "pr": 402,
+          "updatedAt": "2026-10-01T10:00:00Z",
+          "jobs": [
+            {
+              "name": "test",
+              "url": "https://github.com/alexec/Agents/actions/runs/9001/job/1",
+              "conclusion": "failure",
+              "log": "Building for debugging...\nTest Suite 'HelperLimitTests' started.\nHelperLimitTests.swift:42: error: XCTAssertEqual failed: (\"3\") is not equal to (\"4\")\nTest Suite 'HelperLimitTests' failed."
+            },
+            {
+              "name": "packages",
+              "url": "https://github.com/alexec/Agents/actions/runs/9001/job/2",
+              "conclusion": "failure",
+              "log": "Resolving packages...\nerror: the package at 'Packages/AgentsKit' cannot be built."
+            },
+            {
+              "name": "check",
+              "url": "https://github.com/alexec/Agents/actions/runs/9001/job/3",
+              "conclusion": "success",
+              "log": "All checks passed."
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "reruns": [],
+  "comments": []
+}

@@ -100,6 +100,7 @@ extension DaemonCore {
             costToDate: costToDate,
             unmeasuredAgents: tally?.unmeasured ?? 0)
         summary.retiredCount = gone?.count ?? 0
+        if isChatProject(folder) { summary.isChat = true }
         return summary
     }
 
@@ -295,7 +296,9 @@ extension DaemonCore {
     /// time an agent starts in it — before the runtime has read anything. A folder in
     /// one of the app's own worktrees is left alone: it is a checkout of the project,
     /// and whatever the project has committed is already in it.
-    func layOutOnce(_ folder: URL) {
+    /// `chat` is the chat project's first layout (#229), whose `AGENTS.md` says what the
+    /// folder is for.
+    func layOutOnce(_ folder: URL, chat: Bool = false) {
         let standardized = Project.standardize(folder)
         guard !standardized.path.contains("/\(WorktreeName.folder)/"),
               Self.isDirectory(standardized) else { return }
@@ -308,7 +311,7 @@ extension DaemonCore {
         // was added since, never the steps it already had back.
         let from = record.laidOutAt == nil ? 0 : record.layoutVersion ?? 1
         guard from < DotAgents.version else { return }
-        DotAgents.apply(to: standardized, from: from)
+        DotAgents.apply(to: standardized, from: from, chat: chat)
         record.laidOutAt = record.laidOutAt ?? Date()
         record.layoutVersion = DotAgents.version
         records[standardized] = record

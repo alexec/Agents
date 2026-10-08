@@ -102,6 +102,44 @@ struct RemoteSidebar: View {
         .scrollContentBackground(.hidden)
         .background(Paper.sidebar)
         .toolbarBackground(Paper.sidebar, for: .navigationBar)
+        .toolbar {
+            // New Chat (#229): the host's chat project, with no project to pick, as the
+            // window's File ▸ New Chat. A menu of hosts when there are several.
+            ToolbarItem(placement: .primaryAction) {
+                if model.chatHosts.count > 1 {
+                    Menu {
+                        ForEach(model.chatHosts, id: \.self) { host in
+                            Button(host == .mac ? "This Mac" : model.hostLabel(host)) {
+                                Task { await model.newChat(on: host) }
+                            }
+                            .disabled(model.hostIsOffline(host))
+                        }
+                    } label: {
+                        Label("New Chat", systemImage: "square.and.pencil")
+                    }
+                    .disabled(model.isStale)
+                } else {
+                    Button {
+                        Task { await model.newChat(on: .mac) }
+                    } label: {
+                        Label("New Chat", systemImage: "square.and.pencil")
+                    }
+                    .disabled(model.isStale)
+                }
+            }
+        }
+        .alert("No chat project", isPresented: Binding(
+            get: { model.chatProblem != nil }, set: { if !$0 { model.chatProblem = nil } }),
+            presenting: model.chatProblem) { problem in
+            if problem.archived != nil {
+                Button("Unarchive") { Task { await model.unarchiveChatProject(problem) } }
+                Button("Cancel", role: .cancel) {}
+            } else {
+                Button("OK", role: .cancel) {}
+            }
+        } message: { problem in
+            Text(problem.message)
+        }
         .navigationTitle("Agents")
         .searchable(text: $query, prompt: "Search sessions and workflows")
         .task(id: query) {
@@ -408,7 +446,8 @@ private struct NewSessionRow: View {
     }
 }
 
-/// The Runtimes row under Activity, with the Mac's dot when a runtime is out (065).
+/// The Runtimes row under Activity: how many of the Mac's runtimes work, out of how many
+/// are installed, and its red dot when none do (#379), as the window's.
 private struct RuntimesRow: View {
     @Environment(RemoteModel.self) private var model
 
@@ -416,9 +455,18 @@ private struct RuntimesRow: View {
         HStack {
             Text("Runtimes")
             Spacer()
-            if model.runtimeAllowances?.anyOut == true {
-                Circle().fill(StateTint.failure.style(or: .primary)).frame(width: 7, height: 7)
-                    .accessibilityLabel("A runtime is out")
+            if let tally = RuntimeTally(model.runtimes, allowances: model.runtimeAllowances) {
+                HStack(spacing: 4) {
+                    if tally.noneWorking {
+                        Circle().fill(StateTint.failure.style(or: .primary)).frame(width: 7, height: 7)
+                            .accessibilityHidden(true)
+                    }
+                    Text(tally.words).monospacedDigit()
+                }
+                .foregroundStyle(.secondary)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(tally.noneWorking ? "None of \(tally.total) working"
+                                    : "\(tally.working) of \(tally.total) working")
             }
         }
         .accessibilityHint("Opens Runtimes")
