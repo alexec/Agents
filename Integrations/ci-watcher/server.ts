@@ -7,7 +7,8 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { readFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { GhError, fakeGitHub, realGitHub, type GitHub, type RunRef } from "./github.ts";
 
@@ -255,12 +256,20 @@ async function callTool(gh: GitHub, params: any) {
 
 // MARK: Resources
 
-async function listResources() {
-  return { resources: [] };
-}
+const BOARD_URI = "ui://ci/board";
+const BOARD_MIME = "text/html;profile=mcp-app";
+// No network at all: an empty csp, so the host draws it under its strictest policy.
+const BOARD_META = { ui: { csp: {}, prefersBorder: true } };
+const board = {
+  uri: BOARD_URI, name: "board", title: "Pull requests",
+  description: "The repo's open pull requests and their checks, with Rerun on a failing one. Fed by list_prs.",
+  mimeType: BOARD_MIME, _meta: BOARD_META,
+};
 
-async function readResource(params: any): Promise<unknown> {
-  throw new RpcError(-32002, `no resource ${params?.uri}`);
+async function readResource(params: any) {
+  if (params?.uri !== BOARD_URI) throw new RpcError(-32002, `no resource ${params?.uri}`);
+  const text = await readFile(join(here, "board.html"), "utf8");
+  return { contents: [{ uri: BOARD_URI, mimeType: BOARD_MIME, text, _meta: BOARD_META }] };
 }
 
 // MARK: Dispatch
@@ -280,7 +289,7 @@ async function handle(gh: GitHub, method: string, params: any): Promise<unknown>
     case "ping": return {};
     case "tools/list": return { tools: TOOLS };
     case "tools/call": return callTool(gh, params);
-    case "resources/list": return listResources();
+    case "resources/list": return { resources: [board] };
     case "resources/templates/list": return { resourceTemplates: [] };
     case "resources/read": return readResource(params);
     case "events/list": return { events: EVENTS };

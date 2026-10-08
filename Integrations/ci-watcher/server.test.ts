@@ -310,6 +310,33 @@ test("gh not signed in, and a rate limit", async () => {
   }
 });
 
+test("list_prs feeds the board, which resources/read serves", async () => {
+  const { tools } = await ok("tools/list");
+  const list = tools.find((t: any) => t.name === "list_prs");
+  assert.equal(list._meta.ui.resourceUri, "ui://ci/board");
+  assert.equal(list._meta["ui/resourceUri"], "ui://ci/board");
+  for (const t of tools.filter((t: any) => t.name !== "list_prs")) assert.equal(t._meta.ui.resourceUri, undefined);
+
+  const { resources } = await ok("resources/list");
+  assert.equal(resources.length, 1);
+  assert.equal(resources[0].uri, "ui://ci/board");
+  assert.equal(resources[0].mimeType, "text/html;profile=mcp-app");
+
+  const { contents } = await ok("resources/read", { uri: "ui://ci/board" });
+  assert.equal(contents.length, 1);
+  const [page] = contents;
+  assert.equal(page.uri, "ui://ci/board");
+  assert.equal(page.mimeType, "text/html;profile=mcp-app");
+  assert.deepEqual(page._meta.ui.csp, {});
+  assert.equal(page.text, readFileSync(join(here, "board.html"), "utf8"));
+  for (const word of ["ui/initialize", "ui/notifications/initialized", "ui/notifications/tool-result",
+    "rerun_failed", "list_prs", "ui/open-link"]) assert.ok(page.text.includes(word), word);
+  assert.doesNotMatch(page.text, /fetch\(|XMLHttpRequest|WebSocket|<script src|<link /, "the board has no network");
+
+  const missing = await rpc("resources/read", { uri: "ui://ci/nope" });
+  assert.equal(missing.error.code, -32002);
+});
+
 test("a non-local Origin is refused", async () => {
   const body = { jsonrpc: "2.0", id: nextID++, method: "ping" };
   assert.equal((await post(body, { origin: "https://evil.example" })).status, 403);

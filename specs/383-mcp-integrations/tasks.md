@@ -273,7 +273,7 @@ states. **Rerun** reruns.
   - It draws the PRs (number, title, branch, a check pill), using the host's CSS variables for colour and font.
   - **Rerun** on a failing PR calls `tools/call rerun_failed`, then `list_prs` again.
   - Links go through `ui/open-link`.
-- [ ] T032 [US4] In `Integrations/ci-watcher/server.ts`, serve `ui://ci/board` from `resources/list` and `resources/read` as `text/html;profile=mcp-app`. Give `list_prs` `_meta.ui.resourceUri: "ui://ci/board"`, `annotations.readOnlyHint: true` and visibility `["model","app"]`, and `rerun_failed` visibility `["model","app"]`. Extend `server.test.ts` to read the resource and check `list_prs`'s `_meta`. Depends on T028 and T031.
+- [x] T032 [US4] In `Integrations/ci-watcher/server.ts`, serve `ui://ci/board` from `resources/list` and `resources/read` as `text/html;profile=mcp-app`. Give `list_prs` `_meta.ui.resourceUri: "ui://ci/board"`, `annotations.readOnlyHint: true` and visibility `["model","app"]`, and `rerun_failed` visibility `["model","app"]`. Extend `server.test.ts` to read the resource and check `list_prs`'s `_meta`. Depends on T028 and T031.
 
 **Checkpoint**: the board draws in the chat and as a pin (quickstart §1 step 8).
 
