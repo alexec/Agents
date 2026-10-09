@@ -280,6 +280,11 @@ lists, adapted to touch and width.
 - The hand icon for Needs You.
 - One New Session at the top of the sidebar, in place of a row in each project; it opens in the last project a new session was opened in, and the new-session page's project name is a menu to switch project.
 
+### Walk 2, 2026-10-08 (Alex)
+
+- The search field says just "Search".
+- Pinned sessions and workflows go in a Pinned group above Needs You, from every project in pin order, each naming its project; they leave their project's group.
+
 ## Assumptions
 
 - "Done" sessions stay in their project's flat list (plain, no mark); there is no Done
