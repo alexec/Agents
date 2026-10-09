@@ -25,6 +25,10 @@ extension DaemonCore {
         var cwd: URL
         /// The catalog's key and the pool's: a digest of the entry as written.
         var entry: String
+        /// A local server its file asks the daemon to host (#488).
+        var hosted = false
+        /// The project folder whose file names it; nil for the person's own or a plugin's.
+        var project: String?
 
         var poolKey: MCPClientPool.Key { .init(scope: scope, name: name, entry: entry) }
     }
@@ -90,7 +94,8 @@ extension DaemonCore {
         let folder = Project.standardize(project)
         let secrets: SecretsEnv = locations.personalHome.map { SecretsEnv.load(from: SecretsEnv.url(home: $0)) }
             ?? SecretsEnv(lines: [])
-        func ready(_ server: MCPServer, scope: String, cwd: URL) -> Result<ViewServer, ViewServerProblem> {
+        func ready(_ server: MCPServer, scope: String, cwd: URL, hosted: Bool = false,
+                   project: String? = nil) -> Result<ViewServer, ViewServerProblem> {
             switch server.transport {
             case .stdio: if !transports.contains(.stdio) { return .failure(.localServer) }
             case .sse: return .failure(.oldTransport)
@@ -98,7 +103,7 @@ extension DaemonCore {
             }
             guard let filled = secrets.filled(server) else { return .failure(.missingSecret) }
             return .success(ViewServer(name: name, scope: scope, filled: filled, cwd: cwd,
-                                       entry: ServerViewCatalog.key(for: server)))
+                                       entry: ServerViewCatalog.key(for: server), hosted: hosted, project: project))
         }
         if case .success(let servers) = PersonalDotAgents.projectServers(in: folder),
            let server = servers.first(where: { $0.name == name }) {
@@ -107,11 +112,14 @@ extension DaemonCore {
                   mcpApprovalStore.load().isApproved(folder: folder, name: name, entry: entry) else {
                 return .failure(.waiting)
             }
-            return ready(server, scope: MCPApprovals.viewScope(folder), cwd: folder)
+            let hosted = PersonalDotAgents.hostedNames(at: MCPJSONFile.projectURL(folder: folder)).contains(name)
+            return ready(server, scope: MCPApprovals.viewScope(folder), cwd: folder, hosted: hosted,
+                         project: folder.path(percentEncoded: false))
         }
         if let home = locations.personalHome, case .success(let servers) = PersonalDotAgents.personalServers(home: home),
            let server = servers.first(where: { $0.name == name }) {
-            return ready(server, scope: MCPApprovals.viewScope(nil), cwd: home)
+            let hosted = PersonalDotAgents.hostedNames(at: PersonalDotAgents.mcpURL(home: home)).contains(name)
+            return ready(server, scope: MCPApprovals.viewScope(nil), cwd: home, hosted: hosted)
         }
         let records = pluginApprovalStore.load()
         for plugin in DotAgents.pluginFolders(for: folder) {

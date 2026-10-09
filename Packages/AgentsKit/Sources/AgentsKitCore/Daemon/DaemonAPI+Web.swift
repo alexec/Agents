@@ -74,6 +74,8 @@ public extension DaemonAPI {
                 Row(Method.costState, params: Empty.self, result: CostState.self, kind: .hostRequest),
                 Row(Method.eventsList, params: EventsListRequest.self, result: EventsPage.self, kind: .hostRequest),
                 Row(Method.leasesSnapshot, params: Empty.self, result: LeaseSnapshot.self, kind: .hostRequest),
+                // The MCP servers the host runs for every agent (#488), for the Resources page.
+                Row(Method.mcpHosted, params: Empty.self, result: HostedMCPSnapshot.self, kind: .hostRequest),
                 // The low disk space strip (#195, #196), as the window draws it.
                 Row(Method.diskState, params: Empty.self, result: DiskState.self, kind: .hostRequest),
                 // The files the host could not read in this run (#205, #223), as the window's sidebar foot.
@@ -207,6 +209,8 @@ public extension DaemonAPI {
                 Row(Notification.writeFailed, params: WriteFailure.self, result: Empty.self, kind: .hostNotification),
                 // Who holds what, for the page's read-only Resources list (#116).
                 Row(Notification.leasesChanged, params: LeaseSnapshot.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.mcpHostedChanged, params: HostedMCPSnapshot.self, result: Empty.self,
+                    kind: .hostNotification),
                 Row(Notification.diskChanged, params: DiskState.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.storeNotesChanged, params: StoreNotes.self, result: Empty.self,
                     kind: .hostNotification),

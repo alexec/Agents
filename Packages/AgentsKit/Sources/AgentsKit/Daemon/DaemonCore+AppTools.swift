@@ -58,6 +58,8 @@ extension DaemonCore {
     func endAppTools(for token: String) {
         appTools.revoke(token)
         endBridgeRoutes(for: token)
+        let hosted = hostedServers
+        Task { await hosted.release(token) }
     }
 
     func dropAppTokens(for agentID: UUID) {

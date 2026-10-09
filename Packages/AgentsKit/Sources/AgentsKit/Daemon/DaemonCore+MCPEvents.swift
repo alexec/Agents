@@ -72,6 +72,8 @@ struct MCPEventsState {
     var announced: [String: Date] = [:]
     var reconciling = false
     var reconcileAgain = false
+    /// The user each hosted server's event connection is to it (#488), by server.
+    var hostedUsers: [MCPClientPool.Key: String] = [:]
     var ticker: Task<Void, Never>?
 }
 
@@ -131,12 +133,21 @@ extension DaemonCore {
         for task in mcpEvents.tasks.values { task.cancel() }
         mcpEvents.tasks = [:]
         await mcpEvents.clients.endAll()
+        for user in mcpEvents.hostedUsers.values { await hostedServers.release(user) }
+        mcpEvents.hostedUsers = [:]
     }
 
     /// Look again soon: a workflow file moved.
     func scheduleMCPEventsReconcile() {
         guard mcpEvents.started else { return }
         Task { [weak self] in await self?.reconcileMCPEvents() }
+    }
+
+    /// A hosted server said its events changed (#488): its own copy hears it, not the
+    /// event connection, which has no stream.
+    func hostedServerListChanged(_ key: MCPClientPool.Key) async {
+        guard mcpEvents.started, mcpEvents.hostedUsers[key] != nil else { return }
+        await mcpEventsListChanged(key)
     }
 
     private func mcpEventsListChanged(_ key: MCPClientPool.Key) async {
@@ -330,7 +341,13 @@ extension DaemonCore {
         }
         let changed = Set(lines.keys).union(mcpEvents.lines.keys).filter { mcpEvents.lines[$0] != lines[$0] }
         mcpEvents.lines = lines
-        await mcpEvents.clients.keep(only: Set(mcpEvents.subscriptions.values.map(\.pool)))
+        let subscribed = Set(mcpEvents.subscriptions.values.map(\.pool))
+        await mcpEvents.clients.keep(only: subscribed)
+        // A hosted server no subscription names is no longer used by events (#488).
+        for (key, user) in mcpEvents.hostedUsers where !subscribed.contains(key) {
+            mcpEvents.hostedUsers[key] = nil
+            await hostedServers.release(user)
+        }
         // Records no workflow has named for a day go (a changed filter, a deleted workflow).
         var records = mcpRecords()
         var expired = false
@@ -379,6 +396,21 @@ extension DaemonCore {
         switch mcpServer(name, project: project, allowing: [.http, .stdio]) {
         case .failure(let problem): return .failure(problem)
         case .success(var server):
+            // A hosted server's events come from its one copy, over the app's endpoint (#488).
+            if server.hosted {
+                let user = mcpEvents.hostedUsers[server.poolKey] ?? "events-" + UUID().uuidString
+                mcpEvents.hostedUsers[server.poolKey] = user
+                do {
+                    if let routed = try await hostedRoute(server, user: user) { server.filled = routed }
+                } catch HostedMCPServers.Refusal.tooMany {
+                    mcpEvents.hostedUsers[server.poolKey] = nil
+                    return .failure(.unreachable("\(HostedMCPServers.limit) hosted servers are in use on this host."))
+                } catch {
+                    mcpEvents.hostedUsers[server.poolKey] = nil
+                    return .failure(.unreachable("The app's endpoint could not start."))
+                }
+                return .success(server)
+            }
             if case .http(let url, var headers) = server.filled.transport, !MCPSignIns.bringsOwnAuthorization(headers) {
                 switch await mcpSignIns.bearer(server: url, name: name) {
                 case .none: break

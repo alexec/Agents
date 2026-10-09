@@ -194,13 +194,17 @@ public actor DaemonCore {
     #endif
     /// The app's own `agents` MCP server, served here over loopback http to every
     /// runtime (#185). It listens only once a session needs it.
-    lazy var appTools = AppToolsEndpoint { [weak self] method, params in
+    lazy var appTools = AppToolsEndpoint(relay: { [weak self] method, params in
         guard let self else {
             return .failure(JSONRPCError(code: DaemonAPI.Failure.noSuchAgent,
                                          message: "The app is not running, so nothing was shown."))
         }
         return await self.appToolCall(method: method, params: params)
-    }
+    }, hosted: hostedServers)
+    /// The MCP servers this host runs one copy of for every agent (#488), served beside
+    /// the app's own tools.
+    lazy var hostedServers = HostedMCPServers(
+        logFolder: locations.root.appending(path: "mcp-logs", directoryHint: .isDirectory))
     /// Agents whose next prompt carries the `Briefing`: the few things about this app
     /// an agent is told in words. Set when a conversation starts, and again only if a
     /// runtime loses one and we have to begin a new one — the briefing lives in the
@@ -1718,6 +1722,8 @@ public actor DaemonCore {
         bridge.stopAll()
         #endif
         appTools.stop()
+        // The servers it hosts are this daemon's, and end with it (#488).
+        await hostedServers.stopAll()
 
         // Two different things, both going. The agent's terminals are 003's and are
         // killed because the agent owning them is stopping. The user's shells are this
