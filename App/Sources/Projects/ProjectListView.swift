@@ -72,13 +72,14 @@ struct ProjectListView: View {
                 SpendingRow(selection: $selection).activityIcon("dollarsign.circle")
                     .appText(.supporting).sidebarInk(.spending).tag(SidebarItem.spending)
             } header: {
-                Text("Activity")
+                // The size of every other group's heading (#495).
+                Text("Activity").appText(.supporting)
             }
 
-            Section {
-                ForEach(SidebarSmartRow.allCases, id: \.self) { row in
-                    SmartFold(row: row, projects: orderedProjects.map(\.key), folds: folds, query: searched)
-                }
+            // Pinned, Needs You, Working, Unread: a group each, headed and folding as a
+            // project's is, so every group in the list lines up alike (#495).
+            ForEach(SidebarSmartRow.allCases, id: \.self) { row in
+                SmartFold(row: row, projects: orderedProjects.map(\.key), folds: folds, query: searched)
             }
 
             // One group per project (#495), its name the group's heading, its sessions the
@@ -118,7 +119,7 @@ struct ProjectListView: View {
                             .appText(.supporting)
                     }
                 } header: {
-                    Text("Archived projects")
+                    Text("Archived projects").appText(.supporting)
                 }
             }
         }

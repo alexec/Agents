@@ -61,6 +61,8 @@ struct ProjectRow: View {
                     .accessibilityHidden(true)
             }
         }
+        // As a group's heading, its dot over the rows' counts and times (#495).
+        .padding(.trailing, asHeading ? SidebarHeading.trailingInset : 0)
         .contentShape(Rectangle())
         // Clicking a project folds or unfolds it (#375); the detail stays as it was.
         // `simultaneousGesture` sits alongside the list's own handling rather than

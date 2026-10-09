@@ -1,9 +1,10 @@
 import AgentsKitCore
 import SwiftUI
 
-/// One of the rows at the top of the sidebar (#495): Needs You, Working or Unread, across
-/// every project and host, folding open on its sessions as a project does. Folded, it
-/// reads its count off each project's shelf and lists nothing (#356).
+/// One of the groups at the top of the sidebar (#495): Pinned, Needs You, Working or
+/// Unread, across every project and host. A section headed and folding as a project's
+/// is, so its heading and rows line up with theirs. Folded, it reads its count off each
+/// project's shelf and lists nothing (#356).
 struct SmartFold: View {
     @Environment(AppModel.self) private var model
     let row: SidebarSmartRow
@@ -17,7 +18,7 @@ struct SmartFold: View {
         let isOpen = folds.isOpen(row)
         let open = Binding(get: { isOpen }, set: { folds.set(row, open: $0) })
         let agents = isOpen ? shown : []
-        DisclosureGroup(isExpanded: open) {
+        Section(isExpanded: open) {
             if row == .pinned {
                 if isOpen { pinnedRows }
             } else {
@@ -25,9 +26,10 @@ struct SmartFold: View {
                     SessionSidebarRow(agent: item.item, place: place(of: item.item))
                 }
             }
-        } label: {
-            SmartRowLabel(row: row, count: row.count(in: model.work, projects: projects))
-                .togglesFold(open)
+        } header: {
+            SmartRowLabel(row: row, count: row.count(in: model.work, projects: projects)) {
+                open.wrappedValue.toggle()
+            }
         }
     }
 
@@ -89,13 +91,16 @@ struct SmartFold: View {
 private struct SmartRowLabel: View {
     let row: SidebarSmartRow
     let count: Int
+    /// A click on the heading folds or unfolds it, as on a project's (#375).
+    var onClick: () -> Void = {}
 
     var body: some View {
-        // No icon (Alex, #495): the sessions under it carry the marks.
+        // No icon (Alex, #495): the sessions under it carry the marks. Grey, as every
+        // group's heading is.
         HStack(spacing: 6) {
             Text(row.title)
                 .lineLimit(1)
-                .foregroundStyle(count > 0 ? .primary : .secondary)
+                .foregroundStyle(.secondary)
             Spacer(minLength: 4)
             if count > 0 {
                 Text("\(count)")
@@ -105,11 +110,21 @@ private struct SmartRowLabel: View {
                                                       : AnyShapeStyle(.secondary))
             }
         }
+        // A heading runs to the list's edge, its rows stop short of it: this keeps the
+        // count over the rows' counts and times (#495).
+        .padding(.trailing, SidebarHeading.trailingInset)
         .appText(.supporting)
         .contentShape(Rectangle())
+        .simultaneousGesture(TapGesture().onEnded { onClick() })
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(count > 0 ? "\(row.title), \(count)" : "\(row.title), none")
     }
+}
+
+/// How far in from the list's edge a group heading's trailing mark sits, so it lines up
+/// with the trailing counts and times of the rows under it (#495).
+enum SidebarHeading {
+    static let trailingInset: CGFloat = 11
 }
 
 /// A row under a project that opens a page about it (#495): its workflows, or its
