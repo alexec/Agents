@@ -87,8 +87,8 @@ is set up as before, with no tunnel.
 
 ### Put a project on it
 
-1. Click **+** (**New project**) at the top of the **Projects** list, choose the server's
-   name, then **Add Folder…** or **Clone Git URL…**.
+1. Choose **File ▸ Add Project On** or **File ▸ Clone Project On**, then the server's
+   name.
 2. For a folder, choose one on the server, then click **Add as project**. A clone goes
    into your home folder on the server.
 

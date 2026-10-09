@@ -107,8 +107,8 @@ git init -q && git add -A && git commit -qm "First version"
 
 ## 3. Add it to Agents
 
-In the Agents window, click **Add Folder…** in the empty project list (once you have
-projects, it is **+** at the top of the list, then **Add Folder…**), and pick
+In the Agents window, click **Add Project…** in the empty project list (once you have
+projects, it is **File ▸ Add Project…**), and pick
 `weather-app` in your `Demo` folder.
 
 You should see `weather-app` in the list on the left, and beside it an empty new session:

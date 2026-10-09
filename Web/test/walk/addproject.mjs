@@ -1,6 +1,6 @@
 // The #114 and #115 walk, on a scratch root: the page loads in Chrome with no CSP complaint,
 // Chrome DevTools' probe is answered 404 by the listener, and a fresh control plane's empty
-// projects column adds a project by Add Folder… (browsing the host's folders) and by Clone
+// projects column adds a project by Add Project… (browsing the host's folders) and by Clone
 // Git URL…, each then listed by the host. Screenshots go to <out dir>.
 //
 //   node Web/test/walk/addproject.mjs <WEB_URL> <browser code> <folder to add> <out dir> [git URL]
@@ -42,8 +42,8 @@ await page.waitFor(`document.querySelector("[role=menu][aria-label='New project'
 say(`menu: ${JSON.stringify(await page.text("[role=menu][aria-label='New project']"))}`);
 await page.shot(`${out}/addproject-2-menu.png`);
 
-// 4. Add Folder…: the host's home, then the folder typed in, then Add as project.
-await page.press("Add Folder…");
+// 4. Add Project…: the host's home, then the folder typed in, then Add as project.
+await page.press("Add Project…");
 await page.waitFor(`document.querySelector("dialog.sheet[open] .folder-row")`);
 say(`dialog: ${JSON.stringify((await page.text("dialog.sheet")).split("\n").slice(0, 2))}`);
 await page.shot(`${out}/addproject-3-browse-home.png`);
@@ -60,10 +60,10 @@ check(true, `added ${name}: the column lists ${JSON.stringify(await page.text(".
 check(decodeURIComponent(await page.eval("location.hash")).includes(name), `and it is chosen: ${await page.eval("location.hash")}`);
 await page.shot(`${out}/addproject-5-added.png`);
 
-// 5. Clone Git URL…, when given one.
+// 5. Clone Project from Git URL…, when given one.
 if (cloneURL) {
   await page.press("New project");
-  await page.press("Clone Git URL…");
+  await page.press("Clone Project from Git URL…");
   await page.waitFor(`document.querySelector("dialog.sheet[open] input")`);
   await page.focus("dialog.sheet input");
   await page.type("not a url");

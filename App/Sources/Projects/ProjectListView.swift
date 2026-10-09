@@ -193,16 +193,21 @@ struct ProjectListView: View {
                                     set: { if !$0 { requests.dropboxProject = nil } })) {
             if let project = requests.dropboxProject { DropboxSheet(project: project).paperSheet() }
         }
-        // File ▸ Add Folder…, Clone Git URL… and Add Server…: the same sheets as the +
-        // menu, on this Mac.
+        // File ▸ Add Project…, Clone Project from Git URL…, their On menus for a server,
+        // and Add Server….
         .onChange(of: requests.projectSheet) { _, sheet in
             guard let sheet else { return }
             requests.projectSheet = nil
-            targetHost = .mac
             switch sheet {
-            case .chooseFolder: isChoosingFolder = true
-            case .clone: isCloning = true
-            case .addServer: isAddingServer = true
+            case .chooseFolder(let host):
+                targetHost = host
+                if model.isOnThisMac(host) { isChoosingFolder = true } else { isChoosingServerFolder = true }
+            case .clone(let host):
+                targetHost = host
+                isCloning = true
+            case .addServer:
+                targetHost = .mac
+                isAddingServer = true
             }
         }
     }
@@ -616,9 +621,9 @@ private struct EmptyProjectList: View {
                 Text("A project is a folder you work in. Pick one and say what you want done.")
                     .foregroundStyle(.secondary)
                 HStack {
-                    Button("Add Folder…") { isChoosingFolder = true }
+                    Button("Add Project…") { isChoosingFolder = true }
                         .buttonStyle(.paperProminent)
-                    Button("Clone Git URL…") { isCloning = true }
+                    Button("Clone Project from Git URL…") { isCloning = true }
                         .buttonStyle(.paper)
                 }
             }

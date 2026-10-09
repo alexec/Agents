@@ -1,5 +1,5 @@
 // New project (#115), as the window's projects column has it (ProjectListView, CloneSheet,
-// RemoteFolderSheet): Add Folder…, chosen from the host's folders over `files/browse`, and Clone
+// RemoteFolderSheet): Add Project…, chosen from the host's folders over `files/browse`, and Clone
 // Git URL…, on the host the project is for. The browser can't see the host's disk, so every host's
 // folder is chosen the way the window chooses a server's.
 import { signal, useSignal } from "@preact/signals";
@@ -58,7 +58,7 @@ function hostItem(host: ControlHost): string {
 }
 
 /**
- * Add Folder… and Clone Git URL…, per host: under each host's name when there is more than one,
+ * Add Project… and Clone Project from Git URL…, per host: under each host's name when there is more than one,
  * as the window's + menu has a submenu per machine. A host that isn't answering can't take one.
  */
 export function NewProjectItems({ store, onChoose }: { store: Store; onChoose?: () => void }) {
@@ -75,8 +75,8 @@ export function NewProjectItems({ store, onChoose }: { store: Store; onChoose?: 
           <div class="new-project-host" role="group" aria-label={hostItem(host)} key={host.id}>
             {hosts.length > 1 && <p class="menu-head">{hostItem(host)}</p>}
             <button role="menuitem" disabled={offline} onClick={() => { onChoose?.(); void newChat(store, host.id); }}>New Chat</button>
-            <button role="menuitem" disabled={offline} onClick={() => choose("folder", host.id)}>Add Folder…</button>
-            <button role="menuitem" disabled={offline} onClick={() => choose("clone", host.id)}>Clone Git URL…</button>
+            <button role="menuitem" disabled={offline} onClick={() => choose("folder", host.id)}>Add Project…</button>
+            <button role="menuitem" disabled={offline} onClick={() => choose("clone", host.id)}>Clone Project from Git URL…</button>
           </div>
         );
       })}
@@ -98,7 +98,7 @@ export function NewProjectMenu({ store }: { store: Store }) {
   }, [open.value]);
   return (
     <span class="menu-anchor new-project" ref={anchor}>
-      <button class="icon" aria-label="New project" title="New Chat, or Add Folder… or Clone Git URL… as a project"
+      <button class="icon" aria-label="New project" title="New Chat, or Add Project… or Clone Project from Git URL… as a project"
         aria-haspopup="menu" aria-expanded={open.value} onClick={() => (open.value = !open.value)}>+</button>
       {open.value && (
         <div class="popover right" role="menu" aria-label="New project">
@@ -152,8 +152,8 @@ export function EmptyProjects({ store }: { store: Store }) {
       <p class="strong">No projects yet</p>
       <p class="quiet">A project is a folder you work in. Pick one and say what you want done.</p>
       <div class="empty-actions">
-        <button class="prominent" onClick={() => (adding.value = { kind: "folder", host })}>Add Folder…</button>
-        <button onClick={() => (adding.value = { kind: "clone", host })}>Clone Git URL…</button>
+        <button class="prominent" onClick={() => (adding.value = { kind: "folder", host })}>Add Project…</button>
+        <button onClick={() => (adding.value = { kind: "clone", host })}>Clone Project from Git URL…</button>
       </div>
     </div>
   );

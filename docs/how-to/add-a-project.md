@@ -23,9 +23,8 @@ chats that need no project. See [Chat without a project](chat-without-a-project.
 
 **Add a folder that is already on your Mac**
 
-1. Click **+** (**New project**) at the top of the **Projects** list and choose
-   **Add Folder…**. With no projects yet, you can click **Add Folder…** in the list
-   instead.
+1. Choose **File ▸ Add Project…** (⌘O). With no projects yet, you can click
+   **Add Project…** in the list instead.
 2. Pick the folder and click **Open**.
 
    The project appears in the list, named after the folder, and its page opens beside it.
@@ -34,8 +33,8 @@ chats that need no project. See [Chat without a project](chat-without-a-project.
 
 1. Copy the repository's HTTPS or SSH address, such as
    `https://github.com/example/repo.git`.
-2. Click **+** (**New project**) and choose **Clone Git URL…**. With no projects yet, click
-   **Clone Git URL…** instead.
+2. Choose **File ▸ Clone Project from Git URL…** (⇧⌘O). With no projects yet, click
+   **Clone Project from Git URL…** instead.
 
    The sheet **Clone a Git repository** opens with the address you copied already in it.
    Under the address it says where the clone will go, for example
