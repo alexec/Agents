@@ -85,7 +85,7 @@ lists both; clicking one opens its chat.
 
 ### User Story 2 - A project's sessions as one flat list (Priority: P1)
 
-Alex unfolds a project and sees its sessions straight away, newest activity first, each
+Alex unfolds a project and sees its sessions straight away, newest started first, each
 saying its state with a mark (needs you, working, unread, done) — no Pinned / Needs you /
 Working / Done headings to unfold first.
 
@@ -93,19 +93,19 @@ Working / Done headings to unfold first.
 apps Alex compared it to. Together with Story 1 it is the redesign; the rest follows.
 
 **Independent Test**: Unfold a project with sessions in every state; every live session
-is one level under the project, ordered by most recent activity, each with the right mark.
+is one level under the project, newest started first, each with the right mark.
 
 **Acceptance Scenarios**:
 
 1. **Given** a project with sessions needing an answer, working, unread and done,
    **When** it is unfolded, **Then** they show in one list under the project with no
-   group headings, most recent activity first.
+   group headings, newest started first.
 2. **Given** a pinned session, **When** the project is unfolded, **Then** it shows
    first, in its pinned order, with a pin mark, ahead of the newest-first list.
 3. **Given** a folded project with a session that needs an answer, **When** Alex looks
    at the project row, **Then** it shows the needs-you count in the attention colour.
 4. **Given** a session's state changes, **When** it does, **Then** its mark changes in
-   place; it moves only when its order by activity changes.
+   place and the row does not move.
 
 ---
 
@@ -202,7 +202,9 @@ lists, adapted to touch and width.
 - **FR-003**: Smart rows MUST always be present (count hidden when zero) so the layout
   does not move as states change.
 - **FR-004**: Each project MUST fold open directly on its sessions: pinned first (in
-  their order), then the rest by most recent activity, with no per-state group headings.
+  their order), then the rest newest started first, with no per-state group headings.
+  By start, not by last activity, so a working session does not climb past the pointer
+  with every line it writes (as projects stopped doing, #357).
 - **FR-005**: Each session row MUST show its state as a mark — needs you, working,
   unread, done — plus the time of last activity; unread stays a dot and bold title (#70).
 - **FR-006**: A folded project row MUST show its needs-you count in the attention

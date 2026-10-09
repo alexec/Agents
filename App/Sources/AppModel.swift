@@ -126,6 +126,7 @@ final class AppModel {
             selection = nil
             openWorkflow = nil
             openPin = nil
+            projectPage = nil
             composing = false
         }
     }
@@ -159,6 +160,7 @@ final class AppModel {
             // come back to.
             selection = nil
             openWorkflow = nil
+            projectPage = nil
             composing = false
         }
     }
@@ -174,6 +176,7 @@ final class AppModel {
             showsRuntimes = false
             selection = nil
             openWorkflow = nil
+            projectPage = nil
             composing = false
         }
     }
@@ -188,6 +191,7 @@ final class AppModel {
             showsRuntimes = false
             selection = nil
             openWorkflow = nil
+            projectPage = nil
             composing = false
         }
     }
@@ -205,6 +209,7 @@ final class AppModel {
             showsEvents = false
             selection = nil
             openWorkflow = nil
+            projectPage = nil
             composing = false
         }
     }
@@ -273,6 +278,7 @@ final class AppModel {
             if showsSpending { return .spending }
             guard let key = selectedProjectKey else { return nil }
             if let id = openWorkflow { return .workflow(id, in: key) }
+            if let projectPage { return projectPage == .workflows ? .workflows(key) : .archive(key) }
             if let openPin { return .pin(openPin, in: key) }
             if let selection { return .session(selection) }
             return composing ? .project(key) : nil
@@ -290,6 +296,10 @@ final class AppModel {
                 openWorkflow = id
             case .pin(let path, let key):
                 showPin(path, in: key)
+            case .workflows(let key):
+                showProjectPage(.workflows, of: key)
+            case .archive(let key):
+                showProjectPage(.archive, of: key)
             case .spending:
                 showsSpending = true
             case .resources:
@@ -311,6 +321,16 @@ final class AppModel {
                 break
             }
         }
+    }
+
+    /// A project's workflows or its archive, from its row in the sidebar (#495).
+    func showProjectPage(_ page: ProjectPage, of key: ProjectKey) {
+        showsSpending = false
+        showsResources = false
+        showsEvents = false
+        showsRuntimes = false
+        select(key)
+        projectPage = page
     }
 
     /// Go to a project's page, whether or not it was already the selected one.
@@ -348,6 +368,7 @@ final class AppModel {
             selection = nil
             openWorkflow = nil
             openPin = nil
+            projectPage = nil
         }
     }
 
@@ -357,6 +378,7 @@ final class AppModel {
         selection = nil
         openWorkflow = nil
         openPin = nil
+        projectPage = nil
         composing = false
     }
 
@@ -392,6 +414,7 @@ final class AppModel {
             if selection != nil {
                 openWorkflow = nil
                 openPin = nil
+                projectPage = nil
                 composing = false
             }
             if let left = chatOpening { Perf.end(left.timing, "left before it opened") }
@@ -420,9 +443,28 @@ final class AppModel {
         didSet {
             if openWorkflow != nil {
                 openPin = nil
+                projectPage = nil
                 composing = false
             }
         }
+    }
+
+    /// A page about the selected project's work (#495), open where the chat would be: its
+    /// workflows, or what it has archived. A fourth sibling of `selection`, `openWorkflow`
+    /// and `openPin`, so the sidebar's project fold is one row for each and never a fold
+    /// inside a fold.
+    var projectPage: ProjectPage? {
+        didSet {
+            guard projectPage != nil else { return }
+            selection = nil
+            openWorkflow = nil
+            openPin = nil
+            composing = false
+        }
+    }
+
+    enum ProjectPage: Equatable {
+        case workflows, archive
     }
 
     /// The selected project's pinned page (#159) open in the chat's place, by its path in
@@ -432,6 +474,7 @@ final class AppModel {
             guard openPin != nil else { return }
             selection = nil
             openWorkflow = nil
+            projectPage = nil
             composing = false
         }
     }

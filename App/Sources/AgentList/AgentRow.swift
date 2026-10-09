@@ -13,10 +13,14 @@ struct AgentRow: View {
     /// A row of the Mac's sessions list rather than a card on a page: a list-sized
     /// title and one line of what it said, so a column of them reads at a glance.
     private let isCompact: Bool
+    /// Which project it is in, after the title: under a smart row of the sidebar (#495),
+    /// which gathers sessions from every project, and nowhere else.
+    private let place: String?
 
-    init(agent: Agent, isCompact: Bool = false) {
+    init(agent: Agent, isCompact: Bool = false, place: String? = nil) {
         given = agent
         self.isCompact = isCompact
+        self.place = place
     }
 
     /// The agent as the window has it now, read from the model rather than kept.
@@ -81,6 +85,13 @@ struct AgentRow: View {
                         .fontWeight(agent.showsUnread ? .semibold : .regular)
                         .lineLimit(1)
                         .accessibilityValue(agent.showsUnread ? "unread" : "")
+                    if let place {
+                        Text(place)
+                            .appText(.fine)
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                            .layoutPriority(-1)
+                    }
                     // Started by a workflow rather than a person: the one thing about
                     // an agent's origin worth a mark, because it is the difference
                     // between something you asked for and something that ran itself.
