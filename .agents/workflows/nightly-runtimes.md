@@ -7,11 +7,12 @@ on:
 agent: new
 runtime: claude
 model: haiku
-effort: low
+effort: default
 permission-mode: auto
 cooldown: 20h
 hosts: [8AB85821-9D24-59CE-9737-8FC556923733]
 labels: [nightly, runtimes]
+enabled: false
 ---
 
 Update each agent runtime to its latest release and test it against the app (#39), with

@@ -9,7 +9,7 @@ effort: low
 permission-mode: auto
 cooldown: 30m
 labels: [clean-up, check]
-enabled: false
+when-done: archive
 ---
 
 You check in once every agent in this project has stopped (#360). You check that the
