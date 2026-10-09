@@ -79,12 +79,8 @@ private struct SmartRowLabel: View {
     let count: Int
 
     var body: some View {
+        // No icon (Alex, #495): the sessions under it carry the marks.
         HStack(spacing: 6) {
-            Image(systemName: row.systemImage)
-                .foregroundStyle(row == .needsYou && count > 0 ? StateTint.attention.style(or: .secondary)
-                                                               : AnyShapeStyle(.secondary))
-                .frame(width: 16)
-                .accessibilityHidden(true)
             Text(row.title)
                 .lineLimit(1)
                 .foregroundStyle(count > 0 ? .primary : .secondary)
@@ -126,6 +122,8 @@ struct ProjectPageRow: View {
                 .appText(.fine)
                 .foregroundStyle(.secondary)
         }
+        // The size of the rows around it, sessions and New Session alike.
+        .appText(.supporting)
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(title), \(count)")

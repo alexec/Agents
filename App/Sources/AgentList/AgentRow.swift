@@ -61,6 +61,9 @@ struct AgentRow: View {
     @ViewBuilder
     private var rowContent: some View {
         HStack(alignment: .top, spacing: 12) {
+            if isCompact, let mark = SessionMark(agent: agent, group: model.work.group(of: agent)) {
+                mark.padding(.top, 1)
+            } else {
             StatusIcon(state: agent.state, isComingBack: isComingBack,
                        outcome: agent.report?.outcome,
                        isWaiting: agent.isWaiting,
@@ -70,6 +73,7 @@ struct AgentRow: View {
                        isUnread: agent.isUnread,
                        isParked: agent.parking?.isParked == true)
                 .padding(.top, 1)
+            }
 
             VStack(alignment: .leading, spacing: isCompact ? 4 : 3) {
                 HStack(spacing: 5) {
@@ -77,7 +81,8 @@ struct AgentRow: View {
                     // dot and a heavier title, both gone once it is opened, and the row
                     // where it was. Said as the title's value, not as a label over the
                     // row, which would stack on the Text's own (one element per row).
-                    if agent.showsUnread {
+                    // In the sidebar the mark says unread (#495); the dot is the page's.
+                    if agent.showsUnread, !isCompact {
                         UnreadDot()
                     }
                     Text(agent.title ?? "Untitled")
@@ -296,6 +301,50 @@ struct AgentRow: View {
 /// needs a person. The finer distinctions — which outcome, why it stopped, whether
 /// anyone vouched for the ending — are still said, in the tooltip and to a screen
 /// reader, rather than drawn.
+/// A session's mark in the sidebar (Alex, #495): what it wants, in four shapes — an
+/// orange hand when it needs the person, a spinner while it works, two rings when it
+/// finished unread, a check once read. Any other state keeps its `StatusIcon`.
+private struct SessionMark: View {
+    private enum Kind { case needsYou, working, unread, read }
+    private let kind: Kind
+
+    init?(agent: Agent, group: AgentGroup) {
+        switch group {
+        case .needsAttention, .blocked: kind = .needsYou
+        case .running: kind = .working
+        case .finished: kind = agent.showsUnread ? .unread : .read
+        default: return nil
+        }
+    }
+
+    var body: some View {
+        Group {
+            switch kind {
+            case .needsYou:
+                Image(systemName: "hand.raised.fill").foregroundStyle(.orange)
+            case .working:
+                ProgressView().controlSize(.mini)
+            case .unread:
+                Image(systemName: "circle.inset.filled").foregroundStyle(Paper.accent)
+            case .read:
+                Image(systemName: "checkmark.circle").foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: 16, height: 16)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+    }
+
+    private var label: String {
+        switch kind {
+        case .needsYou: "Needs you"
+        case .working: "Working"
+        case .unread: "Unread"
+        case .read: "Done"
+        }
+    }
+}
+
 struct StatusIcon: View {
     let state: AgentState
     /// The daemon is bringing this chat back by itself after a restart.

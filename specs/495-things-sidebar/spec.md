@@ -285,6 +285,12 @@ lists, adapted to touch and width.
 - The search field says just "Search".
 - Pinned sessions and workflows go in a Pinned group above Needs You, from every project in pin order, each naming its project; they leave their project's group.
 
+### Walk 3, 2026-10-08 (Alex)
+
+- No New project menu in the sidebar's toolbar (it overflowed as ">>"): New Chat, Add Folder…, Clone Git URL… and Add Server… are in the File menu.
+- Workflows and Archived rows in the same type and icon size as the rows around them.
+- No icons on the smart groups; the marks are on the sessions: an orange hand for needs you, a spinner for working, two rings for unread, a circled check once read.
+
 ## Assumptions
 
 - "Done" sessions stay in their project's flat list (plain, no mark); there is no Done

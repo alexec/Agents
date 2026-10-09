@@ -164,34 +164,6 @@ struct ProjectListView: View {
             ToolbarItemGroup {
                 ActivityButtons(selection: $selection)
             }
-            // Agents are started by telling a project what you want done, from its page;
-            // this is for a project that is not here yet. Two ways in, one button: a
-            // folder already on the Mac, or a repository that is not yet (027).
-            ToolbarItem {
-                Menu {
-                    if model.hosts.isEmpty {
-                        newProjectItems(on: .mac)
-                    } else {
-                        Menu(model.hosts.isOffline(.mac) ? "This Mac — Not answering" : "This Mac") {
-                            newProjectItems(on: .mac)
-                        }
-                        .disabled(model.hosts.isOffline(.mac))
-                        ForEach(model.hosts.servers, id: \.self) { host in
-                            let offline = model.hostUnreachable(host)
-                            let label = model.hosts.label(host)
-                            Menu(offline ? "\(label) — Offline" : label) {
-                                newProjectItems(on: host)
-                            }
-                            .disabled(offline)
-                        }
-                    }
-                    Divider()
-                    Button("Add Server…") { isAddingServer = true }
-                } label: {
-                    Label("New project", systemImage: "folder.badge.plus")
-                }
-                .help("New Chat, or Add Folder… or Clone Git URL… as a project")
-            }
         }
         .fileImporter(isPresented: $isChoosingFolder, allowedContentTypes: [.folder]) { result in
             guard case .success(let folder) = result else { return }
@@ -305,23 +277,6 @@ struct ProjectListView: View {
                 default: true
                 }
             }
-        }
-    }
-
-    @ViewBuilder
-    private func newProjectItems(on host: HostID) -> some View {
-        // A chat in the host's own chat project (#229): no folder to choose.
-        Button("New Chat") {
-            Task { if await model.newChat(on: host) { requests.focusPrompt() } }
-        }
-        Divider()
-        Button("Add Folder…") {
-            targetHost = host
-            if model.isOnThisMac(host) { isChoosingFolder = true } else { isChoosingServerFolder = true }
-        }
-        Button("Clone Git URL…") {
-            targetHost = host
-            isCloning = true
         }
     }
 }
