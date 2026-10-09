@@ -11,6 +11,9 @@ struct ProjectRow: View {
     var label: String? = nil
     /// Folded, the row says what is under it; unfolded, the rows under it say that.
     var isFolded = true
+    /// Drawn as its group's heading in the sidebar (#495, #498): the name in grey, as a
+    /// group's heading is, so the sessions under it read first.
+    var asHeading = false
 
     /// The phone's own counts, not `summary.counts`: the daemon's are made without
     /// knowing which agents have asked to be looked at. The Mac's row does the same.
@@ -27,16 +30,16 @@ struct ProjectRow: View {
                     if summary.isChat == true {
                         Image(systemName: "bubble.left.and.bubble.right")
                             .imageScale(.small)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.accent)
                             .accessibilityHidden(true)
                     }
                     Text(label ?? summary.name)
                         .lineLimit(1)
-                        .foregroundStyle(summary.exists ? .primary : .secondary)
+                        .foregroundStyle(summary.exists && !asHeading ? .primary : .secondary)
                     if summary.project.isPinned {
                         Image(systemName: "pin.fill")
                             .imageScale(.small)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.accent)
                             .accessibilityHidden(true)
                     }
                 }
