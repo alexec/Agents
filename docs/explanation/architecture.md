@@ -6,9 +6,9 @@ devices: [mac, iphone, ipad, server]
 
 # Architecture
 
-Three views of Agents, from the outside in, in the style of the
+Four views of Agents, from the outside in, in the style of the
 [C4 model](https://c4model.com): the system and its neighbours, the containers it is made
-of, and how those run as processes on a Mac.
+of, the components inside the host daemon, and how they run as processes on a Mac.
 
 ## System context
 
@@ -44,6 +44,30 @@ Every connection to the control plane is made **outwards**: from a client, and f
 host. A client never reaches a host directly, and a host never needs to be reachable. A
 Linux server or another Mac is one more host daemon with its own host data, connected the
 same way. See [The control plane](control-plane.md).
+
+## Components of the host daemon
+
+![The components inside agentsd](../assets/architecture-components.svg)
+
+`agentsd` is the same program on macOS and Linux. Its code is in `Daemon/` (a short
+`main.swift`) and `Packages/AgentsKit`. The folders below are under
+`Packages/AgentsKit/Sources/AgentsKit`.
+
+| Component | Code | What it does |
+| --- | --- | --- |
+| Control uplink | `Daemon/ControlUplink`, `HostDialer` | The host's one connection out to the control plane. Each client's channel on it becomes a connection to the daemon server. |
+| Daemon server | `Daemon/DaemonServer` | JSON-RPC, over `daemon.sock` and over the uplink's channels. Every connection gets every notification, so clients agree. |
+| Daemon core | `Daemon/DaemonCore`, `AgentTable` | The actor that owns every agent: sessions, turns, queues, statuses and attention. Every request lands here, and every change is announced from here. |
+| Workflows and events | `Daemon/DaemonCore+Workflows`, `+Events`, `+EventWaits`, `Workflows/` | Schedules, triggers, cooldowns and queues. `wait_for_event`, `publish_event` and the event log. |
+| Leases and wakefulness | `Daemon/DaemonCore+Leases`, `ResourceCatalog`, `Power/` | A line per declared resource. Keeps the Mac awake while a turn runs. |
+| MCP clients | `MCP/` | The daemon's own connections to MCP servers: `events/poll` for workflow triggers, server views and OAuth sign-ins. |
+| Projects, files and git | `Projects/`, `Files/` | `.agents/` config and plugins, worktrees, changes, clones, folder watching, and file reads and writes for clients. |
+| Installers and catalog | `Runtimes/`, `Catalog/`, `Hosts/` | Finds and installs runtimes, installs skills and MCP servers from the marketplace, installs `agentsd` on a server over ssh. |
+| ACP sessions | `ACP/` | Starts each runtime, and prompts, cancels and resumes it over ACP. Keeps a few warm between turns (`WarmPool`), and puts deadlines on silent turns. |
+| ACP client services | `ACP/Serve/` | Answers what a runtime asks of its client: files, terminal commands, permission requests. |
+| App tools endpoint | `MCP/AppToolsEndpoint`, `ACP/Serve/AppService` | The `mcp__agents__*` tools, over loopback http with a token per session. |
+| Shells | `Terminal/` | Terminals and the project shell, each a pseudo-terminal with its scrollback. |
+| Stores | `Store/` | Whole-file JSON and append-only logs in the host data, kept by one rule (`StoreFile`). |
 
 ## Processes on this Mac
 
