@@ -18,12 +18,50 @@ struct SmartFold: View {
         let open = Binding(get: { isOpen }, set: { folds.set(row, open: $0) })
         let agents = isOpen ? row.agents(in: model.work, projects: projects, query: query) : []
         DisclosureGroup(isExpanded: open) {
-            ForEach(FoldedRow.rows(agents, in: .smart(row))) { item in
-                SessionSidebarRow(agent: item.item, place: place(of: item.item))
+            if row == .pinned {
+                if isOpen { pinnedRows }
+            } else {
+                ForEach(FoldedRow.rows(agents, in: .smart(row))) { item in
+                    SessionSidebarRow(agent: item.item, place: place(of: item.item))
+                }
             }
         } label: {
             SmartRowLabel(row: row, count: row.count(in: model.work, projects: projects))
                 .togglesFold(open)
+        }
+    }
+
+    /// Every project's pinned sessions, then its pinned workflows, each dragged into the
+    /// order wanted among its own project's and its own kind (#180, #432).
+    @ViewBuilder
+    private var pinnedRows: some View {
+        let searching = !query.isEmpty
+        ForEach(projects, id: \.self) { key in
+            let sessions = SidebarSmartRow.pinned.agents(in: model.work, projects: [key], query: query)
+            ForEach(FoldedRow.rows(sessions, in: .smart(.pinned))) { item in
+                SessionSidebarRow(agent: item.item, place: place(of: item.item))
+            }
+            // The whole order, which a search shows only some of.
+            .onMove { from, to in
+                guard !searching else { return }
+                var ids = sessions.map(\.id)
+                ids.move(fromOffsets: from, toOffset: to)
+                let shown = Set(ids)
+                let rest = model.pinnedSessions(in: key.folder).filter { !shown.contains($0) }
+                Task { await model.arrangeSessionPins(ids + rest, in: key) }
+            }
+            let flows = SidebarSmartRow.pinned.workflows(in: model.work, projects: [key], query: query).map(\.workflow)
+            ForEach(FoldedRow.rows(flows, in: .smart(.pinned))) { item in
+                WorkflowListRow(summary: item.item, project: key)
+            }
+            .onMove { from, to in
+                guard !searching else { return }
+                var ids = flows.map(\.workflowID)
+                ids.move(fromOffsets: from, toOffset: to)
+                let shown = Set(ids)
+                let rest = model.pinnedWorkflows(in: key.folder).filter { !shown.contains($0) }
+                Task { await model.arrangeWorkflowPins(ids + rest, in: key) }
+            }
         }
     }
 

@@ -118,7 +118,7 @@ struct ProjectListView: View {
         .environment(\.sidebarRowSize, .small)
         .scrollContentBackground(.hidden)
         .background(Paper.sidebar)
-        .searchable(text: $query, placement: .sidebar, prompt: "Search sessions and workflows")
+        .searchable(text: $query, placement: .sidebar, prompt: "Search")
         // After a pause in the typing (#176): the folds filter what is held, and the
         // archived sessions that match are the hosts' to find, a capped page each (#165).
         .task(id: query) {
@@ -361,11 +361,7 @@ private struct ProjectFold: View {
                 if fold.showsPinnedPages {
                     PinnedPageRows(project: key)
                 }
-                // Then its pinned sessions (#180) and workflows (#432), first and in the
-                // order they were put in, with no heading: the pin on the row says so.
-                if fold.hasPinned {
-                    pinnedRows(fold)
-                }
+                // Its pinned sessions and workflows are in Pinned at the top (#495).
                 // Then every other live session, newest first, its state a mark on the
                 // row rather than a heading over it (#495).
                 ForEach(FoldedRow.rows(fold.sessions, in: .sessions)) { row in
@@ -417,38 +413,6 @@ private struct ProjectFold: View {
     /// the host goes in the name. This Mac's go by name alone.
     private var label: String {
         SidebarOrder.label(summary) { model.hosts.label($0) }
-    }
-
-    /// The pinned sessions, then the pinned workflows (#432), each dragged into the order
-    /// wanted among its own kind.
-    @ViewBuilder
-    private func pinnedRows(_ fold: SidebarProjectFold) -> some View {
-        let pinned = fold.pinned
-        let pinnedFlows = fold.pinnedWorkflows
-        let searching = fold.isSearching
-        ForEach(FoldedRow.rows(pinned, in: .pinned)) { row in
-            SessionSidebarRow(agent: row.item)
-        }
-        // Among the pinned only, and the whole order: a search shows only some.
-        .onMove { from, to in
-            guard !searching else { return }
-            var ids = pinned.map(\.id)
-            ids.move(fromOffsets: from, toOffset: to)
-            let shown = Set(ids)
-            let rest = model.pinnedSessions(in: key.folder).filter { !shown.contains($0) }
-            Task { await model.arrangeSessionPins(ids + rest, in: key) }
-        }
-        ForEach(FoldedRow.rows(pinnedFlows, in: .pinned)) { row in
-            WorkflowListRow(summary: row.item, project: key)
-        }
-        .onMove { from, to in
-            guard !searching else { return }
-            var ids = pinnedFlows.map(\.workflowID)
-            ids.move(fromOffsets: from, toOffset: to)
-            let shown = Set(ids)
-            let rest = model.pinnedWorkflows(in: key.folder).filter { !shown.contains($0) }
-            Task { await model.arrangeWorkflowPins(ids + rest, in: key) }
-        }
     }
 
     /// While searching: the workflows and archived sessions that matched, after the live

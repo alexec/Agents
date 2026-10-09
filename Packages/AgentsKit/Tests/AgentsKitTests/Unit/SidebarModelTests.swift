@@ -270,4 +270,22 @@ struct SidebarModelTests {
         #expect(SidebarSmartRow.unread.agents(in: model, projects: projects).map(\.id) == [unread.id])
         #expect(SidebarSmartRow.needsYou.agents(in: model, projects: projects, query: "web").map(\.id) == [askingWeb.id])
     }
+
+    /// Pinned gathers every project's pinned sessions in pin order, never an archived one
+    /// (#495), and they are not among their project's own sessions.
+    @Test func pinnedGathersEveryProjectsPinsInTheirOrder() {
+        let model = AgentsModel()
+        let first = started(api, .finished, "first", at: 1)
+        let second = started(api, .running, "second", at: 2)
+        let other = started(web, .finished, "other", at: 3)
+        let gone = started(web, .archived, "gone", at: 4)
+        model.replaceAgents([first, second, other, gone])
+        model.replacePins([ProjectPins(folder: api, pins: [], sessions: [second.id, first.id]),
+                           ProjectPins(folder: web, pins: [], sessions: [gone.id, other.id])])
+        let projects = [key, ProjectKey(host: .mac, folder: web)]
+
+        #expect(SidebarSmartRow.pinned.agents(in: model, projects: projects).map(\.id) == [second.id, first.id, other.id])
+        #expect(SidebarSmartRow.pinned.count(in: model, projects: projects) == 3)
+        #expect(SidebarProjectFold(key, label: "api", in: model, isOpen: true).sessions.isEmpty)
+    }
 }
