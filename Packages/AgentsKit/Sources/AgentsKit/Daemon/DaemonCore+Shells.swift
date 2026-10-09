@@ -71,14 +71,13 @@ extension DaemonCore {
     }
 
     /// A new tab: the next number after every shell the agent has, started now, so the
-    /// number is taken before anyone else can pick it (#401).
+    /// number is taken before anyone else can pick it (#401). A project's shell has tabs
+    /// too, opened in the project's folder.
     func openShell(_ request: DaemonAPI.ShellAttachRequest) throws -> DaemonAPI.ShellOpenResponse {
-        guard let agent = agents[request.agentID] else {
-            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "There is no such agent.")
-        }
-        let next = (shells.shells(for: agent.id).max() ?? 0) + 1
+        let folder = try shellFolder(request)
+        let next = (shells.shells(for: request.agentID).max() ?? 0) + 1
         do {
-            _ = try shells.attach(agentID: agent.id, shell: next, folder: agent.cwd,
+            _ = try shells.attach(agentID: request.agentID, shell: next, folder: folder,
                                   rows: request.rows, cols: request.cols)
         } catch ShellHost.Failure.willNotStart(let reason) {
             throw JSONRPCError(code: DaemonAPI.Failure.shellWillNotStart, message: reason)

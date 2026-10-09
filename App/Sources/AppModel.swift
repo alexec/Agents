@@ -547,7 +547,7 @@ final class AppModel {
     /// Where an agent lives: the host it was listed from, or, for one not yet listed
     /// (just started, say), the selected project's host when there is no Mac host.
     private func host(ofAgent id: UUID?) -> HostID {
-        work.agent(id)?.host ?? (hasMacHost ? .mac : selectedProjectHost)
+        work.agent(id)?.host ?? id.flatMap { projectShellHosts[$0] } ?? (hasMacHost ? .mac : selectedProjectHost)
     }
     /// The name `control/status` last gave, so the away strip can still say it.
     private(set) var controlPlaneName: String?
@@ -3663,17 +3663,34 @@ final class AppModel {
         return fresh
     }
 
-    /// The project's own shell (#418), on the project's host, made once per project per
-    /// window and held by the same count as an agent's.
-    func acquireProjectShell(_ project: ProjectKey) -> ShellClient {
+    /// One of the project's own shells (#418), on the project's host, made once per
+    /// project and tab per window and held by the same count as an agent's.
+    func acquireProjectShell(_ project: ProjectKey, shell: Int = 0) -> ShellClient {
         let id = ProjectShell.id(for: project.folder)
-        let key = ShellKey(agentID: id, shell: 0)
+        let key = ShellKey(agentID: id, shell: shell)
         projectShellHosts[id] = project.host
         if shellClients[key] == nil {
-            shellClients[key] = ShellClient(agentID: id, project: project.folder, client: client(for: project.host),
+            shellClients[key] = ShellClient(agentID: id, shell: shell, project: project.folder,
+                                            client: client(for: project.host),
                                             describe: { [weak self] error in self?.describeForShell(error) ?? "\(error)" })
         }
-        return acquireShell(for: id, shell: 0)
+        return acquireShell(for: id, shell: shell)
+    }
+
+    /// The shells the project's host holds for the project, so the panel opens with the
+    /// tabs it had. Nil from a host too old to list them.
+    func projectShellNumbers(_ project: ProjectKey) async -> [Int]? {
+        let id = ProjectShell.id(for: project.folder)
+        projectShellHosts[id] = project.host
+        return await shellNumbers(for: id)
+    }
+
+    /// A new tab in the project's panel, numbered by its host. Nil from a host too old to
+    /// open one for a project, and the panel numbers it itself.
+    func openProjectShell(_ project: ProjectKey) async -> Int? {
+        let id = ProjectShell.id(for: project.folder)
+        projectShellHosts[id] = project.host
+        return await ShellClient.open(agentID: id, project: project.folder, on: client(for: project.host))
     }
 
     /// This window's ends of the shells one host holds.

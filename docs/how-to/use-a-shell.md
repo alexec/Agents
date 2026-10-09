@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac, iphone, ipad]
-description: Open shells in an agent's folder from the Terminal pane, one per tab, or in the project folder with Control-`, and keep them running.
+description: Open shells in an agent's folder from the Terminal pane, or in the project folder with Control-`, one per tab, and keep them running.
 ---
 
 # Use a shell in an agent's folder
@@ -44,13 +44,16 @@ Press Control-` (**View ▸ Project Terminal**) to open a shell in the selected 
 own folder, on the project's Mac or server, under whatever page is open. It needs no
 agent: it opens with none chosen, and choosing an agent in the project leaves it where it
 is, in the project folder, not the agent's worktree. Another project shows that project's
-shell.
+shells.
 
-Press Control-` again, or click the down arrow, to hide it; it keeps running. Click its
-**×** to end it. Drag its top edge to make it taller.
+Click **+** (**New shell**) for another, in a tab of its own, as in an agent's pane.
+Press Control-` again, or click the down arrow, to hide them; they keep running. Click a
+tab's **×** to end that shell; closing the last puts the panel away. Drag its top edge
+to make it taller.
 
 On iPhone and iPad, choose **Project Terminal** from a project page's **…** menu, or
-press Control-` on an iPad keyboard. **Done** puts it away; **End Shell** ends it.
+press Control-` on an iPad keyboard. It has the same tabs as the Mac. **Done** puts it
+away; **End Shell** ends the shell in front.
 
 ## If it doesn't work
 

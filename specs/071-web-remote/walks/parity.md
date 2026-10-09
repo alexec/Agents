@@ -231,7 +231,7 @@ The deltas are tracked by 29 issues:
 | Search in files | None | None | None | **same** |
 | Exchanged documents | `A/Sidebar/ArtifactsPane.swift` | `R/Chat/DocumentView.swift` | `W/views/Exchanged.tsx` (a web address is a link) | **same** |
 | Terminal | Tabs (055): `A/Sidebar/TerminalPane.swift`, `S/Terminal/ShellTabs.swift` | The same tabs, new, switch, close (#345): `R/Panes/TerminalPane.swift` | None | **by design** (web: no terminal on the page, 071) |
-| Project terminal (#418) | Control-`, a panel under the page: `A/Sidebar/ProjectTerminal.swift` | **Project Terminal** in a project page's menu, Control-` on an iPad keyboard: `R/Panes/ProjectTerminalSheet.swift` | None | **by design** (web: no terminal on the page, 071) |
+| Project terminal (#418) | Control-`, a panel under the page, with tabs: `A/Sidebar/ProjectTerminal.swift` | **Project Terminal** in a project page's menu, Control-` on an iPad keyboard, with tabs: `R/Panes/ProjectTerminalSheet.swift` | None | **by design** (web: no terminal on the page, 071) |
 | Browser pane | `A/Sidebar/BrowserPane.swift` | None (FR-030) | None | **by design** (local servers only listen on the Mac) |
 | Open in another app, Show in Finder | `A/Sidebar/OpenElsewhere.swift` | *It can't be shown here.* | *It can't be shown here.* | **by design** |
 
