@@ -1462,6 +1462,7 @@ final class RemoteModel {
                         continue
                     }
                     if note.method == DaemonAPI.Notification.leasesChanged
+                        || note.method == DaemonAPI.Notification.mcpHostedChanged
                         || note.method == DaemonAPI.Notification.eventsChanged { continue }
                     guard let update = AgentsModel.read(note.method, note.params, showing: shown.id) else { continue }
                     await self?.work.apply(update, from: id)
@@ -2306,6 +2307,11 @@ final class RemoteModel {
                                                     Optional<String>.none,
                                                     returning: DaemonAPI.LeaseSnapshot.self) else { return }
         work.replaceLeases(snapshot)
+        // The servers the Mac hosts for every agent (#488), on the same page.
+        if let hosted = try? await client.call(DaemonAPI.Method.mcpHosted, Optional<String>.none,
+                                               returning: DaemonAPI.HostedMCPSnapshot.self) {
+            work.replaceHostedMCP(hosted)
+        }
     }
 
     /// Every volume on the Mac low on space (#196), for the strip under the banner. A Mac

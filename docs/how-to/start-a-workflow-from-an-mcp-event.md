@@ -27,24 +27,24 @@ is shown as not supported yet.
 
 Server events come from servers the project can already use: the project's
 `.agents/mcp.json`, your own `~/.agents/mcp.json`, or a plugin. The CI watcher is in this
-project's `.agents/mcp.json` as `ci`, at `http://127.0.0.1:8795/mcp`.
+project's `.agents/mcp.json` as `ci`, a local server the app hosts:
 
-1. From the project's main folder, not a worktree, start the server:
+```json
+{ "mcpServers": { "ci": { "command": "node", "args": ["Integrations/ci-watcher/server.ts"], "hosted": true } } }
+```
 
-   ```sh
-   Integrations/ci-watcher/run.sh start
-   Integrations/ci-watcher/run.sh status
-   ```
-
-   It runs as a LaunchAgent, `com.agents.ci-watcher`, and holds no token of its own: every
-   GitHub call goes through your `gh`.
-2. In the project's **MCP servers** section, `ci` arrived with the project, so it is
+1. In the project's **MCP servers** section, `ci` arrived with the project, so it is
    **waiting for your OK**: choose **Approve**. Until you do, it is asked for nothing, and
    the workflow's page says it is waiting for approval. See
    [Add an MCP server from the registry](add-an-mcp-server-from-the-registry.md).
+2. There is nothing to start. The app runs one copy of it on the host, the first time a
+   workflow or an agent asks it something, and every agent shares that copy. It holds no
+   token of its own: every GitHub call goes through your `gh`. See
+   [Share one copy of a local MCP server](share-one-copy-of-a-local-mcp-server.md).
 
-A local (stdio) server works too: the app runs its own copy of it to ask for events, with
-the same environment and secrets an agent gets.
+A local server without `"hosted": true` works too: the app runs its own copy of it to ask
+for events, with the same environment and secrets an agent gets, and each agent runs
+another for its tools.
 
 ## Write the workflow
 

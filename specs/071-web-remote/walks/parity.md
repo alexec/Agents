@@ -309,6 +309,7 @@ The deltas are tracked by 29 issues:
 | A workflow in a consequence | A link: `A/Events/EventsView.swift:151` | Plain text: `R/Events/EventsListView.swift:8-10, 45-46` | n/a | **delta**: Remote #248 |
 | Resources, counted holders (#116) | `A/Resources/ResourcesView.swift` | Read-only: `R/Resources/ResourcesListView.swift` | Read-only: `W/views/Resources.tsx` | **same** (reading) |
 | Declaring resources, ending leases (#116) | Settings ▸ Resources, the Resources page | None | None | **by design** (the Mac's) |
+| Hosted MCP servers on Resources: each server, whose file, running / idle / starting again, why it last stopped (#488) | `A/Resources/ResourcesView.swift` (`HostedMCPGroup`), words `HostedMCPWords` | `R/Resources/ResourcesListView.swift` (`HostedMCPListRow`), this Mac's | Per host: `W/views/Resources.tsx` (`HostedMCP`), words `W/model/hostedMCP.ts` | **same** (the Mac and the Remote show this Mac's, as their leases; the page each host's) |
 
 ## Notifications and badges
 

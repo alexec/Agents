@@ -4,6 +4,7 @@
 import type { Store } from "../model/store";
 import type { Lease, ResourceState } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
+import { hostedLastError, hostedLine, hostedPlace } from "../model/hostedMCP";
 
 /** "14:05", twenty-four hours, as LeaseWords.clock says it to agents and the Mac. */
 function clock(at: number): string {
@@ -50,6 +51,30 @@ export function Resources({ store, host, open }: { store: Store; host: string; o
       <summary class="subhead">Resources <span class="count">{declared.length + busy.length}</span></summary>
       <ul>{declared.map(row)}{busy.map(row)}</ul>
       <p class="hint">Declared on the Mac, in Settings ▸ Resources. Agents lease one whenever its description applies.</p>
+    </details>
+  );
+}
+
+/** The MCP servers a host runs once for every agent (#488), read-only. */
+export function HostedMCP({ store, host }: { store: Store; host: string }) {
+  const servers = store.hostedMCP.value[host]?.servers ?? [];
+  if (servers.length === 0) return null;
+  return (
+    <details class="resources hosted-mcp" open>
+      <summary class="subhead">Hosted MCP servers <span class="count">{servers.length}</span></summary>
+      <ul>
+        {servers.map((status) => {
+          const error = hostedLastError(status);
+          return (
+            <li class="resource" key={`${status.project ?? "~"}|${status.name}`}>
+              <p><span class="strong">{status.name}</span> <span class="quiet small">{hostedPlace(status)}</span></p>
+              <p class="quiet small">{hostedLine(status)}</p>
+              {error && <p class={status.state === "restarting" ? "small failure" : "quiet small"}>{error}</p>}
+            </li>
+          );
+        })}
+      </ul>
+      <p class="hint">Run once on this host for every agent, from "hosted": true in mcp.json.</p>
     </details>
   );
 }

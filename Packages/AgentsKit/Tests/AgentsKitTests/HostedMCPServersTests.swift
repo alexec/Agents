@@ -158,6 +158,23 @@ struct HostedMCPServersTests {
         #expect(one.hasPrefix("ci_watcher-"))
     }
 
+    @Test func theRowSaysWhatItIsDoing() {
+        let idle = DaemonAPI.HostedMCPStatus(name: "ci", project: "/Users/a/Agents", state: .idle)
+        #expect(HostedMCPWords.place(idle) == "Agents")
+        #expect(HostedMCPWords.line(idle) == "Idle \u{00B7} nothing uses it")
+        #expect(HostedMCPWords.lastError(idle) == nil)
+        let own = DaemonAPI.HostedMCPStatus(name: "gh", project: nil, state: .running, users: 1)
+        #expect(HostedMCPWords.place(own) == "Your own (~/.agents/mcp.json)")
+        #expect(HostedMCPWords.line(own) == "Running \u{00B7} 1 using it")
+        let down = DaemonAPI.HostedMCPStatus(name: "ci", project: "/p", state: .restarting,
+                                             lastError: "It stopped (exit code 1).", restarts: 2, users: 3)
+        #expect(HostedMCPWords.line(down) == "Stopped; starting again \u{00B7} restarted 2 times")
+        #expect(HostedMCPWords.lastError(down) == "It stopped (exit code 1).")
+        var back = down
+        back.state = .running
+        #expect(HostedMCPWords.lastError(back) == "Last stopped: It stopped (exit code 1).")
+    }
+
     // MARK: mcp.json
 
     @Test func hostedIsReadFromTheFile() throws {

@@ -89,6 +89,7 @@ final class AppModel {
     var costState: DaemonAPI.CostState? { work.costState }
     /// Every resource an agent can lease and who holds it (036).
     var leases: DaemonAPI.LeaseSnapshot? { work.leases }
+    var hostedMCP: DaemonAPI.HostedMCPSnapshot? { work.hostedMCP }
     var costLimits: CostLimits { work.costState?.limits ?? CostLimits() }
     /// How long archived agents are kept (051). Nil until the daemon has said.
     var retentionState: DaemonAPI.RetentionState? { work.retentionState }
@@ -1366,6 +1367,14 @@ final class AppModel {
         work.replaceLeases(snapshot)
     }
 
+    /// The MCP servers this Mac runs for every agent (#488). A daemon too old to know the
+    /// method leaves `hostedMCP` nil, and the Resources page draws no such group.
+    func refreshHostedMCP() async {
+        guard let snapshot = try? await client.call(DaemonAPI.Method.mcpHosted, Optional<String>.none,
+                                                    returning: DaemonAPI.HostedMCPSnapshot.self) else { return }
+        work.replaceHostedMCP(snapshot)
+    }
+
     /// Every volume low on space (#195). A daemon too old to know the method leaves it
     /// empty, and no strip is drawn.
     func refreshDisk() async {
@@ -2458,7 +2467,8 @@ final class AppModel {
         case DaemonAPI.Notification.diskChanged:
             serverDisks[host] = try? params?.decode(DiskState.self)
             return
-        case DaemonAPI.Notification.leasesChanged, DaemonAPI.Notification.eventsChanged:
+        case DaemonAPI.Notification.leasesChanged, DaemonAPI.Notification.eventsChanged,
+             DaemonAPI.Notification.mcpHostedChanged:
             // These describe the Mac's shared resources and event feed in this window.
             return
         case DaemonAPI.Notification.credentialRefused:
@@ -2603,13 +2613,14 @@ final class AppModel {
         async let wake: Void = refreshWakeState()
         async let storeNotes: Void = refreshStoreNotes()
         async let leases: Void = refreshLeases()
+        async let hostedMCP: Void = refreshHostedMCP()
         async let disk: Void = refreshDisk()
         async let events: Void = refreshEvents()
         async let modes: Void = refreshModes()
         async let transcript: Void = loadTranscript()
         _ = await (runtimes, accounts, workflows, pinned, permissions,
                    elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
-                   transcript, runtimeStates, sandbox, person, disk, storeNotes)
+                   transcript, runtimeStates, sandbox, person, disk, storeNotes, hostedMCP)
         #if DEBUG
         openFromLaunchArguments()
         #endif
