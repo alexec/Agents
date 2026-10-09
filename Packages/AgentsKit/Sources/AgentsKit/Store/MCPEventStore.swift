@@ -31,7 +31,9 @@ public struct MCPSubscriptionRecord: Codable, Hashable, Sendable {
     public var cursor: String?
     /// The one before, to fetch again what was still being delivered.
     public var previousCursor: String?
-    public var seen: [Seen]
+    public var seen: [Seen] { didSet { seenIDs = Set(seen.map(\.id)) } }
+    /// `seen`'s ids, so asking is not a walk through two thousand of them.
+    private var seenIDs: Set<String>
     /// Ids written ahead of `raise`. Empty when the record is at rest.
     public var delivering: [String]
     public var lastPolledAt: Date?
@@ -49,6 +51,7 @@ public struct MCPSubscriptionRecord: Codable, Hashable, Sendable {
         self.cursor = cursor
         self.previousCursor = previousCursor
         self.seen = seen
+        self.seenIDs = Set(seen.map(\.id))
         self.delivering = delivering
         self.lastPolledAt = lastPolledAt
         self.lastEventAt = lastEventAt
@@ -58,17 +61,45 @@ public struct MCPSubscriptionRecord: Codable, Hashable, Sendable {
         self.lastNamedAt = lastNamedAt
     }
 
-    public func hasSeen(_ id: String) -> Bool { seen.contains { $0.id == id } }
+    private enum CodingKeys: String, CodingKey {
+        case cursor, previousCursor, seen, delivering, lastPolledAt, lastEventAt, missedSince, failure, nextPollAt,
+             lastNamedAt
+    }
 
-    /// Note ids as seen, then keep a week of them, and at most `seenLimit`.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(cursor: try c.decodeIfPresent(String.self, forKey: .cursor),
+                  previousCursor: try c.decodeIfPresent(String.self, forKey: .previousCursor),
+                  seen: try c.decode([Seen].self, forKey: .seen),
+                  delivering: try c.decode([String].self, forKey: .delivering),
+                  lastPolledAt: try c.decodeIfPresent(Date.self, forKey: .lastPolledAt),
+                  lastEventAt: try c.decodeIfPresent(Date.self, forKey: .lastEventAt),
+                  missedSince: try c.decodeIfPresent(Date.self, forKey: .missedSince),
+                  failure: try c.decodeIfPresent(MCPTriggerFailure.self, forKey: .failure),
+                  nextPollAt: try c.decodeIfPresent(Date.self, forKey: .nextPollAt),
+                  lastNamedAt: try c.decode(Date.self, forKey: .lastNamedAt))
+    }
+
+    public func hasSeen(_ id: String) -> Bool { seenIDs.contains(id) }
+
+    /// Note ids as seen, then keep a week of them, and at most `seenLimit`. `seen` is set
+    /// once, so its ids are counted once.
     public mutating func see(_ ids: [String], at now: Date) {
-        for id in ids where !hasSeen(id) { seen.append(Seen(id: id, at: now)) }
-        trimSeen(now: now)
+        var kept = seen
+        var known = seenIDs
+        for id in ids where known.insert(id).inserted { kept.append(Seen(id: id, at: now)) }
+        seen = Self.trimmed(kept, now: now)
     }
 
     public mutating func trimSeen(now: Date) {
-        seen.removeAll { now.timeIntervalSince($0.at) > Self.seenFor }
-        if seen.count > Self.seenLimit { seen.removeFirst(seen.count - Self.seenLimit) }
+        let kept = Self.trimmed(seen, now: now)
+        if kept.count != seen.count { seen = kept }
+    }
+
+    private static func trimmed(_ seen: [Seen], now: Date) -> [Seen] {
+        var kept = seen.filter { now.timeIntervalSince($0.at) <= seenFor }
+        if kept.count > seenLimit { kept.removeFirst(kept.count - seenLimit) }
+        return kept
     }
 }
 
