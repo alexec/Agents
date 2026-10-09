@@ -196,6 +196,10 @@ extension DaemonCore {
             case DaemonAPI.Method.projectsChatState:
                 return .success(try JSONValue.encoding(chatProjectState()))
 
+            case DaemonAPI.Method.projectsSetPinned:
+                let request = try require(params, as: DaemonAPI.SetPinnedRequest.self)
+                return .success(try JSONValue.encoding(try setPinned(request)))
+
             case DaemonAPI.Method.projectsSetDiskSpace:
                 let request = try require(params, as: DaemonAPI.SetDiskSpaceRequest.self)
                 return .success(try JSONValue.encoding(try setDiskSpace(request)))

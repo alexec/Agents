@@ -1382,6 +1382,12 @@ export class Store extends Work {
     return summary;
   }
 
+  /** A project pinned to the top of the sidebar, or not, as the window's Pin and Unpin. */
+  async setProjectPinned(host: string, folder: string, pinned: boolean): Promise<void> {
+    const summary = await this.act("projects/setPinned", { folder: folder as never, pinned }, host);
+    if (summary) this.upsertProject(summary, host);
+  }
+
   /** Why `host` has a chat project or not (#229), for a New Chat that found none listed. Throws a refusal. */
   chatState(host: string): Promise<ChatProjectState> {
     return this.link.call("projects/chatState", {}, host);

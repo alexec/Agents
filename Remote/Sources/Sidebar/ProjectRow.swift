@@ -22,9 +22,24 @@ struct ProjectRow: View {
     var body: some View {
         HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 1) {
-                Text(label ?? summary.name)
-                    .lineLimit(1)
-                    .foregroundStyle(summary.exists ? .primary : .secondary)
+                HStack(spacing: 4) {
+                    // The chat project (#229) says what it is for.
+                    if summary.isChat == true {
+                        Image(systemName: "bubble.left.and.bubble.right")
+                            .imageScale(.small)
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                    }
+                    Text(label ?? summary.name)
+                        .lineLimit(1)
+                        .foregroundStyle(summary.exists ? .primary : .secondary)
+                    if summary.project.isPinned {
+                        Image(systemName: "pin.fill")
+                            .imageScale(.small)
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                    }
+                }
                 if !summary.exists {
                     Text("Folder is missing")
                         .appText(.fine)
@@ -71,6 +86,8 @@ struct ProjectRow: View {
     /// Said in words, because a coloured dot is not something VoiceOver can read.
     private var accessibilityLabel: String {
         var parts = [label ?? summary.name]
+        if summary.isChat == true { parts.append("chat project") }
+        if summary.project.isPinned { parts.append("pinned") }
         if !summary.exists { parts.append("folder is missing") }
         if let subtitle { parts.append(subtitle) }
         return parts.joined(separator: ", ")

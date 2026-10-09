@@ -32,6 +32,12 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
     /// `.agents/project.json`. Nil is the defaults. Only ever in a summary; never kept in
     /// `projects.json`. Set only by `projects/setDiskSpace`, which agents cannot call.
     public var diskSpace: DiskThresholds?
+    /// Whether the person pinned it to the top of the sidebar. Nil is the default: pinned
+    /// for the chat project (#229), not for any other, so a chat project made before pins
+    /// is pinned without being written to. In a summary, what the host worked out from
+    /// that; in `projects.json`, only what the person chose. Set only by
+    /// `projects/setPinned`, which agents cannot call.
+    public var pinned: Bool?
 
     /// Keys a newer version wrote that this one does not know. Kept so that opening a
     /// record in an older build and saving it does not quietly delete them.
@@ -39,6 +45,8 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
 
     public var id: URL { folder }
     public var isArchived: Bool { archivedAt != nil }
+    /// Pinned to the top of the sidebar, as a summary says it.
+    public var isPinned: Bool { pinned == true }
 
     /// The folder, in the one form everything compares against.
     ///
@@ -75,7 +83,7 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
 
     public init(folder: URL, archivedAt: Date? = nil, addedAt: Date = Date(),
                 laidOutAt: Date? = nil, layoutVersion: Int? = nil, helperLimits: HelperLimits? = nil,
-                diskSpace: DiskThresholds? = nil, unknownFields: [String: JSONValue] = [:]) {
+                diskSpace: DiskThresholds? = nil, pinned: Bool? = nil, unknownFields: [String: JSONValue] = [:]) {
         self.folder = Self.standardize(folder)
         self.archivedAt = archivedAt
         self.addedAt = addedAt
@@ -83,6 +91,7 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
         self.layoutVersion = layoutVersion
         self.helperLimits = helperLimits
         self.diskSpace = diskSpace
+        self.pinned = pinned
         self.unknownFields = unknownFields
     }
 
@@ -96,6 +105,7 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
         // A setting this build cannot read is the defaults, not a project that fails to load.
         helperLimits = (try? c.decodeIfPresent(HelperLimits.self, forKey: .helperLimits)) ?? nil
         diskSpace = (try? c.decodeIfPresent(DiskThresholds.self, forKey: .diskSpace)) ?? nil
+        pinned = (try? c.decodeIfPresent(Bool.self, forKey: .pinned)) ?? nil
         let known = Set(CodingKeys.allCases.map(\.stringValue))
         unknownFields = [:]
         if let extra = try? decoder.container(keyedBy: AnyKey.self) {
@@ -114,6 +124,7 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(layoutVersion, forKey: .layoutVersion)
         try c.encodeIfPresent(helperLimits, forKey: .helperLimits)
         try c.encodeIfPresent(diskSpace, forKey: .diskSpace)
+        try c.encodeIfPresent(pinned, forKey: .pinned)
         if !unknownFields.isEmpty {
             var extra = encoder.container(keyedBy: AnyKey.self)
             for (key, value) in unknownFields {
@@ -123,7 +134,7 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey, CaseIterable {
-        case folder, archivedAt, addedAt, laidOutAt, layoutVersion, helperLimits, diskSpace
+        case folder, archivedAt, addedAt, laidOutAt, layoutVersion, helperLimits, diskSpace, pinned
     }
 
     struct AnyKey: CodingKey {
