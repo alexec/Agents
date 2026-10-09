@@ -1,14 +1,13 @@
 # Contract: the CI watcher MCP server
 
-`Integrations/ci-watcher/`, served at `http://127.0.0.1:8795/mcp`. It is set up in the
-project's `.agents/mcp.json` as `ci`:
+`Integrations/ci-watcher/`, a stdio server the daemon hosts (#488; until then it was an
+http server on `127.0.0.1:8795`). It is set up in the project's `.agents/mcp.json` as `ci`:
 
 ```json
-{ "mcpServers": { "ci": { "type": "http", "url": "http://127.0.0.1:8795/mcp" } } }
+{ "mcpServers": { "ci": { "command": "node", "args": ["Integrations/ci-watcher/server.ts"], "hosted": true } } }
 ```
 
-It binds to `127.0.0.1` only, refuses any `Origin` header other than none or `http://127.0.0.1:*`,
-and holds no token: every GitHub call is `gh api` (or `gh pr list`) as the signed-in person.
+It listens on no port, and holds no token: every GitHub call is `gh api` (or `gh pr list`) as the signed-in person.
 
 ## Capabilities
 
