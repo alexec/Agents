@@ -298,6 +298,12 @@ lists, adapted to touch and width.
 - A workflow's actions (Run Now, Approve, Deny on This Host, the on/off switch, Pin, Archive) are in the window's toolbar, not on the page's title line.
 - A session opened from Unread stays in Unread, read, until another is opened, as in Mail's Unread mailbox; its count drops at once.
 
+### Walk 5, 2026-10-08 (Alex)
+
+- A workflow's row is its title only. Read sessions are an empty circle.
+- The workflow toolbar is labelled buttons (icon and title): Run Now, Turn Off / Turn On, Pin, Archive; Approve and Deny on This Host while it waits; Bring Back when archived.
+- Events, Resources, Runtimes and Cost come back into the sidebar as an **Activity** group, after the smart rows, folding like a project's group, each with an icon in the accent. The sidebar's toolbar has none of them. (This replaces the toolbar answer in the Clarifications above.)
+
 ## Assumptions
 
 - "Done" sessions stay in their project's flat list (plain, no mark); there is no Done

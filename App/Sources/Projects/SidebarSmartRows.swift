@@ -144,58 +144,25 @@ struct ProjectPageRow: View {
     }
 }
 
-/// The pages about all the work, in the sidebar's toolbar (#495): Events, Resources,
-/// Runtimes and Cost, each saying what its row in the list used to — a runtime out, the
-/// day's cost and whether it is near its limit.
-struct ActivityButtons: View {
-    @Environment(AppModel.self) private var model
-    @Binding var selection: SidebarItem?
+/// A page about all the work in the sidebar's Activity group (#495): its icon, in the
+/// accent, before the row. Beside the row rather than a `Label`, whose title a sidebar
+/// list draws in its own style (#155).
+private struct ActivityIcon: ViewModifier {
+    let systemImage: String
 
-    var body: some View {
-        Button { selection = .events } label: {
-            Label("Events", systemImage: "list.bullet.rectangle")
+    func body(content: Content) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: systemImage)
+                .foregroundStyle(Paper.accent)
+                .frame(width: 16)
+                .accessibilityHidden(true)
+            content
         }
-        .help("Events: what happened, what came of it, and who is waiting (⌥⌘E)")
-        Button { selection = .resources } label: {
-            Label("Resources", systemImage: "square.stack.3d.up")
-        }
-        .help(resourcesHelp)
-        Button { selection = .runtimes } label: {
-            Label("Runtimes", systemImage: runtimeIsOut ? "exclamationmark.triangle" : "cpu")
-        }
-        .foregroundStyle(runtimeIsOut ? StateTint.failure.style(or: .primary) : AnyShapeStyle(.primary))
-        .help(runtimesHelp)
-        // An icon, in the group with the others (Alex, #495); the day's figure is its help,
-        // and it turns red when the day is close to its limit.
-        Button { selection = .spending } label: {
-            Label(today.map { "Cost, \($0) today" } ?? "Cost", systemImage: "dollarsign.circle")
-        }
-        .foregroundStyle((model.costState?.dayIsCloseToFull == true ? StateTint.failure : .none)
-            .style(or: .primary))
-        .help(today.map { "Cost: \($0) today (⌥⌘S)" } ?? "Cost: what all of the work has cost (⌥⌘S)")
     }
+}
 
-    private var tally: RuntimeTally? {
-        RuntimeTally(model.runtimes, allowances: model.runtimeAllowances)
-    }
-
-    private var runtimeIsOut: Bool { tally?.noneWorking == true }
-
-    private var runtimesHelp: String {
-        guard let tally else { return "Runtimes: what each can be started on right now (⌥⌘R)" }
-        return "Runtimes: \(tally.words) (⌥⌘R)"
-    }
-
-    private var resourcesHelp: String {
-        guard let resources = model.leases?.resources else { return "Resources: who holds what, and who is waiting (⌥⌘L)" }
-        let held = resources.reduce(0) { $0 + $1.holds.count }
-        let waiting = resources.reduce(0) { $0 + $1.line.count }
-        return "Resources: \(held) held · \(waiting) waiting (⌥⌘L)"
-    }
-
-    /// This Mac's day and every server's, as one figure, as the Cost row had it.
-    private var today: String? {
-        guard let state = model.costState else { return nil }
-        return Cost.total(of: state.today.merging(model.serversToday, uniquingKeysWith: +))
+extension View {
+    func activityIcon(_ systemImage: String) -> some View {
+        modifier(ActivityIcon(systemImage: systemImage))
     }
 }

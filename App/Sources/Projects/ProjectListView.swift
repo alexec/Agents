@@ -61,6 +61,22 @@ struct ProjectListView: View {
                 }
             }
 
+            // The pages about all the work, a group like a project's (Alex, #495): rows of
+            // the list, so they take its selection and keys, each with its icon in the
+            // accent beside the plain title (#155), and folding as a project does.
+            Section(isExpanded: $showsActivity) {
+                EventsRow().activityIcon("list.bullet.rectangle")
+                    .appText(.supporting).sidebarInk(.events).tag(SidebarItem.events)
+                ResourcesRow().activityIcon("square.stack.3d.up")
+                    .appText(.supporting).sidebarInk(.resources).tag(SidebarItem.resources)
+                RuntimesRow().activityIcon("cpu")
+                    .appText(.supporting).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
+                SpendingRow(selection: $selection).activityIcon("dollarsign.circle")
+                    .appText(.supporting).sidebarInk(.spending).tag(SidebarItem.spending)
+            } header: {
+                Text("Activity")
+            }
+
             // One group per project (#495), its name the group's heading, its sessions the
             // rows: Mail's accounts rather than a Projects heading with folds under it.
             ForEach(orderedProjects, id: \.key) { summary in
@@ -157,13 +173,6 @@ struct ProjectListView: View {
             guard !folders.isEmpty else { return false }
             Task { for folder in folders { await model.addProject(folder) } }
             return true
-        }
-        .toolbar {
-            // The pages about all the work (#495), out of the list so its top is what
-            // wants the person. Each says at a glance what its row used to.
-            ToolbarItemGroup {
-                ActivityButtons(selection: $selection)
-            }
         }
         .fileImporter(isPresented: $isChoosingFolder, allowedContentTypes: [.folder]) { result in
             guard case .success(let folder) = result else { return }
