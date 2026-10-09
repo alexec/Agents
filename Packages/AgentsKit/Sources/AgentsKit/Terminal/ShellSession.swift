@@ -21,6 +21,7 @@ public final class ShellSession: @unchecked Sendable {
     private var buffer: Scrollback
     private var _state: ShellState = .live
     private var _lastInputAt: Date
+    private var _lastOutputAt: Date
     public let startedAt = Date()
 
     /// New bytes, as the shell produces them, with the offset of the first of them in
@@ -45,6 +46,7 @@ public final class ShellSession: @unchecked Sendable {
         self.onOutput = onOutput
         self.onStateChange = onStateChange
         self._lastInputAt = Date()
+        self._lastOutputAt = Date()
 
         // The user's own shell, not ours and not the agent's (FR-020, FR-025).
         let executable = shell ?? URL(filePath: ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh")
@@ -91,6 +93,13 @@ public final class ShellSession: @unchecked Sendable {
         return _lastInputAt
     }
 
+    /// When the shell last printed anything. The daemon's own notes do not count:
+    /// only the shell, or something running in it, can keep it from being idle (#516).
+    public var lastOutputAt: Date {
+        lock.lock(); defer { lock.unlock() }
+        return _lastOutputAt
+    }
+
     public var scrollback: Scrollback {
         lock.lock(); defer { lock.unlock() }
         return buffer
@@ -124,14 +133,16 @@ public final class ShellSession: @unchecked Sendable {
         return pty.hasForegroundJob
     }
 
-    /// Idle: nothing running, and nothing typed for a while.
+    /// Idle: nothing running, nothing typed and nothing printed for a while.
     ///
-    /// A pure function of three inputs, written as one so it can be tested as one
+    /// A pure function of its inputs, written as one so it can be tested as one
     /// (FR-028). A busy shell is never idle however long ago the user last typed: they
     /// started a build and went to lunch, which is exactly the case FR-026 exists for.
-    public static func isIdle(isBusy: Bool, lastInputAt: Date, now: Date, threshold: TimeInterval) -> Bool {
+    /// Nor is one still printing, whether or not its job counts as in front: a dev
+    /// server, `tail -f` or a log someone is watching (#516).
+    public static func isIdle(isBusy: Bool, lastInputAt: Date, lastOutputAt: Date, now: Date, threshold: TimeInterval) -> Bool {
         if isBusy { return false }
-        return now.timeIntervalSince(lastInputAt) >= threshold
+        return now.timeIntervalSince(max(lastInputAt, lastOutputAt)) >= threshold
     }
 
     /// How long a shell may sit doing nothing before the daemon lets it go.
@@ -144,16 +155,18 @@ public final class ShellSession: @unchecked Sendable {
     public static let idleThreshold: TimeInterval = 60 * 60 * 2
 
     public func isIdle(now: Date = Date(), threshold: TimeInterval = ShellSession.idleThreshold) -> Bool {
-        Self.isIdle(isBusy: isBusy, lastInputAt: lastInputAt, now: now, threshold: threshold)
+        Self.isIdle(isBusy: isBusy, lastInputAt: lastInputAt, lastOutputAt: lastOutputAt, now: now, threshold: threshold)
     }
 
     // MARK: Doing
 
     /// Held and passed on, under the lock with the offset it was given, so a replay
     /// taken at any moment ends exactly where the next chunk starts. Called on the
-    /// pty's queue, one chunk at a time.
-    private func record(_ data: Data) {
+    /// pty's queue, one chunk at a time. What the shell printed keeps it from being
+    /// idle; the daemon's own notes do not (#516).
+    private func record(_ data: Data, fromShell: Bool = true) {
         lock.lock()
+        if fromShell { _lastOutputAt = Date() }
         let offset = buffer.end
         buffer.append(data)
         lock.unlock()
@@ -163,7 +176,7 @@ public final class ShellSession: @unchecked Sendable {
     /// A line of the daemon's own, held in the scrollback like anything the shell
     /// printed, so a screen that attaches later reads it too.
     public func note(_ text: String) {
-        record(Data("\r\n\u{1B}[2m\(text)\u{1B}[0m\r\n".utf8))
+        record(Data("\r\n\u{1B}[2m\(text)\u{1B}[0m\r\n".utf8), fromShell: false)
     }
 
     public func write(_ data: Data) {

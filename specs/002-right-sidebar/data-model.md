@@ -55,7 +55,8 @@ The spec's "Terminal session". Owned by the daemon, one per agent (FR-023).
 | `scrollback` | `Scrollback` | A ring buffer of raw pty bytes with a byte cap. The daemon parses nothing |
 | `state` | `ShellState` | Below |
 | `startedAt` | `Date` | |
-| `lastInputAt` | `Date` | One of the three inputs to the idle rule |
+| `lastInputAt` | `Date` | One of the inputs to the idle rule |
+| `lastOutputAt` | `Date` | When the shell last printed; also an input to the idle rule (#516) |
 | `title` | `String?` | From OSC 0 or 2. The pane shows it when a program sets one |
 
 ### `ShellState`
@@ -75,7 +76,8 @@ released(reason: String)    // reaped for being idle (FR-028), or died with the 
   A folder that no longer exists is a `failed`, with the folder named.
 - `isBusy` is true when a child of the shell is running. The daemon counts a busy shell as work it is
   holding and will not shut down under it (FR-027).
-- `isIdle` is a pure function of `isBusy`, `lastInputAt` and the clock. Tested as one.
+- `isIdle` is a pure function of `isBusy`, `lastInputAt`, `lastOutputAt` and the clock: a shell still
+  printing is not idle (#516). Tested as one.
 - Every terminal state but `live` keeps the scrollback readable (FR-029). The screen is drawn as it
   was, with a line saying what happened and an offer to start a new one (FR-024).
 - Nothing about a shell is written to disk. A daemon restart loses every shell, and each becomes
