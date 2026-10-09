@@ -13,14 +13,10 @@ struct AppServiceTests {
     /// A service on one end of a pipe and a plain JSON-RPC client on the other, which
     /// is what a runtime is here.
     private func pair(showFile: @escaping AppService.FileSink = { _ in .refused("not expected") },
-                      askForm: @escaping AppService.AskFormSink = { _, _ in .refused("not expected") },
-                      finishTurn: @escaping AppService.FinishSink = { _, _, _, _ in
-                          .refused("not expected")
-                      })
+                      askForm: @escaping AppService.AskFormSink = { _, _ in .refused("not expected") })
         async -> (client: JSONRPCConnection, service: AppService) {
         let (mine, theirs) = PairedTransport.pair()
-        let service = AppService(transport: theirs, finishTurn: finishTurn,
-                                 showFile: showFile, askForm: askForm)
+        let service = AppService(transport: theirs, showFile: showFile, askForm: askForm)
         let client = JSONRPCConnection(transport: mine)
         await client.start()
         return (client, service)
@@ -47,15 +43,14 @@ struct AppServiceTests {
         let (client, service) = await pair()
         let result = try await client.call("tools/list", .object([:]))
         let tools = result["tools"]?.arrayValue ?? []
-        // The one call that ends a turn first, the ones that act mid-turn after it.
-        // The two older names for its halves are gone (023 R5).
+        // No tool ends a turn: the app works out how each one ended.
         // The four agent tools (028 + park) sit after the workflow tool, for an agent
         // that may use them — which is the default. The three lease tools (036) follow
         // them, for every agent, then the three event tools (042). Labels and moving
         // (053) have tools of their own since #481. The two session tools (065) sit after the agent tools, for every
         // agent. The pin tools (#159, #180) come last, for every agent.
         #expect(tools.compactMap { $0["name"]?.stringValue }
-            == [AppService.finishTurnToolName, AppService.showFileToolName,
+            == [AppService.showFileToolName,
                 AppService.workflowToolName, AppService.askFormToolName,
                 AppService.startAgentToolName, AppService.stopAgentToolName,
                 AppService.parkAgentToolName, AppService.archiveAgentToolName,
@@ -69,20 +64,8 @@ struct AppServiceTests {
                 AppService.pinPageToolName, AppService.unpinPageToolName, AppService.movePinToolName,
                 AppService.pinSessionToolName])
 
-        let finish = tools.first?["inputSchema"]
-        #expect(finish?["properties"]?["outcome"]?["enum"]?.arrayValue?
-            .compactMap { $0.stringValue }
-            == WorkOutcome.allCases.map(\.rawValue))
-        // The outcome and its words are the call. The runtime names the conversation.
-        #expect(finish?["required"]?.arrayValue?.compactMap { $0.stringValue }
-            == ["outcome", "message"])
-        #expect(finish?["properties"]?["title"] == nil)
-        // No suggestion offered since #481; one sent is still read (031).
-        #expect(finish?["properties"]?["next_prompt"] == nil)
-        #expect(finish?["properties"]?["next_prompts"] == nil)
-
         try #require(tools.count > 2)
-        let showFile = tools[1]["inputSchema"]
+        let showFile = tools[0]["inputSchema"]
         #expect(showFile?["properties"]?["path"] != nil)
         #expect(showFile?["properties"]?["line"] != nil)
         // The line is the optional half: an agent that only knows the file still has
@@ -96,7 +79,7 @@ struct AppServiceTests {
         // says so.
         #expect(showFile?["properties"]?.objectValue?.keys.sorted() == ["line", "path"])
 
-        let workflows = tools[2]["inputSchema"]
+        let workflows = tools[1]["inputSchema"]
         #expect(workflows?["properties"]?["action"]?["enum"]?.arrayValue?
             .compactMap { $0.stringValue } == ["list", "read", "write", "remove", "enable", "disable"])
         // Only the action is required: `list` needs nothing else, which is the call an
@@ -151,7 +134,7 @@ struct AppServiceTests {
     @Test func theShowFileDescriptionSaysAMarkdownFileIsALivePage() async throws {
         let (client, service) = await pair()
         let result = try await client.call("tools/list", .object([:]))
-        let description = result["tools"]?.arrayValue?[1]["description"]?.stringValue ?? ""
+        let description = result["tools"]?.arrayValue?[0]["description"]?.stringValue ?? ""
         #expect(description.contains("opens as a page"))
         #expect(description.contains("follows your edits"))
         #expect(description.contains("show it once"))
@@ -297,333 +280,35 @@ struct AppServiceTests {
         await service.close()
     }
 
-    private actor FinishBox {
-        var calls = 0
-        var outcome = ""
-        var message = ""
-        var prompts: [SuggestedPrompt] = []
-        var words = AppService.BlockWords.none
-        func record(_ outcome: String, _ message: String, _ prompts: [SuggestedPrompt],
-                    _ words: AppService.BlockWords) {
-            calls += 1
-            self.words = words
-            self.outcome = outcome
-            self.message = message
-            self.prompts = prompts
+    /// Gone altogether: no tool ends a turn. Not listed, and a call to it, prefixed or
+    /// not, is no tool of ours.
+    @Test func finishTurnIsNeitherListedNorAnswered() async throws {
+        let (client, service) = await pair()
+        let listed = try await client.call("tools/list", .object([:]))["tools"]?.arrayValue?
+            .compactMap { $0["name"]?.stringValue } ?? []
+        #expect(!listed.contains(AppTool.finishTurn))
+        for called in [AppTool.finishTurn, "mcp__agents__\(AppTool.finishTurn)"] {
+            await #expect(throws: JSONRPCError.self) {
+                _ = try await client.call("tools/call", [
+                    "name": .string(called), "arguments": ["outcome": "done", "message": "All done."],
+                ])
+            }
         }
-    }
-
-    private func finishing(_ box: FinishBox) -> AppService.FinishSink {
-        { outcome, message, prompts, words in
-            await box.record(outcome, message, prompts, words)
-            return .shown("Noted.")
-        }
-    }
-
-    // MARK: Blocked (039)
-
-    /// The sixth outcome is still offered; what it carried is on wait_for_event (#481),
-    /// and still read here for a conversation that sends it.
-    @Test func blockedIsOfferedAndTheWaitIsOnWaitForEvent() async throws {
-        let properties = AppService.finishTurnTool["inputSchema"]?["properties"]
-        #expect(properties?["outcome"]?["enum"]?.arrayValue?.contains("blocked") == true)
-        #expect(properties?["waiting_on"] == nil)
-        let wait = AppService.waitForEventTool["inputSchema"]?["properties"]
-        #expect(wait?["agents"]?["type"]?.stringValue == "array")
-        #expect(wait?["wake_on"]?["enum"]?.arrayValue == ["any", "all"])
-        #expect(AppService.finishTurnTool["description"]?.stringValue?.contains("wait_for_event") == true)
-    }
-
-    /// #152: wake_on rides to the sink as read; left out, it is nil, which is all.
-    @Test func wakeOnIsCarriedToTheSink() async throws {
-        let box = FinishBox()
-        let (client, service) = await pair(finishTurn: finishing(box))
-        _ = try await client.call("tools/call", [
-            "name": .string(AppService.finishTurnToolName),
-            "arguments": ["outcome": "blocked", "message": "Waiting on any lane.",
-                          "title": "Lanes", "waiting_on": ["A", "B", "C"], "wake_on": "any"],
-        ])
-        #expect(await box.words == AppService.BlockWords(waitingOn: ["A", "B", "C"], wakeOn: .any))
-        await service.close()
-    }
-
-    @Test func aBlockedCallCarriesItsWaitsAndTimeToTheSink() async throws {
-        let box = FinishBox()
-        let (client, service) = await pair(finishTurn: finishing(box))
-        let result = try await client.call("tools/call", [
-            "name": .string(AppService.finishTurnToolName),
-            "arguments": ["outcome": "blocked", "message": "Waiting on the helpers.",
-                          "title": "Waiting", "waiting_on": ["A", "B"],
-                          "check_again_in_minutes": 25],
-        ])
-        #expect(result["isError"]?.boolValue == false)
-        #expect(await box.words == AppService.BlockWords(waitingOn: ["A", "B"], checkAgainInMinutes: 25))
-        await service.close()
-    }
-
-    /// Contract §1: the block's arguments go with blocked alone, and the minutes are
-    /// whole and in range. Refused before the daemon is asked.
-    @Test func blockArgumentsAreRefusedWhereTheyDoNotBelong() async throws {
-        let box = FinishBox()
-        let (client, service) = await pair(finishTurn: finishing(box))
-        let cases: [JSONValue] = [
-            ["outcome": "done", "message": "m", "title": "t", "waiting_on": ["A"]],
-            ["outcome": "done", "message": "m", "title": "t", "check_again_in_minutes": 5],
-            ["outcome": "blocked", "message": "m", "title": "t", "check_again_in_minutes": 0],
-            ["outcome": "blocked", "message": "m", "title": "t", "check_again_in_minutes": 1441],
-            ["outcome": "blocked", "message": "m", "title": "t", "check_again_in_minutes": 2.5],
-            ["outcome": "done", "message": "m", "title": "t", "wake_on": "any"],
-            ["outcome": "blocked", "message": "m", "title": "t", "waiting_on": ["A"], "wake_on": "first"],
-        ]
-        for arguments in cases {
-            let result = try await client.call("tools/call", [
-                "name": .string(AppService.finishTurnToolName), "arguments": arguments,
-            ])
-            #expect(result["isError"]?.boolValue == true, "\(arguments)")
-        }
-        #expect(await box.calls == 0)
-        await service.close()
-    }
-
-    // MARK: Parked or archived once the turn ends
-
-    /// Not listed since #481 — park_agent with no id does it — and still read.
-    @Test func afterwardsIsReadButNotListed() async throws {
-        let properties = AppService.finishTurnTool["inputSchema"]?["properties"]
-        #expect(properties?["afterwards"] == nil)
-        #expect(AppService.finishTurnTool["description"]?.stringValue?.contains("park_agent") == true)
         #expect(AppService.parkAgentTool["inputSchema"]?["required"] == nil, "no id is yourself")
-    }
-
-    @Test func anAskThatFitsTheOutcomeReachesTheSink() async throws {
-        let box = FinishBox()
-        let (client, service) = await pair(finishTurn: finishing(box))
-        let result = try await client.call("tools/call", [
-            "name": .string(AppService.finishTurnToolName),
-            "arguments": ["outcome": "done", "message": "Merged and cleaned up.",
-                          "afterwards": "park"],
-        ])
-        #expect(result["isError"]?.boolValue == false)
-        #expect(await box.words.afterwards == .park)
-        await service.close()
-    }
-
-    /// A word that is neither, and each park pairing that would bury something,
-    /// refused before the daemon is asked.
-    @Test func anAskThatDoesNotFitIsRefusedWhole() async throws {
-        let box = FinishBox()
-        let (client, service) = await pair(finishTurn: finishing(box))
-        let cases: [(JSONValue, String)] = [
-            (["outcome": "done", "message": "m", "afterwards": "delete"], AfterTurn.unknown),
-            (["outcome": "needs_answer", "message": "m", "afterwards": "park"], AfterTurn.park.refusal),
-            (["outcome": "stuck", "message": "m", "afterwards": "park"], AfterTurn.park.refusal),
-            (["outcome": "blocked", "message": "m", "check_again_in_minutes": 5, "afterwards": "park"],
-             AfterTurn.park.refusal),
-            (["outcome": "partly_done", "message": "m", "afterwards": "archive"], AfterTurn.archive.refusal),
-        ]
-        for (arguments, refusal) in cases {
-            let result = try await client.call("tools/call", [
-                "name": .string(AppService.finishTurnToolName), "arguments": arguments,
-            ])
-            #expect(result["isError"]?.boolValue == true, "\(arguments)")
-            #expect(result["content"]?.arrayValue?.first?["text"]?.stringValue == refusal, "\(arguments)")
-        }
-        #expect(await box.calls == 0)
-        await service.close()
-    }
-
-    @Test func aFinishCallReachesTheSinkWithBothHalves() async throws {
-        let box = FinishBox()
-        let (client, service) = await pair(finishTurn: finishing(box))
-        let result = try await client.call("tools/call", [
-            "name": .string(AppService.finishTurnToolName),
-            "arguments": ["outcome": "done", "message": "  Renamed 14 call sites.  ",
-                          "title": "Call sites renamed",
-                          "next_prompt": ["label": "Run the tests", "prompt": "Run the tests and fix what fails"]],
-        ])
-        #expect(result["isError"]?.boolValue == false)
-        #expect(await box.outcome == "done")
-        // Trimmed on the way through, as a report is.
-        #expect(await box.message == "Renamed 14 call sites.")
-        #expect(await box.prompts.map(\.label) == ["Run the tests"])
-        await service.close()
-    }
-
-    /// Too long is refused before the daemon is asked, with the sentence that says how
-    /// short (#184); the same call with fewer words then lands, so the turn is still
-    /// accounted for.
-    @Test func aLongMessageIsRefusedAndAShorterOneLands() async throws {
-        let box = FinishBox()
-        let (client, service) = await pair(finishTurn: finishing(box))
-        let long = String(repeating: "The fix is in and every test passes. ", count: 6)
-        for (outcome, refusal) in [("done", WorkReport.tooLong(.done)),
-                                   ("needs_answer", WorkReport.tooLong(.needsAnswer))] {
-            let result = try await client.call("tools/call", [
-                "name": .string(AppService.finishTurnToolName),
-                "arguments": ["outcome": .string(outcome), "message": .string(long)],
-            ])
-            #expect(result["isError"]?.boolValue == true)
-            #expect(result["content"]?.arrayValue?.first?["text"]?.stringValue == refusal)
-        }
-        #expect(await box.calls == 0)
-
-        let retry = try await client.call("tools/call", [
-            "name": .string(AppService.finishTurnToolName),
-            "arguments": ["outcome": "done", "message": "Login works again."],
-        ])
-        #expect(retry["isError"]?.boolValue == false)
-        #expect(await box.calls == 1)
-        #expect(await box.message == "Login works again.")
-        await service.close()
-    }
-
-    /// The examples went with #481's cut; the rule they illustrated stays, once.
-    @Test func theGuidanceAsksForOneShortSentence() {
-        let message = AppService.finishTurnTool["inputSchema"]?["properties"]?["message"]?["description"]?
-            .stringValue ?? ""
-        #expect(message.hasPrefix("One short sentence"))
-        #expect(message.contains("200 characters"))
-    }
-
-    /// The chips ride along; their absence is not a fault. Left out or sent empty,
-    /// the outcome still lands (FR-003).
-    @Test func aFinishCallWithNoPromptsStillReachesTheSink() async throws {
-        let box = FinishBox()
-        let (client, service) = await pair(finishTurn: finishing(box))
-        for arguments in [
-            JSONValue.object(["outcome": "done", "message": "All done.", "title": "Tidied"]),
-            JSONValue.object(["outcome": "done", "message": "All done.", "title": "Tidied",
-                              "next_prompt": .null]),
-        ] {
-            let result = try await client.call("tools/call", [
-                "name": .string(AppService.finishTurnToolName), "arguments": arguments,
-            ])
-            #expect(result["isError"]?.boolValue == false)
-            #expect(await box.prompts.isEmpty)
-        }
-        #expect(await box.calls == 2)
-        await service.close()
-    }
-
-    /// Refused whole, prompts included, and the five are named so the agent can call
-    /// again with a word we know (Research R4).
-    @Test func aFinishCallWithAnUnknownOutcomeIsRefusedWhole() async throws {
-        let box = FinishBox()
-        let (client, service) = await pair(finishTurn: finishing(box))
-        let result = try await client.call("tools/call", [
-            "name": .string(AppService.finishTurnToolName),
-            "arguments": ["outcome": "succeeded", "message": "all good", "title": "Tidied",
-                          "next_prompt": ["label": "A", "prompt": "Do A"]],
-        ])
-        #expect(result["isError"]?.boolValue == true)
-        let text = result["content"]?.arrayValue?.first?["text"]?.stringValue ?? ""
-        #expect(text.contains("nothing_to_do"))
-        #expect(text.contains("partly_done"))
-        #expect(await box.calls == 0)
-        await service.close()
-    }
-
-    @Test func aFinishCallWithNoWordsIsRefused() async throws {
-        let box = FinishBox()
-        let (client, service) = await pair(finishTurn: finishing(box))
-        for message in ["", "   "] {
-            let result = try await client.call("tools/call", [
-                "name": .string(AppService.finishTurnToolName),
-                "arguments": ["outcome": "done", "message": .string(message), "title": "Tidied"],
-            ])
-            #expect(result["isError"]?.boolValue == true)
-            #expect(result["content"]?.arrayValue?.first?["text"]?.stringValue?
-                .contains("how it went") == true)
-        }
-        #expect(await box.calls == 0)
-        await service.close()
-    }
-
-    @Test func aPrefixedFinishCallIsStillOurTool() async throws {
-        let box = FinishBox()
-        let (client, service) = await pair(finishTurn: finishing(box))
-        let result = try await client.call("tools/call", [
-            "name": "mcp__agents__finish_turn",
-            "arguments": ["outcome": "stuck", "message": "No signing certificate.",
-                          "title": "Signing the build"],
-        ])
-        #expect(result["isError"]?.boolValue == false)
-        #expect(await box.outcome == "stuck")
         await service.close()
     }
 
     @Test func aRefusalIsAToolErrorRatherThanAProtocolError() async throws {
-        let (client, service) = await pair(finishTurn: { _, _, _, _ in
+        let (client, service) = await pair(showFile: { _ in
             .refused("That conversation is closed.")
         })
         let result = try await client.call("tools/call", [
-            "name": .string(AppService.finishTurnToolName),
-            "arguments": ["outcome": "done", "message": "All done."],
+            "name": .string(AppService.showFileToolName),
+            "arguments": ["path": "/tmp/a.md"],
         ])
         // Not a JSON-RPC failure: the agent is meant to read this and carry on.
         #expect(result["isError"]?.boolValue == true)
         #expect(result["content"]?.arrayValue?.first?["text"]?.stringValue == "That conversation is closed.")
-        await service.close()
-    }
-
-    /// A label is what fits on the chip. A prompt with no label at all still gets one.
-    @Test func aMissingLabelBecomesTheStartOfThePrompt() async throws {
-        let box = FinishBox()
-        let (client, service) = await pair(finishTurn: finishing(box))
-        let long = String(repeating: "a", count: 200)
-        _ = try await client.call("tools/call", [
-            "name": .string(AppService.finishTurnToolName),
-            "arguments": ["outcome": "done", "message": "All done.",
-                          "next_prompt": ["prompt": .string(long)]],
-        ])
-        #expect(await box.prompts.first?.label.count == SuggestedPrompt.labelLimit)
-        #expect(await box.prompts.first?.prompt == long)
-        await service.close()
-    }
-
-    /// The list conversations were briefed with before 031 is past the cut-off (#58):
-    /// the call lands, and the list is not read.
-    @Test func aListOfNextPromptsIsNotRead() async throws {
-        let box = FinishBox()
-        let (client, service) = await pair(finishTurn: finishing(box))
-        let result = try await client.call("tools/call", [
-            "name": .string(AppService.finishTurnToolName),
-            "arguments": ["outcome": "done", "message": "Done.", "title": "Tidied",
-                          "next_prompts": .array([["label": "Listed", "prompt": "Do listed"]])],
-        ])
-        #expect(result["isError"]?.boolValue == false)
-        #expect(await box.prompts.isEmpty)
-        await service.close()
-    }
-
-    /// What a fresh agent is told to send (031).
-    @Test func oneNextPromptReachesTheSink() async throws {
-        let box = FinishBox()
-        let (client, service) = await pair(finishTurn: finishing(box))
-        let result = try await client.call("tools/call", [
-            "name": .string(AppService.finishTurnToolName),
-            "arguments": ["outcome": "done", "message": "Done.", "title": "Tidied",
-                          "next_prompt": ["label": "Push", "prompt": "Push the branch"]],
-        ])
-        #expect(result["isError"]?.boolValue == false)
-        #expect(await box.prompts.map(\.prompt) == ["Push the branch"])
-        await service.close()
-    }
-
-    // MARK: The title
-
-    /// The runtime names the conversation. A title an older prompt still sends is
-    /// not read, and the call lands as it would without one.
-    @Test func aTitleSentIsNotRead() async throws {
-        let box = FinishBox()
-        let (client, service) = await pair(finishTurn: finishing(box))
-        let result = try await client.call("tools/call", [
-            "name": .string(AppService.finishTurnToolName),
-            "arguments": ["outcome": "done", "message": "All done.", "title": "Tidied"],
-        ])
-        #expect(result["isError"]?.boolValue == false)
-        #expect(await box.message == "All done.")
-        #expect(await box.calls == 1)
         await service.close()
     }
 
@@ -642,7 +327,7 @@ struct AppServiceTests {
     }
 
     @Test func noToolNameEndsWithAnother() {
-        let names = [AppTool.finishTurn, AppTool.showFile, AppTool.manageWorkflows, AppTool.askForm,
+        let names = [AppTool.showFile, AppTool.manageWorkflows, AppTool.askForm,
                      AppTool.startAgent, AppTool.stopAgent, AppTool.parkAgent, AppTool.archiveAgent,
                      AppTool.listMyAgents,
                      AppTool.waitForEvent, AppTool.cancelWait, AppTool.publishEvent,

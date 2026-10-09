@@ -9,8 +9,7 @@ import Foundation
 ///
 /// Grok appends `_meta.rules` to the system prompt (`15-agent-mode.md`). This is that
 /// text: each tool the server will actually offer this session, under the catalog name
-/// Grok calls (`agents__finish_turn`), with the arguments it takes. The two older names
-/// for `finish_turn` are left out, so a fresh agent is pointed at the one tool.
+/// Grok calls (`agents__show_file`), with the arguments it takes.
 enum AppToolPreface {
     /// What a Grok session is told, for an agent that may or may not start others.
     static func rules(managesAgents: Bool) -> String {
@@ -32,7 +31,7 @@ enum AppToolPreface {
     static let firstPrompt = "Call `agents` tools directly."
 
     /// The name Grok lists for a tool on the app's server. Two underscores, as in
-    /// `agents__finish_turn`.
+    /// `agents__show_file`.
     static func catalogName(_ tool: String) -> String {
         "\(AppTool.serverName)__\(tool)"
     }

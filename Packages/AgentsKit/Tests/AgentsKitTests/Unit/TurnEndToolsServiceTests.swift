@@ -70,21 +70,4 @@ struct TurnEndToolsServiceTests {
         #expect(empty["isError"]?.boolValue == true)
     }
 
-    /// The old arguments still work on finish_turn, unlisted (#481).
-    @Test func finishTurnStillReadsEveryOldArgument() async throws {
-        actor Box { var words: AppService.BlockWords?; func set(_ w: AppService.BlockWords) { words = w } }
-        let box = Box()
-        let tools = AppService(transport: nil, finishTurn: { _, _, _, words in
-            await box.set(words); return .shown("Noted.")
-        })
-        let result = try await call(tools, "finish_turn", [
-            "outcome": "done", "message": "Merged.", "afterwards": "park", "add_labels": ["shipped"],
-            "leave_worktree": "remove", "next_prompt": ["label": "Ship it", "prompt": "Ship it"],
-        ])
-        #expect(result["isError"]?.boolValue == false)
-        let words = await box.words
-        #expect(words?.afterwards == .park)
-        #expect(words?.addLabels == ["shipped"])
-        #expect(words?.move == .move(target: .projectFolder, removeLeft: true, discardChanges: false))
-    }
 }

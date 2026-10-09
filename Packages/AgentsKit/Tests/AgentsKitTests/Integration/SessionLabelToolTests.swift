@@ -7,19 +7,13 @@ import Testing
 struct SessionLabelToolTests {
     private actor Calls {
         var helper: AppService.AgentCall?
-        var labels = AppService.BlockWords.none
         func record(_ call: AppService.AgentCall) { helper = call }
-        func record(_ words: AppService.BlockWords) { labels = words }
     }
 
-    @Test func startAndFinishPayloadsReachTheirSinks() async throws {
+    @Test func startPayloadsReachTheirSink() async throws {
         let calls = Calls()
         let (mine, theirs) = PairedTransport.pair()
         let service = AppService(transport: theirs,
-                                 finishTurn: { _, _, _, words in
-                                     await calls.record(words)
-                                     return .shown("Recorded")
-                                 },
                                  agents: { call in
                                      await calls.record(call)
                                      return .shown("Started")
@@ -32,13 +26,6 @@ struct SessionLabelToolTests {
         ])
         #expect(await calls.helper == .start(prompt: "Review", runtime: nil,
                                               model: nil, permissionMode: nil, labels: ["Ready"]))
-        _ = try await client.call("tools/call", [
-            "name": .string(AppService.finishTurnToolName),
-            "arguments": ["outcome": "done", "message": "Reviewed.",
-                          "add_labels": ["Done"], "remove_labels": ["Ready"]],
-        ])
-        #expect(await calls.labels.addLabels == ["Done"])
-        #expect(await calls.labels.removeLabels == ["Ready"])
         await service.close()
     }
 

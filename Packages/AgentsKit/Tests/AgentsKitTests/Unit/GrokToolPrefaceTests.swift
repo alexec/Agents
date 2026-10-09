@@ -16,7 +16,6 @@ struct GrokToolPrefaceTests {
         for name in offered {
             #expect(rules.contains(GrokToolPreface.catalogName(name)), "\(name)")
         }
-        #expect(rules.contains("one of done, nothing_to_do, needs_answer, partly_done, stuck, blocked"))
         #expect(rules.contains("permission-mode: plan"))
         for retired in AppTool.retiredEndOfTurn { #expect(!rules.contains(retired)) }
         // Grok cannot carry its conversation into another folder (053).
@@ -25,7 +24,7 @@ struct GrokToolPrefaceTests {
 
     @Test func aHelperIsNotToldHowToStartAnAgent() {
         let rules = GrokToolPreface.rules(managesAgents: false)
-        #expect(rules.contains(GrokToolPreface.catalogName(AppTool.finishTurn)))
+        #expect(rules.contains(GrokToolPreface.catalogName(AppTool.showFile)))
         #expect(!rules.contains(GrokToolPreface.catalogName(AppTool.startAgent)))
         #expect(!rules.contains(GrokToolPreface.catalogName(AppTool.stopAgent)))
         #expect(!rules.contains(GrokToolPreface.catalogName(AppTool.listMyAgents)))

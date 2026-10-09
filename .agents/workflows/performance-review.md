@@ -144,10 +144,10 @@ Only **critical** and **high** findings are fixed; medium and low stay recorded.
   > "you".
   > If you start helpers of your own, archive each with archive_agent when its work is
   > done, and never delete its worktree.
-  > End with finish_turn naming the branch, the commits, the twelve numbers and what
+  > End with a last message naming the branch, the commits, the twelve numbers and what
   > you proved, or why you could not.
 
-- Then end your turn with finish_turn `blocked`, `waiting_on` the helper you started.
+- Then call `wait_for_event` with `agents` naming the helper you started.
   You will be started again when it has finished.
 
 ## 5. Report
@@ -165,6 +165,5 @@ When the helper is done (or if none was started):
    worktree it made once everything in it is committed; the unmerged branch stays.)
 4. End with one line per finding:
    `<id> <severity> <title> — fixed on <branch> | needs a decision: … | won't fix: … | recorded`,
-   then finish_turn: `done` if every critical and high finding is fixed or there were
-   none, `partly_done` if any needs a decision, naming the review file
-   `.agents/reviews/performance/<date>.md` on branch `agents/reviews-performance`.
+   then the review file `.agents/reviews/performance/<date>.md` on branch `agents/reviews-performance`.
+   If any finding needs a decision, ask Alex with your question tool.

@@ -77,45 +77,6 @@ public actor AppService {
     public typealias WorkflowSink =
         @Sendable (DaemonAPI.ManageWorkflowsRequest.Action, String?, String?) async -> Outcome
 
-    /// Where the one call goes: the outcome's wire spelling, the sentence and the chips,
-    /// which may be none. The outcome is still a
-    /// string here — the daemon owns which words it knows, because it is the daemon
-    /// that has to refuse one it does not. One sink for the lot, because the daemon
-    /// refuses the whole call or lands the whole call.
-    public typealias FinishSink = @Sendable (String, String, [SuggestedPrompt], BlockWords) async -> Outcome
-
-    /// What a `blocked` outcome carries besides its sentence (039): the agents it waits
-    /// on, as written, and when to check again. Empty for every other outcome — and
-    /// refused here if it is not, so the agent hears it before the call goes further.
-    /// And, on `finish_turn` alone, where the agent asked to be put once the turn is
-    /// over, and where it asked to move to (053) — carried here so the sink's shape
-    /// stays as it was.
-    public struct BlockWords: Sendable, Equatable {
-        public var waitingOn: [String]?
-        public var checkAgainInMinutes: Int?
-        /// Whether the first of `waitingOn` to finish resumes it (#152). Nil is `all`.
-        public var wakeOn: Block.WakeOn?
-        public var afterwards: AfterTurn?
-        public var addLabels: [String]
-        public var removeLabels: [String]
-        public var move: MoveCall?
-
-        public init(waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil,
-                    wakeOn: Block.WakeOn? = nil, afterwards: AfterTurn? = nil,
-                    addLabels: [String] = [], removeLabels: [String] = [],
-                    move: MoveCall? = nil) {
-            self.waitingOn = waitingOn
-            self.checkAgainInMinutes = checkAgainInMinutes
-            self.wakeOn = wakeOn
-            self.afterwards = afterwards
-            self.addLabels = addLabels
-            self.removeLabels = removeLabels
-            self.move = move
-        }
-
-        public static let none = BlockWords()
-    }
-
     /// One of the calls that act on other agents (028), as the agent made it.
     /// Nothing is decided here beyond whether the words are there at all: the daemon
     /// is what knows whose agent is whose.
@@ -182,7 +143,6 @@ public actor AppService {
     public typealias SessionsSink = @Sendable (SessionCall) async -> Outcome
 
     private let connection: JSONRPCConnection?
-    private let finishSink: FinishSink
     private let fileSink: FileSink
     private let askFormSink: AskFormSink
     private let workflowSink: WorkflowSink
@@ -206,9 +166,6 @@ public actor AppService {
     public init(transport: (any LineTransport)?,
                 managesAgents: Bool = true,
                 movesItself: Bool = true,
-                finishTurn: @escaping FinishSink = { _, _, _, _ in
-                    .refused("This app cannot end a turn.")
-                },
                 showFile: @escaping FileSink = { _ in .refused("This app cannot show a file.") },
                 askForm: @escaping AskFormSink = { _, _ in
                     .refused("This app cannot ask the person.")
@@ -239,7 +196,6 @@ public actor AppService {
                 },
                 offersTestView: Bool = AppViewCatalog.offersTestView) {
         let box = self.box
-        self.finishSink = finishTurn
         self.fileSink = showFile
         self.askFormSink = askForm
         self.workflowSink = workflows
@@ -317,63 +273,6 @@ public actor AppService {
 
             // Longest suffix wins, though nothing here shares one: a runtime is free
             // to prefix a tool's name and none of them changes what follows it.
-            if name.hasSuffix(Self.finishTurnToolName) {
-                // The outcome's checks run here as well as at the daemon so an agent
-                // that got the word wrong is told which five there are before the call
-                // goes any further. Never rounded to the nearest one: an unknown outcome
-                // read as `done` is exactly the unearned tick this exists to remove. The
-                // chips are cleaned, and may come to nothing: the call is the outcome;
-                // the chips ride along (FR-003).
-                let raw = (arguments?["outcome"]?.stringValue ?? "")
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                guard WorkOutcome(wire: raw) != nil else {
-                    return .success(Self.reply(Self.unknownOutcome, isError: true))
-                }
-                let message = (arguments?["message"]?.stringValue ?? "")
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !message.isEmpty else {
-                    return .success(Self.reply(Self.noWords, isError: true))
-                }
-                guard !WorkReport.isTooLong(message) else {
-                    return .success(Self.reply(WorkReport.tooLong(WorkOutcome(wire: raw)), isError: true))
-                }
-                // No `title`: the runtime names the conversation, over ACP's
-                // `session_info_update`. One sent by an older prompt is not read.
-                let prompts = SuggestedPrompt.next(arguments?["next_prompt"])
-                var words: BlockWords
-                switch Self.blockWords(raw, arguments) {
-                case .success(let read): words = read
-                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
-                }
-                switch Self.afterwards(raw, arguments) {
-                case .success(let read): words.afterwards = read
-                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
-                }
-                for (key, assign) in [("add_labels", true), ("remove_labels", false)] {
-                    if arguments?[key] != nil && arguments?[key]?.arrayValue == nil {
-                        return .success(Self.reply("Nothing was recorded: `\(key)` must be an array of label strings.", isError: true))
-                    }
-                    let values = arguments?[key]?.arrayValue ?? []
-                    guard values.allSatisfy({ $0.stringValue != nil }) else {
-                        return .success(Self.reply("Nothing was recorded: `\(key)` must contain only strings.", isError: true))
-                    }
-                    if assign { words.addLabels = values.compactMap(\.stringValue) }
-                    else { words.removeLabels = values.compactMap(\.stringValue) }
-                }
-                switch Self.moveCall(arguments) {
-                case .success(let read): words.move = read
-                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
-                }
-                if words.move != nil && !movesItself {
-                    return .success(Self.reply("""
-                        Nothing was recorded: this runtime cannot carry its conversation \
-                        into another folder, so you stay where you are. Call again without \
-                        worktree or leave_worktree.
-                        """, isError: true))
-                }
-                return .success(Self.reply(await finishSink(raw, message, prompts, words)))
-            }
-
             if let call = Self.selfCall(named: name, arguments, movesItself: movesItself) {
                 switch call {
                 case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
@@ -698,8 +597,8 @@ public actor AppService {
 
     /// Every tool this server offers, in the order they are listed.
     static func tools(managesAgents: Bool, movesItself: Bool = true) -> [JSONValue] {
-        // The one that ends a turn first, then the ones that act mid-turn. The two
-        // older names for its halves were retired on 2026-09-29 (023 R5).
+        // `finish_turn` is gone (#479, #481, then removed): the app works out how a turn
+        // ended, and an agent that needs the person asks them.
         // The agent tools after the workflow tool, and only for an agent that
         // may use them (028).
         // `park_agent` for every agent, since with no id it parks the caller (#481).
@@ -720,7 +619,7 @@ public actor AppService {
         // The agent's own session: labels, and moving, which is not offered on a runtime
         // that would forget the conversation on the way (053, #481).
         let selfTools = [Self.setSessionLabelsTool] + (movesItself ? [Self.moveWorktreeTool] : [])
-        return [Self.finishTurnTool, Self.showFileTool, Self.workflowTool, Self.askFormTool]
+        return [Self.showFileTool, Self.workflowTool, Self.askFormTool]
             + agentTools + selfTools + sessionTools + leaseTools
             + eventTools + pinTools
     }
@@ -753,7 +652,7 @@ public actor AppService {
         return .success((cleanedTitle, questions))
     }
 
-    /// The move a `finish_turn` call asks for (053), with its arguments read. `nil` when
+    /// The move a `move_worktree` call asks for (053), with its arguments read. `nil` when
     /// it asks for none.
     static func moveCall(_ arguments: JSONValue?) -> Result<MoveCall?, AgentCallProblem> {
         func text(_ key: String) -> String? {
@@ -799,72 +698,6 @@ public actor AppService {
         init(stringLiteral value: String) { message = value }
     }
 
-    /// The two refusals an outcome can meet before it reaches the daemon, by either
-    /// door. Said once here so the one call and the older name cannot drift.
-    static let unknownOutcome = """
-        Nothing was recorded: outcome has to be one of done, nothing_to_do, \
-        needs_answer, partly_done, stuck or blocked.
-        """
-
-    /// The two block arguments, read, with contract §1's two local refusals: neither
-    /// goes with any outcome but `blocked`, and the minutes are a whole number in range.
-    /// Which agents exist, and whether waiting on them is allowed, is the daemon's.
-    static func blockWords(_ outcome: String, _ arguments: JSONValue?)
-        -> Result<BlockWords, AgentCallProblem> {
-        let names = arguments?["waiting_on"]?.arrayValue?.compactMap(\.stringValue)
-        let minutesValue = arguments?["check_again_in_minutes"]
-        let wakeValue = arguments?["wake_on"]
-        let written = (names?.isEmpty == false) || (minutesValue != nil && minutesValue != .null)
-            || (wakeValue != nil && wakeValue != .null)
-        guard outcome == WorkOutcome.blocked.rawValue else {
-            return written ? .failure(AgentCallProblem(stringLiteral: Block.onlyWithBlocked)) : .success(.none)
-        }
-        var wakeOn: Block.WakeOn?
-        if let wakeValue, wakeValue != .null {
-            guard let known = wakeValue.stringValue.flatMap(Block.WakeOn.init(rawValue:)) else {
-                return .failure(AgentCallProblem(stringLiteral: Block.unknownWakeOn))
-            }
-            wakeOn = known
-        }
-        var minutes: Int?
-        if let minutesValue, minutesValue != .null {
-            // A whole number, however the runtime spelled it: some send "25".
-            let number: Int? = switch minutesValue {
-            case .int(let whole): whole
-            case .double(let value): value == value.rounded() ? Int(exactly: value) : nil
-            case .string(let text): Int(text.trimmingCharacters(in: .whitespaces))
-            default: nil
-            }
-            guard let number, Block.checkAgainMinutes.contains(number) else {
-                return .failure(AgentCallProblem(stringLiteral: """
-                    Nothing was recorded: check_again_in_minutes has to be a whole number \
-                    from \(Block.checkAgainMinutes.lowerBound) to \(Block.checkAgainMinutes.upperBound).
-                    """))
-            }
-            minutes = number
-        }
-        return .success(BlockWords(waitingOn: names, checkAgainInMinutes: minutes, wakeOn: wakeOn))
-    }
-    /// Where the agent asked to be put once the turn is over, read and checked against
-    /// the outcome — here and again at the daemon, as the block's words are. Left out,
-    /// or null, is where its ending puts it.
-    static func afterwards(_ outcome: String, _ arguments: JSONValue?)
-        -> Result<AfterTurn?, AgentCallProblem> {
-        guard let value = arguments?["afterwards"], value != .null else { return .success(nil) }
-        guard let after = value.stringValue.flatMap(AfterTurn.init(wire:)) else {
-            return .failure(AgentCallProblem(stringLiteral: AfterTurn.unknown))
-        }
-        guard let ending = WorkOutcome(wire: outcome), after.goes(with: ending) else {
-            return .failure(AgentCallProblem(stringLiteral: after.refusal))
-        }
-        return .success(after)
-    }
-
-    static let noWords = """
-        Nothing was recorded: say in a sentence how it went. An outcome with no words \
-        is no more use than the turn simply ending.
-        """
-
     /// A tool result is content plus a flag, and a failure inside the tool is reported
     /// this way rather than as a JSON-RPC error: the agent is meant to read it.
     private static func reply(_ text: String, isError: Bool = false) -> JSONValue {
@@ -878,50 +711,6 @@ public actor AppService {
         case .refused(let problem): return reply(problem, isError: true)
         }
     }
-
-    /// The call that says how a turn ended (023), slimmed in #481.
-    ///
-    /// Since #479 nothing tells an agent it must call this: the daemon derives an
-    /// ending the agent did not give. Since #481 it says only how the turn went; waiting, parking, moving and labels each have a tool
-    /// of their own, and the description is a tenth of what it was. Every argument it
-    /// took before is still read — `waiting_on`, `afterwards`, `worktree`, `next_prompt`
-    /// and the rest — except `title`, since the runtime names the conversation; all for prompts and conversations that still send them, but none is
-    /// listed: a fresh agent shown both would send both.
-    static let finishTurnTool: JSONValue = [
-        "name": .string(finishTurnToolName),
-        "title": "Say how the turn ended",
-        "description": """
-            Optional. Without it the app works out how your turn ended from what you last \
-            said. Call it last, to say so yourself. It ends your turn. To ask the person \
-            and carry on with the answer, use your question or form tool instead. To wait \
-            for agents or a time, use wait_for_event; to be parked, park_agent with no id.
-            """,
-        "inputSchema": [
-            "type": "object",
-            "properties": [
-                "outcome": [
-                    "type": "string",
-                    "enum": .array(["done", "nothing_to_do", "needs_answer",
-                                    "partly_done", "stuck", "blocked"]),
-                    "description": """
-                        done: nothing is left for anyone. partly_done: the rest needs a \
-                        decision that is not yours. needs_answer: you cannot go on until \
-                        the person answers. stuck: you could not, and know why. blocked: \
-                        waiting on something other than the person.
-                        """,
-                ],
-                "message": [
-                    "type": "string",
-                    "description": """
-                        One short sentence, under 200 characters, for someone who has not \
-                        read the conversation: what happened and what it means for them, \
-                        no file names. For needs_answer, the question.
-                        """,
-                ],
-            ],
-            "required": .array(["outcome", "message"]),
-        ],
-    ]
 
     /// What an agent is told about moving itself (053), on the tool that does it (#481).
     /// The move happens when the turn ends, so no stretch of the turn has edits landing in

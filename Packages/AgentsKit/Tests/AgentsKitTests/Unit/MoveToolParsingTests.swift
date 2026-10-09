@@ -63,7 +63,7 @@ struct MoveToolParsingTests {
         for key in ["worktree", "leave_worktree", "discard_changes"] {
             #expect(move?["inputSchema"]?["properties"]?[key] != nil, "\(key)")
         }
-        let finish = listed.first { $0["name"]?.stringValue == AppTool.finishTurn }
+        let finish = listed.first { $0["name"]?.stringValue == AppTool.showFile }
         #expect(finish?["inputSchema"]?["properties"]?["worktree"] == nil)
     }
 
@@ -71,7 +71,7 @@ struct MoveToolParsingTests {
     @Test func noMoveIsOfferedWhenTheRuntimeCannotMove() {
         let listed = AppService.tools(managesAgents: true, movesItself: false)
         #expect(!listed.contains { $0["name"]?.stringValue == AppTool.moveWorktree })
-        #expect(listed.contains { $0["name"]?.stringValue == AppTool.finishTurn })
+        #expect(listed.contains { $0["name"]?.stringValue == AppTool.showFile })
     }
 
     /// No argument at all is the agent taking its move back (#481).

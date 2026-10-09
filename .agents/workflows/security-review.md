@@ -146,10 +146,10 @@ Only **critical** and **high** findings are fixed; medium and low stay recorded.
   > security-fix agent for <id> recommends… Alex, which…?", never a bare "I" or "you".
   > If you start helpers of your own, archive each with archive_agent when its work is
   > done, and never delete its worktree.
-  > End with finish_turn naming the branch, the commits and what you proved, or why you
+  > End with a last message naming the branch, the commits and what you proved, or why you
   > could not.
 
-- Then end your turn with finish_turn `blocked`, `waiting_on` the helpers you started.
+- Then call `wait_for_event` with `agents` naming the helpers you started.
   You will be started again when they have all finished.
 
 ## 5. Report
@@ -165,6 +165,5 @@ When the helpers are done (or if none were started):
    worktree it made once everything in it is committed; the unmerged branch stays.)
 4. End with one line per finding:
    `<id> <severity> <title> — fixed on <branch> | needs a decision: … | won't fix: … | recorded`,
-   then finish_turn: `done` if every critical and high finding is fixed or there were
-   none, `partly_done` if any needs a decision, naming the review file
-   `.agents/reviews/security/<date>.md` on branch `agents/reviews-security`.
+   then the review file `.agents/reviews/security/<date>.md` on branch `agents/reviews-security`.
+   If any finding needs a decision, ask Alex with your question tool.
