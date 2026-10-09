@@ -39,12 +39,17 @@ public final class SidebarFolds {
         /// The pinned sessions (#180).
         case pinned
         case workflows
+        /// A project's flat list of sessions (#495), the rows' fold in their ids.
+        case sessions
+        /// One of the smart rows at the sidebar's top (#495), across every project.
+        case smart(SidebarSmartRow)
 
         /// A project and the Archived folds start folded; the rest start open.
         public var startsOpen: Bool {
             switch self {
             case .project, .archivedSessions, .archivedWorkflows: false
-            case .group, .pinned, .workflows: true
+            case .group, .pinned, .workflows, .sessions: true
+            case .smart(let row): row.startsOpen
             }
         }
 
@@ -56,6 +61,8 @@ public final class SidebarFolds {
             case .group(let group): "group.\(group.rawValue)"
             case .pinned: "pinned"
             case .workflows: "workflows"
+            case .sessions: "sessions"
+            case .smart(let row): "smart.\(row.rawValue)"
             }
         }
     }
@@ -68,6 +75,25 @@ public final class SidebarFolds {
     public func set(_ project: ProjectKey, _ fold: Fold = .project, open isOpen: Bool) {
         let name = Self.name(project, fold)
         if fold.startsOpen {
+            guard closed.contains(name) == isOpen else { return }
+            if isOpen { closed.remove(name) } else { closed.insert(name) }
+            defaults.set(closed.sorted(), forKey: closedKey)
+        } else {
+            guard open.contains(name) != isOpen else { return }
+            if isOpen { open.insert(name) } else { open.remove(name) }
+            defaults.set(open.sorted(), forKey: key)
+        }
+    }
+
+    /// Whether one of the smart rows (#495) is open: not a project's, so kept by name alone.
+    public func isOpen(_ row: SidebarSmartRow) -> Bool {
+        let name = Fold.smart(row).name
+        return row.startsOpen ? !closed.contains(name) : open.contains(name)
+    }
+
+    public func set(_ row: SidebarSmartRow, open isOpen: Bool) {
+        let name = Fold.smart(row).name
+        if row.startsOpen {
             guard closed.contains(name) == isOpen else { return }
             if isOpen { closed.remove(name) } else { closed.insert(name) }
             defaults.set(closed.sorted(), forKey: closedKey)

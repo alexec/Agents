@@ -225,4 +225,67 @@ struct SidebarModelTests {
         let walk = SidebarFolds(defaults: defaults, scope: ".walk:w1")
         #expect(!walk.isOpen(key), "another scope's folds are its own")
     }
+
+    private func started(_ folder: URL, _ state: AgentState, _ title: String, at offset: Double,
+                         unread: Bool = false) -> Agent {
+        var made = Agent(runtimeID: "claude", cwd: folder, title: title, state: state,
+                         createdAt: t0.addingTimeInterval(offset), lastActivityAt: t0.addingTimeInterval(offset),
+                         isUnread: unread)
+        if state == .finished { made.endedReason = .endTurn }
+        return made
+    }
+
+    /// A project folds open straight onto its sessions (#495): every live one, the pinned
+    /// left out, newest started first, whatever its state.
+    @Test func aProjectsSessionsAreOneListNewestStartedFirst() {
+        let model = AgentsModel()
+        let asking = started(api, .waitingOnUser, "asking", at: 1)
+        let working = started(api, .running, "working", at: 3)
+        let done = started(api, .finished, "done", at: 2)
+        let pinned = started(api, .finished, "pinned", at: 4)
+        let gone = started(api, .archived, "gone", at: 5)
+        model.replaceAgents([asking, working, done, pinned, gone])
+        model.replacePins([ProjectPins(folder: api, pins: [], sessions: [pinned.id])])
+
+        let fold = SidebarProjectFold(key, label: "api", in: model, isOpen: true)
+        #expect(fold.sessions.map(\.id) == [working.id, done.id, asking.id])
+        #expect(fold.pinned.map(\.id) == [pinned.id])
+        #expect(SidebarProjectFold(key, label: "api", in: model, isOpen: false).sessions.isEmpty)
+    }
+
+    /// The smart rows gather across every project (#495), by what each session wants.
+    @Test func smartRowsGatherAcrossProjects() {
+        let model = AgentsModel()
+        let askingAPI = started(api, .waitingOnUser, "asking api", at: 1)
+        let askingWeb = started(web, .waitingOnUser, "asking web", at: 2)
+        let working = started(web, .running, "working", at: 3)
+        let unread = started(api, .finished, "unread", at: 4, unread: true)
+        let read = started(api, .finished, "read", at: 5)
+        model.replaceAgents([askingAPI, askingWeb, working, unread, read])
+        let projects = [key, ProjectKey(host: .mac, folder: web)]
+
+        #expect(SidebarSmartRow.needsYou.count(in: model, projects: projects) == 2)
+        #expect(SidebarSmartRow.needsYou.agents(in: model, projects: projects).map(\.id) == [askingWeb.id, askingAPI.id])
+        #expect(SidebarSmartRow.working.agents(in: model, projects: projects).map(\.id) == [working.id])
+        #expect(SidebarSmartRow.unread.agents(in: model, projects: projects).map(\.id) == [unread.id])
+        #expect(SidebarSmartRow.needsYou.agents(in: model, projects: projects, query: "web").map(\.id) == [askingWeb.id])
+    }
+
+    /// Pinned gathers every project's pinned sessions in pin order, never an archived one
+    /// (#495), and they are not among their project's own sessions.
+    @Test func pinnedGathersEveryProjectsPinsInTheirOrder() {
+        let model = AgentsModel()
+        let first = started(api, .finished, "first", at: 1)
+        let second = started(api, .running, "second", at: 2)
+        let other = started(web, .finished, "other", at: 3)
+        let gone = started(web, .archived, "gone", at: 4)
+        model.replaceAgents([first, second, other, gone])
+        model.replacePins([ProjectPins(folder: api, pins: [], sessions: [second.id, first.id]),
+                           ProjectPins(folder: web, pins: [], sessions: [gone.id, other.id])])
+        let projects = [key, ProjectKey(host: .mac, folder: web)]
+
+        #expect(SidebarSmartRow.pinned.agents(in: model, projects: projects).map(\.id) == [second.id, first.id, other.id])
+        #expect(SidebarSmartRow.pinned.count(in: model, projects: projects) == 3)
+        #expect(SidebarProjectFold(key, label: "api", in: model, isOpen: true).sessions.isEmpty)
+    }
 }

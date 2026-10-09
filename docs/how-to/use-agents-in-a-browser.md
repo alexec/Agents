@@ -32,7 +32,7 @@ serving it at a public address (issue #61).
    pairs that browser in the same step: there is nothing to copy or paste.
 
    The page lists the projects on every host. With none yet, it says **No projects yet**, with
-   **Add Folder…** and **Clone Git URL…** beside it. Its footer names the browser, as
+   **Add Project…** and **Clone Project from Git URL…** beside it. Its footer names the browser, as
    **Chrome on this Mac**. The window lists it under **Clients** as
    **Chrome on** followed by this Mac's name.
 
@@ -67,8 +67,8 @@ iPhone and iPad do, on every host:
   change the mode, model or runtime;
 - start a chat with **New Chat** at the top of the **+** menu, in the host's **chat**
   project (see [Chat without a project](chat-without-a-project.md));
-- add a project with **+** at the head of the projects column: **Add Folder…** chooses a
-  folder on the host by typing a path or clicking into folders, and **Clone Git URL…** clones
+- add a project with **+** at the head of the projects column: **Add Project…** chooses a
+  folder on the host by typing a path or clicking into folders, and **Clone Project from Git URL…** clones
   an HTTPS or SSH address into the host's home folder. With more than one host, the menu
   names each one;
 - start an agent in the project folder or in a new or existing worktree;
@@ -81,7 +81,7 @@ iPhone and iPad do, on every host:
 The tab's title counts the sessions that need you, as **(2) Agents**.
 
 Settings, signing runtimes in, pairing and hosts have no screens on the page yet, so do them
-in the window. A folder can't be dragged in from Finder, and **Clone Git URL…** doesn't fill
+in the window. A folder can't be dragged in from Finder, and **Clone Project from Git URL…** doesn't fill
 in a copied address, because the page doesn't read the clipboard. The page has no terminal and no dictation.
 
 ### Forget the browser

@@ -65,6 +65,15 @@ struct WorkflowPage: View {
             }
         }
         .navigationTitle(summary?.workflow.name ?? "Workflow")
+        // What you do to a workflow, in the window's toolbar (Alex, #495), as a chat's
+        // are, rather than on the page's title line.
+        .toolbar {
+            if let summary {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    actions(summary)
+                }
+            }
+        }
         // Only once it has actually gone, and not while the list is still being loaded
         // — going back during the first draw would take the reader out of a page they
         // had only just opened.
@@ -157,78 +166,83 @@ struct WorkflowPage: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-            }
-            Spacer(minLength: 0)
-            VStack(alignment: .trailing, spacing: 4) {
-                actions(summary)
-                // They write the workflow's file (#125), so say so where they are.
+                // The toolbar's switches write the workflow's file (#125), so say so.
                 Text(summary.switchesSentence)
                     .appText(.fine)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.trailing)
-                    .frame(maxWidth: 260, alignment: .trailing)
+                    .foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.top, 6)
+            Spacer(minLength: 0)
         }
     }
 
-    /// Run it, and put it away or bring it back — on the title line, where the same
-    /// two are on a chat. Words rather than the row's icon: there is one of each here.
+    /// Run it, turn it off or on, pin it, and put it away or bring it back: the window
+    /// toolbar's (Alex, #495), each a labelled button, as Mail's toolbar has them.
+    @ViewBuilder
     private func actions(_ summary: WorkflowSummary) -> some View {
-        HStack(spacing: 8) {
+        Group {
             if summary.isArchived {
-                Button("Bring Back") { Task { await model.setWorkflowArchived(summary, false) } }
-                    .buttonStyle(.paperProminent)
+                Button {
+                    Task { await model.setWorkflowArchived(summary, false) }
+                } label: {
+                    Label("Bring Back", systemImage: "tray.and.arrow.up")
+                }
+                .help("Take this workflow out of the archive. Takes archived: true out of its file")
             } else {
                 if summary.isUnapproved {
                     // This page is where the file is read, so this is where approving it
-                    // means most. Run now comes back once it is approved. One waiting its
+                    // means most. Run Now comes back once it is approved. One waiting its
                     // turn behind three others has none yet (#132); the page says why.
                     if summary.canBeApproved {
-                        Button("Approve") { Task { await model.approveWorkflow(summary) } }
-                            .buttonStyle(.paperProminent)
-                            .help("Let this workflow run as its file now reads")
+                        Button {
+                            Task { await model.approveWorkflow(summary) }
+                        } label: {
+                            Label("Approve", systemImage: "checkmark.seal")
+                        }
+                        .help("Let this workflow run as its file now reads")
                     }
                     // The third answer (#391): not on this host, with nothing written
                     // into the file, so every other host still sees it waiting.
                     if summary.canBeDenied {
-                        Button("Deny on This Host") { Task { await model.denyWorkflow(summary) } }
-                            .buttonStyle(.paper)
-                            .help("Don't run it on this host. Other hosts still see it waiting; Approve takes this back")
+                        Button {
+                            Task { await model.denyWorkflow(summary) }
+                        } label: {
+                            Label("Deny on This Host", systemImage: "hand.raised.slash")
+                        }
+                        .help("Don't run it on this host. Other hosts still see it waiting; Approve takes this back")
                     }
                 } else {
                     // Offered even on a workflow that cannot fire on its own. Being able to
                     // try one is what makes writing one worth doing, and a refusal says why
                     // rather than nothing happening.
-                    Button(summary.isRunning ? "Running…" : "Run now") {
+                    Button {
                         Task { await model.runWorkflow(summary) }
+                    } label: {
+                        Label(summary.isRunning ? "Running…" : "Run Now", systemImage: "play")
                     }
-                    .buttonStyle(.paperProminent)
                     .disabled(summary.isRunning)
+                    .help(summary.isRunning ? "Running" : "Run this workflow now")
                 }
-                // Beside Run now, which still works with it off (#100): off stops the
+                // Beside Run Now, which still works with it off (#100): off stops the
                 // triggers, not the person.
-                Toggle("Enabled", isOn: Binding(
-                    get: { summary.isEnabled },
-                    set: { on in Task { await model.setWorkflowEnabled(summary, on) } }))
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .appText(.fine)
-                    .help(summary.isEnabled
-                          ? "Turn this workflow off: its triggers stop, and it stays on the list. Writes enabled: false into its file"
-                          : "Turn this workflow back on. Takes enabled: false out of its file")
-                    .accessibilityLabel("Enabled")
-                // Pinned to the top of its project in the sidebar (#432), as a session can be.
+                Button {
+                    Task { await model.setWorkflowEnabled(summary, !summary.isEnabled) }
+                } label: {
+                    Label(summary.isEnabled ? "Turn Off" : "Turn On",
+                          systemImage: summary.isEnabled ? "pause.circle" : "play.circle")
+                }
+                .help(summary.isEnabled
+                      ? "Turn this workflow off: its triggers stop, and it stays on the list. Writes enabled: false into its file"
+                      : "Turn this workflow back on. Takes enabled: false out of its file")
+                // Pinned at the top of the sidebar (#432, #495), as a session can be.
                 let pinned = model.isPinned(summary)
                 Button {
                     Task { await model.setPinned(summary, !pinned, on: model.selectedProjectHost) }
                 } label: {
                     Label(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin")
                 }
-                .buttonStyle(.paper)
                 .help(pinned ? "Take this workflow out of Pinned in the sidebar"
-                             : "Keep this workflow in Pinned, at the top of its project in the sidebar")
+                             : "Keep this workflow in Pinned, at the top of the sidebar")
                 // One click, and back to the project: the same thing the archive
                 // button on a chat does, so putting a thing away is one gesture
                 // wherever it is.
@@ -240,10 +254,10 @@ struct WorkflowPage: View {
                 } label: {
                     Label("Archive", systemImage: "archivebox")
                 }
-                .buttonStyle(.paper)
                 .help("Archive this workflow and go back to the project. Writes archived: true into its file")
             }
         }
+        .labelStyle(.titleAndIcon)
     }
 
     /// What the file could not say, and the file itself.

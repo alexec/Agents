@@ -161,7 +161,7 @@ struct Waiting: View {
                 TextField("Folder path, such as ~/src/project", text: $folder)
                     .textInputAutocapitalization(.never).autocorrectionDisabled()
                     .textFieldStyle(.roundedBorder)
-                Button("Add Folder…") {
+                Button("Add Project…") {
                     adding = true
                     Task { problem = await model.addProject(folder: folder); adding = false }
                 }
@@ -169,7 +169,7 @@ struct Waiting: View {
                 TextField("HTTPS or SSH Git URL", text: $gitURL)
                     .textInputAutocapitalization(.never).autocorrectionDisabled()
                     .textFieldStyle(.roundedBorder)
-                Button("Clone Git URL…") {
+                Button("Clone Project from Git URL…") {
                     adding = true
                     Task { problem = await model.cloneProject(url: gitURL); adding = false }
                 }

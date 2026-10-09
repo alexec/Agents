@@ -14,6 +14,9 @@ struct ProjectRow: View {
     var label: String? = nil
     /// Folded, the row says what is under it; unfolded, the rows under it say that.
     var isFolded = true
+    /// Drawn as its group's heading in the sidebar (#495): the name in grey, as a group's
+    /// heading is, so the sessions under it read first.
+    var asHeading = false
     /// What a click does: the fold opens or closes, and nothing else (#375), as the
     /// Remote's row and the web's do. A session starts from the fold's New session row.
     var onClick: () -> Void = {}
@@ -26,16 +29,16 @@ struct ProjectRow: View {
                     if summary.isChat == true {
                         Image(systemName: "bubble.left.and.bubble.right")
                             .imageScale(.small)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.accent)
                             .accessibilityHidden(true)
                     }
                     Text(label ?? summary.name)
                         .lineLimit(1)
-                        .foregroundStyle(summary.exists ? .primary : .secondary)
+                        .foregroundStyle(summary.exists && !asHeading ? .primary : .secondary)
                     if summary.project.isPinned {
                         Image(systemName: "pin.fill")
                             .imageScale(.small)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.accent)
                             .accessibilityHidden(true)
                     }
                 }
@@ -58,6 +61,8 @@ struct ProjectRow: View {
                     .accessibilityHidden(true)
             }
         }
+        // As a group's heading, its dot over the rows' counts and times (#495).
+        .padding(.trailing, asHeading ? SidebarHeading.trailingInset : 0)
         .contentShape(Rectangle())
         // Clicking a project folds or unfolds it (#375); the detail stays as it was.
         // `simultaneousGesture` sits alongside the list's own handling rather than

@@ -11,8 +11,10 @@ import SwiftUI
 @MainActor
 @Observable
 final class WindowRequests {
-    enum ProjectSheet {
-        case chooseFolder, clone, addServer
+    enum ProjectSheet: Equatable {
+        /// A folder, or a clone, on this Mac or on a server (#495: the File menu is the
+        /// one way in now the sidebar's New project menu has gone).
+        case chooseFolder(HostID = .mac), clone(HostID = .mac), addServer
     }
 
     /// Set by a menu item, taken (and cleared) by `ProjectListView`, which owns the sheets.
@@ -82,10 +84,25 @@ struct AgentsCommands: Commands {
                 }
             }
             Divider()
-            Button("Add Folder…") { requests.projectSheet = .chooseFolder }
+            Button("Add Project…") { requests.projectSheet = .chooseFolder() }
                 .keyboardShortcut("o")
-            Button("Clone Git URL…") { requests.projectSheet = .clone }
+            Button("Clone Project from Git URL…") { requests.projectSheet = .clone() }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
+            // On a server (037), as New Chat On is.
+            if !model.hosts.servers.isEmpty {
+                Menu("Add Project On") {
+                    ForEach(model.hosts.servers, id: \.self) { host in
+                        Button(model.hosts.label(host)) { requests.projectSheet = .chooseFolder(host) }
+                            .disabled(model.hostUnreachable(host))
+                    }
+                }
+                Menu("Clone Project On") {
+                    ForEach(model.hosts.servers, id: \.self) { host in
+                        Button(model.hosts.label(host)) { requests.projectSheet = .clone(host) }
+                            .disabled(model.hostUnreachable(host))
+                    }
+                }
+            }
             Button("Add Server…") { requests.projectSheet = .addServer }
                 .keyboardShortcut("o", modifiers: [.command, .control])
             Divider()

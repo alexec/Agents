@@ -118,6 +118,9 @@ struct ContentView: View {
             // No files pane and no sidebar toggle: a workflow has no agent to have
             // asked about a file, so there would be nothing for either to show.
             WorkflowPage(workflowID: id).paperGround()
+        } else if let page = model.projectPage, let key = model.selectedProjectKey {
+            // A project's workflows or its archive, from its row in the sidebar (#495).
+            ProjectWorkPage(page: page, project: key).paperGround()
         } else if let path = model.openPin, let key = model.selectedProjectKey, let summary = model.selectedProjectSummary {
             // One of the project's pinned pages (#159), live, where the chat would be; or a
             // pinned view (#189), fed afresh.

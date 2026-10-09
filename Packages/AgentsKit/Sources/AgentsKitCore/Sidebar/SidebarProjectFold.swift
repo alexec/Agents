@@ -35,6 +35,11 @@ public struct SidebarProjectFold {
     public private(set) var pinnedWorkflows: [WorkflowSummary] = []
     /// The live groups with something in them, in `AgentGroup.live`'s order.
     public private(set) var groups: [Group] = []
+    /// The live sessions, the pinned left out, as one list newest started first (#495):
+    /// no heading per state, the state is the row's mark. By when they started, not by
+    /// their last activity, so a working session does not climb past the pointer with
+    /// every line it writes (as projects stopped doing, #357).
+    public private(set) var sessions: [Agent] = []
     /// The archived sessions held, newest first: a page while the fold is open (#165).
     public private(set) var archived: [Agent] = []
     /// Whether the project has a session that is not archived, search or not.
@@ -136,6 +141,7 @@ public struct SidebarProjectFold {
                 groups.append(Group(group: group, heading: heading))
             }
         }
+        sessions = groups.flatMap(\.agents).sorted { $0.createdAt > $1.createdAt }
         let archived = shelf.groups[.archived] ?? []
         self.archived = matcher.map { archived.filter($0.matches) } ?? archived
     }

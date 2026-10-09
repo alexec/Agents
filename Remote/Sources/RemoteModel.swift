@@ -548,6 +548,13 @@ final class RemoteModel {
                 openPin = path
             case .spending, .resources, .events, .runtimes:
                 openActivity = newValue
+            case .archive(let key):
+                // The Mac's archive page (#495); the Remote's sidebar has no rows for
+                // them yet, so the project it is in is as far as one goes.
+                selectedProject = key.folder
+                selection = nil
+                openPin = nil
+                openWorkflow = nil
             }
         }
     }

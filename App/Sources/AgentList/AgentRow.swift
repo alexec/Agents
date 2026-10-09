@@ -13,10 +13,14 @@ struct AgentRow: View {
     /// A row of the Mac's sessions list rather than a card on a page: a list-sized
     /// title and one line of what it said, so a column of them reads at a glance.
     private let isCompact: Bool
+    /// Which project it is in, after the title: under a smart row of the sidebar (#495),
+    /// which gathers sessions from every project, and nowhere else.
+    private let place: String?
 
-    init(agent: Agent, isCompact: Bool = false) {
+    init(agent: Agent, isCompact: Bool = false, place: String? = nil) {
         given = agent
         self.isCompact = isCompact
+        self.place = place
     }
 
     /// The agent as the window has it now, read from the model rather than kept.
@@ -56,7 +60,11 @@ struct AgentRow: View {
 
     @ViewBuilder
     private var rowContent: some View {
-        HStack(alignment: .top, spacing: 12) {
+        // In the sidebar, the icon column every row there has (#495): 16 wide, 6 to the title.
+        HStack(alignment: .top, spacing: isCompact ? 6 : 12) {
+            if isCompact, let mark = SessionMark(agent: agent, group: model.work.group(of: agent)) {
+                mark.padding(.top, 1)
+            } else {
             StatusIcon(state: agent.state, isComingBack: isComingBack,
                        outcome: agent.report?.outcome,
                        isWaiting: agent.isWaiting,
@@ -65,7 +73,9 @@ struct AgentRow: View {
                        endedReason: agent.endedReason,
                        isUnread: agent.isUnread,
                        isParked: agent.parking?.isParked == true)
+                .frame(width: isCompact ? 16 : nil)
                 .padding(.top, 1)
+            }
 
             VStack(alignment: .leading, spacing: isCompact ? 4 : 3) {
                 HStack(spacing: 5) {
@@ -73,14 +83,23 @@ struct AgentRow: View {
                     // dot and a heavier title, both gone once it is opened, and the row
                     // where it was. Said as the title's value, not as a label over the
                     // row, which would stack on the Text's own (one element per row).
-                    if agent.showsUnread {
+                    // In the sidebar the mark says unread (#495); the dot is the page's.
+                    if agent.showsUnread, !isCompact {
                         UnreadDot()
                     }
                     Text(agent.title ?? "Untitled")
                         .appText(isCompact ? .supporting : .reading)
                         .fontWeight(agent.showsUnread ? .semibold : .regular)
+                        .foregroundStyle(.primary)
                         .lineLimit(1)
                         .accessibilityValue(agent.showsUnread ? "unread" : "")
+                    if let place {
+                        Text(place)
+                            .appText(.fine)
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                            .layoutPriority(-1)
+                    }
                     // Started by a workflow rather than a person: the one thing about
                     // an agent's origin worth a mark, because it is the difference
                     // between something you asked for and something that ran itself.
@@ -131,9 +150,11 @@ struct AgentRow: View {
                         .foregroundStyle(.secondary)
                         .help(agent.folderGoneMessage)
                 } else if let report = agent.report?.message {
+                    // In the sidebar, white as the title is (#495): what it said is
+                    // what the row is for.
                     Text(report)
                         .appText(isCompact ? .fine : .supporting)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(isCompact ? .primary : .secondary)
                         .lineLimit(isCompact ? 1 : 2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -282,6 +303,50 @@ struct AgentRow: View {
 /// needs a person. The finer distinctions — which outcome, why it stopped, whether
 /// anyone vouched for the ending — are still said, in the tooltip and to a screen
 /// reader, rather than drawn.
+/// A session's mark in the sidebar (Alex, #495): what it wants, in four shapes — an
+/// orange hand when it needs the person, a spinner while it works, two rings when it
+/// finished unread, an empty ring once read. Any other state keeps its `StatusIcon`.
+private struct SessionMark: View {
+    private enum Kind { case needsYou, working, unread, read }
+    private let kind: Kind
+
+    init?(agent: Agent, group: AgentGroup) {
+        switch group {
+        case .needsAttention, .blocked: kind = .needsYou
+        case .running: kind = .working
+        case .finished: kind = agent.showsUnread ? .unread : .read
+        default: return nil
+        }
+    }
+
+    var body: some View {
+        Group {
+            switch kind {
+            case .needsYou:
+                Image(systemName: "hand.raised.fill").foregroundStyle(.orange)
+            case .working:
+                ProgressView().controlSize(.mini)
+            case .unread:
+                Image(systemName: "circle.inset.filled").foregroundStyle(Paper.accent)
+            case .read:
+                Image(systemName: "circle").foregroundStyle(Paper.accent)
+            }
+        }
+        .frame(width: 16, height: 16)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+    }
+
+    private var label: String {
+        switch kind {
+        case .needsYou: "Needs you"
+        case .working: "Working"
+        case .unread: "Unread"
+        case .read: "Done"
+        }
+    }
+}
+
 struct StatusIcon: View {
     let state: AgentState
     /// The daemon is bringing this chat back by itself after a restart.
