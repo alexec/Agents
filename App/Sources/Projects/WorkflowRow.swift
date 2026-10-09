@@ -256,11 +256,14 @@ struct WorkflowRow: View {
 /// follows, and the reason it holds here is that most refusals resolve themselves.
 struct WorkflowStatusIcon: View {
     let summary: WorkflowSummary
+    /// In the accent rather than grey when it wants nobody: the sidebar's (#495).
+    var accented = false
 
     var body: some View {
         Image(systemName: name)
             .appText(.reading)
-            .foregroundStyle((summary.needsAPerson ? StateTint.attention : .none).style(or: .secondary))
+            .foregroundStyle(summary.needsAPerson ? StateTint.attention.style(or: .secondary)
+                             : accented ? AnyShapeStyle(Paper.accent) : AnyShapeStyle(.secondary))
             .accessibilityLabel(label)
     }
 

@@ -303,6 +303,7 @@ lists, adapted to touch and width.
 - A workflow's row is its title only. Read sessions are an empty circle.
 - The workflow toolbar is labelled buttons (icon and title): Run Now, Turn Off / Turn On, Pin, Archive; Approve and Deny on This Host while it waits; Bring Back when archived.
 - Events, Resources, Runtimes and Cost come back into the sidebar as an **Activity** group, after the smart rows, folding like a project's group, each with an icon in the accent. The sidebar's toolbar has none of them. (This replaces the toolbar answer in the Clarifications above.)
+- Activity goes above the smart groups (New Session stays first), and every icon in the sidebar is in the accent, but for the orange hand of Needs You.
 
 ## Assumptions
 

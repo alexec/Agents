@@ -131,7 +131,7 @@ struct WorkflowListRow: View {
 
     var body: some View {
         WorkRow(summary.workflow.name) {
-            WorkflowStatusIcon(summary: summary)
+            WorkflowStatusIcon(summary: summary, accented: true)
                 .appText(.fine)
         } detail: {
             // The title only (Alex, #495): what it does is the tooltip and the page's.

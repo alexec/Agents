@@ -327,7 +327,7 @@ private struct SessionMark: View {
             case .unread:
                 Image(systemName: "circle.inset.filled").foregroundStyle(Paper.accent)
             case .read:
-                Image(systemName: "circle").foregroundStyle(.secondary)
+                Image(systemName: "circle").foregroundStyle(Paper.accent)
             }
         }
         .frame(width: 16, height: 16)

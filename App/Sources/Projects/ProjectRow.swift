@@ -29,7 +29,7 @@ struct ProjectRow: View {
                     if summary.isChat == true {
                         Image(systemName: "bubble.left.and.bubble.right")
                             .imageScale(.small)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.accent)
                             .accessibilityHidden(true)
                     }
                     Text(label ?? summary.name)
@@ -38,7 +38,7 @@ struct ProjectRow: View {
                     if summary.project.isPinned {
                         Image(systemName: "pin.fill")
                             .imageScale(.small)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.accent)
                             .accessibilityHidden(true)
                     }
                 }

@@ -56,12 +56,10 @@ struct ProjectListView: View {
                 // One way to start a session (#495), in the project last started in; the
                 // page it opens can switch project.
                 NewSessionTopRow()
-                ForEach(SidebarSmartRow.allCases, id: \.self) { row in
-                    SmartFold(row: row, projects: orderedProjects.map(\.key), folds: folds, query: searched)
-                }
             }
 
-            // The pages about all the work, a group like a project's (Alex, #495): rows of
+            // The pages about all the work, a group like a project's, above the smart
+            // groups (Alex, #495): rows of
             // the list, so they take its selection and keys, each with its icon in the
             // accent beside the plain title (#155), and folding as a project does.
             Section(isExpanded: $showsActivity) {
@@ -75,6 +73,12 @@ struct ProjectListView: View {
                     .appText(.supporting).sidebarInk(.spending).tag(SidebarItem.spending)
             } header: {
                 Text("Activity")
+            }
+
+            Section {
+                ForEach(SidebarSmartRow.allCases, id: \.self) { row in
+                    SmartFold(row: row, projects: orderedProjects.map(\.key), folds: folds, query: searched)
+                }
             }
 
             // One group per project (#495), its name the group's heading, its sessions the
@@ -407,7 +411,7 @@ private struct NewSessionTopRow: View {
         let project = model.newSessionProject
         HStack(spacing: 6) {
             Image(systemName: "square.and.pencil")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Paper.accent)
                 .frame(width: 16)
                 .accessibilityHidden(true)
             Text("New Session")

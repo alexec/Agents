@@ -35,7 +35,7 @@ private struct PinnedPageRow: View {
             // Plain text beside a plain image, not a Label: a sidebar draws a Label's
             // title in its own style, and the row must read as the sessions do (#155).
             Image(systemName: pin.kind == .view ? "square.grid.2x2" : pin.kind == .html ? "globe" : "doc.text")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Paper.accent)
                 .frame(width: 16)
                 .accessibilityHidden(true)
             Text(pin.title)

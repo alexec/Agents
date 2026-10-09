@@ -123,7 +123,7 @@ struct ProjectPageRow: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: systemImage)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Paper.accent)
                 .frame(width: 16)
                 .accessibilityHidden(true)
             Text(title)
