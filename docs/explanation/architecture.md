@@ -1,6 +1,6 @@
 ---
 diataxis: explanation
-description: The system around Agents, the containers it is made of, and which process starts which, as C4 diagrams.
+description: The system around Agents, its containers, the components of its host daemon, and which process starts which, as C4 diagrams.
 devices: [mac, iphone, ipad, server]
 ---
 
