@@ -48,6 +48,7 @@
 .with-sidebar .row.project .pick { display: flex; flex-direction: column; align-items: flex-start; min-width: 0;
   border: none; background: none; padding: 4px 0; text-align: left; font: inherit; color: inherit; }
 .with-sidebar .row.project .title { font-weight: 500; max-width: 100%; }
+.with-sidebar .row.project .project-pin { font-size: 10px; opacity: 0.55; filter: grayscale(1); }
 .with-sidebar .row.project .subtitle { font-size: 11.5px; }
 .with-sidebar .row.project .dot { grid-column: 3; grid-row: 1; }
 .with-sidebar .project-fold.greyed .row, .with-sidebar .project-fold.greyed .subhead { opacity: 0.55; }

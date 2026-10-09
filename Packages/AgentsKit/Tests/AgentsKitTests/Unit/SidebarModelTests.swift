@@ -162,6 +162,18 @@ struct SidebarModelTests {
         #expect(SidebarOrder.label(summary(api)) { _ in "?" } == "api")
     }
 
+    @Test func pinnedProjectsComeFirstFromEveryHost() {
+        func pinned(_ summary: DaemonAPI.ProjectSummary) -> DaemonAPI.ProjectSummary {
+            var summary = summary
+            summary.project.pinned = true
+            return summary
+        }
+        let listed = [summary(api), pinned(summary(api, host: devbox)), pinned(summary(web))]
+        let ordered = SidebarOrder.projects(listed, servers: [devbox])
+        #expect(ordered.map(\.key) == [ProjectKey(host: .mac, folder: web), ProjectKey(host: devbox, folder: api),
+                                       ProjectKey(host: .mac, folder: api)])
+    }
+
     @Test func projectsStayInTheOrderTheyWereAddedHoweverBusy() {
         let docs = URL(filePath: "/tmp/work/docs")
         func added(_ folder: URL, at offset: Double, active: Double = 0, host: HostID = .mac) -> DaemonAPI.ProjectSummary {

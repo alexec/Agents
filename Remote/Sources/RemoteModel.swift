@@ -2240,6 +2240,21 @@ final class RemoteModel {
         }
     }
 
+    /// A project pinned to the top of the sidebar, or not, through its own host.
+    func setPinned(_ pinned: Bool, for summary: DaemonAPI.ProjectSummary) async {
+        let host = summary.host
+        guard let target = host == .mac ? client : otherHosts[host] else { return }
+        do {
+            var changed = try await target.call(DaemonAPI.Method.projectsSetPinned,
+                                                DaemonAPI.SetPinnedRequest(folder: summary.folder, pinned: pinned),
+                                                returning: DaemonAPI.ProjectSummary.self)
+            changed.host = host
+            work.upsert(changed)
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
     /// Bring an archived project back (#343), through its own host, as the window's Bring
     /// Back does: a project again, with its new-session form open.
     func unarchiveProject(_ summary: DaemonAPI.ProjectSummary) async {

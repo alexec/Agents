@@ -617,6 +617,11 @@ private struct ProjectMenu: View {
         Button("Put Files in Drop Box…") { requests.dropboxProject = summary.key }
             .disabled(model.hostUnreachable(summary.host) || !summary.exists)
         Divider()
+        // To the top of the sidebar, above the projects that are not.
+        Button(summary.project.isPinned ? "Unpin" : "Pin") {
+            Task { await model.setPinned(!summary.project.isPinned, for: summary.key) }
+        }
+        .disabled(model.hostUnreachable(summary.host))
         Button("Archive") {
             Task { await model.archiveProject(summary.key) }
         }

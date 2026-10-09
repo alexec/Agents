@@ -53,16 +53,19 @@ export function byAdded(a: ProjectSummary, b: ProjectSummary): number {
 }
 
 /**
- * This Mac's projects, then each server's, each oldest added first, as the window's and the
- * Remote's (SidebarOrder.projects, #250, #357): no heading for a host.
+ * The pinned first, then the rest; each of the two this Mac's projects, then each server's, each
+ * oldest added first, as the window's and the Remote's (SidebarOrder.projects, #250, #357): no
+ * heading for a host.
  */
 export function orderedProjects(hosts: ControlHost[], projects: Record<string, ProjectSummary[]>):
   { host: ControlHost; project: ProjectSummary }[] {
   const ordered = [...hosts.filter((h) => h.id === "mac"), ...hosts.filter((h) => h.id !== "mac")];
-  return ordered.flatMap((host) => (projects[host.id] ?? [])
+  const byHost = ordered.flatMap((host) => (projects[host.id] ?? [])
     .filter((project) => project.project.archivedAt === undefined)
     .sort(byAdded)
     .map((project) => ({ host, project })));
+  return [...byHost.filter((r) => r.project.project.pinned === true),
+          ...byHost.filter((r) => r.project.project.pinned !== true)];
 }
 
 /** Every host's archived projects, the latest worked on first, as the window's Archived projects (#343). */
@@ -255,11 +258,16 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   const needs = view.needsYou;
   const subtitle = !project.exists ? "Folder is missing" : view.subtitle;
   const fold = (open: boolean) => folds.set(host.id, folder, open);
+  const projectPinned = project.project.pinned === true;
   const projectMenu: MenuItem[] = [
     { label: "New Session", disabled: down, help: "Start a new session in this project",
       run: () => go({ host: host.id, project: folder, compose: true }) },
     { label: "Put Files in Drop Box…", disabled: down, help: "Put files into this project's .agents/dropbox/ (#231)",
       run: () => putFilesInDropbox(host.id, folder, label) },
+    // To the top of the sidebar, as the window's Pin.
+    { label: projectPinned ? "Unpin" : "Pin", disabled: down,
+      help: projectPinned ? "Let this project take its place among the others" : "Keep this project at the top of the sidebar",
+      run: () => void store.setProjectPinned(host.id, folder, !projectPinned) },
   ];
   const row = (agent: Agent) => (
     <SidebarSession key={agent.id} store={store} host={host.id} folder={folder} agent={agent}
@@ -280,7 +288,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
           }}
           onContextMenu={(e) => openContextMenu(e, projectMenu)}
           onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, projectMenu); }}>
-          <span class="title">{label}</span>
+          <span class="title">{label}{projectPinned && <span class="project-pin" aria-label="pinned"> 📌</span>}</span>
           {/* Folded, the row says what is under it; unfolded, the rows under it say that. */}
           {(!unfolded || !project.exists) && subtitle && <span class="subtitle">{subtitle}</span>}
         </button>

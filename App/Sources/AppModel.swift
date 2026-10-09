@@ -1752,6 +1752,20 @@ final class AppModel {
         }
     }
 
+    /// A project pinned to the top of the sidebar, or not.
+    func setPinned(_ pinned: Bool, for key: ProjectKey) async {
+        do {
+            var summary = try await client(for: key.host).call(
+                DaemonAPI.Method.projectsSetPinned,
+                DaemonAPI.SetPinnedRequest(folder: key.folder, pinned: pinned),
+                returning: DaemonAPI.ProjectSummary.self)
+            summary.host = key.host
+            upsert(summary)
+        } catch {
+            problem = describe(error)
+        }
+    }
+
     /// The person's disk space lines for a project (#195), through the window only.
     func setDiskSpace(_ lines: DiskThresholds, for key: ProjectKey) async {
         do {
