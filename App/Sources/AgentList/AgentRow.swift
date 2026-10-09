@@ -303,7 +303,7 @@ struct AgentRow: View {
 /// reader, rather than drawn.
 /// A session's mark in the sidebar (Alex, #495): what it wants, in four shapes — an
 /// orange hand when it needs the person, a spinner while it works, two rings when it
-/// finished unread, a check once read. Any other state keeps its `StatusIcon`.
+/// finished unread, an empty ring once read. Any other state keeps its `StatusIcon`.
 private struct SessionMark: View {
     private enum Kind { case needsYou, working, unread, read }
     private let kind: Kind
@@ -327,7 +327,7 @@ private struct SessionMark: View {
             case .unread:
                 Image(systemName: "circle.inset.filled").foregroundStyle(Paper.accent)
             case .read:
-                Image(systemName: "checkmark.circle").foregroundStyle(.secondary)
+                Image(systemName: "circle").foregroundStyle(.secondary)
             }
         }
         .frame(width: 16, height: 16)
