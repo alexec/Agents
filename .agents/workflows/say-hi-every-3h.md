@@ -25,5 +25,6 @@ on:
       at: [":00"]
       between: "21:00-21:00"
 agent: new
+archived: true
 ---
 Say hi briefly.
