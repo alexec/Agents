@@ -184,8 +184,7 @@ public extension DaemonAPI {
         public enum Outcome: String, Codable, Sendable {
             /// It answered, and was installed: it joins by itself.
             case added
-            /// A host by that name is already on the control plane, or the server has
-            /// Agents installed already.
+            /// A host by that name is already on the control plane.
             case known
             /// Another host's `ProxyJump` or `ProxyCommand` goes through it.
             case bastion

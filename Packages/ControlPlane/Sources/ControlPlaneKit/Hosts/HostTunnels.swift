@@ -197,15 +197,27 @@ public actor HostTunnels {
         let errors = Pipe()
         process.standardError = errors
         let heard = SessionLines(up: up)
-        errors.fileHandleForReading.readabilityHandler = { handle in
-            let data = handle.availableData
-            if data.isEmpty { handle.readabilityHandler = nil } else { heard.take(data) }
-        }
         return await withTaskCancellationHandler {
             await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
-                process.terminationHandler = { _ in
+                // ssh can exit before its last words are read: the session ends when it has
+                // exited and its standard error is closed, or a moment after it exits if a
+                // child of its own still holds that open.
+                let ending = SessionEnding { problem in
                     errors.fileHandleForReading.readabilityHandler = nil
-                    continuation.resume(returning: heard.problem ?? "the ssh session ended")
+                    continuation.resume(returning: problem ?? heard.problem ?? "the ssh session ended")
+                }
+                errors.fileHandleForReading.readabilityHandler = { handle in
+                    let data = handle.availableData
+                    if data.isEmpty {
+                        handle.readabilityHandler = nil
+                        ending.closed()
+                    } else {
+                        heard.take(data)
+                    }
+                }
+                process.terminationHandler = { _ in
+                    ending.exited()
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 1) { ending.end() }
                 }
                 do {
                     try process.run()
@@ -213,11 +225,34 @@ public actor HostTunnels {
                     if Task.isCancelled { process.terminate() }
                 } catch {
                     process.terminationHandler = nil
-                    continuation.resume(returning: "ssh could not be started: \(error.localizedDescription)")
+                    ending.end("ssh could not be started: \(error.localizedDescription)")
                 }
             }
         } onCancel: {
             if process.isRunning { process.terminate() }
+        }
+    }
+
+    /// The end of one session: once ssh has exited and its standard error is closed, or
+    /// when told to end outright. Ends once.
+    final class SessionEnding: @unchecked Sendable {
+        private let lock = NSLock()
+        private var hasExited = false
+        private var isClosed = false
+        private var hasEnded = false
+        private let finish: (String?) -> Void
+
+        init(_ finish: @escaping (String?) -> Void) { self.finish = finish }
+
+        func exited() { if lock.withLock({ hasExited = true; return isClosed }) { end() } }
+        func closed() { if lock.withLock({ isClosed = true; return hasExited }) { end() } }
+
+        func end(_ problem: String? = nil) {
+            let first = lock.withLock { () -> Bool in
+                defer { hasEnded = true }
+                return !hasEnded
+            }
+            if first { finish(problem) }
         }
     }
 

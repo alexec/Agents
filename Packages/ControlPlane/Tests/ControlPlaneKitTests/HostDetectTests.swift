@@ -89,9 +89,10 @@ struct HostDetectTests {
 
         let results = await detect.run()
         #expect(results.map(\.alias) == ["devbox", "bastion", "gpu", "down", "mine", "had"])
-        #expect(results.map(\.outcome) == [.added, .bastion, .failed, .unreachable, .known, .known])
+        #expect(results.map(\.outcome) == [.added, .bastion, .failed, .unreachable, .known, .added])
         #expect(results.first { $0.alias == "gpu" }?.detail == "no host for that system")
-        #expect(installed.value == ["devbox"])
+        // Agents installed there already is not this control plane's host yet (#485).
+        #expect(Set(installed.value) == ["devbox", "had"])
         // The bastion answers, and is never probed nor added; a known host is left alone.
         #expect(Set(probed.value) == ["devbox", "gpu", "down", "had"])
     }
