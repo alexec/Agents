@@ -110,6 +110,32 @@ struct DerivedEndingTests {
         #expect(try await asks(core, id) == 0)
     }
 
+    /// `finish_turn` takes the outcome alone: the line under the agent's name is its
+    /// own closing words, taken when the turn ends, and the outcome is what it said.
+    @Test func anOutcomeWithNoWordsTakesTheClosingWords() async throws {
+        let (locations, work) = try temporary()
+        let turn = TurnGate()
+        var script = Self.saying("Five of six are done. The last needs a key.")
+        script.gate = turn
+        let launcher = FakeLauncher(script: script)
+        let core = try core(launcher, locations: locations)
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
+
+        let token = await eventuallySome("the runtime was handed its token") {
+            let minted = MintedMCPToken.from(sessionParams: await launcher.lastAgent?.newSessionParams)
+            return minted.isEmpty ? nil : minted
+        } ?? ""
+        _ = try await core.finishTurn(.init(token: token, outcome: "partly_done", message: "", prompts: []))
+        #expect(await core.agent(id)?.report?.message == WorkOutcome.partlyDone.heading)
+        turn.open()
+        await settled(core, id, "the turn ended")
+
+        let agent = try #require(await core.agent(id))
+        #expect(agent.report?.outcome == .partlyDone)
+        #expect(agent.report?.message == "Five of six are done.")
+        #expect(try await asks(core, id) == 0)
+    }
+
     /// A turn that ended short keeps its own wording, and nothing is made up for it.
     @Test func aTurnThatEndedShortIsLeftToItsOwnWording() async throws {
         for stop in ["cancelled", "max_tokens", "refusal"] {

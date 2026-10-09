@@ -119,7 +119,8 @@ extension DaemonCore {
     /// earlier call in the same turn left.
     public func finishTurn(_ request: DaemonAPI.FinishTurnRequest) async throws -> String {
         let checked = try checkedReport(token: request.token, outcome: request.outcome,
-                                        message: request.message, waitingOn: request.waitingOn,
+                                        message: request.message, wordsOptional: true,
+                                        waitingOn: request.waitingOn,
                                         checkAgainInMinutes: request.checkAgainInMinutes,
                                         wakeOn: request.wakeOn)
         // Checked after the report's own refusals, so an agent that got the outcome
@@ -175,6 +176,12 @@ extension DaemonCore {
             agents[checked.agentID]?.pendingMove = nil
             await record(.runtimeNote("Move cancelled."), for: checked.agentID)
         }
+        // The last call is the whole account of the turn, words included.
+        if request.message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            unwordedReports.insert(checked.agentID)
+        } else {
+            unwordedReports.remove(checked.agentID)
+        }
         let noted = await land(checked.report, prompts: prompts,
                                afterwards: afterwards,
                                labels: labels,
@@ -203,6 +210,7 @@ extension DaemonCore {
     /// app is holding a form or a permission for the person would tell them the
     /// opposite of the truth, so the agent is sent back to its own question first.
     private func checkedReport(token: String, outcome rawOutcome: String, message: String,
+                               wordsOptional: Bool = false,
                                waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil,
                                wakeOn rawWakeOn: String? = nil)
         throws -> (agentID: UUID, agent: Agent, report: WorkReport) {
@@ -234,7 +242,11 @@ extension DaemonCore {
         guard !WorkReport.isTooLong(message) else {
             throw JSONRPCError(code: JSONRPCError.invalidParams, message: WorkReport.tooLong(outcome))
         }
-        guard var report = WorkReport(outcome: outcome, wire: message) else {
+        // No words, where the call need not give any, reads the outcome's heading until
+        // the turn ends and the agent's closing words take its place.
+        let wordless = wordsOptional && message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard var report = wordless ? WorkReport(outcome: outcome, message: outcome.heading, at: now())
+                : WorkReport(outcome: outcome, wire: message) else {
             throw JSONRPCError(code: JSONRPCError.invalidParams,
                                message: """
                                 Nothing was recorded: say in a sentence how it went. An \
@@ -316,8 +328,7 @@ extension DaemonCore {
         }
         return report.outcome.needsAPerson
             ? """
-                Noted. The person will see this conversation under "Needs attention", \
-                with your message on it.
+                Noted. The person will see this conversation under "Needs attention".
                 """ + droppedNote
             : "Noted. This conversation now reads as \"\(report.outcome.heading)\" wherever the person looks." + droppedNote
     }

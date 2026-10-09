@@ -560,6 +560,10 @@ public actor DaemonCore {
     /// account, kept on the row until this one gives its own, so a turn that ends still
     /// holding it has said nothing about itself.
     var reportBeforeTurn: [UUID: WorkReport] = [:]
+    /// Agents whose `finish_turn` this turn gave an outcome and no words. The row reads
+    /// the outcome's heading until the turn ends, when the agent's closing words replace
+    /// it. Not kept over a restart: the heading is a true line, just a plainer one.
+    var unwordedReports: Set<UUID> = []
     /// Runs whose turn ended done under a workflow's `when-done:` that archives them
     /// (#433), with the line their transcript gets. Set by `move` while the run is still
     /// in flight, and taken once the runtime is let go, as an archive has to be.

@@ -1317,6 +1317,7 @@ extension DaemonCore {
         // not, so nothing of theirs cleared the last turn's report. It stays where the
         // person sees it until this turn gives its own; what is noted here is that it
         // is not this turn's, so a silent ending is accounted for afresh (#479).
+        unwordedReports.remove(agentID)
         if from == .app, var agent = agents[agentID] {
             reportBeforeTurn[agentID] = agent.report
             if agent.outcomeAsked {

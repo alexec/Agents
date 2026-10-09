@@ -75,7 +75,8 @@ struct AppServiceTests {
             == WorkOutcome.allCases.map(\.rawValue))
         // The outcome and its words are the call. The runtime names the conversation.
         #expect(finish?["required"]?.arrayValue?.compactMap { $0.stringValue }
-            == ["outcome", "message"])
+            == ["outcome"])
+        #expect(finish?["properties"]?["message"] == nil)
         #expect(finish?["properties"]?["title"] == nil)
         // No suggestion offered since #481; one sent is still read (031).
         #expect(finish?["properties"]?["next_prompt"] == nil)
@@ -477,12 +478,19 @@ struct AppServiceTests {
         await service.close()
     }
 
-    /// The examples went with #481's cut; the rule they illustrated stays, once.
-    @Test func theGuidanceAsksForOneShortSentence() {
-        let message = AppService.finishTurnTool["inputSchema"]?["properties"]?["message"]?["description"]?
-            .stringValue ?? ""
-        #expect(message.hasPrefix("One short sentence"))
-        #expect(message.contains("200 characters"))
+    /// The outcome is the whole call: the app takes the words from the agent's own
+    /// last message when the turn ends.
+    @Test func anOutcomeAloneReachesTheSink() async throws {
+        let box = FinishBox()
+        let (client, service) = await pair(finishTurn: finishing(box))
+        let result = try await client.call("tools/call", [
+            "name": .string(AppService.finishTurnToolName),
+            "arguments": ["outcome": "stuck"],
+        ])
+        #expect(result["isError"]?.boolValue == false)
+        #expect(await box.outcome == "stuck")
+        #expect(await box.message == "")
+        await service.close()
     }
 
     /// The chips ride along; their absence is not a fault. Left out or sent empty,
@@ -523,19 +531,19 @@ struct AppServiceTests {
         await service.close()
     }
 
-    @Test func aFinishCallWithNoWordsIsRefused() async throws {
+    /// Blank words are no words: the call lands, and the turn's end supplies them.
+    @Test func aFinishCallWithBlankWordsLands() async throws {
         let box = FinishBox()
         let (client, service) = await pair(finishTurn: finishing(box))
         for message in ["", "   "] {
             let result = try await client.call("tools/call", [
                 "name": .string(AppService.finishTurnToolName),
-                "arguments": ["outcome": "done", "message": .string(message), "title": "Tidied"],
+                "arguments": ["outcome": "done", "message": .string(message)],
             ])
-            #expect(result["isError"]?.boolValue == true)
-            #expect(result["content"]?.arrayValue?.first?["text"]?.stringValue?
-                .contains("how it went") == true)
+            #expect(result["isError"]?.boolValue == false)
+            #expect(await box.message == "")
         }
-        #expect(await box.calls == 0)
+        #expect(await box.calls == 2)
         await service.close()
     }
 

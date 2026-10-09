@@ -28,13 +28,19 @@ public enum DerivedEnding {
     /// The report for a clean end that said nothing about itself.
     public static func report(closingWords: String?, questionOpen: Bool, at: Date) -> WorkReport {
         let outcome = outcome(closingWords: closingWords, questionOpen: questionOpen)
+        return WorkReport(outcome: outcome, message: message(closingWords: closingWords, outcome: outcome),
+                          at: at)
+    }
+
+    /// The line under the agent's name, from its closing words: the first sentence, or
+    /// the question when it waits on one. Also what an outcome given with no words of
+    /// its own reads, once the turn has ended.
+    public static func message(closingWords: String?, outcome: WorkOutcome) -> String {
         // A question is the thing to read on the row, so it is the sentence kept.
         let sentence = outcome == .needsAnswer && endsInAQuestion(closingWords)
             ? lastSentence(of: closingWords ?? "")
             : firstSentence(of: closingWords ?? "")
-        let message = sentence.map(trimmed) ?? (outcome == .needsAnswer
-            ? WorkOutcome.needsAnswer.heading : silentDone)
-        return WorkReport(outcome: outcome, message: message, at: at)
+        return sentence.map(trimmed) ?? (outcome == .done ? silentDone : outcome.heading)
     }
 
     /// A first title for a conversation, from the words that began it: the first line,

@@ -10,6 +10,15 @@ extension DaemonCore {
     /// A `finish_turn` call in the turn wins: this only writes where none landed.
     func deriveEnding(agentID: UUID, reason: EndedReason, closingWords words: String,
                       agentRecordedAnEnding: Bool) {
+        // An outcome given with no words takes the agent's closing words, however the
+        // turn then stopped: the app cancels one whose runtime holds on after the call.
+        if unwordedReports.remove(agentID) != nil, agentRecordedAnEnding,
+           var agent = agents[agentID], var report = agent.report {
+            report.message = DerivedEnding.message(closingWords: words, outcome: report.outcome)
+            agent.report = report
+            changed(agent)
+            return
+        }
         guard reason == .endTurn, !agentRecordedAnEnding, var agent = agents[agentID] else { return }
         // A report this turn began under is the last turn's, not this one's (#149).
         let reported = agent.report != nil && agent.report != reportBeforeTurn[agentID]

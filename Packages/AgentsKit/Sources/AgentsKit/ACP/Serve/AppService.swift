@@ -329,11 +329,11 @@ public actor AppService {
                 guard WorkOutcome(wire: raw) != nil else {
                     return .success(Self.reply(Self.unknownOutcome, isError: true))
                 }
+                // Not listed: the app takes the line under the agent's name from its
+                // last words when the turn ends. One an older prompt sends is still
+                // kept, and still refused when it runs long.
                 let message = (arguments?["message"]?.stringValue ?? "")
                     .trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !message.isEmpty else {
-                    return .success(Self.reply(Self.noWords, isError: true))
-                }
                 guard !WorkReport.isTooLong(message) else {
                     return .success(Self.reply(WorkReport.tooLong(WorkOutcome(wire: raw)), isError: true))
                 }
@@ -860,11 +860,6 @@ public actor AppService {
         return .success(after)
     }
 
-    static let noWords = """
-        Nothing was recorded: say in a sentence how it went. An outcome with no words \
-        is no more use than the turn simply ending.
-        """
-
     /// A tool result is content plus a flag, and a failure inside the tool is reported
     /// this way rather than as a JSON-RPC error: the agent is meant to read it.
     private static func reply(_ text: String, isError: Bool = false) -> JSONValue {
@@ -882,17 +877,21 @@ public actor AppService {
     /// The call that says how a turn ended (023), slimmed in #481.
     ///
     /// Since #479 nothing tells an agent it must call this: the daemon derives an
-    /// ending the agent did not give. Since #481 it says only how the turn went; waiting, parking, moving and labels each have a tool
-    /// of their own, and the description is a tenth of what it was. Every argument it
-    /// took before is still read — `waiting_on`, `afterwards`, `worktree`, `next_prompt`
-    /// and the rest — except `title`, since the runtime names the conversation; all for prompts and conversations that still send them, but none is
-    /// listed: a fresh agent shown both would send both.
+    /// ending the agent did not give. Since #481 it says only how the turn went; waiting,
+    /// parking, moving and labels each have a tool of their own, and the description is a
+    /// tenth of what it was. Since then it takes the outcome alone: the runtime names the
+    /// conversation, and the line under its name is the agent's own last words, taken
+    /// when the turn ends. Every argument it took before is still read — `message`,
+    /// `waiting_on`, `afterwards`, `worktree`, `next_prompt` and the rest, all but
+    /// `title` — for prompts and conversations that still send them, but none is listed:
+    /// a fresh agent shown both would send both.
     static let finishTurnTool: JSONValue = [
         "name": .string(finishTurnToolName),
         "title": "Say how the turn ended",
         "description": """
             Optional. Without it the app works out how your turn ended from what you last \
-            said. Call it last, to say so yourself. It ends your turn. To ask the person \
+            said. Call it last, to say so yourself; what you last said is still the line \
+            under your name. It ends your turn. To ask the person \
             and carry on with the answer, use your question or form tool instead. To wait \
             for agents or a time, use wait_for_event; to be parked, park_agent with no id.
             """,
@@ -910,16 +909,8 @@ public actor AppService {
                         waiting on something other than the person.
                         """,
                 ],
-                "message": [
-                    "type": "string",
-                    "description": """
-                        One short sentence, under 200 characters, for someone who has not \
-                        read the conversation: what happened and what it means for them, \
-                        no file names. For needs_answer, the question.
-                        """,
-                ],
             ],
-            "required": .array(["outcome", "message"]),
+            "required": .array(["outcome"]),
         ],
     ]
 
