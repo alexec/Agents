@@ -50,9 +50,8 @@ struct ProjectListView: View {
     var body: some View {
         List(selection: $picked) {
             // What wants the person, across every project and host (#495): Things'
-            // Inbox and Today, Mail's smart mailboxes. Always drawn, so the list does not
-            // move as states change; the pages about all the work that used to be here
-            // are in the toolbar and the View menu.
+            // Inbox and Today, Mail's smart mailboxes, each drawn only with something in
+            // it (#507).
             Section {
                 // One way to start a session (#495), in the project last started in; the
                 // page it opens can switch project.
@@ -78,7 +77,8 @@ struct ProjectListView: View {
             }
 
             // Pinned, Needs You, Working, Unread: a group each, headed and folding as a
-            // project's is, so every group in the list lines up alike (#495).
+            // project's is, so every group in the list lines up alike (#495). Empty, or
+            // with no match for a search, a group is not drawn (#507).
             ForEach(SidebarSmartRow.allCases, id: \.self) { row in
                 SmartFold(row: row, projects: orderedProjects.map(\.key), folds: folds, query: searched)
             }

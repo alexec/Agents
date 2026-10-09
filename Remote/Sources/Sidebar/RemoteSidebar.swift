@@ -176,8 +176,16 @@ private struct RemoteSmartFold: View {
 
     var body: some View {
         let keys = projects.map(\.key)
+        // Empty, or with no match for a search, the group is not drawn (#507); Unread
+        // with nothing unread still is while it keeps the open session.
+        if row.isShown(in: model.work, projects: keys, query: query) || keptUnread != nil {
+            fold(keys)
+        }
+    }
+
+    private func fold(_ keys: [ProjectKey]) -> some View {
         let isOpen = folds.isOpen(row)
-        Section(isExpanded: Binding(get: { isOpen }, set: { folds.set(row, open: $0) })) {
+        return Section(isExpanded: Binding(get: { isOpen }, set: { folds.set(row, open: $0) })) {
             if isOpen {
                 if row == .pinned {
                     ForEach(keys, id: \.self) { key in pinnedRows(key) }
@@ -196,12 +204,18 @@ private struct RemoteSmartFold: View {
     /// its place, read now, until another is opened: its count has already dropped.
     private func shown(_ keys: [ProjectKey]) -> [Agent] {
         var agents = row.agents(in: model.work, projects: keys, query: query)
-        if row == .unread, let id = model.keptInUnread, !agents.contains(where: { $0.id == id }),
-           query.isEmpty, let kept = model.work.agent(id), kept.state != .archived {
+        if let kept = keptUnread, !agents.contains(where: { $0.id == kept.id }) {
             let at = agents.firstIndex { $0.createdAt < kept.createdAt } ?? agents.endIndex
             agents.insert(kept, at: at)
         }
         return agents
+    }
+
+    /// The session Unread keeps, read, while it is the one open; none while searching.
+    private var keptUnread: Agent? {
+        guard row == .unread, query.isEmpty, let id = model.keptInUnread,
+              let kept = model.work.agent(id), kept.state != .archived else { return nil }
+        return kept
     }
 
     /// One project's pinned sessions (#180), then its pinned workflows (#432), each

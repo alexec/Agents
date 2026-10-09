@@ -288,4 +288,20 @@ struct SidebarModelTests {
         #expect(SidebarSmartRow.pinned.count(in: model, projects: projects) == 3)
         #expect(SidebarProjectFold(key, label: "api", in: model, isOpen: true).sessions.isEmpty)
     }
+
+    /// A smart row with nothing in it is not drawn, nor one a search finds nothing in
+    /// (#507).
+    @Test func anEmptySmartRowIsNotShown() {
+        let model = AgentsModel()
+        let asking = started(api, .waitingOnUser, "asking api", at: 1)
+        model.replaceAgents([asking])
+        let projects = [key, ProjectKey(host: .mac, folder: web)]
+
+        #expect(SidebarSmartRow.needsYou.isShown(in: model, projects: projects))
+        #expect(!SidebarSmartRow.working.isShown(in: model, projects: projects))
+        #expect(!SidebarSmartRow.unread.isShown(in: model, projects: projects))
+        #expect(!SidebarSmartRow.pinned.isShown(in: model, projects: projects))
+        #expect(SidebarSmartRow.needsYou.isShown(in: model, projects: projects, query: "asking"))
+        #expect(!SidebarSmartRow.needsYou.isShown(in: model, projects: projects, query: "nothing like it"))
+    }
 }

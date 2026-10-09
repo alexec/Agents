@@ -4,7 +4,7 @@ import SwiftUI
 /// One of the groups at the top of the sidebar (#495): Pinned, Needs You, Working or
 /// Unread, across every project and host. A section headed and folding as a project's
 /// is, so its heading and rows line up with theirs. Folded, it reads its count off each
-/// project's shelf and lists nothing (#356).
+/// project's shelf and lists nothing (#356). Empty, it is not drawn (#507).
 struct SmartFold: View {
     @Environment(AppModel.self) private var model
     let row: SidebarSmartRow
@@ -15,10 +15,17 @@ struct SmartFold: View {
     let query: String
 
     var body: some View {
+        // Unread with nothing unread is still drawn while it keeps the open session.
+        if row.isShown(in: model.work, projects: projects, query: query) || keptUnread != nil {
+            fold
+        }
+    }
+
+    private var fold: some View {
         let isOpen = folds.isOpen(row)
         let open = Binding(get: { isOpen }, set: { folds.set(row, open: $0) })
         let agents = isOpen ? shown : []
-        Section(isExpanded: open) {
+        return Section(isExpanded: open) {
             if row == .pinned {
                 if isOpen { pinnedRows }
             } else {
@@ -37,12 +44,18 @@ struct SmartFold: View {
     /// its place, read now, until another is opened: its count has already dropped.
     private var shown: [Agent] {
         var agents = row.agents(in: model.work, projects: projects, query: query)
-        if row == .unread, let id = model.keptInUnread, !agents.contains(where: { $0.id == id }),
-           query.isEmpty, let kept = model.work.agent(id), kept.state != .archived {
+        if let kept = keptUnread, !agents.contains(where: { $0.id == kept.id }) {
             let at = agents.firstIndex { $0.createdAt < kept.createdAt } ?? agents.endIndex
             agents.insert(kept, at: at)
         }
         return agents
+    }
+
+    /// The session Unread keeps, read, while it is the one open; none while searching.
+    private var keptUnread: Agent? {
+        guard row == .unread, query.isEmpty, let id = model.keptInUnread,
+              let kept = model.work.agent(id), kept.state != .archived else { return nil }
+        return kept
     }
 
     /// Every project's pinned sessions, then its pinned workflows, each dragged into the
@@ -87,7 +100,8 @@ struct SmartFold: View {
 }
 
 /// A smart row's own line: its symbol, its name, and how many, the count in the
-/// attention tint when somebody is waiting and absent at none, so the row stays put.
+/// attention tint when somebody is waiting; absent at none, which only Unread keeping
+/// the open session is drawn at.
 private struct SmartRowLabel: View {
     let row: SidebarSmartRow
     let count: Int
