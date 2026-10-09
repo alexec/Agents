@@ -654,7 +654,7 @@ struct HelperAgentTests {
             }
             return nil
         } ?? []
-        #expect(madeTools.contains(AppTool.finishTurn))
+        #expect(madeTools.contains(AppTool.showFile))
         #expect(!madeTools.contains(AppTool.startAgent))
 
         _ = await eventually("the helper's turn ended and its runtime went") {
@@ -675,7 +675,7 @@ struct HelperAgentTests {
             }
             return nil
         } ?? []
-        #expect(resumedTools.contains(AppTool.finishTurn), "\(resumedTools)")
+        #expect(resumedTools.contains(AppTool.showFile), "\(resumedTools)")
         #expect(!resumedTools.contains(AppTool.startAgent), "\(resumedTools)")
     }
 

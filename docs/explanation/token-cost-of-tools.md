@@ -98,6 +98,14 @@ was dropped. Old calls still work: `finish_turn` reads every argument it took be
 | The tools it gave jobs to: `wait_for_event`, `park_agent`, `archive_agent` | 3,215 | 4,034 |
 | The new tools: `move_worktree`, `set_session_labels` | none | 1,372 |
 | An agent the person started | 36,386 bytes (~9,100 tokens), 21 tools | 31,222 bytes (~7,800 tokens), 23 tools |
+
+**`finish_turn` removed.** After the split, all it still did was say how a turn went, and
+the app already works that out (#479): **Complete**, or **Waiting on your answer** when a
+question is open or the agent's last words ask one, under the first sentence of its last
+message. The runtime names the conversation. The outcomes only an agent could give
+(nothing to do, partly done, stuck) went with it: an agent that needs the person asks them.
+That takes its ~1,100 bytes (~280 tokens) off every session's tool list. A conversation
+that began before then can still call it, and the daemon still records what it says.
 | An agent another agent started | 30,070 bytes (~7,500 tokens) | 25,577 bytes (~6,400 tokens) |
 | Grok's rules | 8,992 bytes | 7,792 bytes |
 

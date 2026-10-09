@@ -154,6 +154,5 @@ rm -rf "$OUT"
 
 ## 6. End
 
-End with one line per signature as in the note, plus the Remote line, then finish_turn:
-`done` if anything was filed or commented, `nothing_to_do` if there were no new crashes,
-`partly_done` if anything was left. Then park.
+End with one line per signature as in the note, plus the Remote line. If anything was
+left, ask Alex about it with your question tool. Otherwise call `park_agent` with no id.

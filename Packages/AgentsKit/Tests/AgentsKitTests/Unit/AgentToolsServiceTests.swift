@@ -51,7 +51,7 @@ struct AgentToolsServiceTests {
         let listed = try await names(client)
         for tool in agentTools where tool != AppService.parkAgentToolName { #expect(!listed.contains(tool), "\(tool)") }
         #expect(listed.contains(AppService.parkAgentToolName))
-        #expect(listed.contains(AppService.finishTurnToolName), "and keeps the rest")
+        #expect(listed.contains(AppService.showFileToolName), "and keeps the rest")
         await service.close()
     }
 

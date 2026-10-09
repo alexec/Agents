@@ -65,7 +65,7 @@ struct AppToolsEndpointTests {
         #expect(list.status == 200)
         #expect(list.headers["Content-Type"] == "application/json")
         let names = try toolNames(list)
-        #expect(names.contains(AppService.finishTurnToolName))
+        #expect(names.contains(AppService.showFileToolName))
         #expect(names.contains("start_agent"))
         #expect(endpoint.openSessions("tok") == 1)
     }
@@ -75,7 +75,7 @@ struct AppToolsEndpointTests {
         endpoint.grant("tok", .init(managesAgents: false, movesItself: false))
         let session = try await opened(endpoint)
         let names = try toolNames(await post(endpoint, body("tools/list", id: 2), session: session))
-        #expect(names.contains(AppService.finishTurnToolName))
+        #expect(names.contains(AppService.showFileToolName))
         #expect(!names.contains("start_agent"))
     }
 
@@ -85,12 +85,12 @@ struct AppToolsEndpointTests {
         endpoint.grant("tok", .init())
         let session = try await opened(endpoint)
         let reply = await post(endpoint, body("tools/call", id: 3, params: [
-            "name": .string(AppService.finishTurnToolName),
-            "arguments": ["outcome": "done", "message": "All of it."],
+            "name": .string(AppService.showFileToolName),
+            "arguments": ["path": "/tmp/README.md"],
         ]), session: session)
         #expect(reply.status == 200)
         let call = try #require(calls.all.first)
-        #expect(call.0 == DaemonAPI.Method.agentsFinishTurn)
+        #expect(call.0 == DaemonAPI.Method.agentsShowFile)
         #expect(call.1["token"]?.stringValue == "tok")
         #expect(String(decoding: reply.body, as: UTF8.self).contains("Noted by the daemon."))
     }
@@ -206,7 +206,7 @@ struct AppToolsEndpointTests {
         let session = try #require(opened.value(forHTTPHeaderField: "Mcp-Session-Id"))
         let (listed, list) = try await send(body("tools/list", id: 2), session: session)
         #expect(listed.statusCode == 200)
-        #expect(String(decoding: list, as: UTF8.self).contains(AppService.finishTurnToolName))
+        #expect(String(decoding: list, as: UTF8.self).contains(AppService.showFileToolName))
         let (called, _) = try await send(body("tools/call", id: 3, params: [
             "name": "show_file", "arguments": ["path": "/tmp/README.md"],
         ]), session: session)

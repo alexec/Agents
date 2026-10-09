@@ -190,7 +190,7 @@ extension PersonalDotAgents {
                                    + " Agents start without your servers until it is fixed."))
         }
         let appName = "agents"
-        result.app = [DaemonAPI.Server(name: appName, transport: "stdio", summary: "finish_turn, show_file and the rest",
+        result.app = [DaemonAPI.Server(name: appName, transport: "stdio", summary: "show_file, ask_form and the rest",
                                        reach: Dictionary(uniqueKeysWithValues: present.map { rule in
                                            (rule.runtimeID, rule.takesStdioServers ? Reach.gets("sent at start")
                                                                                    : .gets("through the bridge"))

@@ -348,17 +348,15 @@ private struct Scorer {
         let blocked = blocks().filter(\.ok)
         let onHelper = blocked.contains { !$0.waitingOn.isEmpty } || blockFoundHelperDone(nil)
         let withTime = blocked.contains { $0.minutes != nil }
-        let last = finished.last?.arguments?["outcome"]?.stringValue
         let outcomes = (blocked.map { _ in "blocked" }
             + finished.compactMap { $0.arguments?["outcome"]?.stringValue }.filter { $0 != "blocked" })
             .joined(separator: ", ")
-        // A title, a next prompt and an account of every turn are not asked of an agent
-        // any more (#479): the daemon works out a silent ending for itself. What is
-        // scored is the tool still doing what only it can — waiting and its outcomes.
+        // No account of a turn is asked of an agent any more: the daemon works out how
+        // every turn ended (#479), and `finish_turn` is gone. What is scored is waiting.
+        // A `finish_turn` from a conversation briefed before then still counts.
         var missing: [String] = []
         if !onHelper { missing.append("blocked on the helper") }
         if !withTime { missing.append("blocked with a check-again time") }
-        if last != "done" && last != "needs_answer" { missing.append("a last done or needs_answer") }
         let refused = calls(DaemonAPI.Method.agentsFinishTurn).filter { !$0.ok }.count
             + calls(DaemonAPI.Method.agentsWaitOn).filter { !$0.ok }.count
         let note = refused > 0 ? " (\(refused) refused first)" : ""

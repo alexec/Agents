@@ -45,7 +45,7 @@ public enum RuntimeAssessment {
         Step(id: "wait", area: "Events",
              passesWhen: "wait_for_event with until_minutes timed out, and the agent was started again to be told"),
         Step(id: "ending", area: "Ending a turn",
-             passesWhen: "wait_for_event waited on the helper and on a time alone, each ending the turn, and a last finish_turn recorded done or needs_answer"),
+             passesWhen: "wait_for_event waited on the helper and on a time alone, each ending the turn"),
         Step(id: "worktree", area: "Worktrees",
              passesWhen: "move_worktree with worktree moved the agent into a new worktree, and move_worktree with leave_worktree remove moved it back and removed it (not offered outside a git repository, or where the runtime cannot move)"),
         Step(id: "sessions", area: "Sessions",
@@ -211,8 +211,7 @@ public enum RuntimeAssessment {
             as they came back.
             6. `own_ask`: \(ownAsk)
             7. `helpers`: `start_agent` a helper on runtime `\(runtimeID)` with \(modelWords), the \
-            label `\(helperLabel)`, and the prompt "Reply with the word OK, then call finish_turn \
-            with outcome done and the message OK." Then call `list_my_agents`. Then call \
+            label `\(helperLabel)`, and the prompt "Reply with the word OK." Then call `list_my_agents`. Then call \
             `wait_for_event` with `agents` the helper's id and a message saying you are \
             waiting on the helper: that ends this turn, and you are started again when the \
             helper finishes. (If that call is refused because the helper has already \
@@ -232,9 +231,8 @@ public enum RuntimeAssessment {
 
             **Turn 4**
 
-            11. `worktree`: `move_worktree` with `worktree` `\(lease)`, then end the turn with \
-            `finish_turn`, outcome `partly_done`, saying you are moving into a worktree. You \
-            are started again in it. (If `move_worktree` is not in your tools, or is refused because the project is not in a git repository, or because \
+            11. `worktree`: `move_worktree` with `worktree` `\(lease)`, then end the turn, \
+            saying you are moving into a worktree. You are started again in it. (If `move_worktree` is not in your tools, or is refused because the project is not in a git repository, or because \
             your runtime cannot move, write `not offered` with what it said, and go straight on \
             to step 12 in this turn.)
 
@@ -247,18 +245,17 @@ public enum RuntimeAssessment {
             asked or refused; record which, and what the answer was.
             14. `permissions`: record whether a permission card came for that write, what it \
             was answered, and whether the file was written.
-            15. `move_worktree` with `leave_worktree` `remove`, then end the turn with \
-            `finish_turn`, outcome `partly_done`, saying you are moving back. You are started again in the project folder. \
+            15. `move_worktree` with `leave_worktree` `remove`, then end the turn, saying \
+            you are moving back. You are started again in the project folder. \
             (If you never moved, skip this and go straight on to step 16.)
 
             **Turn 6**
 
             16. `report`: finish the report: every row filled in, and a section "What to fix" \
             naming each failure with its likely fix — the app, the adapter, the runtime's \
-            version, or a setting. Then end with `finish_turn`: if every step passed by your \
-            own account, call `park_agent` with no id, then `finish_turn` with outcome `done` \
-            and a message saying how many passed; otherwise outcome `needs_answer`, and a message for Alex naming the \
-            failures and what to fix. The app then scores the record and adds its own table \
+            version, or a setting. If every step passed by your own account, call `park_agent` \
+            with no id and end your turn saying how many passed; otherwise end it naming the \
+            failures and what to fix, with a last line asking Alex which to take up. The app then scores the record and adds its own table \
             to this conversation.
             """
     }

@@ -30,25 +30,7 @@ extension AppService {
         }
 
         return AppService(transport: transport, managesAgents: managesAgents,
-                          movesItself: movesItself) { outcome, message, prompts, words in
-            await send(DaemonAPI.Method.agentsFinishTurn,
-                       DaemonAPI.FinishTurnRequest(token: token, outcome: outcome,
-                                                   message: message, prompts: prompts,
-                                                   waitingOn: words.waitingOn,
-                                                   checkAgainInMinutes: words.checkAgainInMinutes,
-                                                   wakeOn: words.wakeOn?.rawValue,
-                                                   afterwards: words.afterwards?.rawValue,
-                                                   addLabels: words.addLabels,
-                                                   removeLabels: words.removeLabels,
-                                                   move: words.move.map {
-                                                       switch $0 {
-                                                       case .move(let target, let removeLeft, let discardChanges):
-                                                           DaemonAPI.MoveAsk(target: target, removeLeft: removeLeft,
-                                                                             discardChanges: discardChanges)
-                                                       }
-                                                   }),
-                       fallback: "Noted.")
-        } showFile: { file in
+                          movesItself: movesItself) { file in
             await send(DaemonAPI.Method.agentsShowFile,
                        DaemonAPI.ShowFileRequest(token: token, file: file),
                        fallback: "Open in the files pane.")
