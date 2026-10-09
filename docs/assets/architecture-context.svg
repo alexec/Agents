@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 720" width="1240" height="720" font-family="-apple-system, Helvetica, Arial, sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#555"/></marker>
+<style>
+.t{fill:#fff;font-weight:700;font-size:15px;text-anchor:middle} .k{fill:#fff;font-size:11px;text-anchor:middle;opacity:.9} .d{fill:#fff;font-size:11.5px;text-anchor:middle}
+.r{stroke:#555;stroke-width:1.4;fill:none;stroke-dasharray:6 4;marker-end:url(#a)} .rl{font-size:11.5px;fill:#333;text-anchor:middle} .rt{font-size:10.5px;fill:#666;text-anchor:middle}
+</style></defs><rect width="1240" height="720" fill="#fff"/>
+
+<text x="40" y="38" font-size="20" font-weight="700">Agents · System Context (C4 level 1)</text><text x="40" y="60" font-size="13" fill="#555">Who uses Agents, and the systems around it.</text>
+<circle cx="620.0" cy="114" r="24" fill="#08427b"/>
+<rect x="530" y="134" width="180" height="96" rx="22" fill="#08427b"/>
+<text class="t" x="620.0" y="162">Alex</text>
+<text class="k" x="620.0" y="179">[Person]</text>
+<text class="d" x="620.0" y="200">Developer who runs</text>
+<text class="d" x="620.0" y="215">coding agents</text>
+<rect x="470" y="330" width="300" height="130" rx="8" fill="#1168bd" stroke="#1168bd"/>
+<text class="t" x="620.0" y="356">Agents</text>
+<text class="k" x="620.0" y="373">[Software System]</text>
+<text class="d" x="620.0" y="394">Runs coding agents on hosts you own;</text>
+<text class="d" x="620.0" y="409">follow and answer them from a Mac,</text>
+<text class="d" x="620.0" y="424">an iPhone, an iPad or a browser</text>
+<rect x="880" y="330" width="300" height="130" rx="8" fill="#8a8a8a" stroke="#8a8a8a"/>
+<text class="t" x="1030.0" y="356">Agent runtimes</text>
+<text class="k" x="1030.0" y="373">[External Software System]</text>
+<text class="d" x="1030.0" y="394">Claude Code, Codex, Copilot,</text>
+<text class="d" x="1030.0" y="409">OpenCode, Cursor, Grok, Gemini</text>
+<rect x="880" y="560" width="300" height="110" rx="8" fill="#8a8a8a" stroke="#8a8a8a"/>
+<text class="t" x="1030.0" y="586">Model providers</text>
+<text class="k" x="1030.0" y="603">[External Software System]</text>
+<text class="d" x="1030.0" y="624">Anthropic, OpenAI, GitHub,</text>
+<text class="d" x="1030.0" y="639">xAI, Google, …</text>
+<rect x="60" y="330" width="300" height="130" rx="8" fill="#8a8a8a" stroke="#8a8a8a"/>
+<text class="t" x="210.0" y="356">MCP servers</text>
+<text class="k" x="210.0" y="373">[External Software System]</text>
+<text class="d" x="210.0" y="394">the person&#x27;s and projects&#x27; own;</text>
+<text class="d" x="210.0" y="409">e.g. the CI watcher</text>
+<text class="d" x="210.0" y="424">(Integrations/ci-watcher)</text>
+<rect x="60" y="560" width="300" height="110" rx="8" fill="#8a8a8a" stroke="#8a8a8a"/>
+<text class="t" x="210.0" y="586">GitHub</text>
+<text class="k" x="210.0" y="603">[External Software System]</text>
+<text class="d" x="210.0" y="624">repositories, pull requests,</text>
+<text class="d" x="210.0" y="639">Actions</text>
+<rect x="470" y="560" width="300" height="110" rx="8" fill="#8a8a8a" stroke="#8a8a8a"/>
+<text class="t" x="620.0" y="586">Package registries</text>
+<text class="k" x="620.0" y="603">[External Software System]</text>
+<text class="d" x="620.0" y="624">npm, vendor install scripts</text>
+<rect x="880" y="120" width="300" height="90" rx="8" fill="#b5b5b5" stroke="#333" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text class="t" x="1030.0" y="146">Apple iCloud</text>
+<text class="k" x="1030.0" y="163">[External Software System]</text>
+<text class="d" x="1030.0" y="184">relay mailbox for phones away</text>
+<path class="r" d="M620,230 L620,330"/>
+<text class="rl" x="620" y="272"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Starts, watches and</tspan></text>
+<text class="rl" x="620" y="286"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">answers agents</tspan></text>
+<text class="rt" x="620" y="300"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[Mac, iPhone, iPad, browser]</tspan></text>
+<path class="r" d="M770,400 L880,400"/>
+<text class="rl" x="825" y="424"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Starts, drives</tspan></text>
+<text class="rt" x="825" y="438"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[ACP over stdio]</tspan></text>
+<path class="r" d="M1030,460 L1030,560"/>
+<text class="rl" x="1030" y="505"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Prompts</tspan></text>
+<text class="rt" x="1030" y="519"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[HTTPS]</tspan></text>
+<path class="r" d="M880,378 L770,378"/>
+<text class="rl" x="825" y="350"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Calls agents tools</tspan></text>
+<text class="rt" x="825" y="364"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[MCP over http]</tspan></text>
+<path class="r" d="M470,395 L360,395"/>
+<text class="rl" x="415" y="368"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Polls events;</tspan></text>
+<text class="rl" x="415" y="382"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">its runtimes call tools</tspan></text>
+<text class="rt" x="415" y="396"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[MCP]</tspan></text>
+<path class="r" d="M620,460 L620,560"/>
+<text class="rl" x="620" y="505"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Installs runtimes</tspan></text>
+<text class="rt" x="620" y="519"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[npm, curl]</tspan></text>
+<path class="r" d="M500,460 L330,560"/>
+<text class="rl" x="450" y="520"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Clones, pushes</tspan></text>
+<text class="rt" x="450" y="534"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[git]</tspan></text>
+<path class="r" d="M720,330 C740,250 820,180 880,170"/>
+<text class="rl" x="795" y="236"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Notifies (planned)</tspan></text>
+<path class="r" d="M180,460 L180,560"/>
+<text class="rl" x="180" y="505"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">gh api</tspan></text>
+<text class="rt" x="180" y="519"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[HTTPS]</tspan></text>
+<text x="40" y="96" font-size="12" font-weight="700" fill="#333">Key</text>
+<rect x="40" y="108" width="26" height="16" rx="3" fill="#08427b"/><text x="74" y="120" font-size="11.5" fill="#333">Person</text>
+<rect x="40" y="132" width="26" height="16" rx="3" fill="#1168bd"/><text x="74" y="144" font-size="11.5" fill="#333">Software system</text>
+<rect x="40" y="156" width="26" height="16" rx="3" fill="#438dd5"/><text x="74" y="168" font-size="11.5" fill="#333">Container</text>
+<rect x="40" y="180" width="26" height="16" rx="3" fill="#8a8a8a"/><text x="74" y="192" font-size="11.5" fill="#333">External software system</text>
+<rect x="40" y="204" width="26" height="16" rx="3" fill="#b5b5b5" stroke="#333" stroke-dasharray="4 3"/><text x="74" y="216" font-size="11.5" fill="#333">Planned, not in this build</text>
+<path class="r" d="M40,236 L66,236"/><text x="74" y="240" font-size="11.5" fill="#333">Relationship [technology]</text>
+</svg>

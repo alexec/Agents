@@ -1,0 +1,165 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1200" width="1600" height="1200" font-family="-apple-system, Helvetica, Arial, sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#555"/></marker>
+<style>.r{stroke:#555;stroke-width:1.4;fill:none;stroke-dasharray:6 4;marker-end:url(#a)} .rl{font-size:11.5px;fill:#333;text-anchor:middle;paint-order:stroke;stroke:#fff;stroke-width:4px} .rt{font-size:10.5px;fill:#666;text-anchor:middle;paint-order:stroke;stroke:#fff;stroke-width:4px}</style></defs>
+<rect width="1600" height="1200" fill="#fff"/>
+<text x="40" y="38" font-size="20" font-weight="700">Agents · Components of the host daemon (C4 level 3)</text>
+<text x="40" y="60" font-size="13" fill="#555">Inside agentsd (Daemon/ + Packages/AgentsKit), the same on macOS and Linux. Folder names are under Packages/AgentsKit/Sources/AgentsKit.</text>
+<rect x="40" y="215" width="1230" height="715" rx="12" fill="none" stroke="#666" stroke-width="1.5" stroke-dasharray="8 5"/>
+<text x="56" y="916" font-size="14" font-weight="700" fill="#444">Host daemon (agentsd)</text><text x="222" y="916" font-size="12" fill="#666">[Container: Swift daemon]</text>
+<rect x="470" y="80" width="360" height="100" rx="8" fill="#438dd5" stroke="#438dd5"/>
+<text x="650.0" y="104" fill="#fff" font-weight="700" font-size="14.5" text-anchor="middle">Control plane</text>
+<text x="650.0" y="120" fill="#fff" font-size="10.5" text-anchor="middle" opacity=".85">[Container: agents-control]</text>
+<text x="650.0" y="139.0" fill="#fff" font-size="11.3" text-anchor="middle">routes each client&#x27;s requests to this host</text>
+<rect x="1330" y="250" width="240" height="652" rx="8" fill="#8a8a8a" stroke="#8a8a8a"/>
+<text x="1450.0" y="274" fill="#fff" font-weight="700" font-size="14.5" text-anchor="middle">Agent runtimes</text>
+<text x="1450.0" y="290" fill="#fff" font-size="10.5" text-anchor="middle" opacity=".85">[External Software System]</text>
+<text x="1450.0" y="309.0" fill="#fff" font-size="11.3" text-anchor="middle">Claude Code, Codex, Copilot,</text>
+<text x="1450.0" y="323.5" fill="#fff" font-size="11.3" text-anchor="middle">OpenCode, Cursor, Grok, Gemini;</text>
+<text x="1450.0" y="338.0" fill="#fff" font-size="11.3" text-anchor="middle">one process per agent,</text>
+<text x="1450.0" y="352.5" fill="#fff" font-size="11.3" text-anchor="middle">started by ACP sessions</text>
+<rect x="70" y="1000" width="260" height="100" rx="8" fill="#8a8a8a" stroke="#8a8a8a"/>
+<text x="200.0" y="1024" fill="#fff" font-weight="700" font-size="14.5" text-anchor="middle">MCP servers</text>
+<text x="200.0" y="1040" fill="#fff" font-size="10.5" text-anchor="middle" opacity=".85">[External Software System]</text>
+<text x="200.0" y="1059.0" fill="#fff" font-size="11.3" text-anchor="middle">stdio or http, e.g. the CI watcher</text>
+<path d="M370,1002 L370,1098 A130.0,12 0 0 0 630,1098 L630,1002 A130.0,12 0 0 0 370,1002 Z" fill="#438dd5"/><ellipse cx="500.0" cy="1002" rx="130.0" ry="12" fill="#438dd5" stroke="#fff" stroke-opacity=".5"/>
+<text x="500.0" y="1030" fill="#fff" font-weight="700" font-size="14.5" text-anchor="middle">Host data</text>
+<text x="500.0" y="1046" fill="#fff" font-size="10.5" text-anchor="middle" opacity=".85">[Container: files on the host]</text>
+<text x="500.0" y="1065.0" fill="#fff" font-size="11.3" text-anchor="middle">records, transcripts, workflows,</text>
+<text x="500.0" y="1079.5" fill="#fff" font-size="11.3" text-anchor="middle">settings; ~/.agents, .agents/</text>
+<rect x="670" y="1000" width="260" height="100" rx="8" fill="#8a8a8a" stroke="#8a8a8a"/>
+<text x="800.0" y="1024" fill="#fff" font-weight="700" font-size="14.5" text-anchor="middle">GitHub</text>
+<text x="800.0" y="1040" fill="#fff" font-size="10.5" text-anchor="middle" opacity=".85">[External Software System]</text>
+<text x="800.0" y="1059.0" fill="#fff" font-size="11.3" text-anchor="middle">repos, worktrees&#x27; remotes</text>
+<rect x="970" y="1000" width="260" height="100" rx="8" fill="#8a8a8a" stroke="#8a8a8a"/>
+<text x="1100.0" y="1024" fill="#fff" font-weight="700" font-size="14.5" text-anchor="middle">Package registries</text>
+<text x="1100.0" y="1040" fill="#fff" font-size="10.5" text-anchor="middle" opacity=".85">[External Software System]</text>
+<text x="1100.0" y="1059.0" fill="#fff" font-size="11.3" text-anchor="middle">npm, vendor install scripts</text>
+<rect x="370" y="250" width="260" height="112" rx="8" fill="#85bbf0" stroke="#5a95cf"/>
+<text x="500.0" y="274" fill="#0b2a4a" font-weight="700" font-size="14.5" text-anchor="middle">Control uplink</text>
+<text x="500.0" y="290" fill="#0b2a4a" font-size="10.5" text-anchor="middle" opacity=".85">[Component: WebSocket client]</text>
+<text x="500.0" y="309.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">ControlUplink, HostDialer · connects out,</text>
+<text x="500.0" y="323.5" fill="#0b2a4a" font-size="11.3" text-anchor="middle">turns each client channel into a</text>
+<text x="500.0" y="338.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">connection to the daemon server</text>
+<rect x="670" y="250" width="260" height="112" rx="8" fill="#85bbf0" stroke="#5a95cf"/>
+<text x="800.0" y="274" fill="#0b2a4a" font-weight="700" font-size="14.5" text-anchor="middle">Daemon server</text>
+<text x="800.0" y="290" fill="#0b2a4a" font-size="10.5" text-anchor="middle" opacity=".85">[Component: JSON-RPC]</text>
+<text x="800.0" y="309.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">DaemonServer · daemon.sock and</text>
+<text x="800.0" y="323.5" fill="#0b2a4a" font-size="11.3" text-anchor="middle">uplink channels; every connection</text>
+<text x="800.0" y="338.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">gets every notification</text>
+<rect x="970" y="250" width="260" height="112" rx="8" fill="#85bbf0" stroke="#5a95cf"/>
+<text x="1100.0" y="274" fill="#0b2a4a" font-weight="700" font-size="14.5" text-anchor="middle">ACP client services</text>
+<text x="1100.0" y="290" fill="#0b2a4a" font-size="10.5" text-anchor="middle" opacity=".85">[Component: ACP/Serve/]</text>
+<text x="1100.0" y="309.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">FileService, TerminalService,</text>
+<text x="1100.0" y="323.5" fill="#0b2a4a" font-size="11.3" text-anchor="middle">permission requests · what a</text>
+<text x="1100.0" y="338.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">runtime asks of its client</text>
+<rect x="370" y="430" width="560" height="112" rx="8" fill="#85bbf0" stroke="#5a95cf"/>
+<text x="650.0" y="454" fill="#0b2a4a" font-weight="700" font-size="14.5" text-anchor="middle">Daemon core</text>
+<text x="650.0" y="470" fill="#0b2a4a" font-size="10.5" text-anchor="middle" opacity=".85">[Component: Swift actor]</text>
+<text x="650.0" y="489.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">DaemonCore, AgentTable · owns every agent: sessions, turns,</text>
+<text x="650.0" y="503.5" fill="#0b2a4a" font-size="11.3" text-anchor="middle">queues, statuses, attention; the one place every client</text>
+<text x="650.0" y="518.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">request lands and every change is announced from</text>
+<rect x="70" y="430" width="260" height="112" rx="8" fill="#85bbf0" stroke="#5a95cf"/>
+<text x="200.0" y="454" fill="#0b2a4a" font-weight="700" font-size="14.5" text-anchor="middle">Workflows and events</text>
+<text x="200.0" y="470" fill="#0b2a4a" font-size="10.5" text-anchor="middle" opacity=".85">[Component: Daemon/, Workflows/]</text>
+<text x="200.0" y="489.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">schedules, triggers, cooldowns,</text>
+<text x="200.0" y="503.5" fill="#0b2a4a" font-size="11.3" text-anchor="middle">queues; wait_for_event and</text>
+<text x="200.0" y="518.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">publish_event; event log</text>
+<rect x="970" y="430" width="260" height="112" rx="8" fill="#85bbf0" stroke="#5a95cf"/>
+<text x="1100.0" y="454" fill="#0b2a4a" font-weight="700" font-size="14.5" text-anchor="middle">Leases and wakefulness</text>
+<text x="1100.0" y="470" fill="#0b2a4a" font-size="10.5" text-anchor="middle" opacity=".85">[Component: Daemon/, Power/]</text>
+<text x="1100.0" y="489.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">lease_resource line per resource,</text>
+<text x="1100.0" y="503.5" fill="#0b2a4a" font-size="11.3" text-anchor="middle">resource catalog; keeps the</text>
+<text x="1100.0" y="518.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">Mac awake while a turn runs</text>
+<rect x="70" y="610" width="260" height="112" rx="8" fill="#85bbf0" stroke="#5a95cf"/>
+<text x="200.0" y="634" fill="#0b2a4a" font-weight="700" font-size="14.5" text-anchor="middle">MCP clients</text>
+<text x="200.0" y="650" fill="#0b2a4a" font-size="10.5" text-anchor="middle" opacity=".85">[Component: MCP/]</text>
+<text x="200.0" y="669.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">MCPClientPool, MCPEventClients,</text>
+<text x="200.0" y="683.5" fill="#0b2a4a" font-size="11.3" text-anchor="middle">MCPStdioProcess, OAuth sign-ins;</text>
+<text x="200.0" y="698.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">events/poll and server views</text>
+<rect x="370" y="610" width="260" height="112" rx="8" fill="#85bbf0" stroke="#5a95cf"/>
+<text x="500.0" y="634" fill="#0b2a4a" font-weight="700" font-size="14.5" text-anchor="middle">Projects, files and git</text>
+<text x="500.0" y="650" fill="#0b2a4a" font-size="10.5" text-anchor="middle" opacity=".85">[Component: Projects/, Files/]</text>
+<text x="500.0" y="669.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">.agents/ config and plugins,</text>
+<text x="500.0" y="683.5" fill="#0b2a4a" font-size="11.3" text-anchor="middle">worktrees, changes, clone,</text>
+<text x="500.0" y="698.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">folder watching, file read/write</text>
+<rect x="670" y="610" width="260" height="112" rx="8" fill="#85bbf0" stroke="#5a95cf"/>
+<text x="800.0" y="634" fill="#0b2a4a" font-weight="700" font-size="14.5" text-anchor="middle">Installers and catalog</text>
+<text x="800.0" y="650" fill="#0b2a4a" font-size="10.5" text-anchor="middle" opacity=".85">[Component: Runtimes/, Catalog/, Hosts/]</text>
+<text x="800.0" y="669.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">runtime discovery and installs,</text>
+<text x="800.0" y="683.5" fill="#0b2a4a" font-size="11.3" text-anchor="middle">skills and MCP marketplace,</text>
+<text x="800.0" y="698.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">agentsd install over ssh</text>
+<rect x="970" y="610" width="260" height="112" rx="8" fill="#85bbf0" stroke="#5a95cf"/>
+<text x="1100.0" y="634" fill="#0b2a4a" font-weight="700" font-size="14.5" text-anchor="middle">ACP sessions</text>
+<text x="1100.0" y="650" fill="#0b2a4a" font-size="10.5" text-anchor="middle" opacity=".85">[Component: ACP/]</text>
+<text x="1100.0" y="669.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">ACPSession, RuntimeProcess,</text>
+<text x="1100.0" y="683.5" fill="#0b2a4a" font-size="11.3" text-anchor="middle">WarmPool · start, prompt, cancel,</text>
+<text x="1100.0" y="698.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">resume; deadlines on silent turns</text>
+<rect x="70" y="790" width="260" height="112" rx="8" fill="#85bbf0" stroke="#5a95cf"/>
+<text x="200.0" y="814" fill="#0b2a4a" font-weight="700" font-size="14.5" text-anchor="middle">Shells</text>
+<text x="200.0" y="830" fill="#0b2a4a" font-size="10.5" text-anchor="middle" opacity=".85">[Component: Terminal/]</text>
+<text x="200.0" y="849.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">ShellSession, PTY, Scrollback ·</text>
+<text x="200.0" y="863.5" fill="#0b2a4a" font-size="11.3" text-anchor="middle">terminals and the project shell,</text>
+<text x="200.0" y="878.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">kept with their scrollback</text>
+<rect x="370" y="790" width="260" height="112" rx="8" fill="#85bbf0" stroke="#5a95cf"/>
+<text x="500.0" y="814" fill="#0b2a4a" font-weight="700" font-size="14.5" text-anchor="middle">Stores</text>
+<text x="500.0" y="830" fill="#0b2a4a" font-size="10.5" text-anchor="middle" opacity=".85">[Component: Store/]</text>
+<text x="500.0" y="849.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">AgentStore, EventStore, LeaseStore,</text>
+<text x="500.0" y="863.5" fill="#0b2a4a" font-size="11.3" text-anchor="middle">SpendLedger, … · whole-file JSON</text>
+<text x="500.0" y="878.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">and append-only logs</text>
+<rect x="970" y="790" width="260" height="112" rx="8" fill="#85bbf0" stroke="#5a95cf"/>
+<text x="1100.0" y="814" fill="#0b2a4a" font-weight="700" font-size="14.5" text-anchor="middle">App tools endpoint</text>
+<text x="1100.0" y="830" fill="#0b2a4a" font-size="10.5" text-anchor="middle" opacity=".85">[Component: MCP over http]</text>
+<text x="1100.0" y="849.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">AppToolsEndpoint, AppService ·</text>
+<text x="1100.0" y="863.5" fill="#0b2a4a" font-size="11.3" text-anchor="middle">mcp__agents__* at 127.0.0.1:&lt;port&gt;</text>
+<text x="1100.0" y="878.0" fill="#0b2a4a" font-size="11.3" text-anchor="middle">/mcp/agents, token per session</text>
+<path class="r" d="M560,250 L620,180"/>
+<text class="rl" x="548" y="214">Connects out</text>
+<text class="rt" x="548" y="228">[wss :8791]</text>
+<path class="r" d="M630,290 L670,290"/>
+<text class="rl" x="650" y="276">Channels</text>
+<path class="r" d="M800,362 L800,430"/>
+<text class="rl" x="838" y="396">Calls</text>
+<text class="rt" x="838" y="410">[JSON-RPC]</text>
+<path class="r" d="M1330,300 L1230,300"/>
+<text class="rl" x="1280" y="282">fs, terminal,</text>
+<text class="rl" x="1280" y="296">permission asks</text>
+<text class="rt" x="1280" y="310">[ACP]</text>
+<path class="r" d="M1030,362 C1010,400 960,420 930,450"/>
+<text class="rl" x="990" y="408">Answers via</text>
+<path class="r" d="M330,480 L370,480"/>
+<text class="rl" x="350" y="466">Starts agents</text>
+<path class="r" d="M930,500 L970,500"/>
+<text class="rl" x="950" y="522">Leases</text>
+<path class="r" d="M200,542 L200,610"/>
+<text class="rl" x="250" y="575">Polls events</text>
+<path class="r" d="M480,542 L490,610"/>
+<text class="rl" x="450" y="582">Files, git</text>
+<path class="r" d="M800,542 L800,610"/>
+<text class="rl" x="760" y="582">Installs</text>
+<path class="r" d="M900,542 C940,570 990,590 1030,610"/>
+<text class="rl" x="990" y="566">Drives</text>
+<path class="r" d="M1230,666 L1330,666"/>
+<text class="rl" x="1280" y="648">Prompts, cancels</text>
+<text class="rt" x="1280" y="662">[ACP over stdio]</text>
+<path class="r" d="M1330,846 L1230,846"/>
+<text class="rl" x="1280" y="828">mcp__agents__*</text>
+<text class="rt" x="1280" y="842">[MCP, http loopback]</text>
+<path class="r" d="M970,830 C945,790 950,600 915,542"/>
+<text class="rl" x="950" y="760">Calls</text>
+<path class="r" d="M380,542 C345,600 345,740 300,790"/>
+<text class="rl" x="350" y="760">Opens</text>
+<path class="r" d="M650,542 L650,760 C650,780 640,790 620,795"/>
+<text class="rl" x="650" y="766">Records</text>
+<path class="r" d="M70,660 C50,720 50,960 140,1000"/>
+<text class="rl" x="120" y="960">MCP</text>
+<text class="rt" x="120" y="974">[stdio, http]</text>
+<path class="r" d="M500,902 L500,990"/>
+<text class="rl" x="500" y="946">Reads, writes</text>
+<text class="rt" x="500" y="960">[files]</text>
+<path class="r" d="M600,722 C680,780 760,860 790,1000"/>
+<text class="rl" x="745" y="890">git</text>
+<text class="rt" x="745" y="904">[ssh, https]</text>
+<path class="r" d="M880,722 C890,800 920,900 1010,1000"/>
+<text class="rl" x="930" y="950">Downloads</text>
+<text class="rt" x="930" y="964">[npm, curl]</text>
+</svg>

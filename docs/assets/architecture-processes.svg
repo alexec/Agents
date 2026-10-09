@@ -1,0 +1,161 @@
+<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" viewBox="0 0 1280 990" width="1280" height="990" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="13">
+  <defs>
+    <marker id="solid" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#333"/>
+    </marker>
+    <marker id="dash" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6a4bc4"/>
+    </marker>
+    <style>
+      .box { fill: #fff; stroke: #333; stroke-width: 1.5; rx: 8; }
+      .client { fill: #eef4ff; }
+      .cp { fill: #f3eeff; }
+      .host { fill: #fff7e8; }
+      .daemon { fill: #fdeee6; }
+      .ext { fill: #eefaf0; }
+      .group { fill: #fafafa; stroke: #999; stroke-width: 1.2; stroke-dasharray: 6 4; rx: 10; }
+      .title { font-weight: 700; font-size: 14px; }
+      .small { font-size: 11.5px; fill: #444; }
+      .mono { font-family: Menlo, monospace; font-size: 11.5px; white-space: pre; }
+      .spawn { stroke: #333; stroke-width: 1.6; fill: none; marker-end: url(#solid); }
+      .conn { stroke: #6a4bc4; stroke-width: 1.6; fill: none; stroke-dasharray: 7 5; marker-end: url(#dash); }
+      .lbl { font-size: 11px; fill: #6a4bc4; }
+      .lbls { font-size: 11px; fill: #333; }
+    </style>
+  </defs>
+
+  <text x="40" y="34" font-size="20" font-weight="700">Agents: processes on this Mac, and what starts what</text>
+
+  <!-- Clients -->
+  <rect class="box client" x="40" y="60" width="380" height="84"/>
+  <text class="title" x="56" y="84">Agents window (Mac) · App/</text>
+  <text class="small" x="56" y="104">Agents.app, App Store sandbox</text>
+  <text class="small" x="56" y="122">starts no process; asks a host for everything</text>
+
+  <rect class="box client" x="450" y="60" width="380" height="84"/>
+  <text class="title" x="466" y="84">Remote (iPhone, iPad) · Remote/</text>
+  <text class="small" x="466" y="104">+ widget, notification extension</text>
+  <text class="small" x="466" y="122">runs nothing; same views via Shared/UI</text>
+
+  <rect class="box client" x="860" y="60" width="380" height="84"/>
+  <text class="title" x="876" y="84">Browser on this Mac · Web/</text>
+  <text class="small" x="876" y="104">page built into Agents Host (Web/dist)</text>
+  <text class="small" x="876" y="122">served by agents-control on localhost:8792</text>
+
+  <!-- Control plane -->
+  <rect class="box cp" x="330" y="200" width="620" height="96"/>
+  <text class="title" x="346" y="224">Control plane · agents-control serve (Packages/ControlPlane)</text>
+  <text class="small" x="346" y="244">launchd job com.alexecollins.agentshost.control · Agents Host.app/Contents/Helpers</text>
+  <text class="small" x="346" y="262">:8791 wss for windows, phones and hosts · :8792 http loopback for the web page</text>
+  <text class="small" x="346" y="280">store: a folder or an S3 bucket (who is paired, which hosts); routes requests, fans out updates</text>
+
+  <path class="conn" d="M230,144 L420,200"/>
+  <path class="conn" d="M640,144 L640,200"/>
+  <path class="conn" d="M1050,144 L860,200"/>
+  <text class="lbl" x="170" y="184">wss, paired by code</text>
+  <text class="lbl" x="648" y="178">wss</text>
+  <text class="lbl" x="960" y="178">ws to :8792</text>
+
+  <!-- Agents Host + launchd -->
+  <rect class="box host" x="40" y="330" width="250" height="92"/>
+  <text class="title" x="56" y="354">Agents Host.app · Host/</text>
+  <text class="small" x="56" y="374">menu bar app, outside the App Store</text>
+  <text class="small" x="56" y="392">registers the two login items;</text>
+  <text class="small" x="56" y="410">quitting it stops neither</text>
+
+  <rect class="box" x="40" y="470" width="250" height="64" style="fill:#f0f0f0"/>
+  <text class="title" x="56" y="494">launchd</text>
+  <text class="small" x="56" y="514">keeps the jobs alive, starts them at login</text>
+
+  <path class="conn" d="M165,422 L165,470"/>
+  <text class="lbl" x="172" y="451">registers (LaunchAgents)</text>
+
+  <path class="spawn" d="M290,490 C312,490 300,250 330,250"/>
+  <path class="spawn" d="M290,505 C315,505 305,385 330,385"/>
+  <path class="spawn" d="M165,534 L165,600"/>
+
+  <!-- ci-watcher -->
+  <rect class="box ext" x="40" y="600" width="250" height="112"/>
+  <text class="title" x="56" y="624">ci-watcher · Integrations/</text>
+  <text class="mono" x="56" y="644">node server.ts --port 8795</text>
+  <text class="small" x="56" y="662">LaunchAgent com.agents.ci-watcher</text>
+  <text class="small" x="56" y="680">MCP over http, 127.0.0.1 only</text>
+  <text class="small" x="56" y="698">calls gh api as Alex → GitHub</text>
+
+  <!-- agentsd -->
+  <rect class="box daemon" x="330" y="340" width="620" height="100"/>
+  <text class="title" x="346" y="364">agentsd --control-network · Daemon/ + Packages/AgentsKit</text>
+  <text class="small" x="346" y="384">launchd job com.alexecollins.agentshost.daemon · this Mac's host; owns every agent and writes its record</text>
+  <text class="small" x="346" y="402">serves the app's own "agents" MCP tools at http://127.0.0.1:&lt;port&gt;/mcp/agents (token per session)</text>
+  <text class="small" x="346" y="420">runs workflows, leases, events; polls MCP servers' events/poll for workflow triggers</text>
+
+  <path class="conn" d="M640,340 L640,296"/>
+  <text class="lbl" x="648" y="324">connects out (wss :8791)</text>
+
+  <!-- children group -->
+  <rect class="group" x="330" y="462" width="620" height="440"/>
+  <text class="title" x="346" y="484" style="fill:#555">Children of agentsd: each in its own process group, dies with the daemon</text>
+  <path class="spawn" d="M640,440 L640,462"/>
+
+  <rect class="box daemon" x="350" y="496" width="580" height="196"/>
+  <text class="title" x="366" y="518">One runtime per agent, ACP over stdio pipes</text>
+  <text class="mono" x="366" y="542">npm exec @agentclientprotocol/claude-agent-acp</text>
+  <text class="mono" x="366" y="560">└─ node                 the ACP adapter</text>
+  <text class="mono" x="366" y="578">   └─ claude            Agent SDK binary (the model loop)</text>
+  <text class="mono" x="366" y="596">      ├─ /bin/zsh       its Bash tool's shells</text>
+  <text class="mono" x="366" y="614">      └─ stdio MCP servers it starts from .mcp.json / plugins</text>
+  <text class="small" x="366" y="640">Likewise codex, copilot, opencode, cursor, grok, gemini (the adapter differs, not the shape).</text>
+  <text class="small" x="366" y="658">The runtime calls back into agentsd for its mcp__agents__* tools over loopback http,</text>
+  <text class="small" x="366" y="676">and reaches http MCP servers (ci on :8795) itself.</text>
+
+  <rect class="box" x="350" y="708" width="280" height="84"/>
+  <text class="title" x="366" y="730">Terminals (PTY)</text>
+  <text class="small" x="366" y="750">shells on a pseudo-terminal: the Files</text>
+  <text class="small" x="366" y="766">pane's terminal, Control-` project shell;</text>
+  <text class="small" x="366" y="782">drawn in any client via the control plane</text>
+
+  <rect class="box" x="650" y="708" width="280" height="84"/>
+  <text class="title" x="666" y="730">Commands for an agent</text>
+  <text class="small" x="666" y="750">ACP terminal/* requests (TerminalService),</text>
+  <text class="small" x="666" y="766">for runtimes that ask the client to run</text>
+  <text class="small" x="666" y="782">commands; output capped</text>
+
+  <rect class="box" x="350" y="806" width="280" height="84"/>
+  <text class="title" x="366" y="828">stdio MCP servers for events</text>
+  <text class="small" x="366" y="848">from .agents/mcp.json, started by the</text>
+  <text class="small" x="366" y="864">daemon itself (MCPStdioProcess) when a</text>
+  <text class="small" x="366" y="880">workflow triggers on their events</text>
+
+  <rect class="box" x="650" y="806" width="280" height="84"/>
+  <text class="title" x="666" y="828">Short-lived helpers</text>
+  <text class="small" x="666" y="848">git (clone, worktrees), runtime installers,</text>
+  <text class="small" x="666" y="864">ssh to install on a server, Claude</text>
+  <text class="small" x="666" y="880">Keychain sign-in, Finder/open for the window</text>
+
+  <path class="conn" d="M350,610 C320,610 320,660 290,660"/>
+  <text class="lbl" x="40" y="732">↑ runtimes call its tools; agentsd polls</text>
+  <text class="lbl" x="40" y="748">its events (both http :8795)</text>
+
+  <!-- Right column: other hosts -->
+  <rect class="box host" x="990" y="340" width="250" height="110"/>
+  <text class="title" x="1006" y="364">A Linux server or another Mac</text>
+  <text class="small" x="1006" y="384">the same agentsd, installed over ssh</text>
+  <text class="small" x="1006" y="402">or by Agents Host; its own runtimes,</text>
+  <text class="small" x="1006" y="420">terminals and records, same tree</text>
+  <text class="small" x="1006" y="438">as on the left</text>
+  <path class="conn" d="M1100,340 C1100,290 1000,260 950,260"/>
+  <text class="lbl" x="1040" y="300">connects out</text>
+
+  <rect class="box host" x="990" y="480" width="250" height="88" style="stroke-dasharray:5 4"/>
+  <text class="title" x="1006" y="504">agents-relay.app (optional)</text>
+  <text class="small" x="1006" y="524">in Agents Host's Helpers; iCloud</text>
+  <text class="small" x="1006" y="542">mailbox for phones away from home</text>
+  <text class="small" x="1006" y="560">and notifications; not in this build yet</text>
+
+  <!-- Legend -->
+  <line x1="40" y1="940" x2="90" y2="940" class="spawn"/>
+  <text class="lbls" x="100" y="944">starts (parent → child process)</text>
+  <line x1="320" y1="940" x2="370" y2="940" class="conn"/>
+  <text class="lbls" x="380" y="944">connects to (socket / http / wss); arrow points the way the connection is made</text>
+  <text class="small" x="40" y="970">Read from the live process tree on 2026-10-08: launchd → agents-control (8791/8792), agentsd → npm → node → claude → zsh, com.agents.ci-watcher → node :8795.</text>
+</svg>
