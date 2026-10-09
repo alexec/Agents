@@ -1,0 +1,148 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 1060" width="1400" height="1060" font-family="-apple-system, Helvetica, Arial, sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#555"/></marker>
+<style>
+.t{fill:#fff;font-weight:700;font-size:15px;text-anchor:middle} .k{fill:#fff;font-size:11px;text-anchor:middle;opacity:.9} .d{fill:#fff;font-size:11.5px;text-anchor:middle}
+.r{stroke:#555;stroke-width:1.4;fill:none;stroke-dasharray:6 4;marker-end:url(#a)} .rl{font-size:11.5px;fill:#333;text-anchor:middle} .rt{font-size:10.5px;fill:#666;text-anchor:middle}
+</style></defs><rect width="1400" height="1060" fill="#fff"/>
+
+<text x="40" y="38" font-size="20" font-weight="700">Agents · Containers (C4 level 2)</text><text x="40" y="60" font-size="13" fill="#555">The deployable parts of Agents and how they talk. A host is a Mac with Agents Host, or a Linux server running agentsd.</text>
+<rect x="40" y="200" width="1010" height="620" rx="12" fill="none" stroke="#666" stroke-width="1.5" stroke-dasharray="8 5"/>
+<text x="56" y="806" font-size="14" font-weight="700" fill="#444">Agents</text><text x="116" y="806" font-size="12" fill="#666">[Software System]</text>
+<circle cx="545.0" cy="94" r="24" fill="#08427b"/>
+<rect x="455" y="114" width="180" height="76" rx="22" fill="#08427b"/>
+<text class="t" x="545.0" y="142">Alex</text>
+<text class="k" x="545.0" y="159">[Person]</text>
+<text class="d" x="545.0" y="180">Developer</text>
+<rect x="70" y="230" width="260" height="110" rx="8" fill="#438dd5" stroke="#438dd5"/>
+<text class="t" x="200.0" y="256">Mac window</text>
+<text class="k" x="200.0" y="273">[Container: macOS app, SwiftUI]</text>
+<text class="d" x="200.0" y="294">App/ + Shared/UI · App Store sandbox;</text>
+<text class="d" x="200.0" y="309">starts nothing, asks a host</text>
+<rect x="410" y="230" width="260" height="110" rx="8" fill="#438dd5" stroke="#438dd5"/>
+<text class="t" x="540.0" y="256">Remote</text>
+<text class="k" x="540.0" y="273">[Container: iOS / iPadOS app, SwiftUI]</text>
+<text class="d" x="540.0" y="294">Remote/ + Shared/UI,</text>
+<text class="d" x="540.0" y="309">widget, notifications</text>
+<rect x="750" y="230" width="260" height="110" rx="8" fill="#438dd5" stroke="#438dd5"/>
+<text class="t" x="880.0" y="256">Web page</text>
+<text class="k" x="880.0" y="273">[Container: TypeScript SPA]</text>
+<text class="d" x="880.0" y="294">Web/ · served by the control plane</text>
+<text class="d" x="880.0" y="309">on localhost:8792</text>
+<rect x="70" y="420" width="260" height="110" rx="8" fill="#438dd5" stroke="#438dd5"/>
+<text class="t" x="200.0" y="446">Agents Host</text>
+<text class="k" x="200.0" y="463">[Container: macOS menu bar app]</text>
+<text class="d" x="200.0" y="484">Host/ · installs and registers</text>
+<text class="d" x="200.0" y="499">the daemon and control plane</text>
+<rect x="410" y="420" width="260" height="110" rx="8" fill="#438dd5" stroke="#438dd5"/>
+<text class="t" x="540.0" y="446">Control plane</text>
+<text class="k" x="540.0" y="463">[Container: Swift server, agents-control]</text>
+<text class="d" x="540.0" y="484">Packages/ControlPlane · pairs clients,</text>
+<text class="d" x="540.0" y="499">routes requests, fans out updates</text>
+<path d="M750,432 L750,518 A130.0,12 0 0 0 1010,518 L1010,432 A130.0,12 0 0 0 750,432 Z" fill="#438dd5" stroke="#438dd5"/>
+<ellipse cx="880.0" cy="432" rx="130.0" ry="12" fill="#438dd5" stroke="#fff" stroke-opacity=".5"/>
+<text class="t" x="880.0" y="458">Control plane store</text>
+<text class="k" x="880.0" y="475">[Container: folder or S3 bucket]</text>
+<text class="d" x="880.0" y="496">pairings, hosts, codes, settings</text>
+<path d="M70,632 L70,728 A130.0,12 0 0 0 330,728 L330,632 A130.0,12 0 0 0 70,632 Z" fill="#438dd5" stroke="#438dd5"/>
+<ellipse cx="200.0" cy="632" rx="130.0" ry="12" fill="#438dd5" stroke="#fff" stroke-opacity=".5"/>
+<text class="t" x="200.0" y="658">Host data</text>
+<text class="k" x="200.0" y="675">[Container: files on the host]</text>
+<text class="d" x="200.0" y="696">agent records, transcripts, workflows:</text>
+<text class="d" x="200.0" y="711">~/Library/Application Support/Agents,</text>
+<text class="d" x="200.0" y="726">~/.agents, a project&#x27;s .agents/</text>
+<rect x="410" y="620" width="260" height="120" rx="8" fill="#438dd5" stroke="#438dd5"/>
+<text class="t" x="540.0" y="646">Host daemon (agentsd)</text>
+<text class="k" x="540.0" y="663">[Container: Swift daemon, macOS + Linux]</text>
+<text class="d" x="540.0" y="684">Daemon/ + Packages/AgentsKit · owns</text>
+<text class="d" x="540.0" y="699">agents, terminals, files, git, workflows;</text>
+<text class="d" x="540.0" y="714">serves the agents MCP tools</text>
+<rect x="750" y="620" width="260" height="110" rx="8" fill="#b5b5b5" stroke="#333" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text class="t" x="880.0" y="646">agents-relay</text>
+<text class="k" x="880.0" y="663">[Container: macOS helper]</text>
+<text class="d" x="880.0" y="684">iCloud mailbox for phones</text>
+<text class="d" x="880.0" y="699">away from home</text>
+<rect x="330" y="880" width="300" height="120" rx="8" fill="#8a8a8a" stroke="#8a8a8a"/>
+<text class="t" x="480.0" y="906">Agent runtimes</text>
+<text class="k" x="480.0" y="923">[External Software System]</text>
+<text class="d" x="480.0" y="944">Claude Code, Codex, Copilot, OpenCode,</text>
+<text class="d" x="480.0" y="959">Cursor, Grok, Gemini, run by agentsd</text>
+<rect x="700" y="880" width="280" height="120" rx="8" fill="#8a8a8a" stroke="#8a8a8a"/>
+<text class="t" x="840.0" y="906">MCP servers</text>
+<text class="k" x="840.0" y="923">[External Software System]</text>
+<text class="d" x="840.0" y="944">stdio or http; e.g. the CI watcher</text>
+<text class="d" x="840.0" y="959">node, 127.0.0.1:8795</text>
+<rect x="1100" y="880" width="260" height="120" rx="8" fill="#8a8a8a" stroke="#8a8a8a"/>
+<text class="t" x="1230.0" y="906">Model providers</text>
+<text class="k" x="1230.0" y="923">[External Software System]</text>
+<text class="d" x="1230.0" y="944">Anthropic, OpenAI, xAI, …</text>
+<rect x="1100" y="690" width="260" height="100" rx="8" fill="#8a8a8a" stroke="#8a8a8a"/>
+<text class="t" x="1230.0" y="716">GitHub</text>
+<text class="k" x="1230.0" y="733">[External Software System]</text>
+<text class="d" x="1230.0" y="754">repos, PRs, Actions</text>
+<rect x="1100" y="420" width="260" height="100" rx="8" fill="#b5b5b5" stroke="#333" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text class="t" x="1230.0" y="446">Apple iCloud</text>
+<text class="k" x="1230.0" y="463">[External Software System]</text>
+<text class="d" x="1230.0" y="484">CloudKit mailbox</text>
+<text x="1110" y="96" font-size="12" font-weight="700" fill="#333">Key</text>
+<rect x="1110" y="108" width="26" height="16" rx="3" fill="#08427b"/><text x="1144" y="120" font-size="11.5" fill="#333">Person</text>
+<rect x="1110" y="132" width="26" height="16" rx="3" fill="#1168bd"/><text x="1144" y="144" font-size="11.5" fill="#333">Software system</text>
+<rect x="1110" y="156" width="26" height="16" rx="3" fill="#438dd5"/><text x="1144" y="168" font-size="11.5" fill="#333">Container</text>
+<rect x="1110" y="180" width="26" height="16" rx="3" fill="#8a8a8a"/><text x="1144" y="192" font-size="11.5" fill="#333">External software system</text>
+<rect x="1110" y="204" width="26" height="16" rx="3" fill="#b5b5b5" stroke="#333" stroke-dasharray="4 3"/><text x="1144" y="216" font-size="11.5" fill="#333">Planned, not in this build</text>
+<path class="r" d="M1110,236 L1136,236"/><text x="1144" y="240" font-size="11.5" fill="#333">Relationship [technology]</text>
+<path class="r" d="M480,170 C380,180 260,200 200,230"/>
+<text class="rl" x="290" y="196"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Uses</tspan></text>
+<path class="r" d="M540,190 L540,230"/>
+<text class="rl" x="568" y="214"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Uses</tspan></text>
+<path class="r" d="M610,170 C700,180 820,200 880,230"/>
+<text class="rl" x="800" y="196"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Uses</tspan></text>
+<path class="r" d="M200,340 C200,380 420,380 470,420"/>
+<text class="rl" x="300" y="374"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Requests, updates</tspan></text>
+<text class="rt" x="300" y="388"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[wss :8791, paired by code]</tspan></text>
+<path class="r" d="M540,340 L540,420"/>
+<text class="rl" x="540" y="374"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Requests, updates</tspan></text>
+<text class="rt" x="540" y="388"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[wss :8791]</tspan></text>
+<path class="r" d="M880,340 C880,380 660,380 610,420"/>
+<text class="rl" x="780" y="374"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Requests, updates</tspan></text>
+<text class="rt" x="780" y="388"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[ws localhost:8792]</tspan></text>
+<path class="r" d="M670,475 L750,475"/>
+<text class="rl" x="710" y="460"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Reads, writes</tspan></text>
+<text class="rt" x="710" y="474"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[file / S3]</tspan></text>
+<path class="r" d="M330,460 L410,460"/>
+<text class="rl" x="370" y="445"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Runs</tspan></text>
+<text class="rt" x="370" y="459"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[launchd]</tspan></text>
+<path class="r" d="M260,530 C300,580 360,620 410,650"/>
+<text class="rl" x="310" y="575"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Installs, runs</tspan></text>
+<text class="rt" x="310" y="589"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[launchd]</tspan></text>
+<path class="r" d="M540,620 L540,530"/>
+<text class="rl" x="540" y="580"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Connects out, serves</tspan></text>
+<text class="rt" x="540" y="594"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[wss :8791]</tspan></text>
+<path class="r" d="M410,690 L330,690"/>
+<text class="rl" x="370" y="675"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Reads, writes</tspan></text>
+<text class="rt" x="370" y="689"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[files]</tspan></text>
+<path class="r" d="M670,680 L750,680"/>
+<text class="rl" x="710" y="665"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Pushes (planned)</tspan></text>
+<path class="r" d="M1010,640 C1050,600 1060,520 1100,480"/>
+<text class="rl" x="1060" y="560"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Mailbox</tspan></text>
+<path class="r" d="M670,720 C800,760 1000,760 1100,740"/>
+<text class="rl" x="900" y="748"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Clones, pushes</tspan></text>
+<text class="rt" x="900" y="762"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[git]</tspan></text>
+<path class="r" d="M450,740 L450,880"/>
+<text class="rl" x="450" y="800"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Starts, drives</tspan></text>
+<text class="rt" x="450" y="814"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[ACP over stdio]</tspan></text>
+<path class="r" d="M560,880 L560,740"/>
+<text class="rl" x="560" y="845"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Calls agents tools</tspan></text>
+<text class="rt" x="560" y="859"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[MCP, http loopback]</tspan></text>
+<path class="r" d="M640,740 C700,800 780,830 800,880"/>
+<text class="rl" x="745" y="800"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Polls events</tspan></text>
+<text class="rt" x="745" y="814"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[MCP events/poll]</tspan></text>
+<path class="r" d="M630,940 L700,940"/>
+<text class="rl" x="665" y="925"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Calls tools</tspan></text>
+<text class="rt" x="665" y="939"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[MCP]</tspan></text>
+<path class="r" d="M480,1000 C480,1040 1230,1040 1230,1000"/>
+<text class="rl" x="860" y="1040"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Prompts</tspan></text>
+<text class="rt" x="860" y="1054"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[HTTPS]</tspan></text>
+<path class="r" d="M980,900 C1040,880 1100,820 1180,790"/>
+<text class="rl" x="1050" y="872"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">gh api</tspan></text>
+<text class="rt" x="1050" y="886"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[HTTPS]</tspan></text>
+</svg>

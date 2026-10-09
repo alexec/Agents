@@ -1,82 +1,85 @@
 ---
 diataxis: explanation
-description: Which programs make up Agents on a Mac, which one starts which, and how they reach each other.
+description: The system around Agents, the containers it is made of, and which process starts which, as C4 diagrams.
 devices: [mac, iphone, ipad, server]
 ---
 
-# The processes behind Agents
+# Architecture
 
-Agents on a Mac is a handful of programs. Only one of them, the daemon, starts anything to
-do with your agents; the window you look at starts nothing. This page shows them all, which
-one starts which, and how they connect.
+Three views of Agents, from the outside in, in the style of the
+[C4 model](https://c4model.com): the system and its neighbours, the containers it is made
+of, and how those run as processes on a Mac.
 
-![Processes on this Mac and what starts what](../assets/architecture.svg)
+## System context
 
-A solid arrow means one program starts another, so the child is in the parent's process
-tree. A dashed arrow is a connection, pointing the way it is made.
+![Agents, the person who uses it, and the systems around it](../assets/architecture-context.svg)
 
-## What macOS starts
+You use Agents to run coding agents on hosts you own, and follow and answer them from a
+Mac, an iPhone, an iPad or a browser. Agents does not talk to a model itself. It starts and
+drives an **agent runtime** (Claude Code, Codex, Copilot, OpenCode, Cursor, Grok or Gemini)
+over ACP, and the runtime prompts its own provider. A runtime calls back into Agents for the
+app's own tools (`mcp__agents__*`) over MCP.
 
-**Agents Host** (`Host/`) is the menu-bar app you install outside the App Store. It does
-little itself: it registers two login items with macOS, and launchd runs them from then on,
-whether Agents Host is open or not.
+Agents also polls **MCP servers** for the events that trigger workflows, clones and pushes
+to **GitHub** with git, and installs runtimes from **package registries**. A relay through
+**iCloud**, for phones away from home, is planned and not in this build.
 
-| launchd job | Program | What it is |
-| --- | --- | --- |
-| `com.alexecollins.agentshost.daemon` | `agentsd --control-network` | This Mac's host: the daemon. |
-| `com.alexecollins.agentshost.control` | `agents-control serve --port 8791` | The control plane, if it runs on this Mac. |
+## Containers
 
-Both programs are in `Agents Host.app/Contents/Helpers`, beside `agents-relay.app`, which is
-optional and not in this build yet. Any other LaunchAgent you add is separate from these,
-such as the CI watcher (`com.agents.ci-watcher`, `Integrations/ci-watcher`).
+![The containers of Agents and how they connect](../assets/architecture-containers.svg)
 
-## The clients start nothing
+| Container | Code | Technology | What it does |
+| --- | --- | --- | --- |
+| Mac window | `App/`, `Shared/UI` | macOS app, SwiftUI, App Store sandbox | A client. Starts nothing; asks a host for everything. |
+| Remote | `Remote/`, `Shared/UI` | iOS and iPadOS app, SwiftUI, with a widget | A client, on the phone and the iPad. |
+| Web page | `Web/` | TypeScript single-page app | A client, served by the control plane on `localhost:8792`. |
+| Agents Host | `Host/` | macOS menu bar app | Installs the daemon and the control plane, registers them with launchd, makes pairing codes. |
+| Control plane | `Packages/ControlPlane` | Swift server, `agents-control` | Pairs clients, routes each request to its host, sends updates to clients. `:8791` wss, `:8792` loopback http. |
+| Control plane store | | A folder or an S3 bucket | Who is paired, which hosts there are, unused codes, settings. Nothing about agents. |
+| Host daemon | `Daemon/`, `Packages/AgentsKit` | Swift daemon, `agentsd`, macOS and Linux | Owns agents, terminals, files, git and workflows on its host. Serves the agents MCP tools. |
+| Host data | | Files on the host | Agent records, transcripts and settings in `~/Library/Application Support/Agents`; shared skills and instructions in `~/.agents`; a project's own `.agents/`. |
+| agents-relay | `Host/Relay` | macOS helper | Planned: an iCloud mailbox for phones away from home. |
 
-The **Agents window** (`App/`, App Store sandbox), the **Remote** on iPhone and iPad
-(`Remote/`) and the **web page** (`Web/`) are clients. Each connects to the control plane,
-which passes its requests to the host they concern and sends it updates. A client never has
-a child process: a terminal, a file read, a git command or a sign-in it asks for runs on a
-host.
+Every connection to the control plane is made **outwards**: from a client, and from each
+host. A client never reaches a host directly, and a host never needs to be reachable. A
+Linux server or another Mac is one more host daemon with its own host data, connected the
+same way. See [The control plane](control-plane.md).
 
-The control plane listens on `:8791` (WebSocket over TLS, for windows, phones and hosts) and
-on `localhost:8792` (plain http, loopback only, for the web page it serves). See
-[The control plane](control-plane.md).
+## Processes on this Mac
 
-## The daemon starts everything else
+![Processes on this Mac and what starts what](../assets/architecture-processes.svg)
 
-`agentsd` owns every agent. It connects out to the control plane like any other host, and
-every process to do with an agent is its child, in a process group of its own, so that
-stopping an agent or the daemon takes the whole group with it.
+This is how the containers above run on a Mac. A solid arrow means one program starts
+another. A dashed arrow is a connection, pointing the way it is made.
 
-- **A runtime per agent.** It speaks ACP over stdio pipes. For Claude that is
+**Agents Host** registers two login items, and launchd runs them whether Agents Host is
+open or not:
+
+| launchd job | Program |
+| --- | --- |
+| `com.alexecollins.agentshost.daemon` | `agentsd --control-network` |
+| `com.alexecollins.agentshost.control` | `agents-control serve --port 8791` |
+
+The clients start no processes. Every process to do with an agent is a child of `agentsd`,
+in a process group of its own, so stopping an agent, or the daemon, takes its whole group
+with it:
+
+- **A runtime per agent**, speaking ACP over stdio. For Claude:
   `npm exec @agentclientprotocol/claude-agent-acp` → `node` (the ACP adapter) → `claude`
-  (the Agent SDK binary). The runtime starts its own children: shells for its Bash tool, and
-  the stdio MCP servers named in `.mcp.json` and in plugins. Codex, Copilot, OpenCode,
-  Cursor, Grok and Gemini have the same shape with a different adapter.
-- **Terminals.** Shells on a pseudo-terminal: the terminal in the Files pane, and the
-  Control-` project shell. Any client draws them, through the control plane.
-- **Commands for an agent.** A runtime that asks its client to run a command over ACP's
-  `terminal/*` gets one started by the daemon, with its output kept to a cap.
-- **MCP servers for events.** A stdio server in `.agents/mcp.json` that a workflow triggers
-  on is started by the daemon itself, which polls its `events/poll`.
-- **Short-lived helpers.** git, runtime installers, ssh to install on a server, the Claude
+  (the Agent SDK binary). The runtime starts its own children: shells for its Bash tool,
+  and the stdio MCP servers in `.mcp.json` and plugins.
+- **Terminals**: shells on a pseudo-terminal, such as the Files pane's terminal and the
+  Control-` project shell.
+- **Commands for an agent**: what a runtime asks its client to run over ACP's `terminal/*`.
+- **MCP servers for events**: stdio servers in `.agents/mcp.json` that a workflow triggers
+  on, polled by the daemon.
+- **Short-lived helpers**: git, runtime installers, ssh to install on a server, the Claude
   Keychain sign-in, and opening files and Finder for the sandboxed window.
 
-## Connections back into the daemon and out to MCP servers
-
-An agent's own tools, the `mcp__agents__*` ones, are not a process. The daemon serves them
-at `http://127.0.0.1:<port>/mcp/agents`, with a token for each session, and the runtime
-calls them there. Before #185 each runtime started an `agentsd mcp` helper for this; that
-helper is gone.
-
-An http MCP server, such as the CI watcher on `127.0.0.1:8795`, is not started by anyone in
-this tree. Runtimes call its tools over http, and the daemon polls its events over http.
-
-## Other hosts
-
-A Linux server, or another Mac running Agents Host, runs the same `agentsd`, with the same
-tree of children under it. It connects out to the control plane, so nothing has to be able
-to reach it. Its agents, terminals and records stay on it.
+The agents MCP tools are not a process. The daemon serves them at
+`http://127.0.0.1:<port>/mcp/agents`, with a token for each session (#185). An http MCP
+server, such as the CI watcher on `127.0.0.1:8795`, belongs to no one in this tree: it is
+a LaunchAgent of its own.
 
 ## Related
 
