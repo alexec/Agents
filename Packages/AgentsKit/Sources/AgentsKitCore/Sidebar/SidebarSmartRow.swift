@@ -49,6 +49,18 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
         }
     }
 
+    /// Whether the sidebar draws it at all (#507): only with something in it, and while
+    /// searching only with a match. Its count is a sum of counts; a search, already
+    /// filtering every list, filters this one too.
+    @MainActor
+    public func isShown(in work: AgentsModel, projects: [ProjectKey], query: String = "") -> Bool {
+        if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return count(in: work, projects: projects) > 0
+        }
+        return !agents(in: work, projects: projects, query: query).isEmpty
+            || !workflows(in: work, projects: projects, query: query).isEmpty
+    }
+
     /// The sessions it gathers, newest started first, as a search leaves them.
     @MainActor
     public func agents(in work: AgentsModel, projects: [ProjectKey], query: String = "") -> [Agent] {
