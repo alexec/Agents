@@ -139,19 +139,39 @@ final class RemoteModel {
         return fresh
     }
 
-    /// The project's own shell (#418), on the project's host: the one Control-` opens
-    /// on the Mac, in the project's folder whichever agent is open.
-    func projectShellClient(for folder: URL) -> ShellClient {
+    /// One of the project's own shells (#418), on the project's host: the ones Control-`
+    /// opens on the Mac, in the project's folder whichever agent is open.
+    func projectShellClient(for folder: URL, shell: Int = 0) -> ShellClient {
         let id = ProjectShell.id(for: folder)
-        let key = ShellKey(agentID: id, shell: 0)
+        let key = ShellKey(agentID: id, shell: shell)
         if let existing = shells[key] { return existing }
-        let host = work.projects.first { $0.folder == folder }?.host ?? .mac
-        let target = host == .mac ? client : otherHosts[host] ?? client
-        let fresh = ShellClient(agentID: id, project: folder, client: target, describe: { error in
+        let fresh = ShellClient(agentID: id, shell: shell, project: folder, client: projectHostClient(for: folder),
+                                describe: { error in
             (error as? JSONRPCError)?.message ?? "Your Mac is not answering."
         })
         shells[key] = fresh
         return fresh
+    }
+
+    /// The shells the project's host holds for the project, so the sheet opens with the
+    /// tabs the Mac's panel has. Nil from a host too old to list them.
+    func projectShellNumbers(for folder: URL) async -> [Int]? {
+        let response = try? await projectHostClient(for: folder).call(
+            DaemonAPI.Method.shellList, DaemonAPI.AgentRequest(agentID: ProjectShell.id(for: folder)),
+            returning: DaemonAPI.ShellListResponse.self)
+        return response?.shells
+    }
+
+    /// A new tab in the project's sheet, numbered by its host. Nil from a host too old
+    /// to open one for a project, and the sheet numbers it itself.
+    func openProjectShell(for folder: URL) async -> Int? {
+        await ShellClient.open(agentID: ProjectShell.id(for: folder), project: folder,
+                               on: projectHostClient(for: folder))
+    }
+
+    private func projectHostClient(for folder: URL) -> DaemonClient {
+        let host = work.projects.first { $0.folder == folder }?.host ?? .mac
+        return host == .mac ? client : otherHosts[host] ?? client
     }
 
     /// The shells the Mac holds for an agent, so the pane opens with the tabs the window
@@ -2167,6 +2187,21 @@ final class RemoteModel {
             archived += theirs.filter(\.project.isArchived).map { var summary = $0; summary.host = host; return summary }
         }
         archivedProjects = archived
+    }
+
+    /// A project pinned to the top of the sidebar, or not, through its own host.
+    func setPinned(_ pinned: Bool, for summary: DaemonAPI.ProjectSummary) async {
+        let host = summary.host
+        guard let target = host == .mac ? client : otherHosts[host] else { return }
+        do {
+            var changed = try await target.call(DaemonAPI.Method.projectsSetPinned,
+                                                DaemonAPI.SetPinnedRequest(folder: summary.folder, pinned: pinned),
+                                                returning: DaemonAPI.ProjectSummary.self)
+            changed.host = host
+            work.upsert(changed)
+        } catch {
+            problem = sentence(for: error)
+        }
     }
 
     /// Bring an archived project back (#343), through its own host, as the window's Bring

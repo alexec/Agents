@@ -196,6 +196,9 @@ public enum DaemonAPI {
         /// paired client (#111). Not in `ConnectionRole.agentMethods`, so no agent and no
         /// workflow can raise a ceiling over agents.
         public static let projectsSetHelperLimits = "projects/setHelperLimits"
+        /// The person pinning a project to the top of the sidebar, or unpinning it, from
+        /// any client. Not in `ConnectionRole.agentMethods`: the sidebar is the person's.
+        public static let projectsSetPinned = "projects/setPinned"
         /// A project's disk space lines (#195), kept in its `.agents/project.json`.
         public static let projectsSetDiskSpace = "projects/setDiskSpace"
         /// Every volume that is low on space, for the window's strip (#195).
@@ -546,6 +549,16 @@ public enum DaemonAPI {
         public init(folder: URL, limits: HelperLimits) {
             self.folder = folder
             self.limits = limits
+        }
+    }
+
+    /// A project pinned to the top of the sidebar, or not.
+    public struct SetPinnedRequest: Codable, Sendable {
+        public var folder: URL
+        public var pinned: Bool
+        public init(folder: URL, pinned: Bool) {
+            self.folder = folder
+            self.pinned = pinned
         }
     }
 

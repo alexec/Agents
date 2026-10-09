@@ -127,6 +127,9 @@ test("Projects: this Mac's then each server's, oldest added first, however busy 
     listed.mac.push(project("new", 40));
     assert.deepEqual(names(listed), ["mac:first", "mac:busy", "mac:new", "box:api"], "a new project lands at the end");
     assert.deepEqual(names({ mac: [project("b", 10), project("a", 10)] }), ["mac:a", "mac:b"], "same moment: by folder");
+    const pinned = (p) => ({ ...p, project: { ...p.project, pinned: true } });
+    assert.deepEqual(names({ mac: [project("a", 1), pinned(project("chat", 2))], box: [pinned(project("api", 3))] }),
+      ["mac:chat", "box:api", "mac:a"], "the pinned first, from every host");
   } finally {
     delete globalThis.location;
     delete globalThis.addEventListener;

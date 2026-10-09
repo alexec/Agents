@@ -45,6 +45,26 @@ struct ProjectShellTests {
         await core.closeShell(.init(agentID: id))
     }
 
+    @Test func aProjectsShellsHaveTabsInItsFolder() async throws {
+        let (core, work) = try await core()
+        let summary = try await core.addProject(work)
+        let id = ProjectShell.id(for: summary.folder)
+        _ = try await core.attachShell(.init(agentID: id, folder: summary.folder))
+
+        let opened = try await core.openShell(.init(agentID: id, folder: summary.folder))
+        #expect(opened.shell == 1)
+        #expect(await core.listShells(id).shells == [0, 1])
+        let second = await core.shells.session(for: id, shell: 1)
+        #expect(second.map { Project.standardize($0.folder) } == Project.standardize(work))
+
+        // Without the folder there is no agent by that id to open one for.
+        await #expect(throws: JSONRPCError.self) {
+            _ = try await core.openShell(.init(agentID: id))
+        }
+        await core.closeShell(.init(agentID: id, shell: 1))
+        await core.closeShell(.init(agentID: id))
+    }
+
     @Test func aFolderThatIsNotAProjectGetsNoShell() async throws {
         let (core, work) = try await core()
         let stranger = work.appendingPathComponent("not-a-project", isDirectory: true)

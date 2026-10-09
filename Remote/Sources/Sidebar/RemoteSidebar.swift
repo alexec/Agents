@@ -388,6 +388,14 @@ private struct ProjectMenuItems: View {
             Label("Put Files in Drop Box…", systemImage: "tray.and.arrow.down")
         }
         .disabled(model.isStale(on: summary.host))
+        // To the top of the sidebar, as the window's Pin.
+        Button {
+            Task { await model.setPinned(!summary.project.isPinned, for: summary) }
+        } label: {
+            Label(summary.project.isPinned ? "Unpin" : "Pin",
+                  systemImage: summary.project.isPinned ? "pin.slash" : "pin")
+        }
+        .disabled(model.isStale(on: summary.host))
     }
 }
 

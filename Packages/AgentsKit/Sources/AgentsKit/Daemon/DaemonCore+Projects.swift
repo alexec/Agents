@@ -87,7 +87,13 @@ extension DaemonCore {
             costToDate: tally?.costToDate ?? [:],
             unmeasuredAgents: tally?.unmeasured ?? 0)
         if isChatProject(folder) { summary.isChat = true }
+        summary.project.pinned = Self.isPinned(project, chat: summary.isChat == true) ? true : nil
         return summary
+    }
+
+    /// The person's pin, or the chat project's own when they never chose: pinned.
+    static func isPinned(_ record: Project, chat: Bool) -> Bool {
+        record.pinned ?? chat
     }
 
     /// Every project's name, disambiguated against the others.
@@ -162,6 +168,7 @@ extension DaemonCore {
             var project = project
             project.helperLimits = configuredHelperLimits(in: project.folder)
             project.diskSpace = configuredDiskSpace(in: project.folder)
+            project.pinned = Self.isPinned(project, chat: isChatProject(project.folder)) ? true : nil
             return DaemonAPI.ProjectSummary(
                 project: project,
                 name: names[project.folder] ?? project.folder.lastPathComponent,
@@ -384,6 +391,32 @@ extension DaemonCore {
     /// was kept rather than finding out later. Lowering a limit below what is in use
     /// stops nothing: it refuses the next start until enough have finished or been
     /// archived.
+    /// `projects/setPinned`: kept in the record, as the person's choice, even when it is
+    /// the default, so unpinning the chat project stays unpinned.
+    public func setPinned(_ request: DaemonAPI.SetPinnedRequest) throws -> DaemonAPI.ProjectSummary {
+        let standardized = Project.standardize(request.folder)
+        guard let before = projectSummary(for: standardized) else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchProject,
+                               message: "\(standardized.path) is not a project.")
+        }
+        var records = projectRecords()
+        var record = records[standardized] ?? before.project
+        if records[standardized] == nil {
+            // A derived project is kept from now on, as it stood, without the summary's own.
+            record.helperLimits = nil
+            record.diskSpace = nil
+        }
+        record.pinned = request.pinned
+        records[standardized] = record
+        try saveProjectRecords(records)
+        guard let summary = projectSummary(for: standardized) else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchProject,
+                               message: "\(standardized.path) is not a project.")
+        }
+        sendProject(summary)
+        return summary
+    }
+
     public func setHelperLimits(_ request: DaemonAPI.SetHelperLimitsRequest) throws -> DaemonAPI.ProjectSummary {
         let standardized = Project.standardize(request.folder)
         guard projectSummary(for: standardized) != nil else {

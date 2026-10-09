@@ -136,6 +136,35 @@ struct ChatProjectTests {
         #expect(marks[other] == .some(nil))
     }
 
+    // The chat project starts pinned, without a write; unpinning it is kept, as is
+    // pinning another.
+    @Test func theChatProjectIsPinnedUntilUnpinned() async throws {
+        let home = try temporary("home")
+        let other = Project.standardize(try temporary("other"))
+        let core = try await core(home: home)
+        await core.ensureChatProject()
+        _ = try await core.addProject(other)
+        let chat = chatFolder(home)
+
+        func pins() async -> [URL: Bool] {
+            Dictionary(uniqueKeysWithValues: await core.allProjects().map { ($0.folder, $0.project.isPinned) })
+        }
+        #expect(await pins() == [chat: true, other: false])
+        #expect(await core.projectRecords()[chat]?.pinned == nil, "the default, not a choice")
+
+        #expect(try await core.setPinned(.init(folder: chat, pinned: false)).project.isPinned == false)
+        #expect(try await core.setPinned(.init(folder: other, pinned: true)).project.isPinned)
+        #expect(await pins() == [chat: false, other: true])
+
+        await core.ensureChatProject()
+        #expect(await pins() == [chat: false, other: true], "a restart leaves the person's choice")
+
+        // A folder that is not a project is refused.
+        await #expect(throws: JSONRPCError.self) {
+            try await core.setPinned(.init(folder: URL(filePath: "/nowhere/at/all"), pinned: true))
+        }
+    }
+
     // US3 scenario 3, FR-003, FR-011
     @Test func anArchivedChatProjectStaysArchived() async throws {
         let home = try temporary("home")

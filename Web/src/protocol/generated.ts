@@ -1152,6 +1152,7 @@ export interface Project {
   layoutVersion?: number;
   helperLimits?: HelperLimits;
   diskSpace?: DiskThresholds;
+  pinned?: boolean;
 }
 
 export interface ProjectDetection {
@@ -1397,6 +1398,11 @@ export interface SetOptionRequest {
   agentID: UUID;
   optionID: string;
   value: JSONValue;
+}
+
+export interface SetPinnedRequest {
+  folder: URLString;
+  pinned: boolean;
 }
 
 export interface SetSandboxRequest {
@@ -2008,6 +2014,7 @@ export interface Methods {
   "projects/clone": { params: CloneRequest; result: ProjectSummary };
   "projects/clones": { params: Empty; result: CloneSummary[] };
   "projects/list": { params: ProjectsListRequest; result: ProjectSummary[] };
+  "projects/setPinned": { params: SetPinnedRequest; result: ProjectSummary };
   "projects/unarchive": { params: ProjectRequest; result: ProjectSummary };
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
   "runtimes/allowances": { params: string | null; result: RuntimeAllowances };
@@ -2107,6 +2114,7 @@ export const MethodTarget = {
   "projects/clone": "host",
   "projects/clones": "host",
   "projects/list": "host",
+  "projects/setPinned": "host",
   "projects/unarchive": "host",
   "runtimes/accounts": "host",
   "runtimes/allowances": "host",
@@ -2277,7 +2285,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PlanEntry: { required: ["content", "priority", "status"], optional: [] },
   PresenceReport: { required: ["active"], optional: ["watching", "mayNotify", "showing"] },
   PrewarmRequest: { required: ["agentID", "why"], optional: [] },
-  Project: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits", "diskSpace"] },
+  Project: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits", "diskSpace", "pinned"] },
   ProjectDetection: { required: ["enabled", "paths"], optional: [] },
   ProjectPins: { required: ["folder", "pins"], optional: ["sessions", "workflows"] },
   ProjectRequest: { required: ["folder"], optional: [] },
@@ -2304,6 +2312,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SetCeilingRequest: { required: ["agentID"], optional: ["ceiling"] },
   SetLabelsRequest: { required: ["agentID", "add", "remove"], optional: [] },
   SetOptionRequest: { required: ["agentID", "optionID", "value"], optional: [] },
+  SetPinnedRequest: { required: ["folder", "pinned"], optional: [] },
   SetSandboxRequest: { required: ["agentID"], optional: ["choice"] },
   SetUnreadRequest: { required: ["agentID", "unread"], optional: [] },
   ShowFileNotification: { required: ["agentID", "file"], optional: [] },

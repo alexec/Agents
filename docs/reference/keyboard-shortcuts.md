@@ -40,7 +40,7 @@ ones every Mac app has.
 | Control-Command-1 to 9 | **Go ▸** a project | Opens that project. |
 | Option-Command-I | **View ▸ Show Inspector** or **Hide Inspector** | Opens or closes the sidebar beside the conversation. |
 | Command-1 to Command-6 | **View ▸ Files**, **Changes**, **Terminal**, **Browser**, **Exchanged**, **Background** | Opens that pane of the sidebar. While a permission or question card is up, these yield to the card's answers. |
-| Control-` | **View ▸ Project Terminal** | Shows or hides a shell in the selected project's own folder, under the page, with or without an agent chosen. Hiding it leaves it running. |
+| Control-` | **View ▸ Project Terminal** | Shows or hides the selected project's own shells, one to a tab, in its folder under the page, with or without an agent chosen. Hiding them leaves them running. |
 | Command-Down Arrow | **View ▸ Jump to Latest** | Scrolls the conversation to its end. |
 | Option-Command-E | **View ▸ Events** | Opens the Events page. |
 | Option-Command-L | **View ▸ Resources** | Opens the Resources page, which shows who holds or is waiting for the simulators, browsers and screen. |

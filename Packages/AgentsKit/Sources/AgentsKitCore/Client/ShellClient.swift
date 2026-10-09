@@ -183,11 +183,12 @@ public final class ShellClient {
         if isAttached { await resize(rows: rows, cols: cols) }
     }
 
-    /// A new shell for the agent, numbered by the daemon (#401). Nil from a host before
-    /// #401, which has the caller number it.
-    public static func open(agentID: UUID, on client: DaemonClient) async -> Int? {
+    /// A new shell for the agent, or for the project in `project`, numbered by the
+    /// daemon (#401). Nil from a host before #401, or for a project from one before its
+    /// shells had tabs, which has the caller number it.
+    public static func open(agentID: UUID, project: URL? = nil, on client: DaemonClient) async -> Int? {
         let response = try? await client.call(DaemonAPI.Method.shellOpen,
-                                              DaemonAPI.ShellAttachRequest(agentID: agentID),
+                                              DaemonAPI.ShellAttachRequest(agentID: agentID, folder: project),
                                               returning: DaemonAPI.ShellOpenResponse.self)
         return response?.shell
     }
