@@ -85,13 +85,16 @@ struct SidebarSubheading: View {
 /// for one button on the right.
 private struct WorkRow<Leading: View, Detail: View, Trailing: View>: View {
     let title: String
+    /// Heavier only when the row needs someone (#520).
+    var emphasized = false
     let leading: Leading
     let detail: Detail
     let trailing: Trailing
 
-    init(_ title: String, @ViewBuilder leading: () -> Leading, @ViewBuilder detail: () -> Detail,
+    init(_ title: String, emphasized: Bool = false, @ViewBuilder leading: () -> Leading, @ViewBuilder detail: () -> Detail,
          @ViewBuilder trailing: () -> Trailing) {
         self.title = title
+        self.emphasized = emphasized
         self.leading = leading()
         self.detail = detail()
         self.trailing = trailing()
@@ -105,7 +108,7 @@ private struct WorkRow<Leading: View, Detail: View, Trailing: View>: View {
                     leading
                         .frame(width: 16)
                     Text(title)
-                        .appText(.supporting).fontWeight(.semibold)
+                        .appText(.supporting).fontWeight(emphasized ? .semibold : .regular)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
@@ -132,7 +135,8 @@ struct WorkflowListRow: View {
     let project: ProjectKey
 
     var body: some View {
-        WorkRow(summary.workflow.name) {
+        // Heavier only while it waits for an OK (#520), as a session's title is while unread.
+        WorkRow(summary.workflow.name, emphasized: summary.awaitingApproval != nil && !summary.isArchived) {
             WorkflowStatusIcon(summary: summary, accented: true)
                 .appText(.fine)
         } detail: {

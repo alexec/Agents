@@ -201,8 +201,10 @@ struct SidebarWorkflowRow: View {
         HStack(alignment: .top, spacing: 10) {
             WorkflowMark(summary: summary)
             VStack(alignment: .leading, spacing: 3) {
+                // Heavier only while it waits for an OK (#520), as a session's title is while unread.
                 Text(summary.workflow.name)
                     .appText(.supporting)
+                    .fontWeight(summary.awaitingApproval != nil && !summary.isArchived ? .semibold : .regular)
                     .lineLimit(1)
             }
             Spacer(minLength: 4)
