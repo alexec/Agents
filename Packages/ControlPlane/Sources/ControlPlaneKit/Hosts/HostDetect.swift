@@ -10,10 +10,11 @@ import Foundation
 ///    through is a way in, not a server. Hosts behind one stay, and are probed through it.
 /// 3. A host the control plane has by that name is left alone.
 /// 4. The rest are probed, a few at once: `BatchMode`, the person's known_hosts,
-///    `StrictHostKeyChecking=yes`, a short timeout. One that answers with Agents already
-///    installed is left alone too; one that does not answer is not added.
+///    `StrictHostKeyChecking=yes`, a short timeout. One that does not answer is not added.
 /// 5. What answered is installed as `hosts/install` would with no key, trusting the host
-///    key the person's known_hosts already has.
+///    key the person's known_hosts already has. One with Agents installed already is
+///    joined the same way (#485): an install left from another control plane, or a join
+///    that never finished, is not on this one.
 ///
 /// Only a control plane on the person's Mac has their config, agent and known_hosts.
 public struct HostDetect: Sendable {
@@ -110,10 +111,7 @@ public struct HostDetect: Sendable {
         var toInstall: [SSHConfigHosts.Resolved] = []
         for (host, answer) in probed {
             switch answer {
-            case .answered(installed: true):
-                results[host.alias] = .init(alias: host.alias, resolved: host.display, outcome: .known,
-                                            detail: "Agents is installed there already.")
-            case .answered(installed: false):
+            case .answered:
                 toInstall.append(host)
             case .unreachable(let why):
                 results[host.alias] = .init(alias: host.alias, resolved: host.display, outcome: .unreachable, detail: why)
