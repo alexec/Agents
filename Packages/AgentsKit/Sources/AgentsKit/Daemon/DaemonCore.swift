@@ -584,6 +584,11 @@ public actor DaemonCore {
     var rateLimitStreaks: [UUID: [Date]] = [:]
     /// How rate limits are retried. A test shortens the waits; nothing else changes it.
     var rateLimitPolicy = RateLimitPolicy.standard
+    /// Tries so far at carrying each agent on past a turn that ended on a retried error
+    /// (#513). Cleared by a turn that ends any other way, and by the person's next prompt.
+    var retriedErrorAttempts: [UUID: Int] = [:]
+    /// How those are tried. A test shortens the waits; nothing else changes it.
+    var retriedErrorPolicy = RetriedErrorPolicy.standard
     /// The last cost figure each agent's runtime quoted, per currency.
     ///
     /// A runtime's cost is a **running total for its session**, not what the last turn

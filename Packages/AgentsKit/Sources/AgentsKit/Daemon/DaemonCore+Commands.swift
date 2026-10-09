@@ -1310,6 +1310,7 @@ extension DaemonCore {
             await record(.userMessage(text, blocks: blocks.count > 1 ? blocks : [], from: from),
                          for: agentID)
             rateLimitAttempts[agentID] = nil
+            if from == .person { retriedErrorAttempts[agentID] = nil }
         }
         lastPrompts[agentID] = SentPrompt(text: text, blocks: blocks, from: from, preface: preface,
                                           costBefore: agents[agentID]?.costToDate ?? [:])
@@ -1502,6 +1503,15 @@ extension DaemonCore {
             }
         }
         _ = retrying
+        // Ended on a blip the runtime says it retries, with nothing after it (#513): it
+        // did not get past it, so the app carries it on, and stops it as an error once
+        // the tries are used up. Never a finished turn whose last word is the blip.
+        if reason == .endTurn, !crossedItsLimit, result.evidence.endsOnRetriedError {
+            reason = .runtimeError
+            await carryOnPastRetriedError(agentID: agentID)
+        } else {
+            retriedErrorAttempts[agentID] = nil
+        }
         // A command whose sandbox could not be set up (064, FR-006a): the turn ran to its
         // end, and the agent stops there with the card.
         // Never once the agent recorded its ending (#224): what it printed or said after
