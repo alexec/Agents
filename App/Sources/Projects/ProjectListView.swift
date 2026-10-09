@@ -38,7 +38,8 @@ struct ProjectListView: View {
     /// Which machine the New project menu was pointed at (037).
     @State private var targetHost: HostID = .mac
     @State private var isChoosingServerFolder = false
-    @State private var isAddingServer = false
+    /// File ▸ Add Server…'s own view of the control plane, while its sheet is open (#503).
+    @State private var addingServer: ControlSettingsModel?
 
     /// This Mac's projects, then each server's: no headings for hosts (Alex, #145), the
     /// host is in a server project's own name.
@@ -207,6 +208,15 @@ struct ProjectListView: View {
                                     set: { if !$0 { requests.dropboxProject = nil } })) {
             if let project = requests.dropboxProject { DropboxSheet(project: project).paperSheet() }
         }
+        // The sheet Settings ▸ Control plane ▸ Add a Server… shows (#503).
+        .sheet(isPresented: Binding(get: { addingServer != nil }, set: { if !$0 { addingServer = nil } })) {
+            if let control = addingServer {
+                ControlAddServerSheet(control: control)
+                    .task { await control.start() }
+                    .onDisappear { control.stop() }
+                    .paperSheet()
+            }
+        }
         // File ▸ Add Project…, Clone Project from Git URL…, their On menus for a server,
         // and Add Server….
         .onChange(of: requests.projectSheet) { _, sheet in
@@ -220,8 +230,7 @@ struct ProjectListView: View {
                 targetHost = host
                 isCloning = true
             case .addServer:
-                targetHost = .mac
-                isAddingServer = true
+                addingServer = ControlConfig.endpoint.flatMap { ControlSettingsModel(endpoint: $0) }
             }
         }
     }
