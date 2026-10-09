@@ -21,8 +21,8 @@ make one change that brings them back under, on a pull request of its own.
 - **Never touch the project folder you start in.** It is the shared checkout of `main`.
   Do any edits in a worktree of your own (step 3).
 - One optimisation pull request per night at most. If an earlier one from this workflow
-  (branch `agents/ci-speed-*`) is still open, do not open another: say so and finish
-  `nothing_to_do`.
+  (branch `agents/ci-speed-*`) is still open, do not open another: say so and park
+  with `park_agent` (no id).
 - Never weaken the checks to make them fast: no skipping or deleting tests, no dropping
   a scheme, platform or job, no `continue-on-error`, no lowering what `main`'s branch
   protection requires (`test`, `packages`, `check`). Tests marked flaky stay as they are.
@@ -53,8 +53,8 @@ make one change that brings them back under, on a pull request of its own.
    the step log: `gh run view <id> --log --job <job id> | grep -i cache`).
 
 If the median wall time of the completed PR runs is **15 minutes or less**, and no run
-in the last 10 went over 20, finish `nothing_to_do` with the median in the message, and
-park. Otherwise go on.
+in the last 10 went over 20, say so with the median, and park with
+`park_agent` (no id). Otherwise go on.
 
 ## 2. Find the cause
 
@@ -95,8 +95,8 @@ of them is now the cause, say so and propose rather than change.
 5. Push and open a pull request with auto-merge (squash), as every agent here does:
    `gh pr create --fill` then `gh pr merge --auto --squash`. The body holds the table
    from step 1 and the reasoning from step 2.
-6. Wait for its checks with wait_for_event (or finish `blocked` with
-   `check_again_in_minutes: 20` and pick up here when started again). When they finish,
+6. Wait for its checks with wait_for_event (or call it with `until_minutes: 20` and no
+   events, and pick up here when started again). When they finish,
    measure the PR's own run as in step 1. Note that the first run of a cache-key change
    is cold by design; if that is why it is slow, push an empty commit
    (`git commit --allow-empty -m "Re-run CI warm"`) once and measure the second run.
@@ -110,6 +110,5 @@ of them is now the cause, say so and propose rather than change.
 1. Remove your worktree once the branch is pushed (`git worktree remove`); the branch
    keeps the commits.
 2. End with the table's medians (before, and the PR's own run after), the cause, the
-   PR link and whether it is set to merge. Finish `done` if the PR is faster and set to
-   merge, `partly_done` if it is left for Alex or a bigger fix needs a decision, and
-   park.
+   PR link and whether it is set to merge. If it is left for Alex or a bigger fix needs a
+   decision, ask Alex with your question tool; otherwise park with `park_agent` (no id).
