@@ -256,12 +256,14 @@ struct WorkflowRow: View {
 /// follows, and the reason it holds here is that most refusals resolve themselves.
 struct WorkflowStatusIcon: View {
     let summary: WorkflowSummary
-    /// In the accent rather than grey when it wants nobody: the sidebar's (#495).
+    /// The sidebar's (#495): in the accent rather than grey when it wants nobody, and
+    /// the size of the other icons there.
     var accented = false
 
     var body: some View {
         Image(systemName: name)
-            .appText(.reading)
+            // The sidebar's icons are the size of its rows' text (#495); the page's larger.
+            .appText(accented ? .supporting : .reading)
             .foregroundStyle(summary.needsAPerson ? StateTint.attention.style(or: .secondary)
                              : accented ? AnyShapeStyle(Paper.accent) : AnyShapeStyle(.secondary))
             .accessibilityLabel(label)

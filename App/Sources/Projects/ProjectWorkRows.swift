@@ -100,8 +100,10 @@ private struct WorkRow<Leading: View, Detail: View, Trailing: View>: View {
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
             VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                // The sidebar's icon column (#495): 16 wide, 6 to the title.
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
                     leading
+                        .frame(width: 16)
                     Text(title)
                         .appText(.supporting).fontWeight(.semibold)
                         .lineLimit(1)

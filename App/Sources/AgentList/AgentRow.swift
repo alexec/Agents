@@ -60,7 +60,8 @@ struct AgentRow: View {
 
     @ViewBuilder
     private var rowContent: some View {
-        HStack(alignment: .top, spacing: 12) {
+        // In the sidebar, the icon column every row there has (#495): 16 wide, 6 to the title.
+        HStack(alignment: .top, spacing: isCompact ? 6 : 12) {
             if isCompact, let mark = SessionMark(agent: agent, group: model.work.group(of: agent)) {
                 mark.padding(.top, 1)
             } else {
@@ -72,6 +73,7 @@ struct AgentRow: View {
                        endedReason: agent.endedReason,
                        isUnread: agent.isUnread,
                        isParked: agent.parking?.isParked == true)
+                .frame(width: isCompact ? 16 : nil)
                 .padding(.top, 1)
             }
 
