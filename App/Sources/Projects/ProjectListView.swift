@@ -15,6 +15,8 @@ struct ProjectListView: View {
     @Binding var selection: SidebarItem?
 
     @AppStorage("showsArchivedProjects") private var showsArchived = false
+    /// Activity, open until folded, and kept so.
+    @AppStorage("showsActivity") private var showsActivity = true
     @State private var folds = SidebarFolds()
     /// What the list has highlighted — one or several (⌘-click), sessions and workflows
     /// alike. Drives bulk Archive; `selection` is still the one thing the detail reads.
@@ -50,12 +52,15 @@ struct ProjectListView: View {
             // any other, so they take the list's selection and its keys. At the top, so
             // what they say at a glance is never folded or scrolled away. Plain `Text`
             // titles, no icons (#155): a sidebar list draws a `Label`'s title in its own
-            // style, so with icons they did not match the project names below.
-            Section("Activity") {
+            // style, so with icons they did not match the project names below. It folds,
+            // as Archived projects does.
+            Section(isExpanded: $showsActivity) {
                 EventsRow().appText(.supporting).sidebarInk(.events).tag(SidebarItem.events)
                 ResourcesRow().appText(.supporting).sidebarInk(.resources).tag(SidebarItem.resources)
                 RuntimesRow().appText(.supporting).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
                 SpendingRow(selection: $selection).appText(.supporting).sidebarInk(.spending).tag(SidebarItem.spending)
+            } header: {
+                Text("Activity")
             }
 
             Section("Projects") {

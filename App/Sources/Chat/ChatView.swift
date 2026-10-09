@@ -50,6 +50,10 @@ struct ChatView: View {
                             .frame(maxWidth: .infinity)
                             .background(Paper.ground, ignoresSafeAreaEdges: [])
                         }
+                        // Stopped at the pane's top. A scroll view draws on up under the
+                        // window's toolbar, which paints no ground of its own since #456,
+                        // so the chat showed through behind the title and project name.
+                        .clipped()
                     form
                 }
             } else {

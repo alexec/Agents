@@ -24,6 +24,8 @@ struct RemoteSidebar: View {
     @State private var showingAllMatches: Set<ProjectKey> = []
     /// Archived projects, open or closed, kept as the window keeps it (#343).
     @AppStorage("showsArchivedProjects") private var showsArchived = false
+    /// Activity, open until folded, and kept so, as the window keeps it.
+    @AppStorage("showsActivity") private var showsActivity = true
 
     private var selection: Binding<SidebarItem?> {
         Binding(get: { model.sidebarItem },
@@ -44,12 +46,14 @@ struct RemoteSidebar: View {
             if !model.projects.isEmpty {
                 // Pages about all the work rather than one project, at the top so what
                 // they say at a glance is never folded or scrolled away. Plain titles, as
-                // on the Mac (#155).
-                Section("Activity") {
+                // on the Mac (#155). It folds, as Archived projects does.
+                Section(isExpanded: $showsActivity) {
                     EventsRow().appText(.supporting).tag(SidebarItem.events)
                     ResourcesRow().appText(.supporting).tag(SidebarItem.resources)
                     RuntimesRow().appText(.supporting).tag(SidebarItem.runtimes)
                     SpendingRow().appText(.supporting).tag(SidebarItem.spending)
+                } header: {
+                    Text("Activity")
                 }
             }
 
@@ -102,44 +106,6 @@ struct RemoteSidebar: View {
         .scrollContentBackground(.hidden)
         .background(Paper.sidebar)
         .toolbarBackground(Paper.sidebar, for: .navigationBar)
-        .toolbar {
-            // New Chat (#229): the host's chat project, with no project to pick, as the
-            // window's File ▸ New Chat. A menu of hosts when there are several.
-            ToolbarItem(placement: .primaryAction) {
-                if model.chatHosts.count > 1 {
-                    Menu {
-                        ForEach(model.chatHosts, id: \.self) { host in
-                            Button(host == .mac ? "This Mac" : model.hostLabel(host)) {
-                                Task { await model.newChat(on: host) }
-                            }
-                            .disabled(model.hostIsOffline(host))
-                        }
-                    } label: {
-                        Label("New Chat", systemImage: "square.and.pencil")
-                    }
-                    .disabled(model.isStale)
-                } else {
-                    Button {
-                        Task { await model.newChat(on: .mac) }
-                    } label: {
-                        Label("New Chat", systemImage: "square.and.pencil")
-                    }
-                    .disabled(model.isStale)
-                }
-            }
-        }
-        .alert("No chat project", isPresented: Binding(
-            get: { model.chatProblem != nil }, set: { if !$0 { model.chatProblem = nil } }),
-            presenting: model.chatProblem) { problem in
-            if problem.archived != nil {
-                Button("Unarchive") { Task { await model.unarchiveChatProject(problem) } }
-                Button("Cancel", role: .cancel) {}
-            } else {
-                Button("OK", role: .cancel) {}
-            }
-        } message: { problem in
-            Text(problem.message)
-        }
         .navigationTitle("Agents")
         .searchable(text: $query, prompt: "Search sessions and workflows")
         .task(id: query) {
