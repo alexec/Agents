@@ -25,6 +25,16 @@ final class ProjectTerminalFrame {
         didSet { defaults.set(height, forKey: Self.heightKey) }
     }
 
+    /// Each project's tabs, so another project and back finds the one that was in front.
+    private var tabs: [ProjectKey: ProjectShellTabs] = [:]
+
+    func tabs(for project: ProjectKey) -> ProjectShellTabs {
+        if let existing = tabs[project] { return existing }
+        let fresh = ProjectShellTabs()
+        tabs[project] = fresh
+        return fresh
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         height = max((defaults.object(forKey: Self.heightKey) as? Double) ?? Self.defaultHeight, Self.minimumHeight)
@@ -42,37 +52,79 @@ final class ProjectTerminalFrame {
     }
 }
 
-/// A shell in the selected project's folder, under whatever page is open (#418).
+/// The tabs over a project's shells, as an agent's Terminal pane has over its own.
+@MainActor
+@Observable
+final class ProjectShellTabs {
+    var shells = [0]
+    var front = 0
+    var titles: [Int: String] = [:]
+    /// A tab just opened, which takes the keyboard; cleared once it has.
+    var toFocus: Int?
+    /// False when the project's host is too old to hold more than the one.
+    var canOpenMore = true
+}
+
+/// The selected project's shells, in its own folder, under whatever page is open (#418),
+/// one to a tab.
 ///
-/// Not an agent's: it opens with no agent chosen, and choosing one does not move it into
-/// that agent's folder or worktree. Another project shows that project's shell. Like an
-/// agent's, it is the daemon's: hiding the panel, changing project, closing the window
-/// or quitting leave it running, and the close button is the one thing that ends it.
+/// Not an agent's: they open with no agent chosen, and choosing one does not move them
+/// into that agent's folder or worktree. Another project shows that project's shells.
+/// Like an agent's, they are the daemon's: hiding the panel, changing project, closing
+/// the window or quitting leave them running, and closing a tab is the one thing that
+/// ends one. Closing the last puts the panel away; the next Control-` starts a new one.
 struct ProjectTerminalPanel: View {
     @Environment(AppModel.self) private var model
     @Environment(ProjectTerminalFrame.self) private var frame
     let project: DaemonAPI.ProjectSummary
     let pageHeight: Double
 
+    private var tabs: ProjectShellTabs { frame.tabs(for: project.key) }
+
     var body: some View {
+        let tabs = tabs
         VStack(spacing: 0) {
             HeightHandle(pageHeight: pageHeight)
-            bar
+            bar(tabs)
             Divider()
-            ShellScreen(id: ProjectShell.id(for: project.folder), home: nil,
-                        acquire: { model.acquireProjectShell(project.key) },
-                        isFront: true, wantsFocus: frame.wantsFocus,
-                        focused: { frame.wantsFocus = false },
-                        titled: { _ in },
-                        newTab: {}, closeTab: close)
-                // A screen per project: another project attaches its own shell.
-                .id(project.key)
+            // Every tab's screen is built and the hidden ones kept alive, as in an
+            // agent's pane, so a tab comes back with its screen and scrollback as it was.
+            ZStack {
+                ForEach(tabs.shells, id: \.self) { shell in
+                    ShellScreen(id: ProjectShell.id(for: project.folder), home: nil,
+                                acquire: { model.acquireProjectShell(project.key, shell: shell) },
+                                isFront: tabs.front == shell,
+                                wantsFocus: tabs.toFocus == shell || (frame.wantsFocus && tabs.front == shell),
+                                focused: {
+                                    if tabs.toFocus == shell { tabs.toFocus = nil }
+                                    if tabs.front == shell { frame.wantsFocus = false }
+                                },
+                                titled: { tabs.titles[shell] = $0 },
+                                newTab: open, closeTab: { close(shell) })
+                        .opacity(tabs.front == shell ? 1 : 0)
+                        .allowsHitTesting(tabs.front == shell)
+                }
+            }
+            // A screen per project: another project attaches its own shells.
+            .id(project.key)
         }
         .frame(height: frame.height(inPageOf: pageHeight))
         .background(Paper.ground)
+        // Asked each time the panel shows a project: a tab opened or closed on the phone
+        // meanwhile is found.
+        .task(id: project.key) {
+            guard let held = await model.projectShellNumbers(project.key) else {
+                tabs.canOpenMore = false
+                return
+            }
+            tabs.canOpenMore = true
+            // None held: the first screen starts one.
+            tabs.shells = held.isEmpty ? [0] : held
+            if !tabs.shells.contains(tabs.front) { tabs.front = tabs.shells.first ?? 0 }
+        }
     }
 
-    private var bar: some View {
+    private func bar(_ tabs: ProjectShellTabs) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "apple.terminal")
                 .foregroundStyle(.secondary)
@@ -83,31 +135,53 @@ struct ProjectTerminalPanel: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .help(project.folder.path(percentEncoded: false))
-            Spacer()
+            ShellTabs(shells: tabs.shells, titles: tabs.titles, front: tabs.front,
+                      canOpenMore: tabs.canOpenMore,
+                      select: { shell in
+                          tabs.front = shell
+                          tabs.toFocus = shell
+                      },
+                      open: open, close: close)
             Button {
                 frame.isOpen = false
             } label: {
                 Image(systemName: "chevron.down")
             }
             .buttonStyle(.borderless)
-            .help("Hide the project’s shell (⌃`). It keeps running.")
-            Button {
-                close()
-            } label: {
-                Image(systemName: "xmark")
-            }
-            .buttonStyle(.borderless)
-            .help("End the project’s shell")
+            .help("Hide the project’s shells (⌃`). They keep running.")
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
+        .padding(.leading, 10)
+        .padding(.trailing, 10)
     }
 
-    /// Closing is what ends it, as closing an agent's last tab does; the next Control-`
-    /// starts a new one.
-    private func close() {
-        frame.isOpen = false
-        Task { await model.closeShell(agentID: ProjectShell.id(for: project.folder), shell: 0) }
+    /// The host numbers the new shell, so a tab opened on the phone at the same moment
+    /// never gets the same one.
+    private func open() {
+        let tabs = tabs
+        Task {
+            let next = await model.openProjectShell(project.key) ?? ((tabs.shells.max() ?? -1) + 1)
+            if !tabs.shells.contains(next) { tabs.shells.append(next) }
+            tabs.front = next
+            tabs.toFocus = next
+        }
+    }
+
+    /// Closing a tab ends its shell. Closing the last puts the panel away, and the next
+    /// Control-` starts a new one.
+    private func close(_ shell: Int) {
+        let tabs = tabs
+        guard let index = tabs.shells.firstIndex(of: shell) else { return }
+        tabs.shells.remove(at: index)
+        tabs.titles[shell] = nil
+        Task { await model.closeShell(agentID: ProjectShell.id(for: project.folder), shell: shell) }
+        if tabs.shells.isEmpty {
+            frame.isOpen = false
+            tabs.shells = [0]
+            tabs.front = 0
+        } else if tabs.front == shell {
+            tabs.front = tabs.shells[min(index, tabs.shells.count - 1)]
+            tabs.toFocus = tabs.front
+        }
     }
 }
 
