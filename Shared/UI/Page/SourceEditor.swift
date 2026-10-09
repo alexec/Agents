@@ -136,6 +136,10 @@ private struct SourceTextView: NSViewRepresentable {
         view.smartInsertDeleteEnabled = false
         view.textContainerInset = NSSize(width: 6, height: 6)
         view.string = text
+        // Setting the text leaves the caret at its end. Opened from Open File… the
+        // field's focus passes to this view, which then scrolls down to that caret,
+        // laying the file out as it goes so it looks typed in. The top it is.
+        view.setSelectedRange(NSRange(location: 0, length: 0))
         view.isEditable = isEditable
         if let line {
             // A beat later, once the view is in a window and laid out to scroll in.
@@ -205,6 +209,8 @@ private struct SourceTextView: UIViewRepresentable {
         view.smartInsertDeleteType = .no
         view.textContainerInset = UIEdgeInsets(top: 6, left: 6, bottom: 6, right: 6)
         view.text = text
+        // As on the Mac: the caret at the top, not at the end the text left it.
+        view.selectedRange = NSRange(location: 0, length: 0)
         view.isEditable = isEditable
         if let line {
             Task { @MainActor [weak view] in
