@@ -16,7 +16,7 @@ struct SessionLabelToolTests {
         let calls = Calls()
         let (mine, theirs) = PairedTransport.pair()
         let service = AppService(transport: theirs,
-                                 finishTurn: { _, _, _, _, words in
+                                 finishTurn: { _, _, _, words in
                                      await calls.record(words)
                                      return .shown("Recorded")
                                  },

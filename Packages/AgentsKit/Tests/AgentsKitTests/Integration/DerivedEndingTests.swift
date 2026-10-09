@@ -100,14 +100,13 @@ struct DerivedEndingTests {
             return minted.isEmpty ? nil : minted
         } ?? ""
         _ = try await core.finishTurn(.init(token: token, outcome: "partly_done",
-                                            message: "Five of six.", prompts: [], title: "Six things"))
+                                            message: "Five of six.", prompts: []))
         turn.open()
         await settled(core, id, "the turn ended")
 
         let agent = try #require(await core.agent(id))
         #expect(agent.report?.outcome == .partlyDone)
         #expect(agent.report?.message == "Five of six.")
-        #expect(agent.title == "Six things")
         #expect(try await asks(core, id) == 0)
     }
 

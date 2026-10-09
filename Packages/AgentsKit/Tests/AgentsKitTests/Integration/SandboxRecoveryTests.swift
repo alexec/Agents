@@ -104,7 +104,7 @@ struct SandboxRecoveryTests {
         await eventually("the fake is in its turn") { gate.turnsArrived == 1 }
 
         _ = try await core.finishTurn(.init(token: token, outcome: "done", message: "Fixed.",
-                                            prompts: [], title: nil, waitingOn: nil))
+                                            prompts: [], waitingOn: nil))
         await settled(core, id, "the turn ended after finish_turn")
 
         let agent = try #require(await core.agent(id))

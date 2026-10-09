@@ -82,7 +82,7 @@ struct BlockedTests {
                         wakeOn: String? = nil) async throws -> String {
         if let id = callers[token] { await core.bindAppToken(token, to: id) }
         return try await core.finishTurn(.init(token: token, outcome: outcome, message: message,
-                                               prompts: [], title: nil, waitingOn: waitingOn,
+                                               prompts: [], waitingOn: waitingOn,
                                                checkAgainInMinutes: minutes, wakeOn: wakeOn))
     }
 

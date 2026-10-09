@@ -77,12 +77,12 @@ public actor AppService {
     public typealias WorkflowSink =
         @Sendable (DaemonAPI.ManageWorkflowsRequest.Action, String?, String?) async -> Outcome
 
-    /// Where the one call goes: the outcome's wire spelling, the sentence, the chips,
-    /// which may be none, and the conversation's new title. The outcome is still a
+    /// Where the one call goes: the outcome's wire spelling, the sentence and the chips,
+    /// which may be none. The outcome is still a
     /// string here — the daemon owns which words it knows, because it is the daemon
     /// that has to refuse one it does not. One sink for the lot, because the daemon
     /// refuses the whole call or lands the whole call.
-    public typealias FinishSink = @Sendable (String, String, [SuggestedPrompt], String?, BlockWords) async -> Outcome
+    public typealias FinishSink = @Sendable (String, String, [SuggestedPrompt], BlockWords) async -> Outcome
 
     /// What a `blocked` outcome carries besides its sentence (039): the agents it waits
     /// on, as written, and when to check again. Empty for every other outcome — and
@@ -206,7 +206,7 @@ public actor AppService {
     public init(transport: (any LineTransport)?,
                 managesAgents: Bool = true,
                 movesItself: Bool = true,
-                finishTurn: @escaping FinishSink = { _, _, _, _, _ in
+                finishTurn: @escaping FinishSink = { _, _, _, _ in
                     .refused("This app cannot end a turn.")
                 },
                 showFile: @escaping FileSink = { _ in .refused("This app cannot show a file.") },
@@ -337,10 +337,8 @@ public actor AppService {
                 guard !WorkReport.isTooLong(message) else {
                     return .success(Self.reply(WorkReport.tooLong(WorkOutcome(wire: raw)), isError: true))
                 }
-                // The title names the conversation's goal, which outlasts a turn, so
-                // it is sent only when the goal changes: one left out, or that cleans
-                // to nothing, keeps the name the row already has.
-                let title = arguments?["title"]?.stringValue.flatMap(Agent.cleanedTitle)
+                // No `title`: the runtime names the conversation, over ACP's
+                // `session_info_update`. One sent by an older prompt is not read.
                 let prompts = SuggestedPrompt.next(arguments?["next_prompt"])
                 var words: BlockWords
                 switch Self.blockWords(raw, arguments) {
@@ -373,7 +371,7 @@ public actor AppService {
                         worktree or leave_worktree.
                         """, isError: true))
                 }
-                return .success(Self.reply(await finishSink(raw, message, prompts, title, words)))
+                return .success(Self.reply(await finishSink(raw, message, prompts, words)))
             }
 
             if let call = Self.selfCall(named: name, arguments, movesItself: movesItself) {
@@ -884,11 +882,10 @@ public actor AppService {
     /// The call that says how a turn ended (023), slimmed in #481.
     ///
     /// Since #479 nothing tells an agent it must call this: the daemon derives an
-    /// ending the agent did not give. Since #481 it says only how the turn went and what
-    /// the conversation is called; waiting, parking, moving and labels each have a tool
+    /// ending the agent did not give. Since #481 it says only how the turn went; waiting, parking, moving and labels each have a tool
     /// of their own, and the description is a tenth of what it was. Every argument it
     /// took before is still read — `waiting_on`, `afterwards`, `worktree`, `next_prompt`
-    /// and the rest — for prompts and conversations that still send them, but none is
+    /// and the rest — except `title`, since the runtime names the conversation; all for prompts and conversations that still send them, but none is
     /// listed: a fresh agent shown both would send both.
     static let finishTurnTool: JSONValue = [
         "name": .string(finishTurnToolName),
@@ -920,10 +917,6 @@ public actor AppService {
                         read the conversation: what happened and what it means for them, \
                         no file names. For needs_answer, the question.
                         """,
-                ],
-                "title": [
-                    "type": "string",
-                    "description": "A few words naming the conversation's goal. Only when it changes.",
                 ],
             ],
             "required": .array(["outcome", "message"]),

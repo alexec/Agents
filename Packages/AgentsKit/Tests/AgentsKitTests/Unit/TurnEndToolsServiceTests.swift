@@ -74,7 +74,7 @@ struct TurnEndToolsServiceTests {
     @Test func finishTurnStillReadsEveryOldArgument() async throws {
         actor Box { var words: AppService.BlockWords?; func set(_ w: AppService.BlockWords) { words = w } }
         let box = Box()
-        let tools = AppService(transport: nil, finishTurn: { _, _, _, _, words in
+        let tools = AppService(transport: nil, finishTurn: { _, _, _, words in
             await box.set(words); return .shown("Noted.")
         })
         let result = try await call(tools, "finish_turn", [

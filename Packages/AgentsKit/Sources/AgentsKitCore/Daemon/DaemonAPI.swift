@@ -1070,12 +1070,6 @@ public enum DaemonAPI {
         public var outcome: String
         public var message: String
         public var prompts: [SuggestedPrompt]
-        /// What the conversation is about now, in the agent's words. Required by the
-        /// tool, optional here: an agent's MCP helper is started from whatever binary
-        /// was on disk when its session began, so one begun before this field existed
-        /// relays a call without it, and that call still lands — with the title left
-        /// as it was.
-        public var title: String?
         /// Only with `blocked` (039). See `ReportOutcomeRequest`.
         public var waitingOn: [String]?
         public var checkAgainInMinutes: Int?
@@ -1083,7 +1077,9 @@ public enum DaemonAPI {
         /// A string, checked at the daemon; left out is `all`.
         public var wakeOn: String?
         /// `park` or `archive`: where the agent asked to be put once the turn is over.
-        /// A string, checked at the daemon, and optional for the reason `title` is.
+        /// A string, checked at the daemon, and optional: an agent's MCP helper is
+        /// started from whatever binary was on disk when its session began, so one
+        /// begun before this field existed relays a call without it.
         public var afterwards: String?
         public var addLabels: [String]
         public var removeLabels: [String]
@@ -1093,7 +1089,7 @@ public enum DaemonAPI {
         public var move: MoveAsk?
 
         public init(token: String, outcome: String, message: String,
-                    prompts: [SuggestedPrompt], title: String? = nil,
+                    prompts: [SuggestedPrompt],
                     waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil,
                     wakeOn: String? = nil, afterwards: String? = nil,
                     addLabels: [String] = [], removeLabels: [String] = [],
@@ -1102,7 +1098,6 @@ public enum DaemonAPI {
             self.outcome = outcome
             self.message = message
             self.prompts = prompts
-            self.title = title
             self.waitingOn = waitingOn
             self.checkAgainInMinutes = checkAgainInMinutes
             self.wakeOn = wakeOn
@@ -1118,7 +1113,6 @@ public enum DaemonAPI {
             outcome = try c.decode(String.self, forKey: .outcome)
             message = try c.decode(String.self, forKey: .message)
             prompts = try c.decode([SuggestedPrompt].self, forKey: .prompts)
-            title = try c.decodeIfPresent(String.self, forKey: .title)
             waitingOn = try c.decodeIfPresent([String].self, forKey: .waitingOn)
             checkAgainInMinutes = try c.decodeIfPresent(Int.self, forKey: .checkAgainInMinutes)
             wakeOn = try c.decodeIfPresent(String.self, forKey: .wakeOn)

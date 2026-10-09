@@ -30,11 +30,11 @@ extension AppService {
         }
 
         return AppService(transport: transport, managesAgents: managesAgents,
-                          movesItself: movesItself) { outcome, message, prompts, title, words in
+                          movesItself: movesItself) { outcome, message, prompts, words in
             await send(DaemonAPI.Method.agentsFinishTurn,
                        DaemonAPI.FinishTurnRequest(token: token, outcome: outcome,
                                                    message: message, prompts: prompts,
-                                                   title: title, waitingOn: words.waitingOn,
+                                                   waitingOn: words.waitingOn,
                                                    checkAgainInMinutes: words.checkAgainInMinutes,
                                                    wakeOn: words.wakeOn?.rawValue,
                                                    afterwards: words.afterwards?.rawValue,
