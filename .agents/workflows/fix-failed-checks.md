@@ -5,8 +5,9 @@ on:
       repo: alexec/Agents
 agent: new
 cooldown: 5m
-enabled: false
 labels: [ci]
+permission-mode: auto
+enabled: false
 ---
 
 A pull request's checks failed. The event's data says which PR, branch and jobs.
