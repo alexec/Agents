@@ -262,17 +262,19 @@ lists, adapted to touch and width.
   — change: to the toolbar / Window menu and the smart rows.
 - `specs/071-web-remote/walks/parity.md` — change: the sidebar rows.
 
+## Clarifications
+
+### Session 2026-10-08
+
+- Q: Which smart rows? → A: Needs You, Working, Unread.
+- Q: What does clicking a smart row do? → A: It folds open in the sidebar, like a project; the detail stays the chat.
+- Q: Where do Events, Resources, Runtimes and Spending go? → A: Toolbar and Window menu; toolbar buttons carry today's warning marks.
+
 ## Assumptions
 
-- Smart rows are Needs You, Working and Unread; Unread is included because unread is
-  already a first-class mark (#70) and Mail/Things both surface it at the top. Easy to
-  drop after the walk.
-- Smart rows fold open in the sidebar (like a project) rather than opening a list page
-  in the detail, so the detail stays the chat and the one-list selection is kept.
 - "Done" sessions stay in their project's flat list (plain, no mark); there is no Done
   smart row.
-- Activity pages go to the toolbar and Window menu; the sidebar foot keeps its status
-  lines only.
+- The sidebar foot keeps its status lines only.
 - Workflow pages and the archive page reuse today's pages in the detail; only how they
   are reached changes.
 - #145's reasons for one column (Spending, busy projects and host status in sight) hold:

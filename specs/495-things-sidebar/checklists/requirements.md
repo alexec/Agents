@@ -31,5 +31,4 @@
 
 ## Notes
 
-- Open choices made as defaults in Assumptions (Unread smart row, smart rows fold in the
-  sidebar, Activity to toolbar + Window menu); to be confirmed by the layout walk (FR-015).
+- Smart rows, smart-row click and Activity placement confirmed by Alex 2026-10-08 (see Clarifications).
