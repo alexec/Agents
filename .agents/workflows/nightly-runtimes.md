@@ -20,7 +20,7 @@ or branch yourself: the script works in a tree of its own.
 
 1. Call `list_my_agents` and note the runtimes it says are available. Then run
    `scripts/nightly-runtimes.py plan --available <those ids, comma-separated>`.
-   If it prints `Nothing changed.`, finish with `nothing_to_do`, say nothing else, and park.
+   If it prints `Nothing changed.`, say nothing else, and park with `park_agent` (no id).
 2. Lease the resource `build` with `lease_resource` for 60 minutes (if you are in line, keep
    waiting with `lease_resource`), run `scripts/nightly-runtimes.py build`, and release
    `build` with `release_resource` the moment it ends, whether it passed or not.
