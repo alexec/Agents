@@ -288,7 +288,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
           }}
           onContextMenu={(e) => openContextMenu(e, projectMenu)}
           onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, projectMenu); }}>
-          <span class="title">{label}{projectPinned && <span class="project-pin" aria-label="pinned"> 📌</span>}</span>
+          <span class="title">{project.isChat === true && <span class="project-chat" aria-label="chat project">💬 </span>}{label}{projectPinned && <span class="project-pin" aria-label="pinned"> 📌</span>}</span>
           {/* Folded, the row says what is under it; unfolded, the rows under it say that. */}
           {(!unfolded || !project.exists) && subtitle && <span class="subtitle">{subtitle}</span>}
         </button>
