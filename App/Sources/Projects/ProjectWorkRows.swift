@@ -122,7 +122,7 @@ private struct WorkRow<Leading: View, Detail: View, Trailing: View>: View {
 
 // MARK: Workflows
 
-/// One workflow: its name and what it is. Picking it shows its page; the list's own
+/// One workflow: its name, with what it is as its tooltip. Picking it shows its page; the list's own
 /// selection lights it, as it does a session's row (066).
 struct WorkflowListRow: View {
     @Environment(AppModel.self) private var model
@@ -134,7 +134,8 @@ struct WorkflowListRow: View {
             WorkflowStatusIcon(summary: summary)
                 .appText(.fine)
         } detail: {
-            Text(summary.workflow.summary)
+            // The title only (Alex, #495): what it does is the tooltip and the page's.
+            EmptyView()
         } trailing: {
             // Marked where it stands, rather than moved (#100): off is not put away.
             if !summary.isEnabled, !summary.isArchived {
@@ -144,6 +145,7 @@ struct WorkflowListRow: View {
             }
         }
         .listRowInsets(.vertical, 2)
+        .help(summary.workflow.summary)
         .sidebarInk(.workflow(summary.id, in: project))
         .tag(SidebarItem.workflow(summary.id, in: project))
         .accessibilityElement(children: .combine)
