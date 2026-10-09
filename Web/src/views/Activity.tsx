@@ -6,7 +6,7 @@ import type { Store } from "../model/store";
 import type { AllowanceState, Consequence, ControlHost, CostState, Event, ProjectSummary, RuntimeAvailability, RuntimeStatus } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import type { ActivityPage } from "../route";
-import { Resources } from "./Resources";
+import { HostedMCP, Resources } from "./Resources";
 import { BackToList } from "./BackToList";
 import { folderKey, projectFolder } from "../model/groups";
 import { runtimeTally } from "../model/runtimes";
@@ -205,9 +205,11 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
                 <section key={host.id}>
                   {several && <h2 class="section-head">{hostName(host.id)}</h2>}
                   <Resources store={store} host={host.id} open />
+                  <HostedMCP store={store} host={host.id} />
                 </section>
               ))}
-              {Object.values(store.leases.value).every((s) => s.resources.length === 0) && (
+              {Object.values(store.leases.value).every((s) => s.resources.length === 0)
+                && Object.values(store.hostedMCP.value).every((s) => s.servers.length === 0) && (
                 <p class="hint">Nothing is declared or held. Resources are declared on the Mac, in Settings ▸ Resources.</p>
               )}
             </>

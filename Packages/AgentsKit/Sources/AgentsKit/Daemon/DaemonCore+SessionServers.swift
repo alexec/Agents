@@ -172,7 +172,9 @@ extension DaemonCore {
         for name in signedIn.leftOut {
             DaemonLog.shared.write("session servers: \(name) left out of a \(runtimeID) session: needs sign-in")
         }
-        return await bridged(signedIn.servers, runtimeID: runtimeID, token: token, cwd: cwd)
+        // A hosted server goes as its route on the app's endpoint (#488).
+        let hosted = await hostedSwapped(signedIn.servers, project: projectFolder, token: token, runtimeID: runtimeID)
+        return await bridged(hosted, runtimeID: runtimeID, token: token, cwd: cwd)
     }
 
     static func noHTTPRefusal(_ runtime: String) -> String {

@@ -64,6 +64,20 @@ extension PersonalDotAgents {
         return parseServers(data)
     }
 
+    /// The names of the entries in one `mcp.json` that ask the daemon to host them (#488):
+    /// a local server with `"hosted": true`. Nothing for a file that is missing or that
+    /// `parseServers` would refuse.
+    static func hostedNames(at url: URL) -> Set<String> {
+        guard let data = try? Data(contentsOf: url), case .success = parseServers(data),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let entries = object["mcpServers"] as? [String: Any] else { return [] }
+        return Set(entries.compactMap { name, value in
+            guard let entry = value as? [String: Any], entry["command"] != nil,
+                  let hosted = entry["hosted"] as? Bool, hosted else { return nil }
+            return name
+        })
+    }
+
     static func parseServers(_ data: Data) -> Result<[MCPServer], MCPFileProblem> {
         if data.allSatisfy({ [0x20, 0x09, 0x0A, 0x0D].contains($0) }) { return .success([]) }
         let root: Any
@@ -112,6 +126,16 @@ extension PersonalDotAgents {
             guard let raw = entry[key] else { return .some(nil) }
             guard let table = raw as? [String: String] else { return nil }
             return .some(table)
+        }
+        // `"hosted": true` asks the daemon to run one copy for every agent here (#488).
+        if let hosted = entry["hosted"] {
+            guard let hosted = hosted as? Bool else {
+                return .failure(MCPFileProblem(message: "The server “\(name)” has a hosted that is not true or false."))
+            }
+            if hosted, entry["command"] == nil {
+                return .failure(MCPFileProblem(message: "The server “\(name)” is hosted but has no command: "
+                                               + "only a local server can be hosted."))
+            }
         }
         if let command = entry["command"] {
             guard let command = command as? String, !command.isEmpty else {

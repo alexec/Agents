@@ -876,6 +876,24 @@ export interface HostTunnel {
   problem?: string;
 }
 
+export interface HostedMCPSnapshot {
+  servers: HostedMCPStatus[];
+  at: WireDate;
+}
+
+export type HostedMCPState = "idle" | "starting" | "running" | "restarting";
+
+export interface HostedMCPStatus {
+  name: string;
+  project?: string;
+  state: HostedMCPState;
+  since?: WireDate;
+  retryAt?: WireDate;
+  lastError?: string;
+  restarts: number;
+  users: number;
+}
+
 export interface LabelVocabularyRequest {
   folder: URLString;
 }
@@ -1991,6 +2009,7 @@ export interface Methods {
   "files/watch": { params: FilesWatchRequest; result: Empty };
   "hosts/list": { params: Empty; result: ControlHost[] };
   "leases/snapshot": { params: Empty; result: LeaseSnapshot };
+  "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
   "modes/remembered": { params: Empty; result: Record<string, JSONValue> };
   "options/remembered": { params: RememberedOptionsRequest; result: ConfigOption[] };
   "permissions/answer": { params: AnswerRequest; result: Empty };
@@ -2091,6 +2110,7 @@ export const MethodTarget = {
   "files/watch": "host",
   "hosts/list": "control",
   "leases/snapshot": "host",
+  "mcp/hosted": "host",
   "modes/remembered": "host",
   "options/remembered": "host",
   "permissions/answer": "host",
@@ -2154,6 +2174,7 @@ export interface Notifications {
   "disk/changed": DiskState;
   "files/changed": FilesChangedNotification;
   "leases/changed": LeaseSnapshot;
+  "mcp/hostedChanged": HostedMCPSnapshot;
   "modes/changed": Record<string, JSONValue>;
   "pages/changed": PagesChangedNotification;
   "pins/changed": PinsChangedNotification;
@@ -2250,6 +2271,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive"] },
   HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
   HostTunnel: { required: ["up"], optional: ["problem"] },
+  HostedMCPSnapshot: { required: ["servers", "at"], optional: [] },
+  HostedMCPStatus: { required: ["name", "state", "restarts", "users"], optional: ["project", "since", "retryAt", "lastError"] },
   LabelVocabularyRequest: { required: ["folder"], optional: [] },
   Lease: { required: ["resource", "displayName", "holder", "grantedAt", "expiresAt", "warned"], optional: [] },
   LeaseSnapshot: { required: ["resources", "at"], optional: [] },

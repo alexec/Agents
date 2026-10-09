@@ -228,6 +228,9 @@ public final class AgentsModel {
     /// the daemon last said. Replaced whole by each `leases/changed`, never merged. Nil
     /// from a daemon too old to have leases, which draws nothing.
     public private(set) var leases: DaemonAPI.LeaseSnapshot?
+    /// The MCP servers the host runs for every agent (#488), as the daemon last said.
+    /// Replaced whole by each `mcp/hostedChanged`. Nil from a daemon too old to host any.
+    public private(set) var hostedMCP: DaemonAPI.HostedMCPSnapshot?
     /// Every volume that is low on space (#195), as the daemon last said. Replaced whole
     /// by each `disk/changed`. Empty from a daemon too old to say, which draws nothing.
     public private(set) var disk = DiskState()
@@ -349,6 +352,7 @@ public final class AgentsModel {
         case runtimeAllowancesChanged(RuntimeAllowances)
         case agentRemoved(DaemonAPI.AgentRemovedNotification)
         case leasesChanged(DaemonAPI.LeaseSnapshot)
+        case hostedMCPChanged(DaemonAPI.HostedMCPSnapshot)
         case diskChanged(DiskState)
         case eventsChanged(DaemonAPI.EventsChange)
         case modesChanged(DaemonAPI.RememberedModes)
@@ -398,6 +402,8 @@ public final class AgentsModel {
             return decode(RuntimeAllowances.self, Update.runtimeAllowancesChanged)
         case DaemonAPI.Notification.agentRemoved: return decode(DaemonAPI.AgentRemovedNotification.self, Update.agentRemoved)
         case DaemonAPI.Notification.leasesChanged: return decode(DaemonAPI.LeaseSnapshot.self, Update.leasesChanged)
+        case DaemonAPI.Notification.mcpHostedChanged:
+            return decode(DaemonAPI.HostedMCPSnapshot.self, Update.hostedMCPChanged)
         case DaemonAPI.Notification.diskChanged: return decode(DiskState.self, Update.diskChanged)
         case DaemonAPI.Notification.eventsChanged: return decode(DaemonAPI.EventsChange.self, Update.eventsChanged)
         case DaemonAPI.Notification.modesChanged: return decode(DaemonAPI.RememberedModes.self, Update.modesChanged)
@@ -570,6 +576,9 @@ public final class AgentsModel {
 
         case .leasesChanged(let snapshot):
             replaceLeases(snapshot)
+
+        case .hostedMCPChanged(let snapshot):
+            hostedMCP = snapshot
 
         case .diskChanged(let state):
             disk = state
@@ -858,6 +867,7 @@ public final class AgentsModel {
     public func replaceCostState(_ state: DaemonAPI.CostState) { costState = state }
     public func replaceRetentionState(_ state: DaemonAPI.RetentionState) { retentionState = state }
     public func replaceRuntimeAllowances(_ allowances: RuntimeAllowances) { runtimeAllowances = allowances }
+    public func replaceHostedMCP(_ snapshot: DaemonAPI.HostedMCPSnapshot) { hostedMCP = snapshot }
     public func replaceLeases(_ snapshot: DaemonAPI.LeaseSnapshot) {
         leases = snapshot
         reindexLeases()

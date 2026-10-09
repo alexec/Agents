@@ -57,14 +57,18 @@ public final class AppToolsEndpoint: @unchecked Sendable {
     private let relay: AppService.Relay
     private let log: @Sendable (String) -> Void
     private var holders: [String: Holder] = [:]
+    /// The servers the daemon hosts (#488), served beside the app's own at
+    /// `/mcp/hosted/<route>`.
+    let hosted: HostedMCPServers?
     private var channel: (any Channel)?
     private var starting: Task<Int, any Error>?
 
     /// `relay` is the daemon's own `handle`: each tool's request goes there with the token,
     /// and what it answers goes back to the agent.
-    public init(relay: @escaping AppService.Relay,
-                log: @escaping @Sendable (String) -> Void = { DaemonLog.shared.write($0) }) {
+    init(relay: @escaping AppService.Relay, hosted: HostedMCPServers? = nil,
+         log: @escaping @Sendable (String) -> Void = { DaemonLog.shared.write($0) }) {
         self.relay = relay
+        self.hosted = hosted
         self.log = log
     }
 
@@ -99,6 +103,12 @@ public final class AppToolsEndpoint: @unchecked Sendable {
     /// How many MCP sessions `token`'s runtime has open. For tests and the status.
     func openSessions(_ token: String) -> Int {
         lock.withLock { holders[token]?.sessions.count ?? 0 }
+    }
+
+    /// A hosted server (#488) as a session carrying `token` is handed it.
+    public static func hostedServer(name: String, port: Int, path: String, token: String) -> MCPServer {
+        MCPServer(name: name, transport: .http(url: "http://127.0.0.1:\(port)\(path)",
+                                               headers: ["Authorization": "Bearer \(token)"]))
     }
 
     /// The server a session is handed for `token`.
@@ -143,6 +153,10 @@ public final class AppToolsEndpoint: @unchecked Sendable {
         }
         // A page in a browser can reach loopback. Nothing here is for one.
         if let origin = header("Origin"), !Self.isLoopbackOrigin(origin) { return Reply(403) }
+        if path.hasPrefix(HostedMCPServers.pathPrefix), let hosted {
+            return await hosted.answer(path: path, token: Self.bearer(header("Authorization")),
+                                       session: header("Mcp-Session-Id"), method: method, body: body)
+        }
         guard (path.split(separator: "?", maxSplits: 1).first.map(String.init) ?? path) == Self.path else {
             return Reply(404)
         }

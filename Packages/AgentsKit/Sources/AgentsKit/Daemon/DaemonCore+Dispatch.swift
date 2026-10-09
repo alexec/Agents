@@ -310,6 +310,9 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.MCPListRequest.self)
                 return .success(try JSONValue.encoding(try await mcpList(request)))
 
+            case DaemonAPI.Method.mcpHosted:
+                return .success(try JSONValue.encoding(await hostedServers.snapshot()))
+
             case DaemonAPI.Method.mcpApprove:
                 let request = try require(params, as: DaemonAPI.MCPApproveRequest.self)
                 return .success(try JSONValue.encoding(try await mcpApprove(request)))

@@ -1,1 +1,1 @@
-{ "mcpServers": { "ci": { "type": "http", "url": "http://127.0.0.1:8795/mcp" } } }
+{ "mcpServers": { "ci": { "command": "node", "args": ["Integrations/ci-watcher/server.ts"], "hosted": true } } }
