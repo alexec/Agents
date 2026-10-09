@@ -117,14 +117,14 @@ struct ActivityButtons: View {
         }
         .foregroundStyle(runtimeIsOut ? StateTint.failure.style(or: .primary) : AnyShapeStyle(.primary))
         .help(runtimesHelp)
+        // An icon, in the group with the others (Alex, #495); the day's figure is its help,
+        // and it turns red when the day is close to its limit.
         Button { selection = .spending } label: {
-            Text(today ?? "Cost")
-                .monospacedDigit()
-                .foregroundStyle((model.costState?.dayIsCloseToFull == true ? StateTint.failure : .none)
-                    .style(or: .primary))
+            Label(today.map { "Cost, \($0) today" } ?? "Cost", systemImage: "dollarsign.circle")
         }
-        .help(today == nil ? "Cost: what all of the work has cost (⌥⌘S)"
-                           : "What every agent has cost today. Opens Cost (⌥⌘S)")
+        .foregroundStyle((model.costState?.dayIsCloseToFull == true ? StateTint.failure : .none)
+            .style(or: .primary))
+        .help(today.map { "Cost: \($0) today (⌥⌘S)" } ?? "Cost: what all of the work has cost (⌥⌘S)")
     }
 
     private var tally: RuntimeTally? {

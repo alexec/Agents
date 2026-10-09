@@ -19,7 +19,7 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
 
     public var systemImage: String {
         switch self {
-        case .needsYou: "exclamationmark.bubble"
+        case .needsYou: "hand.raised"
         case .working: "circle.dotted"
         case .unread: "circle.inset.filled"
         }

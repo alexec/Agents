@@ -83,6 +83,7 @@ struct AgentRow: View {
                     Text(agent.title ?? "Untitled")
                         .appText(isCompact ? .supporting : .reading)
                         .fontWeight(agent.showsUnread ? .semibold : .regular)
+                        .foregroundStyle(.primary)
                         .lineLimit(1)
                         .accessibilityValue(agent.showsUnread ? "unread" : "")
                     if let place {
@@ -142,9 +143,11 @@ struct AgentRow: View {
                         .foregroundStyle(.secondary)
                         .help(agent.folderGoneMessage)
                 } else if let report = agent.report?.message {
+                    // In the sidebar, white as the title is (#495): what it said is
+                    // what the row is for.
                     Text(report)
                         .appText(isCompact ? .fine : .supporting)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(isCompact ? .primary : .secondary)
                         .lineLimit(isCompact ? 1 : 2)
                         .fixedSize(horizontal: false, vertical: true)
                 }

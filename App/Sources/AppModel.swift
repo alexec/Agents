@@ -357,7 +357,30 @@ final class AppModel {
         // A new session in it (#366): the project's own page is where a session starts,
         // as New Session has it. The project's row in the sidebar only folds (#375).
         composing = true
+        // The next New Session starts here too (#495).
+        rememberNewSessionProject(key)
         draftWorktree = nil
+    }
+
+    /// The project New Session at the top of the sidebar starts in (#495): the last one a
+    /// new session was opened in, while it is still a live project; otherwise the selected
+    /// one, otherwise the first.
+    var newSessionProject: ProjectKey? {
+        let live = liveProjects.map(\.key)
+        if let remembered = rememberedNewSessionProject, live.contains(remembered) { return remembered }
+        if let selected = selectedProjectKey, live.contains(selected) { return selected }
+        return live.first
+    }
+
+    private var rememberedNewSessionProject: ProjectKey? =
+        UserDefaults.standard.string(forKey: AppModel.newSessionProjectDefault).flatMap(ProjectKey.init(stored:))
+
+    static let newSessionProjectDefault = "newSessionProject"
+
+    private func rememberNewSessionProject(_ key: ProjectKey) {
+        guard rememberedNewSessionProject != key else { return }
+        rememberedNewSessionProject = key
+        UserDefaults.standard.set(key.stored, forKey: Self.newSessionProjectDefault)
     }
 
     /// A new session in the selected project: the empty chat with its prompt, where a

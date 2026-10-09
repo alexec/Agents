@@ -14,6 +14,9 @@ struct ProjectRow: View {
     var label: String? = nil
     /// Folded, the row says what is under it; unfolded, the rows under it say that.
     var isFolded = true
+    /// Drawn as its group's heading in the sidebar (#495): the name in grey, as a group's
+    /// heading is, so the sessions under it read first.
+    var asHeading = false
     /// What a click does: the fold opens or closes, and nothing else (#375), as the
     /// Remote's row and the web's do. A session starts from the fold's New session row.
     var onClick: () -> Void = {}
@@ -31,7 +34,7 @@ struct ProjectRow: View {
                     }
                     Text(label ?? summary.name)
                         .lineLimit(1)
-                        .foregroundStyle(summary.exists ? .primary : .secondary)
+                        .foregroundStyle(summary.exists && !asHeading ? .primary : .secondary)
                     if summary.project.isPinned {
                         Image(systemName: "pin.fill")
                             .imageScale(.small)

@@ -71,9 +71,7 @@ struct ProjectAgentsView: View {
     /// on it from here. The one thing about the folder that is news here is that it has gone.
     private var heading: some View {
         VStack(spacing: 6) {
-            Text(summary?.name ?? "Project")
-                .appText(.title).fontWeight(.semibold)
-                .lineLimit(1)
+            projectMenu
             if let summary {
                 Text(place(summary))
                     .appText(.supporting)
@@ -91,6 +89,45 @@ struct ProjectAgentsView: View {
         }
         .multilineTextAlignment(.center)
         .chatColumn()
+    }
+
+    /// The project's name, as a menu of every project (#495): New Session at the top of
+    /// the sidebar starts in the last one used, and this is where another is chosen.
+    private var projectMenu: some View {
+        Menu {
+            ForEach(SidebarOrder.projects(model.liveProjects, servers: model.hosts.servers), id: \.key) { project in
+                Button {
+                    model.showProject(project.key)
+                } label: {
+                    if project.key == model.selectedProjectKey {
+                        Label(label(project), systemImage: "checkmark")
+                    } else {
+                        Text(label(project))
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Text(summary?.name ?? "Project")
+                    .appText(.title).fontWeight(.semibold)
+                    .lineLimit(1)
+                Image(systemName: "chevron.up.chevron.down")
+                    .imageScale(.small)
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+            }
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Start the session in another project")
+        .accessibilityLabel("Project: \(summary?.name ?? "none")")
+    }
+
+    private func label(_ project: DaemonAPI.ProjectSummary) -> String {
+        SidebarOrder.label(project) { model.hosts.label($0) }
     }
 
     /// `~/Agents · this Mac`, or the path and the server's name.

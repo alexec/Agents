@@ -53,17 +53,23 @@ struct ProjectListView: View {
             // move as states change; the pages about all the work that used to be here
             // are in the toolbar and the View menu.
             Section {
+                // One way to start a session (#495), in the project last started in; the
+                // page it opens can switch project.
+                NewSessionTopRow()
                 ForEach(SidebarSmartRow.allCases, id: \.self) { row in
                     SmartFold(row: row, projects: orderedProjects.map(\.key), folds: folds, query: searched)
                 }
             }
 
-            Section("Projects") {
-                ForEach(orderedProjects, id: \.key) { summary in
-                    ProjectFold(summary: summary, folds: folds, query: searched,
-                                showsAllMatches: showingAllMatches.contains(summary.key),
-                                showAllMatches: { showingAllMatches.insert(summary.key) })
-                }
+            // One group per project (#495), its name the group's heading, its sessions the
+            // rows: Mail's accounts rather than a Projects heading with folds under it.
+            ForEach(orderedProjects, id: \.key) { summary in
+                ProjectFold(summary: summary, folds: folds, query: searched,
+                            showsAllMatches: showingAllMatches.contains(summary.key),
+                            showAllMatches: { showingAllMatches.insert(summary.key) })
+            }
+
+            Section {
                 // A host had more matches than its page: the next page, on asking (#176).
                 if !searched.isEmpty, model.searchHasMore {
                     Button("More matches…") { Task { await model.searchMore() } }
@@ -345,13 +351,11 @@ private struct ProjectFold: View {
                                       isOpen: folds.isOpen(key))
         let isOpen = fold.isUnfolded
         if fold.isShown {
-            DisclosureGroup(isExpanded: Binding(
+            Section(isExpanded: Binding(
                 get: { isOpen },
                 set: { folds.set(key, open: $0) })) {
-                // Folded, nothing at all is under the row (#356): see `isUnfolded`.
-                // First, where a session starts (#375): the project's own row only folds.
-                NewSessionSidebarRow(project: key)
-                    .disabled(model.hostUnreachable(summary.host))
+                // Folded, nothing at all is under the heading (#356): see `isUnfolded`.
+                // A session starts from New Session at the top (#495), or the menu.
                 // The project's pinned pages (#159), before its sessions. Not while
                 // searching: the search is for sessions.
                 if fold.showsPinnedPages {
@@ -390,8 +394,8 @@ private struct ProjectFold: View {
                                        count: archived, item: .archive(key))
                     }
                 }
-            } label: {
-                ProjectRow(summary: summary, label: label, isFolded: !isOpen) {
+            } header: {
+                ProjectRow(summary: summary, label: label, isFolded: !isOpen, asHeading: true) {
                     // A search holds every match open.
                     if !fold.isSearching { folds.set(key, open: !isOpen) }
                 }
@@ -467,36 +471,50 @@ private struct ProjectFold: View {
     }
 }
 
-/// The first row under an unfolded project (#375): a new session in it, as ⌘N and the
-/// project menu's New Session start one. It carries the project's own item, which the
-/// sidebar lights while that project's new session is open.
-private struct NewSessionSidebarRow: View {
+/// The first row of the sidebar (#495): a new session, in the project the last one was
+/// started in, as ⌘N starts one. The page it opens can switch project. It carries that
+/// project's own item, which the sidebar lights while its new session is open.
+private struct NewSessionTopRow: View {
     @Environment(AppModel.self) private var model
     @Environment(WindowRequests.self) private var requests
-    let project: ProjectKey
 
     var body: some View {
+        let project = model.newSessionProject
         HStack(spacing: 6) {
-            // Plain text beside a plain image, as the pinned pages have it (#155).
             Image(systemName: "square.and.pencil")
                 .foregroundStyle(.secondary)
                 .frame(width: 16)
                 .accessibilityHidden(true)
-            Text("New session")
+            Text("New Session")
                 .lineLimit(1)
             Spacer(minLength: 0)
         }
+        .appText(.supporting)
         .contentShape(Rectangle())
         // Every click, not only a changed selection: the row may already be the lit one
         // while the prompt has lost the keyboard. See `ProjectRow` before #375.
         .simultaneousGesture(TapGesture().onEnded {
+            guard let project else { return }
             model.showProject(project)
             requests.focusPrompt()
         })
+        .disabled(project == nil)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("New session")
-        .sidebarInk(.project(project))
-        .tag(SidebarItem.project(project))
+        .accessibilityLabel("New Session")
+        .modifier(NewSessionTag(project: project))
+    }
+}
+
+/// The row's item while there is a project to start in; none while there is not.
+private struct NewSessionTag: ViewModifier {
+    let project: ProjectKey?
+
+    func body(content: Content) -> some View {
+        if let project {
+            content.sidebarInk(.project(project)).tag(SidebarItem.project(project))
+        } else {
+            content
+        }
     }
 }
 

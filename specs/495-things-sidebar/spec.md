@@ -272,6 +272,14 @@ lists, adapted to touch and width.
 - Q: What does clicking a smart row do? → A: It folds open in the sidebar, like a project; the detail stays the chat.
 - Q: Where do Events, Resources, Runtimes and Spending go? → A: Toolbar and Window menu; toolbar buttons carry today's warning marks.
 
+### Walk 1, 2026-10-08 (Alex)
+
+- Cost goes in the toolbar's group with the other three (an icon; the day's figure is its help, red near the limit).
+- One group per project, its name the group's heading, rather than a Projects heading with folds.
+- Grey for the groups' headings, white for a session's title and message.
+- The hand icon for Needs You.
+- One New Session at the top of the sidebar, in place of a row in each project; it opens in the last project a new session was opened in, and the new-session page's project name is a menu to switch project.
+
 ## Assumptions
 
 - "Done" sessions stay in their project's flat list (plain, no mark); there is no Done
