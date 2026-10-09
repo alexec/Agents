@@ -39,6 +39,8 @@ button.prominent {
 }
 
 a { color: var(--accent); }
+/* Said, not left to the browser: a link in the chat shows the hand (#515). */
+a[href] { cursor: pointer; }
 
 :focus-visible { outline-color: var(--accent); }
 

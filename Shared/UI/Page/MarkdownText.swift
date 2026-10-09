@@ -96,6 +96,7 @@ struct MarkdownText: View {
         case .paragraph(let text):
             self.text(text, caret: caret).textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
+                .linkPointer(text)
 
         case .heading(let level, let text):
             // Not a step of the scale: `TextStep.heading` says why, and resolves the
@@ -104,6 +105,7 @@ struct MarkdownText: View {
                 .font(TextStep.heading(level: level))
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
+                .linkPointer(text)
 
         case .list(let ordered, let start, let items):
             VStack(alignment: .leading, spacing: Self.itemSpacing) {
@@ -176,8 +178,9 @@ struct MarkdownText: View {
 
     /// A block's text, with the caret after its last character when there is one.
     private func text(_ text: AttributedString, caret: CursorFlag?) -> Text {
-        guard let caret else { return Text(text) }
-        return Text("\(Text(text))\(caret.caret)")
+        let drawn = Text.markingLinks(text)
+        guard let caret else { return drawn }
+        return Text("\(drawn)\(caret.caret)")
     }
 
     /// A block that is not text — a picture, a table, a rule — with the caret on the
@@ -244,6 +247,74 @@ struct MarkdownText: View {
         }
     }
 }
+
+/// A link's words, marked so the laid-out text can say where they are (#515).
+private struct LinkRun: TextAttribute {}
+
+private extension Text {
+    /// The text, with each link's words marked. Text with no link is drawn as it was.
+    static func markingLinks(_ text: AttributedString) -> Text {
+        let runs = text.runs[\.link]
+        guard runs.contains(where: { $0.0 != nil }) else { return Text(text) }
+        return runs.reduce(Text(verbatim: "")) { drawn, run in
+            let part = Text(AttributedString(text[run.1]))
+            return Text("\(drawn)\(run.0 == nil ? part : part.customAttribute(LinkRun()))")
+        }
+    }
+}
+
+private extension View {
+    /// The hand over a link, on the Mac (#515). Selectable text shows the I-beam
+    /// everywhere, links included, so a link did not look like one until clicked.
+    /// Only text holding a link pays for the hover.
+    @ViewBuilder
+    func linkPointer(_ text: AttributedString) -> some View {
+        #if os(macOS)
+        if text.runs[\.link].contains(where: { $0.0 != nil }) {
+            modifier(LinkPointer())
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
+    }
+}
+
+#if os(macOS)
+/// Where the links are in a laid-out text, and the hand while the pointer is on one.
+private struct LinkPointer: ViewModifier {
+    @State private var links: [CGRect] = []
+    @State private var overLink = false
+
+    func body(content: Content) -> some View {
+        content
+            .overlayPreferenceValue(Text.LayoutKey.self) { layouts in
+                GeometryReader { proxy in
+                    let found = Self.links(in: layouts, proxy)
+                    Color.clear.onChange(of: found, initial: true) { links = found }
+                }
+            }
+            .onContinuousHover { phase in
+                switch phase {
+                case .active(let point): overLink = links.contains { $0.contains(point) }
+                case .ended: overLink = false
+                }
+            }
+            .pointerStyle(overLink ? .link : nil)
+    }
+
+    private static func links(in layouts: Text.LayoutKey.Value, _ proxy: GeometryProxy) -> [CGRect] {
+        layouts.flatMap { anchored in
+            let origin = proxy[anchored.origin]
+            return anchored.layout.flatMap { line in
+                line.filter { $0[LinkRun.self] != nil }
+                    .map { $0.typographicBounds.rect.offsetBy(dx: origin.x, dy: origin.y) }
+            }
+        }
+    }
+}
+#endif
 
 /// Content that scrolls sideways when it is wider than the column, and is simply drawn
 /// when it is not (#90).
