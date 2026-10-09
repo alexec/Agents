@@ -1,0 +1,18 @@
+{
+  "pins" : [
+    {
+      "pinned_by" : {
+        "agent" : "5C451A88-8447-432C-9889-5675A593B5F3"
+      },
+      "title" : "Pull requests",
+      "view" : {
+        "arguments" : {
+          "repo" : "alexec/Agents"
+        },
+        "server" : "ci",
+        "tool" : "list_prs",
+        "uri" : "ui://ci/board"
+      }
+    }
+  ]
+}
