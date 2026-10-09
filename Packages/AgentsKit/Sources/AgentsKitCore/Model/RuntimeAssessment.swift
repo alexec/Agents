@@ -45,9 +45,9 @@ public enum RuntimeAssessment {
         Step(id: "wait", area: "Events",
              passesWhen: "wait_for_event with until_minutes timed out, and the agent was started again to be told"),
         Step(id: "ending", area: "Ending a turn",
-             passesWhen: "finish_turn recorded blocked on the helper, blocked with a check-again time, and a last done or needs_answer"),
+             passesWhen: "wait_for_event waited on the helper and on a time alone, each ending the turn, and a last finish_turn recorded done or needs_answer"),
         Step(id: "worktree", area: "Worktrees",
-             passesWhen: "finish_turn with worktree moved the agent into a new worktree, and finish_turn with leave_worktree remove moved it back and removed it (not offered outside a git repository, or where the runtime cannot move)"),
+             passesWhen: "move_worktree with worktree moved the agent into a new worktree, and move_worktree with leave_worktree remove moved it back and removed it (not offered outside a git repository, or where the runtime cannot move)"),
         Step(id: "sessions", area: "Sessions",
              passesWhen: "list_sessions listed this agent's own session, and read_session on its id gave back that id and its title"),
         Step(id: "scope", area: "Scope",
@@ -212,31 +212,29 @@ public enum RuntimeAssessment {
             6. `own_ask`: \(ownAsk)
             7. `helpers`: `start_agent` a helper on runtime `\(runtimeID)` with \(modelWords), the \
             label `\(helperLabel)`, and the prompt "Reply with the word OK, then call finish_turn \
-            with outcome done and the message OK." Then call `list_my_agents`. End this turn with \
-            `finish_turn`: outcome `blocked`, `waiting_on` the helper's id, title \
-            "Assess \(runtimeName)", and a message saying you are waiting on the helper. You \
-            are started again when the helper finishes. (If that call is \
-            refused because the helper has already finished, go straight on to step 8 in \
-            this turn.)
+            with outcome done and the message OK." Then call `list_my_agents`. Then call \
+            `wait_for_event` with `agents` the helper's id and a message saying you are \
+            waiting on the helper: that ends this turn, and you are started again when the \
+            helper finishes. (If that call is refused because the helper has already \
+            finished, go straight on to step 8 in this turn.)
 
             **Turn 2**, once the helper has finished
 
             8. `helpers`: `park_agent` the helper, then `archive_agent` it.
             9. `wait`: `wait_for_event` on `\(neverEvent)` with `until_minutes` 1. When it says \
-            you are still waiting, end the turn with `finish_turn`, outcome `blocked`, saying you \
-            are waiting for the wait to time out. You are started again when it does. (If the \
-            call itself comes back timed out, go straight on to step 10 in this turn.)
+            you are still waiting, end your turn. You are started again when it times out. (If \
+            the call itself comes back timed out, go straight on to step 10 in this turn.)
 
             **Turn 3**, once the wait has timed out
 
-            10. `ending`: end the turn with `finish_turn`, outcome `blocked`, \
-            `check_again_in_minutes` 1, saying you will check again in a minute.
+            10. `ending`: `wait_for_event` with `until_minutes` 1 and no events, with a message \
+            saying you will check again in a minute. That ends the turn.
 
             **Turn 4**
 
-            11. `worktree`: end the turn with `finish_turn`, outcome `partly_done`, `worktree` \
-            `\(lease)`, saying you are moving into a worktree. You are started again in it. (If \
-            that call is refused because the project is not in a git repository, or because \
+            11. `worktree`: `move_worktree` with `worktree` `\(lease)`, then end the turn with \
+            `finish_turn`, outcome `partly_done`, saying you are moving into a worktree. You \
+            are started again in it. (If `move_worktree` is not in your tools, or is refused because the project is not in a git repository, or because \
             your runtime cannot move, write `not offered` with what it said, and go straight on \
             to step 12 in this turn.)
 
@@ -249,8 +247,8 @@ public enum RuntimeAssessment {
             asked or refused; record which, and what the answer was.
             14. `permissions`: record whether a permission card came for that write, what it \
             was answered, and whether the file was written.
-            15. End the turn with `finish_turn`, outcome `partly_done`, `leave_worktree` \
-            `remove`, saying you are moving back. You are started again in the project folder. \
+            15. `move_worktree` with `leave_worktree` `remove`, then end the turn with \
+            `finish_turn`, outcome `partly_done`, saying you are moving back. You are started again in the project folder. \
             (If you never moved, skip this and go straight on to step 16.)
 
             **Turn 6**
@@ -258,8 +256,8 @@ public enum RuntimeAssessment {
             16. `report`: finish the report: every row filled in, and a section "What to fix" \
             naming each failure with its likely fix — the app, the adapter, the runtime's \
             version, or a setting. Then end with `finish_turn`: if every step passed by your \
-            own account, outcome `done`, `afterwards` `park`, and a message saying how many \
-            passed; otherwise outcome `needs_answer`, and a message for Alex naming the \
+            own account, call `park_agent` with no id, then `finish_turn` with outcome `done` \
+            and a message saying how many passed; otherwise outcome `needs_answer`, and a message for Alex naming the \
             failures and what to fix. The app then scores the record and adds its own table \
             to this conversation.
             """

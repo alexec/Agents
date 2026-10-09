@@ -1211,7 +1211,10 @@ public actor DaemonCore {
                 agent.isUnread = false
             }
             if let after = agent.afterTurn, !pickingUp {
-                if after == .park, endedAsAsked, agent.parking == nil, archiveWhenDone[agentID] == nil {
+                // Asked with park_agent before the ending was known (#481), so the ending
+                // it got — its own or the one worked out for it — has to go with a park.
+                let goes = agent.report.map { after.goes(with: $0.outcome) } ?? true
+                if after == .park, endedAsAsked, goes, agent.parking == nil, archiveWhenDone[agentID] == nil {
                     agent.parking = .parked(at: now())
                     agent.isUnread = false
                 }

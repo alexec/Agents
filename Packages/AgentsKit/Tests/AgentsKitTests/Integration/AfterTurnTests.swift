@@ -117,9 +117,11 @@ struct AfterTurnTests {
         #expect(agent.parking == nil)
     }
 
-    // MARK: The last call is the whole account
+    // MARK: A later account
 
-    @Test func aLaterCallWithoutAfterwardsClearsTheAsk() async throws {
+    /// Since #481 the ask is park_agent's to make, so a later finish_turn without one
+    /// keeps it — while its ending still goes with a park.
+    @Test func aLaterCallWithoutAfterwardsKeepsTheAsk() async throws {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
@@ -127,12 +129,96 @@ struct AfterTurnTests {
 
         try await finish(core, launcher, "done", afterwards: "park")
         try await finish(core, launcher, "done", afterwards: nil)
+        #expect(await core.agent(id)?.afterTurn == .park)
+
+        try await settle(core, id)
+        #expect(await core.agent(id)?.parking?.isParked == true)
+    }
+
+    /// And an ending that does not go with it drops it, telling the agent.
+    @Test func aLaterEndingThatDoesNotGoWithTheAskDropsIt() async throws {
+        let (locations, work) = try temporary()
+        let launcher = midTurn()
+        let core = try core(launcher, locations: locations)
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
+
+        _ = try await core.askAfterTurn(.init(token: await mintedToken(launcher), afterwards: "park"))
+        let reply = try await finish(core, launcher, "stuck", afterwards: nil)
+        #expect(reply.contains("Your ask to be parked is dropped"))
         #expect(await core.agent(id)?.afterTurn == nil)
+        try await settle(core, id)
+        #expect(await core.agent(id)?.parking == nil)
+    }
+
+    // MARK: park_agent with no id (#481)
+
+    /// Asked mid-turn and never followed by finish_turn: the turn's worked-out ending
+    /// goes with a park, and it is parked when the turn ends.
+    @Test func parkAgentOnItselfParksWhenTheTurnEnds() async throws {
+        let (locations, work) = try temporary()
+        let launcher = midTurn()
+        let core = try core(launcher, locations: locations)
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
+
+        let reply = try await core.askAfterTurn(.init(token: await mintedToken(launcher), afterwards: "park"))
+        #expect(reply.contains("will be parked"))
+        #expect(await core.agent(id)?.parking == nil, "nothing happens until the turn is over")
 
         try await settle(core, id)
         let agent = try #require(await core.agent(id))
         #expect(agent.state == .finished)
-        #expect(agent.parking == nil)
+        #expect(agent.parking?.isParked == true)
+    }
+
+    /// Its own id is the same ask as none.
+    @Test func parkAgentWithItsOwnIdIsTheSameAsk() async throws {
+        let (locations, work) = try temporary()
+        let launcher = midTurn()
+        let core = try core(launcher, locations: locations)
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
+
+        let reply = try await core.parkHelper(.init(token: await mintedToken(launcher), agentID: id.uuidString))
+        #expect(reply.contains("will be parked"))
+        #expect(await core.agent(id)?.afterTurn == .park)
+        try await settle(core, id)
+    }
+
+    /// A wait this turn and a park do not go together: the wait first refuses the park;
+    /// the park first is dropped by the wait, which says so.
+    @Test func aWaitAndAParkDoNotGoTogether() async throws {
+        let (locations, work) = try temporary()
+        let launcher = midTurn()
+        let core = try core(launcher, locations: locations)
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
+        let token = await mintedToken(launcher)
+
+        _ = try await core.askAfterTurn(.init(token: token, afterwards: "park"))
+        let waiting = try await core.waitOn(.init(token: token, untilMinutes: 5, message: "CI is running."))
+        #expect(waiting.contains("Your ask to be parked is dropped"))
+        #expect(await core.agent(id)?.afterTurn == nil)
+        #expect(await core.agent(id)?.report?.outcome == .blocked)
+
+        let error = await #expect(throws: JSONRPCError.self) {
+            _ = try await core.askAfterTurn(.init(token: token, afterwards: "park"))
+        }
+        #expect(error?.message.contains("this turn ended blocked") == true)
+        try await settle(core, id)
+        #expect(await core.agent(id)?.parking == nil)
+    }
+
+    /// Archiving itself is a workflow's run's, and only where its workflow allows.
+    @Test func archiveAgentOnItselfIsRefusedOutsideARun() async throws {
+        let (locations, work) = try temporary()
+        let launcher = midTurn()
+        let core = try core(launcher, locations: locations)
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
+
+        let error = await #expect(throws: JSONRPCError.self) {
+            _ = try await core.askAfterTurn(.init(token: await mintedToken(launcher), afterwards: "archive"))
+        }
+        #expect(error?.message == DaemonCore.cannotArchiveItself)
+        #expect(await core.agent(id)?.afterTurn == nil)
+        try await settle(core, id)
     }
 
     /// The older door cannot ask, and a later account through it is the whole account.

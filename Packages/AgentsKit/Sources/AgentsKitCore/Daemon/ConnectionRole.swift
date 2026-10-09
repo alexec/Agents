@@ -35,6 +35,9 @@ public enum ConnectionRole: String, Sendable, Hashable {
     /// tools' results and never sets them (#64).
     public static let agentMethods: Set<String> = Set<String>([
         DaemonAPI.Method.agentsFinishTurn,
+        DaemonAPI.Method.agentsAfterTurn,
+        DaemonAPI.Method.agentsSetOwnLabels,
+        DaemonAPI.Method.agentsWaitOn,
         DaemonAPI.Method.agentsSuggestPrompts,
         DaemonAPI.Method.agentsReportOutcome,
         DaemonAPI.Method.agentsShowFile,

@@ -76,7 +76,7 @@ struct ToolPolicyTests {
             #expect(!category.instead.isEmpty)
         }
         #expect(RemitCategory.standingArrangements.instead.contains(AppTool.manageWorkflows))
-        #expect(RemitCategory.suggestions.instead.contains(AppTool.finishTurn))
+        #expect(RemitCategory.suggestions.instead.contains("your reply"), "no next_prompt to give it to since #481")
         for retired in AppTool.retiredEndOfTurn {
             #expect(!RemitCategory.suggestions.instead.contains(retired))
         }
@@ -485,8 +485,7 @@ struct ToolPolicyTests {
         let names = try #require(meta["claudeCode"]?["options"]?["disallowedTools"]?.arrayValue).compactMap(\.stringValue)
         #expect(names.contains("EnterWorktree"))
         #expect(names.contains("ExitWorktree"))
-        #expect(RemitCategory.workingFolder.instead.contains(AppTool.finishTurn))
-        #expect(RemitCategory.workingFolder.instead.contains("leave_worktree"))
+        #expect(RemitCategory.workingFolder.instead.contains(AppTool.moveWorktree))
     }
 
     /// The relay table (056): Codex's config reads as it did in 047, Claude's relay is

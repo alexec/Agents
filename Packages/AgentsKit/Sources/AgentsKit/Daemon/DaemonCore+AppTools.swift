@@ -140,10 +140,11 @@ extension DaemonCore {
             afterwards = after
         }
         // A move is the agent carrying on somewhere else, so it does not go with an
-        // ending that waits for someone, or with being put down (053).
+        // ending that waits for someone (053), or with being archived. With a park it
+        // does since #481: the agent moves, and stays parked there.
         if request.move != nil {
             let waits = [WorkOutcome.needsAnswer, .blocked].contains(checked.report.outcome)
-            guard !waits, afterwards == nil else {
+            guard !waits, afterwards != .archive else {
                 throw JSONRPCError(code: JSONRPCError.invalidParams, message: Self.moveRefusal)
             }
         }
@@ -193,7 +194,7 @@ extension DaemonCore {
 
     static let moveRefusal = """
         Nothing was recorded: a move carries you on in the new folder, so it does not go \
-        with needs_answer, blocked or afterwards. End the turn without worktree or \
+        with needs_answer, blocked or being archived. End the turn without worktree or \
         leave_worktree, or with done, nothing_to_do, partly_done or stuck.
         """
 
@@ -267,10 +268,10 @@ extension DaemonCore {
     /// Put a report on the agent — and a row of chips, where the call carried one —
     /// and say what became of it.
     ///
-    /// `afterwards` is written whatever it is, so a later call without one — by either
-    /// door, the older of which cannot ask — clears an earlier ask: the last call in a
-    /// turn is its whole account (FR-005), and an ask left under a later `stuck` would
-    /// put away work that needs somebody.
+    /// `afterwards`, when the call carries one, replaces the ask. A call without one keeps
+    /// an ask `park_agent` made (#481) — unless this ending does not go with it: an ask
+    /// left under a later `stuck` would put away work that needs somebody, so it is
+    /// dropped, and the agent told.
     private func land(_ report: WorkReport, prompts: [SuggestedPrompt]?, title: String? = nil,
                       afterwards: AfterTurn? = nil,
                       labels: [SessionLabel]? = nil,
@@ -279,7 +280,16 @@ extension DaemonCore {
         // Replacing whatever this turn said before it changed its mind (FR-005).
         agent.report = report
         if let prompts { agent.suggestedPrompts = prompts }
-        agent.afterTurn = afterwards
+        var dropped: AfterTurn?
+        if let afterwards {
+            agent.afterTurn = afterwards
+        } else if let asked = agent.afterTurn, !asked.goes(with: report.outcome) {
+            agent.afterTurn = nil
+            dropped = asked
+        }
+        let droppedNote = dropped.map {
+            " Your ask to be \($0 == .park ? "parked" : "archived") is dropped: it does not go with \(report.outcome.rawValue)."
+        } ?? ""
         if let labels { agent.labels = labels }
         // Said in front of the person, so already seen: no banner for what they watched.
         if isWatched(agentID) { agent.reportSeenAt = report.at }
@@ -312,14 +322,14 @@ extension DaemonCore {
             // Reported after its turn had already ended, with everything it named
             // already over by then: nothing else will pass through `move` for it.
             await resumeIfCleared(agentID)
-            return Self.blockedNote(report.block, names: { self.waitName($0) })
+            return Self.blockedNote(report.block, names: { self.waitName($0) }) + droppedNote
         }
         return report.outcome.needsAPerson
             ? """
                 Noted. The person will see this conversation under "Needs attention", \
                 with your message on it.
-                """
-            : "Noted. This conversation now reads as \"\(report.outcome.heading)\" wherever the person looks."
+                """ + droppedNote
+            : "Noted. This conversation now reads as \"\(report.outcome.heading)\" wherever the person looks." + droppedNote
     }
 
     /// What an agent is told about its suggestion, by either door. There is only
@@ -492,7 +502,7 @@ extension DaemonCore {
     /// that start agents, change workflows, take leases or publish.
     func autoAllowedTurnTool(_ request: PermissionRequest) -> PermissionOption? {
         let call = request.toolCall
-        guard call.isFinishingTurn || call.isShowingFile else { return nil }
+        guard call.isFinishingTurn || call.isOwnSessionCall || call.isShowingFile else { return nil }
         return request.options.first { $0.kind == .allowAlways }
             ?? request.options.first { $0.kind == .allowOnce }
     }

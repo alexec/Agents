@@ -901,11 +901,11 @@ struct HelperAgentTests {
         for (target, expected) in cases {
             let stopped = await refusal { _ = try await calling(core, token) { t in try await core.stopHelper(.init(token: t, agentID: target)) } }
             #expect(stopped?.message == expected, "stop \(target)")
-            let parkExpected = target == lead.uuidString
-                ? "Nothing changed: an agent cannot park itself this way; set afterwards to park on finish_turn."
-                : expected
-            let parked = await refusal { _ = try await calling(core, token) { t in try await core.parkHelper(.init(token: t, agentID: target)) } }
-            #expect(parked?.message == parkExpected, "park \(target)")
+            // Its own id parks itself once its turn ends (#481), so it is no refusal.
+            if target != lead.uuidString {
+                let parked = await refusal { _ = try await calling(core, token) { t in try await core.parkHelper(.init(token: t, agentID: target)) } }
+                #expect(parked?.message == expected, "park \(target)")
+            }
             let archiveExpected = target == lead.uuidString ? DaemonCore.cannotArchiveItself : expected
             let archived = await refusal { _ = try await calling(core, token) { t in try await core.archiveHelper(.init(token: t, agentID: target)) } }
             #expect(archived?.message == archiveExpected, "archive \(target)")
@@ -970,8 +970,8 @@ struct HelperAgentTests {
         callers[helperToken] = helper
 
         let leadError = await refusal { _ = try await calling(core, token) { t in try await core.archiveHelper(.init(token: t, agentID: lead.uuidString)) } }
-        #expect(leadError?.message == "Nothing changed: you can't archive yourself. Park when your turn ends "
-                + "with finish_turn's afterwards: park, and the person or the agent that started you can archive you.")
+        #expect(leadError?.message == "Nothing changed: you can't archive yourself. Call park_agent with no id "
+                + "to be parked when your turn ends; the person or the agent that started you can archive you.")
         // A helper hears the same, rather than that it may not use the tools at all.
         let helperError = await refusal { _ = try await calling(core, helperToken) { t in try await core.archiveHelper(.init(token: t, agentID: helper.uuidString)) } }
         #expect(helperError?.message == DaemonCore.cannotArchiveItself)

@@ -1573,6 +1573,9 @@ extension DaemonCore {
         // unless the person has queued words, which go first. No question about how the
         // turn went: it ended to move (053).
         if movedBy == .agent {
+            // Parked as it also asked (#481): it stays down in the new folder, and the
+            // move's preface waits for whatever starts it next.
+            if agents[agentID]?.parking?.isParked == true { return }
             if agents[agentID]?.queuedPrompts.isEmpty == true {
                 await continueAfterMove(agentID)
             } else {

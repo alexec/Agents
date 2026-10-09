@@ -42,24 +42,24 @@ JSON. A token is taken as about four bytes.
 
 | Session | Bytes | About |
 | --- | --- | --- |
-| An agent the person started (21 tools) | 35,764 | 8,900 tokens |
-| An agent another agent started (16 tools) | 29,448 | 7,400 tokens |
-| Grok's rules, which repeat the tools in its system prompt | 8,851 | 2,200 tokens |
+| An agent the person started (23 tools) | 31,222 | 7,800 tokens |
+| An agent another agent started (19 tools) | 25,577 | 6,400 tokens |
+| Grok's rules, which repeat the tools in its system prompt | 7,792 | 1,950 tokens |
 | The briefing, sent once with the first prompt (Claude) | 2,589 | 650 tokens |
 
-Two tools are over half of it: `manage_workflows` (8,600 bytes) and `finish_turn` (8,188).
-`start_agent` is next at 3,385; every other tool is under 1,800.
+`manage_workflows` is the largest at 8,901 bytes, then `start_agent` at 3,385; every other
+tool is under 2,300. `finish_turn` was 8,509 until it was split (below).
 
 What a runtime does with the list differs:
 
 - **Claude** defers MCP tools behind its own tool search. A session sees each tool's name
   only, and pays for a schema once the agent loads it. The app's tools cost a Claude agent
-  almost nothing until it uses them, and `finish_turn` is the one every turn uses.
+  almost nothing until it uses them.
 - **Grok** hides MCP tools behind `search_tool` too, so the app writes the tools into its
   rules instead (see [Why agents' own tools are taken away](scoped-tools.md)). That is about
   2,200 tokens, fixed for the session.
 - **Codex, OpenCode, Gemini, Copilot, Cursor and Antigravity** send every listed schema
-  with every request: about 8,900 tokens, against the 97 K a Codex turn reads on average.
+  with every request: about 7,800 tokens, against the 97 K a Codex turn reads on average.
 
 A project's own MCP servers are added on top, in the same way for each runtime. They are
 the person's choice, and they are not measured here. To measure one, list its tools
@@ -83,6 +83,26 @@ transcript. `turns.jsonl` now carries it beside each turn too, added up when a t
 reports more than once, so turns can be compared without reading whole transcripts.
 `scripts/turn-usage.sh --since DATE` compares runtimes from a date on, and `--turns` prints
 one line per turn.
+
+**`finish_turn` split into focused tools (#481).** One tool carried every job at the end
+of a turn: the outcome, the title, the next prompt, labels, parking, waiting on agents or a
+time, and moves. Its description explained which arguments could not go together, and
+agents still got that wrong. It now says only how the turn went. Waiting is on
+`wait_for_event` (`agents`, `wake_on`, `until_minutes`), parking itself on `park_agent`
+with no id, moves on `move_worktree`, and labels on `set_session_labels`. The next prompt
+was dropped. Old calls still work: `finish_turn` reads every argument it took before.
+
+| Measured by `ToolCostTests` | Before | After |
+| --- | --- | --- |
+| `finish_turn` | 8,509 bytes (~2,130 tokens) | 1,154 bytes (~290 tokens) |
+| The tools it gave jobs to: `wait_for_event`, `park_agent`, `archive_agent` | 3,215 | 4,034 |
+| The new tools: `move_worktree`, `set_session_labels` | none | 1,372 |
+| An agent the person started | 36,386 bytes (~9,100 tokens), 21 tools | 31,222 bytes (~7,800 tokens), 23 tools |
+| An agent another agent started | 30,070 bytes (~7,500 tokens) | 25,577 bytes (~6,400 tokens) |
+| Grok's rules | 8,992 bytes | 7,792 bytes |
+
+That is about 1,300 tokens a request off every session on the runtimes that send every
+schema, two more tools to choose from notwithstanding.
 
 ## What was left alone, and why
 

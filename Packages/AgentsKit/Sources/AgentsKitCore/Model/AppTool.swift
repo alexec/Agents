@@ -11,10 +11,17 @@ import Foundation
 /// `mcp__agents__finish_turn` — so they are matched on the end of a name and never
 /// whole.
 public enum AppTool {
-    /// The one call that ends a turn: how it went, and what to ask next. What one
-    /// passes to it becomes the line under the agent's name and the row of chips
-    /// above the prompt.
+    /// The optional call that says how a turn ended: what one passes to it becomes the
+    /// line under the agent's name. Since #481 it says only that; waiting, parking,
+    /// moving and labels each have a tool of their own.
     public static let finishTurn = "finish_turn"
+
+    /// Add or remove the agent's own labels on its session (#481).
+    public static let setSessionLabels = "set_session_labels"
+
+    /// Move into a worktree, or back to the project folder, once the turn ends (#481).
+    /// Offered only on a runtime that can carry its conversation across folders.
+    public static let moveWorktree = "move_worktree"
 
     /// What one passes to this becomes the file open in the sidebar.
     public static let showFile = "show_file"
@@ -106,7 +113,7 @@ public enum AppTool {
         finishTurn, showFile, manageWorkflows, askForm, startAgent, stopAgent, parkAgent,
         listMyAgents, leaseResource, releaseResource, listResources, waitForEvent,
         cancelWait, publishEvent, listSessions, readSession, archiveAgent,
-        pinPage, unpinPage, movePin, pinSession,
+        pinPage, unpinPage, movePin, pinSession, setSessionLabels, moveWorktree,
     ]
 
     /// How runtimes put the server's name in front of a tool's, as measured: Claude's

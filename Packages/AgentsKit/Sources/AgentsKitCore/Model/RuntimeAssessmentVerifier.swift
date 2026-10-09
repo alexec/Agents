@@ -303,11 +303,28 @@ private struct Scorer {
     /// A block on the helper refused because the helper had already ended: the daemon's
     /// own account of the helper finishing first.
     func blockFoundHelperDone(_ helper: UUID?) -> Bool {
-        calls(DaemonAPI.Method.agentsFinishTurn).contains { call in
-            !call.ok && call.arguments?["outcome"]?.stringValue == "blocked"
-                && (call.answer ?? "").contains("has already ended")
-                && (helper == nil || (call.arguments?["waitingOn"]?.arrayValue ?? [])
-                    .contains { $0.stringValue?.uppercased() == helper?.uuidString })
+        blocks().contains { call in
+            !call.ok && (call.answer ?? "").contains("has already ended")
+                && (helper == nil || call.waitingOn.contains { $0.uppercased() == helper?.uuidString })
+        }
+    }
+
+    /// Every block asked for, answered or refused: `wait_for_event` on agents or a time
+    /// (#481), or `finish_turn` with `blocked`, as a conversation briefed before then does.
+    func blocks() -> [(at: Date, ok: Bool, answer: String?, waitingOn: [String], minutes: Int?)] {
+        record.calls.compactMap { call in
+            switch call.method {
+            case DaemonAPI.Method.agentsWaitOn:
+                return (call.at, call.ok, call.answer,
+                        (call.arguments?["agents"]?.arrayValue ?? []).compactMap(\.stringValue),
+                        call.arguments?["untilMinutes"]?.intValue)
+            case DaemonAPI.Method.agentsFinishTurn where call.arguments?["outcome"]?.stringValue == "blocked":
+                return (call.at, call.ok, call.answer,
+                        (call.arguments?["waitingOn"]?.arrayValue ?? []).compactMap(\.stringValue),
+                        call.arguments?["checkAgainInMinutes"]?.intValue)
+            default:
+                return nil
+            }
         }
     }
 
@@ -328,12 +345,13 @@ private struct Scorer {
 
     func ending() -> (Verdict, String) {
         let finished = calls(DaemonAPI.Method.agentsFinishTurn).filter(\.ok)
-        let blocked = finished.filter { $0.arguments?["outcome"]?.stringValue == "blocked" }
-        let onHelper = blocked.contains { !($0.arguments?["waitingOn"]?.arrayValue ?? []).isEmpty }
-            || blockFoundHelperDone(nil)
-        let withTime = blocked.contains { $0.arguments?["checkAgainInMinutes"]?.intValue != nil }
+        let blocked = blocks().filter(\.ok)
+        let onHelper = blocked.contains { !$0.waitingOn.isEmpty } || blockFoundHelperDone(nil)
+        let withTime = blocked.contains { $0.minutes != nil }
         let last = finished.last?.arguments?["outcome"]?.stringValue
-        let outcomes = finished.compactMap { $0.arguments?["outcome"]?.stringValue }.joined(separator: ", ")
+        let outcomes = (blocked.map { _ in "blocked" }
+            + finished.compactMap { $0.arguments?["outcome"]?.stringValue }.filter { $0 != "blocked" })
+            .joined(separator: ", ")
         // A title, a next prompt and an account of every turn are not asked of an agent
         // any more (#479): the daemon works out a silent ending for itself. What is
         // scored is the tool still doing what only it can — waiting and its outcomes.
@@ -342,6 +360,7 @@ private struct Scorer {
         if !withTime { missing.append("blocked with a check-again time") }
         if last != "done" && last != "needs_answer" { missing.append("a last done or needs_answer") }
         let refused = calls(DaemonAPI.Method.agentsFinishTurn).filter { !$0.ok }.count
+            + calls(DaemonAPI.Method.agentsWaitOn).filter { !$0.ok }.count
         let note = refused > 0 ? " (\(refused) refused first)" : ""
         guard missing.isEmpty else {
             return (.failed, "recorded: \(outcomes.isEmpty ? "nothing" : outcomes)\(note); missing: " + missing.joined(separator: ", "))
@@ -349,11 +368,21 @@ private struct Scorer {
         return (.passed, "recorded: \(outcomes)\(note)")
     }
 
-    /// The `move` a `finish_turn` carried, by where it went: into a worktree, or back.
+    /// The moves asked for, by where they went: into a worktree, or back. On
+    /// `move_worktree` (#481), or as a `move` on `finish_turn`, as before then.
     func moves(back: Bool) -> [AppToolCall] {
-        calls(DaemonAPI.Method.agentsFinishTurn).filter { call in
-            guard let target = call.arguments?["move"]?["target"]?.objectValue else { return false }
-            return (target["projectFolder"] != nil) == back
+        record.calls.compactMap { call -> AppToolCall? in
+            let move: JSONValue?
+            switch call.method {
+            case DaemonAPI.Method.agentsMoveSelf: move = call.arguments
+            case DaemonAPI.Method.agentsFinishTurn: move = call.arguments?["move"]
+            default: return nil
+            }
+            guard let target = move?["target"]?.objectValue else { return nil }
+            guard (target["projectFolder"] != nil) == back else { return nil }
+            var asked = call
+            asked.arguments = .object(["move": move ?? .null])
+            return asked
         }
     }
 
@@ -376,14 +405,14 @@ private struct Scorer {
             if why.contains("git repository") || why == RuntimeCatalog.whyCannotMoveFolders(runtimeID: record.runtimeID) {
                 return (.notOffered, why)
             }
-            return (.failed, said(into, "finish_turn worktree"))
+            return (.failed, said(into, "move_worktree worktree"))
         }
         let notes = runtimeNotes().filter { $0.at >= moved.at }
         guard let inNote = notes.first(where: { $0.text.hasPrefix("Moved from the project folder to worktree") }) else {
             return (.failed, notes.first(where: { $0.text.hasPrefix("Could not move") })?.text ?? "never moved into the worktree")
         }
         let back = moves(back: true).filter { $0.ok && $0.at > moved.at }
-        guard let leaving = back.first else { return (.failed, said(moves(back: true), "finish_turn leave_worktree")) }
+        guard let leaving = back.first else { return (.failed, said(moves(back: true), "move_worktree leave_worktree")) }
         guard leaving.arguments?["move"]?["removeLeft"]?.boolValue == true else {
             return (.failed, "left the worktree without remove")
         }

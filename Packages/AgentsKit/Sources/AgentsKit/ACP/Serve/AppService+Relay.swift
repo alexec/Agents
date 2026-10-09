@@ -134,6 +134,33 @@ extension AppService {
                                   DaemonAPI.ReadSessionRequest(token: token, session: session),
                                   fallback: SessionLookup.unavailable)
             }
+        } itself: { call in
+            // The agent's own session (#481): the daemon takes which from the token.
+            switch call {
+            case .afterTurn(let after):
+                return await send(DaemonAPI.Method.agentsAfterTurn,
+                                  DaemonAPI.AfterTurnRequest(token: token, afterwards: after.rawValue),
+                                  fallback: "Noted.")
+            case .labels(let add, let remove):
+                return await send(DaemonAPI.Method.agentsSetOwnLabels,
+                                  DaemonAPI.OwnLabelsRequest(token: token, add: add, remove: remove),
+                                  fallback: "Labelled.")
+            case .move(let move):
+                let request: DaemonAPI.MoveSelfRequest
+                switch move {
+                case .move(let target, let removeLeft, let discardChanges)?:
+                    request = .init(token: token, target: target, removeLeft: removeLeft,
+                                    discardChanges: discardChanges)
+                case nil:
+                    request = .init(token: token, target: nil)
+                }
+                return await send(DaemonAPI.Method.agentsMoveSelf, request, fallback: "Noted.")
+            case .waitOn(let agents, let wakeOn, let untilMinutes, let message):
+                return await send(DaemonAPI.Method.agentsWaitOn,
+                                  DaemonAPI.WaitOnRequest(token: token, agents: agents, wakeOn: wakeOn?.rawValue,
+                                                          untilMinutes: untilMinutes, message: message),
+                                  fallback: "Waiting.")
+            }
         } pins: { call in
             // Always the caller's own project folder: the daemon takes it from the token (#159).
             switch call {

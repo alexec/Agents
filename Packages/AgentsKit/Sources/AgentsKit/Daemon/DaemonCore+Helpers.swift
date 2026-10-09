@@ -159,6 +159,11 @@ extension DaemonCore {
     }
 
     public func parkHelper(_ request: DaemonAPI.HelperRequest) throws -> String {
+        // Its own id is the same ask as none (#481).
+        if let callerID = appTokens[request.token],
+           UUID(uuidString: request.agentID.trimmingCharacters(in: .whitespacesAndNewlines)) == callerID {
+            return try askAfterTurn(DaemonAPI.AfterTurnRequest(token: request.token, afterwards: AfterTurn.park.rawValue))
+        }
         let (_, target) = try helperTarget(request, doing: "park")
         let title = target.title ?? "Untitled"
         if target.parking?.isParked == true {
@@ -186,7 +191,9 @@ extension DaemonCore {
         // Itself first, whoever it is, so even a helper hears how it is put away.
         if let callerID = appTokens[request.token],
            UUID(uuidString: request.agentID.trimmingCharacters(in: .whitespacesAndNewlines)) == callerID {
-            throw JSONRPCError(code: DaemonAPI.Failure.notYours, message: Self.cannotArchiveItself)
+            // A workflow's run its workflow lets archive itself, once its turn ends (#481).
+            return try askAfterTurn(DaemonAPI.AfterTurnRequest(token: request.token,
+                                                               afterwards: AfterTurn.archive.rawValue))
         }
         let (caller, target) = try helperTarget(request, doing: "archive")
         let title = target.title ?? "Untitled"
@@ -208,8 +215,8 @@ extension DaemonCore {
     }
 
     /// What an agent hears when it tries to archive itself (#120, Alex's words).
-    static let cannotArchiveItself = "Nothing changed: you can't archive yourself. Park when your turn ends "
-        + "with finish_turn's afterwards: park, and the person or the agent that started you can archive you."
+    static let cannotArchiveItself = "Nothing changed: you can't archive yourself. Call park_agent with no id "
+        + "to be parked when your turn ends; the person or the agent that started you can archive you."
 
     // MARK: Listing
 
@@ -342,8 +349,7 @@ extension DaemonCore {
         guard target.id != caller.id else {
             throw JSONRPCError(code: DaemonAPI.Failure.notYours,
                                message: verb == "park"
-                                   ? "Nothing changed: an agent cannot park itself this way; "
-                                       + "set afterwards to park on finish_turn."
+                                   ? "Nothing changed: to park yourself, call park_agent with no id."
                                    : verb == "archive" ? Self.cannotArchiveItself
                                    : "Nothing changed: an agent cannot \(verb) itself.")
         }
