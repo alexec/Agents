@@ -291,6 +291,13 @@ lists, adapted to touch and width.
 - Workflows and Archived rows in the same type and icon size as the rows around them.
 - No icons on the smart groups; the marks are on the sessions: an orange hand for needs you, a spinner for working, two rings for unread, a circled check once read.
 
+### Walk 4, 2026-10-08 (Alex)
+
+- No "No sessions yet" line under an empty project.
+- No Workflows page: a project's workflows are rows after its sessions, for now. Archived workflows stay on the Archived page.
+- A workflow's actions (Run Now, Approve, Deny on This Host, the on/off switch, Pin, Archive) are in the window's toolbar, not on the page's title line.
+- A session opened from Unread stays in Unread, read, until another is opened, as in Mail's Unread mailbox; its count drops at once.
+
 ## Assumptions
 
 - "Done" sessions stay in their project's flat list (plain, no mark); there is no Done

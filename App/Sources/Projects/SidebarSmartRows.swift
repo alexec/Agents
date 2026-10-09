@@ -16,7 +16,7 @@ struct SmartFold: View {
     var body: some View {
         let isOpen = folds.isOpen(row)
         let open = Binding(get: { isOpen }, set: { folds.set(row, open: $0) })
-        let agents = isOpen ? row.agents(in: model.work, projects: projects, query: query) : []
+        let agents = isOpen ? shown : []
         DisclosureGroup(isExpanded: open) {
             if row == .pinned {
                 if isOpen { pinnedRows }
@@ -29,6 +29,18 @@ struct SmartFold: View {
             SmartRowLabel(row: row, count: row.count(in: model.work, projects: projects))
                 .togglesFold(open)
         }
+    }
+
+    /// What the row lists. Unread keeps the session opened from it (`keptInUnread`) in
+    /// its place, read now, until another is opened: its count has already dropped.
+    private var shown: [Agent] {
+        var agents = row.agents(in: model.work, projects: projects, query: query)
+        if row == .unread, let id = model.keptInUnread, !agents.contains(where: { $0.id == id }),
+           query.isEmpty, let kept = model.work.agent(id), kept.state != .archived {
+            let at = agents.firstIndex { $0.createdAt < kept.createdAt } ?? agents.endIndex
+            agents.insert(kept, at: at)
+        }
+        return agents
     }
 
     /// Every project's pinned sessions, then its pinned workflows, each dragged into the

@@ -278,7 +278,7 @@ final class AppModel {
             if showsSpending { return .spending }
             guard let key = selectedProjectKey else { return nil }
             if let id = openWorkflow { return .workflow(id, in: key) }
-            if let projectPage { return projectPage == .workflows ? .workflows(key) : .archive(key) }
+            if projectPage == .archive { return .archive(key) }
             if let openPin { return .pin(openPin, in: key) }
             if let selection { return .session(selection) }
             return composing ? .project(key) : nil
@@ -296,8 +296,6 @@ final class AppModel {
                 openWorkflow = id
             case .pin(let path, let key):
                 showPin(path, in: key)
-            case .workflows(let key):
-                showProjectPage(.workflows, of: key)
             case .archive(let key):
                 showProjectPage(.archive, of: key)
             case .spending:
@@ -433,6 +431,9 @@ final class AppModel {
             // transcript entry is ours to keep, so the shared model is told first.
             work.watching = selection
             presence?.watching(selection)
+            // Opened from Unread, it stays there until something else is opened (#495),
+            // as a read message stays in Mail's Unread mailbox while it is selected.
+            keptInUnread = selection.flatMap { work.agent($0) }.flatMap { $0.showsUnread ? $0.id : nil }
             // A session picked is the session shown, not a workflow left open over it.
             if selection != nil {
                 openWorkflow = nil
@@ -445,6 +446,10 @@ final class AppModel {
             Task { await loadTranscript() }
         }
     }
+
+    /// The session opened while it was unread, kept in the sidebar's Unread until another
+    /// is opened (#495), so it does not leave the list under the pointer on the click.
+    private(set) var keptInUnread: UUID?
 
     /// The agent this window just started, until its chat is opened. A new chat starts
     /// with the sidebar shut, whatever the last one had open (#358).
@@ -487,7 +492,7 @@ final class AppModel {
     }
 
     enum ProjectPage: Equatable {
-        case workflows, archive
+        case archive
     }
 
     /// The selected project's pinned page (#159) open in the chat's place, by its path in

@@ -1,9 +1,9 @@
 import AgentsKitCore
 import SwiftUI
 
-/// A page about one project's work, where the chat would be (#495): its workflows, or
-/// what it has archived. They used to be folds inside the project's fold in the sidebar;
-/// a row each there now opens this, so the sidebar is never more than two levels deep.
+/// What one project has archived, where the chat would be (#495): sessions and
+/// workflows. It used to be folds inside the project's fold in the sidebar; one row there
+/// now opens this, so the sidebar is never more than two levels deep.
 ///
 /// The same rows as the sidebar's, in a list whose selection is the window's: a click
 /// opens the workflow's page or the session's chat, as it did from the fold.
@@ -15,16 +15,13 @@ struct ProjectWorkPage: View {
     var body: some View {
         @Bindable var model = model
         VStack(alignment: .leading, spacing: 0) {
-            Text(page == .workflows ? "Workflows" : "Archived")
+            Text("Archived")
                 .appText(.title)
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
                 .padding(.bottom, 8)
             List(selection: $model.sidebarItem) {
-                switch page {
-                case .workflows: workflows
-                case .archive: archive
-                }
+                archive
             }
             .listStyle(.inset)
             .scrollContentBackground(.hidden)
@@ -33,17 +30,6 @@ struct ProjectWorkPage: View {
     }
 
     private var held: [WorkflowSummary] { model.workflows(in: project.folder) }
-
-    @ViewBuilder
-    private var workflows: some View {
-        let live = held.filter { !$0.isArchived }
-        if live.isEmpty {
-            Text("No workflows").foregroundStyle(.secondary)
-        }
-        ForEach(live, id: \.id) { summary in
-            WorkflowListRow(summary: summary, project: project)
-        }
-    }
 
     @ViewBuilder
     private var archive: some View {

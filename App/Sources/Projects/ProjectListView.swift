@@ -234,8 +234,6 @@ struct ProjectListView: View {
             folds.set(key, open: true)
         } else if case .pin(_, let key) = item {
             folds.set(key, open: true)
-        } else if case .workflows(let key) = item {
-            folds.set(key, open: true)
         } else if case .archive(let key) = item {
             folds.set(key, open: true)
         } else if case .project(let key) = item {
@@ -322,23 +320,17 @@ private struct ProjectFold: View {
                 ForEach(FoldedRow.rows(fold.sessions, in: .sessions)) { row in
                     SessionSidebarRow(agent: row.item)
                 }
-                if fold.showsNoSessions {
-                    Text("No sessions yet")
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
+                // Then its workflows, after the sessions (Alex, #495): rows, not a page.
+                ForEach(FoldedRow.rows(fold.workflows, in: .workflows)) { row in
+                    WorkflowListRow(summary: row.item, project: key)
                 }
                 if fold.isSearching {
-                    // What matched among the workflows and the archive, in the fold while
-                    // searching, so a match is one click away as it was.
+                    // What matched in the archive, in the group while searching, so a
+                    // match is one click away as it was.
                     searchMatches(fold)
                 } else {
-                    // Workflows and the archive, one row each opening a page (#495):
-                    // never a fold inside the fold.
-                    let workflows = fold.workflows.count + fold.pinnedWorkflows.count
-                    if workflows > 0 {
-                        ProjectPageRow(title: "Workflows", systemImage: "clock.arrow.circlepath",
-                                       count: workflows, item: .workflows(key))
-                    }
+                    // The archive, one row opening a page (#495): never a fold inside
+                    // the group.
                     let archived = fold.archivedCount(summary) + fold.archivedWorkflows.count
                     if archived > 0 {
                         ProjectPageRow(title: "Archived", systemImage: "archivebox",
@@ -374,7 +366,7 @@ private struct ProjectFold: View {
     /// ones, the archived capped until Show all (#176).
     @ViewBuilder
     private func searchMatches(_ fold: SidebarProjectFold) -> some View {
-        ForEach(FoldedRow.rows(fold.workflows + fold.archivedWorkflows, in: .workflows)) { row in
+        ForEach(FoldedRow.rows(fold.archivedWorkflows, in: .archivedWorkflows)) { row in
             WorkflowListRow(summary: row.item, project: key)
         }
         let shown = fold.archivedShown(showingAll: showsAllMatches)
