@@ -73,6 +73,11 @@ struct MCPEventsState {
     /// When each subscription's line was last told to the windows, so "Checked 20 s ago"
     /// is put right at most once a minute rather than on every poll.
     var announced: [String: Date] = [:]
+    /// Set when the record holds what only the pace and the page read (when it last
+    /// polled, when next): written with the next write that must happen, once a minute
+    /// or on a stop.
+    var recordsUnsaved = false
+    var recordsSavedAt: Date?
     /// The record's writes and their bytes since the start, for tests to count.
     var recordWrites = 0
     var recordBytes = 0
@@ -117,6 +122,7 @@ extension DaemonCore {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(60))
                 guard !Task.isCancelled else { return }
+                await self?.saveMCPRecordsIfDue()
                 await self?.reconcileMCPEvents()
             }
         }
@@ -130,6 +136,7 @@ extension DaemonCore {
         mcpEvents.ticker = nil
         for task in mcpEvents.tasks.values { task.cancel() }
         mcpEvents.tasks = [:]
+        if mcpEvents.recordsUnsaved { saveMCPRecords() }
         await mcpEvents.clients.endAll()
         for user in mcpEvents.hostedUsers.values { await hostedServers.release(user) }
         mcpEvents.hostedUsers = [:]
@@ -372,6 +379,7 @@ extension DaemonCore {
             let gone = mcpEvents.subscriptions.removeValue(forKey: id)
             mcpEvents.tasks.removeValue(forKey: id)?.cancel()
             mcpEvents.live[id] = nil
+            mcpEvents.announced[id] = nil
             if let gone { DaemonLog.shared.write("mcp events: \(gone.server) \(gone.event) unsubscribed (key \(gone.key))") }
         }
         for (id, subscription) in wanted.sorted(by: { $0.key < $1.key }) {
@@ -746,8 +754,8 @@ extension DaemonCore {
             var records = mcpRecords()
             if records.subscriptions[id] != nil {
                 records.subscriptions[id]?.nextPollAt = now().addingTimeInterval(wait.timeInterval)
-                mcpEvents.records = records
-                saveMCPRecords()
+                keepMCPRecordsForLater(records)
+                saveMCPRecordsIfDue()
             }
             do { try await mcpEvents.sleep(wait) } catch { return }
         }
@@ -835,6 +843,12 @@ extension DaemonCore {
     /// What a poll brought. A first poll (no cursor) starts from now: its events are noted
     /// as seen, never raised. Otherwise the ids go into `delivering` and are written down
     /// before any is raised; each moves to `seen` once the event log has it.
+    ///
+    /// One write at most: the one ahead of raising. A poll that brought nothing new is
+    /// kept for later, cursor and all: a restart that asks from an older cursor is given
+    /// again only ids `seen` already holds, since every poll that raised was written. What
+    /// was raised is kept for later too: the event log is the commit point, and a restart
+    /// finds the ids still in `delivering` there.
     private func deliverMCPEvents(_ result: EventsPollResult, for subscription: MCPSubscription, usedCursor: String?) {
         let id = subscription.id
         let at = now()
@@ -877,25 +891,22 @@ extension DaemonCore {
         record.cursor = result.cursor ?? record.cursor
         record.delivering = fresh.compactMap(\.eventId)
         records.subscriptions[id] = record
-        mcpEvents.records = records
-        saveMCPRecords()
         guard !fresh.isEmpty else {
+            keepMCPRecordsForLater(records)
             if result.truncated || at.timeIntervalSince(mcpEvents.announced[id] ?? .distantPast) >= 60 {
                 announceMCPSubscription(id)
             }
             return
         }
-        for event in fresh {
-            raiseMCPEvent(event, for: subscription)
-            guard let eventID = event.eventId else { continue }
-            record.see([eventID], at: at)
-            record.delivering.removeAll { $0 == eventID }
-            record.lastEventAt = at
-        }
-        records = mcpRecords()
-        records.subscriptions[id] = record
         mcpEvents.records = records
         saveMCPRecords()
+        for event in fresh { raiseMCPEvent(event, for: subscription) }
+        record.see(record.delivering, at: at)
+        record.delivering = []
+        record.lastEventAt = at
+        records = mcpRecords()
+        records.subscriptions[id] = record
+        keepMCPRecordsForLater(records)
         announceMCPSubscription(id)
     }
 
@@ -975,10 +986,26 @@ extension DaemonCore {
 
     private func saveMCPRecords() {
         guard let records = mcpEvents.records else { return }
+        mcpEvents.recordsUnsaved = false
+        mcpEvents.recordsSavedAt = now()
         keepQuietly("where each server's events have got to") {
             mcpEvents.recordBytes += try mcpEventStore.save(records)
             mcpEvents.recordWrites += 1
         }
+    }
+
+    /// Hold `records`, to be written with the next write that must happen, or within a
+    /// minute.
+    private func keepMCPRecordsForLater(_ records: MCPEventRecords) {
+        mcpEvents.records = records
+        mcpEvents.recordsUnsaved = true
+    }
+
+    /// Write what was kept for later, when the last write is a minute old.
+    func saveMCPRecordsIfDue() {
+        guard mcpEvents.recordsUnsaved,
+              now().timeIntervalSince(mcpEvents.recordsSavedAt ?? .distantPast) >= 60 else { return }
+        saveMCPRecords()
     }
 
     // MARK: Clear
