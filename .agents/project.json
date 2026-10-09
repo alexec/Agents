@@ -1,0 +1,7 @@
+{
+  "helperLimits" : {
+    "notArchived" : 12,
+    "queued" : 7,
+    "running" : 5
+  }
+}
