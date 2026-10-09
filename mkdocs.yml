@@ -114,6 +114,7 @@ nav:
       - explanation/why-agents.md
       - explanation/control-plane.md
       - explanation/window-and-daemon.md
+      - explanation/architecture.md
       - explanation/scoped-tools.md
       - explanation/views.md
       - explanation/projects-hosts-worktrees.md
