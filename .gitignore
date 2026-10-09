@@ -9,7 +9,9 @@ xcuserdata/
 # Generated from project.yml by xcodegen. Never edit or commit it.
 Agents.xcodeproj/
 
-# Another session's worktree lives here. Not ours to commit.
+# Agents' worktrees: the app's in .agents/worktrees, Claude Code's own in
+# .claude/worktrees. Never committed.
+.agents/worktrees/
 .claude/worktrees/
 
 # Built by scripts/build-linux-agentsd.sh (037). Build outputs, 58 MB each. The
