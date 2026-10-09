@@ -116,14 +116,6 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// moved on by the person, is not what the ask was about.
     public var afterTurn: AfterTurn?
 
-    /// Whether the title is the agent's own, given with the call that ends its turn.
-    ///
-    /// Once it is, a title from the runtime no longer replaces it. That is not a
-    /// nicety: Claude's adapter generates a title of its own *when the turn ends*,
-    /// which is after the agent's last tool call, so without this the agent's name for
-    /// the work would be overwritten a moment after it was given.
-    public var titledByAgent: Bool
-
     /// The pool entry the chat is on now (052): which runtime *and* which way of paying
     /// for it, since Codex on its plan and Codex on a key are two entries. Nil when it
     /// started outside the pool.
@@ -355,7 +347,6 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         outcomeAsked = try c.decodeIfPresent(Bool.self, forKey: .outcomeAsked) ?? false
         // New with the title on `finish_turn`. An older record's title came from the
         // runtime or the prompt, so a runtime title may still replace it.
-        titledByAgent = try c.decodeIfPresent(Bool.self, forKey: .titledByAgent) ?? false
         // 052's, read and never written since 065. Kept: 052 is after the cut-off
         // (#58: 051), so a record a 052 build wrote must still open.
         poolEntryID = try c.decodeIfPresent(UUID.self, forKey: .poolEntryID)
@@ -434,7 +425,6 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         if restartPickUps != 0 { try c.encode(restartPickUps, forKey: .restartPickUps) }
         try c.encodeIfPresent(report, forKey: .report)
         if outcomeAsked { try c.encode(outcomeAsked, forKey: .outcomeAsked) }
-        if titledByAgent { try c.encode(titledByAgent, forKey: .titledByAgent) }
         // 052's poolEntryID, switchingOff and allowanceWait are read from an older record
         // and never written again (065): nothing sets them, and a wait found at launch is
         // cleared. They go once the #58 cut-off moves past 052.
@@ -469,6 +459,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case startingPoint
         case restartPickUps
         case report, outcomeAsked
+        /// Gone: the runtime names the conversation now. Known, so an older record's
+        /// key is dropped rather than carried on as an unknown field.
         case titledByAgent
         case poolEntryID, switchingOff, allowanceWait
         case parking
@@ -527,7 +519,6 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 restartPickUps: Int = 0,
                 report: WorkReport? = nil,
                 outcomeAsked: Bool = false,
-                titledByAgent: Bool = false,
                 parking: Parking? = nil,
                 afterTurn: AfterTurn? = nil,
                 archivedAt: Date? = nil,
@@ -570,7 +561,6 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.restartPickUps = restartPickUps
         self.report = report
         self.outcomeAsked = outcomeAsked
-        self.titledByAgent = titledByAgent
         self.poolEntryID = nil
         self.switchingOff = false
         self.allowanceWait = nil

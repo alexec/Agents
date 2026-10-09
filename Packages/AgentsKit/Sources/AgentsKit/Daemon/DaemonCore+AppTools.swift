@@ -149,10 +149,6 @@ extension DaemonCore {
             }
         }
         let prompts = Array(request.prompts.prefix(SuggestedPrompt.limit))
-        // Cleaned again here, not trusted from the helper: the daemon is what writes
-        // the record. No title — the goal has not changed, or a helper from an older
-        // binary sent none — leaves the name as it was.
-        let title = request.title.flatMap(Agent.cleanedTitle)
         let labels: [SessionLabel]
         do {
             labels = try SessionLabelPolicy.change(
@@ -179,7 +175,7 @@ extension DaemonCore {
             agents[checked.agentID]?.pendingMove = nil
             await record(.runtimeNote("Move cancelled."), for: checked.agentID)
         }
-        let noted = await land(checked.report, prompts: prompts, title: title,
+        let noted = await land(checked.report, prompts: prompts,
                                afterwards: afterwards,
                                labels: labels,
                                on: agents[checked.agentID] ?? checked.agent, id: checked.agentID)
@@ -272,7 +268,7 @@ extension DaemonCore {
     /// an ask `park_agent` made (#481) — unless this ending does not go with it: an ask
     /// left under a later `stuck` would put away work that needs somebody, so it is
     /// dropped, and the agent told.
-    private func land(_ report: WorkReport, prompts: [SuggestedPrompt]?, title: String? = nil,
+    private func land(_ report: WorkReport, prompts: [SuggestedPrompt]?,
                       afterwards: AfterTurn? = nil,
                       labels: [SessionLabel]? = nil,
                       on agent: Agent, id agentID: UUID) async -> String {
@@ -293,12 +289,6 @@ extension DaemonCore {
         if let labels { agent.labels = labels }
         // Said in front of the person, so already seen: no banner for what they watched.
         if isWatched(agentID) { agent.reportSeenAt = report.at }
-        // In the same write as the report, so no window ever sees the new account of
-        // the work under the old name for it.
-        if let title {
-            agent.title = title
-            agent.titledByAgent = true
-        }
         // The record before the windows, which is the order that leaves something true
         // behind when the daemon is killed mid-call.
         await record(.workReported(report), for: agentID)

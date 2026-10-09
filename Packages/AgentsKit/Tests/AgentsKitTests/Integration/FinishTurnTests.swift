@@ -339,69 +339,41 @@ struct FinishTurnTests {
         return FakeLauncher(script: script)
     }
 
-    @Test("The agent's title lands with its report")
-    func theTitleLandsWithTheReport() async throws {
-        let (locations, work) = try temporary()
-        let launcher = midTurn()
-        let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "fix the login redirect"))
-
-        _ = try await core.finishTurn(.init(token: await mintedToken(launcher),
-                                            outcome: "done", message: "The redirect works now.",
-                                            prompts: [], title: "Login redirect fixed"))
-
-        let agent = try #require(await core.agent(id))
-        #expect(agent.title == "Login redirect fixed")
-        #expect(agent.titledByAgent)
-        #expect(agent.report?.message == "The redirect works now.")
-        try await settle(core, id)
-    }
-
-    /// The case the flag exists for. The adapter's title arrives after the agent's
-    /// call, and must not replace the name the agent just gave.
-    @Test("A runtime title at the end of the turn does not replace the agent's")
-    func theRuntimeDoesNotOverwriteTheAgentsTitle() async throws {
-        let (locations, work) = try temporary()
-        let launcher = namingAtTurnEnd("Fix login redirect issue")
-        let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "fix the login redirect"))
-
-        _ = try await core.finishTurn(.init(token: await mintedToken(launcher),
-                                            outcome: "done", message: "Fixed.",
-                                            prompts: [], title: "Login redirect fixed"))
-        try await settle(core, id)
-        // The turn ending does not mean the runtime's title has been *handled*: it
-        // comes on the event stream, which is read on its own task. This proves a
-        // thing did not happen, so it is a wait rather than a poll — and the test
-        // below proves that, in this very setup, the title does arrive.
-        try await Task.sleep(for: .milliseconds(500))
-
-        #expect(await core.agent(id)?.title == "Login redirect fixed")
-    }
-
-    /// And the guard is only a guard. Until the agent names the conversation, the
-    /// runtime's title is still better than the first line of the prompt.
-    @Test("Until the agent names it, a runtime title still fills in")
-    func aRuntimeTitleStillFillsIn() async throws {
+    /// The runtime names the conversation, over ACP's `session_info_update`.
+    @Test("The runtime's title names the conversation")
+    func theRuntimeNamesIt() async throws {
         let (locations, work) = try temporary()
         let launcher = namingAtTurnEnd("Fix login redirect issue")
         let core = try core(launcher, locations: locations)
         let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "fix the login redirect"))
         // Waited for, not assumed after the turn: the title is on the event stream,
-        // and the turn ending can be handled before it is. The first draft asserted
-        // straight after `settle` and failed under the full suite.
+        // and the turn ending can be handled before it is.
         await eventually("the runtime's title arrived") {
             await core.agent(id)?.title == "Fix login redirect issue"
         }
-        #expect(await core.agent(id)?.titledByAgent == false)
         try await settle(core, id)
     }
 
-    /// No title — the agent's goal has not changed, or a helper started from an older
-    /// binary sent none. The call still lands, and the name is left as it was rather
-    /// than blanked or refused.
-    @Test("A call with no title leaves the name as it was")
-    func noTitleLeavesTheNameAlone() async throws {
+    /// The case that used to be guarded the other way: the adapter's title arrives
+    /// after the agent's call, and now it is the name kept.
+    @Test("A runtime title after finish_turn still names the conversation")
+    func theRuntimeTitleLandsAfterFinishTurn() async throws {
+        let (locations, work) = try temporary()
+        let launcher = namingAtTurnEnd("Fix login redirect issue")
+        let core = try core(launcher, locations: locations)
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "fix the login redirect"))
+
+        _ = try await core.finishTurn(.init(token: await mintedToken(launcher),
+                                            outcome: "done", message: "Fixed.", prompts: []))
+        await eventually("the runtime's title arrived") {
+            await core.agent(id)?.title == "Fix login redirect issue"
+        }
+        try await settle(core, id)
+    }
+
+    /// `finish_turn` says how the turn went, and nothing about the name.
+    @Test("finish_turn leaves the name as it was")
+    func finishTurnLeavesTheNameAlone() async throws {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
@@ -412,74 +384,7 @@ struct FinishTurnTests {
 
         let agent = try #require(await core.agent(id))
         #expect(agent.title == before)
-        #expect(!agent.titledByAgent)
         #expect(agent.report?.message == "Fixed.")
         try await settle(core, id)
-    }
-
-    /// The title names the goal, so it is sent once and then left out while the goal
-    /// holds. A later call without one keeps the agent's name — and keeps it the
-    /// agent's, so the runtime's title at the end of the turn still does not replace it.
-    @Test("A goal title outlasts the calls that leave it out")
-    func theGoalTitleOutlastsLaterCalls() async throws {
-        let (locations, work) = try temporary()
-        let launcher = namingAtTurnEnd("Fix login redirect issue")
-        let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "fix the login redirect"))
-        let token = await mintedToken(launcher)
-
-        _ = try await core.finishTurn(.init(token: token, outcome: "partly_done",
-                                            message: "Found the redirect.",
-                                            prompts: [], title: "Login redirect"))
-        _ = try await core.finishTurn(.init(token: token, outcome: "done", message: "Fixed.",
-                                            prompts: []))
-        try await settle(core, id)
-        // As above: the runtime's title comes on its own task, so this waits for a
-        // thing not to happen.
-        try await Task.sleep(for: .milliseconds(500))
-
-        let agent = try #require(await core.agent(id))
-        #expect(agent.title == "Login redirect")
-        #expect(agent.titledByAgent)
-        #expect(agent.report?.message == "Fixed.")
-    }
-
-    /// The daemon cleans the title as well as the tool, because the daemon is what
-    /// writes the record — and a title that cleans to nothing is left out, not drawn.
-    @Test("The daemon cleans what it is sent")
-    func theDaemonCleansTheTitle() async throws {
-        let (locations, work) = try temporary()
-        let launcher = midTurn()
-        let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "fix it"))
-        let token = await mintedToken(launcher)
-        let before = await core.agent(id)?.title
-
-        _ = try await core.finishTurn(.init(token: token, outcome: "done", message: "Fixed.",
-                                            prompts: [], title: "   \n  "))
-        #expect(await core.agent(id)?.title == before)
-
-        _ = try await core.finishTurn(.init(token: token, outcome: "done", message: "Fixed.",
-                                            prompts: [], title: " Login\nredirect   fixed "))
-        #expect(await core.agent(id)?.title == "Login redirect fixed")
-        try await settle(core, id)
-    }
-
-    /// The flag is on the record, so a runtime title after a restart still does not
-    /// replace the agent's.
-    @Test("Who named it survives being written down")
-    func titledByAgentIsKept() async throws {
-        let (locations, work) = try temporary()
-        let launcher = midTurn()
-        let core = try core(launcher, locations: locations)
-        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "fix it"))
-        _ = try await core.finishTurn(.init(token: await mintedToken(launcher),
-                                            outcome: "done", message: "Fixed.",
-                                            prompts: [], title: "Login redirect fixed"))
-        try await settle(core, id)
-
-        let reread = try await AgentStore(locations: locations).loadAll().agents.first { $0.id == id }
-        #expect(reread?.title == "Login redirect fixed")
-        #expect(reread?.titledByAgent == true)
     }
 }

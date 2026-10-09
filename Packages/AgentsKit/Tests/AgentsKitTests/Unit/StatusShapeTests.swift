@@ -100,17 +100,18 @@ struct AgentTitleTests {
         #expect(long?.hasSuffix("…") == true)
     }
 
-    @Test("Who named it is kept on the record, and an older record says nobody did")
-    func roundTrip() throws {
-        let agent = Agent(runtimeID: "claude", cwd: URL(fileURLWithPath: "/tmp"),
-                          title: "Login redirect fixed", titledByAgent: true)
-        let data = try JSONEncoder().encode(agent)
-        #expect(try JSONDecoder().decode(Agent.self, from: data).titledByAgent)
-
-        // Written only when true, so an older build's record is unchanged by this one.
-        let plain = Agent(runtimeID: "claude", cwd: URL(fileURLWithPath: "/tmp"))
-        let written = String(decoding: try JSONEncoder().encode(plain), as: UTF8.self)
+    /// An older record says who named it. The key is read and dropped, not carried on
+    /// as an unknown field, since the runtime names the conversation now.
+    @Test("An older record's titledByAgent is dropped")
+    func titledByAgentIsDropped() throws {
+        let agent = Agent(runtimeID: "claude", cwd: URL(fileURLWithPath: "/tmp"), title: "Login redirect fixed")
+        var object = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(agent)) as? [String: Any])
+        object["titledByAgent"] = true
+        let older = try JSONSerialization.data(withJSONObject: object)
+        let read = try JSONDecoder().decode(Agent.self, from: older)
+        #expect(read.title == "Login redirect fixed")
+        #expect(read.unknownFields["titledByAgent"] == nil)
+        let written = String(decoding: try JSONEncoder().encode(read), as: UTF8.self)
         #expect(!written.contains("titledByAgent"))
-        #expect(try JSONDecoder().decode(Agent.self, from: Data(written.utf8)).titledByAgent == false)
     }
 }

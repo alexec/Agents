@@ -75,7 +75,7 @@ extension DaemonCore {
             mcpServers: agent.mcpServers, requestID: request.requestID, sandbox: agent.sandboxOverride,
             labels: agent.labels.filter { $0.owner == .person }.map(\.value)))
         // The same name, so the person finds the work where they left it.
-        if let title = agent.title, var successor = agents[id], successor.title == nil || !successor.titledByAgent {
+        if let title = agent.title, var successor = agents[id] {
             successor.title = title
             changed(successor)
         }

@@ -14,7 +14,7 @@ struct AppServiceTests {
     /// is what a runtime is here.
     private func pair(showFile: @escaping AppService.FileSink = { _ in .refused("not expected") },
                       askForm: @escaping AppService.AskFormSink = { _, _ in .refused("not expected") },
-                      finishTurn: @escaping AppService.FinishSink = { _, _, _, _, _ in
+                      finishTurn: @escaping AppService.FinishSink = { _, _, _, _ in
                           .refused("not expected")
                       })
         async -> (client: JSONRPCConnection, service: AppService) {
@@ -73,10 +73,10 @@ struct AppServiceTests {
         #expect(finish?["properties"]?["outcome"]?["enum"]?.arrayValue?
             .compactMap { $0.stringValue }
             == WorkOutcome.allCases.map(\.rawValue))
-        // The outcome and its words are the call; the name and the chips ride along.
+        // The outcome and its words are the call. The runtime names the conversation.
         #expect(finish?["required"]?.arrayValue?.compactMap { $0.stringValue }
             == ["outcome", "message"])
-        #expect(finish?["properties"]?["title"]?["type"]?.stringValue == "string")
+        #expect(finish?["properties"]?["title"] == nil)
         // No suggestion offered since #481; one sent is still read (031).
         #expect(finish?["properties"]?["next_prompt"] == nil)
         #expect(finish?["properties"]?["next_prompts"] == nil)
@@ -302,22 +302,20 @@ struct AppServiceTests {
         var outcome = ""
         var message = ""
         var prompts: [SuggestedPrompt] = []
-        var title: String?
         var words = AppService.BlockWords.none
         func record(_ outcome: String, _ message: String, _ prompts: [SuggestedPrompt],
-                    _ title: String?, _ words: AppService.BlockWords) {
+                    _ words: AppService.BlockWords) {
             calls += 1
             self.words = words
             self.outcome = outcome
             self.message = message
             self.prompts = prompts
-            self.title = title
         }
     }
 
     private func finishing(_ box: FinishBox) -> AppService.FinishSink {
-        { outcome, message, prompts, title, words in
-            await box.record(outcome, message, prompts, title, words)
+        { outcome, message, prompts, words in
+            await box.record(outcome, message, prompts, words)
             return .shown("Noted.")
         }
     }
@@ -448,7 +446,6 @@ struct AppServiceTests {
         // Trimmed on the way through, as a report is.
         #expect(await box.message == "Renamed 14 call sites.")
         #expect(await box.prompts.map(\.label) == ["Run the tests"])
-        #expect(await box.title == "Call sites renamed")
         await service.close()
     }
 
@@ -556,7 +553,7 @@ struct AppServiceTests {
     }
 
     @Test func aRefusalIsAToolErrorRatherThanAProtocolError() async throws {
-        let (client, service) = await pair(finishTurn: { _, _, _, _, _ in
+        let (client, service) = await pair(finishTurn: { _, _, _, _ in
             .refused("That conversation is closed.")
         })
         let result = try await client.call("tools/call", [
@@ -615,67 +612,18 @@ struct AppServiceTests {
 
     // MARK: The title
 
-    /// Sent when the goal is named or changes, and left out otherwise. A call without
-    /// one — or with one that cleans to nothing — still lands, carrying no title, so
-    /// the row keeps the name it has.
-    @Test func aFinishCallWithNoTitleLandsWithoutOne() async throws {
+    /// The runtime names the conversation. A title an older prompt still sends is
+    /// not read, and the call lands as it would without one.
+    @Test func aTitleSentIsNotRead() async throws {
         let box = FinishBox()
         let (client, service) = await pair(finishTurn: finishing(box))
-        for arguments in [
-            JSONValue.object(["outcome": "done", "message": "All done."]),
-            JSONValue.object(["outcome": "done", "message": "All done.", "title": ""]),
-            JSONValue.object(["outcome": "done", "message": "All done.", "title": "  \n\t "]),
-        ] {
-            let result = try await client.call("tools/call", [
-                "name": .string(AppService.finishTurnToolName), "arguments": arguments,
-            ])
-            #expect(result["isError"]?.boolValue == false)
-            #expect(await box.title == nil)
-            #expect(await box.message == "All done.")
-        }
-        #expect(await box.calls == 3)
-        await service.close()
-    }
-
-    /// The words an agent reads decide what it names: the goal, kept while it holds,
-    /// not the step it just took. On the tool: the briefing says nothing of it since #479.
-    @Test func theTitleIsDescribedAsTheGoal() {
-        let property = AppService.finishTurnTool["inputSchema"]?["properties"]?["title"]?["description"]?
-            .stringValue ?? ""
-        #expect(property.contains("goal"))
-        #expect(property.contains("Only when it changes"))
-    }
-
-    /// A title is a row's name: one line, spaces collapsed, no longer than a
-    /// prompt-made title may be.
-    @Test func aTitleIsMadeFitForARow() async throws {
-        let box = FinishBox()
-        let (client, service) = await pair(finishTurn: finishing(box))
-        _ = try await client.call("tools/call", [
+        let result = try await client.call("tools/call", [
             "name": .string(AppService.finishTurnToolName),
-            "arguments": ["outcome": "done", "message": "Done.",
-                          "title": "  Login redirect\n   fixed  "],
+            "arguments": ["outcome": "done", "message": "All done.", "title": "Tidied"],
         ])
-        #expect(await box.title == "Login redirect fixed")
-
-        let long = String(repeating: "word ", count: 40)
-        _ = try await client.call("tools/call", [
-            "name": .string(AppService.finishTurnToolName),
-            "arguments": ["outcome": "done", "message": "Done.", "title": .string(long)],
-        ])
-        let clipped = try #require(await box.title)
-        #expect(clipped.count == 80)
-        #expect(clipped.hasSuffix("…"))
-        await service.close()
-    }
-
-    /// The tool says what the title is for, where an agent reads it.
-    @Test func theToolSaysWhatTheTitleIsFor() async throws {
-        let (client, service) = await pair()
-        let result = try await client.call("tools/list", .object([:]))
-        let title = result["tools"]?.arrayValue?.first?["inputSchema"]?["properties"]?["title"]?["description"]?
-            .stringValue ?? ""
-        #expect(title.contains("naming the conversation's goal"))
+        #expect(result["isError"]?.boolValue == false)
+        #expect(await box.message == "All done.")
+        #expect(await box.calls == 1)
         await service.close()
     }
 
