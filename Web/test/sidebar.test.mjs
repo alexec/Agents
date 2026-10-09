@@ -133,6 +133,17 @@ test("Projects: this Mac's then each server's, oldest added first, however busy 
   }
 });
 
+test("Activity is open until folded, and kept so", async () => {
+  const { Folds } = await load("src/model/folds.ts");
+  const storage = new Memory();
+  const first = new Folds(storage);
+  assert.equal(first.showsActivity.value, true, "open by default");
+  first.setShowsActivity(false);
+  assert.equal(new Folds(storage).showsActivity.value, false);
+  first.setShowsActivity(true);
+  assert.equal(new Folds(storage).showsActivity.value, true);
+});
+
 test("Archived projects is closed until opened, and kept so (#343)", async () => {
   const { Folds } = await load("src/model/folds.ts");
   const storage = new Memory();

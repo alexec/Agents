@@ -113,10 +113,11 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
       </header>
       <div class="scroll" onKeyDown={(e) => moveWithKeys(e)}>
         {!searched.value && (
-          <section class="activity" aria-label="Activity">
-            <h2 class="sidebar-head-label">Activity</h2>
+          <details class="activity" aria-label="Activity" open={folds.showsActivity.value}
+            onToggle={(e) => folds.setShowsActivity((e.currentTarget as HTMLDetailsElement).open)}>
+            <summary class="sidebar-head-label" data-fold="activity">Activity</summary>
             <ActivityRows store={store} chosen={r.activity} onPick={(page: ActivityPage) => go({ activity: page })} />
-          </section>
+          </details>
         )}
         <section class="project-list" aria-label="Projects">
           <h2 class="sidebar-head-label">Projects</h2>
