@@ -1,4 +1,4 @@
-// The words for a hosted MCP server's row on the Resources page (#488), ported from
+// The words for a hosted MCP server's row on the MCP Servers page (#488, #589), ported from
 // HostedMCPWords in AgentsKitCore so the Mac, the Remote and the page say the same.
 import type { HostedMCPStatus } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
@@ -38,4 +38,13 @@ export function hostedLine(status: HostedMCPStatus): string {
 export function hostedLastError(status: HostedMCPStatus): string | undefined {
   if (!status.lastError) return undefined;
   return status.state === "restarting" ? status.lastError : `Last stopped: ${status.lastError}`;
+}
+
+/** The Activity row's count: how many run, or how many stopped while in use, which is the one
+ * worth a red dot. Null with none hosted. As HostedMCPWords.tally. */
+export function hostedTally(servers: HostedMCPStatus[]): { words: string; stopped: boolean } | null {
+  if (servers.length === 0) return null;
+  const stopped = servers.filter((s) => s.state === "restarting").length;
+  if (stopped > 0) return { words: `${stopped} stopped`, stopped: true };
+  return { words: `${servers.filter((s) => s.state === "running").length} running`, stopped: false };
 }

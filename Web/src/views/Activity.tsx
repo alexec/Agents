@@ -1,7 +1,7 @@
-// Activity at the top of the sidebar (#151), as the window's (#145): Events, Resources, Runtimes
-// and Spending, each a row whose tooltip says what it has at a glance (#587) and that opens its
-// page in the chat's place. What each page lets you change is the Mac's, but for marking a runtime available and
-// stopping a wait (#541).
+// Activity at the top of the sidebar (#151), as the window's (#145): Events, Resources, Runtimes,
+// MCP Servers (#589) and Spending, each a row whose tooltip says what it has at a glance (#587)
+// and that opens its page in the chat's place. What each page lets you change is the Mac's, but
+// for marking a runtime available and stopping a wait (#541).
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
@@ -13,6 +13,7 @@ import { BackToList } from "./BackToList";
 import { Modal } from "./Modal";
 import { folderKey, projectFolder } from "../model/groups";
 import { runtimeTally } from "../model/runtimes";
+import { hostedTally } from "../model/hostedMCP";
 import { refusalMessage } from "../model/workflows";
 
 function navigate(destination: { host: string; project: string; session?: string; workflow?: string }): void {
@@ -141,7 +142,7 @@ function useActivity(store: Store): void {
 }
 
 /** Each Activity page's icon, the window's SF Symbol as near as text has it (#495). */
-const activityIcons: Record<ActivityPage, string> = { events: "☰\uFE0E", resources: "◫", runtimes: "⚙\uFE0E", spending: "$" };
+const activityIcons: Record<ActivityPage, string> = { events: "☰\uFE0E", resources: "◫", runtimes: "⚙\uFE0E", mcp: "▤", spending: "$" };
 
 export function ActivityRows({ store, chosen, onPick }: {
   store: Store; chosen: ActivityPage | undefined; onPick: (page: ActivityPage) => void;
@@ -152,6 +153,7 @@ export function ActivityRows({ store, chosen, onPick }: {
   const held = resources.reduce((n, r) => n + (r.holds ?? (r.lease ? [r.lease] : [])).length, 0);
   const waiting = resources.reduce((n, r) => n + r.line.length, 0);
   const tally = runtimeTally(Object.values(store.runtimes.value).flat());
+  const hosted = hostedTally(Object.values(store.hostedMCP.value).flatMap((s) => s.servers));
   const costs = store.costs.value;
   const today = totalWords(todayTotals(costs));
   const mac = costs["mac"];
@@ -175,13 +177,15 @@ export function ActivityRows({ store, chosen, onPick }: {
       {row("runtimes", "Runtimes", "What each runtime can be started on right now",
         tally ? (tally.working === 0 ? `None of ${tally.total} working` : `${tally.working} of ${tally.total} working`) : null,
         tally?.working === 0)}
+      {row("mcp", "MCP Servers", "The MCP servers each host runs once for every agent, and why each last stopped",
+        hosted?.words ?? null, hosted?.stopped ?? false)}
       {row("spending", "Cost", "What all of the work has cost, and what it cost today", spent || null,
         closeToFull(mac))}
     </>
   );
 }
 
-const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", spending: "Cost" };
+const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", mcp: "MCP Servers", spending: "Cost" };
 
 /** An Activity page in the chat's place. */
 export function ActivityPageView({ store, page }: { store: Store; page: ActivityPage }) {
@@ -207,11 +211,9 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
                 <section key={host.id}>
                   {several && <h2 class="section-head">{hostName(host.id)}</h2>}
                   <Resources store={store} host={host.id} open />
-                  <HostedMCP store={store} host={host.id} />
                 </section>
               ))}
-              {Object.values(store.leases.value).every((s) => s.resources.length === 0)
-                && Object.values(store.hostedMCP.value).every((s) => s.servers.length === 0) && (
+              {Object.values(store.leases.value).every((s) => s.resources.length === 0) && (
                 <p class="hint">Nothing is declared or held. Resources are declared on the Mac, in Settings ▸ Resources.</p>
               )}
             </>
@@ -236,6 +238,20 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
               </ul>
             </section>
           ))}
+          {page === "mcp" && (
+            <>
+              <p class="hint">MCP servers each host runs once and shares with every agent, rather than one copy in each session. A stdio entry in mcp.json is hosted with "hosted": true.</p>
+              {store.hosts.value.map((host) => (
+                <section key={host.id}>
+                  {several && <h2 class="section-head">{hostName(host.id)}</h2>}
+                  <HostedMCP store={store} host={host.id} />
+                </section>
+              ))}
+              {Object.values(store.hostedMCP.value).every((s) => s.servers.length === 0) && (
+                <p class="hint">No hosted servers. Every MCP server runs in each session that uses it.</p>
+              )}
+            </>
+          )}
           {page === "runtimes" && <p class="hint">Installing and signing in are managed on the Mac, in Settings ▸ Agent Runtimes.</p>}
           {page === "spending" && <SpendingPage store={store} hostName={hostName} />}
         </div>

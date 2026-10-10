@@ -45,9 +45,6 @@ struct ResourcesView: View {
                             .simultaneousGesture(TapGesture().onEnded { model.settingsPaneAsked = .resources })
                             .appText(.fine)
                     }
-                    if let hosted = model.hostedMCP, !hosted.servers.isEmpty {
-                        HostedMCPGroup(servers: hosted.servers)
-                    }
                     ForEach(groups, id: \.title) { group in
                         VStack(alignment: .leading, spacing: 8) {
                             Text(group.title.uppercased())
@@ -109,61 +106,6 @@ struct ResourcesView: View {
         guard let focus = model.resourcesFocus else { return }
         withAnimation { proxy.scrollTo(focus, anchor: .top) }
         model.resourcesFocus = nil
-    }
-}
-
-/// The MCP servers this Mac runs once for every agent (#488): what each is doing, and why
-/// it last stopped. Read-only: a server is hosted by `"hosted": true` in its `mcp.json`.
-private struct HostedMCPGroup: View {
-    let servers: [DaemonAPI.HostedMCPStatus]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("HOSTED MCP SERVERS")
-                .appText(.fine).fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-            VStack(spacing: 0) {
-                ForEach(Array(servers.enumerated()), id: \.element.id) { index, status in
-                    if index > 0 { Divider().padding(.leading, 32) }
-                    HStack(alignment: .top, spacing: 10) {
-                        dot(status).padding(.top, 5)
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(spacing: 8) {
-                                Text(status.name).appText(.reading).fontWeight(.semibold)
-                                Text(HostedMCPWords.place(status)).appText(.fine).foregroundStyle(.secondary)
-                            }
-                            Text(HostedMCPWords.line(status)).appText(.fine).foregroundStyle(.secondary)
-                            if let error = HostedMCPWords.lastError(status) {
-                                Text(error)
-                                    .appText(.fine)
-                                    .foregroundStyle(status.state == .restarting
-                                                     ? StateTint.failure.style(or: .secondary) : AnyShapeStyle(.secondary))
-                                    .textSelection(.enabled)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-                        Spacer(minLength: 12)
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .accessibilityElement(children: .combine)
-                }
-            }
-            .padding(.vertical, 4)
-            .paperRaised(in: RoundedRectangle(cornerRadius: 10))
-        }
-    }
-
-    @ViewBuilder
-    private func dot(_ status: DaemonAPI.HostedMCPStatus) -> some View {
-        switch status.state {
-        case .running, .starting:
-            Circle().fill(.secondary).frame(width: 10, height: 10)
-        case .restarting:
-            Circle().fill(StateTint.failure.style(or: .secondary)).frame(width: 10, height: 10)
-        case .idle:
-            Circle().strokeBorder(.secondary, lineWidth: 1.5).frame(width: 10, height: 10)
-        }
     }
 }
 

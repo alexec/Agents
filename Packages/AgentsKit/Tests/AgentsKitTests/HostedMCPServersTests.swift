@@ -175,6 +175,18 @@ struct HostedMCPServersTests {
         #expect(HostedMCPWords.lastError(back) == "Last stopped: It stopped (exit code 1).")
     }
 
+    /// The MCP Servers row under Activity (#589), as the web's `hostedTally`.
+    @Test func theActivityRowCountsRunningOrStopped() {
+        #expect(HostedMCPWords.tally([]) == nil)
+        let running = DaemonAPI.HostedMCPStatus(name: "gh", project: nil, state: .running, users: 1)
+        let idle = DaemonAPI.HostedMCPStatus(name: "ci", project: "/p", state: .idle)
+        #expect(HostedMCPWords.tally([running, idle])?.words == "1 running")
+        #expect(HostedMCPWords.tally([running, idle])?.stopped == false)
+        let down = DaemonAPI.HostedMCPStatus(name: "ci", project: "/p", state: .restarting, users: 1)
+        #expect(HostedMCPWords.tally([running, down])?.words == "1 stopped")
+        #expect(HostedMCPWords.tally([running, down])?.stopped == true)
+    }
+
     // MARK: mcp.json
 
     @Test func hostedIsReadFromTheFile() throws {

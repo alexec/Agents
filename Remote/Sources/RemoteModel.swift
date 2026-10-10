@@ -613,7 +613,7 @@ final class RemoteModel {
                 selection = nil
                 openArchive = false
                 openPin = path
-            case .spending, .resources, .events, .runtimes:
+            case .spending, .resources, .events, .runtimes, .mcpServers:
                 openActivity = newValue
             case .archive(let key):
                 // The project's archive page (#495, #498), with what is opened from it
@@ -2470,7 +2470,7 @@ final class RemoteModel {
                                                     Optional<String>.none,
                                                     returning: DaemonAPI.LeaseSnapshot.self) else { return }
         work.replaceLeases(snapshot)
-        // The servers the Mac hosts for every agent (#488), on the same page.
+        // The servers the Mac hosts for every agent (#488), read with them for their page (#589).
         if let hosted = try? await client.call(DaemonAPI.Method.mcpHosted, Optional<String>.none,
                                                returning: DaemonAPI.HostedMCPSnapshot.self) {
             work.replaceHostedMCP(hosted)

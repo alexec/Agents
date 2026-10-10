@@ -52,6 +52,11 @@ struct ProjectListView: View {
         RuntimeTally(model.runtimes, allowances: model.runtimeAllowances)?.noneWorking == true
     }
 
+    /// A hosted server stopped while in use: MCP Servers' icon says so in red (#587, #589).
+    private var mcpServersStopped: Bool {
+        HostedMCPWords.tally(model.hostedMCP?.servers ?? [])?.stopped == true
+    }
+
     var body: some View {
         List(selection: $picked) {
             // What wants the person, across every project and host (#495): Things'
@@ -74,6 +79,8 @@ struct ProjectListView: View {
                     .appText(.supporting).sidebarInk(.resources).tag(SidebarItem.resources)
                 RuntimesRow().activityIcon("cpu", warns: runtimesFailing)
                     .appText(.supporting).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
+                MCPServersRow().activityIcon("server.rack", warns: mcpServersStopped)
+                    .appText(.supporting).sidebarInk(.mcpServers).tag(SidebarItem.mcpServers)
                 SpendingRow(selection: $selection).activityIcon("dollarsign.circle",
                                                                 warns: model.costState?.dayIsCloseToFull == true)
                     .appText(.supporting).sidebarInk(.spending).tag(SidebarItem.spending)

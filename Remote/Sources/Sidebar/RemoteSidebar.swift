@@ -45,6 +45,11 @@ struct RemoteSidebar: View {
         RuntimeTally(model.runtimes, allowances: model.runtimeAllowances)?.noneWorking == true
     }
 
+    /// A hosted server stopped while in use: MCP Servers' icon says so in red (#587, #589).
+    private var mcpServersStopped: Bool {
+        HostedMCPWords.tally(model.work.hostedMCP?.servers ?? [])?.stopped == true
+    }
+
     private var servers: [HostID] {
         model.hostSections.map(\.id).filter { $0 != .mac }
     }
@@ -67,6 +72,8 @@ struct RemoteSidebar: View {
                     ResourcesRow().activityIcon("square.stack.3d.up").appText(.supporting).tag(SidebarItem.resources)
                     RuntimesRow().activityIcon("cpu", warns: runtimesFailing)
                         .appText(.supporting).tag(SidebarItem.runtimes)
+                    MCPServersRow().activityIcon("server.rack", warns: mcpServersStopped)
+                        .appText(.supporting).tag(SidebarItem.mcpServers)
                     SpendingRow().activityIcon("dollarsign.circle", warns: model.costState?.dayIsCloseToFull == true)
                         .appText(.supporting).tag(SidebarItem.spending)
                 } header: {

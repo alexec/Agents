@@ -55,13 +55,12 @@ export function Resources({ store, host, open }: { store: Store; host: string; o
   );
 }
 
-/** The MCP servers a host runs once for every agent (#488), read-only. */
+/** The MCP servers a host runs once for every agent (#488), read-only, on their own Activity page (#589). */
 export function HostedMCP({ store, host }: { store: Store; host: string }) {
   const servers = store.hostedMCP.value[host]?.servers ?? [];
   if (servers.length === 0) return null;
   return (
-    <details class="resources hosted-mcp" open>
-      <summary class="subhead">Hosted MCP servers <span class="count">{servers.length}</span></summary>
+    <div class="resources hosted-mcp">
       <ul>
         {servers.map((status) => {
           const error = hostedLastError(status);
@@ -74,7 +73,6 @@ export function HostedMCP({ store, host }: { store: Store; host: string }) {
           );
         })}
       </ul>
-      <p class="hint">Run once on this host for every agent, from "hosted": true in mcp.json.</p>
-    </details>
+    </div>
   );
 }

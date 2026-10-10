@@ -1,7 +1,7 @@
 import Foundation
 
-/// The words for a hosted MCP server's row on the Resources page (#488), the same on the
-/// Mac, the Remote and the web page (`Web/src/model/hostedMCP.ts`).
+/// The words for a hosted MCP server's row on the MCP Servers page (#488, #589), the same on
+/// the Mac, the Remote and the web page (`Web/src/model/hostedMCP.ts`).
 public enum HostedMCPWords {
     /// Whose file names it: the project's folder name, or the person's own.
     public static func place(_ status: DaemonAPI.HostedMCPStatus) -> String {
@@ -30,6 +30,15 @@ public enum HostedMCPWords {
     public static func lastError(_ status: DaemonAPI.HostedMCPStatus) -> String? {
         guard let error = status.lastError, !error.isEmpty else { return nil }
         return status.state == .restarting ? error : "Last stopped: \(error)"
+    }
+
+    /// The Activity row's count: how many run, or how many stopped while in use, which is
+    /// the one worth a red dot. Nil with none hosted.
+    public static func tally(_ servers: [DaemonAPI.HostedMCPStatus]) -> (words: String, stopped: Bool)? {
+        guard !servers.isEmpty else { return nil }
+        let stopped = servers.filter { $0.state == .restarting }.count
+        if stopped > 0 { return ("\(stopped) stopped", true) }
+        return ("\(servers.filter { $0.state == .running }.count) running", false)
     }
 
     private static func times(_ count: Int) -> String { count == 1 ? "once" : "\(count) times" }
