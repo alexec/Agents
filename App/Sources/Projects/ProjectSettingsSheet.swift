@@ -125,6 +125,10 @@ struct ProjectSettingsSheet: View {
                         Text(each.title)
                             .lineLimit(1)
                         Spacer()
+                        if each == .general, !(summary?.guardedChanges ?? []).isEmpty {
+                            Circle().fill(StateTint.attention.style(or: .secondary)).frame(width: 7, height: 7)
+                                .accessibilityLabel("Waiting for your OK")
+                        }
                         if each == .plugins, waitingPlugins > 0 {
                             Circle().fill(StateTint.attention.style(or: .secondary)).frame(width: 7, height: 7)
                                 .accessibilityLabel("Waiting for your OK")
@@ -197,6 +201,11 @@ private struct ProjectGeneralPane: View {
                 .appText(.title).fontWeight(.semibold)
                 .padding(.bottom, 18)
             if let summary {
+                // Changes made outside the app to its own files wait here (#502).
+                ForEach(summary.guardedChanges ?? []) { change in
+                    GuardedChangeQuestion(change: change, key: summary.key)
+                        .padding(.bottom, 18)
+                }
                 Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 12) {
                     row("Name") { Text(summary.name).textSelection(.enabled) }
                     row("Folder") {

@@ -21,6 +21,8 @@ import UserNotifications
 final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
     /// Open that agent's conversation, with the question in front of the person.
     var open: @MainActor (UUID) -> Void = { _ in }
+    /// A project's page, for a question asked of the project rather than a session (#531).
+    var openProject: @MainActor (URL) -> Void = { _ in }
 
     private let center = UNUserNotificationCenter.current()
     private var showing: [String: NeedID] = [:]
@@ -88,8 +90,13 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
         content.subtitle = headline.h1
         content.body = headline.h3
         content.sound = alert ? .default : nil
-        content.userInfo = ["agentID": need.agentID.uuidString]
-        content.threadIdentifier = need.agentID.uuidString
+        if let agentID = need.agentID {
+            content.userInfo = ["agentID": agentID.uuidString]
+            content.threadIdentifier = agentID.uuidString
+        } else {
+            // The project's own question (#531): its token names the project.
+            content.threadIdentifier = token
+        }
         let request = UNNotificationRequest(identifier: token, content: content, trigger: nil)
         showing[token] = need.id
         Self.log.info("showing \(token, privacy: .public), alert \(alert)")
@@ -147,11 +154,17 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
     /// Opening it selects that conversation. It answers nothing itself (FR-019).
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
                                             didReceive response: UNNotificationResponse) async {
-        guard let text = response.notification.request.content.userInfo["agentID"] as? String,
-              let agentID = UUID(uuidString: text) else { return }
-        await MainActor.run {
-            NSApp.activate()
-            open(agentID)
+        let request = response.notification.request
+        if let text = request.content.userInfo["agentID"] as? String, let agentID = UUID(uuidString: text) {
+            await MainActor.run {
+                NSApp.activate()
+                open(agentID)
+            }
+        } else if let folder = NeedID.guardedFolder(fromToken: request.identifier) {
+            await MainActor.run {
+                NSApp.activate()
+                openProject(folder)
+            }
         }
     }
 }

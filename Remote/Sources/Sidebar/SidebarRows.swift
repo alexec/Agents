@@ -164,7 +164,7 @@ private struct SessionMark: View {
         Group {
             switch kind {
             case .needsYou:
-                Image(systemName: "hand.raised.fill").foregroundStyle(.orange)
+                Image(systemName: "hand.raised.fill").tinted(.attention)
             case .working:
                 SyncedSpinner(diameter: 14)
             case .unread:

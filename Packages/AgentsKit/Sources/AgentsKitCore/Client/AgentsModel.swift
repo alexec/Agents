@@ -1659,6 +1659,20 @@ public final class AgentsModel {
         guard let agentID else { return nil }
         return elicitations.first { $0.agentID == agentID }
     }
+
+    /// The changes to its project's own files asked in this session (#531): the ones its
+    /// agent made, from the project's summary.
+    public func guardedChanges(askedIn agentID: UUID?) -> [GuardedChange] {
+        guard let agentID, let agent = agent(agentID) else { return [] }
+        let key = ProjectKey(host: agent.host, folder: agent.projectFolder)
+        return (project(key)?.guardedChanges ?? []).filter { $0.askedIn == agentID }
+    }
+
+    /// The changes asked of the project itself, on its page (#531): no session to ask them
+    /// in, because git brought them or their agents are gone.
+    public func guardedChanges(ofProject key: ProjectKey?) -> [GuardedChange] {
+        (project(key)?.guardedChanges ?? []).filter { $0.askedIn == nil }
+    }
 }
 
 @MainActor

@@ -114,6 +114,21 @@ extension DaemonCore {
             found.append(need(.report(agent.id, report.at), for: agent, kind: .report,
                               wanted: "\(report.outcome.heading): \(report.message)", now: now))
         }
+        // A change to the app's own files, made outside it (#531): asked in the session of
+        // the agent that made it, or of the project when no agent did.
+        for state in guardedRecords().states where !archived.contains(state.folder) {
+            guard let pending = state.pending else { continue }
+            let change = guardedChange(state.folder, state.path, pending)
+            let id = NeedID.guardedChange(state.folder, state.path)
+            let raisedAt = needRaisedAt[id] ?? now
+            needRaisedAt[id] = raisedAt
+            let agent = change.askedIn.flatMap { agents[$0] }
+            found.append(Need(id: id, agentID: agent?.id, folder: state.folder, kind: .guardedChange,
+                              raisedAt: raisedAt,
+                              headline: Headline(h1: state.folder.lastPathComponent,
+                                                 h2: agent?.title ?? "",
+                                                 h3: change.headline).truncating()))
+        }
         // Forget the first-seen time of anything that is no longer outstanding, so a
         // question asked again later is a new need with a new `raisedAt`.
         let live = Set(found.map(\.id))
@@ -357,7 +372,7 @@ extension DaemonCore {
     /// The person at a screen this host can see, or watching the conversation, takes
     /// the banner down instead.
     private func forward(_ need: Need, decision: Decision, presences: [Surface: Presence]) {
-        let watched = presences.values.contains { $0.isWatching(need.agentID) }
+        let watched = need.agentID.map { agent in presences.values.contains { $0.isWatching(agent) } } ?? false
         if decision.wait || decision.to?.isMac == true || watched {
             withdrawForwarded(need.id)
             return

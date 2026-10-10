@@ -1110,6 +1110,38 @@ final class RemoteModel {
     /// answered is a form that cannot be answered first.
     var formForSelection: ElicitationRequest? { work.elicitation(for: selection) }
 
+    /// The changes to its project's own files the open conversation's agent made (#531),
+    /// each a question over the prompt, as a form is.
+    var guardedChangesForSelection: [GuardedChange] { work.guardedChanges(askedIn: selection) }
+
+    /// What a guarded file was and is (#502), for the person deciding.
+    func readGuardedChange(_ change: GuardedChange, for key: ProjectKey) async -> GuardedChangeReading? {
+        let request = DaemonAPI.GuardedChangeRequest(folder: key.folder, path: change.path)
+        do {
+            return try await client(for: request).call(DaemonAPI.Method.projectsReadGuardedChange, request,
+                                                       returning: GuardedChangeReading.self)
+        } catch {
+            problem = sentence(for: error)
+            return nil
+        }
+    }
+
+    /// Keep (the change is used from now on) or Undo (the approved copy goes back), of the
+    /// file as the person was shown it (#531). The project's summary that comes back with
+    /// it, or after it, takes the question away.
+    func settleGuardedChange(_ reading: GuardedChangeReading, keep: Bool, for key: ProjectKey) async {
+        let request = DaemonAPI.GuardedChangeRequest(folder: key.folder, path: reading.path, digest: reading.digest)
+        do {
+            var summary: DaemonAPI.ProjectSummary = try await client(for: request).call(
+                keep ? DaemonAPI.Method.projectsKeepGuardedChange : DaemonAPI.Method.projectsUndoGuardedChange,
+                request, returning: DaemonAPI.ProjectSummary.self)
+            summary.host = key.host
+            work.upsert(summary)
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
     /// A file being read, by path, or nothing.
     ///
     /// On the model rather than in a view's `@State` because the tap that opens one is
@@ -1950,6 +1982,12 @@ final class RemoteModel {
 
     private var pendingOpen: UUID?
 
+    /// A project's page, from a banner with no session behind it (#531): where a change
+    /// git brought to its files is asked. The phone holds the Mac's projects only.
+    func openProject(_ folder: URL) {
+        sidebarItem = .project(ProjectKey(host: .mac, folder: folder))
+    }
+
     /// Which conversation a banner is about, from the need it names. The Mac's
     /// `attention/pending` is the truth; this reads the copy the model already holds.
     func agentID(forNeedToken token: String) -> UUID? {
@@ -2043,8 +2081,13 @@ final class RemoteModel {
         guard presence == nil else { return }
         notifier.open = { [weak self] agentID in self?.open(agentID) }
         notifier.openNeed = { [weak self] token in
-            guard let self, let agentID = self.agentID(forNeedToken: token) else { return }
-            self.notifier.open(agentID)
+            guard let self else { return }
+            if let agentID = self.agentID(forNeedToken: token) {
+                self.notifier.open(agentID)
+            } else if let folder = NeedID.guardedFolder(fromToken: token) {
+                // The project's own question (#531), on its page.
+                self.openProject(folder)
+            }
         }
         notifier.authorisationChanged = { [weak self] in self?.presence?.connected() }
         let reporter = PresenceReporter { [weak self] watching, active, mayNotify, showing in

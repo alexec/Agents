@@ -9,6 +9,7 @@ import type {
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, DiskState, StoreNotes,
   ChatProjectState, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
+  GuardedChange, GuardedChangeReading,
 } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -1393,6 +1394,36 @@ export class Store extends Work {
     const summary = await this.act("projects/unarchive", { folder: folder as never }, host);
     if (summary) this.upsertProject(summary, host);
     return summary;
+  }
+
+  /**
+   * The changes to a project's own files waiting for Keep or Undo (#531): those asked in `session`,
+   * the agent that made them, or with no session, those asked of the project `folder` on its page.
+   */
+  guardedChanges(host: string, where: { session: string } | { folder: string }): { folder: string; change: GuardedChange }[] {
+    const found: { folder: string; change: GuardedChange }[] = [];
+    for (const summary of this.projects.value[host] ?? []) {
+      if ("folder" in where && folderKey(summary.project.folder) !== folderKey(where.folder)) continue;
+      for (const change of summary.guardedChanges ?? []) {
+        const askedIn = change.askedIn ?? null;
+        if ("session" in where ? askedIn === where.session : askedIn === null) {
+          found.push({ folder: summary.project.folder, change });
+        }
+      }
+    }
+    return found;
+  }
+
+  /** What a guarded file was and is (#502), for the person deciding. */
+  async readGuardedChange(host: string, folder: string, change: GuardedChange): Promise<GuardedChangeReading | null> {
+    return await this.act("projects/readGuardedChange", { folder: folder as never, path: change.path }, host);
+  }
+
+  /** Keep (the change is used from now on) or Undo (the approved copy goes back), of the file as it was shown. */
+  async settleGuardedChange(host: string, folder: string, reading: GuardedChangeReading, keep: boolean): Promise<void> {
+    const params = { folder: folder as never, path: reading.path, ...(reading.digest !== undefined ? { digest: reading.digest } : {}) };
+    const summary = await this.act(keep ? "projects/keepGuardedChange" : "projects/undoGuardedChange", params, host);
+    if (summary) this.upsertProject(summary, host);
   }
 
   /** A project pinned to the top of the sidebar, or not, as the window's Pin and Unpin. */

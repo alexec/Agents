@@ -38,6 +38,7 @@ import { comingBackDescription } from "../model/status";
 import { parkLine } from "./SessionRow";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
 import { eventWaitCapsule, leaseMark } from "../model/rowLines";
+import { GuardedChangeCards } from "./GuardedChange";
 
 const detailKey = "agents.turnDetail";
 
@@ -530,6 +531,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       <footer class="foot">
         <BackgroundRows store={store} host={host} agent={agent} disabled={down} steps={(item) => (subagent.value = item)} />
         {agent && <Capsules store={store} host={host} agent={agent} />}
+        {/* A change its agent made to the project's own files, asked here (#531). */}
+        <GuardedChangeCards store={store} host={host} where={{ session }} down={down} />
         <Cards store={store} host={host} session={session} down={down} />
         <Prompt store={store} draftKey={`${host}|${session}`} placeholder={promptPlaceholder(agent)} disabled={down || !agent}
           stop={agent && hasTurnInFlight(agent) ? () => void store.perform(host, agent.id, "agents/stop") : undefined}

@@ -104,8 +104,11 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
         var total = 0
         var waiting: [Agent] = []
         var newestNeed: [UUID: Need] = [:]
-        for need in model.needs.values where newestNeed[need.agentID].map({ $0.raisedAt < need.raisedAt }) ?? true {
-            newestNeed[need.agentID] = need
+        for need in model.needs.values {
+            // A project's own question (#531) has no session to stand beside.
+            guard let agentID = need.agentID,
+                  newestNeed[agentID].map({ $0.raisedAt < need.raisedAt }) ?? true else { continue }
+            newestNeed[agentID] = need
         }
         for summary in model.liveProjects {
             total += model.attentionCount(in: summary.folder)

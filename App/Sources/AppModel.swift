@@ -267,6 +267,19 @@ final class AppModel {
         selection = agentID
     }
 
+    /// A project's own page, from a banner with no session behind it (#531): where a
+    /// change git brought to its files is asked.
+    func openProject(_ key: ProjectKey) {
+        showsSpending = false
+        showsResources = false
+        showsEvents = false
+        showsRuntimes = false
+        select(key)
+        openWorkflow = nil
+        projectPage = nil
+        selection = nil
+    }
+
     /// What is picked in the sidebar, as one value.
     ///
     /// Activity, the projects and their sessions and workflows share one list (#145), so
@@ -1871,6 +1884,34 @@ final class AppModel {
     }
 
     /// The person's disk space lines for a project (#195), through the window only.
+    /// What a guarded file in `.agents` was and is (#502), for the person deciding.
+    func readGuardedChange(_ change: GuardedChange, for key: ProjectKey) async -> GuardedChangeReading? {
+        do {
+            return try await client(for: key.host).call(
+                DaemonAPI.Method.projectsReadGuardedChange,
+                DaemonAPI.GuardedChangeRequest(folder: key.folder, path: change.path),
+                returning: GuardedChangeReading.self)
+        } catch {
+            problem = describe(error)
+            return nil
+        }
+    }
+
+    /// Keep (the change is used from now on) or Undo (the approved copy goes back), of the
+    /// file as the person was shown it (#502).
+    func settleGuardedChange(_ reading: GuardedChangeReading, keep: Bool, for key: ProjectKey) async {
+        do {
+            var summary = try await client(for: key.host).call(
+                keep ? DaemonAPI.Method.projectsKeepGuardedChange : DaemonAPI.Method.projectsUndoGuardedChange,
+                DaemonAPI.GuardedChangeRequest(folder: key.folder, path: reading.path, digest: reading.digest),
+                returning: DaemonAPI.ProjectSummary.self)
+            summary.host = key.host
+            upsert(summary)
+        } catch {
+            problem = describe(error)
+        }
+    }
+
     func setDiskSpace(_ lines: DiskThresholds, for key: ProjectKey) async {
         do {
             var summary = try await client(for: key.host).call(
@@ -3053,6 +3094,7 @@ final class AppModel {
             // sidebar and a page that disagree about where you are.
             self.openAgent(agentID)
         }
+        notifier.openProject = { [weak self] folder in self?.openProject(ProjectKey(host: .mac, folder: folder)) }
         let reporter = PresenceReporter { [weak self] watching, active, showing in
             guard let self else { return }
             // Every host hears whether the person is here; only the one the open

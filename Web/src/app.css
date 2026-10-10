@@ -381,6 +381,11 @@ button.link.reading:hover { text-decoration: underline; }
 .note { display: flex; flex-direction: column; gap: 3px; }
 .sandbox-failure p { margin: 0; }
 .sandbox-failure .answers { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
+/* A change to a project's own files, asked over the prompt or on the project's page (#531). */
+.guarded-change { border-color: color-mix(in srgb, var(--tint-attention) 25%, transparent); }
+.guarded-change p { margin: 0; }
+.guarded-change .strong { color: var(--tint-attention); }
+.guarded-change .guarded-answers { display: flex; justify-content: flex-end; gap: 10px; }
 .note.switch {
   padding: 10px 12px;
   border-radius: var(--radius-card);

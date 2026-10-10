@@ -53,6 +53,16 @@ struct StartAgentView: View {
 
     private var form: some View {
         Form {
+            // A change to the project's own files that no session can be asked about (#531).
+            if let key = model.work.project(project)?.key {
+                ForEach(model.work.guardedChanges(ofProject: key)) { change in
+                    Section {
+                        GuardedChangeQuestion(change: change, key: key)
+                            .listRowInsets(EdgeInsets())
+                            .listRowBackground(Color.clear)
+                    }
+                }
+            }
             ChoiceRows()
             Section("Reach") {
                 ForEach(model.startFolders, id: \.self) { folder in
