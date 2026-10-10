@@ -124,3 +124,4 @@ nav:
       - explanation/compaction-by-runtime.md
       - explanation/token-compression-tools.md
       - explanation/token-cost-of-tools.md
+      - explanation/direction.md

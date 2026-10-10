@@ -42,8 +42,16 @@ gh issue list --state open --search "no:assignee -label:parked" --limit 100 \
   --json number,title,labels,createdAt
 ```
 
-Order them: `bug` first, then everything else; within each, oldest first. If there are
-none, say "No unassigned issues to start." and park with `park_agent` (no id).
+Order them: `bug` first, then everything else; within each, oldest first.
+
+**Untried work first (#611).** Count the issues labelled `needs-walk` (merged UI changes
+nobody has run): `gh issue list --state all --label needs-walk --json number,title,assignees`.
+While there are more than 5, start no enhancements: after the bugs, take the unassigned
+`needs-walk` issues instead, oldest first, as walk lanes (step 3). See
+`docs/explanation/direction.md`.
+
+If there is nothing to start, say "No unassigned issues to start." and park with
+`park_agent` (no id).
 
 ## 3. Start one agent per free slot
 
@@ -58,6 +66,18 @@ For each of the first (free slots) issues, in order:
    > in each UI commit what the other two clients do. Commit, push, open a pull request
    > that says "Fixes #<n>", and turn on auto-merge (squash) at once. Then call
    > move_worktree with leave_worktree: remove, and park_agent with no id.
+
+   For a walk lane, name the worktree `walk-github-issue-<n>`, title it
+   `Walk #<n>: <issue title>`, and use this prompt instead:
+
+   > Issue #<n>'s UI change has merged but nobody has run it (`gh issue view <n>`; its
+   > pull request says what changed). Walk it on main with the run-app skill (the web page
+   > in headless Chrome; Remote screens only by building, never a simulator), on a scratch
+   > root, never the real app. Follow AGENTS.md for the "build" lease. If the Mac is
+   > locked, leave everything as it is and park. If it works, comment on the issue what you
+   > ran and saw, and remove the `needs-walk` label. If not, file a bug for each problem,
+   > linked to #<n>, then remove the label. Then call move_worktree with leave_worktree:
+   > remove, and park_agent with no id.
 
 3. If start_agent refuses because the limit is reached, unassign that issue
    (`gh issue edit <n> --remove-assignee alexec`) and stop starting more.
