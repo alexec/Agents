@@ -55,6 +55,20 @@ On iPhone and iPad, choose **Project Terminal** from a project page's **…** me
 press Control-` on an iPad keyboard. It has the same tabs as the Mac. **Done** puts it
 away; **End Shell** ends the shell in front.
 
+## Keys in a shell
+
+While a shell has the keyboard on the Mac, five keys are the terminal's, as in Terminal:
+
+- Command-. interrupts what is running, as Control-C does.
+- Command-K clears the screen and what scrolled off it.
+- Command-F finds in the shell's text.
+- Command-T opens another shell, and Command-W closes this one.
+
+Every other shortcut works as it does anywhere else in the window: Command-N, Control-`,
+Control-Command-S and the rest of [Keyboard shortcuts](../reference/keyboard-shortcuts.md).
+You don't have to click out of the shell first. To stop the agent or find a session
+instead, click out of the shell, or use the menu.
+
 ## If it doesn't work
 
 - **The project shell says There is no such agent.** The project is on a server with an
