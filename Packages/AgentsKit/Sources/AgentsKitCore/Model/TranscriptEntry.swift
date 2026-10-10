@@ -167,6 +167,19 @@ extension TranscriptEntry {
         }
     }
 
+    /// What Copy puts on the pasteboard for a message (#519): all of what it says, as
+    /// it was written, Markdown and all, whatever level its turn is drawn at. Nil for
+    /// anything that is not a message, and for one with no text in it.
+    public var copiedText: String? {
+        switch kind {
+        case .userMessage(let text, let blocks, _), .agentMessage(_, let text, let blocks):
+            let copied = text.isEmpty ? blocks.plainText : text
+            return copied.isEmpty ? nil : copied
+        default:
+            return nil
+        }
+    }
+
     /// Chunks of one message join up by the runtime's own message id.
     public var messageID: String? {
         switch kind {

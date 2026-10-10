@@ -24,4 +24,21 @@ struct TranscriptEntryTests {
         let read = try JSONDecoder().decode(TranscriptEntry.self, from: JSONEncoder().encode(entry))
         #expect(read.kind == entry.kind)
     }
+
+    @Test func copyTakesTheWholeMessageAsWritten() throws {
+        // Streamed chunks, joined the way the chat joins them: one message, every word.
+        let chunks = TranscriptEntry.coalesced([
+            TranscriptEntry(kind: .agentMessage(messageID: "m", text: "## Done\n\n")),
+            TranscriptEntry(kind: .agentMessage(messageID: "m", text: "- one\n- `two`")),
+        ])
+        #expect(chunks.count == 1)
+        #expect(try #require(chunks.first).copiedText == "## Done\n\n- one\n- `two`")
+        #expect(TranscriptEntry(kind: .userMessage("Fix it", blocks: [.text("Fix it")])).copiedText == "Fix it")
+        // Blocks alone give the text in them.
+        #expect(TranscriptEntry(kind: .agentMessage(messageID: nil, text: "",
+                                                    blocks: [.text("a"), .text("b")])).copiedText == "ab")
+        // Nothing to copy is nothing offered.
+        #expect(TranscriptEntry(kind: .agentMessage(messageID: nil, text: "")).copiedText == nil)
+        #expect(TranscriptEntry(kind: .runtimeNote("note")).copiedText == nil)
+    }
 }

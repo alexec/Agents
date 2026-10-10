@@ -301,6 +301,21 @@ button.link {
 
 .reply { margin: 0; line-height: 1.5; }
 
+/* Copy Message (#519), there only while the message is pointed at or the button focused, and
+   out of the flow so nothing moves when it shows: beside the person's bubble, in the free margin
+   at its left; over the top corner of a reply, on the paper. A touch screen has no pointer, so
+   there it sits under the message, always. */
+.copyable { position: relative; }
+.copyable > .copy-message { position: absolute; display: none; background: var(--paper-ground); }
+.bubble.copyable > .copy-message { right: 100%; bottom: 0; margin-right: 6px; }
+.reply.copyable > .copy-message, .note.copyable > .copy-message { top: -2px; right: 0; }
+.copyable:hover > .copy-message, .copy-message:focus-visible { display: block; }
+@media (hover: none) {
+  .copyable > .copy-message, .bubble.copyable > .copy-message, .reply.copyable > .copy-message, .note.copyable > .copy-message {
+    position: static; display: block; margin: 4px 0 0 auto;
+  }
+}
+
 /* Agent text, through the Markdown renderer. */
 .markdown > :first-child { margin-top: 0; }
 .markdown > :last-child { margin-bottom: 0; }

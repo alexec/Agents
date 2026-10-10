@@ -2936,13 +2936,13 @@ final class RemoteModel {
     /// A finished turn's entries, for the chat to open it: the last page of them when
     /// the turn is longer than a host gives in one answer (#200).
     /// Nil when they did not come, which the chat says and asks again for (#400).
-    func turnEntries(_ agentID: UUID, _ range: Range<Int>) async -> [TranscriptEntry]? {
+    func turnEntries(_ agentID: UUID, _ range: Range<Int>) async -> TranscriptPage? {
         let request = DaemonAPI.TranscriptRequest(agentID: agentID, before: range.upperBound,
                                                   limit: min(range.count, DaemonAPI.TranscriptRequest.limitCeiling),
                                                   from: range.lowerBound)
         do {
             return try await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
-                                                       returning: TranscriptPage.self).entries
+                                                       returning: TranscriptPage.self)
         } catch {
             note("chat: steps of \(agentID) did not load: \(error)")
             return nil
