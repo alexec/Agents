@@ -150,8 +150,9 @@ Only **critical** and **high** findings are fixed; medium and low stay recorded.
   > End with a last message naming the branch, the commits and what you proved, or why you
   > could not.
 
-- Then call `wait_for_event` with `agents` naming the helpers you started.
-  You will be started again when they have all finished.
+- Then call `wait_for_event` with `agents` naming the helpers you started and
+  `until_minutes: 240`. You will be started again when they have all finished, or when
+  the time runs out; if any is still working then, wait again the same way.
 
 ## 5. Report
 

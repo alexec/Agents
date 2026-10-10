@@ -1,13 +1,16 @@
 // Activity at the top of the sidebar (#151), as the window's (#145): Events, Resources, Runtimes,
-// MCP Servers (#589) and Spending, each a row that says what it has at a glance and opens its page in the chat's
-// place. The pages are read-only: what each page lets you change is the Mac's.
+// MCP Servers (#589) and Spending, each a row that says what it has at a glance and opens its page
+// in the chat's place. What each page lets you change is the Mac's, but for marking a runtime
+// available and stopping a wait (#541).
 import { useEffect } from "preact/hooks";
+import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import type { AllowanceState, Consequence, ControlHost, CostState, Event, ProjectSummary, RuntimeAvailability, RuntimeStatus } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import type { ActivityPage } from "../route";
 import { HostedMCP, Resources } from "./Resources";
 import { BackToList } from "./BackToList";
+import { Modal } from "./Modal";
 import { folderKey, projectFolder } from "../model/groups";
 import { runtimeTally } from "../model/runtimes";
 import { hostedTally } from "../model/hostedMCP";
@@ -263,9 +266,46 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
   );
 }
 
+/**
+ * Where Events reads from (#541), as the other clients' one menu has it: "all", "mac" (an event
+ * about a host itself), or one host's project as `host|folderKey`.
+ */
+export function eventIsIn(where: string, host: string, event: Event): boolean {
+  if (where === "all") return true;
+  if ("mac" in event.scope) return where === "mac";
+  return where === `${host}|${folderKey(event.scope.project._0)}`;
+}
+
+/** Everything one event carries, in the rows the window's detail and the Remote's sheet show. */
+export function eventDetailRows(event: Event, scopeName: string): [string, string][] {
+  const rows: [string, string][] = [
+    ["When", fromWireDate(event.at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" })],
+    ["Where", scopeName],
+  ];
+  if (event.count > 1 && event.lastAt !== undefined) rows.push(["Repeats", `${event.count} times, last at ${clock(fromWireDate(event.lastAt))}`]);
+  if (event.publisher) rows.push(["Published by", event.publisher.title]);
+  if (event.message) rows.push(["Message", event.message]);
+  for (const key of Object.keys(event.details).sort()) rows.push([key, event.details[key]!]);
+  rows.push(["Position", String(event.position)]);
+  return rows;
+}
+
 function EventsList({ store, hostName }: { store: Store; hostName: (host: string) => string }) {
+  const where = useSignal("all");
+  const picked = useSignal<{ host: string; event: Event; scope: string } | null>(null);
+  const several = store.hosts.value.length > 1;
+  const scopeName = (host: string, event: Event) => {
+    if ("mac" in event.scope) return "This Mac";
+    const folder = event.scope.project._0;
+    return (store.projects.value[host] ?? []).find((project) => folderKey(project.project.folder) === folderKey(folder))?.name
+      ?? decodeURIComponent(folder.split("/").pop() ?? "Project");
+  };
+  const places = store.hosts.value.flatMap((host) => (store.projects.value[host.id] ?? [])
+    .filter((project) => !project.project.archivedAt)
+    .map((project) => ({ value: `${host.id}|${folderKey(project.project.folder)}`, name: several ? `${hostName(host.id)}: ${project.name}` : project.name })))
+    .sort((a, b) => a.name.localeCompare(b.name));
   const events: { host: string; event: Event }[] = Object.entries(store.events.value)
-    .flatMap(([host, page]) => page.events.map((event) => ({ host, event })))
+    .flatMap(([host, page]) => page.events.filter((event) => eventIsIn(where.value, host, event)).map((event) => ({ host, event })))
     .sort((a, b) => (b.event.lastAt ?? b.event.at) - (a.event.lastAt ?? a.event.at));
   const waiting = Object.entries(store.events.value).flatMap(([host, page]) => page.waiting.map((w) => ({ host, w })));
   const days = new Map<string, { title: string; items: { host: string; event: Event }[] }>();
@@ -288,35 +328,45 @@ function EventsList({ store, hostName }: { store: Store; hostName: (host: string
   };
   const showOlder = () => { for (const [host, page] of Object.entries(store.events.value)) if (page.hasMore) void store.loadOlderEvents(host); };
   const hasOlder = Object.values(store.events.value).some((page) => page.hasMore);
+  const shown = picked.value;
   return (
     <>
       {waiting.length > 0 && (
         <section>
-          <h2 class="section-head">Waiting</h2>
-          <ul class="event-list">
+          <h2 class="section-head">Waiting now</h2>
+          <ul class="event-list waiting-list">
             {waiting.map(({ host, w }) => <li key={`${host}|${w.agentID}`}>
               <button class="event-waiting" onClick={() => navigate({ host, project: w.folder, session: w.agentID })}>
                 <span class="strong">{w.title}</span><span class="quiet small">{w.status.line}</span>
               </button>
+              {w.status.cancellable && <button class="event-stop" aria-label={`Stop ${w.title} waiting`}
+                title="Stop waiting. Nothing will start it again for this wait."
+                onClick={() => void store.cancelWait(host, w.agentID)}>✕</button>}
             </li>)}
           </ul>
         </section>
       )}
-      <h2 class="section-head">What happened</h2>
-      {events.length === 0 && <p class="hint">Nothing yet.</p>}
+      <div class="event-head">
+        <h2 class="section-head">What happened</h2>
+        <select aria-label="Where" value={where.value} onChange={(e) => (where.value = (e.currentTarget as HTMLSelectElement).value)}>
+          <option value="all">All projects</option>
+          <option value="mac">This Mac</option>
+          {places.map((place) => <option key={place.value} value={place.value}>{place.name}</option>)}
+        </select>
+      </div>
+      {events.length === 0 && <p class="hint">{where.value === "all" ? "Nothing yet." : "Nothing has happened there yet."}</p>}
       {[...days.entries()].map(([key, day]) => <section key={key}>
         <h3 class="event-day">{day.title}</h3>
         <ul class="event-list">{day.items.map(({ host, event }) => {
           const at = fromWireDate(event.at);
-          const projectScope = "project" in event.scope ? event.scope.project._0 : null;
-          const scope = projectScope ? store.hosts.value
-            .flatMap((known) => store.projects.value[known.id] ?? [])
-            .find((project) => folderKey(project.project.folder) === folderKey(projectScope))?.name
-            ?? decodeURIComponent(projectScope.split("/").pop() ?? "Project") : "This Mac";
+          const scope = scopeName(host, event);
+          const open = () => (picked.value = { host, event, scope: hostName(host) !== scope && several ? `${scope} · ${hostName(host)}` : scope });
           return <li key={`${host}|${event.position}`}>
             <time class="when" dateTime={at.toISOString()} title={at.toLocaleString()}>{clock(at)}</time>
             <span class="body">
-              <span>{event.sentence}{event.count > 1 && <span class="quiet"> ×{event.count}</span>}</span>
+              <button class="event-open" title="Everything this event carries" onClick={open}>
+                {event.sentence}{event.count > 1 && <span class="quiet"> ×{event.count}</span>}
+              </button>
               <span class="quiet small event-name">{event.name} · {scope}{hostName(host) !== scope && ` · ${hostName(host)}`}</span>
               {event.publisher && <span class="quiet small">by “{event.publisher.title}”</span>}
               {event.message && <span class="quiet small">“{event.message}”</span>}
@@ -326,7 +376,22 @@ function EventsList({ store, hostName }: { store: Store; hostName: (host: string
         })}</ul>
       </section>)}
       {hasOlder && <button class="link event-older" onClick={showOlder}>Show older</button>}
+      {shown && <EventDetail key={`${shown.host}|${shown.event.position}`} event={shown.event} scope={shown.scope} close={() => (picked.value = null)} />}
     </>
+  );
+}
+
+/** One event, read-only: the window's detail and the Remote's sheet. Copy as trigger stays the Mac's. */
+function EventDetail({ event, scope, close }: { event: Event; scope: string; close: () => void }) {
+  return (
+    <Modal label="Event" close={close}>
+      <form method="dialog" class="sheet-body event-detail">
+        <h2>{event.sentence}</h2>
+        <p class="quiet small event-name">{event.name}</p>
+        <dl>{eventDetailRows(event, scope).map(([name, value], index) => <div key={index}><dt>{name}</dt><dd>{value}</dd></div>)}</dl>
+        <div class="sheet-actions"><button value="close">Done</button></div>
+      </form>
+    </Modal>
   );
 }
 

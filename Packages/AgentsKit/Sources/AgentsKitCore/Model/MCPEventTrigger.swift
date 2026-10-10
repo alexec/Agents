@@ -41,12 +41,27 @@ public struct MCPEventTrigger: Codable, Hashable, Sendable {
         return String(ContentDigest.sha256(Data(text.utf8)).prefix(16))
     }
 
+    /// Whether it names a server's whole noun, `pr.*`: a wait may (#577), where a
+    /// workflow file names one event.
+    public var isWholeNoun: Bool { event.hasSuffix(".*") }
+
+    /// Whether `name` is its event, or one of its noun's.
+    public func covers(_ name: String) -> Bool {
+        guard isWholeNoun else { return name == event }
+        return name.hasPrefix(String(event.dropLast())) && EventCatalogue.isServerEventName(name)
+    }
+
+    /// The same servers and arguments, on one event its noun covers.
+    public func narrowed(to name: String) -> MCPEventTrigger {
+        MCPEventTrigger(event: name, servers: servers, arguments: arguments)
+    }
+
     /// Whether a raised event is one of its subscriptions': the same name, from a server
     /// it hears, and carrying that server's key. Matching on the key means an event can
     /// never run a workflow that did not ask for it.
     public func matches(_ event: Event) -> Bool {
-        guard event.name == self.event, let server = event.details["server"], hears(server: server) else { return false }
-        return event.details["subscription"] == subscriptionKey(server: server)
+        guard covers(event.name), let server = event.details["server"], hears(server: server) else { return false }
+        return event.details["subscription"] == narrowed(to: event.name).subscriptionKey(server: server)
     }
 
     /// The arguments as the file and the wire say them, `server:` folded back in.

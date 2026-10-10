@@ -362,11 +362,9 @@ public enum WorkflowFile {
                 switch EventPattern.parse(name, filters: filters) {
                 case .success(let pattern):
                     return .event(pattern)
-                case .failure(.badFilter(let kind, let key, let valid)):
-                    throw YAMLNode.Failure(valid.isEmpty
-                        ? "\"\(kind)\" takes no settings, not \(key)"
-                        : "\"\(kind)\" takes \(valid.joined(separator: ", ")), not \(key)")
-                case .failure(let problem) where problem.isBadValue:
+                // A key it cannot be narrowed by (#574) leaves the trigger unreadable,
+                // saying so, rather than firing for everything.
+                case .failure(let problem) where problem.isBadFilter || problem.isBadValue:
                     throw YAMLNode.Failure(problem.message)
                 case .failure:
                     break

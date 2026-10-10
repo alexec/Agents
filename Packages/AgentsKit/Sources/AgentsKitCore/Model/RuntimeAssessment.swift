@@ -18,6 +18,9 @@ public enum RuntimeAssessment {
     public static let pingEvent = "custom.assess_ping"
     /// Waited for and never published, so the wait times out (step `wait`).
     public static let neverEvent = "custom.assess_never"
+    /// The long deadline of the wait step `events` cancels, so it is not the one step
+    /// `wait` lets time out.
+    public static let longWaitMinutes = 1440
 
     /// One step, by its id: what the agent does, and what the record must show.
     public struct Step: Hashable, Sendable, Identifiable {
@@ -35,7 +38,7 @@ public enum RuntimeAssessment {
         Step(id: "workflows", area: "Workflows",
              passesWhen: "manage_workflows listed them, wrote a throwaway that was left waiting for the person's OK, listed it, and removed it, leaving nothing behind"),
         Step(id: "events", area: "Events",
-             passesWhen: "custom.assess_ping is on the log from this agent, and its wait came back with it; cancel_wait then cleared a second wait"),
+             passesWhen: "custom.assess_ping is on the log from this agent, and its wait came back with it; a wait with no until_minutes was refused; cancel_wait then cleared a second wait"),
         Step(id: "ask_form", area: "Questions",
              passesWhen: "ask_form with a choice and a text field was answered, and the text came back to the agent unchanged and into the report"),
         Step(id: "own_ask", area: "Questions",
@@ -203,8 +206,9 @@ public enum RuntimeAssessment {
             4. `events`: `wait_for_event` with action `recent` and limit 1, and note the position \
             it gives; `publish_event` `\(pingEvent)` with the message "ping"; then \
             `wait_for_event` on `\(pingEvent)` from that position. It comes back at once. Then \
-            `wait_for_event` on `\(neverEvent)` with no `until_minutes`; when it says you are \
-            still waiting, call `cancel_wait`.
+            `wait_for_event` on `\(neverEvent)` with no `until_minutes`, which is refused: note \
+            what it says. Then `wait_for_event` on `\(neverEvent)` with `until_minutes` \
+            \(longWaitMinutes); when it says you are still waiting, call `cancel_wait`.
             5. `ask_form`: `ask_form` titled "\(runtimeName) assessment" with two questions: id \
             `pick`, prompt "Pick one", options `a` (Alpha) and `b` (Beta); and id `words`, prompt \
             "Type any short phrase", with no options. Write both answers into the report exactly \

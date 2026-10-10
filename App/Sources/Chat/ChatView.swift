@@ -223,6 +223,12 @@ struct ChatView: View {
                 .frame(maxHeight: 300)
                 .fixedSize(horizontal: false, vertical: true)
             }
+            // A change its agent made to the project's own files waits the same way (#531).
+            if let agent = model.selectedAgent {
+                ForEach(model.work.guardedChanges(askedIn: agent.id)) { change in
+                    GuardedChangeQuestion(change: change, key: ProjectKey(host: agent.host, folder: agent.projectFolder))
+                }
+            }
             // A form waits the same way a permission question does, and floats with it.
             if let request = model.elicitationForSelection {
                 // A fresh card per form, so the answers and the step reached on one

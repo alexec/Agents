@@ -14,9 +14,9 @@ import { backgroundEntryLine } from "../../model/background";
 import { outcomeNeedsAPerson } from "../../model/groups";
 import { outcomeHeadings, queuedLabel, startingLabel } from "../../model/status";
 import {
-  callLine, compactionLine, drawnInTurn, fields, isSummaryOnly, isThought, kindOf, turnLine, turnParts, type ChatTurn, type Item,
+  callLine, compactionLine, copiedText, drawnInTurn, fields, isSummaryOnly, isThought, kindOf, turnLine, turnParts, type ChatTurn, type Item,
 } from "../../model/turns";
-import { Markdown } from "../../render/markdown";
+import { fileLinkPath, Markdown } from "../../render/markdown";
 import { AppView } from "./AppView";
 import { switchNote } from "../../model/switchNote";
 import { continueWithout, keepStopped, sandboxCard } from "../../model/sandboxWords";
@@ -33,12 +33,19 @@ export const detailSummaries: Record<TurnDetail, string> = {
 
 /** The text of a message's blocks: text blocks as Markdown, anything else named. */
 export function Blocks({ blocks, text }: { blocks: ContentBlock[] | undefined; text: string }) {
-  if (!blocks?.length) return <Markdown text={text} />;
+  // A file a message links to opens in Files, as a file a call touched does (#548).
+  const openFile = useContext(CallActionsContext)?.open;
+  if (!blocks?.length) return <Markdown text={text} openFile={openFile} />;
   return (
     <>
       {blocks.map((block, index) => {
-        if (block.type === "text") return <Markdown key={index} text={block.text} />;
-        if (block.type === "resource_link") return <p key={index} class="attachment">📎 {block.name}</p>;
+        if (block.type === "text") return <Markdown key={index} text={block.text} openFile={openFile} />;
+        if (block.type === "resource_link") {
+          const path = openFile ? fileLinkPath(block.uri) : null;
+          return path && openFile
+            ? <p key={index} class="attachment">📎 <button class="link reading" title={path} onClick={() => openFile({ path })}>{block.name}</button></p>
+            : <p key={index} class="attachment">📎 {block.name}</p>;
+        }
         if (block.type === "resource") return <p key={index} class="attachment">📎 {block.resource.uri.split("/").pop()}</p>;
         // Drawn from its own bytes, as ChatBlocks does; a remote address stays unloaded (071 FR-030).
         if (block.type === "image") {
@@ -131,6 +138,8 @@ export interface CallActions {
   /** The sandbox failure the open agent waits on an answer to (Agent.pendingSandboxFailure, #253). */
   waitingSandbox?: SandboxFailureRecord | undefined;
   answerSandbox?: ((carryOn: boolean) => Promise<void>) | undefined;
+  /** Open a subagent's own steps (ChatActions.subagentSteps, #544). */
+  subagentSteps?: ((item: BackgroundItem) => void) | undefined;
 }
 export const CallActionsContext = createContext<CallActions | null>(null);
 
@@ -182,7 +191,7 @@ export function ToolCallLine({ call, text, open = false, background, onClick }: 
                 </div>
               );
             }
-            if (piece.type === "content" && piece.content.type === "text") return <Markdown key={index} text={piece.content.text} />;
+            if (piece.type === "content" && piece.content.type === "text") return <Markdown key={index} text={piece.content.text} openFile={actions?.open} />;
             // Any other block as a message draws it: a picture, an attachment (#252).
             if (piece.type === "content") return <div key={index} class="quiet"><Blocks blocks={[piece.content]} text="" /></div>;
             if (piece.type === "terminal") return <p key={index} class="quiet">Terminal output is shown in the Mac window.</p>;
@@ -266,6 +275,27 @@ export function fromLine(title: string | undefined): string {
   return `From \u201C${title ?? "another agent"}\u201D`;
 }
 
+/**
+ * Copy Message (#519): the whole message, as written, onto the clipboard. Shown while the pointer
+ * is on the message or the button has focus; the Mac and the phone have it on the message's menu.
+ */
+function CopyMessage({ entry }: { entry: TranscriptEntry }) {
+  const copied = useSignal(false);
+  const text = copiedText(entry);
+  if (!text) return null;
+  const copy = () => {
+    void navigator.clipboard?.writeText(text).then(() => {
+      copied.value = true;
+      setTimeout(() => { copied.value = false; }, 1500);
+    }, () => {});
+  };
+  return (
+    <button class="steps-control copy-message" onClick={copy} title="Copy this message, as written">
+      {copied.value ? "Copied" : "Copy"}
+    </button>
+  );
+}
+
 /** One entry, drawn as its kind is (EntryRow). Marked so Exchanged can bring it into view. */
 export function EntryRow({ entry }: { entry: TranscriptEntry }) {
   return <div class="entry-mark" data-entry={entry.id}>{entryBody(entry)}</div>;
@@ -276,17 +306,17 @@ function entryBody(entry: TranscriptEntry) {
     case "userMessage": {
       const message = fields(entry, "userMessage")!;
       if (message.from === "app") {
-        return <div class="note"><p class="faint">Agents asked</p><div class="quiet"><Blocks blocks={message.blocks} text={message._0} /></div></div>;
+        return <div class="note copyable"><p class="faint">Agents asked</p><div class="quiet"><Blocks blocks={message.blocks} text={message._0} /></div><CopyMessage entry={entry} /></div>;
       }
       if (message.from === "agent") {
         // Another agent's message (#560): the person's bubble, named as the sender's.
-        return <div class="from-agent"><p class="faint">{fromLine(entry.sender?.title)}</p><div class="bubble"><Blocks blocks={message.blocks} text={message._0} /></div></div>;
+        return <div class="from-agent"><p class="faint">{fromLine(entry.sender?.title)}</p><div class="bubble copyable"><Blocks blocks={message.blocks} text={message._0} /><CopyMessage entry={entry} /></div></div>;
       }
-      return <div class="bubble"><Blocks blocks={message.blocks} text={message._0} /></div>;
+      return <div class="bubble copyable"><Blocks blocks={message.blocks} text={message._0} /><CopyMessage entry={entry} /></div>;
     }
     case "agentMessage": {
       const message = fields(entry, "agentMessage")!;
-      return <div class="reply"><Blocks blocks={message.blocks} text={message.text} /></div>;
+      return <div class="reply copyable"><Blocks blocks={message.blocks} text={message.text} /><CopyMessage entry={entry} /></div>;
     }
     case "agentThought":
       return <p class="thought quiet">{fields(entry, "agentThought")!.text}</p>;
@@ -373,13 +403,25 @@ function entryBody(entry: TranscriptEntry) {
       return <AppView call={fields(entry, "appView")!._0} />;
     case "background": {
       // As the window's line: how it started or ended, a failure in the failure tint (#253).
-      const item = fields(entry, "background")!._0;
-      return <p class={item.state === "failed" ? "failure" : "quiet"}>{backgroundEntryLine(item)}</p>;
+      return <BackgroundEntryLine item={fields(entry, "background")!._0} />;
     }
     default:
       // Written by a newer build: kept in the record, drawn as nothing.
       return null;
   }
+}
+
+/** BackgroundEntryLine: how it started or ended, and a subagent's Steps (#544). */
+function BackgroundEntryLine({ item }: { item: BackgroundItem }) {
+  const steps = useContext(CallActionsContext)?.subagentSteps;
+  return (
+    <p class={item.state === "failed" ? "failure" : "quiet"}>
+      {backgroundEntryLine(item)}
+      {item.kind === "subagent" && steps && (
+        <> <button class="link" title="See what this subagent did" onClick={() => steps(item)}>Steps</button></>
+      )}
+    </p>
+  );
 }
 
 export function elicitationTitle(request: { message?: string; mode: { form: { _0: { title?: string } } } | { url: { _0: string } } }): string {
@@ -416,8 +458,8 @@ function stepsWords(count: number | undefined, open: boolean): string {
  * Opening loads the last page once, and only for a turn near the end: every turn open at once
  * would fetch them all. One the chat has let go shows a button instead of fetching itself (#291).
  */
-export const TurnView = memo(function TurnView({ turn, detail, fetched, hasEarlier, auto, isLive, background, toggle: toggleTurn, loadDetail: loadTurn, loadEarlier }: {
-  turn: ChatTurn; detail: TurnDetail; fetched: Item[] | undefined; hasEarlier: boolean; auto: boolean; isLive: boolean;
+export const TurnView = memo(function TurnView({ turn, detail, fetched, fetchFailed, hasEarlier, auto, isLive, background, toggle: toggleTurn, loadDetail: loadTurn, loadEarlier }: {
+  turn: ChatTurn; detail: TurnDetail; fetched: Item[] | undefined; fetchFailed: boolean; hasEarlier: boolean; auto: boolean; isLive: boolean;
   background: readonly BackgroundItem[]; toggle: (turn: ChatTurn) => void;
   loadDetail: (turn: ChatTurn) => Promise<void>; loadEarlier: (turn: ChatTurn) => Promise<void>;
 }) {
@@ -462,6 +504,9 @@ export const TurnView = memo(function TurnView({ turn, detail, fetched, hasEarli
       )}
       {open && stepCount !== 0 ? (
         waiting ? (loading.value || (auto && !asked.current) ? <p class="quiet">Loading…</p>
+          // A read that failed says so, as the window's turn does, rather than a bare Load steps (#544).
+          : fetchFailed ? <p class="load-failure" role="status"><span>These steps did not load.</span>
+            <button class="link" onClick={ask}>Try Again</button></p>
           : <button class="steps-control" onClick={ask}>Load steps</button>) : (
           <>
             {hasEarlier && <button class="steps-control" onClick={() => void loadEarlier(turn)}>Earlier steps</button>}

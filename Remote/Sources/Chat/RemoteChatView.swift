@@ -104,6 +104,13 @@ struct RemoteChatView: View {
                 }
         )
         .environment(\.chatActions, actions)
+        // A file a message links to is on the Mac: it opens in Files, as a file a tool
+        // call touched does (#548). Links to the web are the system's.
+        .environment(\.openURL, OpenURLAction { [actions] url in
+            guard url.isFileURL else { return .systemAction }
+            actions.open(ToolCallLocation(path: url.path(percentEncoded: false)))
+            return .handled
+        })
         .environment(\.appViewStore, views)
         .environment(\.appViewActions, agent.map(appViewActions))
         // A view full screen is drawn in the chat's place, as on the Mac (#187).
@@ -188,7 +195,8 @@ struct RemoteChatView: View {
         }
         .toolbar {
             // Stop is the prompt's own button while the agent works, as on the Mac;
-            // Archive is on the session's row.
+            // Pin and Archive are in the bar where there is room, as the Mac's toolbar
+            // has them, and in the ··· menu on a phone (#586).
             // Blocked (039): the card's Carry on, where the chat's own controls are.
             if let agent, model.isBlocked(agent) {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -199,6 +207,16 @@ struct RemoteChatView: View {
                     }
                     .disabled(model.isStale(agent))
                     .accessibilityHint(AgentsModel.carryOnHelp(for: agent))
+                }
+            }
+            if let agent, sizeClass == .regular {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    if agent.state == .archived {
+                        BringBackAgentButton(agent: agent)
+                    } else {
+                        PinAgentButton(agent: agent)
+                        ArchiveAgentButton(agent: agent, leavesChat: true)
+                    }
                 }
             }
             if let agent {
@@ -243,6 +261,13 @@ struct RemoteChatView: View {
                 }
                 .frame(maxHeight: 300)
                 .fixedSize(horizontal: false, vertical: true)
+            }
+            // A change its agent made to the project's own files waits the same way (#531).
+            if let agent {
+                ForEach(model.guardedChangesForSelection) { change in
+                    GuardedChangeQuestion(change: change, key: ProjectKey(host: agent.host, folder: agent.projectFolder))
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
             // A form waits the same way a permission does and floats with it, never
             // hidden behind one (#243), as on the Mac.
@@ -323,10 +348,11 @@ struct RemoteChatView: View {
     }
 }
 
-/// The rarer things to do with this agent. Stop and Archive are buttons in the bar, as
-/// on the Mac (033); what is left here is what the Mac keeps elsewhere.
+/// The rarer things to do with this agent, and on a phone, where the bar has no room
+/// for them, Pin and Archive (#586).
 private struct ChatMenu: View {
     @Environment(RemoteModel.self) private var model
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @AppStorage(TurnDetail.phoneDefaultsKey) private var turnDetail = TurnDetail.outcome
     let agent: Agent
     /// Open File… (#415), over the chat.
@@ -347,6 +373,11 @@ private struct ChatMenu: View {
             if agent.state != .archived {
                 // As the Mac's Session menu has it (#342).
                 BranchAgentButton(agent: agent)
+                if sizeClass != .regular {
+                    Divider()
+                    PinAgentButton(agent: agent)
+                    ArchiveAgentButton(agent: agent, leavesChat: true)
+                }
             } else {
                 Divider()
                 Button("Bring Back", systemImage: "tray.and.arrow.up") {

@@ -101,6 +101,9 @@ public extension DaemonAPI {
                 Row(Method.agentsSendNow, params: UnqueueRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsUnqueue, params: UnqueueRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsStop, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
+                // Events ▸ Waiting now's ✕, as the window and the Remote have it (#541).
+                Row(Method.eventsCancelWait, params: CancelWaitRequest.self, result: [WaitingAgent].self,
+                    kind: .hostRequest),
                 Row(Method.agentsStopBackground, params: StopBackgroundRequest.self, result: JSONValue.self, kind: .hostRequest),
                 Row(Method.agentsPark, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsUnpark, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
@@ -168,6 +171,13 @@ public extension DaemonAPI {
                 Row(Method.projectsUnarchive, params: ProjectRequest.self, result: ProjectSummary.self, kind: .hostRequest),
                 // Pin and Unpin on a project's row, as the window's sidebar has them.
                 Row(Method.projectsSetPinned, params: SetPinnedRequest.self, result: ProjectSummary.self, kind: .hostRequest),
+                // A change to the project's own files made outside the app (#531): read, Keep, Undo.
+                Row(Method.projectsReadGuardedChange, params: GuardedChangeRequest.self, result: GuardedChangeReading.self,
+                    kind: .hostRequest),
+                Row(Method.projectsKeepGuardedChange, params: GuardedChangeRequest.self, result: ProjectSummary.self,
+                    kind: .hostRequest),
+                Row(Method.projectsUndoGuardedChange, params: GuardedChangeRequest.self, result: ProjectSummary.self,
+                    kind: .hostRequest),
                 // New Chat (#229): why a host has no chat project, asked only when none is listed.
                 Row(Method.projectsChatState, params: Empty.self, result: ChatProjectState.self, kind: .hostRequest),
                 Row(Method.filesWatch, params: FilesWatchRequest.self, result: Empty.self, kind: .hostRequest),

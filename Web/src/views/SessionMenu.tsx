@@ -1,7 +1,8 @@
 // A session's actions (071 FR-027): Carry on while it sits in an open block (#250), Stop while it
 // holds a runtime or a block, Park or Unpark
 // (Agent.parkAction), Branch (#342), and Archive, or Bring Back and Delete (#398). In the chat
-// header's ··· menu, and the sidebar row's menu.
+// header's ··· menu, and the sidebar row's menu. The chat's has Open File… first, as the Remote's
+// ··· menu does (#543), for a page with no keyboard to press ⌘P on.
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { Agent } from "../protocol/generated";
@@ -59,7 +60,41 @@ export function sessionActions(agent: Agent, pinned?: boolean): { action: Action
   return found;
 }
 
-export function SessionMenu({ store, host, agent, disabled }: { store: Store; host: string; agent: Agent | undefined; disabled: boolean }) {
+/**
+ * Pin or Unpin, and Archive or Bring Back: the buttons in the chat's header beside its ···
+ * menu (#586), as the window's toolbar has them. No Pin on an archived session.
+ */
+export function headerActions(agent: Agent, pinned: boolean): { action: Action; label: string; help: string }[] {
+  if (agent.state === "archived") {
+    return [{ action: "agents/unarchive", label: "Bring Back", help: "Bring this session back from the archive" }];
+  }
+  return [
+    pinned
+      ? { action: "unpin", label: "Unpin", help: "Take this session out of Pinned in the sidebar" }
+      : { action: "pin", label: "Pin", help: "Keep this session in Pinned, at the top of the sidebar" },
+    { action: "agents/archive", label: "Archive", help: "Archive this session and leave it" },
+  ];
+}
+
+/** `headerActions` as buttons. Archive leaves the chat for its project, once the host has it. */
+export function SessionButtons({ store, host, agent, disabled }: { store: Store; host: string; agent: Agent | undefined; disabled: boolean }) {
+  if (!agent) return null;
+  const pinned = store.sessionPinsIn(host, projectFolder(agent)).includes(agent.id);
+  return (
+    <>
+      {headerActions(agent, pinned).map(({ action, label, help }) => (
+        <button key={action} title={help} disabled={disabled || !!store.onItsWay.value[agent.id]}
+          onClick={() => {
+            if (action !== "agents/archive") return runSessionAction(store, host, agent, action);
+            void store.perform(host, agent.id, action).then((done) => { if (done) go({ host, project: projectFolder(agent) }); });
+          }}>{label}</button>
+      ))}
+    </>
+  );
+}
+
+export function SessionMenu({ store, host, agent, disabled, openFile }:
+  { store: Store; host: string; agent: Agent | undefined; disabled: boolean; openFile?: () => void }) {
   const open = useSignal(false);
   const anchor = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -76,6 +111,13 @@ export function SessionMenu({ store, host, agent, disabled }: { store: Store; ho
         disabled={!agent || disabled || (agent && !!store.onItsWay.value[agent.id])} onClick={() => (open.value = !open.value)}>···</button>
       {open.value && agent && (
         <div class="popover right" role="menu">
+          {openFile && (
+            <button role="menuitem" title="Find a file in this session's folder by name"
+              onClick={() => {
+                open.value = false;
+                openFile();
+              }}>Open File…</button>
+          )}
           {sessionActions(agent, store.sessionPinsIn(host, projectFolder(agent)).includes(agent.id)).map(({ action, label, help }) => (
             <button key={action} role="menuitem" title={help}
               onClick={() => {

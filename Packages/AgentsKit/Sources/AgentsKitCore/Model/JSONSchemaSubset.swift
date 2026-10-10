@@ -10,7 +10,8 @@ public enum JSONSchemaSubset {
     public static func check(_ value: JSONValue, against schema: JSONValue, name: String) -> String? {
         guard let problem = problem(value, schema, path: nil) else { return nil }
         if let properties = schema["properties"]?.objectValue, problem.isKey {
-            let keys = properties.keys.sorted()
+            let required = Set(schema["required"]?.arrayValue?.compactMap(\.stringValue) ?? [])
+            let keys = properties.keys.sorted().map { required.contains($0) ? "\($0) (required)" : $0 }
             let takes = keys.isEmpty ? "takes no settings" : "takes \(keys.joined(separator: ", "))"
             return "\(name) \(takes); \(problem.words)."
         }
@@ -42,7 +43,7 @@ public enum JSONSchemaSubset {
             }
             if schema["additionalProperties"]?.boolValue == false,
                let extra = object.keys.sorted().first(where: { properties[$0] == nil }) {
-                return Problem(words: "not \(extra)", isKey: path == nil)
+                return Problem(words: "\"\(extra)\" is not one of its arguments", isKey: path == nil)
             }
             for key in object.keys.sorted() {
                 guard let inner = properties[key], let value = object[key] else { continue }

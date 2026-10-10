@@ -484,10 +484,16 @@ extension DaemonCore {
         let stamp = FileStamp(url)
         if let held = pinsCache[project], held.stamp == stamp { return held.file }
         pinsReads += 1
-        let read = StoreFile.read(at: url, meaning: "no pins show",
-                                  outside: locations.root) { try PinsFile.read($0).file }
         let file: PinsFile
-        if case .read(let found) = read { file = found } else { file = PinsFile() }
+        // A file changed outside the app is not used until the person keeps it (#502).
+        let guarded = guardedContent(.pins, in: project)
+        if guarded.onDisk {
+            let read = StoreFile.read(at: url, meaning: "no pins show",
+                                      outside: locations.root) { try PinsFile.read($0).file }
+            if case .read(let found) = read { file = found } else { file = PinsFile() }
+        } else {
+            file = guarded.data.flatMap { try? PinsFile.read($0).file } ?? PinsFile()
+        }
         pinsCache[project] = (stamp, file)
         return file
     }
@@ -513,6 +519,9 @@ extension DaemonCore {
 
     func writePins(_ file: PinsFile, in project: URL) throws {
         let url = Self.pinsFileURL(project)
+        guard guardedFileIsSettled(.pins, in: project) else {
+            throw pinRefusal(guardedRefusal(.pins, lead: "The pins were not changed: "))
+        }
         do {
             if file.isEmpty {
                 try StoreFile.requireWritable(url)
@@ -528,6 +537,7 @@ extension DaemonCore {
         } catch {
             throw pinRefusal("The pins could not be written in \(project.path)/.agents: \(error.localizedDescription)")
         }
+        approveGuardedWrite(.pins, in: project)
         pinsCache[project] = nil
         pinsChanged(project)
     }

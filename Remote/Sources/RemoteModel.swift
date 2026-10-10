@@ -432,23 +432,72 @@ final class RemoteModel {
 
     var projects: [DaemonAPI.ProjectSummary] { work.liveProjects }
 
-    func addProject(folder path: String) async -> String? {
-        let request = DaemonAPI.ProjectRequest(folder: URL(fileURLWithPath: (path as NSString).expandingTildeInPath))
-        do {
-            let summary = try await client.call(DaemonAPI.Method.projectsAdd, request, returning: DaemonAPI.ProjectSummary.self)
-            await catchUp()
-            selectedProject = summary.project.folder
-            return nil
-        } catch { return sentence(for: error) }
+    /// The hosts a project can be added on or cloned to (#537): this Mac, then each
+    /// other host of the control plane, as the window's + menu lists them.
+    var projectHosts: [HostSection] {
+        let sections = hostSections
+        return sections.isEmpty ? [HostSection(id: .mac, title: "This Mac", offline: false)] : sections
     }
 
-    func cloneProject(url: String) async -> String? {
-        let request = DaemonAPI.CloneRequest(url: url)
+    /// The client for `host` itself, for a call that names no project there yet.
+    private func client(on host: HostID) throws -> DaemonClient {
+        if host == .mac { return client }
+        guard let other = otherHosts[host], reachableHosts.contains(host) else { throw HostAway(host: host) }
+        return other
+    }
+
+    /// One folder on `host`, for choosing a project there (#537): `files/browse`, as the
+    /// window's and the page's folder sheets read a server's. `~` is the host's home.
+    func browse(_ path: String, on host: HostID) async -> Result<DirectoryListing, BrowseProblem> {
         do {
-            _ = try await client.call(DaemonAPI.Method.projectsClone, request, returning: DaemonAPI.ProjectSummary.self)
-            await catchUp()
+            return .success(try await client(on: host).call(DaemonAPI.Method.filesBrowse,
+                                                             DaemonAPI.FilesBrowseRequest(path: path),
+                                                             returning: DirectoryListing.self))
+        } catch let error as JSONRPCError {
+            return .failure(BrowseProblem(message: error.message))
+        } catch {
+            return .failure(BrowseProblem(message: notAnswering(host, "its folders can't be shown.")))
+        }
+    }
+
+    struct BrowseProblem: Error {
+        let message: String
+    }
+
+    /// Add a folder on `host` as a project, and open it. Answers why not, or nil.
+    func addProject(_ folder: URL, on host: HostID) async -> String? {
+        do {
+            let summary = try await client(on: host).call(DaemonAPI.Method.projectsAdd,
+                                                          DaemonAPI.ProjectRequest(folder: folder),
+                                                          returning: DaemonAPI.ProjectSummary.self)
+            show(summary, on: host)
             return nil
-        } catch { return sentence(for: error) }
+        } catch {
+            return away(error, "the project was not added.") ?? sentence(for: error)
+        }
+    }
+
+    /// Clone a repository into `host`'s home folder as a project, and open it. Answers
+    /// why not, or nil.
+    func cloneProject(url: String, on host: HostID) async -> String? {
+        do {
+            let summary = try await client(on: host).call(DaemonAPI.Method.projectsClone,
+                                                          DaemonAPI.CloneRequest(url: url),
+                                                          returning: DaemonAPI.ProjectSummary.self)
+            show(summary, on: host)
+            return nil
+        } catch {
+            return away(error, "nothing was cloned.") ?? sentence(for: error)
+        }
+    }
+
+    /// A project just added on `host`, listed and opened at once rather than when the
+    /// host next says so.
+    private func show(_ summary: DaemonAPI.ProjectSummary, on host: HostID) {
+        var added = summary
+        added.host = host
+        work.upsert(added)
+        sidebarItem = .project(added.key)
     }
 
     /// One host's heading in the project list. Several hosts, and the list is grouped
@@ -1109,6 +1158,38 @@ final class RemoteModel {
     /// (#243, #539): each waits on its own, and a form hidden until a permission is
     /// answered is a form that cannot be answered first.
     var formForSelection: ElicitationRequest? { work.elicitation(for: selection) }
+
+    /// The changes to its project's own files the open conversation's agent made (#531),
+    /// each a question over the prompt, as a form is.
+    var guardedChangesForSelection: [GuardedChange] { work.guardedChanges(askedIn: selection) }
+
+    /// What a guarded file was and is (#502), for the person deciding.
+    func readGuardedChange(_ change: GuardedChange, for key: ProjectKey) async -> GuardedChangeReading? {
+        let request = DaemonAPI.GuardedChangeRequest(folder: key.folder, path: change.path)
+        do {
+            return try await client(for: request).call(DaemonAPI.Method.projectsReadGuardedChange, request,
+                                                       returning: GuardedChangeReading.self)
+        } catch {
+            problem = sentence(for: error)
+            return nil
+        }
+    }
+
+    /// Keep (the change is used from now on) or Undo (the approved copy goes back), of the
+    /// file as the person was shown it (#531). The project's summary that comes back with
+    /// it, or after it, takes the question away.
+    func settleGuardedChange(_ reading: GuardedChangeReading, keep: Bool, for key: ProjectKey) async {
+        let request = DaemonAPI.GuardedChangeRequest(folder: key.folder, path: reading.path, digest: reading.digest)
+        do {
+            var summary: DaemonAPI.ProjectSummary = try await client(for: request).call(
+                keep ? DaemonAPI.Method.projectsKeepGuardedChange : DaemonAPI.Method.projectsUndoGuardedChange,
+                request, returning: DaemonAPI.ProjectSummary.self)
+            summary.host = key.host
+            work.upsert(summary)
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
 
     /// A file being read, by path, or nothing.
     ///
@@ -1950,6 +2031,12 @@ final class RemoteModel {
 
     private var pendingOpen: UUID?
 
+    /// A project's page, from a banner with no session behind it (#531): where a change
+    /// git brought to its files is asked. The phone holds the Mac's projects only.
+    func openProject(_ folder: URL) {
+        sidebarItem = .project(ProjectKey(host: .mac, folder: folder))
+    }
+
     /// Which conversation a banner is about, from the need it names. The Mac's
     /// `attention/pending` is the truth; this reads the copy the model already holds.
     func agentID(forNeedToken token: String) -> UUID? {
@@ -2043,8 +2130,13 @@ final class RemoteModel {
         guard presence == nil else { return }
         notifier.open = { [weak self] agentID in self?.open(agentID) }
         notifier.openNeed = { [weak self] token in
-            guard let self, let agentID = self.agentID(forNeedToken: token) else { return }
-            self.notifier.open(agentID)
+            guard let self else { return }
+            if let agentID = self.agentID(forNeedToken: token) {
+                self.notifier.open(agentID)
+            } else if let folder = NeedID.guardedFolder(fromToken: token) {
+                // The project's own question (#531), on its page.
+                self.openProject(folder)
+            }
         }
         notifier.authorisationChanged = { [weak self] in self?.presence?.connected() }
         let reporter = PresenceReporter { [weak self] watching, active, mayNotify, showing in
@@ -2148,10 +2240,11 @@ final class RemoteModel {
         openArchivedFolds.union(folder.map { [Project.standardize($0)] } ?? [])
     }
 
-    /// A project's Archived fold has opened: a page of its newest archived sessions.
-    func loadArchived(in folder: URL) async {
-        openArchivedFolds.insert(Project.standardize(folder))
-        await loadArchivedAgents(in: folder, limit: SidebarProjectFold.archivedShown)
+    /// A project's Archived fold has opened: a page of its newest archived sessions, from
+    /// the project's own host (#533).
+    func loadArchived(in key: ProjectKey) async {
+        openArchivedFolds.insert(Project.standardize(key.folder))
+        await loadArchivedAgents(in: key, limit: SidebarProjectFold.archivedShown)
     }
 
     /// A project's Archived fold has closed: what it held is let go, but for the chat open
@@ -2163,43 +2256,66 @@ final class RemoteModel {
             .filter { !searched.contains($0) })
     }
 
-    /// The most a search brings back, a page from the Mac: the sidebar holds the live
-    /// sessions and filters those itself (#165, #176).
+    /// The most a search brings back from each host, a page at a time: the sidebar holds
+    /// the live sessions and filters those itself (#165, #176).
     static let searchShown = 200
     /// Archived sessions a search brought in, let go when the search ends.
     private var searched: Set<UUID> = []
+    /// The next page of matches, for each host whose last page was full (#176).
+    private var searchNext: [HostID: DaemonAPI.ListRequest] = [:]
+    /// Whether a host has more matches than it has sent: More matches… asks for them.
+    var searchHasMore: Bool { !searchNext.isEmpty }
 
-    /// The archived sessions matching `words`, one capped page; nothing when it is empty.
+    /// The archived sessions matching `words`, a capped page from every host that answers,
+    /// as the window asks (#533); nothing when it is empty.
     func searchSessions(_ words: String) async {
         let earlier = searched
         searched = []
+        searchNext = [:]
         if !earlier.isEmpty {
             let unseen = Set(ClientHolding.archivedToLetGo(work.agents, projects: archivedHeldFor, chat: selection))
             work.forget(earlier.filter { unseen.contains($0) })
         }
         guard !words.isEmpty else { return }
         let request = DaemonAPI.ListRequest(archivedCommands: false, limit: Self.searchShown, lean: true, query: words)
-        guard let found = try? await client.call(DaemonAPI.Method.agentsList, request, returning: [Agent].self),
+        let hosts: [HostID] = [.mac] + reachableHosts.sorted { $0.rawValue < $1.rawValue }
+        for host in hosts { await search(request, on: host) }
+    }
+
+    /// The next page from each host that has more, newest first as the host lists them.
+    func searchMore() async {
+        let next = searchNext
+        searchNext = [:]
+        for (host, request) in next { await search(request, on: host) }
+    }
+
+    private func search(_ request: DaemonAPI.ListRequest, on host: HostID) async {
+        guard let target = hostClient(host),
+              let found = try? await target.call(DaemonAPI.Method.agentsList, request, returning: [Agent].self),
+              // A search ended or changed while this was on its way: not what is asked now.
               !Task.isCancelled else { return }
         let archived = found.filter { $0.state == .archived }
-        searched = Set(archived.filter { work.agent($0.id) == nil }.map(\.id))
-        work.takeListed(archived)
+        searched.formUnion(archived.filter { work.agent($0.id) == nil }.map(\.id))
+        work.takeListed(archived.map { var agent = $0; agent.host = host; return agent })
+        searchNext[host] = request.next(after: found)
     }
 
-    func loadArchivedAgents(in folder: URL, limit: Int) async {
+    /// A project's newest archived sessions, asked of the project's own host and stamped
+    /// as its own, as the window's (#533).
+    func loadArchivedAgents(in key: ProjectKey, limit: Int) async {
         let request = DaemonAPI.ListRequest(archivedCommands: false, archivedOnly: true,
-                                            folder: folder, limit: limit, lean: true)
-        guard let listed = try? await client.call(DaemonAPI.Method.agentsList, request,
+                                            folder: key.folder, limit: limit, lean: true)
+        guard let target = hostClient(key.host),
+              let listed = try? await target.call(DaemonAPI.Method.agentsList, request,
                                                   returning: [Agent].self) else { return }
-        work.takeListed(listed)
+        work.takeListed(listed.map { var agent = $0; agent.host = key.host; return agent })
     }
 
-    func loadAllArchivedAgents(in folder: URL) async {
-        let request = DaemonAPI.ListRequest(archivedCommands: false, archivedOnly: true,
-                                            folder: folder, lean: true)
-        guard let listed = try? await client.call(DaemonAPI.Method.agentsList, request,
-                                                  returning: [Agent].self) else { return }
-        work.takeListed(listed)
+    /// The client for `host`: the Mac's own, or a server's while it answers.
+    private func hostClient(_ host: HostID) -> DaemonClient? {
+        if host == .mac { return client }
+        guard reachableHosts.contains(host) else { return nil }
+        return otherHosts[host]
     }
 
     /// A workflow's newest `limit` runs, archived ones included, for its page. Answers
@@ -2820,13 +2936,13 @@ final class RemoteModel {
     /// A finished turn's entries, for the chat to open it: the last page of them when
     /// the turn is longer than a host gives in one answer (#200).
     /// Nil when they did not come, which the chat says and asks again for (#400).
-    func turnEntries(_ agentID: UUID, _ range: Range<Int>) async -> [TranscriptEntry]? {
+    func turnEntries(_ agentID: UUID, _ range: Range<Int>) async -> TranscriptPage? {
         let request = DaemonAPI.TranscriptRequest(agentID: agentID, before: range.upperBound,
                                                   limit: min(range.count, DaemonAPI.TranscriptRequest.limitCeiling),
                                                   from: range.lowerBound)
         do {
             return try await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
-                                                       returning: TranscriptPage.self).entries
+                                                       returning: TranscriptPage.self)
         } catch {
             note("chat: steps of \(agentID) did not load: \(error)")
             return nil
@@ -3066,8 +3182,11 @@ final class RemoteModel {
     func stop(_ agentID: UUID) async {
         await act(.stop, on: agentID, DaemonAPI.Method.agentsStop, DaemonAPI.AgentRequest(agentID: agentID))
     }
-    func archive(_ agentID: UUID) async {
-        await act(.archive, on: agentID, DaemonAPI.Method.agentsArchive, DaemonAPI.AgentRequest(agentID: agentID))
+    func archive(_ agentID: UUID, andLeave: Bool = false) async {
+        let archived = await act(.archive, on: agentID, DaemonAPI.Method.agentsArchive,
+                                 DaemonAPI.AgentRequest(agentID: agentID))
+        // Not when it failed: the chat stays in front, under the reason why.
+        if archived, andLeave, selection == agentID { selection = nil }
     }
 
     /// Continue in the project folder (#119): a successor that reads this session and

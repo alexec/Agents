@@ -165,6 +165,36 @@ struct ContentView: View {
     private var detailToolbar: some ToolbarContent {
         // No New Session button (#375): the project's New session row, ⌘N and the
         // project menu start one.
+        // Pin and Archive (#586), as the workflow page has them: the two things a session
+        // is most often done with. Archive leaves the chat, as ⌥⌘⌫ does.
+        if let agent = model.selectedAgent {
+            ToolbarItemGroup {
+                let pinned = model.isPinned(agent)
+                Button {
+                    Task { await model.setPinned(agent, !pinned) }
+                } label: {
+                    Label(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin")
+                }
+                .disabled(agent.state == .archived)
+                .help(pinned ? "Take this session out of Pinned in the sidebar"
+                             : "Keep this session in Pinned, at the top of the sidebar")
+                if agent.state == .archived {
+                    Button {
+                        Task { await model.unarchive(agent.id) }
+                    } label: {
+                        Label("Bring Back", systemImage: "tray.and.arrow.up")
+                    }
+                    .help("Bring this session back from the archive (⌥⌘⌫)")
+                } else {
+                    Button {
+                        Task { await model.archive(agent.id, andLeave: true) }
+                    } label: {
+                        Label("Archive", systemImage: "archivebox")
+                    }
+                    .help("Archive this session and leave it (⌥⌘⌫)")
+                }
+            }
+        }
         if model.selection != nil {
             ToolbarItem {
                 SidebarToggle(windowWidth: frame.windowWidth)
@@ -310,8 +340,8 @@ private struct NothingPickedPage: View {
             Label("Nothing selected", systemImage: "sidebar.left")
         } description: {
             Text("""
-            Pick a session on the left to read it, or a project's New session row to \
-            start one there. ⌘N starts one in the selected project.
+            Pick a session on the left to read it, or New Session at the top to \
+            start one. ⌘N does the same.
 
             ↑ and ↓ move through the list, → and ← unfold and fold a project, \
             and ⌘F finds a session.

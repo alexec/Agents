@@ -441,7 +441,10 @@ public actor AppService {
                 }
                 wakeOn = known
             }
-            if let minutes, !Block.checkAgainMinutes.contains(minutes) {
+            guard let minutes else {
+                return .failure(AgentCallProblem(stringLiteral: "Nothing is waited for: " + EventWords.deadlineRequired()))
+            }
+            if !Block.checkAgainMinutes.contains(minutes) {
                 return .failure(AgentCallProblem(stringLiteral: """
                     Nothing is waited for: until_minutes has to be a whole number from \
                     \(Block.checkAgainMinutes.lowerBound) to \(Block.checkAgainMinutes.upperBound).
@@ -568,7 +571,7 @@ public actor AppService {
                 guard let filter = object[key].flatMap(WorkflowTrigger.filter) else {
                     return .failure(AgentCallProblem(stringLiteral:
                         "Nothing is waited for: the \"\(key)\" in where is not a value. A value is text, "
-                        + "a number, true or false, or a list of those, e.g. {\"outcome\": [\"done\", \"nothing_to_do\"]}."))
+                        + "a number, true or false, or a list of those, e.g. {\"branch\": [\"main\", \"develop\"]}."))
                 }
                 out[key] = filter
             }
@@ -976,8 +979,8 @@ public actor AppService {
             whose file says `enabled: false` are theirs to turn on.
 
             Under on:, besides schedule and today's hyphenated names (agent-finished and \
-            the rest), any event name works, narrowed by its details written under it, \
-            e.g. `- workflow.completed:` with `workflow: nightly` under it.
+            the rest), any event name works, narrowed by the details marked [narrow by …] \
+            below written under it, e.g. `- branch.moved:` with `branch: main` under it.
             """ + "\n" + EventCatalogue.describe()),
         "inputSchema": [
             "type": "object",
@@ -1296,13 +1299,18 @@ public actor AppService {
             are started again with it. The call itself waits up to 45 seconds; if nothing \
             has happened by then it says you are still waiting and keeps your place. Use \
             this instead of polling. Also lists recent events (action "recent") and every \
-            event you can wait on (action "list"). The same names work as workflow triggers.
+            event you can wait on (action "list"). The same names work as workflow triggers. \
+            An MCP server's event (such as pr.merged) is checked against what the project's \
+            servers offer, and the wait subscribes to it until it ends.
 
             To wait for agents, name them in agents instead of events: your turn ends at \
             once, and you are resumed with how each ended when all have finished (or the \
             first, with wake_on any). until_minutes, with agents or alone, resumes you then \
             anyway, to check on something the app can't see, like CI; say what in message. \
             Anything you started in the background stops when the turn ends.
+
+            Every wait needs until_minutes, so none can last for ever: when it runs out you \
+            are started again, and can wait again.
             """,
         "inputSchema": [
             "type": "object",
@@ -1323,9 +1331,12 @@ public actor AppService {
                 "where": [
                     "type": "object",
                     "description": """
-                        Narrow them by their details, e.g. {"workflow": "nightly"} or \
-                        {"agent": "Fix login"}. A list means any of them, e.g. \
-                        {"labels": "deploy", "outcome": ["done", "nothing_to_do"]}.
+                        Narrow them by a filter: branch on branch.moved, e.g. {"branch": "main"}, \
+                        or why on person.away and person.back. A list means any of them, \
+                        e.g. {"why": ["locked", "idle"]}. For an MCP server's event, such as \
+                        pr.merged, these are the server's own filters, sent to it, e.g. \
+                        {"repo": "owner/name"}; server narrows which servers. Nothing else \
+                        narrows an event.
                         """,
                 ],
                 "from": [
@@ -1337,7 +1348,10 @@ public actor AppService {
                 ],
                 "until_minutes": [
                     "type": "integer",
-                    "description": "Give up after this many minutes, 1 to 1440. You are started again either way.",
+                    "description": """
+                        Required to wait: give up after this many minutes, 1 to 1440. You are \
+                        started again either way, and can wait again.
+                        """,
                 ],
                 "agents": [
                     "type": "array",

@@ -42,6 +42,13 @@ public enum EventWords {
         "until_minutes has to be from \(EventWait.deadlineMinutes.lowerBound) to \(EventWait.deadlineMinutes.upperBound)."
     }
 
+    /// A wait with no deadline, refused (#572): nothing else is sure to end it.
+    public static func deadlineRequired() -> String {
+        "until_minutes is required: say how long to wait, from \(EventWait.deadlineMinutes.lowerBound) minute "
+            + "to 24 hours (\(EventWait.deadlineMinutes.upperBound)). When it runs out you are started again "
+            + "and can wait again."
+    }
+
     /// Names only a Mac raises, said on a host that is not one (#372).
     public static func neverHere(_ names: [String]) -> String {
         let one = names.count == 1
@@ -49,18 +56,33 @@ public enum EventWords {
             + "a Linux server, so \(one ? "it never happens" : "they never happen") here."
     }
 
-    /// A server's event, or a name the app does not know, that nothing in the project is
-    /// asking any server for: it can only end the wait if something starts asking.
-    public static func unheard(_ names: [String], heard: [String]) -> String {
-        let one = names.count == 1
-        let them = one ? "it" : "them"
-        let guesses = names.compactMap { name in EventPatternProblem.closest(to: name).map { "\(name) → \($0)" } }
-        return "\(names.joined(separator: ", ")) \(one ? "is not an event" : "are not events") the app raises, "
-            + "and no workflow in this project triggers on \(them), so no MCP server is asked for \(them) "
-            + "and this wait may never end. A server's event reaches a wait only while a workflow here has it "
-            + "under on:."
-            + (heard.isEmpty ? "" : " Server events heard here now: \(heard.joined(separator: ", ")).")
-            + (guesses.isEmpty ? "" : " Did you mean \(guesses.joined(separator: ", "))?")
+    // MARK: Servers' events in a wait (#577)
+
+    /// The subscriptions a wait made, said first in its answer: "Subscribed to
+    /// pr.merged on ci (repo alexec/Agents)."
+    public static func subscribed(_ events: [WaitServerEvent]) -> String {
+        let made = events.filter { !$0.servers.isEmpty }
+        guard !made.isEmpty else { return "" }
+        return "Subscribed to \(made.map(\.label).joined(separator: " and ")). "
+    }
+
+    /// No server here offers a name: refused, with what each server does offer, and the
+    /// app's own name it may have meant.
+    public static func notOffered(_ name: String, offers: [String: [String]]) -> String {
+        var words = "No server here offers \(name)."
+        for (server, names) in offers.sorted(by: { $0.key < $1.key }) {
+            words += names.isEmpty ? " \(server) offers no events." : " \(server) offers \(names.joined(separator: ", "))."
+        }
+        if offers.isEmpty { words += " This project has no MCP server that offers events." }
+        if let guess = EventPatternProblem.closest(to: name) { words += " Did you mean \(guess)?" }
+        return words
+    }
+
+    /// A name only servers that could not be asked might offer: kept, since they may come
+    /// back, and subscribed to when they do.
+    public static func serversMayComeBack(_ name: String, why: [String]) -> String {
+        "\(name) could not be checked: \(why.joined(separator: " ")) The wait is kept, and subscribes when "
+            + "the server can be asked; if it never offers \(name), this wait never ends. "
     }
 
     public static let nothingNamed = "Say what to wait for in events, e.g. [\"agent.finished\"]. "

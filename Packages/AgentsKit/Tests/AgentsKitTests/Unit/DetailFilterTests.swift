@@ -7,28 +7,18 @@ import Testing
 struct DetailFilterTests {
     @Test func aListMatchesAnyOfItsValues() throws {
         let filter = try #require(DetailFilter(anyOf: ["done", "nothing_to_do"]))
-        #expect(filter.matches("done", isSet: false))
-        #expect(filter.matches("nothing_to_do", isSet: false))
-        #expect(!filter.matches("stuck", isSet: false))
-        #expect(!filter.matches(nil, isSet: false))
+        #expect(filter.matches("done"))
+        #expect(filter.matches("nothing_to_do"))
+        #expect(!filter.matches("stuck"))
+        #expect(!filter.matches(nil))
+        // The whole value, exactly: a comma-joined one is not a set (#574).
+        #expect(!DetailFilter("bug").matches("bug,p1"))
     }
 
     @Test func aListOfOneIsTheSingleValue() {
         #expect(DetailFilter(anyOf: ["done"]) == DetailFilter("done"))
         #expect(DetailFilter(anyOf: ["done"])?.single == "done")
         #expect(DetailFilter(anyOf: []) == nil)
-    }
-
-    @Test func aSetDetailMatchesWhenItHoldsAnyValueComparedAsLabelsAre() throws {
-        let bug: DetailFilter = "Bug"
-        #expect(bug.matches("bug,p1", isSet: true))
-        #expect(!bug.matches("bugfix,p1", isSet: true))
-        #expect(!bug.matches("", isSet: true))
-        #expect(DetailFilter("needs review").matches("needs review,p1", isSet: true))
-        let either = try #require(DetailFilter(anyOf: ["bug", "regression"]))
-        #expect(either.matches("regression", isSet: true))
-        // Not a set: the whole value, exactly.
-        #expect(!bug.matches("bug", isSet: false))
     }
 
     @Test func itIsWrittenAsTheStatusLineTheCapsuleAndTheFileSayIt() throws {

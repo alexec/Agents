@@ -9,6 +9,7 @@ import type {
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, DiskState, StoreNotes,
   ChatProjectState, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
+  GuardedChange, GuardedChangeReading,
 } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -61,6 +62,8 @@ export interface TurnDetailPage {
   entries: TranscriptEntry[];
   /** Where this page starts. Earlier steps of the turn exist when this is past the turn's start. */
   firstIndex: number;
+  /** The read failed: said as such, with Try Again, rather than as a turn with nothing in it (#544). */
+  failed?: true;
 }
 
 /** Puts `id` among the newest `cap` entries of `held`, letting the oldest go (#291). */
@@ -1334,7 +1337,8 @@ export class Store extends Work {
     const page = await this.link.call("agents/transcript", {
       agentID: session as never, before: range.end, limit: Math.min(span, turnPage), from: range.start,
     }, host).catch(() => null);
-    return { entries: page?.entries ?? [], firstIndex: page?.firstIndex ?? range.start };
+    if (!page) return { entries: [], firstIndex: range.start, failed: true };
+    return { entries: page.entries, firstIndex: page.firstIndex };
   }
 
   // MARK: What the browser sends (071 US3)
@@ -1390,6 +1394,36 @@ export class Store extends Work {
     const summary = await this.act("projects/unarchive", { folder: folder as never }, host);
     if (summary) this.upsertProject(summary, host);
     return summary;
+  }
+
+  /**
+   * The changes to a project's own files waiting for Keep or Undo (#531): those asked in `session`,
+   * the agent that made them, or with no session, those asked of the project `folder` on its page.
+   */
+  guardedChanges(host: string, where: { session: string } | { folder: string }): { folder: string; change: GuardedChange }[] {
+    const found: { folder: string; change: GuardedChange }[] = [];
+    for (const summary of this.projects.value[host] ?? []) {
+      if ("folder" in where && folderKey(summary.project.folder) !== folderKey(where.folder)) continue;
+      for (const change of summary.guardedChanges ?? []) {
+        const askedIn = change.askedIn ?? null;
+        if ("session" in where ? askedIn === where.session : askedIn === null) {
+          found.push({ folder: summary.project.folder, change });
+        }
+      }
+    }
+    return found;
+  }
+
+  /** What a guarded file was and is (#502), for the person deciding. */
+  async readGuardedChange(host: string, folder: string, change: GuardedChange): Promise<GuardedChangeReading | null> {
+    return await this.act("projects/readGuardedChange", { folder: folder as never, path: change.path }, host);
+  }
+
+  /** Keep (the change is used from now on) or Undo (the approved copy goes back), of the file as it was shown. */
+  async settleGuardedChange(host: string, folder: string, reading: GuardedChangeReading, keep: boolean): Promise<void> {
+    const params = { folder: folder as never, path: reading.path, ...(reading.digest !== undefined ? { digest: reading.digest } : {}) };
+    const summary = await this.act(keep ? "projects/keepGuardedChange" : "projects/undoGuardedChange", params, host);
+    if (summary) this.upsertProject(summary, host);
   }
 
   /** A project pinned to the top of the sidebar, or not, as the window's Pin and Unpin. */
@@ -1584,9 +1618,12 @@ export class Store extends Work {
     }, host);
   }
 
+  /** Whether the host took it, so a caller can leave the chat only when it did (#586). */
   async perform(host: string, agentID: string,
-                action: "agents/stop" | "agents/park" | "agents/unpark" | "agents/archive" | "agents/unarchive"): Promise<void> {
-    await this.acting(agentID, action, () => this.act(action, { agentID: agentID as UUID }, host));
+                action: "agents/stop" | "agents/park" | "agents/unpark" | "agents/archive" | "agents/unarchive"): Promise<boolean> {
+    let done = false;
+    await this.acting(agentID, action, async () => { done = await this.act(action, { agentID: agentID as UUID }, host) !== null; });
+    return done;
   }
 
   // MARK: Files, changes and live pages (071 US4)
@@ -1968,6 +2005,14 @@ export class Store extends Work {
         .sort((a: ActivityEvent, b: ActivityEvent) => b.position - a.position);
       this.events.value = { ...this.events.value, [host]: { ...page, events: merged } };
     }
+  }
+
+  /** Events ▸ Waiting now's ✕ (#541): the wait ends and nothing starts the agent again for it. */
+  async cancelWait(host: string, agentID: string): Promise<void> {
+    const waiting = await this.act("events/cancelWait", { agentID: agentID as UUID }, host);
+    const held = this.events.value[host];
+    if (waiting && held) this.events.value = { ...this.events.value, [host]: { ...held, waiting } };
+    await this.loadEvents(host);
   }
 
   /** Appends one older page without losing the current head or waiting rows. */

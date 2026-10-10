@@ -87,26 +87,20 @@ private struct HostedMCPRow: View {
     }
 }
 
-/// The way into MCP Servers under Activity: how many run, and a red dot when one stopped
-/// while in use.
+/// The way into MCP Servers under Activity.
 struct MCPServersRow: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
+        // The title alone (#587): how many run is the tooltip's, and one stopped turns the
+        // row's icon red (`activityIcon(_:warns:)`).
+        let words = HostedMCPWords.tally(model.hostedMCP?.servers ?? [])?.words
         HStack(alignment: .firstTextBaseline) {
             Text("MCP Servers").foregroundStyle(.primary)
             Spacer()
-            if let tally = HostedMCPWords.tally(model.hostedMCP?.servers ?? []) {
-                HStack(spacing: 4) {
-                    if tally.stopped {
-                        Circle().fill(StateTint.failure.style(or: .primary)).frame(width: 8, height: 8)
-                    }
-                    Text(tally.words).monospacedDigit()
-                }
-                .appText(.fine)
-                .foregroundStyle(.secondary)
-            }
         }
-        .help("The MCP servers this Mac runs once for every agent, and why each last stopped")
+        .help(words.map { "\($0). The MCP servers this Mac runs once for every agent, and why each last stopped" }
+              ?? "The MCP servers this Mac runs once for every agent, and why each last stopped")
+        .accessibilityValue(words ?? "")
     }
 }

@@ -49,7 +49,7 @@ public enum Routing {
         guard outstanding else { return Decision(to: nil, alert: false, wait: false) }
 
         // 1. Being watched, anywhere.
-        if presences.values.contains(where: { $0.isWatching(need.agentID) }) {
+        if let agentID = need.agentID, presences.values.contains(where: { $0.isWatching(agentID) }) {
             return Decision(to: nil, alert: false, wait: false)
         }
 

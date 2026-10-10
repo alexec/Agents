@@ -40,7 +40,7 @@ Check the build and say whether it is green.
 | `on:` `agent-asked-form` | No settings | Runs when an agent in this project asks you to fill in a form. |
 | `on:` `agent-stopped` | No settings | Runs when an agent in this project stops without finishing. |
 | `on:` `workflow-completed` | Optionally `id:`, a workflow's id | Runs when that workflow's run finishes, or when any workflow's run finishes if there is no `id:`. |
-| `on:` an event name, such as `branch.moved` or `custom.build_green` | Optionally the event's details, as filters | Runs when that event happens. Any name on [Events](events.md) works, or a subject with `.*`, such as `agent.*`, for all of its events. Under the name, list details to narrow it, such as `branch: main`. A detail can take a list, meaning any of them, such as `outcome: [done, nothing_to_do]`. A detail the event does not carry, or a value a detail cannot have, is an error in the file, naming the right ones. An event about this Mac runs matching workflows in every project. A name this version does not know is shown on the workflow's page and never runs. |
+| `on:` an event name, such as `branch.moved` or `custom.build_green` | Optionally the event's details, as filters | Runs when that event happens. Any name on [Events](events.md) works, or a subject with `.*`, such as `agent.*`, for all of its events. Under the name, list its filters to narrow it: `branch` on `branch.moved`, such as `branch: main`, and `why` on `person.away` and `person.back`. A filter can take a list, meaning any of them, such as `branch: [main, develop]`. Any other key, or a value a filter cannot have, is an error in the file, naming the right ones; the workflow never runs until it is fixed. An event about this Mac runs matching workflows in every project. A name this version does not know is shown on the workflow's page and never runs. |
 | `on:` a server's event, such as `checks.failed` | Optionally `server:`, and the event's own filters | Runs when an MCP server reports that event. Its name is `noun.verbed`, with no prefix, as the server names it. Without `server:`, it hears every MCP server this project can use that offers the name, including one added later. `server:` narrows it to one server's name, or a list of names. Every other key is the event's own filter, sent to the server as it is: a list is a list argument, not "any of". A filter the event doesn't take, or a value of the wrong type, is an error on the workflow's page, naming the filters it takes. A name whose noun is one of the app's subjects, such as `branch.created`, is never a server's event. See [Events from MCP servers](events.md#events-from-mcp-servers). |
 | `agent:` `new` | The default | Each run starts a new agent. |
 | `agent:` `standing` | | Each run goes to the workflow's own agent, which keeps its conversation from run to run. |
@@ -73,43 +73,42 @@ agent: new
 Deploy the docs, then say what you deployed.
 ```
 
-To start a new agent for each PDF or Markdown file dropped into the project's
-`.agents/dropbox/review/` (see [Hand files to a workflow](../how-to/hand-files-to-a-workflow.md)):
+To start a new agent for each file dropped into the project's `.agents/dropbox/` (see
+[Hand files to a workflow](../how-to/hand-files-to-a-workflow.md)):
 
 ```markdown
 ---
 name: Review what lands in the drop box
 on:
-  - dropbox.file_added:
-      folder: review
-      extension: [pdf, md]
+  - dropbox.file_added
 agent: new
 ---
 
-Read the dropped file and review it. Move it to .agents/dropbox/done/ when finished.
+If the dropped file is not a PDF or Markdown file, leave it and stop. Otherwise read it and
+review it, then move it out of .agents/dropbox/, to reviewed/.
 ```
+
+An arrival can't be narrowed by its folder or extension, so the prompt says which files to
+leave, and a file the agent is done with leaves the drop box: moved to a folder inside it, it
+would arrive again.
 
 A run started by an event no agent is behind, such as this one, is told the event at the end of
 its prompt, details and all, so the agent reads the file's `path` there.
 
-To narrow by more than one value, give a list. This one runs when an agent labelled `bug`
-finishes and is parked, and when the `nightly` workflow's agent ends `stuck` or
-`partly_done`:
+Only `branch` on `branch.moved` and `why` on `person.away` and `person.back` narrow an
+event (see [Names and filters](events.md#names-and-filters)). To narrow by more than one
+value, give a list. This one runs when `main` or a `release/` branch you name moves:
 
 ```markdown
 ---
-name: Write up bug fixes
+name: Check the release branches
 on:
-  - agent.finished:
-      labels: bug
-      afterwards: park
-  - workflow.completed:
-      workflow: nightly
-      outcome: [stuck, partly_done]
+  - branch.moved:
+      branch: [main, release/2.0]
 agent: new
 ---
 
-Write up what the agent that set this off changed, for the release notes.
+Check that the branch named in the event builds, and say what broke if it doesn't.
 ```
 
 To run a check once a batch of agents is done, rather than after each one, use

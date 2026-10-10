@@ -48,7 +48,7 @@ struct ChatTranscript: View {
     @State private var turnViews: [UUID: TurnDetail] = [:]
     /// Every entry of a stored turn once it has been opened, folded. Eight at a time:
     /// opening one lets the oldest opened one go (#285).
-    @State private var fetchedTurns: [UUID: [TranscriptItem]] = [:]
+    @State private var fetchedTurns: [UUID: FetchedTurn] = [:]
     @State private var fetchedOrder: [UUID] = []
     /// Stored turns whose entries did not come when opened: said, and asked for again
     /// on Try Again, never kept as a turn with no steps (#400).
@@ -64,6 +64,28 @@ struct ChatTranscript: View {
         var storedTurns: [ChatTurn] = []
         var items: [TranscriptItem] = []
         var itemTurns: [ChatTurn] = []
+    }
+
+    /// A stored turn's entries as far back as they have been fetched, folded once.
+    private struct FetchedTurn {
+        let entries: [TranscriptEntry]
+        /// Where `entries` starts in the transcript: past the turn's start when it has
+        /// earlier steps not yet asked for (#519).
+        let firstIndex: Int
+        /// The ask is the turn's own and is drawn already.
+        let items: [TranscriptItem]
+
+        init(entries: [TranscriptEntry], firstIndex: Int) {
+            self.entries = entries
+            self.firstIndex = firstIndex
+            let items = TranscriptEntry.display(entries)
+            self.items = items.first?.isPersonsAsk == true ? Array(items.dropFirst()) : items
+        }
+
+        func hasEarlier(than turn: ChatTurn) -> Bool {
+            guard let range = turn.range else { return false }
+            return firstIndex > range.lowerBound
+        }
     }
     /// Set once the pane is sitting at the foot of the conversation. Until then the
     /// top of the list is on screen only because nothing has moved yet, and taking
@@ -177,11 +199,13 @@ struct ChatTranscript: View {
                     ForEach(rows) { turn in
                         TurnView(turn: turn,
                                  detail: turnViews[turn.id] ?? defaultDetail,
-                                 fetched: fetchedTurns[turn.id],
+                                 fetched: fetchedTurns[turn.id]?.items,
+                                 hasEarlier: fetchedTurns[turn.id]?.hasEarlier(than: turn) ?? false,
                                  fetchFailed: failedTurns.contains(turn.id),
                                  isLive: turn.id == liveID,
                                  toggle: { toggle(turn) },
-                                 fetch: { await fetch(turn) })
+                                 fetch: { await fetch(turn) },
+                                 fetchEarlier: { await fetchEarlier(turn) })
                             .equatable()
                             .id(turn.id)
                     }
@@ -471,12 +495,12 @@ struct ChatTranscript: View {
         failedTurns.remove(turn.id)
         let answer = await actions.turnEntries(agent.id, range)
         guard !Task.isCancelled else { return }
-        guard let loaded = answer else {
+        guard let page = answer else {
             failedTurns.insert(turn.id)
             return
         }
-        let items = TranscriptEntry.display(loaded)
-        fetchedTurns[turn.id] = items.first?.isPersonsAsk == true ? Array(items.dropFirst()) : items
+        fetchedTurns[turn.id] = FetchedTurn(entries: page.entries,
+                                            firstIndex: max(range.lowerBound, page.firstIndex))
         fetchedOrder.removeAll { $0 == turn.id }
         fetchedOrder.append(turn.id)
         while fetchedOrder.count > Self.fetchedKept {
@@ -486,6 +510,21 @@ struct ChatTranscript: View {
             // shows the summary it already had (#285).
             if turnViews[dropped]?.showsSteps == true { turnViews[dropped] = .outcome }
         }
+    }
+
+    /// The page of a stored turn before the one held, put in front of it (#519). A turn
+    /// longer than a host gives in one answer used to open at its last page with
+    /// nothing to say the start of it was missing.
+    private func fetchEarlier(_ turn: ChatTurn) async {
+        guard let range = turn.range, let held = fetchedTurns[turn.id], held.hasEarlier(than: turn) else { return }
+        let answer = await actions.turnEntries(agent.id, range.lowerBound..<held.firstIndex)
+        guard !Task.isCancelled, let page = answer, let still = fetchedTurns[turn.id],
+              still.firstIndex == held.firstIndex else { return }
+        let seen = Set(still.entries.map(\.id))
+        fetchedTurns[turn.id] = FetchedTurn(entries: page.entries.filter { !seen.contains($0.id) } + still.entries,
+                                            firstIndex: page.entries.isEmpty
+                                                ? range.lowerBound
+                                                : max(range.lowerBound, page.firstIndex))
     }
 
     /// Whether the conversation's last turn is still going.

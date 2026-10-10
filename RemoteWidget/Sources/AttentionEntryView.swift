@@ -256,6 +256,7 @@ private struct LargeRow: View {
         case .permission: "asks permission"
         case .elicitation: "asks a question"
         case .report: "has a report"
+        case .guardedChange: "asks to keep a change"
         case nil: "finished, unread"
         }
         let waited = session.since.formatted(.relative(presentation: .named, unitsStyle: .wide))
@@ -307,13 +308,14 @@ private struct SessionRow: View {
             .joined(separator: ", ")
     }
 
-    /// The same three shapes the app draws a need as, so a row here and a row in the app
+    /// The same shapes the app draws a need as, so a row here and a row in the app
     /// are the same thing seen twice.
     static func symbol(for kind: Need.Kind?) -> String? {
         switch kind {
         case .permission: "hand.raised.fill"
         case .elicitation: "questionmark.circle.fill"
         case .report: "exclamationmark.bubble.fill"
+        case .guardedChange: "exclamationmark.shield.fill"
         case nil: nil
         }
     }

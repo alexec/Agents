@@ -114,3 +114,16 @@ test("Markdown in blocks draws as it does whole, at every length a reply grows t
   assert.equal(markdownBlocks(long).length, 50, "a reply of paragraphs is a block each");
   assert.equal(markdownBlocks(long + " more").slice(0, 49).join(""), markdownBlocks(long).slice(0, 49).join(""), "the finished ones stay");
 });
+
+test("a file: link opens the file where the page says how, and nowhere else (#548)", () => {
+  const opened = [];
+  const nodes = renderMarkdown("see [Main](file:///Users/a/My%20App/main.swift) and [x](file://elsewhere/etc/passwd)",
+    undefined, (location) => opened.push(location.path));
+  const out = show(nodes);
+  assert.match(out, /<button type="button" class="link reading" title="\/Users\/a\/My App\/main.swift" onClick="[^"]*">Main<\/button>/);
+  assert.doesNotMatch(out, /href="file:/);
+  assert.doesNotMatch(out, /title="\/etc/);
+  const button = nodes[0].props.children.find((child) => child?.type === "button");
+  button.props.onClick();
+  assert.deepEqual(opened, ["/Users/a/My App/main.swift"]);
+});

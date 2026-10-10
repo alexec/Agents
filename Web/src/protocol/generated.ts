@@ -333,6 +333,10 @@ export interface BranchSummary {
   remote?: string;
 }
 
+export interface CancelWaitRequest {
+  agentID: UUID;
+}
+
 export interface CarriedSetting {
   optionID: string;
   name: string;
@@ -762,6 +766,7 @@ export interface EventWait {
   since: WireDate;
   ending?: EventWaitEnding;
   resumePromptID?: UUID;
+  serverEvents?: WaitServerEvent[];
 }
 
 export type EventWaitEnding =
@@ -848,6 +853,37 @@ export type GitView =
   | { shared: { since: string } }
   | { sharedFromHead: Record<string, never> }
   | { unavailable: ChangesUnavailable };
+
+export interface GuardedChange {
+  path: string;
+  digest?: string;
+  changedBy: string[];
+  changedByIDs: UUID[];
+  byGit: boolean;
+  since: WireDate;
+  askedIn?: UUID;
+}
+
+export interface GuardedChangeReading {
+  path: string;
+  digest?: string;
+  approved?: string;
+  current?: string;
+  lines: GuardedDiffLine[];
+}
+
+export interface GuardedChangeRequest {
+  folder: URLString;
+  path: string;
+  digest?: string;
+}
+
+export interface GuardedDiffLine {
+  kind: GuardedDiffLineKind;
+  text: string;
+}
+
+export type GuardedDiffLineKind = "same" | "removed" | "added";
 
 export interface Headline {
   h1: string;
@@ -936,6 +972,12 @@ export interface ListRequest {
   query?: string;
 }
 
+export interface MCPEventTrigger {
+  event: string;
+  servers?: string[];
+  arguments: Record<string, JSONValue>;
+}
+
 export interface MCPServer {
   name: string;
   transport: MCPServerTransport;
@@ -989,7 +1031,7 @@ export type MoveTarget =
 
 export interface Need {
   id: NeedID;
-  agentID: UUID;
+  agentID?: UUID;
   folder: URLString;
   kind: NeedKind;
   raisedAt: WireDate;
@@ -1002,7 +1044,7 @@ export type NeedID =
   | { elicitation: UUID }
   | { report: { agentID: UUID; at: WireDate } };
 
-export type NeedKind = "permission" | "elicitation" | "report";
+export type NeedKind = "permission" | "elicitation" | "report" | "guardedChange";
 
 export interface OptionsRequest {
   runtimeID: string;
@@ -1203,6 +1245,7 @@ export interface ProjectSummary {
   unmeasuredAgents: number;
   retiredCount: number;
   isChat?: boolean;
+  guardedChanges?: GuardedChange[];
 }
 
 export interface ProjectsListRequest {
@@ -1724,6 +1767,11 @@ export type WaitEndingHow =
   | { archived: Record<string, never> }
   | { gone: Record<string, never> };
 
+export interface WaitServerEvent {
+  trigger: MCPEventTrigger;
+  servers: string[];
+}
+
 export interface WaitStatus {
   line: string;
   mark: string;
@@ -2009,6 +2057,7 @@ export interface Methods {
   "dropbox/put": { params: DropboxPutRequest; result: DropboxPutResponse };
   "elicitations/answer": { params: AnswerElicitationRequest; result: Empty };
   "elicitations/pending": { params: Empty; result: ElicitationRequest[] };
+  "events/cancelWait": { params: CancelWaitRequest; result: WaitingAgent[] };
   "events/list": { params: EventsListRequest; result: EventsPage };
   "files/browse": { params: FilesBrowseRequest; result: DirectoryListing };
   "files/list": { params: FilesListRequest; result: DirectoryListing };
@@ -2040,9 +2089,12 @@ export interface Methods {
   "projects/chatState": { params: Empty; result: ChatProjectState };
   "projects/clone": { params: CloneRequest; result: ProjectSummary };
   "projects/clones": { params: Empty; result: CloneSummary[] };
+  "projects/keepGuardedChange": { params: GuardedChangeRequest; result: ProjectSummary };
   "projects/list": { params: ProjectsListRequest; result: ProjectSummary[] };
+  "projects/readGuardedChange": { params: GuardedChangeRequest; result: GuardedChangeReading };
   "projects/setPinned": { params: SetPinnedRequest; result: ProjectSummary };
   "projects/unarchive": { params: ProjectRequest; result: ProjectSummary };
+  "projects/undoGuardedChange": { params: GuardedChangeRequest; result: ProjectSummary };
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
   "runtimes/allowances": { params: string | null; result: RuntimeAllowances };
   "runtimes/list": { params: Empty; result: RuntimeStatus[] };
@@ -2110,6 +2162,7 @@ export const MethodTarget = {
   "dropbox/put": "host",
   "elicitations/answer": "host",
   "elicitations/pending": "host",
+  "events/cancelWait": "host",
   "events/list": "host",
   "files/browse": "host",
   "files/list": "host",
@@ -2141,9 +2194,12 @@ export const MethodTarget = {
   "projects/chatState": "host",
   "projects/clone": "host",
   "projects/clones": "host",
+  "projects/keepGuardedChange": "host",
   "projects/list": "host",
+  "projects/readGuardedChange": "host",
   "projects/setPinned": "host",
   "projects/unarchive": "host",
+  "projects/undoGuardedChange": "host",
   "runtimes/accounts": "host",
   "runtimes/allowances": "host",
   "runtimes/list": "host",
@@ -2220,6 +2276,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BackgroundItem: { required: ["id", "kind", "name", "state", "canStop", "isStopping", "startedAt"], optional: ["taskType", "detail", "command", "parentID", "toolCallID", "outputFilePath", "summary", "lastToolName", "endedAt"] },
   Block: { required: ["waits"], optional: ["checkAgainAt", "wakeOn", "clearedAt", "clearedBy"] },
   BranchSummary: { required: ["name"], optional: ["remote"] },
+  CancelWaitRequest: { required: ["agentID"], optional: [] },
   CarriedSetting: { required: ["optionID", "name", "source"], optional: ["from", "to"] },
   ChangedFile: { required: ["path", "source", "state", "editCount", "beyondReported", "inProgress", "outsideFolder"], optional: ["relativePath", "added", "removed", "firstLine", "oldPath"] },
   ChangedFileDetail: { required: ["file", "edits"], optional: ["hunks", "whole"] },
@@ -2264,7 +2321,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   EntryNotification: { required: ["agentID", "entry"], optional: ["index", "oversized"] },
   Event: { required: ["position", "name", "at", "count", "scope", "sentence", "details", "chainDepth", "consequences"], optional: ["lastAt", "publisher", "message"] },
   EventPublisher: { required: ["agentID", "title"], optional: [] },
-  EventWait: { required: ["id", "patterns", "from", "since"], optional: ["deadline", "ending", "resumePromptID"] },
+  EventWait: { required: ["id", "patterns", "from", "since"], optional: ["deadline", "ending", "resumePromptID", "serverEvents"] },
   EventsListRequest: { required: ["limit"], optional: ["before", "scope", "groups"] },
   EventsPage: { required: ["events", "waiting", "hasMore"], optional: [] },
   FileMentionDTO: { required: ["path", "relativePath"], optional: [] },
@@ -2276,6 +2333,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FilesReadRequest: { required: ["agentID", "path"], optional: ["knownStamp"] },
   FilesWatchRequest: { required: ["agentID", "folder"], optional: [] },
   FolderHunk: { required: ["oldStart", "newStart", "noNewlineAtEnd", "lines"], optional: [] },
+  GuardedChange: { required: ["path", "changedBy", "changedByIDs", "byGit", "since"], optional: ["digest", "askedIn"] },
+  GuardedChangeReading: { required: ["path", "lines"], optional: ["digest", "approved", "current"] },
+  GuardedChangeRequest: { required: ["folder", "path"], optional: ["digest"] },
+  GuardedDiffLine: { required: ["kind", "text"], optional: [] },
   Headline: { required: ["h1", "h2", "h3"], optional: [] },
   HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive"] },
   HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
@@ -2288,13 +2349,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
   ListCursor: { required: ["lastActivityAt", "id"], optional: [] },
   ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query"] },
+  MCPEventTrigger: { required: ["event", "arguments"], optional: ["servers"] },
   MCPServer: { required: ["name", "transport"], optional: [] },
   MCPTriggerFailure: { required: ["code", "message", "since"], optional: [] },
   MCPTriggerStatus: { required: ["name", "state"], optional: ["server", "lastPolledAt", "lastEventAt", "missedSince", "failure", "retryAt"] },
   MarkRuntimeAvailable: { required: ["credentialKey"], optional: [] },
   MessageSender: { required: ["agentID", "title"], optional: [] },
   MissingFolder: { required: ["branchKept"], optional: [] },
-  Need: { required: ["id", "agentID", "folder", "kind", "raisedAt", "headline"], optional: [] },
+  Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID"] },
   OptionsRequest: { required: ["runtimeID", "cwd", "mcpServers"], optional: [] },
   OptionsResponse: { required: ["draftID", "options", "commands"], optional: [] },
   PagesChangedNotification: { required: ["folder", "folders"], optional: [] },
@@ -2321,7 +2383,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProjectDetection: { required: ["enabled", "paths"], optional: [] },
   ProjectPins: { required: ["folder", "pins"], optional: ["sessions", "workflows"] },
   ProjectRequest: { required: ["folder"], optional: [] },
-  ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: ["isChat"] },
+  ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: ["isChat", "guardedChanges"] },
   ProjectsListRequest: { required: ["includeArchived"], optional: [] },
   PromptRequest: { required: ["agentID", "text", "attachments", "from"], optional: ["sendID"] },
   QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface", "sender", "hops"] },
@@ -2379,6 +2441,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ViewShowRequest: { required: ["agentID", "server", "uri", "hash", "show"], optional: ["project"] },
   Wait: { required: ["agentID", "nameAtReport"], optional: ["ending"] },
   WaitEnding: { required: ["at", "how"], optional: [] },
+  WaitServerEvent: { required: ["trigger", "servers"], optional: [] },
   WaitStatus: { required: ["line", "mark", "cancellable"], optional: [] },
   WaitingAgent: { required: ["agentID", "title", "folder", "status"], optional: [] },
   WebRemoteStatus: { required: ["port", "served"], optional: ["reason", "detail"] },

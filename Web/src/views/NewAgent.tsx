@@ -30,6 +30,7 @@ import { OfflineStrip } from "./OfflineStrip";
 import { PromptMenus } from "./PromptMenus";
 import { BackToList } from "./BackToList";
 import { orderedProjects, projectLabel } from "./Sidebar";
+import { GuardedChangeCards } from "./GuardedChange";
 
 type Where = { kind: "project" } | { kind: "new" } | { kind: "existing"; root: string } | { kind: "branch"; name: string };
 
@@ -245,6 +246,8 @@ export function NewAgent({ store, host, folder, projectName, down }: {
         <p class="quiet" title={path}>{path} · {machine}</p>
       </div>
       <footer class="foot">
+        {/* A change to the project's own files that no session can be asked about (#531). */}
+        <GuardedChangeCards store={store} host={host} where={{ folder }} down={down || !store.hostIsOnline(host)} />
         <Prompt store={store} draftKey={draftKey} placeholder="What should it do?"
           capabilities={capabilities} disabled={down || !chosenRuntime || !store.hostIsOnline(host)} send={start}
           recipient={store.recipient(host)} starting commands={form.value.commands}

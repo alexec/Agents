@@ -1,5 +1,10 @@
 import AgentsKitCore
 import SwiftUI
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
 /// What the agent has said and done, one line at a time, the same on every screen (033).
 ///
@@ -41,6 +46,9 @@ struct TurnView: View, Equatable {
     let detail: TurnDetail
     /// A stored turn's own entries, once fetched.
     let fetched: [TranscriptItem]?
+    /// Whether the fetched entries start after the turn does: a turn longer than a
+    /// host gives in one answer opens at its last page (#519).
+    var hasEarlier = false
     /// They were asked for and did not come (#400).
     var fetchFailed = false
     /// Whether this is the turn still going.
@@ -48,10 +56,12 @@ struct TurnView: View, Equatable {
     let toggle: () -> Void
     /// Fetch a stored turn's entries, for a turn drawn with its steps.
     let fetch: () async -> Void
+    /// Fetch the page of its steps before the ones held.
+    var fetchEarlier: () async -> Void = {}
 
     nonisolated static func == (a: TurnView, b: TurnView) -> Bool {
         a.turn == b.turn && a.detail == b.detail && a.fetched == b.fetched && a.fetchFailed == b.fetchFailed
-            && a.isLive == b.isLive
+            && a.hasEarlier == b.hasEarlier && a.isLive == b.isLive
     }
 
     var body: some View {
@@ -85,6 +95,7 @@ struct TurnView: View, Equatable {
                 } else if waiting {
                     ProgressView().controlSize(.small)
                 } else {
+                    if hasEarlier { EarlierStepsControl(fetch: fetchEarlier) }
                     // In the turn's own margin: no rule and no indent (#148).
                     VStack(alignment: .leading, spacing: 10) {
                         ForEach(steps) { StepRow(item: $0, isOpen: detail == .details) }
@@ -146,6 +157,39 @@ private struct StepsControl: View {
         .onHover { isHovering = $0 }
         .help(isOpen ? "Hide this turn's steps" : "Show every step of this turn")
         .accessibilityLabel(words)
+    }
+}
+
+/// "Earlier steps": the start of a turn too long to come in one answer (#519). Without
+/// it, the steps began part-way through with nothing to say so.
+private struct EarlierStepsControl: View {
+    let fetch: () async -> Void
+    @State private var isFetching = false
+
+    var body: some View {
+        Button {
+            guard !isFetching else { return }
+            isFetching = true
+            Task {
+                await fetch()
+                isFetching = false
+            }
+        } label: {
+            Text("Earlier steps")
+                .appText(.fine)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 8)
+                #if os(iOS)
+                .frame(minHeight: 32)
+                #else
+                .padding(.vertical, 3)
+                #endif
+                .background { Capsule().strokeBorder(.quaternary) }
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(isFetching)
+        .help("Show the steps of this turn before these")
     }
 }
 
@@ -212,6 +256,7 @@ private struct EntryRow: View {
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .copiesMessage(entry)
             } else if from == .agent {
                 // Another agent's message (#560): a prompt like the person's, at the right,
                 // but named as the sender's so it is never taken for theirs.
@@ -222,6 +267,7 @@ private struct EntryRow: View {
                         .appText(.reading)
                         .padding(12)
                         .paperWell(in: RoundedRectangle(cornerRadius: 12))
+                        .copiesMessage(entry)
                 }
                 .padding(.leading, 60)
                 .frame(maxWidth: .infinity, alignment: .trailing)
@@ -232,6 +278,7 @@ private struct EntryRow: View {
                     .appText(.reading)
                     .padding(12)
                     .paperWell(in: RoundedRectangle(cornerRadius: 12))
+                    .copiesMessage(entry)
                     .padding(.leading, 60)
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
@@ -239,6 +286,7 @@ private struct EntryRow: View {
         case .agentMessage(_, let text, let blocks):
             BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
                 .appText(.reading)
+                .copiesMessage(entry)
 
         case .agentThought(_, let text):
             Text(text)
@@ -881,5 +929,39 @@ struct WrappingHStack: Layout {
         }
         if !row.items.isEmpty { rows.append(row) }
         return rows
+    }
+}
+
+extension View {
+    /// Copy Message on a message (#519): what it says, whole and as written, onto the
+    /// pasteboard. Selecting across a reply's paragraphs and code blocks was the only
+    /// way before, and at Outcome what is drawn is not always all there is.
+    func copiesMessage(_ entry: TranscriptEntry) -> some View {
+        modifier(CopiesMessage(text: entry.copiedText))
+    }
+}
+
+private struct CopiesMessage: ViewModifier {
+    let text: String?
+
+    func body(content: Content) -> some View {
+        if let text {
+            content
+                .contextMenu {
+                    Button("Copy Message") { Self.copy(text) }
+                }
+                .accessibilityAction(named: "Copy Message") { Self.copy(text) }
+        } else {
+            content
+        }
+    }
+
+    static func copy(_ text: String) {
+        #if os(macOS)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        #else
+        UIPasteboard.general.string = text
+        #endif
     }
 }

@@ -78,3 +78,36 @@ test("Open in Files is offered unless the file is gone", () => {
   assert.equal(canOpenInFiles(file("deleted")), false);
   assert.equal(canOpenInFiles(undefined), true);
 });
+
+const { wordMarks, markWords, tokens } = await load("src/model/diff.ts");
+
+test("a line in words: words, spaces and each other character alone (WordDiff.tokens)", () => {
+  assert.deepEqual(tokens("let x = f(a_1);").map((t) => t.text), ["let", " ", "x", " ", "=", " ", "f", "(", "a_1", ")", ";"]);
+});
+
+test("the words that changed are marked on each side, neighbours merged", () => {
+  assert.deepEqual(wordMarks("let x = foo(bar);", "let x = baz(qux);"), { old: [[8, 11], [12, 15]], next: [[8, 11], [12, 15]] });
+  assert.deepEqual(wordMarks("call(a)", "call(a, b)"), { old: [], next: [[6, 9]] });
+  assert.deepEqual(wordMarks("foo(bar", "x"), null, "too little in common is a rewrite");
+});
+
+test("offsets are UTF-16, as the window's are", () => {
+  assert.deepEqual(wordMarks("say 😀 hi", "say 😀 yo"), { old: [[7, 9]], next: [[7, 9]] });
+});
+
+test("too long a line is not compared", () => {
+  const long = "a ".repeat(600);
+  assert.equal(wordMarks(long, long + "b"), null);
+});
+
+test("removed and added lines of a block pair first with first (LineDiff.markWords)", () => {
+  const rows = markWords(lineDiff("a\nlet x = 1;\nlet y = 2;\nz", "a\nlet x = 3;\nlet y = 2;\nnew\nz"));
+  assert.deepEqual(rows.map((r) => [r.kind[0], r.text, r.changed]), [
+    ["c", "a", undefined],
+    ["r", "let x = 1;", [[8, 9]]],
+    ["a", "let x = 3;", [[8, 9]]],
+    ["c", "let y = 2;", undefined],
+    ["a", "new", undefined],
+    ["c", "z", undefined],
+  ]);
+});

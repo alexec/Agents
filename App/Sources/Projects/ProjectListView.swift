@@ -47,6 +47,16 @@ struct ProjectListView: View {
         SidebarOrder.projects(model.liveProjects, servers: model.hosts.servers)
     }
 
+    /// No runtime can be started on: Runtimes' icon says so in red (#587).
+    private var runtimesFailing: Bool {
+        RuntimeTally(model.runtimes, allowances: model.runtimeAllowances)?.noneWorking == true
+    }
+
+    /// A hosted server stopped while in use: MCP Servers' icon says so in red (#587, #589).
+    private var mcpServersStopped: Bool {
+        HostedMCPWords.tally(model.hostedMCP?.servers ?? [])?.stopped == true
+    }
+
     var body: some View {
         List(selection: $picked) {
             // What wants the person, across every project and host (#495): Things'
@@ -67,11 +77,12 @@ struct ProjectListView: View {
                     .appText(.supporting).sidebarInk(.events).tag(SidebarItem.events)
                 ResourcesRow().activityIcon("square.stack.3d.up")
                     .appText(.supporting).sidebarInk(.resources).tag(SidebarItem.resources)
-                RuntimesRow().activityIcon("cpu")
+                RuntimesRow().activityIcon("cpu", warns: runtimesFailing)
                     .appText(.supporting).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
-                MCPServersRow().activityIcon("server.rack")
+                MCPServersRow().activityIcon("server.rack", warns: mcpServersStopped)
                     .appText(.supporting).sidebarInk(.mcpServers).tag(SidebarItem.mcpServers)
-                SpendingRow(selection: $selection).activityIcon("dollarsign.circle")
+                SpendingRow(selection: $selection).activityIcon("dollarsign.circle",
+                                                                warns: model.costState?.dayIsCloseToFull == true)
                     .appText(.supporting).sidebarInk(.spending).tag(SidebarItem.spending)
             } header: {
                 // The size of every other group's heading (#495).
@@ -363,8 +374,8 @@ private struct ProjectFold: View {
                     // the group.
                     let archived = fold.archivedCount(summary) + fold.archivedWorkflows.count
                     if archived > 0 {
-                        ProjectPageRow(title: "Archived", systemImage: "archivebox",
-                                       count: archived, item: .archive(key))
+                        ProjectPageRow(title: "Archived", systemImage: "archivebox", item: .archive(key))
+                            .help("\(archived) archived")
                     }
                 }
             } header: {
@@ -689,29 +700,28 @@ private struct SpendingRow: View {
     @Environment(AppModel.self) private var model
     @Binding var selection: SidebarItem?
 
-    private var isPicked: Bool { selection == .spending }
-
     var body: some View {
+        // The title alone (#587): the day's figure and what is left are the tooltip's,
+        // and near the limit the row's icon turns red (`activityIcon(_:warns:)`).
         HStack(alignment: .firstTextBaseline) {
             Text("Cost").foregroundStyle(.primary)
             Spacer()
-            VStack(alignment: .trailing, spacing: 1) {
-                if let today {
-                    Text(today).monospacedDigit()
-                }
-                // Nothing when there is no limit: headroom that does not exist is
-                // not a thing to draw an empty gauge for.
-                if let state = model.costState, let left = state.dayHeadroom,
-                   let daily = state.limits.daily {
-                    Text("\(left.money(in: daily.currency)) left")
-                }
-            }
-            .appText(.fine)
-            .foregroundStyle(foreground)
         }
-        .help(today == nil
-              ? "What all of the work has cost"
-              : "What every agent has cost today. Opens Cost.")
+        .help(help)
+        .accessibilityValue(figures ?? "")
+    }
+
+    /// Today's cost, and what is left of a daily limit where there is one.
+    private var figures: String? {
+        guard let today else { return nil }
+        if let state = model.costState, let left = state.dayHeadroom, let daily = state.limits.daily {
+            return "\(today) today, \(left.money(in: daily.currency)) left"
+        }
+        return "\(today) today"
+    }
+
+    private var help: String {
+        figures.map { "\($0). What every agent has cost. Opens Cost." } ?? "What all of the work has cost"
     }
 
     /// This Mac's day and every server's, as one figure: what the work cost is the
@@ -720,16 +730,6 @@ private struct SpendingRow: View {
     private var today: String? {
         guard let state = model.costState else { return nil }
         return Cost.total(of: state.today.merging(model.serversToday, uniquingKeysWith: +))
-    }
-
-    /// Colour means the limit is about to bite. The app's existing threshold for a
-    /// nearly full context, not a second number to learn. A picked row is drawn on the
-    /// selection colour, where red on blue is neither legible nor a warning anybody
-    /// reads.
-    private var foreground: AnyShapeStyle {
-        if isPicked { return AnyShapeStyle(.primary) }
-        return (model.costState?.dayIsCloseToFull == true ? StateTint.failure : .none)
-            .style(or: .secondary)
     }
 }
 

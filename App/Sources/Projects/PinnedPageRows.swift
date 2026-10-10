@@ -41,12 +41,9 @@ private struct PinnedPageRow: View {
             Text(pin.title)
                 .lineLimit(1)
                 .foregroundStyle(pin.missing ? .secondary : .primary)
+            // Nothing at its end (#587), which is only a session's: missing is the grey
+            // title and the tooltip's why.
             Spacer(minLength: 4)
-            if pin.missing {
-                Text("Missing")
-                    .appText(.fine)
-                    .foregroundStyle(.tertiary)
-            }
         }
         .appText(.supporting)
         .padding(.vertical, 2)

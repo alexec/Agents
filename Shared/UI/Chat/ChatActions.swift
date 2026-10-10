@@ -32,9 +32,12 @@ struct ChatActions {
     var subagentSteps: (@MainActor (String) -> Void)? = nil
     /// Open what a background task printed, from its output file (057).
     var backgroundOutput: (@MainActor (BackgroundItem) -> Void)? = nil
-    /// Every entry of a finished turn, by where it sits in the transcript, for a turn
-    /// the chat opens from its summary. Nil when they did not come (#400).
-    var turnEntries: @MainActor (UUID, Range<Int>) async -> [TranscriptEntry]? = { _, _ in [] }
+    /// A finished turn's entries, by where it sits in the transcript, for a turn the
+    /// chat opens from its summary: the last page of them, whose `firstIndex` says
+    /// whether there are earlier steps to ask for (#519). Nil when they did not come (#400).
+    var turnEntries: @MainActor (UUID, Range<Int>) async -> TranscriptPage? = { _, range in
+        TranscriptPage(firstIndex: range.lowerBound, total: range.upperBound, entries: [])
+    }
     /// Ask again for the open chat's history, after it did not load (#400).
     var reloadTranscript: @MainActor () async -> Void = {}
     /// The sandbox card's two answers (064), for the open agent. Nil offers neither.

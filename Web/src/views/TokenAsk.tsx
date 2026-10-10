@@ -4,7 +4,8 @@
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import { keyWords } from "../model/credentials";
-import { hostLabel, Modal } from "./NewProject";
+import { hostLabel } from "./NewProject";
+import { Modal } from "./Modal";
 
 export function TokenAskDialog({ store }: { store: Store }) {
   const ask = store.tokenAsk.value;

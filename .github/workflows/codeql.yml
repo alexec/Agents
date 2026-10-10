@@ -11,11 +11,12 @@
 #
 name: "CodeQL Advanced"
 
+# Nightly, not on every push to main (#595): the Swift scan takes a macOS runner, and with
+# a merge every few minutes it kept pull requests queued behind it.
 on:
-  push:
-    branches: [ "main" ]
   schedule:
-    - cron: '37 14 * * 6'
+    - cron: '37 9 * * *'
+  workflow_dispatch:
 
 jobs:
   analyze:

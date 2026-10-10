@@ -45,11 +45,15 @@ struct TurnEndToolsServiceTests {
         ])
         for bad: JSONValue in [["agents": ["A"], "events": ["agent.finished"]],
                                ["agents": ["A"], "wake_on": "first"],
-                               ["until_minutes": 0]] {
+                               ["until_minutes": 0],
+                               ["agents": ["A"]]] {
             let result = try await call(tools, "wait_for_event", bad)
             #expect(result["isError"]?.boolValue == true, "\(bad)")
         }
         #expect(await calls.made.count == 2)
+        // Every wait ends by itself (#572), a wait on agents as much as one on events.
+        let forever = try await call(tools, "wait_for_event", ["agents": ["A"]])
+        #expect("\(forever)".contains("until_minutes is required"))
         // A wait on events is still an event wait, never a block.
         #expect(AppService.selfCall(named: "wait_for_event", ["events": ["custom.x"], "until_minutes": 5],
                                     movesItself: true) == nil)

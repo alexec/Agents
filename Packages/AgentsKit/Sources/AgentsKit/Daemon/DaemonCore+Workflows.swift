@@ -269,6 +269,8 @@ extension DaemonCore {
         let agents = folder.appending(path: ".agents").path
         let own = changed.filter { $0.path == agents || $0.path.hasPrefix(agents + "/") }
         guard !own.isEmpty else { return }
+        // A change to an app-owned file made outside the app waits for the person (#502).
+        checkGuardedFiles(in: folder)
         let workflowsFolder = WorkflowFile.folder(in: folder).path
         if own.contains(where: { $0.path == agents || $0.path.hasPrefix(workflowsFolder) }) {
             scheduleWorkflowRescan(in: folder)

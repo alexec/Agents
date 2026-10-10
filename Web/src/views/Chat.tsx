@@ -7,10 +7,10 @@
 import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import { openTurnsHeld, rememberOpen, type Store } from "../model/store";
-import { backgroundAge, backgroundEnded, backgroundNoun, isRunning } from "../model/background";
-import { display, isPersonsAsk, isWorking, type ChatTurn, type Item } from "../model/turns";
+import { backgroundAge, backgroundEnded, backgroundNoun, isRunning, subagentNoSteps, subagentStatus } from "../model/background";
+import { display, isPersonsAsk, isWorking, omittingThoughts, type ChatTurn, type Item } from "../model/turns";
 import { toWireDate } from "../protocol/dates";
-import type { Agent, AppViewCall, FileMentionDTO, TranscriptEntry } from "../protocol/generated";
+import type { Agent, AppViewCall, BackgroundItem, FileMentionDTO, TranscriptEntry } from "../protocol/generated";
 import { replace, route } from "../route";
 import { Cards } from "./Cards";
 import { OfflineStrip } from "./OfflineStrip";
@@ -22,10 +22,11 @@ import { Labels } from "./Labels";
 import { Prompt } from "./Prompt";
 import { PromptMenus } from "./PromptMenus";
 import { ContextMeter, CostLimitBanner, SandboxCapsule } from "./PromptStatus";
-import { SessionMenu } from "./SessionMenu";
+import { SessionButtons, SessionMenu } from "./SessionMenu";
 import { drawable } from "../model/options";
 import { projectFolder } from "../model/groups";
-import { CallActionsContext, detailSummaries, detailTitles, fromLine, TurnView, type CallActions, type TurnDetail } from "./chat/Rows";
+import { CallActionsContext, detailSummaries, detailTitles, fromLine, ItemRow, TurnView, type CallActions, type TurnDetail } from "./chat/Rows";
+import { Modal } from "./Modal";
 import { nameOf, pathOf, setPane } from "./files/paneState";
 import { FileSearch, isOpenFileKey } from "./files/FileSearch";
 import { focusedEntry } from "../model/focus";
@@ -37,6 +38,7 @@ import { comingBackDescription } from "../model/status";
 import { parkLine } from "./SessionRow";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
 import { eventWaitCapsule, leaseMark } from "../model/rowLines";
+import { GuardedChangeCards } from "./GuardedChange";
 
 const detailKey = "agents.turnDetail";
 
@@ -111,6 +113,10 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   const chosen = useSignal<Record<string, TurnDetail>>({});
   /** The few opened turns whose entries are held, newest last (#291). */
   const fetched = useSignal<Record<string, HeldTurn>>({});
+  /** Turns whose steps were asked for and did not come, until asked again (#544). */
+  const failedTurns = useSignal<Record<string, true>>({});
+  /** The subagent whose steps are open over the chat, as the phone's sheet (#544). */
+  const subagent = useSignal<BackgroundItem | null>(null);
   const openedTurns = useRef<string[]>([]);
   const earlierTurn = useRef<string | null>(null);
   /** Which chat a turn's page was asked for, so a reply for one left behind is dropped. */
@@ -144,6 +150,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       // Answered only while the agent waits on it, and while its host answers (#253).
       waitingSandbox: agent?.pendingSandboxFailure,
       answerSandbox: agent?.pendingSandboxFailure && !down ? (carryOn) => store.answerSandbox(host, session, carryOn) : undefined,
+      subagentSteps: (item) => (subagent.value = item),
     };
   }, [session, agent?.pendingSandboxFailure, down]);
 
@@ -194,6 +201,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     void store.loadRuntimes(host);
     chosen.value = {};
     fetched.value = {};
+    failedTurns.value = {};
+    subagent.value = null;
     openedTurns.current = [];
     following.current = true;
     away.value = false;
@@ -398,6 +407,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     const page = await store.turnEntries(host, session, turn.range);
     if (`${watchingSession.current}` !== stamp) return;
     if (fetched.peek()[turn.id]) return;
+    const { [turn.id]: _, ...others } = failedTurns.peek();
+    failedTurns.value = page.failed ? { ...others, [turn.id]: true } : others;
     const span = turn.range.end - turn.range.start;
     if (!page.entries.length && page.firstIndex === turn.range.start && span > 0) return;
     hold(turn.id, {
@@ -466,7 +477,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
             ))}
           </select>
           <button onClick={() => replace({ ...r, files: !r.files })} aria-pressed={!!r.files}>Files</button>
-          <SessionMenu store={store} host={host} agent={agent} disabled={down} />
+          <SessionButtons store={store} host={host} agent={agent} disabled={down} />
+          <SessionMenu store={store} host={host} agent={agent} disabled={down} openFile={() => (searchingFiles.value = true)} />
         </span>
       </header>
       {hostDown && <OfflineStrip store={store} host={host} />}
@@ -491,7 +503,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         {store.hasMoreOfTheConversation && <p class="more" aria-label="Loading earlier"><span class="spinner" /></p>}
         {rows.map((turn, index) => (
           <TurnView key={turn.id} turn={turn} detail={chosen.value[turn.id] ?? level.value}
-            fetched={fetched.value[turn.id]?.items} hasEarlier={fetched.value[turn.id]?.hasEarlier ?? false}
+            fetched={fetched.value[turn.id]?.items} fetchFailed={!!failedTurns.value[turn.id]} hasEarlier={fetched.value[turn.id]?.hasEarlier ?? false}
             auto={index >= rows.length - openTurnsHeld}
             isLive={index === rows.length - 1 && live} background={background}
             toggle={turnActions.toggle} loadDetail={turnActions.loadDetail} loadEarlier={turnActions.loadEarlier} />
@@ -503,6 +515,10 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           <p class="working" aria-label="Working"><span class="spinner" /></p>
         )}
       </div>
+      {subagent.value && (
+        <SubagentSteps store={store} item={agent?.background?.find((b) => b.id === subagent.value!.id) ?? subagent.value}
+          showsThinking={level.value === "details"} close={() => (subagent.value = null)} />
+      )}
       </ViewLayerContext.Provider>
       </CallActionsContext.Provider>
       {/* As JumpToEnd: shown whenever the reader is away from the end; what came since, said in words. */}
@@ -514,8 +530,10 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         </button>
       )}
       <footer class="foot">
-        <BackgroundRows store={store} host={host} agent={agent} disabled={down} />
+        <BackgroundRows store={store} host={host} agent={agent} disabled={down} steps={(item) => (subagent.value = item)} />
         {agent && <Capsules store={store} host={host} agent={agent} />}
+        {/* A change its agent made to the project's own files, asked here (#531). */}
+        <GuardedChangeCards store={store} host={host} where={{ session }} down={down} />
         <Cards store={store} host={host} session={session} down={down} />
         <Prompt store={store} draftKey={`${host}|${session}`} placeholder={promptPlaceholder(agent)} disabled={down || !agent}
           stop={agent && hasTurnInFlight(agent) ? () => void store.perform(host, agent.id, "agents/stop") : undefined}
@@ -649,10 +667,45 @@ function Capsules({ store, host, agent }: { store: Store; host: string; agent: A
 }
 
 /**
- * What the agent left running, over the prompt (057): Stop on what the runtime can stop, and a
- * subagent says it stops with the agent, as BackgroundItemRow (#253).
+ * One subagent: who it is, what it was asked, and what it did (SubagentStepsView, #544), in a
+ * sheet over the chat as the phone has it. Its steps are those among the chat's loaded entries.
  */
-function BackgroundRows({ store, host, agent, disabled }: { store: Store; host: string; agent: Agent | undefined; disabled: boolean }) {
+function SubagentSteps({ store, item, showsThinking, close }: {
+  store: Store; item: BackgroundItem; showsThinking: boolean; close: () => void;
+}) {
+  const now = useSignal(toWireDate(new Date()));
+  useEffect(() => {
+    const timer = setInterval(() => (now.value = toWireDate(new Date())), 1_000);
+    return () => clearInterval(timer);
+  }, []);
+  const steps = useMemo(() => display(store.entries.value, item.id), [store.entries.value, item.id]);
+  const shown = showsThinking ? steps : omittingThoughts(steps);
+  return (
+    <Modal label={`Subagent ${item.name}`} close={close}>
+      <div class="sheet-body subagent-steps">
+        <h2>{item.name}</h2>
+        <p class="quiet small">{subagentStatus(item, now.value)}</p>
+        {item.detail && (
+          <div class="asked">
+            <p class="faint small">Asked to</p>
+            <p>{item.detail}</p>
+          </div>
+        )}
+        {!steps.length && <p class="faint small">{subagentNoSteps(item)}</p>}
+        <div class="steps">{shown.map((step) => <ItemRow key={step.id} item={step} background={[]} />)}</div>
+        <div class="sheet-actions"><button onClick={close}>Done</button></div>
+      </div>
+    </Modal>
+  );
+}
+
+/**
+ * What the agent left running, over the prompt (057): Stop on what the runtime can stop, and a
+ * subagent says it stops with the agent and opens its Steps, as BackgroundItemRow (#253, #544).
+ */
+function BackgroundRows({ store, host, agent, disabled, steps }: {
+  store: Store; host: string; agent: Agent | undefined; disabled: boolean; steps: (item: BackgroundItem) => void;
+}) {
   const now = useSignal(toWireDate(new Date()));
   const items = (agent?.background ?? []).filter(isRunning);
   useEffect(() => {
@@ -667,6 +720,9 @@ function BackgroundRows({ store, host, agent, disabled }: { store: Store; host: 
         <li key={item.id} title={item.command ?? item.detail ?? item.name} class={item.isStopping ? "stopping" : undefined}>
           <span class="noun">{backgroundNoun(item)}</span> {item.name}
           <span class="age">{item.isStopping ? "Stopping…" : backgroundEnded(item) ?? backgroundAge(item, now.value)}</span>
+          {item.kind === "subagent" && (
+            <button class="stop" title="See what this subagent is doing" onClick={() => steps(item)}>Steps</button>
+          )}
           {item.canStop ? (
             <button class="stop" disabled={disabled || item.isStopping} aria-label={`Stop ${item.name}`}
               title={`Stop ${item.name}, and nothing else the agent is doing`}

@@ -10,7 +10,9 @@ import AgentsKitCore
 /// is started again once for one wait, across a restart as much as within one.
 ///
 /// Every check and write here happens before the first `await` of the call that makes
-/// it, which on this actor is the whole of the lock.
+/// it, which on this actor is the whole of the lock. The one exception is asking the
+/// servers what they offer (#577), which comes first, before anything is checked or
+/// written that it could race.
 extension DaemonCore {
     // MARK: wait_for_event
 
@@ -37,16 +39,17 @@ extension DaemonCore {
         let names = (request.events ?? []).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         guard !names.isEmpty else { throw eventRefusal(EventWords.nothingNamed) }
-        if let minutes = request.untilMinutes, !EventWait.deadlineMinutes.contains(minutes) {
-            throw eventRefusal(EventWords.badDeadline())
-        }
-        var filters = request.where ?? [:]
-        if let named = filters["agent"] {
-            filters["agent"] = DetailFilter(anyOf: try named.values.map { try agentReference($0, for: caller) }) ?? named
-        }
+        // Every wait ends by itself (#572), whatever it waits on.
+        guard let minutes = request.untilMinutes else { throw eventRefusal(EventWords.deadlineRequired()) }
+        guard EventWait.deadlineMinutes.contains(minutes) else { throw eventRefusal(EventWords.badDeadline()) }
+        let filters = request.where ?? [:]
         var patterns: [EventPattern] = []
         for name in names {
             switch EventPattern.parse(name, filters: filters) {
+            // A server's event is matched by its subscription, not its details: `where`
+            // goes to the server (#577).
+            case .success(let pattern) where EventWait.isServerPattern(pattern.name):
+                patterns.append(EventPattern(pattern.name))
             case .success(let pattern): patterns.append(pattern)
             case .failure(let problem): throw eventRefusal(problem.message)
             }
@@ -58,35 +61,37 @@ extension DaemonCore {
         if !neverHere.isEmpty, neverHere.count == patterns.count {
             throw eventRefusal(EventWords.neverHere(neverHere) + " Nothing is waiting.")
         }
-        // A server's event is raised only while a workflow here subscribes to it (#383):
-        // a wait on one nothing asks for is kept, and told, since a workflow may yet.
-        let heard = mcpEventsHeard(in: caller.projectFolder)
-        let unheard = patterns.map(\.name).filter { name in
-            guard EventCatalogue.isServerEventName(name) || (name.hasSuffix(".*") && EventPattern(name).wholeSubject == nil)
-            else { return false }
-            return !heard.contains { name.hasSuffix(".*") ? $0.hasPrefix(String(name.dropLast())) : $0 == name }
-        }
-        let warning = (neverHere.isEmpty ? "" : EventWords.neverHere(neverHere) + " ")
-            + (unheard.isEmpty ? "" : EventWords.unheard(unheard, heard: heard) + " ")
-        let at = now()
+        // A server's event is a subscription the wait holds, as a trigger's is (#577):
+        // checked against what the project's servers offer, `where` as its arguments.
+        // Asked before anything below, which must not be split by an `await`.
         let from = request.from ?? eventLog.head
+        let serverNames = patterns.map(\.name).filter(EventWait.isServerPattern)
+        let servers: MCPWaitCheck
+        switch await checkMCPWait(serverNames, where: request.where ?? [:], project: caller.projectFolder) {
+        case .success(let check): servers = check
+        case .failure(let refusal): throw refusal
+        }
+        guard agents[caller.id] != nil else { throw noAgent() }
+        let warning = (neverHere.isEmpty ? "" : EventWords.neverHere(neverHere) + " ") + servers.warning
+        let at = now()
+        let wait = EventWait(patterns: patterns, from: from,
+                             deadline: at.addingTimeInterval(TimeInterval(minutes) * 60),
+                             since: at, serverEvents: serverNames.isEmpty ? nil : servers.events)
 
         // Something already after `from`: answered now, and nothing is left waiting.
-        if let hit = eventLog.matches(after: from, patterns, scopes: scopes).first {
+        if let hit = eventLog.events.first(where: { scopes.contains($0.scope) && wait.matches($0) }) {
             let previous = endWait(caller.id, by: .agent, quietly: true)
             return warning + (previous.map(EventWords.replaced) ?? "") + EventWords.matched(hit)
         }
 
         let previous = endWait(caller.id, by: .agent, quietly: true)
-        let wait = EventWait(patterns: patterns, from: from,
-                             deadline: request.untilMinutes.map { at.addingTimeInterval(TimeInterval($0) * 60) },
-                             since: at)
         guard var agent = agents[caller.id] else { throw noAgent() }
         agent.eventWait = wait
         changed(agent)
+        startMCPWait(servers)
         broadcastEvents()
         armEventWaitTimer()
-        let prefix = warning + (previous.map(EventWords.replaced) ?? "")
+        let prefix = warning + EventWords.subscribed(servers.events) + (previous.map(EventWords.replaced) ?? "")
         // Parked before anything is awaited, so an event in the next instant finds the
         // call to answer rather than starting the agent again.
         let answer = await withCheckedContinuation { continuation in
@@ -128,6 +133,7 @@ extension DaemonCore {
         guard var agent = agents[agentID], let wait = agent.eventWait, wait.isOpen else { return nil }
         agent.eventWait = nil
         changed(agent)
+        mcpWaitEnded(wait)
         if let call = openEventWaits.removeValue(forKey: agentID) {
             openEventWaitStarted.removeValue(forKey: agentID)
             call.resume(returning: .success(quietly ? EventWords.replaced(wait) : EventWords.ended(wait, by: canceller)))
@@ -150,6 +156,7 @@ extension DaemonCore {
                   isInScope(event, for: agent), wait.matches(event),
                   event.details["agent"] != id.uuidString else { continue }
             if wait.isOpen {
+                mcpWaitEnded(wait)
                 if let call = openEventWaits.removeValue(forKey: id) {
                     // Its call is still open: answered, and nothing is left waiting.
                     let started = openEventWaitStarted.removeValue(forKey: id) ?? wait.since
@@ -268,6 +275,7 @@ extension DaemonCore {
         // Only the agents with a wait, not every agent there is (#218).
         for id in Array(agents.withEventWait) {
             guard var agent = agents[id], var wait = agent.eventWait, wait.isDue(now: at) else { continue }
+            mcpWaitEnded(wait)
             if let call = openEventWaits.removeValue(forKey: id) {
                 openEventWaitStarted.removeValue(forKey: id)
                 agent.eventWait = nil
@@ -295,6 +303,15 @@ extension DaemonCore {
     /// nothing was running ends now. Nothing is raised for the time the daemon was down.
     func resumeEventWaitsAfterRestart() async {
         loadEventsIfNeeded()
+        // A wait an earlier build saved with no deadline gets one now (#572), so none
+        // can hang for ever.
+        let latest = now().addingTimeInterval(TimeInterval(EventWait.deadlineMinutes.upperBound) * 60)
+        for id in Array(agents.withEventWait) {
+            guard var agent = agents[id], var wait = agent.eventWait, wait.isOpen, wait.deadline == nil else { continue }
+            wait.deadline = latest
+            agent.eventWait = wait
+            changed(agent)
+        }
         for agent in agents.withEventWait.compactMap({ agents[$0] }) {
             guard let wait = agent.eventWait, !wait.isOpen, let promptID = wait.resumePromptID,
                   agent.queuedPrompts.first?.id == promptID else { continue }
@@ -370,22 +387,6 @@ extension DaemonCore {
         return ["agent": agent.id.uuidString, "agent_title": agent.title ?? "Untitled",
                 "labels": Set(agent.labels.map(\.normalizedValue)).sorted().joined(separator: ","),
                 "runtime": agent.runtimeID, "started_by": startedBy]
-    }
-
-    /// An agent named in `where.agent`, by id or by title in the caller's project.
-    private func agentReference(_ given: String, for caller: Agent) throws -> String {
-        let trimmed = given.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let id = UUID(uuidString: trimmed), agents[id] != nil { return id.uuidString }
-        let folder = caller.projectFolder
-        let here = agents.live.values.filter { $0.projectFolder == folder && $0.id != caller.id }
-        let named = here.filter { ($0.title ?? "").caseInsensitiveCompare(trimmed) == .orderedSame }
-        if named.count == 1 { return named[0].id.uuidString }
-        let listing = here.compactMap(\.title).sorted().map { "\u{201C}\($0)\u{201D}" }.joined(separator: ", ")
-        if named.count > 1 {
-            throw eventRefusal("More than one agent here is called \u{201C}\(trimmed)\u{201D}; use its id.")
-        }
-        throw eventRefusal("No agent in this project is called \u{201C}\(trimmed)\u{201D}."
-                           + (listing.isEmpty ? "" : " Agents here: \(listing)."))
     }
 
     private func eventRefusal(_ message: String) -> JSONRPCError {

@@ -7,7 +7,7 @@ import { cases } from "./fixtures.mjs";
 // Branch opens the new session (#342), so the menu reads the page's address as it loads.
 globalThis.location = { hash: "" };
 globalThis.addEventListener = () => {};
-const { sessionActions, deleteTitle, deleteMessage } = await load("src/views/SessionMenu.tsx");
+const { sessionActions, headerActions, deleteTitle, deleteMessage } = await load("src/views/SessionMenu.tsx");
 delete globalThis.location;
 delete globalThis.addEventListener;
 const agents = Object.fromEntries(cases("groups/agents.json").map((c) => [c.name, c.input.agent]));
@@ -47,4 +47,13 @@ test("given whether it is pinned, Pin or Unpin before Branch and Archive; never 
   assert.deepEqual(sessionActions(agents["running"], false).map((a) => a.label), ["Stop", "Park", "Pin", "Branch", "Archive"]);
   assert.deepEqual(sessionActions(agents["done"], true).map((a) => a.label), ["Park", "Mark as Unread", "Unpin", "Branch", "Archive"]);
   assert.deepEqual(sessionActions(agents["archived"], true).map((a) => a.label), ["Bring Back", "Delete…"]);
+});
+
+test("the chat's header has Pin and Archive, or Unpin, or only Bring Back when archived (#586)", () => {
+  const header = (name, pinned) => headerActions(agents[name], pinned).map((a) => a.label);
+  assert.deepEqual(header("running", false), ["Pin", "Archive"]);
+  assert.deepEqual(header("done", true), ["Unpin", "Archive"]);
+  const archived = Object.keys(agents).find((name) => agents[name].state === "archived");
+  assert.ok(archived);
+  assert.deepEqual(header(archived, true), ["Bring Back"]);
 });

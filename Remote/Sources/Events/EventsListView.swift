@@ -171,7 +171,8 @@ private struct EventSheet: View {
     }
 }
 
-/// The Events row under Activity, the Mac's shape.
+/// The Events row under Activity, the Mac's shape: the title alone (#587), when the last
+/// event came said to VoiceOver.
 struct EventsRow: View {
     @Environment(RemoteModel.self) private var model
 
@@ -179,13 +180,9 @@ struct EventsRow: View {
         HStack(alignment: .firstTextBaseline) {
             Text("Events")
             Spacer()
-            if let last = model.work.lastEventAt {
-                Text("Last \(LeaseWords.clock(last))")
-                    .monospacedDigit()
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
-            }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(model.work.lastEventAt.map { "last at \(LeaseWords.clock($0))" } ?? "")
         .accessibilityHint("Opens Events")
     }
 }

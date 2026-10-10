@@ -99,14 +99,14 @@ struct DropboxTests {
         await core.stopWatchingAllWorkflows()
     }
 
-    @Test func aWorkflowNarrowedToAFolderRunsOnlyForItAndIsToldThePath() async throws {
+    /// Not narrowed by folder or anything else (#574): the agent is told the path, and
+    /// decides.
+    @Test func aWorkflowOnArrivalsRunsAndIsToldThePath() async throws {
         let (locations, work) = try temporary()
         try Self.writeWorkflow("""
             ---
             on:
-              - dropbox.file_added:
-                  folder: review
-                  extension: [pdf, md]
+              - dropbox.file_added
             agent: new
             ---
 
@@ -117,12 +117,6 @@ struct DropboxTests {
         await core.rescanWorkflows(in: work)
         await warmUp(core, work)
         #expect(await core.allWorkflows(in: work).first { $0.workflowID == "review" }?.workflow.problem == nil)
-
-        try drop("top", at: "notes.md", in: work)
-        try drop("wrong kind", at: "review/data.csv", in: work)
-        await eventually("both arrivals are raised", within: .seconds(10)) { await arrivals(core).count == 2 }
-        try await Task.sleep(for: .milliseconds(300))
-        #expect(await core.allAgents().filter { $0.startedByWorkflow == "review" }.isEmpty)
 
         try drop("please", at: "review/draft.md", in: work)
         await eventually("the workflow started an agent", within: .seconds(10)) {

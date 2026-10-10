@@ -24,7 +24,50 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Which macOS jobs this run needs (#594), on a runner that is never short. Most of a
+  # pull request's time to land was spent queued for a macOS runner, not building: in
+  # October 2026 `test` waited 3–31 minutes and `packages` 8–36 to run for a few seconds
+  # with nothing selected. A job skipped by its `if:` still satisfies a required check,
+  # so `packages` and `test` start only when there is work for them. The jobs' own
+  # selection steps still choose the suites; this only decides whether they start, and
+  # if it fails they start anyway.
+  #
+  # On a push to main it waits first (#595): every merge starts a run, the next merge
+  # cancels it (the concurrency group above), and each cancelled run used to hold two
+  # macOS runners until then. Waiting here lets a burst of merges cancel each other on
+  # this runner, so only the last takes macOS runners.
+  select:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      apps: ${{ steps.test-selection.outputs.apps }}
+      packages: ${{ steps.test-selection.outputs.packages }}
+    steps:
+      - name: Let a burst of merges settle
+        if: github.event_name == 'push'
+        run: sleep 300
+
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Select test suites for changed files
+        id: test-selection
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          base="$BASE_SHA"
+          if [[ -z "$base" && -n "$DEFAULT_BRANCH" ]]; then
+            base=$(git merge-base "origin/$DEFAULT_BRANCH" HEAD || true)
+          fi
+          bash scripts/select-test-suites.sh "$base" | tee -a "$GITHUB_OUTPUT"
+
   test:
+    needs: select
+    # `always()` so a failed `select` still runs this job rather than skipping it, which
+    # would read as a pass.
+    if: ${{ always() && !cancelled() && (needs.select.result != 'success' || needs.select.outputs.apps != 'skip') }}
     # The project targets the macOS and iOS 27 SDKs, which only this image has.
     # A preview image while macOS 27 is new; move to macos-27 when it is GA.
     runs-on: xcode-27
@@ -339,6 +382,8 @@ jobs:
   # Web/src/protocol/generated.ts to the Swift source: a protocol type changed without
   # regenerating fails here. ControlPlane links AgentsKit, so it runs on changes to either.
   packages:
+    needs: select
+    if: ${{ always() && !cancelled() && (needs.select.result != 'success' || needs.select.outputs.packages != 'skip') }}
     runs-on: xcode-27
     timeout-minutes: 30
     env:

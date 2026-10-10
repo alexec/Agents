@@ -133,23 +133,14 @@ struct RuntimesRow: View {
     }
 
     var body: some View {
+        // The title alone (#587): how many work is the tooltip's, and none working turns
+        // the row's icon red (`activityIcon(_:warns:)`).
         HStack(alignment: .firstTextBaseline) {
             Text("Runtimes").foregroundStyle(.primary)
             Spacer()
-            if let tally {
-                HStack(spacing: 4) {
-                    if tally.noneWorking {
-                        Circle().fill(StateTint.failure.style(or: .primary)).frame(width: 8, height: 8)
-                    }
-                    Text(tally.words).monospacedDigit()
-                }
-                .appText(.fine)
-                .foregroundStyle(.secondary)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(tally.noneWorking ? "None of \(tally.total) working"
-                                    : "\(tally.working) of \(tally.total) working")
-            }
         }
-        .help("What each runtime can be started on right now, and where its allowance stands")
+        .help(tally.map { "\($0.working) of \($0.total) working. What each runtime can be started on right now, and where its allowance stands" }
+              ?? "What each runtime can be started on right now, and where its allowance stands")
+        .accessibilityValue(tally.map { $0.noneWorking ? "None of \($0.total) working" : "\($0.working) of \($0.total) working" } ?? "")
     }
 }

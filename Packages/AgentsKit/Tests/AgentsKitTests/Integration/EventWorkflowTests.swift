@@ -246,22 +246,25 @@ struct EventWorkflowTests {
         let own = try #require(await started(core, by: "on-finish").first)
         let token = UUID().uuidString
         await core.bindAppToken(token, to: waiter)
+        // From just before its finish, so that is the one the wait hears: `agent`
+        // narrows nothing now (#574).
+        let ownID = own.id.uuidString
+        let finished = try #require(await eventuallySome("its agent finished") {
+            await core.eventLog.events.last { $0.name == "agent.finished" && $0.details["agent"] == ownID }
+        })
         let answer = try await core.waitForEvent(.init(token: token, events: ["agent.finished"],
-                                                       where: ["agent": DetailFilter(own.id.uuidString)], from: 0))
+                                                       from: finished.position - 1, untilMinutes: 60))
         #expect(answer.hasPrefix("agent.finished happened at "))
-        let finished = await core.eventLog.events.last { $0.name == "agent.finished" && $0.details["agent"] == own.id.uuidString }
-        #expect(finished?.consequences.contains { if case .woke(waiter, _) = $0 { return true } else { return false } } == true)
         #expect(await firedOn(core, "agent.finished", about: own.id) == 0)
     }
 
-    // MARK: 073 — finer matching
+    // MARK: 073 — what an agent event carries
 
-    /// Finish three agents: one labelled bug that the person parked mid-turn, one
-    /// labelled bug left where it ended, one labelled perf, parked. Only the first fires
-    /// "finished, labelled bug, and parked" (073 US1).
-    @Test func aFinishLabelledBugAndParkedFiresOnlyForThatOne() async throws {
+    /// Every agent event carries the agent's labels, runtime and starter, and whether it
+    /// parked (073 US1): shown, though not matched on (#574).
+    @Test func anAgentsFinishCarriesItsContext() async throws {
         let (locations, work) = try temporary()
-        try write("  - agent.finished:\n      labels: bug\n      afterwards: park", as: "write-up", in: work)
+        try write("  - agent.finished", as: "write-up", in: work)
         var script = FakeACPAgent.Script()
         script.turnDelay = .milliseconds(400)
         let core = try await core(locations, launcher: FakeLauncher(script: script))
@@ -275,13 +278,12 @@ struct EventWorkflowTests {
         }
         let bugParked = try await start(["Bug", "p1"], park: true)
         let bugStays = try await start(["bug"], park: false)
-        let perfParked = try await start(["perf"], park: true)
 
         func finish(_ id: UUID) async -> Event? {
             await core.eventLog.events.first { $0.name == "agent.finished" && $0.details["agent"] == id.uuidString }
         }
-        try await eventually("all three finished") {
-            for id in [bugParked, bugStays, perfParked] where await finish(id) == nil { return false }
+        try await eventually("both finished") {
+            for id in [bugParked, bugStays] where await finish(id) == nil { return false }
             return true
         }
         let first = try #require(await finish(bugParked))
@@ -291,11 +293,7 @@ struct EventWorkflowTests {
         #expect(first.details["afterwards"] == "park")
         #expect(await finish(bugStays)?.details["afterwards"] == "stay")
 
-        try await eventually("the workflow ran for the first") { await firedOn(core, "agent.finished", about: bugParked) == 1 }
-        try await Task.sleep(for: .milliseconds(200))
-        #expect(await firedOn(core, "agent.finished", about: bugStays) == 0)
-        #expect(await firedOn(core, "agent.finished", about: perfParked) == 0)
-        // The workflow's own agent is started by a workflow, and is no bug fix.
+        try await eventually("the workflow ran") { await !started(core, by: "write-up").isEmpty }
         let own = try #require(await started(core, by: "write-up").first)
         try await eventually("its own agent finished") { await finish(own.id) != nil }
         #expect(await finish(own.id)?.details["started_by"] == "workflow")
@@ -306,28 +304,6 @@ struct EventWorkflowTests {
         // A label added later leaves what the log says happened as it was (US1 scenario 7).
         _ = try await core.setSessionLabels(.init(agentID: bugStays, add: ["regression"]))
         #expect(await finish(bugStays)?.details["labels"] == "bug")
-    }
-
-    @Test func aWaitForADeployLabelledFinishWakesOnlyForThatLabel() async throws {
-        let (locations, work) = try temporary()
-        let core = try await core(locations)
-        let waiter = try await core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: work, prompt: "Wait"))
-        try await eventually("waiter settled") { await core.agent(waiter)?.state == .finished }
-        let from = await core.eventLog.head
-        let plain = try await core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: work, prompt: "Build"))
-        try await eventually("plain finished") { await core.agent(plain)?.state == .finished }
-        let deploy = try await core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: work, prompt: "Ship",
-                                                                 labels: ["deploy"]))
-        try await eventually("deploy finished") { await core.agent(deploy)?.state == .finished }
-        let token = UUID().uuidString
-        await core.bindAppToken(token, to: waiter)
-        let answer = try await core.waitForEvent(.init(token: token, events: ["agent.finished"],
-                                                       where: ["labels": "deploy"], from: from))
-        #expect(answer.hasPrefix("agent.finished happened at "))
-        // Both had finished already, so the wait is answered from the log at once: with
-        // the deploy, not the plain build before it.
-        #expect(answer.contains("agent=Ship"))
-        #expect(!answer.contains("agent=Build"))
     }
 
     /// Codes on the event, today's words in its sentence (073 US3, FR-011).
@@ -353,8 +329,6 @@ struct EventWorkflowTests {
         let failed = await core.eventLog.events.last { $0.name == "agent.failed" }
         #expect(failed?.details["reason"] == "allowance_spent")
         #expect(failed?.sentence.hasSuffix("ended in an error: its allowance ran out.") == true)
-        #expect(try EventPattern.parse("agent.failed", filters: ["reason": "its allowance ran out"]).get()
-            .matches(try #require(failed)))
 
         _ = await core.raise(EventDraft(name: "mac.wake", scope: .mac, sentence: "This Mac woke up."))
         try await eventually("refused") { await core.eventLog.events.contains { $0.name == "workflow.refused" } }

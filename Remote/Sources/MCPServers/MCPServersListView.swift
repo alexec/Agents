@@ -58,20 +58,14 @@ struct MCPServersRow: View {
     @Environment(RemoteModel.self) private var model
 
     var body: some View {
+        // The title alone (#587): how many run is said to VoiceOver, and one stopped turns
+        // the row's icon red (`activityIcon(_:warns:)`).
         HStack(alignment: .firstTextBaseline) {
             Text("MCP Servers")
             Spacer()
-            if let tally = HostedMCPWords.tally(model.work.hostedMCP?.servers ?? []) {
-                HStack(spacing: 4) {
-                    if tally.stopped {
-                        Circle().fill(StateTint.failure.style(or: .primary)).frame(width: 7, height: 7)
-                            .accessibilityHidden(true)
-                    }
-                    Text(tally.words).monospacedDigit()
-                }
-                .appText(.fine).foregroundStyle(.secondary)
-            }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(HostedMCPWords.tally(model.work.hostedMCP?.servers ?? [])?.words ?? "")
         .accessibilityHint("Opens MCP Servers")
     }
 }

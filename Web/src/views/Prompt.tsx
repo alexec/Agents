@@ -15,7 +15,7 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { ComponentChildren } from "preact";
 import type { ACPPromptCapabilities, Attachment, FileMentionDTO, SlashCommand, SuggestedPrompt, UUID } from "../protocol/generated";
-import { returnAction, sendHelp, sendLabel, stopHelp } from "../model/promptWords";
+import { onTouchScreen, returnAction, sendHelp, sendLabel, stopHelp } from "../model/promptWords";
 import { tellingWords, type AgentAct, type Store } from "../model/store";
 import { attach, pastedFiles, pastedWords, refusal, totalRefusal } from "../model/attachments";
 import { Telling } from "./Telling";
@@ -254,7 +254,7 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
         )}
         <div class="prompt-field">
           {/* Never disabled: what is typed while the link is down is kept and sent once it's back (US7). */}
-          <textarea aria-label="Prompt" placeholder={offered ? `${offered.prompt}  (Tab)` : placeholder} rows={2} value={text.value}
+          <textarea aria-label="Prompt" enterkeyhint={onTouchScreen() ? "enter" : "send"} placeholder={offered ? `${offered.prompt}  (Tab)` : placeholder} rows={2} value={text.value}
             readOnly={starting && sending.value}
             onInput={(e) => {
               text.value = (e.currentTarget as HTMLTextAreaElement).value;

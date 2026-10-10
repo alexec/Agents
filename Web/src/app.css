@@ -301,6 +301,21 @@ button.link {
 
 .reply { margin: 0; line-height: 1.5; }
 
+/* Copy Message (#519), there only while the message is pointed at or the button focused, and
+   out of the flow so nothing moves when it shows: beside the person's bubble, in the free margin
+   at its left; over the top corner of a reply, on the paper. A touch screen has no pointer, so
+   there it sits under the message, always. */
+.copyable { position: relative; }
+.copyable > .copy-message { position: absolute; display: none; background: var(--paper-ground); }
+.bubble.copyable > .copy-message { right: 100%; bottom: 0; margin-right: 6px; }
+.reply.copyable > .copy-message, .note.copyable > .copy-message { top: -2px; right: 0; }
+.copyable:hover > .copy-message, .copy-message:focus-visible { display: block; }
+@media (hover: none) {
+  .copyable > .copy-message, .bubble.copyable > .copy-message, .reply.copyable > .copy-message, .note.copyable > .copy-message {
+    position: static; display: block; margin: 4px 0 0 auto;
+  }
+}
+
 /* Agent text, through the Markdown renderer. */
 .markdown > :first-child { margin-top: 0; }
 .markdown > :last-child { margin-bottom: 0; }
@@ -381,6 +396,11 @@ button.link.reading:hover { text-decoration: underline; }
 .note { display: flex; flex-direction: column; gap: 3px; }
 .sandbox-failure p { margin: 0; }
 .sandbox-failure .answers { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
+/* A change to a project's own files, asked over the prompt or on the project's page (#531). */
+.guarded-change { border-color: color-mix(in srgb, var(--tint-attention) 25%, transparent); }
+.guarded-change p { margin: 0; }
+.guarded-change .strong { color: var(--tint-attention); }
+.guarded-change .guarded-answers { display: flex; justify-content: flex-end; gap: 10px; }
 .note.switch {
   padding: 10px 12px;
   border-radius: var(--radius-card);
@@ -460,6 +480,9 @@ button.link.reading:hover { text-decoration: underline; }
 .background li { align-items: baseline; }
 .background li.stopping { opacity: 0.5; }
 .background .stop { font-size: 11px; padding: 0 8px; }
+dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 64px); }
+.subagent-steps p { margin: 0; }
+.subagent-steps .asked { padding: 10px; border-radius: 8px; background: var(--paper-ground); display: flex; flex-direction: column; gap: 3px; }
 
 /* Cards above the prompt: a question or a permission, answered here or elsewhere. */
 /* In a short window the cards give up height, not the prompt: the foot is never taller than the
@@ -816,6 +839,8 @@ button.remove:hover { opacity: 1; }
 .diff-line .sign { display: inline-block; width: 1.2em; opacity: 0.6; }
 .diff-line.added { background: var(--paper-wash); font-weight: 500; }
 .diff-line.removed { opacity: 0.55; text-decoration: line-through; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); }
+/* Changed words: a wash stronger than the line's own, never a colour (CodeLine, #545). */
+.diff-word { color: inherit; background: color-mix(in srgb, var(--paper-ink) 14%, transparent); border-radius: 2px; }
 .live-page .page { line-height: 1.6; max-width: 70ch; margin: 0 auto; }
 .live-page .page.gone { opacity: 0.6; }
 .passage { padding: 2px 8px; margin: 0 -8px 10px; border-radius: var(--radius-control); transition: background 0.6s; }
@@ -836,22 +861,17 @@ button.remove:hover { opacity: 1; }
   resize: vertical;
 }
 
-/* US5: a workflow row: mark, name and what it is, Run Now on the right. */
-.row.workflow { box-sizing: border-box; grid-template-columns: minmax(0, 1fr) auto auto; column-gap: 4px; align-items: center; padding: 0 4px 0 0; cursor: default; }
-/* The row's name and line open its page (#98): a button of its own, so Run Now and ··· keep their clicks. */
+/* US5: a workflow row: mark and name, as the window's (#547); its actions are in its context menu. */
+.row.workflow { box-sizing: border-box; grid-template-columns: minmax(0, 1fr); align-items: center; padding: 0; cursor: default; }
+/* The row's name opens its page (#98). */
 .row.workflow .pick { display: grid; grid-template-columns: 18px minmax(0, 1fr); column-gap: 8px; align-items: center; min-width: 0;
-  text-align: left; border: none; background: none; padding: 6px 0 6px 10px; color: inherit; font: inherit; }
-.row.workflow .workflow-menu { margin-right: 0; }
-.row.workflow .workflow-menu > button { border: none; background: none; padding: 3px 6px; opacity: 0.6; }
+  text-align: left; border: none; background: none; padding: 6px 4px 6px 10px; color: inherit; font: inherit; }
 .row.workflow:hover { background: none; }
-.row.workflow .body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.row.workflow .subtitle { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* A session's weight (#520): regular, heavier only while it waits for an OK. */
-.row.workflow .title { font-weight: 400; }
+.row.workflow .title { font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row.workflow .title.needs-ok { font-weight: 600; }
 .workflow-mark { opacity: 0.55; text-align: center; }
 .workflow-mark.tinted { color: var(--tint-attention); opacity: 1; }
-.row.workflow .run-now { font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--paper-rule); background: var(--paper-raised); white-space: nowrap; }
 
 /* A workflow's page (#98, #100), in the chat's place. */
 .workflow-page .workflow-body { max-width: 760px; margin: 0 auto; padding: 16px 24px 32px; display: flex; flex-direction: column; gap: 8px; }

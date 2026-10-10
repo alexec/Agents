@@ -27,8 +27,6 @@
 .with-sidebar .sidebar-head { gap: 6px; border-bottom: none; padding: 0 10px; }
 .with-sidebar .sidebar .scroll { padding: 0 6px 8px; }
 .with-sidebar .sidebar .row { box-sizing: border-box; }
-/* A workflow's row says Off where it stands, as the window's does; Run Now is on its page. */
-.with-sidebar .sidebar .row.workflow .run-now { display: none; }
 .with-sidebar .sidebar-head-label { font-size: 11px; font-weight: 600; opacity: 0.5; margin: 12px 8px 4px; }
 
 /* Activity: an icon in the accent, the page's name in the rows' type (#155, #495), and what it says
@@ -181,3 +179,15 @@
 
 /* A row with files dragged over it, which a drop puts in the project's drop box (#231). */
 .with-sidebar .sidebar .drop-target { outline: 2px dashed var(--accent); outline-offset: -2px; border-radius: 6px; }
+.with-sidebar .waiting-list li { display: flex; align-items: center; gap: 4px; }
+.with-sidebar .event-stop { border: 0; background: none; padding: 4px 8px; font-size: 12px; opacity: 0.55; }
+.with-sidebar .event-stop:hover { opacity: 1; }
+.with-sidebar .event-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.with-sidebar .event-head select { font: inherit; font-size: 12px; margin-right: 8px; }
+.with-sidebar .event-open { border: 0; background: none; padding: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.with-sidebar .event-open:hover { text-decoration: underline; }
+.event-detail dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: 13px; }
+.event-detail dl div { display: contents; }
+.event-detail dt { opacity: 0.6; }
+.event-detail dd { margin: 0; overflow-wrap: anywhere; user-select: text; }
+.event-detail .event-name { font-family: var(--font-mono); margin: 0; }

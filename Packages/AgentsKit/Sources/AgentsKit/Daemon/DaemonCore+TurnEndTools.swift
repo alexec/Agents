@@ -90,9 +90,11 @@ extension DaemonCore {
                                message: "That conversation is not open any more, so nothing is waited for.")
         }
         let names = request.agents.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
-        guard !names.isEmpty || request.untilMinutes != nil else {
+        // Every wait ends by itself (#572): a helper still running when it does is
+        // seen, and waited on again.
+        guard request.untilMinutes != nil else {
             throw JSONRPCError(code: JSONRPCError.invalidParams,
-                               message: "Nothing is waited for: name agents, or give until_minutes.")
+                               message: "Nothing is waited for: " + EventWords.deadlineRequired())
         }
         if agent.pendingMove?.askedBy == .agent {
             throw JSONRPCError(code: JSONRPCError.invalidParams, message: """

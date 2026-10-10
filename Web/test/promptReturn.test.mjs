@@ -12,3 +12,9 @@ test("Return and Shift-Return send; Option-Return is a line break", () => {
   assert.equal(returnAction({ altKey: true, shiftKey: false }), "lineBreak");
   assert.equal(returnAction({ altKey: true, shiftKey: true }), "lineBreak");
 });
+
+test("On a touch screen Return is a line break, as the Remote's on-screen keyboard (#543)", () => {
+  assert.equal(returnAction({ altKey: false, shiftKey: false }, true), "lineBreak");
+  assert.equal(returnAction({ altKey: false, shiftKey: true }, true), "lineBreak");
+  assert.equal(returnAction({ altKey: false, shiftKey: false }, false), "send");
+});
