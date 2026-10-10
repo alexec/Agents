@@ -66,11 +66,11 @@ const poll = (name: string, args: unknown, cursor: string | null, maxEvents = 50
 const now = (offsetMs = 0) => new Date(Date.now() + offsetMs).toISOString();
 const cursorAt = (since: string) => Buffer.from(JSON.stringify({ since, ids: [] })).toString("base64url");
 
-function failedRun(id: number, branch: string, updatedAt: string, attempt = 1) {
+function failedRun(id: number, branch: string, updatedAt: string, attempt = 1, pr = 402) {
   return {
     id, attempt, name: "CI", url: `https://github.com/${REPO}/actions/runs/${id}`,
     event: "pull_request", status: "completed", conclusion: "failure",
-    branch, headSha: `sha${id}`, pr: 402, updatedAt,
+    branch, headSha: `sha${id}`, pr, updatedAt,
     jobs: [
       { name: "test", url: `https://github.com/${REPO}/actions/runs/${id}/job/1`, conclusion: "failure", log: "boom" },
       { name: "check", url: `https://github.com/${REPO}/actions/runs/${id}/job/2`, conclusion: "success", log: "fine" },
@@ -108,10 +108,11 @@ test("events/list gives both events, poll only, with their schemas", async () =>
     assert.equal(e.inputSchema.properties.repo.type, "string");
     assert.equal(e.payloadSchema.type, "object");
   }
-  const checks = events.find((e: any) => e.name === "checks.failed");
-  assert.equal(checks.inputSchema.properties.branch.type, "string");
-  const merged = events.find((e: any) => e.name === "pr.merged");
-  assert.equal(merged.inputSchema.properties.branch, undefined);
+  for (const e of events) {
+    assert.equal(e.inputSchema.properties.branch.type, "string");
+    assert.equal(e.inputSchema.properties.pr.type, "integer");
+    assert.ok(e.inputSchema.properties.pr.description);
+  }
 });
 
 test("cursor null gives no events and a cursor", async () => {
@@ -180,6 +181,48 @@ test("branch narrows", async () => {
   assert.deepEqual(raised.events.map((e: any) => e.eventId), [`checks.failed:${REPO}:9200:1`]);
 });
 
+function openPR(number: number, branch: string, extra: object = {}) {
+  return { number, title: `PR ${number}`, branch, url: `https://github.com/${REPO}/pull/${number}`,
+    state: "open", updatedAt: now(), ...extra };
+}
+
+test("pr narrows checks.failed, and with branch both must hold", async () => {
+  edit((d) => repoData(d).prs.push(openPR(403, "agents/pr-403"), openPR(404, "agents/pr-404")));
+  const args = { repo: REPO, pr: 403 };
+  const both = { repo: REPO, pr: 403, branch: "agents/pr-403" };
+  const crossed = { repo: REPO, pr: 404, branch: "agents/pr-403" };
+  const [first, firstBoth, firstCrossed] = await Promise.all(
+    [args, both, crossed].map((a) => poll("checks.failed", a, null)));
+  edit((d) => repoData(d).runs.push(
+    failedRun(9400, "agents/pr-403", now(5), 1, 403),
+    failedRun(9401, "agents/pr-404", now(5), 1, 404)));
+  const raised = await poll("checks.failed", args, first.cursor);
+  assert.deepEqual(raised.events.map((e: any) => e.eventId), [`checks.failed:${REPO}:9400:1`]);
+  assert.equal(raised.events[0].data.pr.number, 403);
+  const quiet = await poll("checks.failed", args, raised.cursor);
+  assert.deepEqual(quiet.events, []);
+  const narrowed = await poll("checks.failed", both, firstBoth.cursor);
+  assert.deepEqual(narrowed.events.map((e: any) => e.eventId), [`checks.failed:${REPO}:9400:1`]);
+  const none = await poll("checks.failed", crossed, firstCrossed.cursor);
+  assert.deepEqual(none.events, []);
+});
+
+test("pr and branch narrow pr.merged", async () => {
+  const byPR = { repo: REPO, pr: 405 };
+  const byBranch = { repo: REPO, branch: "agents/pr-406" };
+  const crossed = { repo: REPO, pr: 405, branch: "agents/pr-406" };
+  const [first, firstBranch, firstCrossed] = await Promise.all(
+    [byPR, byBranch, crossed].map((a) => poll("pr.merged", a, null)));
+  const merged = { state: "merged", mergedAt: now(5), mergeSha: "abc", updatedAt: now(5) };
+  edit((d) => repoData(d).prs.push(openPR(405, "agents/pr-405", merged), openPR(406, "agents/pr-406", merged)));
+  const raised = await poll("pr.merged", byPR, first.cursor);
+  assert.deepEqual(raised.events.map((e: any) => e.eventId), [`pr.merged:${REPO}:405`]);
+  const branched = await poll("pr.merged", byBranch, firstBranch.cursor);
+  assert.deepEqual(branched.events.map((e: any) => e.eventId), [`pr.merged:${REPO}:406`]);
+  const none = await poll("pr.merged", crossed, firstCrossed.cursor);
+  assert.deepEqual(none.events, []);
+});
+
 test("ties at one updated_at aren't lost", async () => {
   const args = { repo: REPO, branch: "agents/ties" };
   const first = await poll("checks.failed", args, null);
@@ -210,8 +253,15 @@ test("bad arguments are -32602, an unknown event -32011", async () => {
   const missing = await rpc("events/poll", { name: "checks.failed", arguments: {}, cursor: null });
   assert.equal(missing.error.code, -32602);
   assert.match(missing.error.message, /repo/);
-  const extra = await rpc("events/poll", { name: "pr.merged", arguments: { repo: REPO, branch: "x" }, cursor: null });
+  const extra = await rpc("events/poll", { name: "pr.merged", arguments: { repo: REPO, sha: "x" }, cursor: null });
   assert.equal(extra.error.code, -32602);
+  for (const name of ["checks.failed", "pr.merged"]) {
+    for (const pr of ["551", 0, -1, 1.5]) {
+      const wrong = await rpc("events/poll", { name, arguments: { repo: REPO, pr }, cursor: null });
+      assert.equal(wrong.error.code, -32602);
+      assert.equal(wrong.error.message, "pr must be a positive integer");
+    }
+  }
   const shape = await rpc("events/poll", { name: "checks.failed", arguments: { repo: "not a repo" }, cursor: null });
   assert.equal(shape.error.code, -32602);
   const cursor = await rpc("events/poll", { name: "checks.failed", arguments: { repo: REPO }, cursor: "%%%" });

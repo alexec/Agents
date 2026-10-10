@@ -9,8 +9,8 @@ in the project's `.agents/mcp.json` as `ci`, and the **Fix failed checks** workf
 
 | Kind | Name | What it does |
 | --- | --- | --- |
-| Event | `checks.failed` | A pull request's Actions run finished with a failure. Arguments: `repo`, optional `branch`. |
-| Event | `pr.merged` | A pull request was merged. Argument: `repo`. |
+| Event | `checks.failed` | A pull request's Actions run finished with a failure. Arguments: `repo`, optional `branch` and `pr`. |
+| Event | `pr.merged` | A pull request was merged. Arguments: `repo`, optional `branch` and `pr`. |
 | Tool | `list_prs` | Open pull requests and their check state. Read-only; feeds the board. |
 | Tool | `failed_log` | The last 300 lines of each failed job's log. Read-only. |
 | Tool | `rerun_failed` | Reruns a run's failed jobs. |

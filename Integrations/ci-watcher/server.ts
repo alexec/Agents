@@ -80,13 +80,17 @@ const prSchema = {
   properties: { number: { type: "integer" }, title: { type: "string" }, branch: { type: "string" }, url: { type: "string" } },
 };
 
+const prProperty = { type: "integer", description: "Only this pull request, by number." };
+
 const EVENTS = [
   {
     name: "checks.failed",
     title: "Checks failed",
     description: "A pull request's checks finished with a failure: one event per run and attempt, so a rerun that fails again is a new one.",
     delivery: ["poll"],
-    inputSchema: schema({ repo: repoProperty, branch: { type: "string", description: "Only this PR branch." } }, ["repo"]),
+    inputSchema: schema({
+      repo: repoProperty, branch: { type: "string", description: "Only runs on this PR branch." }, pr: prProperty,
+    }, ["repo"]),
     payloadSchema: {
       type: "object",
       properties: {
@@ -101,7 +105,9 @@ const EVENTS = [
     title: "Pull request merged",
     description: "A pull request was merged.",
     delivery: ["poll"],
-    inputSchema: schema({ repo: repoProperty }, ["repo"]),
+    inputSchema: schema({
+      repo: repoProperty, branch: { type: "string", description: "Only the PR from this branch." }, pr: prProperty,
+    }, ["repo"]),
     payloadSchema: {
       type: "object",
       properties: { pr: prSchema, mergedAt: { type: "string" }, mergeSha: { type: "string" } },
@@ -127,15 +133,23 @@ async function candidates(gh: GitHub, name: string, args: Record<string, any>, s
   const repo: string = args.repo;
   if (name === "checks.failed") {
     const { runs, truncated } = await gh.failedRuns(repo, args.branch, since);
+    // A run that names another PR is skipped before its details are fetched; one that names
+    // none is checked against the PR its details find. The cursor still moves past both.
     const list = runs.map((ref: RunRef): Candidate => ({
       eventId: `checks.failed:${repo}:${ref.id}:${ref.attempt}`,
       time: new Date(ref.updatedAt).toISOString(),
-      data: () => gh.runDetails(repo, ref),
+      data: async () => {
+        if (args.pr !== undefined && ref.prNumber !== undefined && ref.prNumber !== args.pr) return null;
+        const details = await gh.runDetails(repo, ref);
+        return args.pr !== undefined && details?.pr.number !== args.pr ? null : details;
+      },
     }));
     return { list, truncated };
   }
   const { prs, truncated } = await gh.mergedPRs(repo, since);
-  const list = prs.map((m): Candidate => ({
+  const list = prs
+    .filter((m) => (args.pr === undefined || m.pr.number === args.pr) && (args.branch === undefined || m.pr.branch === args.branch))
+    .map((m): Candidate => ({
     eventId: `pr.merged:${repo}:${m.pr.number}`,
     time: new Date(m.mergedAt).toISOString(),
     data: async () => m,
@@ -180,7 +194,7 @@ async function poll(gh: GitHub, params: any) {
     } catch (error) {
       throw eventsError(error);
     }
-    // A run that belongs to no pull request isn't a PR's checks; the cursor still moves past it.
+    // A run that belongs to no pull request (or not the one asked for) isn't raised; the cursor still moves past it.
     if (data !== null) events.push({ eventId: c.eventId, name: event.name, timestamp: c.time, data });
   }
   return {
