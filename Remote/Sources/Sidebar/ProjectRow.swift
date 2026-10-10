@@ -2,8 +2,8 @@ import AgentsKitCore
 import SwiftUI
 
 /// One folder in the sidebar, the row its sessions fold under: the Mac's `ProjectRow`
-/// (#145, #226). The dot is the whole reason to look at this list: something in here is
-/// waiting on you, folded or not.
+/// (#145, #226). As a group's heading, a grey count of its own sessions, as every group's
+/// heading says it (#587); as a row, a dot when something in it is waiting on you.
 struct ProjectRow: View {
     @Environment(RemoteModel.self) private var model
     let summary: DaemonAPI.ProjectSummary
@@ -47,7 +47,7 @@ struct ProjectRow: View {
                     Text("Folder is missing")
                         .appText(.fine)
                         .foregroundStyle(.secondary)
-                } else if isFolded, let subtitle {
+                } else if isFolded, !asHeading, let subtitle {
                     Text(subtitle)
                         .appText(.fine)
                         .foregroundStyle(.secondary)
@@ -55,7 +55,16 @@ struct ProjectRow: View {
                 }
             }
             Spacer(minLength: 4)
-            if needsPerson {
+            if asHeading {
+                // How many its group lists (#587). Who needs you is in Needs You at the
+                // top, so no dot.
+                if ownCount > 0 {
+                    Text("\(ownCount)")
+                        .monospacedDigit()
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                }
+            } else if needsPerson {
                 Circle()
                     .fill(StateTint.attention.style(or: .secondary))
                     .frame(width: 7, height: 7)
@@ -65,6 +74,9 @@ struct ProjectRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
     }
+
+    /// The sessions its group lists, each listed once (`SidebarSmartRow.home`).
+    private var ownCount: Int { SidebarProjectFold.ownCount(summary.key, in: model.work) }
 
     /// What is going on in there, in the Mac row's words and order: urgency first, and
     /// only ever two facts.
@@ -92,13 +104,18 @@ struct ProjectRow: View {
         if summary.isChat == true { parts.append("chat project") }
         if summary.project.isPinned { parts.append("pinned") }
         if !summary.exists { parts.append("folder is missing") }
-        if let subtitle { parts.append(subtitle) }
+        if asHeading {
+            if ownCount > 0 { parts.append("\(ownCount)") }
+        } else if let subtitle {
+            parts.append(subtitle)
+        }
         return parts.joined(separator: ", ")
     }
 }
 
 /// What today has cost, the Mac's row: drawn whether or not anything has been spent so
-/// Spending is always there to go in by.
+/// Spending is always there to go in by. The title alone (#587): the day's figure and
+/// what is left are VoiceOver's, and near the limit the row's icon turns red.
 struct SpendingRow: View {
     @Environment(RemoteModel.self) private var model
 
@@ -106,20 +123,19 @@ struct SpendingRow: View {
         HStack(alignment: .firstTextBaseline) {
             Text("Cost")
             Spacer()
-            VStack(alignment: .trailing, spacing: 1) {
-                if let today {
-                    Text(today).monospacedDigit()
-                }
-                if let state = model.costState, let left = state.dayHeadroom,
-                   let daily = state.limits.daily {
-                    Text("\(left.money(in: daily.currency)) left")
-                }
-            }
-            .appText(.fine)
-            .foregroundStyle((model.costState?.dayIsCloseToFull == true ? StateTint.failure : .none)
-                                .style(or: .secondary))
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(figures ?? "")
         .accessibilityHint("Opens Cost")
+    }
+
+    /// Today's cost, and what is left of a daily limit where there is one.
+    private var figures: String? {
+        guard let today else { return nil }
+        if let state = model.costState, let left = state.dayHeadroom, let daily = state.limits.daily {
+            return "\(today) today, \(left.money(in: daily.currency)) left"
+        }
+        return "\(today) today"
     }
 
     private var today: String? {
