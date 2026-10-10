@@ -56,10 +56,10 @@ extension AppService {
                 return await send(DaemonAPI.Method.agentsStopHelper,
                                   DaemonAPI.HelperRequest(token: token, agentID: agentID),
                                   fallback: "Stopped.")
-            case .park(let agentID):
-                return await send(DaemonAPI.Method.agentsParkHelper,
+            case .requestArchive(let agentID):
+                return await send(DaemonAPI.Method.agentsRequestArchiveHelper,
                                   DaemonAPI.HelperRequest(token: token, agentID: agentID),
-                                  fallback: "Parked.")
+                                  fallback: "Asked.")
             case .archive(let agentID):
                 return await send(DaemonAPI.Method.agentsArchiveHelper,
                                   DaemonAPI.HelperRequest(token: token, agentID: agentID),

@@ -1216,6 +1216,11 @@
         "advertisedOptions" : [
 
         ],
+        "archiveRequest" : {
+          "requested" : {
+            "at" : 812500300
+          }
+        },
         "availableCommands" : [
 
         ],
@@ -1223,11 +1228,6 @@
         "cwd" : "file:///fixture/project/",
         "id" : "00000000-0000-0000-0000-000000000031",
         "lastActivityAt" : 812500000,
-        "parking" : {
-          "parked" : {
-            "at" : 812500300
-          }
-        },
         "report" : {
           "at" : 812500060,
           "message" : "It went.",
@@ -1247,36 +1247,37 @@
       },
       "isComingBack" : false
     },
-    "name" : "parked, done"
+    "name" : "asks to archive, done"
   },
   {
     "expected" : {
       "shape" : "needsYou",
       "symbol" : "exclamationmark.circle.fill",
-      "tinted" : false,
-      "words" : "Stuck"
+      "tinted" : true,
+      "words" : "Unread · Partly done"
     },
     "input" : {
       "agent" : {
         "advertisedOptions" : [
 
         ],
+        "archiveRequest" : {
+          "requested" : {
+            "at" : 812500360
+          }
+        },
         "availableCommands" : [
 
         ],
         "createdAt" : 812500000,
         "cwd" : "file:///fixture/project/",
         "id" : "00000000-0000-0000-0000-000000000032",
+        "isUnread" : true,
         "lastActivityAt" : 812500000,
-        "parking" : {
-          "parked" : {
-            "at" : 812500360
-          }
-        },
         "report" : {
           "at" : 812500060,
           "message" : "It went.",
-          "outcome" : "stuck"
+          "outcome" : "partly_done"
         },
         "runtimeID" : "claude",
         "startOptions" : {
@@ -1292,32 +1293,33 @@
       },
       "isComingBack" : false
     },
-    "name" : "parked, stuck"
+    "name" : "asks to archive, partly done, unread"
   },
   {
     "expected" : {
-      "shape" : "needsYou",
-      "symbol" : "exclamationmark.circle.fill",
+      "shape" : "stopped",
+      "symbol" : "stop.circle",
       "tinted" : false,
-      "words" : "Waiting on you"
+      "words" : "Stopped by you"
     },
     "input" : {
       "agent" : {
         "advertisedOptions" : [
 
         ],
+        "archiveRequest" : {
+          "requested" : {
+            "at" : 812500300
+          }
+        },
         "availableCommands" : [
 
         ],
         "createdAt" : 812500000,
         "cwd" : "file:///fixture/project/",
+        "endedReason" : "cancelled",
         "id" : "00000000-0000-0000-0000-000000000033",
         "lastActivityAt" : 812500000,
-        "parking" : {
-          "parked" : {
-            "at" : 812500300
-          }
-        },
         "runtimeID" : "claude",
         "startOptions" : {
           "extraArguments" : [
@@ -1327,12 +1329,12 @@
 
           }
         },
-        "state" : "waitingOnUser",
+        "state" : "stopped",
         "title" : "Session 33"
       },
       "isComingBack" : false
     },
-    "name" : "parked, but asking"
+    "name" : "asks to archive, stopped"
   },
   {
     "expected" : {
@@ -1346,6 +1348,11 @@
         "advertisedOptions" : [
 
         ],
+        "archiveRequest" : {
+          "whenTurnEnds" : {
+            "since" : 812500240
+          }
+        },
         "availableCommands" : [
 
         ],
@@ -1353,11 +1360,6 @@
         "cwd" : "file:///fixture/project/",
         "id" : "00000000-0000-0000-0000-000000000034",
         "lastActivityAt" : 812500000,
-        "parking" : {
-          "whenTurnEnds" : {
-            "since" : 812500240
-          }
-        },
         "runtimeID" : "claude",
         "startOptions" : {
           "extraArguments" : [
@@ -1372,7 +1374,7 @@
       },
       "isComingBack" : false
     },
-    "name" : "parked when the turn ends, running"
+    "name" : "asks to archive when the turn ends, running"
   },
   {
     "expected" : {
@@ -1421,6 +1423,11 @@
         "advertisedOptions" : [
 
         ],
+        "archiveRequest" : {
+          "requested" : {
+            "at" : 812500300
+          }
+        },
         "availableCommands" : [
 
         ],
@@ -1428,11 +1435,6 @@
         "cwd" : "file:///fixture/project/",
         "id" : "00000000-0000-0000-0000-000000000036",
         "lastActivityAt" : 812500000,
-        "parking" : {
-          "parked" : {
-            "at" : 812500300
-          }
-        },
         "runtimeID" : "claude",
         "startOptions" : {
           "extraArguments" : [
@@ -1447,7 +1449,7 @@
       },
       "isComingBack" : false
     },
-    "name" : "archived and parked"
+    "name" : "archived, a request left on it"
   },
   {
     "expected" : {

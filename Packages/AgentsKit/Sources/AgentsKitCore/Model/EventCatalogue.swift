@@ -158,8 +158,8 @@ public enum EventCatalogue {
                   "An agent in this project was stopped before finishing.", aliases: ["agent-stopped"]),
         EventKind("agent.failed", .project, about(EventDetail("reason", values: EndedReason.allCases.map(\.code))),
                   "An agent in this project ended in an error.", aliases: ["agent-stopped"]),
-        EventKind("agent.parked", .project, about(outcome),
-                  "An agent in this project was parked: put down to come back to."),
+        EventKind("agent.archive_requested", .project, about(outcome),
+                  "An agent in this project asked to be archived, and waits for the person's OK."),
         EventKind("agent.messaged", .project, about(EventDetail("from"), EventDetail("from_title")),
                   "An agent in this project was sent a message by another, with message_agent."),
         EventKind("agent.archived", .project, about(EventDetail("by", values: ["agent", "you"]), outcome),
@@ -262,6 +262,8 @@ public enum EventCatalogue {
     public static let renamed: [String: String] = [
         "mac.disk_low": "machine.disk_low",
         "mac.disk_ok": "machine.disk_ok",
+        // Parking became a request to archive (#584).
+        "agent.parked": "agent.archive_requested",
     ]
 
     /// The name as the catalogue has it today.

@@ -36,7 +36,8 @@ public enum WarmPool {
         /// The person has prompted it at least once: a chat, not a workflow's or an
         /// agent's errand.
         public var personsConversation = false
-        public var parked = false
+        /// It asks the person to archive it (#584): put down, nobody is expected.
+        public var asksToArchive = false
         public var lastPersonPrompt: Date?
         /// The person's usual gap between prompts here, when there are enough to say.
         public var typicalGap: TimeInterval?
@@ -69,7 +70,7 @@ public enum WarmPool {
         let intent = entry.intentAt.map { now.timeIntervalSince($0) < intentLasts } ?? false
         let wanted = signals.watchedActive || intent
         // A session put down: nobody is expected, unless somebody is looking at it now.
-        if signals.parked, !wanted { return 0 }
+        if signals.asksToArchive, !wanted { return 0 }
         // Away from the Mac: only what is in front of somebody on another surface is
         // kept, or what somebody has just opened or typed in there, which says they are,
         // or what the app itself will wake: that needs nobody about.

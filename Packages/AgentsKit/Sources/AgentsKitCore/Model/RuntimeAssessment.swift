@@ -44,7 +44,7 @@ public enum RuntimeAssessment {
         Step(id: "own_ask", area: "Questions",
              passesWhen: "a question asked with the runtime's own tool reached the app and was answered (not offered where the runtime has none)"),
         Step(id: "helpers", area: "Helpers",
-             passesWhen: "start_agent made a helper marked as this agent's; the agent was resumed when it finished; it was parked, then archived by this agent"),
+             passesWhen: "start_agent made a helper marked as this agent's; the agent was resumed when it finished; request_archive archived it for this agent"),
         Step(id: "wait", area: "Events",
              passesWhen: "wait_for_event with until_minutes timed out, and the agent was started again to be told"),
         Step(id: "ending", area: "Ending a turn",
@@ -223,7 +223,7 @@ public enum RuntimeAssessment {
 
             **Turn 2**, once the helper has finished
 
-            8. `helpers`: `park_agent` the helper, then `archive_agent` it.
+            8. `helpers`: `request_archive` the helper. If that leaves it asking rather than archived, `archive_agent` it.
             9. `wait`: `wait_for_event` on `\(neverEvent)` with `until_minutes` 1. When it says \
             you are still waiting, end your turn. You are started again when it times out. (If \
             the call itself comes back timed out, go straight on to step 10 in this turn.)
@@ -257,7 +257,7 @@ public enum RuntimeAssessment {
 
             16. `report`: finish the report: every row filled in, and a section "What to fix" \
             naming each failure with its likely fix — the app, the adapter, the runtime's \
-            version, or a setting. If every step passed by your own account, call `park_agent` \
+            version, or a setting. If every step passed by your own account, call `request_archive` \
             with no id and end your turn saying how many passed; otherwise end it naming the \
             failures and what to fix, with a last line asking Alex which to take up. The app then scores the record and adds its own table \
             to this conversation.

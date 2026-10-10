@@ -47,13 +47,13 @@ struct HelperLimitTests {
                                                           helper(.archived), helper(.running)]) == 1)
     }
 
-    @Test func aParkedHelperIsNotRunningButOneParkingWhenItsTurnEndsIs() {
-        var parked = helper(.finished)
-        parked.parking = .parked(at: Date())
-        #expect(!HelperLimit.isRunning(parked))
-        var parking = helper(.running)
-        parking.parking = .whenTurnEnds(since: Date())
-        #expect(HelperLimit.isRunning(parking))
+    @Test func aHelperAskingToBeArchivedIsNotRunningButOneAskingWhenItsTurnEndsIs() {
+        var asking = helper(.finished)
+        asking.archiveRequest = .requested(at: Date())
+        #expect(!HelperLimit.isRunning(asking))
+        var later = helper(.running)
+        later.archiveRequest = .whenTurnEnds(since: Date())
+        #expect(HelperLimit.isRunning(later))
     }
 
     /// Blocked on agents or a time, or waiting on events or an allowance: the app

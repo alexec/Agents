@@ -16,8 +16,8 @@ import Observation
 @MainActor
 @Observable
 public final class ProjectShelf {
-    /// Each group's agents, newest started first (#182); Parked, most recently parked
-    /// first (040, FR-003); Archived, newest activity first, as the host pages them.
+    /// Each group's agents, newest started first (#182); Archived, newest activity
+    /// first, as the host pages them.
     public private(set) var groups: [AgentGroup: [Agent]] = [:]
     /// How many agents are in each group, by the client's own grouping.
     public private(set) var counts: [AgentGroup: Int] = [:]
@@ -106,17 +106,11 @@ public final class ProjectShelf {
         return a.id.uuidString < b.id.uuidString
     }
 
-    /// Parked reads most recently parked first; Archived, newest activity first; the
-    /// rest, newest started first.
+    /// Archived reads newest activity first; the rest, newest started first.
     nonisolated static func order(_ group: AgentGroup) -> (Agent, Agent) -> Bool {
         switch group {
         case .archived:
             return byActivity
-        case .parked:
-            return { a, b in
-                let at = a.parking?.parkedAt ?? .distantPast, bt = b.parking?.parkedAt ?? .distantPast
-                return at != bt ? at > bt : byStart(a, b)
-            }
         default:
             return byStart
         }

@@ -7,7 +7,7 @@ import Testing
 /// workflow's `when-done:` allows — driven through the real daemon.
 ///
 /// The promise: only a run of a workflow that says so is archived, only when its turn
-/// ended done or with nothing to do, and a session a person started stays park-only.
+/// ended done or with nothing to do, and a session a person started stays the person's to archive.
 @Suite("A workflow's run archived when done", .timeLimit(.minutes(1)))
 struct WorkflowWhenDoneTests {
     private static func file(whenDone: String?, agent: String = "new") -> String {
@@ -95,7 +95,7 @@ struct WorkflowWhenDoneTests {
 
     @Test func theKeyIsRead() {
         let folder = URL(filePath: "/tmp/work")
-        for (text, expected) in [(nil, nil), ("park", WorkflowWhenDone.park),
+        for (text, expected) in [(nil, nil), ("keep", WorkflowWhenDone.keep), ("park", .keep),
                                  ("archive-allowed", .archiveAllowed), ("archive", .archive)] as [(String?, WorkflowWhenDone?)] {
             let workflow = WorkflowFile.parse(Self.file(whenDone: text), workflowID: "check", in: folder)
             #expect(workflow.problem == nil)
@@ -117,13 +117,13 @@ struct WorkflowWhenDoneTests {
                                                        workflowID: "check", in: folder))
         }
         #expect(note(nil).isEmpty)
-        #expect(note("park").isEmpty)
-        #expect(note("archive-allowed").contains("archive_agent with no id"))
+        #expect(note("keep").isEmpty)
+        #expect(note("archive-allowed").contains("request_archive with no id"))
         #expect(note("archive").contains("archives its run"))
         #expect(note("archive", agent: "triggering").isEmpty, "a borrowed agent is somebody else's")
     }
 
-    @Test func thePageWritesTheLineAndParkTakesItOut() async throws {
+    @Test func thePageWritesTheLineAndKeepTakesItOut() async throws {
         let setup = try await setUp(whenDone: nil)
         let url = WorkflowFile.url(for: "check", in: setup.project)
         let settings = WorkflowSettings()
@@ -133,7 +133,7 @@ struct WorkflowWhenDoneTests {
         #expect(try String(contentsOf: url, encoding: .utf8).contains("when-done: archive-allowed"))
 
         summary = try await setup.core.setWorkflowSettings(
-            .init(folder: setup.project, workflowID: "check", settings: settings, whenDone: "park"))
+            .init(folder: setup.project, workflowID: "check", settings: settings, whenDone: "keep"))
         #expect(summary.workflow.whenDone == nil)
         #expect(try !String(contentsOf: url, encoding: .utf8).contains("when-done"))
 
@@ -154,10 +154,10 @@ struct WorkflowWhenDoneTests {
         #expect(agent.archivedReason == .byAgent)
     }
 
-    @Test func archiveWinsOverAnAskToPark() async throws {
+    @Test func archiveWinsOverARequest() async throws {
         let setup = try await setUp(whenDone: "archive")
         let id = try await run(setup)
-        try await finish(setup, "nothing_to_do", afterwards: "park")
+        try await finish(setup, "nothing_to_do", afterwards: "request_archive")
         #expect(await archived(setup.core, id) != nil)
     }
 
@@ -181,6 +181,26 @@ struct WorkflowWhenDoneTests {
         #expect(await archived(setup.core, id) != nil)
     }
 
+    /// A request needs nobody's OK where the run may archive itself (#584, decision 2).
+    @Test func archiveAllowedArchivesOnARequestToo() async throws {
+        let setup = try await setUp(whenDone: "archive-allowed")
+        let id = try await run(setup)
+        try await finish(setup, "done", afterwards: "request_archive")
+        let agent = try #require(await archived(setup.core, id))
+        #expect(agent.archiveRequest == nil)
+    }
+
+    /// Partly done goes with a request but not with archiving: the person is asked.
+    @Test func archiveAllowedAsksThePersonForAPartlyDoneRequest() async throws {
+        let setup = try await setUp(whenDone: "archive-allowed")
+        let id = try await run(setup)
+        try await finish(setup, "partly_done", afterwards: "request_archive")
+        try await settle(setup.core, id)
+        let agent = try #require(await setup.core.agent(id))
+        #expect(agent.state == .finished)
+        #expect(agent.asksToArchive)
+    }
+
     @Test func archiveAllowedKeepsARunThatDoesNotAsk() async throws {
         let setup = try await setUp(whenDone: "archive-allowed")
         let id = try await run(setup)
@@ -199,9 +219,9 @@ struct WorkflowWhenDoneTests {
         try await settle(setup.core, id)
     }
 
-    // MARK: park
+    // MARK: keep
 
-    @Test func parkRefusesAnAskToArchive() async throws {
+    @Test func keepRefusesAnAskToArchive() async throws {
         let setup = try await setUp(whenDone: nil)
         let id = try await run(setup)
         let error = await #expect(throws: JSONRPCError.self) {
@@ -214,7 +234,7 @@ struct WorkflowWhenDoneTests {
         #expect(await setup.core.agent(id)?.state == .finished)
     }
 
-    /// A person's session is park-only, whatever a workflow in its project says.
+    /// A person's session is the person's to archive, whatever a workflow in its project says.
     @Test func aPersonsSessionCannotArchiveItself() async throws {
         let setup = try await setUp(whenDone: "archive")
         let id = try await setup.core.start(.init(runtimeID: "cursor", cwd: setup.project, prompt: "go"))

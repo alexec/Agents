@@ -119,7 +119,7 @@ public final class SidebarFolds {
 /// A row under one of a project's folds, known by the fold as well as by what it shows
 /// (#237).
 ///
-/// A session that moves from one fold to another (Done to Parked, to Archived) used to
+/// A session that moves from one fold to another (Done to Paused, to Archived) used to
 /// keep its own id as it went. SwiftUI's outline list read that as the same item, and
 /// the rows it told `NSOutlineView` to take out no longer matched the rows it had:
 /// "error removing child indexes (6) in parent (which has 5 children)". AppKit catches

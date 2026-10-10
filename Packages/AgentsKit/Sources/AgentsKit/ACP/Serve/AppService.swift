@@ -11,7 +11,7 @@ import Foundation
 /// tools of its own: one that ends a turn — what one passes to `finish_turn` becomes
 /// the line under the agent's name and the row of chips above the prompt — and two
 /// that act mid-turn, `show_file` and `manage_workflows`. Five more act on other
-/// agents — `start_agent`, `stop_agent`, `park_agent`, `archive_agent` (#120) and
+/// agents — `start_agent`, `stop_agent`, `request_archive` (#584), `archive_agent` (#120) and
 /// `list_my_agents` (028) — and are offered only to an agent the person or a workflow started.
 ///
 /// This speaks MCP itself rather than pulling in an SDK: it is four methods of
@@ -35,11 +35,11 @@ public actor AppService {
     public static let askFormToolName = AppTool.askForm
 
     /// And five that act on other agents (028), offered only to an agent the person or
-    /// a workflow started: start one in this project, and stop, park, archive (#120) or
+    /// a workflow started: start one in this project, and stop, ask to archive, archive (#120) or
     /// list the ones this agent started.
     public static let startAgentToolName = AppTool.startAgent
     public static let stopAgentToolName = AppTool.stopAgent
-    public static let parkAgentToolName = AppTool.parkAgent
+    public static let requestArchiveToolName = AppTool.requestArchive
     public static let archiveAgentToolName = AppTool.archiveAgent
     public static let listMyAgentsToolName = AppTool.listMyAgents
     public static let listSessionsToolName = AppTool.listSessions
@@ -85,7 +85,7 @@ public actor AppService {
         case start(prompt: String, runtime: String?, model: String?, permissionMode: String?,
                    worktree: String? = nil, labels: [String] = [])
         case stop(agentID: String)
-        case park(agentID: String)
+        case requestArchive(agentID: String)
         case archive(agentID: String)
         case list
     }
@@ -121,7 +121,7 @@ public actor AppService {
     }
 
     /// What an agent asks of its own session (#481), each once on the tool that does it:
-    /// to be put away once the turn ends (`park_agent` or `archive_agent` with no id), its
+    /// to be put away once the turn ends (`request_archive` or `archive_agent` with no id), its
     /// labels, a move (none takes one back), or a wait on agents or a time.
     public enum SelfCall: Sendable, Equatable {
         case afterTurn(AfterTurn)
@@ -358,7 +358,7 @@ public actor AppService {
                 guard managesAgents else {
                     return .success(Self.reply("""
                         Nothing was done: an agent that another agent started cannot \
-                        start, stop, park or list agents of its own.
+                        start, stop, archive or list agents of its own.
                         """, isError: true))
                 }
                 switch call {
@@ -376,7 +376,7 @@ public actor AppService {
     }
 
     /// Which of the calls on the agent's own session a tool is (#481), with its arguments
-    /// read. `nil` when it is none of them — `park_agent` with an id is a helper's, and a
+    /// read. `nil` when it is none of them — `request_archive` with an id is a helper's, and a
     /// `wait_for_event` on events is an event wait.
     static func selfCall(named name: String, _ arguments: JSONValue?,
                          movesItself: Bool) -> Result<SelfCall, AgentCallProblem>? {
@@ -392,7 +392,7 @@ public actor AppService {
             }
             return .success(list.compactMap(\.stringValue))
         }
-        if name.hasSuffix(parkAgentToolName), !given("id") { return .success(.afterTurn(.park)) }
+        if name.hasSuffix(requestArchiveToolName), !given("id") { return .success(.afterTurn(.requestArchive)) }
         if name.hasSuffix(archiveAgentToolName), !given("id") { return .success(.afterTurn(.archive)) }
         if name.hasSuffix(setSessionLabelsToolName) {
             let add: [String], remove: [String]
@@ -479,14 +479,14 @@ public actor AppService {
                                    worktree: text("worktree"),
                                    labels: arguments?["labels"]?.arrayValue?.compactMap(\.stringValue) ?? []))
         }
-        if name.hasSuffix(stopAgentToolName) || name.hasSuffix(parkAgentToolName)
+        if name.hasSuffix(stopAgentToolName) || name.hasSuffix(requestArchiveToolName)
             || name.hasSuffix(archiveAgentToolName) {
             guard let id = text("id") else {
                 return .failure("Nothing changed: `id` has to be the id start_agent or list_my_agents gave.")
             }
             if name.hasSuffix(stopAgentToolName) { return .success(.stop(agentID: id)) }
             if name.hasSuffix(archiveAgentToolName) { return .success(.archive(agentID: id)) }
-            return .success(.park(agentID: id))
+            return .success(.requestArchive(agentID: id))
         }
         if name.hasSuffix(listMyAgentsToolName) {
             return .success(.list)
@@ -616,11 +616,11 @@ public actor AppService {
         // ended, and an agent that needs the person asks them.
         // The agent tools after the workflow tool, and only for an agent that
         // may use them (028).
-        // `park_agent` for every agent, since with no id it parks the caller (#481).
+        // `request_archive` for every agent, since with no id it asks for the caller (#481, #584).
         let agentTools = managesAgents
-            ? [Self.startAgentTool, Self.stopAgentTool, Self.parkAgentTool, Self.archiveAgentTool,
+            ? [Self.startAgentTool, Self.stopAgentTool, Self.requestArchiveTool, Self.archiveAgentTool,
                Self.listMyAgentsTool]
-            : [Self.parkAgentTool]
+            : [Self.requestArchiveTool]
         // The three lease tools after those, for every agent: waiting for the
         // simulator is not managing anyone (036).
         let leaseTools = [Self.leaseResourceTool, Self.releaseResourceTool, Self.listResourcesTool]
@@ -738,7 +738,7 @@ public actor AppService {
             Move once this turn ends: into a git worktree of this project, or back to the \
             project folder. Do it when the work turns into a change that should be on its \
             own branch, or when asked. You are started again there to carry on, or stay \
-            parked if you asked to be. Nothing uncommitted comes with you, and a new \
+            there if you asked to be archived. Nothing uncommitted comes with you, and a new \
             worktree starts from the commit you have checked out: commit first. Give \
             neither argument to take back a move you asked for. Not with a wait.
             """,
@@ -947,7 +947,7 @@ public actor AppService {
             the control plane knows; do not invent an id.
 
             `when-done:` says what a run may do with its session once it is done: \
-            `park` (the default) keeps every run in the list; `archive-allowed` lets a \
+            `keep` (the default) keeps every run in the list; `archive-allowed` lets a \
             run that finishes done or nothing_to_do archive itself; `archive` archives \
             every run that finishes so. Leave it out unless the person asks for runs to \
             be put away.
@@ -1043,20 +1043,20 @@ public actor AppService {
             of the work that can run alongside the rest. It starts in this project's \
             folder — there is no way to start one anywhere else — and appears in the \
             person's list of agents, marked as started by you. The person can open it, \
-            talk to it, stop it, park it or archive it at any time.
+            talk to it, stop it or archive it at any time.
 
             This project has two limits on agents started by agents, counting every agent \
             here, which only the person sets (in Project Settings): how many may be \
             running — working, waiting on a question, or waiting to carry on by \
-            itself — and how many may exist not yet archived, where stopped, parked and \
-            finished ones still count. A start that would break either is queued \
+            itself — and how many may exist not yet archived, where stopped, finished \
+            and asking-to-be-archived ones still count. A start that would break either is queued \
             instead, saying which: nothing runs yet, and it starts by itself, oldest \
             first, once a running place and a not-archived place are both free, behind \
             the working and waiting ones. So you can queue work up front rather than \
             wait and try again; wait for a queued agent with wait_for_event as for any \
             other. A third limit says how many may be queued; past it a start is \
             refused. Use list_my_agents to see yours and how many places of each \
-            are in use. Stop one with stop_agent, or park one with park_agent, when its \
+            are in use. Stop one with stop_agent, or call request_archive on it, when its \
             part is done: that frees its running place, and it keeps its other place \
             until it is archived. Once its work is merged or abandoned, archive it with \
             archive_agent to free that place too (where the person allows it); archive \
@@ -1066,7 +1066,7 @@ public actor AppService {
             Do not start one for work you could simply do yourself. The agent you \
             start cannot start agents of its own.
 
-            Returns the new agent's id, which stop_agent, park_agent and archive_agent take.
+            Returns the new agent's id, which stop_agent, request_archive and archive_agent take.
             """,
         "inputSchema": [
             "type": "object",
@@ -1120,7 +1120,7 @@ public actor AppService {
         ],
     ]
 
-    /// The id schema stop, park and archive share.
+    /// The id schema stop and archive share.
     private static let agentIDSchema: JSONValue = [
         "type": "object",
         "properties": [
@@ -1145,7 +1145,7 @@ public actor AppService {
         "inputSchema": agentIDSchema,
     ]
 
-    /// The id park and archive take, which may be left out to mean the caller (#481).
+    /// The id request_archive and archive take, which may be left out to mean the caller (#481).
     private static let ownOrHelperIDSchema: JSONValue = [
         "type": "object",
         "properties": [
@@ -1156,18 +1156,23 @@ public actor AppService {
         ],
     ]
 
-    static let parkAgentTool: JSONValue = [
-        "name": .string(parkAgentToolName),
-        "title": "Park yourself or an agent you started",
+    static let requestArchiveTool: JSONValue = [
+        "name": .string(requestArchiveToolName),
+        "title": "Ask to archive yourself or an agent you started",
         "description": """
-            With no id: park yourself (put this conversation down to come back to) once \
-            this turn ends, when you have finished and cleaned up. Only if the turn ends \
-            done, nothing_to_do or partly_done; anything the person sends first drops it. \
-            Goes with move_worktree: you move, and stay parked.
+            With no id: ask for this conversation to be archived once this turn ends, \
+            when you have finished and cleaned up. Only if the turn ends done, \
+            nothing_to_do or partly_done; anything the person sends first drops it. The \
+            person sees the ask on your row and archives it, or leaves it. Where nobody \
+            needs to agree — your workflow lets its run archive itself, or the agent \
+            that started you may archive you — you are archived instead, if the turn \
+            ends done or nothing_to_do. Goes with move_worktree: you move, and stay \
+            there asking.
 
-            With an id: park an agent you started with start_agent, as the person's own \
-            Park would. If it is still working it parks when its turn ends. Parking frees \
-            its running place; it keeps its not-archived place until it is archived.
+            With an id: the same for an agent you started with start_agent. Where this \
+            project lets you archive your agents it is archived now, or once its turn \
+            ends; otherwise it asks the person. Either way its running place is freed \
+            once it is done; it keeps its not-archived place until it is archived.
             """,
         "inputSchema": ownOrHelperIDSchema,
     ]
@@ -1265,7 +1270,7 @@ public actor AppService {
         "description": .string("""
             Say something to another session in this project, which it reads as a prompt \
             marked as yours, not the person's; the person sees it in that chat too. A session \
-            that is working gets it after its turn; one that is done or parked is woken by it, \
+            that is working gets it after its turn; one that is done or asking to be archived is woken by it, \
             within the project's running limit; one the person started, or one that is stopped, \
             waits until it is next started. \
             It never answers a question that session is waiting on. A reply comes back the \

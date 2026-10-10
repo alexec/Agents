@@ -1451,8 +1451,7 @@ public final class AgentsModel {
         return projects.first { $0.folder == folder }
     }
 
-    /// The agents of one project, in one group, newest started first (#182) — or, under
-    /// Parked, most recently parked first (040, FR-003).
+    /// The agents of one project, in one group, newest started first (#182).
     ///
     /// Grouped by `AgentGroup(for:)`, so no client can put an agent under a heading
     /// another client would not.

@@ -102,15 +102,15 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// person. One ask per silence, and the agent cannot write it.
     public var outcomeAsked: Bool
 
-    /// Whether the person has put this chat down to come back to (040). Absent is not
-    /// parked. It sits beside `state`, `endedReason` and `report` and replaces none of
-    /// them, so unparking is only removing it and the chat is back where its ending
-    /// says. Written by the daemon alone: a person parks and unparks, a person's prompt
-    /// unparks, and archiving clears it.
-    public var parking: Parking?
+    /// Whether an agent has asked for this session to be archived, waiting for the
+    /// person's OK (#584). A mark, not a group: it sits beside `state`, `endedReason`
+    /// and `report` and replaces none of them. Written by the daemon alone: an agent
+    /// asks, and a person's prompt, a later ending that needs them, and archiving
+    /// take it away.
+    public var archiveRequest: ArchiveRequest?
 
     /// Where the agent asked, on the call that ended its turn, to be put once that
-    /// turn is really over: parked, or archived. Absent is where its ending puts it.
+    /// turn is really over: asked to be archived, or archived. Absent is where its ending puts it.
     /// Written only by `finish_turn`, and cleared when the turn ends, is stopped, or
     /// the person sends something — a turn ending any other way than its own, or work
     /// moved on by the person, is not what the ask was about.
@@ -352,8 +352,11 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         poolEntryID = try c.decodeIfPresent(UUID.self, forKey: .poolEntryID)
         switchingOff = try c.decodeIfPresent(Bool.self, forKey: .switchingOff) ?? false
         allowanceWait = try c.decodeIfPresent(AllowanceWait.self, forKey: .allowanceWait)
-        // Written only when parked.
-        parking = try c.decodeIfPresent(Parking.self, forKey: .parking)
+        // Written only when asked.
+        archiveRequest = try c.decodeIfPresent(ArchiveRequest.self, forKey: .archiveRequest)
+        // Parked before #584: no longer a place. The session goes back to the group its
+        // ending puts it in, read, since the person had already put it down.
+        if c.contains(.parking) { isUnread = false }
         // Absent when nothing was asked. A word this build does not know — a newer
         // build's, or the `archive` agents could once ask for — asked for nothing.
         afterTurn = (try? c.decodeIfPresent(AfterTurn.self, forKey: .afterTurn)) ?? nil
@@ -428,7 +431,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // 052's poolEntryID, switchingOff and allowanceWait are read from an older record
         // and never written again (065): nothing sets them, and a wait found at launch is
         // cleared. They go once the #58 cut-off moves past 052.
-        try c.encodeIfPresent(parking, forKey: .parking)
+        try c.encodeIfPresent(archiveRequest, forKey: .archiveRequest)
         try c.encodeIfPresent(afterTurn, forKey: .afterTurn)
         try c.encodeIfPresent(archivedAt, forKey: .archivedAt)
         try c.encodeIfPresent(sandboxOverride, forKey: .sandboxOverride)
@@ -463,7 +466,10 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         /// key is dropped rather than carried on as an unknown field.
         case titledByAgent
         case poolEntryID, switchingOff, allowanceWait
+        /// Parking, gone since #584. Known, so an older record's key is read once and
+        /// dropped rather than carried on as an unknown field.
         case parking
+        case archiveRequest
         case afterTurn
         case background
         case archivedAt
@@ -519,7 +525,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 restartPickUps: Int = 0,
                 report: WorkReport? = nil,
                 outcomeAsked: Bool = false,
-                parking: Parking? = nil,
+                archiveRequest: ArchiveRequest? = nil,
                 afterTurn: AfterTurn? = nil,
                 archivedAt: Date? = nil,
                 unknownFields: [String: JSONValue] = [:]) {
@@ -564,7 +570,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.poolEntryID = nil
         self.switchingOff = false
         self.allowanceWait = nil
-        self.parking = parking
+        self.archiveRequest = archiveRequest
         self.afterTurn = afterTurn
         self.archivedAt = archivedAt
         self.unknownFields = unknownFields

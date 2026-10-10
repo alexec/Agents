@@ -208,9 +208,9 @@ struct EventWorkflowTests {
         try await eventually("fired again on the person's turn") { await firedOn(core, "agent.finished", about: agent) == 2 }
     }
 
-    @Test func aParkedWorkflowIsNotFiredByItsOwnAgentParking() async throws {
+    @Test func aWorkflowOnRequestsIsNotFiredByItsOwnAgentAsking() async throws {
         let (locations, work) = try temporary()
-        try write("  - agent.parked", as: "on-park", in: work)
+        try write("  - agent.archive_requested", as: "on-ask", in: work)
         var script = FakeACPAgent.Script()
         script.turnDelay = .milliseconds(400)
         let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
@@ -219,20 +219,20 @@ struct EventWorkflowTests {
         await core.rescanWorkflows(in: work)
         let person = try await core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: work, prompt: "Go"))
         try await eventually("settled") { await core.agent(person)?.state.hasTurnInFlight == false }
-        try await core.park(person)
-        try await eventually("the workflow ran") { await started(core, by: "on-park").count == 1 }
-        let own = try #require(await started(core, by: "on-park").first)
+        try await core.requestArchive(person)
+        try await eventually("the workflow ran") { await started(core, by: "on-ask").count == 1 }
+        let own = try #require(await started(core, by: "on-ask").first)
 
-        // Its agent parks as its run's turn ends, the way one asking to on finish_turn does.
+        // Its agent asks as its run's turn ends, the way one calling request_archive does.
         try await eventually("its turn is going") { await core.agent(own.id)?.state.hasTurnInFlight == true }
-        try await core.park(own.id)
-        try await eventually("it parked") {
-            await core.eventLog.events.contains { $0.name == "agent.parked" && $0.details["agent"] == own.id.uuidString }
+        try await core.requestArchive(own.id)
+        try await eventually("it asked") {
+            await core.eventLog.events.contains { $0.name == "agent.archive_requested" && $0.details["agent"] == own.id.uuidString }
         }
         try await Task.sleep(for: .milliseconds(500))
-        #expect(await started(core, by: "on-park").count == 1)
-        #expect(await firedOn(core, "agent.parked", about: own.id) == 0)
-        #expect(!(await refusedForDepth(core, "on-park")))
+        #expect(await started(core, by: "on-ask").count == 1)
+        #expect(await firedOn(core, "agent.archive_requested", about: own.id) == 0)
+        #expect(!(await refusedForDepth(core, "on-ask")))
     }
 
     @Test func aWaitStillHearsTheWorkflowsOwnAgentFinish() async throws {
@@ -261,7 +261,7 @@ struct EventWorkflowTests {
     // MARK: 073 — what an agent event carries
 
     /// Every agent event carries the agent's labels, runtime and starter, and whether it
-    /// parked (073 US1): shown, though not matched on (#574).
+    /// asked to be archived (073 US1, #584): shown, though not matched on (#574).
     @Test func anAgentsFinishCarriesItsContext() async throws {
         let (locations, work) = try temporary()
         try write("  - agent.finished", as: "write-up", in: work)
@@ -270,27 +270,27 @@ struct EventWorkflowTests {
         let core = try await core(locations, launcher: FakeLauncher(script: script))
         await core.rescanWorkflows(in: work)
 
-        func start(_ labels: [String], park: Bool) async throws -> UUID {
+        func start(_ labels: [String], ask: Bool) async throws -> UUID {
             let id = try await core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: work, prompt: "Fix it",
                                                                  labels: labels))
-            if park { try await core.park(id) }
+            if ask { try await core.requestArchive(id) }
             return id
         }
-        let bugParked = try await start(["Bug", "p1"], park: true)
-        let bugStays = try await start(["bug"], park: false)
+        let bugAsks = try await start(["Bug", "p1"], ask: true)
+        let bugStays = try await start(["bug"], ask: false)
 
         func finish(_ id: UUID) async -> Event? {
             await core.eventLog.events.first { $0.name == "agent.finished" && $0.details["agent"] == id.uuidString }
         }
         try await eventually("both finished") {
-            for id in [bugParked, bugStays] where await finish(id) == nil { return false }
+            for id in [bugAsks, bugStays] where await finish(id) == nil { return false }
             return true
         }
-        let first = try #require(await finish(bugParked))
+        let first = try #require(await finish(bugAsks))
         #expect(first.details["labels"] == "bug,p1")
         #expect(first.details["runtime"] == "claude")
         #expect(first.details["started_by"] == "person")
-        #expect(first.details["afterwards"] == "park")
+        #expect(first.details["afterwards"] == "archive_requested")
         #expect(await finish(bugStays)?.details["afterwards"] == "stay")
 
         try await eventually("the workflow ran") { await !started(core, by: "write-up").isEmpty }

@@ -73,23 +73,29 @@ extension DaemonCore {
                      endingRun: endingRun).position
     }
 
+    /// `agent.finished`'s `afterwards`, once `move` has settled the turn's ending (#584).
+    func afterwards(_ agentID: UUID, _ agent: Agent) -> String {
+        if archiveWhenDone[agentID] != nil { return "archived" }
+        return agent.archiveRequest?.isRequested == true ? "archive_requested" : "stay"
+    }
+
     /// `agent.finished`, `agent.stopped` or `agent.failed`. Stopped is somebody or
     /// something choosing to stop it; failed is everything that ended it that nobody
     /// chose. The old `agent-stopped` trigger answers to both (FR-022).
     @discardableResult
     ///
-    /// `parks` is whether the agent is parked once this ending is through, by its own
-    /// ask or the person's park while the turn ran (073 FR-003), which `move` has
-    /// decided by now. Read as "parked afterwards" rather than "parked by this ending":
-    /// a finish held back for the outcome question is raised on the second ending, by
-    /// when the park the first one made has already happened.
+    /// `afterwards` is what becomes of the session once this ending is through (073
+    /// FR-003, #584): `archive_requested`, `archived` or `stay`, which `move` has
+    /// decided by now. Read as "afterwards" rather than "by this ending": a finish held
+    /// back for the outcome question is raised on the second ending, by when the
+    /// request the first one made has already happened.
     /// The details are codes (073 FR-007, FR-008); the sentence keeps today's words.
     func raiseAgentEnding(_ agentID: UUID, next: AgentState, reason: EndedReason?, depth: Int,
-                          parks: Bool = false) -> EventPosition? {
+                          afterwards: String = "stay") -> EventPosition? {
         guard let agent = agents[agentID] else { return nil }
         if next == .finished {
             let outcome = agent.report?.outcome
-            var details = ["afterwards": parks ? "park" : "stay"]
+            var details = ["afterwards": afterwards]
             if let outcome { details["outcome"] = outcome.rawValue }
             return raiseAgentEvent("agent.finished", agentID,
                                    sentence: outcome.map { "finished: \($0.heading.lowercased())." } ?? "finished.",

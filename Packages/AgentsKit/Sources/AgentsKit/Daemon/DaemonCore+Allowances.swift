@@ -309,7 +309,7 @@ extension DaemonCore {
         }
     }
 
-    /// Drop a chat's wait: the person prompted, stopped, parked or archived it (FR-017),
+    /// Drop a chat's wait: the person prompted, stopped or archived it, or it asked to be archived (FR-017),
     /// or it has just been resumed. Says nothing; whatever dropped it says what it did.
     func dropAllowanceWait(_ agentID: UUID) {
         guard var agent = agents[agentID], agent.allowanceWait != nil else { return }

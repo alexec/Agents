@@ -137,17 +137,13 @@ public enum DaemonAPI {
         public static let retentionState = "retention/state"
         /// Change that, confirming first when the change deletes agents at once (051).
         public static let retentionSet = "retention/set"
-        /// Put a chat down to come back to, or pick it back up (040). The person's
-        /// word about their own attention: no agent tool reaches either.
-        public static let agentsPark = "agents/park"
-        public static let agentsUnpark = "agents/unpark"
         /// The ways on from an agent whose folder has gone (#119): a successor in the
         /// project folder that reads this session, or the worktree made again from its
         /// branch. The person's, from the error and the chat header.
         public static let agentsContinueInProject = "agents/continueInProject"
         public static let agentsRecreateWorktree = "agents/recreateWorktree"
         /// Mark a finished chat unread, or read, from its row (#70). The person's word
-        /// about their own attention, as parking is: no agent tool reaches it.
+        /// about their own attention: no agent tool reaches it.
         public static let agentsSetUnread = "agents/setUnread"
         /// Start a finished session's runtime ahead of a prompt, because a window opened it
         /// or somebody is typing in its box (#183). Answers at once; the start goes on
@@ -248,12 +244,13 @@ public enum DaemonAPI {
         /// What the MCP helper relays when an agent calls the workflow tool.
         public static let agentsManageWorkflows = "agents/manageWorkflows"
         /// What the MCP helper relays when an agent calls `start_agent`,
-        /// `stop_agent`, `park_agent` or `list_my_agents` (028). The
+        /// `stop_agent`, `request_archive` or `list_my_agents` (028). The
         /// caller is the token, and the token alone decides the project and what it
         /// may touch.
         public static let agentsStartHelper = "agents/startHelper"
         public static let agentsStopHelper = "agents/stopHelper"
-        public static let agentsParkHelper = "agents/parkHelper"
+        /// `request_archive` with an id (#584; `park_agent` before it).
+        public static let agentsRequestArchiveHelper = "agents/requestArchiveHelper"
         /// `archive_agent` (#120).
         public static let agentsArchiveHelper = "agents/archiveHelper"
         public static let agentsListHelpers = "agents/listHelpers"
@@ -305,8 +302,8 @@ public enum DaemonAPI {
         /// helper when an agent calls `finish_turn`. The two above stay for the older
         /// names the helper still relays.
         public static let agentsFinishTurn = "agents/finishTurn"
-        /// `park_agent` or `archive_agent` with no id (#481): the agent asking to be put
-        /// away once its own turn ends.
+        /// `request_archive` or `archive_agent` with no id (#481, #584): the agent asking
+        /// to be put away once its own turn ends.
         public static let agentsAfterTurn = "agents/afterTurn"
         /// `set_session_labels` (#481): the agent's own labels on its own session.
         public static let agentsSetOwnLabels = "agents/setOwnLabels"
@@ -717,7 +714,8 @@ public enum DaemonAPI {
             lastActivityAt = try c.decode(Date.self, forKey: .lastActivityAt)
             // By the group's name, dropping any this build has never heard of. A plain
             // `[AgentGroup: Int]` decode throws on an unknown key, which would take the
-            // whole project list down on a phone older than the group (039's `blocked`, 040's `parked`).
+            // whole project list down on a phone older than the group (039's `blocked`), or
+            // newer than one that went (040's `parked`, gone in #584).
             counts = [:]
             for (name, count) in try c.decode([String: Int].self, forKey: .counts) {
                 if let group = AgentGroup(rawValue: name) { counts[group] = count }
@@ -1110,7 +1108,7 @@ public enum DaemonAPI {
         /// `any` or `all` (#152): whether the first of `waitingOn` to finish resumes it.
         /// A string, checked at the daemon; left out is `all`.
         public var wakeOn: String?
-        /// `park` or `archive`: where the agent asked to be put once the turn is over.
+        /// `request_archive` or `archive`: where the agent asked to be put once the turn is over.
         /// A string, checked at the daemon, and optional: an agent's MCP helper is
         /// started from whatever binary was on disk when its session began, so one
         /// begun before this field existed relays a call without it.
@@ -2388,8 +2386,8 @@ public enum DaemonAPI {
         /// The `hosts:` to write (#317): machine ids, or empty to take the line out so
         /// every host runs it. Left out means left alone, as the labels are.
         public var hosts: [String]?
-        /// The `when-done:` to write (#433): `park`, `archive-allowed` or `archive`, and
-        /// `park` or empty takes the line out. Left out means left alone, as the hosts are.
+        /// The `when-done:` to write (#433): `keep`, `archive-allowed` or `archive`, and
+        /// `keep` or empty takes the line out. Left out means left alone, as the hosts are.
         public var whenDone: String?
         public init(folder: URL, workflowID: String, settings: WorkflowSettings, cooldown: String? = nil,
                     labels: [String]? = nil, hosts: [String]? = nil, whenDone: String? = nil) {
@@ -2482,7 +2480,7 @@ public enum DaemonAPI {
         }
     }
 
-    /// What an agent passes to `stop_agent` or `park_agent`. The id
+    /// What an agent passes to `stop_agent` or `request_archive`. The id
     /// is a string so one that is not a UUID is refused in words rather than failing
     /// to decode.
     public struct HelperRequest: Codable, Sendable {
@@ -2495,8 +2493,8 @@ public enum DaemonAPI {
         }
     }
 
-    /// `park_agent` or `archive_agent` on itself (#481): `park` or `archive`, checked at
-    /// the daemon.
+    /// `request_archive` or `archive_agent` on itself (#481): `request_archive` or
+    /// `archive`, checked at the daemon.
     public struct AfterTurnRequest: Codable, Sendable {
         public var token: String
         public var afterwards: String

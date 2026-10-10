@@ -126,7 +126,7 @@ extension DaemonCore {
         signals.needsAnswer = agent.report?.outcome == .needsAnswer
             || elicitations.values.contains { $0.agentID == agent.id }
         signals.unread = agent.isUnread
-        signals.parked = agent.parking?.isParked == true
+        signals.asksToArchive = agent.archiveRequest?.isRequested == true
         signals.pendingWake = agent.isWaiting
         let prompts = personPromptTimes[agent.id] ?? []
         signals.personsConversation = !prompts.isEmpty
@@ -144,7 +144,7 @@ extension DaemonCore {
         if s.watchedActive { words.append("on screen") } else if s.watched { words.append("open") }
         if s.needsAnswer { words.append("needs an answer") }
         if s.unread { words.append("unread") }
-        if s.parked { words.append("parked") }
+        if s.asksToArchive { words.append("asks to be archived") }
         if s.pendingWake { words.append("waiting to be woken") }
         if !s.personsConversation { words.append(agent.startedByWorkflow != nil ? "a workflow's" : "an agent's") }
         if let last = s.lastPersonPrompt { words.append("last prompt \(Int(now().timeIntervalSince(last)))s ago") }
@@ -319,10 +319,10 @@ extension DaemonCore {
     }
 
     /// Settled, where it is, with nothing waiting to move it: a finished chat, or one
-    /// the person stopped and is coming back to. Not one put down (parked), and not one a
+    /// the person stopped and is coming back to. Not one asking to be archived (#584), and not one a
     /// spending limit would refuse the prompt this is for (#202).
     func mayPrewarm(_ agent: Agent) -> Bool {
-        guard Self.mayPrewarm(agent), agent.parking == nil else { return false }
+        guard Self.mayPrewarm(agent), agent.archiveRequest == nil else { return false }
         let limits = limitStore.load()
         return !agent.isAtCostLimit(under: limits) && !isDayLimitReached(under: limits)
     }
@@ -355,7 +355,7 @@ extension DaemonCore {
         // A prompt took it as it came up: it is that turn's now.
         guard turnTasks[id] == nil, !sending.contains(id), live[id] != nil else { return }
         guard stops[id, default: 0] == stopsBefore, let now = agents[id], mayPrewarm(now) else {
-            DaemonLog.shared.write("warm pool: released \(id) after prewarming: stopped, archived, parked or moved meanwhile")
+            DaemonLog.shared.write("warm pool: released \(id) after prewarming: stopped, archived, asked to be archived or moved meanwhile")
             return await releaseRuntime(for: id)
         }
         let at = self.now()

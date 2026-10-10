@@ -1,6 +1,7 @@
 [
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "running",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -37,6 +38,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : true,
@@ -73,6 +75,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "running",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -109,6 +112,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -145,6 +149,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -182,6 +187,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "finished",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -224,6 +230,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "finished",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -261,6 +268,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "finished",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -299,6 +307,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : true,
@@ -340,6 +349,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : true,
@@ -381,6 +391,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : true,
@@ -422,6 +433,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "waiting",
       "isWaiting" : true,
       "needsAPerson" : false,
@@ -471,6 +483,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "waiting",
       "isWaiting" : true,
       "needsAPerson" : false,
@@ -518,6 +531,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -559,6 +573,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "finished",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -610,6 +625,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "waiting",
       "isWaiting" : true,
       "needsAPerson" : false,
@@ -660,6 +676,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "finished",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -715,6 +732,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -753,6 +771,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "finished",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -795,6 +814,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "finished",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -836,6 +856,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "finished",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -878,6 +899,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -919,6 +941,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "waiting",
       "isWaiting" : true,
       "needsAPerson" : false,
@@ -973,6 +996,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "stopped",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -1010,6 +1034,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "stopped",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -1047,6 +1072,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "stopped",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -1084,6 +1110,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -1121,6 +1148,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -1158,6 +1186,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -1194,6 +1223,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "stopped",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -1236,17 +1266,23 @@
   },
   {
     "expected" : {
-      "group" : "parked",
+      "asksToArchive" : true,
+      "group" : "finished",
       "isWaiting" : false,
       "needsAPerson" : false,
       "showsUnread" : false,
-      "title" : "Parked"
+      "title" : "Done"
     },
     "input" : {
       "agent" : {
         "advertisedOptions" : [
 
         ],
+        "archiveRequest" : {
+          "requested" : {
+            "at" : 812500300
+          }
+        },
         "availableCommands" : [
 
         ],
@@ -1254,11 +1290,6 @@
         "cwd" : "file:///fixture/project/",
         "id" : "00000000-0000-0000-0000-000000000031",
         "lastActivityAt" : 812500000,
-        "parking" : {
-          "parked" : {
-            "at" : 812500300
-          }
-        },
         "report" : {
           "at" : 812500060,
           "message" : "It went.",
@@ -1278,37 +1309,39 @@
       },
       "wantsEyes" : false
     },
-    "name" : "parked, done"
+    "name" : "asks to archive, done"
   },
   {
     "expected" : {
-      "group" : "parked",
+      "asksToArchive" : true,
+      "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : true,
-      "showsUnread" : false,
-      "title" : "Parked"
+      "showsUnread" : true,
+      "title" : "Needs you"
     },
     "input" : {
       "agent" : {
         "advertisedOptions" : [
 
         ],
+        "archiveRequest" : {
+          "requested" : {
+            "at" : 812500360
+          }
+        },
         "availableCommands" : [
 
         ],
         "createdAt" : 812500000,
         "cwd" : "file:///fixture/project/",
         "id" : "00000000-0000-0000-0000-000000000032",
+        "isUnread" : true,
         "lastActivityAt" : 812500000,
-        "parking" : {
-          "parked" : {
-            "at" : 812500360
-          }
-        },
         "report" : {
           "at" : 812500060,
           "message" : "It went.",
-          "outcome" : "stuck"
+          "outcome" : "partly_done"
         },
         "runtimeID" : "claude",
         "startOptions" : {
@@ -1324,33 +1357,35 @@
       },
       "wantsEyes" : false
     },
-    "name" : "parked, stuck"
+    "name" : "asks to archive, partly done, unread"
   },
   {
     "expected" : {
-      "group" : "needsAttention",
+      "asksToArchive" : true,
+      "group" : "stopped",
       "isWaiting" : false,
-      "needsAPerson" : true,
+      "needsAPerson" : false,
       "showsUnread" : false,
-      "title" : "Needs you"
+      "title" : "Paused"
     },
     "input" : {
       "agent" : {
         "advertisedOptions" : [
 
         ],
+        "archiveRequest" : {
+          "requested" : {
+            "at" : 812500300
+          }
+        },
         "availableCommands" : [
 
         ],
         "createdAt" : 812500000,
         "cwd" : "file:///fixture/project/",
+        "endedReason" : "cancelled",
         "id" : "00000000-0000-0000-0000-000000000033",
         "lastActivityAt" : 812500000,
-        "parking" : {
-          "parked" : {
-            "at" : 812500300
-          }
-        },
         "runtimeID" : "claude",
         "startOptions" : {
           "extraArguments" : [
@@ -1360,15 +1395,16 @@
 
           }
         },
-        "state" : "waitingOnUser",
+        "state" : "stopped",
         "title" : "Session 33"
       },
       "wantsEyes" : false
     },
-    "name" : "parked, but asking"
+    "name" : "asks to archive, stopped"
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "running",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -1380,6 +1416,11 @@
         "advertisedOptions" : [
 
         ],
+        "archiveRequest" : {
+          "whenTurnEnds" : {
+            "since" : 812500240
+          }
+        },
         "availableCommands" : [
 
         ],
@@ -1387,11 +1428,6 @@
         "cwd" : "file:///fixture/project/",
         "id" : "00000000-0000-0000-0000-000000000034",
         "lastActivityAt" : 812500000,
-        "parking" : {
-          "whenTurnEnds" : {
-            "since" : 812500240
-          }
-        },
         "runtimeID" : "claude",
         "startOptions" : {
           "extraArguments" : [
@@ -1406,10 +1442,11 @@
       },
       "wantsEyes" : false
     },
-    "name" : "parked when the turn ends, running"
+    "name" : "asks to archive when the turn ends, running"
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "archived",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -1446,6 +1483,7 @@
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "archived",
       "isWaiting" : false,
       "needsAPerson" : false,
@@ -1457,6 +1495,11 @@
         "advertisedOptions" : [
 
         ],
+        "archiveRequest" : {
+          "requested" : {
+            "at" : 812500300
+          }
+        },
         "availableCommands" : [
 
         ],
@@ -1464,11 +1507,6 @@
         "cwd" : "file:///fixture/project/",
         "id" : "00000000-0000-0000-0000-000000000036",
         "lastActivityAt" : 812500000,
-        "parking" : {
-          "parked" : {
-            "at" : 812500300
-          }
-        },
         "runtimeID" : "claude",
         "startOptions" : {
           "extraArguments" : [
@@ -1483,10 +1521,11 @@
       },
       "wantsEyes" : false
     },
-    "name" : "archived and parked"
+    "name" : "archived, a request left on it"
   },
   {
     "expected" : {
+      "asksToArchive" : false,
       "group" : "waiting",
       "isWaiting" : false,
       "needsAPerson" : false,

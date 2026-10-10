@@ -475,16 +475,16 @@ extension DaemonCore {
             case DaemonAPI.Method.agentsPrompt:
                 let request = try require(params, as: DaemonAPI.PromptRequest.self)
                 // Only the Mac and the phone send this, so a person's prompt here is a
-                // person typing, and that picks a parked chat back up (040, FR-009).
-                // Workflows, the restart pick-up and the outcome question reach
-                // `prompt` directly and leave the chat parked. It also drops an agent's
-                // ask to be parked or archived when its turn ends: the person has moved
-                // the work on.
+                // person typing, and that takes back a request to archive (#584): the
+                // person has answered it by carrying on. Workflows, the restart pick-up
+                // and the outcome question reach `prompt` directly and leave the mark.
+                // It also drops an agent's ask to be archived when its turn ends: the
+                // person has moved the work on.
                 return .success(try await once(request.sendID) {
-                    // Before the unpark below: a refused send leaves the chat as it was.
+                    // Before the mark goes below: a refused send leaves the chat as it was.
                     try await self.requireFolder(request.agentID)
                     if request.from == .person {
-                        await self.unparkQuietly(request.agentID)
+                        await self.clearArchiveRequest(request.agentID)
                         await self.dropAfterTurnAsk(request.agentID)
                         // How quickly they reply here, for the warm pool (#183).
                         await self.notePersonPrompt(request.agentID)
@@ -547,17 +547,6 @@ extension DaemonCore {
             case DaemonAPI.Method.agentsUnarchive:
                 let request = try require(params, as: DaemonAPI.AgentRequest.self)
                 try await unarchive(request.agentID)
-                return .success([:])
-
-            case DaemonAPI.Method.agentsPark:
-                let request = try require(params, as: DaemonAPI.AgentRequest.self)
-                try park(request.agentID)
-                return .success([:])
-
-            case DaemonAPI.Method.agentsUnpark:
-                let request = try require(params, as: DaemonAPI.AgentRequest.self)
-                try await requireFolder(request.agentID)
-                try unpark(request.agentID)
                 return .success([:])
 
             case DaemonAPI.Method.agentsContinueInProject:
@@ -888,9 +877,9 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.HelperRequest.self)
                 return .success(["note": .string(try await stopHelper(request))])
 
-            case DaemonAPI.Method.agentsParkHelper:
+            case DaemonAPI.Method.agentsRequestArchiveHelper:
                 let request = try require(params, as: DaemonAPI.HelperRequest.self)
-                return .success(["note": .string(try parkHelper(request))])
+                return .success(["note": .string(try await requestArchiveHelper(request))])
 
             case DaemonAPI.Method.agentsArchiveHelper:
                 let request = try require(params, as: DaemonAPI.HelperRequest.self)

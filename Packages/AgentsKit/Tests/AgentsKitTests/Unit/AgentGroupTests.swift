@@ -15,7 +15,7 @@ struct AgentGroupTests {
     }
 
     @Test func groupsAppearInActionOrder() {
-        #expect(AgentGroup.live.map(\.title) == ["Needs you", "Waiting", "Working", "Done", "Paused", "Parked"])
+        #expect(AgentGroup.live.map(\.title) == ["Needs you", "Waiting", "Working", "Done", "Paused"])
         #expect(AgentGroup.archived.title == "Archived")
         #expect(!AgentGroup.live.contains(.blocked))
     }
@@ -30,10 +30,13 @@ struct AgentGroupTests {
         #expect(completed.group(wantsEyes: false) == .finished)
     }
 
-    @Test func parkedAndUnreadIsParked() {
-        var parked = agent(.finished, report: .done, endedReason: .endTurn, unread: true)
-        parked.parking = .parked(at: Date())
-        #expect(parked.group(wantsEyes: false) == .parked)
+    /// #584: a request to archive is a mark on the row too, never a group.
+    @Test func askingToBeArchivedStaysInDone() {
+        var asking = agent(.finished, report: .done, endedReason: .endTurn, unread: true)
+        asking.archiveRequest = .requested(at: Date())
+        #expect(asking.group(wantsEyes: false) == .finished)
+        #expect(asking.asksToArchive)
+        #expect(asking.showsUnread)
     }
 
     /// What truly needs the person stays under Needs you, read or not.
@@ -79,14 +82,14 @@ struct AgentGroupTests {
         #expect(agent(.stopped, endedReason: .processDied).group(wantsEyes: false) == .needsAttention)
     }
 
-    @Test func explicitParkingAndLiveQuestionsKeepTheirPriority() {
+    @Test func aRequestNeverMovesTheGroupAndAnArchivedOneShowsNoMark() {
         var finished = agent(.finished, report: .done, endedReason: .endTurn, unread: true)
-        finished.parking = .parked(at: Date())
-        #expect(finished.group(wantsEyes: false) == .parked)
+        finished.archiveRequest = .requested(at: Date())
         finished.state = .waitingOnUser
         #expect(finished.group(wantsEyes: false) == .needsAttention)
         finished.state = .archived
         #expect(finished.group(wantsEyes: false) == .archived)
+        #expect(!finished.asksToArchive)
     }
 
     @Test func everyStateAndOutcomeMapsToOneVisibleGroup() {
