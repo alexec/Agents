@@ -62,7 +62,7 @@ test("smart groups gather by what a session wants, newest started first (#495)",
   assert.equal(sessionMark(agent("paused", 1, { state: "stopped", endedReason: "cancelled" })), null, "its own status mark");
 });
 
-test("To Archive gathers what an agent asked to have archived, whatever its group (#584)", async () => {
+test("To Archive gathers what an agent asked to have archived, each listed once (#584, #587)", async () => {
   const { smartAgents, smartRows, smartTitles } = await load("src/model/sidebar.ts");
   const asked = { requested: { at: 1 } };
   const live = [
@@ -71,7 +71,8 @@ test("To Archive gathers what an agent asked to have archived, whatever its grou
     agent("later", 3, { state: "running", archiveRequest: { whenTurnEnds: { since: 1 } } }),
     agent("none", 4),
   ];
-  assert.deepEqual(smartAgents("toArchive", live).map((a) => a.id), ["partly", "done"], "asked, not set to ask");
+  assert.deepEqual(smartAgents("toArchive", live).map((a) => a.id), ["done"], "asked, not set to ask");
+  assert.deepEqual(smartAgents("needsYou", live).map((a) => a.id), ["partly"], "partly done is listed once, under Needs You");
   assert.equal(smartRows.at(-1), "toArchive");
   assert.equal(smartTitles.toArchive, "To Archive");
   const { sessionMark } = await load("src/model/sidebar.ts");
