@@ -307,8 +307,8 @@ private struct NothingPickedPage: View {
             Label("Nothing selected", systemImage: "sidebar.left")
         } description: {
             Text("""
-            Pick a session on the left to read it, or a project's New session row to \
-            start one there. ⌘N starts one in the selected project.
+            Pick a session on the left to read it, or New Session at the top to \
+            start one. ⌘N does the same.
 
             ↑ and ↓ move through the list, → and ← unfold and fold a project, \
             and ⌘F finds a session.

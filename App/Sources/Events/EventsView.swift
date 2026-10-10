@@ -330,16 +330,13 @@ struct EventsRow: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
+        // The title alone (#587): only a session's row has something at its end. When
+        // the last event came is the tooltip's.
         HStack(alignment: .firstTextBaseline) {
             Text("Events").foregroundStyle(.primary)
             Spacer()
-            if let last = model.work.lastEventAt {
-                Text("Last \(LeaseWords.clock(last))")
-                    .monospacedDigit()
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
-            }
         }
-        .help("What happened, what came of it, and who is waiting")
+        .help(model.work.lastEventAt.map { "Last at \(LeaseWords.clock($0)). What happened, what came of it, and who is waiting" }
+              ?? "What happened, what came of it, and who is waiting")
     }
 }

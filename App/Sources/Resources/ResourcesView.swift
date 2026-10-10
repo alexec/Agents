@@ -319,16 +319,12 @@ struct ResourcesRow: View {
     }
 
     var body: some View {
+        // The title alone (#587): what is held and waited for is the tooltip's.
         HStack(alignment: .firstTextBaseline) {
             Text("Resources").foregroundStyle(.primary)
             Spacer()
-            if let counts {
-                Text(counts)
-                    .monospacedDigit()
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
-            }
         }
-        .help("Who holds the simulators, browsers and screen, and who is waiting")
+        .help(counts.map { "\($0). Who holds the simulators, browsers and screen, and who is waiting" }
+              ?? "Who holds the simulators, browsers and screen, and who is waiting")
     }
 }

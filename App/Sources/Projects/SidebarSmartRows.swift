@@ -146,7 +146,6 @@ enum SidebarHeading {
 struct ProjectPageRow: View {
     let title: String
     let systemImage: String
-    let count: Int
     let item: SidebarItem
 
     var body: some View {
@@ -155,19 +154,17 @@ struct ProjectPageRow: View {
                 .foregroundStyle(Paper.accent)
                 .frame(width: 16)
                 .accessibilityHidden(true)
+            // White, as every row's title is (#587); nothing at its end, which is only
+            // a session's, the count in its tooltip.
             Text(title)
                 .lineLimit(1)
+                .foregroundStyle(.primary)
             Spacer(minLength: 4)
-            Text("\(count)")
-                .monospacedDigit()
-                .appText(.fine)
-                .foregroundStyle(.secondary)
         }
         // The size of the rows around it, sessions and New Session alike.
         .appText(.supporting)
         .contentShape(Rectangle())
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(title), \(count)")
+        .accessibilityElement(children: .combine)
         .sidebarInk(item)
         .tag(item)
     }
@@ -178,11 +175,14 @@ struct ProjectPageRow: View {
 /// list draws in its own style (#155).
 private struct ActivityIcon: ViewModifier {
     let systemImage: String
+    /// Red when the page has something wrong to say (#587): the row has no figure at its
+    /// end to colour, which is only a session's.
+    var warns = false
 
     func body(content: Content) -> some View {
         HStack(spacing: 6) {
             Image(systemName: systemImage)
-                .foregroundStyle(Paper.accent)
+                .foregroundStyle(warns ? StateTint.failure.style(or: .primary) : AnyShapeStyle(Paper.accent))
                 .frame(width: 16)
                 .accessibilityHidden(true)
             content
@@ -191,7 +191,7 @@ private struct ActivityIcon: ViewModifier {
 }
 
 extension View {
-    func activityIcon(_ systemImage: String) -> some View {
-        modifier(ActivityIcon(systemImage: systemImage))
+    func activityIcon(_ systemImage: String, warns: Bool = false) -> some View {
+        modifier(ActivityIcon(systemImage: systemImage, warns: warns))
     }
 }

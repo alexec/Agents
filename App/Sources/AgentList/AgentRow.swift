@@ -94,10 +94,12 @@ struct AgentRow: View {
                         .lineLimit(1)
                         .accessibilityValue(agent.showsUnread ? "unread" : "")
                     if let place {
+                        // Whole, the title giving way first (#587): cut to "p" it said nothing.
                         Text(place)
                             .appText(.fine)
                             .foregroundStyle(.tertiary)
                             .lineLimit(1)
+                            .fixedSize()
                             .layoutPriority(-1)
                     }
                     // Started by a workflow rather than a person: the one thing about
@@ -150,78 +152,82 @@ struct AgentRow: View {
                         .foregroundStyle(.secondary)
                         .help(agent.folderGoneMessage)
                 } else if let report = agent.report?.message {
-                    // In the sidebar, white as the title is (#495): what it said is
-                    // what the row is for.
+                    // Grey under the white title, in the sidebar as on the page (#587).
                     Text(report)
                         .appText(isCompact ? .fine : .supporting)
-                        .foregroundStyle(isCompact ? .primary : .secondary)
+                        .foregroundStyle(.secondary)
                         .lineLimit(isCompact ? 1 : 2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                // Working in a worktree (030): named, because with two agents in one
-                // project the worktree is how you tell whose changes are whose. On this
-                // line, not the title's, so a long branch never cuts the title short (#68).
-                // Labels are shown here and changed over the chat.
-                if agent.worktree != nil || !agent.labels.isEmpty {
-                    WrappingHStack(spacing: 5) {
-                        if let worktree = agent.worktree {
-                            // Gone is the daemon's mark on the record, which it keeps by a stat on
-                            // its heartbeat and when it removes a worktree: the row asks nothing
-                            // of the host itself, so a long list costs no folder listings (#176).
-                            WorktreeBadge(worktree: worktree, isGone: agent.missingFolder != nil)
+                // In the sidebar the row is the title and that one line (#587): what it
+                // holds, waits on, runs or is labelled with is the chat's to say, where
+                // the prompt bar and the wait lines carry it, and Carry on with it.
+                if !isCompact {
+                    // Working in a worktree (030): named, because with two agents in one
+                    // project the worktree is how you tell whose changes are whose. On this
+                    // line, not the title's, so a long branch never cuts the title short (#68).
+                    // Labels are shown here and changed over the chat.
+                    if agent.worktree != nil || !agent.labels.isEmpty {
+                        WrappingHStack(spacing: 5) {
+                            if let worktree = agent.worktree {
+                                // Gone is the daemon's mark on the record, which it keeps by a stat on
+                                // its heartbeat and when it removes a worktree: the row asks nothing
+                                // of the host itself, so a long list costs no folder listings (#176).
+                                WorktreeBadge(worktree: worktree, isGone: agent.missingFolder != nil)
+                            }
+                            ForEach(agent.labels, id: \.normalizedValue) { LabelChip(label: $0) }
                         }
-                        ForEach(agent.labels, id: \.normalizedValue) { LabelChip(label: $0) }
                     }
-                }
 
-                // What it holds or waits for (036), so an idle agent still holding the
-                // simulator can be seen from the list.
-                if let leases = model.work.leaseStatus(of: agent.id) {
-                    LeaseMark(status: leases)
-                }
+                    // What it holds or waits for (036), so an idle agent still holding the
+                    // simulator can be seen from the list.
+                    if let leases = model.work.leaseStatus(of: agent.id) {
+                        LeaseMark(status: leases)
+                    }
 
-                // What it has running in the background (057), on the same kind of line.
-                if let running = BackgroundWords.mark(agent.background) {
-                    Label(running, systemImage: "apple.terminal")
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel(running)
-                }
+                    // What it has running in the background (057), on the same kind of line.
+                    if let running = BackgroundWords.mark(agent.background) {
+                        Label(running, systemImage: "apple.terminal")
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(running)
+                    }
 
-                // Waiting on events (042), on the same kind of line.
-                if agent.eventWait?.isOpen == true, let wait = model.work.waitStatus(of: agent) {
-                    Text(wait.mark)
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
-                // Blocked (039): what it waits on, one line an agent, and when it will
-                // look again — so the row says what it is waiting for without opening
-                // it (SC-005). Carry on is here because the person often knows the block
-                // has gone before the app does.
-                if model.isBlocked(agent) {
-                    ForEach(model.blockLines(agent), id: \.self) { line in
-                        Text(line)
+                    // Waiting on events (042), on the same kind of line.
+                    if agent.eventWait?.isOpen == true, let wait = model.work.waitStatus(of: agent) {
+                        Text(wait.mark)
                             .appText(.fine)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
-                    Button(AgentsModel.carryOnLabel) { Task { await model.carryOn(agent.id) } }
-                        .buttonStyle(.paper)
-                        .controlSize(.small)
-                        .padding(.top, 3)
-                        .help(AgentsModel.carryOnHelp(for: agent))
-                }
-                // Parked, and since when; or that it will park when this turn ends
-                // (040). How it ended stays the icon's to say.
-                if let line = ParkWords.line(agent.parking) {
-                    Text(line)
-                        .appText(.fine)
-                        .foregroundStyle(.tertiary)
+
+                    // Blocked (039): what it waits on, one line an agent, and when it will
+                    // look again — so the row says what it is waiting for without opening
+                    // it (SC-005). Carry on is here because the person often knows the block
+                    // has gone before the app does.
+                    if model.isBlocked(agent) {
+                        ForEach(model.blockLines(agent), id: \.self) { line in
+                            Text(line)
+                                .appText(.fine)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        Button(AgentsModel.carryOnLabel) { Task { await model.carryOn(agent.id) } }
+                            .buttonStyle(.paper)
+                            .controlSize(.small)
+                            .padding(.top, 3)
+                            .help(AgentsModel.carryOnHelp(for: agent))
+                    }
+                    // Parked, and since when; or that it will park when this turn ends
+                    // (040). How it ended stays the icon's to say.
+                    if let line = ParkWords.line(agent.parking) {
+                        Text(line)
+                            .appText(.fine)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
             }
             Spacer(minLength: 0)

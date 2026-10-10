@@ -78,6 +78,19 @@ public struct SidebarProjectFold {
         pinned.contains { work.group(of: $0) == .needsAttention } || pinnedWorkflows.contains(where: \.needsAPerson)
     }
 
+    /// How many sessions the project's own group lists, folded or not: its live ones that
+    /// no smart group lists (#587). The busy groups go to Needs You and Working whole, so
+    /// what is left is the rest, less the unread and the pinned among them.
+    public static func ownCount(_ key: ProjectKey, in work: AgentsModel) -> Int {
+        let shelf = work.shelf(key)
+        let rest = AgentGroup.live.filter { !SidebarSmartRow.busyGroups.contains($0) }
+            .reduce(0) { $0 + (shelf.counts[$1] ?? 0) }
+        let pinnedAtRest = SidebarSmartRow.pinnedSessions(in: work, key).count {
+            SidebarSmartRow.home(of: $0, in: work.group(of: $0), isPinned: false) == nil
+        }
+        return max(0, rest - SidebarSmartRow.unreadAtRest(in: shelf) - pinnedAtRest)
+    }
+
     /// How many archived sessions the fold says it holds: the host's count while there is
     /// no search, since the client holds a page of them only while the fold is open (#165).
     public func archivedCount(_ summary: DaemonAPI.ProjectSummary?) -> Int {
@@ -141,7 +154,10 @@ public struct SidebarProjectFold {
                 groups.append(Group(group: group, heading: heading))
             }
         }
-        sessions = groups.flatMap(\.agents).sorted { $0.createdAt > $1.createdAt }
+        // Only those no smart group lists: each session is in the sidebar once (#587).
+        sessions = groups.flatMap { group in
+            group.agents.filter { SidebarSmartRow.home(of: $0, in: group.group, isPinned: false) == nil }
+        }.sorted { $0.createdAt > $1.createdAt }
         let archived = shelf.groups[.archived] ?? []
         self.archived = matcher.map { archived.filter($0.matches) } ?? archived
     }

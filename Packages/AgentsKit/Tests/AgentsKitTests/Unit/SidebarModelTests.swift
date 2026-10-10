@@ -235,8 +235,8 @@ struct SidebarModelTests {
         return made
     }
 
-    /// A project folds open straight onto its sessions (#495): every live one, the pinned
-    /// left out, newest started first, whatever its state.
+    /// A project folds open straight onto its sessions (#495): every live one no smart
+    /// group lists (#587), newest started first, whatever its state.
     @Test func aProjectsSessionsAreOneListNewestStartedFirst() {
         let model = AgentsModel()
         let asking = started(api, .waitingOnUser, "asking", at: 1)
@@ -248,7 +248,8 @@ struct SidebarModelTests {
         model.replacePins([ProjectPins(folder: api, pins: [], sessions: [pinned.id])])
 
         let fold = SidebarProjectFold(key, label: "api", in: model, isOpen: true)
-        #expect(fold.sessions.map(\.id) == [working.id, done.id, asking.id])
+        #expect(fold.sessions.map(\.id) == [done.id])
+        #expect(SidebarProjectFold.ownCount(key, in: model) == 1)
         #expect(fold.pinned.map(\.id) == [pinned.id])
         #expect(SidebarProjectFold(key, label: "api", in: model, isOpen: false).sessions.isEmpty)
     }
@@ -303,5 +304,40 @@ struct SidebarModelTests {
         #expect(!SidebarSmartRow.pinned.isShown(in: model, projects: projects))
         #expect(SidebarSmartRow.needsYou.isShown(in: model, projects: projects, query: "asking"))
         #expect(!SidebarSmartRow.needsYou.isShown(in: model, projects: projects, query: "nothing like it"))
+    }
+
+    /// Each live session is listed once (#587): in Pinned, else Needs You, else Working,
+    /// else Unread, else under its project; and every count says what its group lists.
+    @Test func aSessionIsListedOnceInItsFirstGroup() {
+        let model = AgentsModel()
+        let pinnedAsking = started(api, .waitingOnUser, "pinned asking", at: 1)
+        let asking = started(api, .waitingOnUser, "asking", at: 2)
+        let pinnedWorking = started(api, .running, "pinned working", at: 3)
+        let working = started(api, .running, "working", at: 4)
+        let pinnedUnread = started(api, .finished, "pinned unread", at: 5, unread: true)
+        let unread = started(api, .finished, "unread", at: 6, unread: true)
+        let read = started(api, .finished, "read", at: 7)
+        model.replaceAgents([pinnedAsking, asking, pinnedWorking, working, pinnedUnread, unread, read])
+        model.replacePins([ProjectPins(folder: api, pins: [],
+                                       sessions: [pinnedAsking.id, pinnedWorking.id, pinnedUnread.id])])
+        let projects = [key]
+
+        let listed: [SidebarSmartRow: [UUID]] = Dictionary(uniqueKeysWithValues: SidebarSmartRow.allCases.map {
+            ($0, $0.agents(in: model, projects: projects).map(\.id))
+        })
+        #expect(listed[.pinned] == [pinnedAsking.id, pinnedWorking.id, pinnedUnread.id])
+        #expect(listed[.needsYou] == [asking.id])
+        #expect(listed[.working] == [working.id])
+        #expect(listed[.unread] == [unread.id])
+        let fold = SidebarProjectFold(key, label: "api", in: model, isOpen: true)
+        #expect(fold.sessions.map(\.id) == [read.id])
+
+        for row in SidebarSmartRow.allCases {
+            #expect(row.count(in: model, projects: projects) == listed[row]?.count, "\(row)")
+        }
+        #expect(SidebarProjectFold.ownCount(key, in: model) == 1)
+        let everyRow = listed.values.flatMap { $0 } + fold.sessions.map(\.id)
+        #expect(everyRow.count == Set(everyRow).count, "nothing is listed twice")
+        #expect(Set(everyRow).count == 7, "nothing is left out")
     }
 }
