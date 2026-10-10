@@ -365,13 +365,13 @@ struct WorkflowToolTests {
         #expect(answer.contains("Created four"))
     }
 
-    @Test func aWorkflowTooManyAcrossEveryProjectIsRefusedTheSameWay() async throws {
-        // The ceiling an agent meets in a project of its own that is nowhere near full.
-        // The remedy is somewhere else, so the refusal has to say so.
+    @Test func aNewOneWhenTheTotalIsRunningIsWrittenOffAndTurningItOnIsRefused() async throws {
+        // A new workflow starts off, and one turned off takes no place (#506), so the
+        // total is met where it is taken: when the person turns it on, with the remedy.
         let (locations, root) = try temporary()
         let work = try project(root)
         let (core, token, agentID) = try await core(locations, in: work)
-        // Twelve approved elsewhere: more than the ten the machine runs.
+        // Twelve approved and on elsewhere: more than the ten the machine runs.
         for index in 0..<4 {
             let other = root.appendingPathComponent("full\(index)", isDirectory: true)
             try FileManager.default.createDirectory(
@@ -382,12 +382,23 @@ struct WorkflowToolTests {
             await core.rescanWorkflows(in: Project.standardize(other))
         }
 
-        await #expect(throws: JSONRPCError.self) {
-            try await call(core, token, .write, id: "mine", content: sample, keepingAlive: agentID)
+        let answer = try await call(core, token, .write, id: "mine", content: sample, keepingAlive: agentID)
+        #expect(answer.contains("Created mine"))
+        var mine = try #require(await core.allWorkflows(in: work).first { $0.workflowID == "mine" })
+        #expect(!mine.isEnabled)
+        #expect(mine.overLimit == nil)
+        if let digest = mine.awaitingApproval?.digest {
+            mine = try await core.approveWorkflow(.init(folder: work, workflowID: "mine", digest: digest))
         }
 
-        #expect(FileManager.default.fileExists(
-            atPath: WorkflowFile.url(for: "mine", in: work).path) == false)
+        do {
+            _ = try await core.setWorkflowEnabled(.init(folder: work, workflowID: "mine", enabled: true))
+            Issue.record("an eleventh workflow was turned on")
+        } catch let error as JSONRPCError {
+            #expect(error.code == DaemonAPI.Failure.workflowLimitReached)
+            #expect(error.message.contains(WorkflowLimit.total.remedy))
+        }
+        #expect(await core.allWorkflows(in: work).first { $0.workflowID == "mine" }?.isEnabled == false)
     }
 
     @Test func changingAnExistingOneSaysSoRatherThanSayingCreate() async throws {

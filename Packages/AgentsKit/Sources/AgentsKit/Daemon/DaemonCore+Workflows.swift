@@ -438,6 +438,7 @@ extension DaemonCore {
             isArchived: archived,
             isEnabled: enabled,
             overLimit: overLimit,
+            totalLimit: workflowTotalLimit(),
             nextFireAt: runs ? workflow.nextDue(after: now) : nil,
             lastOutcome: state?.lastOutcome,
             isRunning: isRunning(workflow),
@@ -474,7 +475,8 @@ extension DaemonCore {
     ///
     /// The per-project ceiling counts only workflows waiting for the person's OK: the
     /// worry is a queue nobody reviewed, and a workflow somebody approved is not that.
-    /// The total counts the approved ones, which are the ones that can run.
+    /// The total counts the approved ones turned on, which are the ones that can run: one
+    /// turned off runs nothing, so it takes no place (#506).
     ///
     /// By name rather than by age, and by project path rather than by when a project
     /// was added, because a folder has no reliable age — a checkout writes every file
@@ -482,19 +484,20 @@ extension DaemonCore {
     /// come out with the same list.
     ///
     /// Archived workflows are in neither. That is why archiving makes room: it is the
-    /// one move that changes these lists without deleting anybody's file. Nor are ones
-    /// denied on this host (#391): they neither wait nor run here.
+    /// one move that changes these lists without deleting anybody's file; turning one
+    /// off takes it out of the total too. Nor are ones denied on this host (#391): they
+    /// neither wait nor run here.
     struct WorkflowCeilings {
         /// Each project's waiting workflows by file name; the first few may wait.
         var waiting: [URL: [String]] = [:]
-        /// Approved and not archived, in the order the total is applied.
+        /// Approved, turned on and not archived, in the order the total is applied.
         var approved: [(folder: URL, workflowID: String)] = []
         /// Denied on this host (#391), by `WorkflowState.key`: past neither ceiling.
         var denied: Set<String> = []
 
         /// The waiting ones a project is allowed, which are the ones that can be approved.
         func mayWait(in folder: URL) -> ArraySlice<String> {
-            (waiting[folder] ?? []).prefix(WorkflowLimit.project.allowed)
+            (waiting[folder] ?? []).prefix(WorkflowLimit.projectAllowed)
         }
     }
 
@@ -510,7 +513,7 @@ extension DaemonCore {
                     ceilings.denied.insert(folder.path + "/" + id)
                 } else if awaitingApproval(workflow, state: state, records: records) != nil {
                     ceilings.waiting[folder, default: []].append(id)
-                } else {
+                } else if !workflow.isOff {
                     ceilings.approved.append((folder: folder, workflowID: id))
                 }
             }
@@ -523,7 +526,8 @@ extension DaemonCore {
     ///
     /// A waiting one is only ever past its project's: it runs nothing until approved,
     /// so the total has nothing to say about it. An approved one is only ever past the
-    /// total: a project may hold as many approved workflows as the machine allows.
+    /// total, and only while it is turned on (#506): a project may hold as many
+    /// approved workflows as the machine allows.
     func limitReached(by workflow: Workflow, records: WorkflowRecords,
                       ceilings: WorkflowCeilings? = nil) -> WorkflowLimit? {
         guard !workflow.isArchived else { return nil }
@@ -532,7 +536,8 @@ extension DaemonCore {
         if ceilings.waiting[workflow.folder]?.contains(workflow.workflowID) == true {
             return ceilings.mayWait(in: workflow.folder).contains(workflow.workflowID) ? nil : .project
         }
-        let live = ceilings.approved.prefix(WorkflowLimit.total.allowed)
+        if workflow.isOff { return nil }
+        let live = ceilings.approved.prefix(workflowTotalLimit())
         return live.contains { $0.folder == workflow.folder && $0.workflowID == workflow.workflowID }
             ? nil : .total
     }
@@ -572,6 +577,62 @@ extension DaemonCore {
             broadcast(DaemonAPI.Notification.workflowChanged,
                       summary(for: workflow, records: records, ceilings: ceilings))
         }
+    }
+
+    /// Tell the windows about every workflow, in every project, after something that
+    /// moves the total: a workflow turned on or off, or the total itself changed
+    /// (#506). The total is a fact about all of them at once, so one project's
+    /// rebroadcast would leave another's row saying it is over a limit it no longer is.
+    func rebroadcastAllWorkflows(except: (folder: URL, workflowID: String)? = nil) {
+        let records = workflowStore.load()
+        let ceilings = workflowCeilings(records: records)
+        for (folder, held) in workflows {
+            for (id, workflow) in held where workflow.runs(on: MachineID.current)
+                && !(except?.folder == folder && except?.workflowID == id) {
+                broadcast(DaemonAPI.Notification.workflowChanged,
+                          summary(for: workflow, records: records, ceilings: ceilings))
+            }
+        }
+    }
+
+    // MARK: The total (#506)
+
+    /// How many workflows turned on may run across every project: the person's
+    /// setting, or ten.
+    func workflowTotalLimit() -> Int {
+        readWorkflowLimit().effectiveTotal
+    }
+
+    /// The person's setting, as `workflow-limit.json` has it. Read once and kept: the
+    /// daemon is its only writer. A missing or unreadable file is the default, which
+    /// is never more than the person chose.
+    public func readWorkflowLimit() -> WorkflowLimitSettings {
+        if let workflowLimitSettings { return workflowLimitSettings }
+        let loaded = StoreFile.load(WorkflowLimitSettings.self, at: locations.workflowLimit,
+                                    empty: WorkflowLimitSettings(), meaning: "the workflow limit at its default")
+        workflowLimitSettings = loaded
+        return loaded
+    }
+
+    /// Set the total. Takes effect at once, with no restart: every row is told where it
+    /// now stands, and raising it lets the ones past it run from their next trigger,
+    /// while lowering it stops the last ones in the order the total is applied.
+    public func setWorkflowLimit(_ settings: WorkflowLimitSettings) throws -> WorkflowLimitSettings {
+        if let problem = settings.problem {
+            throw JSONRPCError(code: JSONRPCError.invalidParams, message: problem)
+        }
+        // The default is kept as no setting, so a host that never changed it has no file.
+        let kept = WorkflowLimitSettings(total: settings.total == WorkflowLimit.defaultTotal ? nil : settings.total)
+        try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
+        if kept.total == nil {
+            try? FileManager.default.removeItem(at: locations.workflowLimit)
+        } else {
+            try StoreFile.write(StoreCoding.encoder.encode(kept), to: locations.workflowLimit)
+        }
+        let changed = readWorkflowLimit() != kept
+        workflowLimitSettings = kept
+        if changed { rebroadcastAllWorkflows() }
+        return kept
     }
 
     // MARK: The clock
@@ -757,6 +818,7 @@ extension DaemonCore {
             isArchived: workflow.isArchived,
             isDisabled: disabled,
             overLimit: limitReached(by: workflow, records: records),
+            totalLimit: workflowTotalLimit(),
             dayLimitReached: isDayLimitReached(),
             folderExists: Self.isDirectory(workflow.folder),
             triggeringAgentIsUsable: triggeringAgentIsUsable,
@@ -1445,6 +1507,24 @@ extension DaemonCore {
                                message: "There is no workflow called \(request.workflowID) in this project.")
         }
         var records = workflowStore.load()
+        // Turning one on takes a place under the total (#506), so it is refused when
+        // they are all taken rather than turned on to run nothing: the person is told
+        // here, where they pressed it. One waiting for approval takes its place only
+        // once approved, and one denied here never does.
+        if request.enabled, workflow.isOff, !workflow.isArchived {
+            let state = records.state(folder: workflow.folder, workflowID: workflow.workflowID)
+            let ceilings = workflowCeilings(records: records)
+            let total = workflowTotalLimit()
+            if awaitingApproval(workflow, state: state, records: records) == nil,
+               deniedHere(workflow, state: state) == nil,
+               ceilings.approved.count >= total {
+                throw JSONRPCError(code: DaemonAPI.Failure.workflowLimitReached,
+                                   message: """
+                                    \(WorkflowLimit.total.sentence(total: total)), so \(workflow.workflowID) \
+                                    was left off. \(WorkflowLimit.total.remedy).
+                                    """)
+            }
+        }
         let written = try editWorkflowFile(workflow, in: &records) {
             try WorkflowSwitches.setting(enabled: request.enabled, in: $0)
         }
@@ -1465,7 +1545,10 @@ extension DaemonCore {
         }
         try keep("this workflow's settings") { try workflowStore.save(records) }
         if let dropped { sayQueueDropped(dropped, reason: .disabled) }
-        return try rereadAfterWrite(workflow)
+        let summary = try rereadAfterWrite(workflow)
+        // A place under the total was taken or given back, in whichever project (#506).
+        rebroadcastAllWorkflows(except: (folder: summary.folder, workflowID: summary.workflowID))
+        return summary
     }
 
     /// Put one away, or bring it back.

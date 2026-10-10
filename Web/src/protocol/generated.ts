@@ -1821,7 +1821,7 @@ export type WorkflowRefusal =
   | { queueFull: { limit: number } }
   | { archived: Record<string, never> }
   | { disabled: Record<string, never> }
-  | { overLimit: { _0: WorkflowLimit } }
+  | { overLimit: { _0: WorkflowLimit; allowed?: number } }
   | { unreadable: { _0: string } }
   | { triggerNotSupported: { name: string } }
   | { agentUnavailable: Record<string, never> }
@@ -1876,6 +1876,7 @@ export interface WorkflowSummary {
   isArchived: boolean;
   isEnabled: boolean;
   overLimit?: WorkflowLimit;
+  totalLimit?: number;
   nextFireAt?: WireDate;
   nextFireAtByTrigger: (WireDate | null)[];
   lastOutcome?: WorkflowOutcome;
@@ -2384,7 +2385,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
   WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort"] },
   WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "hosts", "whenDone"] },
-  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["overLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
+  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
   WorkflowsListRequest: { required: [], optional: ["folder"] },
   WorktreeStatus: { required: ["uncommitted"], optional: ["ahead", "behind", "unmerged"] },
   WorktreeSummary: { required: ["name", "root", "isProjectFolder", "exists", "madeByApp", "agents"], optional: ["branch", "status"] },

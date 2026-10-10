@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 214 rows: **143 same**, **43 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 215 rows: **143 same**, **44 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -28,7 +28,7 @@ Of 214 rows: **143 same**, **43 by design**, **28 delta** (after #188, #189, #19
 | Worktrees and Files | 9 | 6 | 6 |
 | Pins | 4 | 1 | 0 |
 | Workflows page | 15 | 1 | 2 |
-| Settings and Project Settings | 1 | 7 | 0 |
+| Settings and Project Settings | 1 | 8 | 0 |
 | Pool, runtimes and spending | 7 | 1 | 2 |
 | Events and resources | 2 | 1 | 2 |
 | Notifications and badges | 3 | 1 | 0 |
@@ -284,6 +284,7 @@ The deltas are tracked by 29 issues:
 | The accent (#156) | AccentColor | AccentColor | `--accent`, the same values | **same** |
 | What agents call you (#121) | Settings ▸ General | None | None | **by design** |
 | Warm pool size (#183) | Settings ▸ General | None | None | **by design** |
+| The most workflows that may run (#506): the setting, and the number in force on an over-the-limit row and in its refusal | The setting in Settings ▸ Cost: `A/Settings/CostSettingsView.swift`; the number on the row and status card from `WorkflowSummary.totalLimit`: `A/Projects/WorkflowRow.swift`, `S/WorkflowStatus.swift` | The number on the status card: `S/WorkflowStatus.swift`; a refused Turn On says why | The number on the row and status card, and in a refusal's words: `W/model/workflows.ts`; a refused Turn On says why | The number: **same**. The setting: **by design** (Settings are the Mac's) |
 
 ## Pool, runtimes and spending
 

@@ -32,7 +32,7 @@ extension WorkflowSummary {
         }
         lines += mcpArgumentLines
         if waitsItsTurn, let limit = overLimit {
-            lines.append(WorkflowStatusLine(symbol: "hourglass", text: "Waiting its turn: \(limit.sentence)",
+            lines.append(WorkflowStatusLine(symbol: "hourglass", text: "Waiting its turn: \(limit.sentence(total: limitTotal))",
                                             detail: limit.remedy, tint: .attention))
         } else if let waiting = awaitingApproval {
             lines.append(WorkflowStatusLine(symbol: "checkmark.shield",
@@ -49,7 +49,7 @@ extension WorkflowSummary {
             lines.append(enabledLine)
         }
         if let limit = overLimit, !waitsItsTurn {
-            lines.append(WorkflowStatusLine(symbol: "exclamationmark.triangle", text: "Over the limit: \(limit.sentence)",
+            lines.append(WorkflowStatusLine(symbol: "exclamationmark.triangle", text: "Over the limit: \(limit.sentence(total: limitTotal))",
                                             detail: limit.remedy, tint: .attention))
         }
         if isRunning {
@@ -95,7 +95,7 @@ extension WorkflowSummary {
         case .person?, nil: text = "Off — turned off here"
         }
         return WorkflowStatusLine(symbol: "pause.circle", text: text,
-                                  detail: "None of its triggers run it; Run now still does. It still counts towards the workflow limits")
+                                  detail: "None of its triggers run it; Run now still does. It doesn't count towards the workflows running")
     }
 
     /// When it next runs, or that nothing will until something changes.

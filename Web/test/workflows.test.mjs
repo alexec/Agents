@@ -104,7 +104,7 @@ test("off says so in place of a next time, and in what is happening (#100)", () 
 test("off says why when it started off, as the Mac and the Remote do (#124)", () => {
   const summary = { workflow: { workflowID: "n", triggers: [schedule], mode: "new", prompt: "", settings: {}, unknownFields: {} },
     isArchived: false, isEnabled: false, isRunning: false, nextFireAtByTrigger: [] };
-  const rest = ". None of its triggers run it until it is turned on. It still counts towards the workflow limits, and Run now still runs it";
+  const rest = ". None of its triggers run it until it is turned on. It doesn't count towards the workflows running, and Run now still runs it";
   assert.equal(w.happening({ ...summary, offReason: "writtenByAgent" }),
     "Off: written by an agent. Turn it on when you are ready" + rest);
   assert.equal(w.happening({ ...summary, offReason: "file" }),

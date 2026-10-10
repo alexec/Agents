@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// The two limits, and what they have stopped.
+/// The two limits, and what they have stopped; and how many workflows may run (#506).
 ///
 /// The app's first preferences of any kind. Writing lives here rather than in the
 /// Spending window because that window is read-only by construction — nothing on it
@@ -66,9 +66,40 @@ struct CostSettingsView: View {
             .paperListRow()
 
             if !stoppedByALimit.isEmpty { stopped }
+
+            workflows
         }
         .paperForm()
         .task { await model.refreshCostState() }
+        .task { await model.refreshWorkflowLimit() }
+    }
+
+    // MARK: Workflows (#506)
+
+    /// How many workflows turned on may run across every project, as a menu of the
+    /// numbers it may be, its default marked and choosing it putting it back.
+    private var workflows: some View {
+        let kept = model.workflowLimit ?? WorkflowLimitSettings()
+        let current = kept.effectiveTotal
+        return Section {
+            Picker("Turned on at once", selection: Binding(get: { current }, set: { chosen in
+                Task { await model.setWorkflowLimit(WorkflowLimitSettings(total: chosen)) }
+            })) {
+                ForEach(Array(WorkflowLimit.totalRange), id: \.self) { number in
+                    Text(number == WorkflowLimit.defaultTotal ? "\(number) (default)" : "\(number)").tag(number)
+                }
+            }
+            .disabled(model.workflowLimit == nil)
+        } header: {
+            Text("The most workflows that may run")
+        } footer: {
+            Text("Approved workflows turned on, across every project. One turned off or archived "
+                 + "takes no place. Past this, a workflow is listed but none of its triggers run it, "
+                 + "and turning another on is refused until you turn one off or archive one. "
+                 + "Agents can't change this."
+                 + (model.hosts.isEmpty ? "" : " Each server keeps to this number on its own."))
+        }
+        .paperListRow()
     }
 
     // MARK: What today has cost

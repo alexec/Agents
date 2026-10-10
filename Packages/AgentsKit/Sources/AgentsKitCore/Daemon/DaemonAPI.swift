@@ -223,6 +223,12 @@ public enum DaemonAPI {
         /// Deny one on this host only (#391): it does not run here, and the file is not
         /// touched, so other hosts still see it waiting. Takes a `WorkflowApproveRequest`.
         public static let workflowsDeny = "workflows/deny"
+        /// How many workflows turned on may run across every project (#506): the
+        /// person's setting, as `WorkflowLimitSettings`.
+        public static let workflowsLimit = "workflows/limit"
+        /// Set it. The person's alone: not in an agent's allowlist, since a ceiling an
+        /// agent could raise for itself is not one. Answers the setting as kept.
+        public static let workflowsSetLimit = "workflows/setLimit"
         /// A project's plugins and which are waiting for the person's OK (security review, S2).
         public static let pluginsList = "plugins/list"
         public static let pluginsApprove = "plugins/approve"
@@ -2128,7 +2134,8 @@ public enum DaemonAPI {
         public static let workflowUnreadable = -32015
         /// A path outside the calling agent's own workflow folder.
         public static let notInWorkflowFolder = -32016
-        /// A new workflow in a project that already has all the live ones it may have.
+        /// A new workflow in a project that already has all the waiting ones it may
+        /// have, or one turned on when the total is already running (#506).
         public static let workflowLimitReached = -32017
         /// An agent turning back on a workflow the person turned off (#100). Only an
         /// agent's own off can be undone by an agent.

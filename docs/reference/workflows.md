@@ -198,9 +198,9 @@ A workflow does not run, and its page says why, when:
   workflow's page in Agents count as approved unless the workflow was already waiting,
   and workflows that existed before this version were approved as they stood;
 - you denied it on this Mac or server. See [Approve, Deny and Archive](#approve-deny-and-archive);
-- it is approved but not one of the first ten approved workflows across every project,
-  taken in order of project folder and then file name. Archiving one anywhere makes room;
-  turning one off does not. See [Limits](#limits);
+- it is approved and on, but not one of the first ten (or the number you set) approved
+  workflows turned on across every project, taken in order of project folder and then
+  file name. Turning one off or archiving one anywhere makes room. See [Limits](#limits);
 - it was set off by a chain of workflows already three deep;
 - the day's spending limit has been reached;
 - the project folder is not there;
@@ -323,7 +323,7 @@ once every 15 minutes" after the triggers.
 
 ## Limits
 
-Two limits, both fixed:
+Two limits:
 
 - **At most three workflows waiting for approval in one project.** Approved workflows do
   not count, so a project may have as many approved workflows as the next limit allows.
@@ -334,12 +334,20 @@ Two limits, both fixed:
   inert: its row says *This project already has 3 workflows waiting for approval. Approve
   or remove one of the 3 workflows waiting for approval first*, and it has no
   **Approve** until one of the three ahead of it is approved, archived or removed.
-- **At most ten approved workflows run, across every project.** Past that, a workflow is
-  listed and says *10 workflows are already running, across every project*. Archiving
-  one anywhere makes room.
+- **At most ten approved workflows turned on run, across every project.** Ten is the
+  default; set another number, from 1 to 50, in **Settings ▸ Cost ▸ The most workflows
+  that may run** on the Mac. Only you can: agents can't, through the app's tools. It is
+  kept by this Mac, outside every project, and copied to each server, which counts its
+  own. Past it, a workflow is listed and says *10 workflows are already running, across
+  every project. Turn one off or archive one, in any project, to let it run*, with the
+  number in force. Turning one on when they are all taken is refused with the same words,
+  and it stays off. A change takes effect at once: raising it lets the ones past it run
+  from their next trigger, and lowering it stops the last ones, in the same order as
+  ever, from their next trigger; a run already going finishes.
 
 Archived workflows count towards neither, and nor do ones denied on this Mac or server.
-Turned-off ones still count.
+Turned-off ones take no place among the ones that run; one waiting for approval counts
+towards the three waiting whether it is on or off.
 
 ## Approve, Deny and Archive
 
@@ -363,7 +371,7 @@ On the Mac or server that denied it:
 - it stays in its place on the list, marked **Denied on this host**, not under
   **Archived workflows**;
 - it no longer counts as waiting, so it frees a place among the three that may wait, and
-  it does not count towards the ten approved workflows that may run;
+  it does not count towards the approved workflows that may run;
 - **Approve** is still there, and takes the denial back without bringing an archive back.
 
 `hosts:` in the file is not the same thing: it is a list written into the shared file,
@@ -392,7 +400,7 @@ They differ in what else they do:
 | Where it is listed | In its place, marked **Off** | Under **Archived workflows** |
 | Its triggers | Do not run it; each one skipped is counted on its row | Do not run it; nothing is recorded |
 | **Run now** | Runs it, to try it | Refuses |
-| The [limits](#limits) | Still counts, so turning it off and on again moves nothing | Frees its place |
+| The [limits](#limits) | Frees its place among the ones that run; turning it on again is refused when they are all taken | Frees its place |
 | Turned back on by | **Enabled**, **Turn On**, the phone, or an agent if an agent turned it off (not one an agent wrote, or one whose file says `enabled: false`) | **Bring Back** |
 
 A new workflow an agent writes with `manage_workflows` starts turned off, whatever its
