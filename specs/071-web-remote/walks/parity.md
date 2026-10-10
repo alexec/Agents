@@ -307,7 +307,8 @@ The deltas are tracked by 29 issues:
 
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
-| Events ▸ Waiting now | Openable, with ✕: `A/Events/EventsView.swift:58-61, 281-325` | None: `R/Events/EventsListView.swift:31-58` | Titles only: `W/views/Activity.tsx:237-243` | **delta**: Remote #248, web #262 |
+| Events ▸ Waiting now | Openable, with ✕: `A/Events/EventsView.swift:281-325` | Openable, ✕ when `status.cancellable`: `R/Events/EventsListView.swift:31-60` | Openable, ✕ when `status.cancellable` over `events/cancelWait`: `W/views/Activity.tsx` (`EventsList`) (#541) | **same** (#541) |
+| Events ▸ where, and one event's detail | Project menu and kind chips; a row opens `A/Events/EventDetailView.swift` with Copy as trigger | Project menu; a row opens `EventSheet`: `R/Events/EventsListView.swift` | Project menu (*All projects*, *This Mac*, each host's projects); the sentence opens a sheet with the same rows: `W/views/Activity.tsx` (`eventIsIn`, `eventDetailRows`) (#541) | **same** (#541). Kind chips and Copy as trigger: **by design** the Mac's |
 | Event rows: consequences, name, scope, days, Show older | `S/Events/EventRow.swift`, `A/Events/EventsView.swift:89, 161-173` | Shared (no kind filter) | Same consequence lines, event name and scope, day headings and Show older; older pages append per host. | **same** |
 | A workflow in a consequence | A link: `A/Events/EventsView.swift:151` | Plain text: `R/Events/EventsListView.swift:8-10, 45-46` | n/a | **delta**: Remote #248 |
 | Resources, counted holders (#116) | `A/Resources/ResourcesView.swift` | Read-only: `R/Resources/ResourcesListView.swift` | Read-only: `W/views/Resources.tsx` | **same** (reading) |

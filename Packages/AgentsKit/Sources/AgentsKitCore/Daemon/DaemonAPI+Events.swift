@@ -12,7 +12,7 @@ public extension DaemonAPI.Method {
     static let eventsPublish = "events/publish"
     /// A page of the log and who is waiting, for the Mac's page and the phone's list.
     static let eventsList = "events/list"
-    /// The person cancelling an agent's wait from the Mac. The phone cannot: it reads.
+    /// The person cancelling an agent's wait, from the Mac, the phone or the web page.
     static let eventsCancelWait = "events/cancelWait"
     /// Raise an event by hand. Debug builds on a scratch root only: how the events page
     /// is seen before anything real raises one.
