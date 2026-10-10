@@ -95,6 +95,20 @@ struct RemoteSidebar: View {
                 }
             }
 
+            // A server gone quiet greys its projects; this says why, once, as the window's
+            // sidebar foot does (#534).
+            let offline = servers.filter { model.hostIsOffline($0) }
+            if !offline.isEmpty {
+                Section {
+                    ForEach(offline, id: \.self) { host in
+                        Label("\(model.hostLabel(host)) is offline", systemImage: "bolt.horizontal.circle")
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .accessibilityElement(children: .combine)
+                    }
+                }
+            }
+
             // A file the Mac keeps that could not be read (#205, #223), as the window's
             // sidebar foot: why paired devices or projects may have gone from view.
             if !model.work.storeNotes.isEmpty {
