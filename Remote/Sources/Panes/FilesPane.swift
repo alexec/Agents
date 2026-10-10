@@ -78,7 +78,13 @@ struct FilesPane: View {
             await untilCancelled()
             await model.files.unwatch(agentID: agent.id, folder: agent.cwd)
         }
-        .task(id: model.entries.count) { await refreshChangeIndex() }
+        // The change marks follow the conversation and the folder alike (#535).
+        .task(id: ChangeAsk(entries: model.entries.count, folderEvents: model.files.anyChange[agent.id] ?? 0)) {
+            // A moment's pause, so the folder events of one save are one ask.
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            await refreshChangeIndex()
+        }
         .onChange(of: state.openFile) { _, url in
             guard let url else { return }
             state.place.opened(url, fromRow: url == chosenFromRow)
@@ -442,6 +448,11 @@ struct FilesPane: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    private struct ChangeAsk: Equatable {
+        var entries: Int
+        var folderEvents: Int
     }
 
     private func refreshChangeIndex() async {
