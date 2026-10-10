@@ -38,6 +38,10 @@ extension AppService {
             await send(DaemonAPI.Method.agentsAskForm,
                        DaemonAPI.AskFormRequest(token: token, title: title, questions: questions),
                        fallback: "Asked.")
+        } suggestNextPrompt: { suggestion in
+            await send(DaemonAPI.Method.agentsSuggestPrompts,
+                       DaemonAPI.SuggestPromptsRequest(token: token, prompts: [suggestion]),
+                       fallback: "Suggested.")
         } workflows: { action, workflowID, content in
             await send(DaemonAPI.Method.agentsManageWorkflows,
                        DaemonAPI.ManageWorkflowsRequest(token: token, action: action,

@@ -42,13 +42,14 @@ JSON. A token is taken as about four bytes.
 
 | Session | Bytes | About |
 | --- | --- | --- |
-| An agent the person started (23 tools) | 31,222 | 7,800 tokens |
-| An agent another agent started (19 tools) | 25,577 | 6,400 tokens |
-| Grok's rules, which repeat the tools in its system prompt | 7,792 | 1,950 tokens |
-| The briefing, sent once with the first prompt (Claude) | 2,589 | 650 tokens |
+| An agent the person started (24 tools) | 43,623 | 10,900 tokens |
+| An agent another agent started (20 tools) | 37,965 | 9,500 tokens |
+| Grok's rules, which repeat the tools in its system prompt | 7,750 | 1,940 tokens |
+| The briefing, sent once with the first prompt (Claude) | 2,083 | 520 tokens |
 
-`manage_workflows` is the largest at 8,901 bytes, then `start_agent` at 3,385; every other
-tool is under 2,300. `finish_turn` was 8,509 until it was split (below).
+Measured on 2026-10-10. `manage_workflows` is the largest at 20,211 bytes, then
+`start_agent` at 3,398; every other tool is under 2,800. `suggest_next_prompt` adds
+476 bytes (~119 tokens). `finish_turn` was 8,509 until it was split (below).
 
 What a runtime does with the list differs:
 
@@ -59,15 +60,14 @@ What a runtime does with the list differs:
   rules instead (see [Why agents' own tools are taken away](scoped-tools.md)). That is about
   2,200 tokens, fixed for the session.
 - **Codex, OpenCode, Gemini, Copilot, Cursor and Antigravity** send every listed schema
-  with every request: about 7,800 tokens, against the 97 K a Codex turn reads on average.
+  with every request: about 10,900 tokens, against the 97 K a Codex turn reads on average.
 
 A project's own MCP servers are added on top, in the same way for each runtime. They are
 the person's choice, and they are not measured here. To measure one, list its tools
 (`tools/list`) and count the bytes of the answer.
 
-`ToolCostTests` holds the lead's list under 40,000 bytes, about a tenth over what it
-measured. A new tool or a longer description that goes over says so in the tests, and the
-ceiling is raised on purpose.
+`ToolCostTests` holds the lead's list under 45,000 bytes. A new tool or a longer
+description that goes over says so in the tests, and the ceiling is raised on purpose.
 
 ## What changed
 

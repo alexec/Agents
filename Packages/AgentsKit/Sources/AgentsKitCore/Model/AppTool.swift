@@ -36,6 +36,9 @@ public enum AppTool {
     /// `ask_question` so it does not collide with Antigravity's own tool.
     public static let askForm = "ask_form"
 
+    /// Offer one optional prompt for the person to send next.
+    public static let suggestNextPrompt = "suggest_next_prompt"
+
     // Five that act on other agents (028): start one in this project, and stop, ask to
     // archive (#584), archive (#120) or list the ones this agent started. An agent never archives itself
     // or the person's sessions. Never offered to an agent another agent started.
@@ -119,7 +122,7 @@ public enum AppTool {
 
     /// Every tool the app's MCP server serves.
     public static let all: [String] = [
-        finishTurn, showFile, manageWorkflows, askForm, startAgent, stopAgent, requestArchive,
+        finishTurn, showFile, manageWorkflows, askForm, suggestNextPrompt, startAgent, stopAgent, requestArchive,
         listMyAgents, leaseResource, releaseResource, listResources, waitForEvent,
         cancelWait, publishEvent, listSessions, readSession, archiveAgent,
         pinPage, unpinPage, movePin, pinSession, setSessionLabels, moveWorktree, messageAgent,

@@ -188,6 +188,31 @@ struct SuggestedPromptTests {
         }
     }
 
+    @Test func aSuggestionIsRefusedWhileAPermissionIsWaiting() async throws {
+        let (locations, work) = try temporary()
+        var script = FakeACPAgent.Script()
+        script.turnDelay = .milliseconds(600)
+        script.permission = ["toolCall": ["title": "Delete everything"],
+                             "options": [["optionId": "allow", "name": "Allow",
+                                          "kind": "allow_once"],
+                                         ["optionId": "no", "name": "Reject",
+                                          "kind": "reject_once"]]]
+        let launcher = FakeLauncher(script: script)
+        let core = try core(launcher, locations: locations)
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
+        await eventually("the agent is blocked on the question") {
+            await core.agent(id)?.state == .waitingOnUser
+        }
+
+        let error = await #expect(throws: JSONRPCError.self) {
+            _ = try await core.suggestPrompts(.init(token: await mintedToken(core, launcher), prompts: [
+                SuggestedPrompt(label: "Run the tests", prompt: "Run the tests"),
+            ]))
+        }
+        #expect(error?.code == JSONRPCError.invalidParams)
+        #expect(await core.agent(id)?.suggestedPrompts.isEmpty == true)
+    }
+
     /// Anything on this Mac can reach the daemon's socket, so a token that has been
     /// retired must not still speak for the agent it once did.
     @Test func aTokenStopsWorkingWhenItsRuntimeIsGone() async throws {

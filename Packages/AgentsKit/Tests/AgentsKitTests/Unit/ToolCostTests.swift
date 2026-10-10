@@ -26,9 +26,8 @@ struct ToolCostTests {
     }
 
     /// The ceiling, in bytes, on what a lead's session is listed. About four bytes a
-    /// token for this English and JSON, so 40 KB is some 10,000 tokens: about a tenth
-    /// over what it measured on 2026-10-08.
-    static let leadCeiling = 40_000
+    /// token for this English and JSON, so 45 KB is about 11,250 tokens.
+    static let leadCeiling = 45_000
 
     @Test func everyToolIsMeasuredAndTheWholeIsUnderItsCeiling() throws {
         let lead = listed(managesAgents: true)

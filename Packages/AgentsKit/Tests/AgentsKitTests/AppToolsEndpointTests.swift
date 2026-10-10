@@ -95,6 +95,22 @@ struct AppToolsEndpointTests {
         #expect(String(decoding: reply.body, as: UTF8.self).contains("Noted by the daemon."))
     }
 
+    @Test func aNextPromptCallUsesTheExistingSuggestionRoute() async throws {
+        let calls = Calls()
+        let endpoint = endpoint(calls)
+        endpoint.grant("tok", .init())
+        let session = try await opened(endpoint)
+        let reply = await post(endpoint, body("tools/call", id: 3, params: [
+            "name": .string(AppService.suggestNextPromptToolName),
+            "arguments": ["label": "Run the tests", "prompt": "Run the tests and fix failures"],
+        ]), session: session)
+        #expect(reply.status == 200)
+        let call = try #require(calls.all.first)
+        #expect(call.0 == DaemonAPI.Method.agentsSuggestPrompts)
+        #expect(call.1["token"]?.stringValue == "tok")
+        #expect(call.1["prompts"]?.arrayValue?.first?["label"]?.stringValue == "Run the tests")
+    }
+
     @Test func aNotificationIsAcceptedWithNothingSaid() async throws {
         let endpoint = endpoint()
         endpoint.grant("tok", .init())
