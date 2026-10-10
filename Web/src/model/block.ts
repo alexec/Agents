@@ -64,6 +64,13 @@ export function blockLines(agent: Agent, agents: readonly Agent[]): string[] {
   return [...(wake ? [wake] : []), ...lines, ...(check ? [check] : [])];
 }
 
+/** The agents an open block still waits on by name in quotes, as AgentsModel.waitMark names them (#582). */
+export function blockWaitNames(agent: Agent, agents: readonly Agent[]): string[] {
+  const waits = openBlock(agent)?.waits ?? [];
+  const working = waits.filter((wait) => wait.ending === undefined);
+  return (working.length > 0 ? working : waits).map((wait) => `“${waitName(wait, agents)}”`);
+}
+
 /** AgentsModel.carryOnLabel and Block.carryOnPrompt: what Carry on says, and sends as the person. */
 export const carryOnLabel = "Carry on";
 export const carryOnPrompt = "I've cleared the block you were waiting on. Carry on.";

@@ -53,6 +53,23 @@ public struct WaitStatus: Codable, Hashable, Sendable {
         return patterns.map(\.label).joined(separator: " or ")
     }
 
+    /// What an event wait waits for, one thing a pattern (#582): an agent finishing by
+    /// its name in quotes, as a block names it, and anything else by its label.
+    static func things(_ patterns: [EventPattern], names: (UUID) -> String?) -> [String] {
+        patterns.map { pattern in
+            guard pattern.name == "agent.finished", pattern.filters.count == 1,
+                  let id = pattern.filters["agent"]?.single else { return pattern.label }
+            return "\u{201C}\(UUID(uuidString: id).flatMap(names) ?? id)\u{201D}"
+        }
+    }
+
+    /// A row's one wait line (#582): "◷ Waiting for “Fix login” (+2)", the first thing
+    /// it waits for and how many more. Nil when it waits for nothing.
+    public static func rowLine(_ things: [String]) -> String? {
+        guard let first = things.first else { return nil }
+        return "\(symbol) Waiting for \(first)" + (things.count > 1 ? " (+\(things.count - 1))" : "")
+    }
+
     static func finishing(_ names: [String]) -> String {
         let quoted = names.map { "\u{201C}\($0)\u{201D}" }
         switch quoted.count {
@@ -60,5 +77,20 @@ public struct WaitStatus: Codable, Hashable, Sendable {
         case 2: return "\(quoted[0]) and \(quoted[1]) to finish"
         default: return quoted.dropLast().joined(separator: ", ") + " and \(quoted.last!) to finish"
         }
+    }
+}
+
+/// Everything a waiting agent's row says about it, on one line (#582): its block, its
+/// wait on events and the resources it is in line for, which used to be a line each and
+/// a line an agent. The whole of it is the line's help; the chat says it in full.
+public struct WaitMark: Equatable, Sendable {
+    /// "◷ Waiting for “Fix login” (+2)".
+    public var line: String
+    /// Every line it stands for, one a line, for a tooltip or a screen reader.
+    public var detail: String
+
+    public init(line: String, detail: String) {
+        self.line = line
+        self.detail = detail
     }
 }

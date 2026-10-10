@@ -33,6 +33,10 @@ test("a lease held is the row's mark, a wait after it is one more", () => {
   assert.equal(mark.full, "Holding The screen, 18 min left, until 14:18. Waiting for build, held by “Fix login” until 14:12, 2nd in line.");
   assert.equal(lines.leaseMark("nobody", snapshot, title), null);
   assert.equal(lines.leaseMark("x", snapshot, title).mark, "◷ Waiting for build · 1st in line");
+  // A row shows only what it holds (#582); what it waits for is the wait line's.
+  assert.deepEqual(mark.holds, { mark: "▣ Holds Screen · 18 min", more: 0, full: "Holding The screen, 18 min left, until 14:18." });
+  assert.deepEqual(mark.waitingNames, ["build"]);
+  assert.equal(lines.leaseMark("x", snapshot, title).holds, null);
 });
 
 test("a lease in its last five minutes says left", () => {
@@ -52,6 +56,23 @@ test("a wait on agents finishing reads as a block does; any other wait by its pa
     anyOf: { outcome: ["done", "failed"] } }]), title), "◷ Waiting for workflow.completed outcome done|failed workflow nightly");
   assert.equal(lines.eventWaitMark(wait([{ name: "agent.finished", filters: { agent: "a" } }], { timedOut: {} }), title), null);
   assert.equal(lines.eventWaitMark({ state: "running" }, title), null);
+});
+
+test("a waiting row is one line: the first thing it waits for and how many more (#582)", () => {
+  assert.equal(lines.rowWaitLine([]), null);
+  assert.equal(lines.rowWaitLine(["“Fix login”"]), "◷ Waiting for “Fix login”");
+  assert.equal(lines.rowWaitLine(["“Fix login”", "“Ship it”", "build"]), "◷ Waiting for “Fix login” (+2)");
+  const waiting = { state: "finished", eventWait: { id: "w", from: 0, since: 0,
+    patterns: [{ name: "agent.finished", filters: { agent: "a" } }, { name: "mac.wake", filters: {} }] } };
+  assert.deepEqual(lines.eventWaitThings(waiting, title), ["“Fix login”", "mac.wake"]);
+  const lease = { waitingNames: ["build"], waitingFull: ["Waiting for build, held by “Ship it”, 1st in line"] };
+  const mark = lines.waitMark(waiting, { names: ["“Docs”"], lines: ["Docs — still working"] }, lease, title);
+  assert.equal(mark.line, "◷ Waiting for “Docs” (+3)");
+  assert.equal(mark.detail.split("\n")[0], "Docs — still working");
+  assert.equal(mark.detail.split("\n")[2], "Waiting for build, held by “Ship it”, 1st in line");
+  assert.equal(lines.waitMark({ state: "running" }, { names: [], lines: [] }, null, title), null);
+  assert.equal(lines.waitMark({ state: "finished" }, { names: [], lines: ["Checks again at 14:30"] }, null, title).line,
+    "◷ Checks again at 14:30");
 });
 
 test("who started it, and the worktree's help", () => {

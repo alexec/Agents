@@ -60,4 +60,17 @@ struct WaitStatusTests {
                                                       Wait(agentID: docs, nameAtReport: "Docs")]))
         #expect(WaitStatus.of(both, names: names)?.mark == "◷ Waiting for “Fix login” and “Docs” to finish")
     }
+
+    @Test func aRowSaysTheFirstThingAndHowManyMore() {
+        #expect(WaitStatus.rowLine([]) == nil)
+        #expect(WaitStatus.rowLine(["“Fix login”"]) == "◷ Waiting for “Fix login”")
+        #expect(WaitStatus.rowLine(["“Fix login”", "“Docs”", "build"]) == "◷ Waiting for “Fix login” (+2)")
+    }
+
+    @Test func aWaitOnEventsIsOneThingAPattern() {
+        let fixLogin = UUID()
+        let patterns = [EventPattern("agent.finished", filters: ["agent": DetailFilter(fixLogin.uuidString)]),
+                        EventPattern("mac.wake")]
+        #expect(WaitStatus.things(patterns, names: { $0 == fixLogin ? "Fix login" : nil }) == ["“Fix login”", "mac.wake"])
+    }
 }

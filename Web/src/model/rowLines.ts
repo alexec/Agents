@@ -32,8 +32,15 @@ function shortName(displayName: string, kind: ResourceKind): string {
   return displayName;
 }
 
-/** LeaseMark: the first lease or wait in short, how many more, the whole of it, and one capsule each. */
-export interface LeaseMark { mark: string; more: number; full: string; capsules: string[] }
+/**
+ * LeaseMark: the first lease or wait in short, how many more, the whole of it, and one capsule each;
+ * then LeaseStatus.holdingOnly's mark for a row (#582), and each wait by name and in full for its wait line.
+ */
+export interface LeaseMark {
+  mark: string; more: number; full: string; capsules: string[];
+  holds: { mark: string; more: number; full: string } | null;
+  waitingNames: string[]; waitingFull: string[];
+}
 
 /** LeaseStatus.of, then its mark: nothing when the agent holds and waits for nothing. */
 export function leaseMark(agentID: string, snapshot: LeaseSnapshot | undefined,
@@ -63,16 +70,17 @@ export function leaseMark(agentID: string, snapshot: LeaseSnapshot | undefined,
   const first = holding[0];
   const mark = first ? `▣ Holds ${first.short} · ${first.minutes} min${first.soon ? " left" : ""}`
     : `◷ Waiting for ${waiting[0]!.short} · ${ordinal(waiting[0]!.place)} in line`;
-  const full = [
-    ...holding.map((h) => `Holding ${h.display}, ${h.minutes} min left, until ${clock(h.expires)}`),
-    ...waiting.map((w) => `Waiting for ${w.display}, held by ${w.holder}${w.until ? ` until ${clock(w.until)}` : ""}, ${ordinal(w.place)} in line`),
-  ].join(". ") + ".";
+  const held = holding.map((h) => `Holding ${h.display}, ${h.minutes} min left, until ${clock(h.expires)}`);
+  const waitingFull = waiting.map((w) => `Waiting for ${w.display}, held by ${w.holder}${w.until ? ` until ${clock(w.until)}` : ""}, ${ordinal(w.place)} in line`);
+  const full = [...held, ...waitingFull].join(". ") + ".";
   // LeaseStatus.capsules: holdings first, for the chat's row over the prompt.
   const capsules = [
     ...holding.map((h) => `\u25A3 ${h.short} \u00B7 ${h.minutes} min${h.soon ? " left" : ""}`),
     ...waiting.map((w) => `\u25F7 Waiting for ${w.short} \u00B7 held by ${w.holder}${w.until ? ` until ${clock(w.until)}` : ""} \u00B7 ${ordinal(w.place)}`),
   ];
-  return { mark, more: holding.length + waiting.length - 1, full, capsules };
+  return { mark, more: holding.length + waiting.length - 1, full, capsules,
+    holds: first ? { mark, more: holding.length - 1, full: held.join(". ") + "." } : null,
+    waitingNames: waiting.map((w) => w.short), waitingFull };
 }
 
 /** WaitStatus.finishing: "“A” to finish", "“A” and “B” to finish". */
@@ -119,6 +127,38 @@ export function eventWaitMark(agent: Agent, title: (id: string) => string | unde
   const what = agents.length > 0 && agents.every((a) => a !== undefined)
     ? finishing(agents as string[]) : wait.patterns.map(patternLabel).join(" or ");
   return `◷ Waiting for ${what}`;
+}
+
+/** WaitStatus.things: what a wait on events waits for, one thing a pattern, an agent finishing by its name in quotes. */
+export function eventWaitThings(agent: Agent, title: (id: string) => string | undefined): string[] {
+  const wait = agent.eventWait;
+  if (!wait || wait.ending !== undefined) return [];
+  return wait.patterns.map((p) => {
+    const id = p.name === "agent.finished" && Object.keys(p.anyOf ?? p.filters).length === 1 ? single(p, "agent") : undefined;
+    return id === undefined ? patternLabel(p) : `“${title(id) ?? id}”`;
+  });
+}
+
+/** WaitStatus.rowLine: "◷ Waiting for “Fix login” (+2)", the first thing it waits for and how many more. */
+export function rowWaitLine(things: string[]): string | null {
+  if (things.length === 0) return null;
+  return `◷ Waiting for ${things[0]}${things.length > 1 ? ` (+${things.length - 1})` : ""}`;
+}
+
+/** WaitMark: a waiting row's one line, and every line it stands for, for its title (#582). */
+export interface WaitMark { line: string; detail: string }
+
+/**
+ * AgentsModel.waitMark: the agents its block waits on, what its wait on events waits for and the
+ * resources it is in line for, on one line, first first; a block naming nothing says when it looks again.
+ */
+export function waitMark(agent: Agent, block: { names: string[]; lines: string[] }, leases: LeaseMark | null,
+  title: (id: string) => string | undefined): WaitMark | null {
+  const things = [...block.names, ...eventWaitThings(agent, title), ...(leases?.waitingNames ?? [])];
+  const event = eventWaitCapsule(agent, title)?.line;
+  const detail = [...block.lines, ...(event ? [event] : []), ...(leases?.waitingFull ?? [])];
+  const line = rowWaitLine(things) ?? (detail[0] !== undefined ? `◷ ${detail[0]}` : null);
+  return line === null ? null : { line, detail: detail.join("\n") };
 }
 
 /** AgentsModel.startedByAgentLabel: who started an agent another agent started. */

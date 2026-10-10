@@ -544,7 +544,7 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
     <div class={`nav-item${drop.targeted ? " drop-target" : ""}`} onContextMenu={(e) => openContextMenu(e, menu())}
       onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }} {...drop.props}>
       <SessionRow agent={agent} chosen={chosen} onPick={() => go({ host, project: folder, session: agent.id })} going={going}
-        waits={store.waitsOf(host, agent)} extras={rowExtras(store, host, agent)}
+        extras={rowExtras(store, host, agent)}
         inSidebar place={place} />
     </div>
   );

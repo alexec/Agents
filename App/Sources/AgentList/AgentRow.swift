@@ -180,9 +180,9 @@ struct AgentRow: View {
                         }
                     }
 
-                    // What it holds or waits for (036), so an idle agent still holding the
-                    // simulator can be seen from the list.
-                    if let leases = model.work.leaseStatus(of: agent.id) {
+                    // What it holds (036), so an idle agent still holding the simulator can be
+                    // seen from the list. What it waits for is the wait line's.
+                    if let leases = model.work.leaseStatus(of: agent.id)?.holdingOnly {
                         LeaseMark(status: leases)
                     }
 
@@ -196,30 +196,16 @@ struct AgentRow: View {
                             .accessibilityLabel(running)
                     }
 
-                    // Waiting on events (042), on the same kind of line.
-                    if agent.eventWait?.isOpen == true, let wait = model.work.waitStatus(of: agent) {
-                        Text(wait.mark)
+                    // What it waits for (#582): agents (039), events (042) and resources (036)
+                    // on one line, the first and how many more, so the row says what it is
+                    // waiting for without opening it (039 SC-005) and stays one line tall.
+                    // Each in full is the line's help, and the chat's; Carry on is the menu's.
+                    if let wait = model.work.waitMark(of: agent) {
+                        Text(wait.line)
                             .appText(.fine)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
-                    }
-
-                    // Blocked (039): what it waits on, one line an agent, and when it will
-                    // look again — so the row says what it is waiting for without opening
-                    // it (SC-005). Carry on is here because the person often knows the block
-                    // has gone before the app does.
-                    if model.isBlocked(agent) {
-                        ForEach(model.blockLines(agent), id: \.self) { line in
-                            Text(line)
-                                .appText(.fine)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                        Button(AgentsModel.carryOnLabel) { Task { await model.carryOn(agent.id) } }
-                            .buttonStyle(.paper)
-                            .controlSize(.small)
-                            .padding(.top, 3)
-                            .help(AgentsModel.carryOnHelp(for: agent))
+                            .help(wait.detail)
                     }
                     // Parked, and since when; or that it will park when this turn ends
                     // (040). How it ended stays the icon's to say.

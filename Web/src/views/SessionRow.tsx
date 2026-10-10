@@ -4,7 +4,8 @@
 // what it waits on, and parking. Only Needs you is ever in colour.
 import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
-import { eventWaitMark, leaseMark, startedByAgentLabel, worktreeHelp, type LeaseMark } from "../model/rowLines";
+import { leaseMark, startedByAgentLabel, waitMark, worktreeHelp, type LeaseMark, type WaitMark } from "../model/rowLines";
+import { blockWaitNames, openBlock } from "../model/block";
 import { backgroundMark } from "../model/background";
 import { parkedAt, projectFolder, showsUnread } from "../model/groups";
 import { queuedLine, rowStatus, type StatusShape } from "../model/status";
@@ -73,7 +74,8 @@ export interface RowExtras {
   startedByWorkflow: string | null;
   startedByAgent: string | null;
   leases: LeaseMark | null;
-  eventWait: string | null;
+  /** What it waits for, on one line (#582): its block, its wait on events, the resources it is in line for. */
+  wait: WaitMark | null;
   /** A queued helper's place in its project's queue (#362), "Queued, 2nd". */
   queued: string | null;
 }
@@ -82,6 +84,7 @@ export interface RowExtras {
 export function rowExtras(store: Store, host: string, agent: Agent): RowExtras {
   const title = (id: string) => store.agent(host, id)?.title;
   const workflowID = agent.startedByWorkflow;
+  const leases = leaseMark(agent.id, store.leases.value[host], title);
   return {
     comingBack: store.isComingBack(host, agent.id),
     // Its id when the file has since gone, so the mark never goes with it, as the window's.
@@ -89,13 +92,15 @@ export function rowExtras(store: Store, host: string, agent: Agent): RowExtras {
       : store.projectWorkflows(host, projectFolder(agent))
         .find((w) => w.workflow.workflowID === workflowID)?.workflow.name ?? workflowID,
     startedByAgent: startedByAgentLabel(agent, title),
-    leases: leaseMark(agent.id, store.leases.value[host], title),
-    eventWait: eventWaitMark(agent, title),
+    leases,
+    wait: waitMark(agent, openBlock(agent)
+      ? { names: blockWaitNames(agent, store.agents.value[host] ?? []), lines: store.waitsOf(host, agent) }
+      : { names: [], lines: [] }, leases, title),
     queued: agent.state === "queued" ? queuedLine(agent, store.projectAgents(host, projectFolder(agent))) : null,
   };
 }
 
-export function SessionRow({ agent, chosen, onPick, going, waits = [], extras, inSidebar = false, place }: {
+export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = false, place }: {
   agent: Agent; chosen: boolean; onPick: () => void;
   /** In the sidebar (#495): the state is the row's mark, unread among them, rather than a dot. */
   inSidebar?: boolean;
@@ -103,8 +108,6 @@ export function SessionRow({ agent, chosen, onPick, going, waits = [], extras, i
   place?: string | undefined;
   /** What the window's row says from beyond the agent's record (#251). */
   extras?: RowExtras | undefined;
-  /** A blocked agent's wait lines (039, #157): blockLines over its host's agents. */
-  waits?: string[];
   /** Stop, park or archive on its way (#87): what it is doing, and to whom. */
   going?: { doing: string; recipient: string } | undefined;
 }) {
@@ -142,16 +145,15 @@ export function SessionRow({ agent, chosen, onPick, going, waits = [], extras, i
             {labels.map((label) => <span key={label.value} class="chip label">{label.value}</span>)}
           </span>
         )}
-        {/* What it holds or waits for (036), so an idle agent still holding the screen can be seen. */}
-        {extras?.leases && (
-          <span class="subtitle lease-mark" role="note" aria-label={extras.leases.full} title={extras.leases.full}>
-            {extras.leases.mark}{extras.leases.more > 0 && <span class="quiet"> · and {extras.leases.more} more</span>}
+        {/* What it holds (036), so an idle agent still holding the screen can be seen. What it waits for is the wait line's. */}
+        {extras?.leases?.holds && (
+          <span class="subtitle lease-mark" role="note" aria-label={extras.leases.holds.full} title={extras.leases.holds.full}>
+            {extras.leases.holds.mark}{extras.leases.holds.more > 0 && <span class="quiet"> · and {extras.leases.holds.more} more</span>}
           </span>
         )}
         {running && <span class="subtitle">{running}</span>}
-        {/* Waiting on events (042), then on agents, one line an agent (039, #152). */}
-        {extras?.eventWait && <span class="subtitle wait-line">{extras.eventWait}</span>}
-        {waits.map((line) => <span key={line} class="subtitle wait-line">{line}</span>)}
+        {/* What it waits for (#582): agents, events and resources on one line; each in full is its title, and the chat's. */}
+        {extras?.wait && <span class="subtitle wait-line" title={extras.wait.detail}>{extras.wait.line}</span>}
         {park && <span class="subtitle quiet">{park}</span>}
       </span>
       <time class="when" dateTime={activity.toISOString()} title={activity.toLocaleString()}>{shortAgo(activity)}</time>
