@@ -36,5 +36,5 @@
 
 ## Landing a change
 
-- **Every change has an issue and a pull request.** Work on a branch of your own, push it, open the PR with `gh pr create`, turn on `gh pr merge --auto --squash` at once, and wait for it to land; fix what CI fails. Never push to `main`.
+- **Every change has an issue and a pull request.** Work on a branch of your own, in a worktree you moved into with move_worktree (never one made by hand with `git worktree add`, which the app never sees: #615), push it, open the PR with `gh pr create`, turn on `gh pr merge --auto --squash` at once, and wait for it to land; fix what CI fails. Never push to `main`.
 - **Label your session as you go** with set_session_labels: `#<n>` for the issue, `P#<n>` for the PR, and `merged` once it lands.

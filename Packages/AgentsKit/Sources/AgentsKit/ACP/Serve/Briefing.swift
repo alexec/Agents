@@ -103,6 +103,19 @@ public enum Briefing {
         by id or exact title; \(AppTool.listSessions) lists them. Reading leaves it as it was.
         """
 
+    /// Worktrees through the app (#615). With `move_worktree` only described, agents
+    /// ran `git worktree add` from a shell and worked there, and the app went on
+    /// showing them in the project folder: the wrong branch in the sidebar, the wrong
+    /// tree in Changes, a worktree nothing cleans up. Only where the tool is offered:
+    /// a runtime that cannot carry its conversation into another folder is not told
+    /// about a tool it does not have.
+    public static let worktrees = """
+        To work on a branch of your own, move into a worktree with \(AppTool.moveWorktree) \
+        and end your turn; you are started again there, and the app shows where you \
+        are. Never edit in a worktree you have not moved into this way, and do not \
+        make one with `git worktree add` when \(AppTool.moveWorktree) can.
+        """
+
     /// Who is who, for the sentence below (#121).
     public struct Naming: Hashable, Sendable {
         /// The runtime's display name ("Claude"), not its model.
@@ -264,11 +277,14 @@ public enum Briefing {
     /// `managesAgents` is false for an agent another agent started, which gets no line
     /// about starting agents because it has no tools for it (028).
     ///
+    /// `movesItself` is false for a runtime that cannot move folders, which gets no
+    /// line about worktrees because it has no `move_worktree` (#615).
+    ///
     /// `naming` is who is who (#121), first because the lines after it say "I" and
     /// "me" and that is the person it names. Nil says nothing, for a caller that does
     /// not know.
     public static func lines(for policy: ToolPolicy, managesAgents: Bool = true,
-                             naming: Naming? = nil) -> [String] {
+                             movesItself: Bool = true, naming: Naming? = nil) -> [String] {
         let schedulingRemoved = policy.removed.contains { $0.category == .standingArrangements }
         return [naming.map(Self.naming)].compactMap { $0 }
             + [liveDocument,
@@ -276,13 +292,15 @@ public enum Briefing {
                 workflows(scheduling: schedulingRemoved)]
             + (managesAgents ? [helpers] : [])
             + [leases, events, sessions]
+            + (movesItself ? [worktrees] : [])
             + [residue(policy.residue)].compactMap { $0 }
     }
 
     /// The whole of it, as the one block the daemon appends to a first prompt.
     public static func text(for policy: ToolPolicy, managesAgents: Bool = true,
-                            naming: Naming? = nil) -> String {
-        var blocks = lines(for: policy, managesAgents: managesAgents, naming: naming)
+                            movesItself: Bool = true, naming: Naming? = nil) -> String {
+        var blocks = lines(for: policy, managesAgents: managesAgents, movesItself: movesItself,
+                           naming: naming)
         if policy.appToolSchemaDelivery == .firstPrompt {
             blocks.append(AppToolPreface.firstPrompt)
         }

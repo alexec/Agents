@@ -82,9 +82,10 @@ of them is now the cause, say so and propose rather than change.
 
 ## 3. Change it
 
-1. Make a worktree off the latest `main` on a new branch
-   `agents/ci-speed-<today, YYYY-MM-DD>`:
-   `git fetch origin && git worktree add -b agents/ci-speed-<date> .agents/worktrees/ci-speed-<date> origin/main`.
+1. Move into a worktree off the latest `main` through the app (#615): `git fetch origin`,
+   check `main` here is `origin/main` (`git merge --ff-only origin/main` if not), then
+   move_worktree with worktree `ci-speed-<today, YYYY-MM-DD>` and end your turn; you are
+   started again in it, on `agents/ci-speed-<date>`.
 2. Make the **one** change with the biggest expected saving (or a few small ones with
    the same cause). Keep the existing comment style in `ci.yml`: say why, in a comment,
    for anything non-obvious.

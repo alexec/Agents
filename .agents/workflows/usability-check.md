@@ -56,13 +56,14 @@ not yours: their reviews run on Sundays and Wednesdays.
 
 ## 1. Set up and scope
 
-1. Make or reuse the review worktree, on the local branch `agents/reviews-usability`:
-   ```sh
-   git worktree add .agents/worktrees/reviews-usability agents/reviews-usability 2>/dev/null \
-     || git worktree add -b agents/reviews-usability .agents/worktrees/reviews-usability main
-   cd .agents/worktrees/reviews-usability && git merge --no-edit main
-   ```
-   (If the worktree is already there, `cd` into it and merge `main`.) It is never pushed.
+1. Move into the review worktree, on the local branch `agents/reviews-usability`, through the app, so it
+   shows where you work (#615):
+   - `.agents/worktrees/reviews-usability` is there: move_worktree with its absolute path.
+   - Only the branch `agents/reviews-usability` is there: `git worktree add .agents/worktrees/reviews-usability
+     agents/reviews-usability`, then move_worktree with its absolute path.
+   - Neither: move_worktree with worktree `reviews-usability`.
+
+   End your turn; you are started again in it. There, `git merge --no-edit main`. It is never pushed.
 2. Read every file in `.agents/reviews/usability/`. The newest run file (`YYYY-MM-DD.md`)
    has `reviewed-through:` (a commit of `main`, your last-run marker) and `area:` in its
    front matter. `findings.md` there is the running list of every finding ever recorded.

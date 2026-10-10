@@ -45,13 +45,14 @@ not yours: the Security review workflow looks at that on Sundays.
 
 ## 1. Set up and scope
 
-1. Make or reuse the review worktree, on the local branch `agents/reviews-performance`:
-   ```sh
-   git worktree add .agents/worktrees/reviews-performance agents/reviews-performance 2>/dev/null \
-     || git worktree add -b agents/reviews-performance .agents/worktrees/reviews-performance main
-   cd .agents/worktrees/reviews-performance && git merge --no-edit main
-   ```
-   (If the worktree is already there, `cd` into it and merge `main`.) This branch
+1. Move into the review worktree, on the local branch `agents/reviews-performance`, through the app, so it
+   shows where you work (#615):
+   - `.agents/worktrees/reviews-performance` is there: move_worktree with its absolute path.
+   - Only the branch `agents/reviews-performance` is there: `git worktree add .agents/worktrees/reviews-performance
+     agents/reviews-performance`, then move_worktree with its absolute path.
+   - Neither: move_worktree with worktree `reviews-performance`.
+
+   End your turn; you are started again in it. There, `git merge --no-edit main`. This branch
    holds `.agents/reviews/performance/` and nothing else of its own; it is never pushed.
 2. Read every file in `.agents/reviews/performance/`. The newest run file
    (`YYYY-MM-DD.md`) has `reviewed-through:` (a commit of `main`, your last-run marker)
