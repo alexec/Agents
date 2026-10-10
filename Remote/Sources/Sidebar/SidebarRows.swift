@@ -52,6 +52,8 @@ struct SidebarSessionRow: View {
                             .appText(.fine)
                             .foregroundStyle(.tertiary)
                             .lineLimit(1)
+                            // Whole, the title giving way first (#587): cut to "p" it said nothing.
+                            .fixedSize()
                             .layoutPriority(-1)
                     }
                     // Started by a workflow (the Mac row's mark), then by another agent.
@@ -85,50 +87,9 @@ struct SidebarSessionRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-                // Its worktree (030) and labels, on their own line so a long branch never
-                // cuts the title short (#68).
-                if agent.worktree != nil || !agent.labels.isEmpty {
-                    WrappingHStack(spacing: 5) {
-                        if let worktree = agent.worktree {
-                            HStack(spacing: 3) {
-                                Image(systemName: "arrow.triangle.branch")
-                                Text(worktree.name).lineLimit(1)
-                                    .strikethrough(agent.missingFolder != nil)
-                            }
-                            .appText(.fine)
-                            .foregroundStyle(.tertiary)
-                            .accessibilityElement(children: .ignore)
-                            .accessibilityLabel("in worktree \(worktree.name)")
-                        }
-                        ForEach(agent.labels, id: \.normalizedValue) { LabelChip(label: $0) }
-                    }
-                }
-                if let leases = model.work.leaseStatus(of: agent.id) {
-                    LeaseMark(status: leases)
-                }
-                if let running = BackgroundWords.mark(agent.background) {
-                    Text(running)
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                if agent.eventWait?.isOpen == true, let wait = model.work.waitStatus(of: agent) {
-                    Text(wait.mark)
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                ForEach(model.blockLines(agent), id: \.self) { line in
-                    Text(line)
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                if let line = ParkWords.line(agent.parking) {
-                    Text(line)
-                        .appText(.fine)
-                        .foregroundStyle(.tertiary)
-                }
+                // The row is the title and that one line (#587): what it holds, waits on,
+                // runs or is labelled with is the chat's to say, and Carry on is in the
+                // row's long press.
             }
             Spacer(minLength: 0)
             // When it last did anything, as the page's row has it (#341).
@@ -208,7 +169,8 @@ private struct SessionMark: View {
     }
 }
 
-/// One workflow under its project: its name, and Off where it is (#100). What it does is
+/// One workflow under its project: its name, and nothing at its end, which is only a
+/// session's (#587): off is its pause mark, said to VoiceOver (#100). What it does is
 /// its page's to say (#495). Its page opens in the detail as a session's chat does.
 struct SidebarWorkflowRow: View {
     @Environment(RemoteModel.self) private var model
@@ -226,13 +188,9 @@ struct SidebarWorkflowRow: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 4)
-            if !summary.isEnabled, !summary.isArchived {
-                Text("Off")
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
-            }
         }
         .accessibilityElement(children: .combine)
+        .accessibilityValue(!summary.isEnabled && !summary.isArchived ? "turned off" : "")
         .tag(SidebarItem.workflow(summary.id, in: project))
         // Pin or Unpin (#432), from the leading edge, as a session's row has it.
         .swipeActions(edge: .leading) {
@@ -338,8 +296,10 @@ struct WorkflowMark: View {
 
     private var symbol: String {
         if summary.isArchived { return "archivebox" }
-        if summary.awaitingApproval != nil { return "hand.raised" }
-        if summary.deniedHere != nil { return "hand.raised.slash" }
+        // A shield, not a hand (#587): the hand is a session's Needs You mark, and a
+        // workflow waiting for an OK beside it read as one more session asking.
+        if summary.awaitingApproval != nil { return "checkmark.shield" }
+        if summary.deniedHere != nil { return "xmark.shield" }
         if !summary.isEnabled { return "pause.circle" }
         // Waiting behind a run is not something wrong (#422).
         if summary.queued > 0 { return "tray.full" }
@@ -368,10 +328,9 @@ struct PinnedPageRows: View {
                 Text(pin.title)
                     .lineLimit(1)
                     .foregroundStyle(pin.missing ? .secondary : .primary)
+                // Nothing at its end (#587), which is only a session's: missing is the
+                // grey title, and VoiceOver's.
                 Spacer(minLength: 4)
-                if pin.missing {
-                    Text("Missing").appText(.fine).foregroundStyle(.tertiary)
-                }
             }
             .appText(.supporting)
             .accessibilityElement(children: .ignore)

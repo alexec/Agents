@@ -40,6 +40,11 @@ struct RemoteSidebar: View {
                 })
     }
 
+    /// No runtime can be started on: Runtimes' icon says so in red (#587).
+    private var runtimesFailing: Bool {
+        RuntimeTally(model.runtimes, allowances: model.runtimeAllowances)?.noneWorking == true
+    }
+
     private var servers: [HostID] {
         model.hostSections.map(\.id).filter { $0 != .mac }
     }
@@ -60,8 +65,10 @@ struct RemoteSidebar: View {
                 Section(isExpanded: $showsActivity) {
                     EventsRow().activityIcon("list.bullet.rectangle").appText(.supporting).tag(SidebarItem.events)
                     ResourcesRow().activityIcon("square.stack.3d.up").appText(.supporting).tag(SidebarItem.resources)
-                    RuntimesRow().activityIcon("cpu").appText(.supporting).tag(SidebarItem.runtimes)
-                    SpendingRow().activityIcon("dollarsign.circle").appText(.supporting).tag(SidebarItem.spending)
+                    RuntimesRow().activityIcon("cpu", warns: runtimesFailing)
+                        .appText(.supporting).tag(SidebarItem.runtimes)
+                    SpendingRow().activityIcon("dollarsign.circle", warns: model.costState?.dayIsCloseToFull == true)
+                        .appText(.supporting).tag(SidebarItem.spending)
                 } header: {
                     Text("Activity")
                 }
@@ -410,13 +417,11 @@ private struct ProjectPageRow: View {
                 .foregroundStyle(Paper.accent)
                 .frame(width: 20)
                 .accessibilityHidden(true)
+            // Nothing at its end, which is only a session's (#587): the count is
+            // VoiceOver's.
             Text(title)
                 .lineLimit(1)
             Spacer(minLength: 4)
-            Text("\(count)")
-                .monospacedDigit()
-                .appText(.fine)
-                .foregroundStyle(.secondary)
         }
         .appText(.supporting)
         .accessibilityElement(children: .ignore)
@@ -429,10 +434,12 @@ private struct ProjectPageRow: View {
 /// accent, before the row. Beside the row rather than a `Label`, whose title a sidebar
 /// list draws in its own style (#155).
 private extension View {
-    func activityIcon(_ systemImage: String) -> some View {
+    /// Red when the page has something wrong to say (#587): the row has no figure at its
+    /// end to colour, which is only a session's.
+    func activityIcon(_ systemImage: String, warns: Bool = false) -> some View {
         HStack(spacing: 8) {
             Image(systemName: systemImage)
-                .foregroundStyle(Paper.accent)
+                .foregroundStyle(warns ? StateTint.failure.style(or: .primary) : AnyShapeStyle(Paper.accent))
                 .frame(width: 20)
                 .accessibilityHidden(true)
             self
@@ -545,29 +552,21 @@ private struct NewSessionTag: ViewModifier {
     }
 }
 
-/// The Runtimes row under Activity: how many of the Mac's runtimes work, out of how many
-/// are installed, and its red dot when none do (#379), as the window's.
+/// The Runtimes row under Activity, as the window's: the title alone (#587), how many of
+/// the Mac's runtimes work said to VoiceOver, and none working turns the row's icon red
+/// (#379).
 private struct RuntimesRow: View {
     @Environment(RemoteModel.self) private var model
 
     var body: some View {
+        let tally = RuntimeTally(model.runtimes, allowances: model.runtimeAllowances)
         HStack {
             Text("Runtimes")
             Spacer()
-            if let tally = RuntimeTally(model.runtimes, allowances: model.runtimeAllowances) {
-                HStack(spacing: 4) {
-                    if tally.noneWorking {
-                        Circle().fill(StateTint.failure.style(or: .primary)).frame(width: 7, height: 7)
-                            .accessibilityHidden(true)
-                    }
-                    Text(tally.words).monospacedDigit()
-                }
-                .foregroundStyle(.secondary)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(tally.noneWorking ? "None of \(tally.total) working"
-                                    : "\(tally.working) of \(tally.total) working")
-            }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(tally.map { $0.noneWorking ? "None of \($0.total) working"
+                                                       : "\($0.working) of \($0.total) working" } ?? "")
         .accessibilityHint("Opens Runtimes")
     }
 }

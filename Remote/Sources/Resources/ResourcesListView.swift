@@ -109,7 +109,7 @@ private struct HostedMCPListRow: View {
     }
 }
 
-/// The way in, under Activity, with how much is held on the way past.
+/// The way in, under Activity: the title alone (#587), how much is held said to VoiceOver.
 struct ResourcesRow: View {
     @Environment(RemoteModel.self) private var model
 
@@ -125,10 +125,9 @@ struct ResourcesRow: View {
         HStack(alignment: .firstTextBaseline) {
             Text("Resources")
             Spacer()
-            if let counts {
-                Text(counts).monospacedDigit().appText(.fine).foregroundStyle(.secondary)
-            }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(counts ?? "")
         .accessibilityHint("Opens Resources")
     }
 }
