@@ -7,7 +7,7 @@
 // The code is a browser's (`agents-control code --client --browser`). The root is a
 // run-app scratch root seeded as parity.md says: a git project `work`, three workflows (one
 // turned off), a finished unread session "Repo notes", one in a worktree with two labels, and
-// one parked. Scenes that need the host away pause the root's own agentsd (its daemon.lock pid)
+// one asking to be archived (#584). Scenes that need the host away pause the root's own agentsd (its daemon.lock pid)
 // with SIGSTOP and always resume it. The disk scene writes the root's disk-free-override (#195,
 // a debug host on a scratch root only) and always removes it; the host looks once a minute.
 
@@ -268,10 +268,10 @@ for (const scene of scenes) {
       try {
         await page.eval(`document.querySelector(".session-menu > button").click()`);
         await sleep(200);
-        await page.press("Park");
+        await page.press("Archive");
         await sleep(600);
-        say(`row while parking: ${JSON.stringify(await visible(".sessions .row.session.chosen"))}`);
-        say(`menu while parking: ${await page.eval(`document.querySelector(".session-menu > button").disabled`)}`);
+        say(`row while archiving: ${JSON.stringify(await visible(".sessions .row.session.chosen"))}`);
+        say(`menu while archiving: ${await page.eval(`document.querySelector(".session-menu > button").disabled`)}`);
         await page.focus(".chat textarea");
         await page.type("One more line, please.");
         await page.eval(`document.querySelector(".chat button.send").click()`);
@@ -283,10 +283,10 @@ for (const scene of scenes) {
       }
       await sleep(3000);
       say(`after: ${JSON.stringify(await visible(".sessions .row.session"))}`);
-      // Unpark, so the session is as it was.
+      // Bring it back, so the session is as it was.
       await page.eval(`document.querySelector(".session-menu > button").click()`);
       await sleep(200);
-      await page.press("Unpark").catch(() => {});
+      await page.press("Bring Back").catch(() => {});
     } else if (scene === "starting") {
       // #87: a new session's words stay, held, under "Starting — telling your Mac".
       await openProject();

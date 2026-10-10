@@ -21,14 +21,14 @@ struct TurnEndToolsServiceTests {
                    itself: { call in await calls.add(call); return .shown("Noted.") })
     }
 
-    @Test func parkAndArchiveWithNoIdAreTheCallerItselfEvenForAHelper() async throws {
+    @Test func requestArchiveAndArchiveWithNoIdAreTheCallerItselfEvenForAHelper() async throws {
         let calls = Calls()
         let helper = service(calls, managesAgents: false)
-        _ = try await call(helper, "mcp__agents__park_agent", [:])
+        _ = try await call(helper, "mcp__agents__request_archive", [:])
         _ = try await call(helper, "mcp__agents__archive_agent", ["id": " "])
-        #expect(await calls.made == [.afterTurn(.park), .afterTurn(.archive)])
+        #expect(await calls.made == [.afterTurn(.requestArchive), .afterTurn(.archive)])
         // With an id it is still a helper's, and refused to an agent another started.
-        let refused = try await call(helper, "park_agent", ["id": "abc"])
+        let refused = try await call(helper, "request_archive", ["id": "abc"])
         #expect(refused["isError"]?.boolValue == true)
         #expect(await calls.made.count == 2)
     }

@@ -55,7 +55,7 @@ Check the build and say whether it is green.
 | `archived:` | `true` or `false` | Whether it is archived. **Archive** adds `archived: true` and **Bring Back** takes the line out, so it is archived wherever the file goes. See [Off and archived](#off-and-archived). Anything else stops the workflow running, and its page says what is wrong. |
 | `cooldown:` | A length of time in minutes, hours or days, such as `15m`, `2h`, `1h30m` or `1d`; at least a minute | The least time from the start of one run to the start of the next. See [Cooldown](#cooldown). A value that is not a length of time stops the workflow running, and its page says what is wrong. |
 | `hosts:` | A list of machine ids | Which computers run it. Without it, or with an empty list, every host that has the project runs it and lists it. With ids, only those hosts do, on a schedule, on an event, or from **Run now**. An id is the computer's: a Mac's hardware UUID, or on Linux the contents of `/etc/machine-id`. The host name is used only when neither of those exists. The workflow's page offers the computers it knows by the names already on screen and writes the id, so renaming a computer does not unpin the workflow. A value that is not a list of ids stops the workflow running, and its page says what is wrong. |
-| `when-done:` | `park`, `archive-allowed` or `archive` | What a run may do with its session when it is done. Without it, `park`: every run stays in the list. See [When a run is done](#when-a-run-is-done). Anything else stops the workflow running, and its page says what is wrong. |
+| `when-done:` | `keep`, `archive-allowed` or `archive` | What a run may do with its session when it is done. Without it, `keep`: every run stays in the list. `park`, the word before #584, is read as `keep`. See [When a run is done](#when-a-run-is-done). Anything else stops the workflow running, and its page says what is wrong. |
 
 For example, to start a new agent whenever `main` moves, or another agent publishes
 `custom.build_green`:
@@ -267,8 +267,8 @@ that starts a helper decides what becomes of it.
 
 | Value | What happens |
 |---|---|
-| `park` | The default. Every run stays in the list. A run may still park itself. |
-| `archive-allowed` | A run that finishes **Complete** or **Nothing to do** may archive itself, when there is nothing for you to look at. It is told it may. Otherwise it stays. |
+| `keep` | The default, **Keep each run**. Every run stays in the list when it is done. A run may ask you to archive it. |
+| `archive-allowed` | A run that finishes **Complete** or **Nothing to do** may archive itself, with `request_archive` or `archive_agent` and no id, when there is nothing for you to look at. It is told it may. Otherwise it stays. |
 | `archive` | A run that finishes **Complete** or **Nothing to do** is archived, whatever the agent asks. |
 
 - A run that ends **Waiting on your answer**, **Partly done**, **Stuck** or **Blocked** is

@@ -1151,19 +1151,19 @@ extension DaemonCore {
     }
 
     /// What the run is told about putting its session away (#433), when its workflow
-    /// says more than park: the one thing about `when-done:` it could not know.
+    /// says more than keep: the one thing about `when-done:` it could not know.
     static func whenDoneNote(_ workflow: Workflow) -> String {
         guard workflow.mode != .triggering else { return "" }
-        switch workflow.whenDone ?? .park {
-        case .park: return ""
+        switch workflow.whenDone ?? .keep {
+        case .keep: return ""
         case .archiveAllowed:
             return """
 
 
                 (This workflow lets its run archive itself. If you finish done or with nothing \
                 to do, and there is nothing the person needs to look at, call \
-                \(AppTool.archiveAgent) with no id before you end. Otherwise leave it out, \
-                or park with \(AppTool.parkAgent) and no id.)
+                \(AppTool.requestArchive) with no id before you end: no one is asked, and the \
+                run is archived once the turn ends. Otherwise leave it out.)
                 """
         case .archive:
             return """
@@ -1687,14 +1687,14 @@ extension DaemonCore {
                     edited = try writeHosts(hosts, into: edited)
                 }
             }
-            // `park` takes the line out, as a file that never said (#433). Anything that
+            // `keep` takes the line out, as a file that never said (#433). Anything that
             // is not one of the three is refused, never read as the nearest.
             if let text = request.whenDone {
                 let trimmed = text.trimmingCharacters(in: .whitespaces)
-                guard let chosen = trimmed.isEmpty ? .park : WorkflowWhenDone(rawValue: trimmed) else {
+                guard let chosen = trimmed.isEmpty ? .keep : WorkflowWhenDone(rawValue: trimmed) else {
                     throw JSONRPCError(code: JSONRPCError.invalidParams, message: WorkflowWhenDone.unknown)
                 }
-                if chosen != (existing.whenDone ?? .park) {
+                if chosen != (existing.whenDone ?? .keep) {
                     edited = try FrontMatterEdit.set(WorkflowWhenDone.key, to: chosen.fileText, in: edited)
                 }
             }
@@ -1849,13 +1849,13 @@ extension DaemonCore {
     /// What this agent's run may do with its session, while a workflow that started or
     /// keeps the agent is running it. `nil` for anything else: a session a person
     /// started, a run that is over, and an agent a triggering workflow borrowed, which
-    /// is somebody else's and stays park-only.
+    /// is somebody else's and stays the person's to archive.
     func whenDone(forRunOf agentID: UUID) -> WorkflowWhenDone? {
         guard let agent = agents[agentID], let (_, run) = runInFlight(for: agentID),
               run.agentID == agentID, agent.startedByWorkflow == run.workflowID,
               let workflow = workflow(run.workflowID, in: run.folder),
               workflow.mode != .triggering, workflow.problem == nil else { return nil }
-        return workflow.whenDone ?? .park
+        return workflow.whenDone ?? .keep
     }
 
     /// Whether the turn ending now is a run's, done as its workflow lets the daemon put
@@ -1868,8 +1868,10 @@ extension DaemonCore {
         guard let report = agent.report, report != reportBeforeTurn[agentID],
               AfterTurn.archive.goes(with: report.outcome) else { return false }
         switch whenDone {
-        case .park: return false
-        case .archiveAllowed: return asked == .archive
+        case .keep: return false
+        // Either ask (#584): where the run may archive itself, a request needs nobody's
+        // OK — unless it moves, when it stays there asking.
+        case .archiveAllowed: return asked == .archive || (asked == .requestArchive && agent.pendingMove == nil)
         case .archive: return true
         }
     }

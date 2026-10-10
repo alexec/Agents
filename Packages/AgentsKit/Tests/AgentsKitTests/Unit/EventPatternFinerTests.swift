@@ -156,7 +156,7 @@ struct EventPatternFinerTests {
         #expect(EventPattern.matching(moved).asTrigger == "on:\n  - branch.moved:\n      branch: main")
         #expect(EventPattern.matching(event("person.back", ["why": "idle"])).asTrigger
                 == "on:\n  - person.back:\n      why: idle")
-        let finished = about("agent.finished", labels: "bug", ["outcome": "done", "afterwards": "park"])
+        let finished = about("agent.finished", labels: "bug", ["outcome": "done", "afterwards": "archive_requested"])
         #expect(EventPattern.matching(finished).asTrigger == "on:\n  - agent.finished")
         #expect(EventPattern.matching(event("custom.ship", ["labels": "bug"])).asTrigger == "on:\n  - custom.ship")
         let dropped = event("dropbox.file_added", ["path": "a.txt", "extension": "txt"])

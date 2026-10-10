@@ -18,8 +18,6 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     case finished
     /// A turn deliberately stopped by a person or its parent agent.
     case stopped
-    /// Put down by the person to come back to (040). Below the others and always open.
-    case parked
     case archived
 
     /// The heading this group is drawn under.
@@ -31,31 +29,28 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
         case .running: return "Working"
         case .finished: return "Done"
         case .stopped: return "Paused"
-        case .parked: return "Parked"
         case .archived: return "Archived"
         }
     }
 
     /// The groups shown in the panel. Archived is revealed on demand. Blocked is not
-    /// one: see the case.
-    public static let live: [AgentGroup] = [.needsAttention, .waiting, .running, .finished, .stopped, .parked]
+    /// one: see the case. Parked (040) was, until #584 made putting a session down a
+    /// request to archive it: a mark on the row, not a group. An older daemon's
+    /// `parked` count is dropped as any unknown group's is.
+    public static let live: [AgentGroup] = [.needsAttention, .waiting, .running, .finished, .stopped]
 
     /// Place a session by what happens next. Questions, unaccounted endings, unresolved
     /// blocks, and unexpected stops need the person; watched waits resume on their
-    /// own. A deliberate stop is Paused. Parked and Archived remain explicit choices.
+    /// own. A deliberate stop is Paused. Archived remains an explicit choice.
     /// The runtime state stays intact while this presentation changes.
     ///
     /// Unread is not an argument (#70). It is a mark on the row, not a reason for a
     /// group: a group that depended on it moved the row out from under the person the
-    /// moment they opened it.
+    /// moment they opened it. Nor is a request to archive (#584), for the same reason.
     public init(for state: AgentState, wantsEyes: Bool, report: WorkReport?, outcomeAsked: Bool,
-                parked: Bool, waitingOnEvents: Bool = false,
+                waitingOnEvents: Bool = false,
                 endedReason: EndedReason? = nil, waitingForAllowance: Bool = false) {
         let wantsAnswer = report?.outcome.needsAPerson == true
-        if parked, state != .archived, state != .waitingOnUser {
-            self = .parked
-            return
-        }
         switch state {
         // Grouped with the working agents, and without `running`'s `wantsEyes` arm: an
         // agent whose conversation has not begun has not asked anybody to look at
@@ -136,7 +131,7 @@ public extension Agent {
     /// because the version without it was the bug (FR-001, FR-004).
     func group(wantsEyes: Bool) -> AgentGroup {
         AgentGroup(for: state, wantsEyes: wantsEyes, report: report, outcomeAsked: outcomeAsked,
-                   parked: parking?.isParked == true, waitingOnEvents: eventWait?.isOpen == true,
+                   waitingOnEvents: eventWait?.isOpen == true,
                    endedReason: endedReason, waitingForAllowance: allowanceWait != nil)
     }
 

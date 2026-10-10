@@ -130,18 +130,6 @@ private actor FakeState {
                 await change(request?.agentID) { $0.state = .finished }
                 return .success(.object([:]))
 
-            case DaemonAPI.Method.agentsPark:
-                let request = try params?.decode(DaemonAPI.AgentRequest.self)
-                await change(request?.agentID) {
-                    $0.parking = $0.state.hasTurnInFlight ? .whenTurnEnds(since: Date()) : .parked(at: Date())
-                }
-                return .success(.object([:]))
-
-            case DaemonAPI.Method.agentsUnpark:
-                let request = try params?.decode(DaemonAPI.AgentRequest.self)
-                await change(request?.agentID) { $0.parking = nil }
-                return .success(.object([:]))
-
             case DaemonAPI.Method.agentsSetUnread:
                 let request = try params?.decode(DaemonAPI.SetUnreadRequest.self)
                 await change(request?.agentID) { $0.isUnread = request?.unread == true }

@@ -61,13 +61,13 @@ struct WebFixturesTests {
 
     static func agent(_ n: Int, _ state: AgentState, title: String? = nil, minutes: Double = 0,
                       isUnread: Bool = false, endedReason: EndedReason? = nil, report: WorkReport? = nil,
-                      outcomeAsked: Bool = false, parking: Parking? = nil, eventWait: EventWait? = nil,
+                      outcomeAsked: Bool = false, archiveRequest: ArchiveRequest? = nil, eventWait: EventWait? = nil,
                       labels: [SessionLabel] = [], background: [BackgroundItem] = [],
                       cwd: URL = folderURL) -> Agent {
         Agent(id: id(n), runtimeID: "claude", cwd: cwd, title: title ?? "Session \(n)", labels: labels, state: state,
               createdAt: base, lastActivityAt: at(minutes), isUnread: isUnread, endedReason: endedReason,
               background: background, eventWait: eventWait, report: report, outcomeAsked: outcomeAsked,
-              parking: parking)
+              archiveRequest: archiveRequest)
     }
 
     static func report(_ outcome: WorkOutcome, _ message: String = "It went.", block: Block? = nil) -> WorkReport {
@@ -118,12 +118,13 @@ struct WebFixturesTests {
             ("stopped with the daemon", agent(28, .stopped, endedReason: .daemonGone), false),
             ("stopped, no reason", agent(29, .stopped), false),
             ("stopped, a needs-answer report kept", agent(30, .stopped, endedReason: .cancelled, report: report(.needsAnswer)), false),
-            ("parked, done", agent(31, .finished, report: report(.done), parking: .parked(at: at(5))), false),
-            ("parked, stuck", agent(32, .finished, report: report(.stuck), parking: .parked(at: at(6))), false),
-            ("parked, but asking", agent(33, .waitingOnUser, parking: .parked(at: at(5))), false),
-            ("parked when the turn ends, running", agent(34, .running, parking: .whenTurnEnds(since: at(4))), false),
+            ("asks to archive, done", agent(31, .finished, report: report(.done), archiveRequest: .requested(at: at(5))), false),
+            ("asks to archive, partly done, unread", agent(32, .finished, isUnread: true, report: report(.partlyDone),
+                                                           archiveRequest: .requested(at: at(6))), false),
+            ("asks to archive, stopped", agent(33, .stopped, endedReason: .cancelled, archiveRequest: .requested(at: at(5))), false),
+            ("asks to archive when the turn ends, running", agent(34, .running, archiveRequest: .whenTurnEnds(since: at(4))), false),
             ("archived", agent(35, .archived), false),
-            ("archived and parked", agent(36, .archived, parking: .parked(at: at(5))), false),
+            ("archived, a request left on it", agent(36, .archived, archiveRequest: .requested(at: at(5))), false),
             ("queued for a place (#362)", agent(37, .queued), false),
         ]
     }
@@ -290,7 +291,7 @@ struct WebFixturesTests {
             let group = agent.group(wantsEyes: input["wantsEyes"]?.boolValue ?? false)
             return .object(["group": .string(group.rawValue), "title": .string(group.title),
                             "needsAPerson": .bool(agent.needsAPerson), "isWaiting": .bool(agent.isWaiting),
-                            "showsUnread": .bool(agent.showsUnread)])
+                            "showsUnread": .bool(agent.showsUnread), "asksToArchive": .bool(agent.asksToArchive)])
         }
     }
 
@@ -331,7 +332,8 @@ struct WebFixturesTests {
                 for heading in group.headings(model.agents(in: folder, group: group)) {
                     headings.append(.object(["group": .string(group.rawValue), "title": .string(heading.title),
                                              "ids": .array(heading.agents.map { .string($0.id.uuidString) }),
-                                             "unread": .int(heading.agents.filter(\.showsUnread).count)]))
+                                             "unread": .int(heading.agents.filter(\.showsUnread).count),
+                                             "asking": .int(heading.agents.filter(\.asksToArchive).count)]))
                 }
             }
             let counts = model.counts(in: folder)
@@ -359,7 +361,7 @@ struct WebFixturesTests {
             return .object([
                 "shape": .string(Self.name(of: shape)),
                 "symbol": shape.symbol.map(JSONValue.string) ?? .null,
-                "tinted": .bool(StatusShape.isTinted(shape, isParked: agent.parking?.isParked == true)),
+                "tinted": .bool(StatusShape.isTinted(shape)),
                 "words": .string(StatusShape.words(row: agent, isComingBack: back)),
             ])
         }

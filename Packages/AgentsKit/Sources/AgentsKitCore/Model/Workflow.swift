@@ -81,7 +81,7 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
     /// UUID, Linux `/etc/machine-id`, the host name only when neither exists.
     public var hosts: [String]?
     /// What a run may do with its session when it is done, from the file's
-    /// `when-done:` (#433). `nil` is a file that does not say, which is `park`.
+    /// `when-done:` (#433). `nil` is a file that does not say, which is `keep`.
     public var whenDone: WorkflowWhenDone?
 
     /// Whether it is put away.

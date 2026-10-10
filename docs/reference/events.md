@@ -86,13 +86,13 @@ an event already on the log.
 | Event | Filter by | Details | What it means |
 | --- | --- | --- | --- |
 | `agent.started` | — | agent | An agent started working. |
-| `agent.finished` | — | agent, outcome, afterwards | An agent ended a turn having done its work. `afterwards` is `park` when the agent is parked once the turn is over (it asked to be, or you parked it while it worked), else `stay`. `outcome` is `done`, `nothing_to_do`, `needs_answer`, `partly_done`, `stuck` or `blocked`. |
+| `agent.finished` | — | agent, outcome, afterwards | An agent ended a turn having done its work. `afterwards` is `archive_requested` when the turn ends asking to be archived, `archived` when the session is archived as the turn ends, else `stay`. `outcome` is `done`, `nothing_to_do`, `needs_answer`, `partly_done`, `stuck` or `blocked`. |
 | `agent.asked_permission` | — | agent | An agent is asking for permission. |
 | `agent.asked_form` | — | agent | An agent raised a form to fill in. |
 | `agent.blocked` | — | agent, waiting_on | An agent ended its turn waiting on something. When `waiting_on` names agents or a time to check again, the agent resumes by itself; otherwise it needs you to carry it on. See [Statuses and groups](statuses.md). |
 | `agent.stopped` | — | agent, by | An agent was stopped before finishing. `by` is `you`, `cost_limit` or `unknown`. |
 | `agent.failed` | — | agent, reason | An agent ended in an error. `reason` is `allowance_spent`, `rate_limited`, `process_died`, `sign_in_refused`, `runtime_error`, `sandbox_failed`, `max_tokens`, `max_turn_requests`, `refusal`, `daemon_gone`, `stopped_by_agent` or `unrecognised`. |
-| `agent.parked` | — | agent, outcome | An agent was parked: put down to come back to. `outcome` is its last report's, when it made one. |
+| `agent.archive_requested` | — | agent, outcome | An agent's turn ended asking for its session to be archived, and it waits for you to agree. `outcome` is its last report's, when it made one. A trigger or wait on `agent.parked`, its name before #584, is read as this. |
 | `agent.messaged` | — | agent, from, from_title | An agent was sent a message by another agent with `message_agent`. `agent` is the one it was sent to; `from` is the sender's id and `from_title` its title. |
 | `agent.archived` | — | agent, by, outcome | An agent was archived. `by` is `you`, or `agent` when the agent that started it archived it with `archive_agent`. `outcome` is its last report's, when it made one. |
 | `agent.deleted` | — | agent, because | An archived agent was deleted with its conversation. `because` is `age` or `person`. A trigger on `agent.retired`, its name before #398, still answers. |

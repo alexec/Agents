@@ -846,17 +846,16 @@ export class Work {
 }
 
 /** Something a person asked of a whole agent, on its way to its host (#87; AgentAct.swift). */
-export type AgentAct = "agents/stop" | "agents/park" | "agents/unpark" | "agents/archive" | "agents/unarchive"
+export type AgentAct = "agents/stop" | "agents/archive" | "agents/unarchive"
   | { sendNow: string };
 
 /** What the pending mark says it is doing, before "telling your Mac" (AgentAct.doing). */
 export function actDoing(act: AgentAct): string {
   if (typeof act !== "string") return "Sending";
-  return { "agents/stop": "Stopping", "agents/park": "Parking", "agents/unpark": "Unparking", "agents/archive": "Archiving",
-    "agents/unarchive": "Bringing back" }[act];
+  return { "agents/stop": "Stopping", "agents/archive": "Archiving", "agents/unarchive": "Bringing back" }[act];
 }
 
-/** Telling.words: "Parking — telling your Mac", or "telling your Mac" beside a button that says what. */
+/** Telling.words: "Archiving — telling your Mac", or "telling your Mac" beside a button that says what. */
 export function tellingWords(doing: string | null, recipient: string): string {
   return doing ? `${doing} — telling ${recipient}` : `telling ${recipient}`;
 }
@@ -1568,7 +1567,7 @@ export class Store extends Work {
   }
 
   /**
-   * What is on its way to each agent (#87; AgentsModel's acting): stop, park, unpark, archive or
+   * What is on its way to each agent (#87; AgentsModel's acting): stop, archive, bring back or
    * Send now, one at a time. Every control that would send a second sees the first is going.
    */
   readonly onItsWay = signal<Record<string, AgentAct>>({});
@@ -1620,10 +1619,18 @@ export class Store extends Work {
 
   /** Whether the host took it, so a caller can leave the chat only when it did (#586). */
   async perform(host: string, agentID: string,
-                action: "agents/stop" | "agents/park" | "agents/unpark" | "agents/archive" | "agents/unarchive"): Promise<boolean> {
+                action: "agents/stop" | "agents/archive" | "agents/unarchive"): Promise<boolean> {
     let done = false;
     await this.acting(agentID, action, async () => { done = await this.act(action, { agentID: agentID as UUID }, host) !== null; });
     return done;
+  }
+
+  /**
+   * To Archive's Archive All (#584): each session given, one Archive at a time on its own host,
+   * as the window's does, so each shows on its way and one that fails does not stop the rest.
+   */
+  async archiveAll(sessions: readonly { host: string; agentID: string }[]): Promise<void> {
+    for (const { host, agentID } of sessions) await this.perform(host, agentID, "agents/archive");
   }
 
   // MARK: Files, changes and live pages (071 US4)

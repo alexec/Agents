@@ -1,14 +1,16 @@
 // One session in the sidebar, as the Mac's AgentRow draws it (071 FR-018, #251): the status
 // mark (Coming back after a restart too), the title with who or what started it, the agent's own
 // last report, labels and the worktree, what it holds or waits for, what runs in the background,
-// what it waits on, and parking. Only Needs you is ever in colour. In the sidebar it is the mark,
-// the title, the time and one grey line (#587): the rest is the project page's and the chat's.
+// what it waits on, and whether an agent asks for it to be archived. Only Needs you is ever in
+// colour. In the sidebar it is the mark, the title, the time and one grey line (#587): the rest is
+// the project page's and the chat's.
 import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { leaseMark, startedByAgentLabel, waitMark, worktreeHelp, type LeaseMark, type WaitMark } from "../model/rowLines";
 import { blockWaitNames, openBlock } from "../model/block";
 import { backgroundMark } from "../model/background";
-import { parkedAt, projectFolder, showsUnread } from "../model/groups";
+import { projectFolder, showsUnread } from "../model/groups";
+import { archiveLine, archiveMark } from "../model/archiveWords";
 import { queuedLine, rowStatus, type StatusShape } from "../model/status";
 import { fromWireDate } from "../protocol/dates";
 import { Telling } from "./Telling";
@@ -29,7 +31,8 @@ export function StatusMark({ agent, comingBack = false }: { agent: Agent; coming
   );
 }
 
-const markWords: Record<SessionMark, string> = { needsYou: "Needs you", working: "Working", unread: "Unread", read: "Done" };
+const markWords: Record<SessionMark, string> = { needsYou: "Needs you", working: "Working", unread: "Unread", read: "Done",
+  asksToArchive: archiveMark };
 
 /**
  * A session's mark in the sidebar (#495, #499), the window's and the Remote's: an orange hand when
@@ -42,6 +45,7 @@ export function SidebarMark({ agent, comingBack = false }: { agent: Agent; comin
   return (
     <span class={`sidebar-mark ${mark}`} role="img" aria-label={markWords[mark]} title={markWords[mark]}>
       {mark === "needsYou" && <span class="glyph" aria-hidden="true">✋&#xFE0E;</span>}
+      {mark === "asksToArchive" && <span class="glyph" aria-hidden="true">🗃&#xFE0E;</span>}
     </span>
   );
 }
@@ -58,15 +62,6 @@ export function ago(date: Date, now = new Date()): string {
     if (Math.abs(seconds) >= size) return relative.format(Math.round(seconds / size), unit);
   }
   return relative.format(Math.round(seconds), "second");
-}
-
-/** ParkWords.line: "Parked 3 days ago", or "Parks when this turn ends". */
-export function parkLine(agent: Agent): string | null {
-  if (!agent.parking) return null;
-  if ("whenTurnEnds" in agent.parking) return "Parks when this turn ends";
-  const at = fromWireDate(parkedAt(agent)!);
-  if (Date.now() - at.getTime() < 60_000) return "Parked just now";
-  return "Parked " + ago(at);
 }
 
 /** What a row says that its host's other state decides: who started it, its leases, its waits. */
@@ -112,11 +107,12 @@ export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = f
   place?: string | undefined;
   /** What the window's row says from beyond the agent's record (#251). */
   extras?: RowExtras | undefined;
-  /** Stop, park or archive on its way (#87): what it is doing, and to whom. */
+  /** Stop or archive on its way (#87): what it is doing, and to whom. */
   going?: { doing: string; recipient: string } | undefined;
 }) {
   const running = backgroundMark(agent.background ?? []);
-  const park = parkLine(agent);
+  // The mark alone: the row is a button, so Archive is the menu's, the strip's and To Archive's (#584).
+  const asks = archiveLine(agent);
   const activity = fromWireDate(agent.lastActivityAt);
   const labels = agent.labels ?? [];
   return (
@@ -163,7 +159,7 @@ export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = f
           {running && <span class="subtitle">{running}</span>}
           {/* What it waits for (#582): agents, events and resources on one line; each in full is its title, and the chat's. */}
           {extras?.wait && <span class="subtitle wait-line" title={extras.wait.detail}>{extras.wait.line}</span>}
-          {park && <span class="subtitle quiet">{park}</span>}
+          {asks && <span class="subtitle quiet archive-mark">{asks}</span>}
         </>}
       </span>
       <time class="when" dateTime={activity.toISOString()} title={activity.toLocaleString()}>{shortAgo(activity)}</time>

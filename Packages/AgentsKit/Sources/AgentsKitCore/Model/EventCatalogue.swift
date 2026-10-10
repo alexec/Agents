@@ -146,7 +146,7 @@ public struct EventKind: Hashable, Sendable {
 public enum EventCatalogue {
     public static let all: [EventKind] = [
         EventKind("agent.started", .project, about(), "An agent in this project started working."),
-        EventKind("agent.finished", .project, about(outcome, EventDetail("afterwards", values: ["park", "stay"])),
+        EventKind("agent.finished", .project, about(outcome, EventDetail("afterwards", values: ["archive_requested", "archived", "stay"])),
                   "An agent in this project ended a turn having done its work.", aliases: ["agent-finished"]),
         EventKind("agent.asked_permission", .project, about(),
                   "An agent in this project is asking for permission.", aliases: ["agent-asked-permission"]),
@@ -158,8 +158,8 @@ public enum EventCatalogue {
                   "An agent in this project was stopped before finishing.", aliases: ["agent-stopped"]),
         EventKind("agent.failed", .project, about(EventDetail("reason", values: EndedReason.allCases.map(\.code))),
                   "An agent in this project ended in an error.", aliases: ["agent-stopped"]),
-        EventKind("agent.parked", .project, about(outcome),
-                  "An agent in this project was parked: put down to come back to."),
+        EventKind("agent.archive_requested", .project, about(outcome),
+                  "An agent in this project asked to be archived, and waits for the person's OK."),
         EventKind("agent.messaged", .project, about(EventDetail("from"), EventDetail("from_title")),
                   "An agent in this project was sent a message by another, with message_agent."),
         EventKind("agent.archived", .project, about(EventDetail("by", values: ["agent", "you"]), outcome),
@@ -262,6 +262,8 @@ public enum EventCatalogue {
     public static let renamed: [String: String] = [
         "mac.disk_low": "machine.disk_low",
         "mac.disk_ok": "machine.disk_ok",
+        // Parking became a request to archive (#584).
+        "agent.parked": "agent.archive_requested",
     ]
 
     /// The name as the catalogue has it today.

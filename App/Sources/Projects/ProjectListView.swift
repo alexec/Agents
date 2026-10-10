@@ -82,7 +82,7 @@ struct ProjectListView: View {
                 Text("Activity").appText(.supporting)
             }
 
-            // Pinned, Needs You, Working, Unread: a group each, headed and folding as a
+            // Pinned, Needs You, Working, Unread, To Archive: a group each, headed and folding as a
             // project's is, so every group in the list lines up alike (#495). Empty, or
             // with no match for a search, a group is not drawn (#507).
             ForEach(SidebarSmartRow.allCases, id: \.self) { row in

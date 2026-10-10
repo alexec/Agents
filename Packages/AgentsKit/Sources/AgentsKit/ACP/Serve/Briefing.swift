@@ -28,7 +28,7 @@ public enum Briefing {
     // (023). It went in #479: runtimes forgot it, called it and carried on, wrote too
     // much in it, and a silent ending cost a whole extra turn to ask about. The daemon
     // works the ending out for itself now (`DerivedEnding`), and the tool stays for an
-    // agent that wants to say it; waiting, parking and moving have tools of their own
+    // agent that wants to say it; waiting, asking to be archived and moving have tools of their own
     // since #481. A project or workflow that still wants the self-report says so in its
     // own prompt.
 
@@ -80,7 +80,7 @@ public enum Briefing {
     /// their numbers, which are the project's and can change mid-conversation (#64).
     public static let helpers = """
         For work that can run alongside yours, use \(AppTool.startAgent) within my \
-        limits on how many may run and be kept. Stop or park helpers when they are done, \
+        limits on how many may run and be kept. Stop helpers when they are done, \
         and archive them once their work is merged or abandoned. Do not start one for \
         work you could simply do yourself.
         """

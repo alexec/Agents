@@ -1,7 +1,8 @@
 import Foundation
 
 /// One of the rows at the top of the sidebar that gather sessions across every project
-/// and host (#495): Pinned, then by what they want — Needs You, Working, Unread. Mail's
+/// and host (#495): Pinned, then by what they want — Needs You, Working, Unread, and the
+/// sessions an agent asked to have archived, To Archive (#584). Mail's
 /// Favorites and smart mailboxes, Things' Inbox and Today.
 ///
 /// Read off each project's shelf (#165), so a folded smart row costs a sum of counts per
@@ -11,6 +12,8 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
     /// order and each project's pin order. Out of their projects' groups (Alex, #495).
     case pinned
     case needsYou, working, unread
+    /// Sessions an agent asked the person to archive (#584), with Archive All on it.
+    case toArchive
 
     public var title: String {
         switch self {
@@ -18,6 +21,7 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
         case .needsYou: "Needs You"
         case .working: "Working"
         case .unread: "Unread"
+        case .toArchive: "To Archive"
         }
     }
 
@@ -27,6 +31,7 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
         case .needsYou: "hand.raised"
         case .working: "circle.dotted"
         case .unread: "circle.inset.filled"
+        case .toArchive: "archivebox"
         }
     }
 
@@ -53,6 +58,8 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
                 return total + (shelf.counts[.running] ?? 0) - pinnedHere
             case .unread:
                 return total + Self.unreadAtRest(in: shelf) - pinnedHere
+            case .toArchive:
+                return total + Self.askingAtRest(in: shelf) - pinnedHere
             case .pinned:
                 return total
             }
@@ -60,27 +67,38 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
     }
 
     /// Where a live session is listed (#587): once, in the first of the smart groups it
-    /// belongs to — Pinned, Needs You, Working, Unread — or, in none of them, under its
-    /// project. Nil for its project.
+    /// belongs to — Pinned, Needs You, Working, To Archive (#584), Unread — or, in none of
+    /// them, under its project. Nil for its project. To Archive comes before Unread though
+    /// it is drawn after it, so Archive All reaches every session that asks.
     public static func home(of agent: Agent, in group: AgentGroup, isPinned: Bool) -> SidebarSmartRow? {
         if isPinned { return .pinned }
         switch group {
         case .needsAttention, .blocked: return .needsYou
         case .running: return .working
         case .archived: return nil
-        default: return agent.showsUnread ? .unread : nil
+        default: return agent.asksToArchive ? .toArchive : agent.showsUnread ? .unread : nil
         }
     }
 
     /// The groups whose sessions go to Needs You or Working whatever else they are.
     static let busyGroups: [AgentGroup] = [.needsAttention, .blocked, .running]
 
-    /// The unread that are neither waiting on a person nor working: Unread's share. The
-    /// busy groups are few, so this is the shelf's count less a short count of theirs.
+    /// The unread that are neither waiting on a person nor working nor asking to be
+    /// archived: Unread's share. The busy groups are few, so this is the shelf's count
+    /// less a short count of theirs.
     @MainActor
     static func unreadAtRest(in shelf: ProjectShelf) -> Int {
         shelf.unread - busyGroups.reduce(0) { $0 + (shelf.groups[$1] ?? []).count(where: \.showsUnread) }
             - (shelf.groups[.archived] ?? []).count(where: \.showsUnread)
+            - AgentGroup.live.filter { !busyGroups.contains($0) }
+                .reduce(0) { $0 + (shelf.groups[$1] ?? []).count { $0.showsUnread && $0.asksToArchive } }
+    }
+
+    /// Those asking to be archived that are neither waiting on a person nor working: To
+    /// Archive's share (#584).
+    @MainActor
+    static func askingAtRest(in shelf: ProjectShelf) -> Int {
+        shelf.asking - busyGroups.reduce(0) { $0 + (shelf.groups[$1] ?? []).count(where: \.asksToArchive) }
     }
 
     /// Whether the sidebar draws it at all (#507): only with something in it, and while
@@ -112,7 +130,9 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
             case .needsYou: (shelf.groups[.needsAttention] ?? []) + (shelf.groups[.blocked] ?? [])
             case .working: shelf.groups[.running] ?? []
             case .unread: AgentGroup.live.filter { !Self.busyGroups.contains($0) }
-                .flatMap { shelf.groups[$0] ?? [] }.filter(\.showsUnread)
+                .flatMap { shelf.groups[$0] ?? [] }.filter { $0.showsUnread && !$0.asksToArchive }
+            case .toArchive: AgentGroup.live.filter { !Self.busyGroups.contains($0) }
+                .flatMap { shelf.groups[$0] ?? [] }.filter(\.asksToArchive)
             }
             // A pinned session is listed in Pinned and nowhere else (#587).
             let pinned = Set(work.pinnedSessions(in: key.folder))

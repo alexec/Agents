@@ -163,7 +163,7 @@ say(`open a file: greeting.txt reads ${JSON.stringify(await page.eval(`document.
 window("shot", `${out}/closing-window-3-done.png`);
 
 // 6. A second turn held on its permission: a prompt queued and sent now, the model changed,
-// parked and unparked, then stopped and archived.
+// then stopped and archived.
 await page.focus(".chat textarea[aria-label=Prompt]");
 await page.type("Run this with your Bash tool: echo three > three.txt. Then say done.");
 await page.press("Send");
@@ -188,10 +188,6 @@ const changed = await until("the model on the record", () => {
 say(`change model: ${current} → ${other}; on the record ${JSON.stringify(before)} → ${JSON.stringify(changed)}`);
 window("shot", `${out}/closing-window-4-model.png`);
 await until("the turn to hold its runtime", () => ["running", "waitingOnUser"].includes(record(id).state), 120);
-await menu("Park");
-say(`park: ${JSON.stringify(await until("parking", () => record(id).parking, 15))}`);
-await menu("Unpark");
-await until("unparked", () => !record(id).parking, 15);
 await menu("Stop");
 const stopped = await until("stopped", () => { const a = record(id); return a.state === "stopped" ? a : null; }, 30);
 say(`stop: ${stopped.state}, ${stopped.endedReason}`);

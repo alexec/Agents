@@ -34,7 +34,7 @@ public enum HelperLimit {
     /// has not been archived, plus starts that have taken a place and not yet made
     /// their agent.
     ///
-    /// Stopped, finished and parked ones count. Only archiving gives this place back,
+    /// Stopped, finished and asking-to-be-archived ones count. Only archiving gives this place back,
     /// so a project cannot quietly fill with idle agents nobody sees.
     public static func placesInUse(in project: URL, agents: some Sequence<Agent>,
                                    reserved: Int = 0) -> Int {
@@ -59,12 +59,12 @@ public enum HelperLimit {
     ///   to come back (052);
     /// - one the daemon is bringing back after a restart (`comingBack`).
     ///
-    /// Not running: finished, stopped, parked, a block only the person can clear, and
-    /// archived. One set to park when its turn ends is still in that turn, so it counts
-    /// until it parks.
+    /// Not running: finished, stopped, asking to be archived (#584), a block only the
+    /// person can clear, and archived. One that asks once its turn ends is still in
+    /// that turn, so it counts until the turn ends.
     public static func isRunning(_ agent: Agent, comingBack: Set<UUID> = []) -> Bool {
         if agent.state == .archived { return false }
-        if agent.parking?.isParked == true { return false }
+        if agent.archiveRequest?.isRequested == true { return false }
         if agent.state.hasTurnInFlight { return true }
         if comingBack.contains(agent.id) { return true }
         return agent.isWaiting || agent.allowanceWait != nil

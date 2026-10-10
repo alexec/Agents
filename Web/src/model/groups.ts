@@ -1,6 +1,6 @@
 // Where a session sits in the sessions column: AgentGroup (Model/AgentGroup.swift), ported by
 // hand and held to Packages/AgentsKit/Tests/AgentsKitTests/Fixtures/web/groups (research R7).
-import type { Agent, AgentGroup, EndedReason, WireDate, WorkOutcome, WorkReport } from "../protocol/generated";
+import type { Agent, AgentGroup, EndedReason, WorkOutcome, WorkReport } from "../protocol/generated";
 
 export const groupTitles: Record<AgentGroup, string> = {
   needsAttention: "Needs you",
@@ -9,12 +9,14 @@ export const groupTitles: Record<AgentGroup, string> = {
   running: "Working",
   finished: "Done",
   stopped: "Paused",
-  parked: "Parked",
   archived: "Archived",
 };
 
-/** The groups shown in the column, in order. Archived is folded under them; Blocked is never assigned. */
-export const liveGroups: readonly AgentGroup[] = ["needsAttention", "waiting", "running", "finished", "stopped", "parked"];
+/**
+ * The groups shown in the column, in order. Archived is folded under them; Blocked is never assigned.
+ * Parked went in #584: a request to archive is a mark on the row, not a group.
+ */
+export const liveGroups: readonly AgentGroup[] = ["needsAttention", "waiting", "running", "finished", "stopped"];
 
 /** Whether somebody has to do something about this outcome (WorkOutcome.needsAPerson). */
 export function outcomeNeedsAPerson(outcome: WorkOutcome): boolean {
@@ -34,12 +36,9 @@ export function resumesByItself(report: WorkReport | undefined): boolean {
 
 const pausedEndings: readonly (EndedReason | undefined)[] = ["cancelled", "stoppedByAgent", "allowanceSpent"];
 
-export function isParked(agent: Agent): boolean {
-  return agent.parking !== undefined && "parked" in agent.parking;
-}
-
-export function parkedAt(agent: Agent): WireDate | undefined {
-  return agent.parking && "parked" in agent.parking ? agent.parking.parked.at : undefined;
+/** Agent.asksToArchive: an agent asked the person to archive it, and it is not archived yet (#584). */
+export function asksToArchive(agent: Agent): boolean {
+  return agent.archiveRequest !== undefined && "requested" in agent.archiveRequest && agent.state !== "archived";
 }
 
 /** Agent.isWaiting: the app will carry it on by itself. */
@@ -80,7 +79,6 @@ export function groupOf(agent: Agent, wantsEyes = false): AgentGroup {
   const wantsAnswer = report !== undefined && outcomeNeedsAPerson(report.outcome);
   const outcomeAsked = agent.outcomeAsked === true;
   const waitingOnEvents = agent.eventWait !== undefined && agent.eventWait.ending === undefined;
-  if (isParked(agent) && agent.state !== "archived" && agent.state !== "waitingOnUser") return "parked";
   switch (agent.state) {
     case "starting": return "running";
     case "waitingOnUser": return "needsAttention";
@@ -127,16 +125,11 @@ export function byStart(a: Agent, b: Agent): number {
   return b.createdAt - a.createdAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 }
 
-/**
- * AgentsModel.agents(in:group:): newest started first; under Parked most recently parked first;
- * under Archived newest activity first, as the host pages them.
- */
+/** AgentsModel.agents(in:group:): newest started first; under Archived newest activity first, as the host pages them. */
 export function agentsIn(agents: readonly Agent[], folder: string, group: AgentGroup): Agent[] {
   const wanted = folderKey(folder);
   const found = agents.filter((agent) => projectFolder(agent) === wanted && groupOf(agent) === group);
-  if (group === "archived") return found.sort(byActivity);
-  if (group !== "parked") return found.sort(byStart);
-  return found.sort((a, b) => (parkedAt(b) ?? -Infinity) - (parkedAt(a) ?? -Infinity) || byStart(a, b));
+  return found.sort(group === "archived" ? byActivity : byStart);
 }
 
 /** The column's headings in order, empty ones left out. */

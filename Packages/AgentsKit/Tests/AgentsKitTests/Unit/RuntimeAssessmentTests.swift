@@ -69,7 +69,7 @@ struct RuntimeAssessmentTests {
                                                         "waitingOn": .array([s(helper.uuidString)]),
                                                         "title": s("Assess Claude"),
                                                         "prompts": .array([.object(["label": s("x"), "prompt": s("y")])])]),
-            call(40, DaemonAPI.Method.agentsParkHelper, ["agentID": s(helper.uuidString)]),
+            call(40, DaemonAPI.Method.agentsRequestArchiveHelper, ["agentID": s(helper.uuidString)]),
             call(41, DaemonAPI.Method.agentsArchiveHelper, ["agentID": s(helper.uuidString)]),
             call(42, DaemonAPI.Method.eventsWait, ["events": .array([s(RuntimeAssessment.neverEvent)]), "untilMinutes": .int(1)],
                  answer: "Still waiting for custom.assess_never."),
@@ -89,7 +89,7 @@ struct RuntimeAssessmentTests {
                                                                           "removeLeft": .bool(true)]),
                                                          "prompts": .array([])]),
             call(180, DaemonAPI.Method.agentsFinishTurn, ["outcome": s("done"), "message": s("all passed"),
-                                                         "afterwards": s("park"), "prompts": .array([])]),
+                                                         "afterwards": s("request_archive"), "prompts": .array([])]),
         ]
         let form = ElicitationRequest(agentID: me, mode: .form(ElicitationSchema(properties: [])))
         let transcript: [TranscriptEntry] = [
@@ -130,7 +130,7 @@ struct RuntimeAssessmentTests {
             event(2, "lease.granted", ["agent": me.uuidString, "resource": "assess-abcd"]),
             event(4, "lease.released", ["how": "released", "resource": "assess-abcd"]),
             event(9, RuntimeAssessment.pingEvent, [:], publisher: me),
-            event(40, "agent.parked", ["agent": helper.uuidString]),
+            event(40, "agent.archive_requested", ["agent": helper.uuidString]),
         ]
         var helperAgent = Agent(id: helper, runtimeID: "claude", cwd: URL(filePath: "/tmp/work"), state: .archived)
         helperAgent.startedByAgent = me
@@ -480,7 +480,7 @@ struct RuntimeAssessmentTests {
         for step in RuntimeAssessment.steps { #expect(brief.contains("`\(step.id)`"), "\(step.id)") }
         for word in [RuntimeAssessment.pingEvent, RuntimeAssessment.neverEvent, RuntimeAssessment.helperLabel,
                      "AskUserQuestion", "assess-abcd1234", "until_minutes", report, scopeFile,
-                     "cancel_wait", "leave_worktree", "move_worktree", "park_agent", "read_session", "claude-agent-acp 0.81.2", "this Mac (test)",
+                     "cancel_wait", "leave_worktree", "move_worktree", "request_archive", "read_session", "claude-agent-acp 0.81.2", "this Mac (test)",
                      "on:\n      - custom.assess_never"] {
             #expect(brief.contains(word), "\(word)")
         }

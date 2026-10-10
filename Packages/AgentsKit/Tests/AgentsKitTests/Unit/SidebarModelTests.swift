@@ -94,12 +94,12 @@ struct SidebarModelTests {
         let model = AgentsModel()
         var unread = agent(api, .finished, "unread", at: 1)
         unread.isUnread = true
-        var parked = agent(api, .finished, "parked", at: 2)
-        parked.parking = .parked(at: t0)
-        model.replaceAgents([parked, unread, agent(api, .running, "working", at: 3),
+        var asking = agent(api, .finished, "asking", at: 2)
+        asking.archiveRequest = .requested(at: t0)
+        model.replaceAgents([asking, unread, agent(api, .running, "working", at: 3),
                              agent(api, .waitingOnUser, "asking", at: 4)])
         let fold = SidebarProjectFold(key, label: "api", in: model, isOpen: true)
-        #expect(fold.groups.map(\.group) == AgentGroup.live.filter { [.needsAttention, .running, .finished, .parked].contains($0) })
+        #expect(fold.groups.map(\.group) == AgentGroup.live.filter { [.needsAttention, .running, .finished].contains($0) })
         #expect(fold.groups.first { $0.group == .finished }?.unread == 1)
     }
 

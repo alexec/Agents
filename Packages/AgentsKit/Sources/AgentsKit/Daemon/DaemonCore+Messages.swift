@@ -88,7 +88,7 @@ extension DaemonCore {
 
         messagesSent[callerID] = sent + [now]
         var updated = target
-        if wakes { updated.parking = nil }
+        if wakes { updated.archiveRequest = nil }
         updated.queuedPrompts.append(prompt)
         changed(updated)
         raiseAgentEvent("agent.messaged", target.id, sentence: "was sent a message by \u{201C}\(sender.title)\u{201D}.",

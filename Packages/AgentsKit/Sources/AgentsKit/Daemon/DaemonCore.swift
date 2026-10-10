@@ -1204,24 +1204,23 @@ public actor DaemonCore {
         // other move — picked up again, stopped, archived — is not a finish, so the
         // flag goes.
         agent.isUnread = next == .finished && !isWatched(agentID)
-        // Parking (040). A chat marked while its turn was in flight is parked the moment
-        // that turn ends, by whatever means, and before anything is told — so the
-        // ending never counts as a need and no banner goes out (FR-006). Not when a
-        // restarting daemon is about to pick it back up: that turn has not ended, and
-        // it parks when it does. Archiving takes the mark away, and unarchiving does
-        // not put it back (FR-010). The triggers below read `next`, never the mark, so
-        // a workflow sees the ending it always did (FR-015).
+        // A request to archive (#584), asked while the turn was in flight — by the agent
+        // itself with request_archive and no id, or by the agent that started it — is
+        // settled the moment that turn ends, by whatever means, and before anything is
+        // told. Not when a restarting daemon is about to pick it back up: that turn has
+        // not ended. The triggers below read `next`, never the mark, so a workflow sees
+        // the ending it always did.
         //
-        // An agent's own ask to be parked, made on the call that ended its turn, is the
-        // same park at the same moment — but only for the ending it asked about: the
-        // turn it made the ask in, ended by its own hand, with nothing the person has
-        // queued since. Any other ending drops the ask.
+        // The agent's own ask goes only with the ending it asked about: the turn it made
+        // the ask in, ended by its own hand, with nothing the person has queued since.
+        // An ending that wants the person for something else takes any request away:
+        // the session wants them again. Archiving takes it away too, and unarchiving does not put it back.
         //
-        // A workflow's run may be archived instead (#433), when its file's `when-done:`
-        // says so and the run's turn ended done as above: noted here, while the run is
-        // still in flight to say which workflow it is, and archived once the runtime is
-        // let go. Nothing else is archived on an agent's word.
-        let wasParked = agent.parking?.isParked == true
+        // Where something may already archive the session without asking (decision 2),
+        // it is archived instead, once the runtime is let go: a workflow's run its
+        // `when-done:` lets archive itself (#433), or a helper the agent that started it
+        // may archive. Nothing else is archived on an agent's word.
+        let wasRequested = agent.archiveRequest?.isRequested == true
         archiveWhenDone[agentID] = nil
         switch next {
         case .finished, .stopped:
@@ -1231,22 +1230,37 @@ public actor DaemonCore {
             if endedAsAsked, runArchivesWhenDone(agentID, agent: agent, asked: agent.afterTurn) {
                 archiveWhenDone[agentID] = archivedWhenDoneNote(agentID)
             }
-            if case .whenTurnEnds = agent.parking, !pickingUp {
-                agent.parking = .parked(at: now())
-                agent.isUnread = false
+            guard !pickingUp else { break }
+            let asked: Bool
+            if case .whenTurnEnds = agent.archiveRequest {
+                asked = true
+            } else if agent.afterTurn == .requestArchive, endedAsAsked {
+                // Asked before the ending was known (#481), so the ending it got — its
+                // own or the one worked out for it — has to go with the request.
+                asked = agent.report.map { AfterTurn.requestArchive.goes(with: $0.outcome) } ?? true
+            } else {
+                asked = false
             }
-            if let after = agent.afterTurn, !pickingUp {
-                // Asked with park_agent before the ending was known (#481), so the ending
-                // it got — its own or the one worked out for it — has to go with a park.
-                let goes = agent.report.map { after.goes(with: $0.outcome) } ?? true
-                if after == .park, endedAsAsked, goes, agent.parking == nil, archiveWhenDone[agentID] == nil {
-                    agent.parking = .parked(at: now())
-                    agent.isUnread = false
+            // An ending that asks the person for something a request does not go with —
+            // a question, stuck, blocked, a crash — wants them again. Partly done goes
+            // with it: the session asks under Needs you, and the person decides.
+            let wantsThePerson = agent.report.map { next == .finished && !AfterTurn.requestArchive.goes(with: $0.outcome) }
+                ?? (agent.group(wantsEyes: false) == .needsAttention)
+            if wantsThePerson || (next == .stopped && agent.group(wantsEyes: false) == .needsAttention) {
+                agent.archiveRequest = nil
+            } else if asked, archiveWhenDone[agentID] == nil {
+                if endedAsAsked, let note = helperArchivesWithoutAsking(agentID, agent: agent) {
+                    archiveWhenDone[agentID] = note
+                    agent.archiveRequest = nil
+                } else if !wasRequested {
+                    agent.archiveRequest = .requested(at: now())
                 }
-                agent.afterTurn = nil
+            } else if case .whenTurnEnds = agent.archiveRequest {
+                agent.archiveRequest = nil
             }
+            agent.afterTurn = nil
         case .archived:
-            agent.parking = nil
+            agent.archiveRequest = nil
             agent.afterTurn = nil
         case .starting, .running, .waitingOnUser, .queued:
             break
@@ -1258,11 +1272,11 @@ public actor DaemonCore {
         } else {
             agent.archivedAt = nil
         }
-        let parkedNow = !wasParked && agent.parking?.isParked == true
+        let requestedNow = !wasRequested && agent.archiveRequest?.isRequested == true
         let archivedNow = next == .archived && agents[agentID]?.state != .archived
         // Read before the ending below releases the run, as that ending's own depth is:
-        // a workflow that parks its agent must not fire on that park from depth zero.
-        let putAwayDepth = parkedNow || archivedNow ? workflowChainDepth(causedBy: agentID) : 0
+        // a workflow whose agent asks to be archived must not fire on that ask from depth zero.
+        let putAwayDepth = requestedNow || archivedNow ? workflowChainDepth(causedBy: agentID) : 0
         // And whose run it is, so that workflow does not fire on its own agent's ending (#102).
         let endingRun = runInFlight(for: agentID)?.key
         let wasStarting = agents[agentID]?.state == .starting
@@ -1305,7 +1319,7 @@ public actor DaemonCore {
             // The event first (042): it is what a waiting agent hears, and what the
             // log keeps. Workflows still fire from the line below until US3 moves them.
             let cause = raiseAgentEnding(agentID, next: next, reason: reasonThisEventSet ?? agent.endedReason,
-                                         depth: depth, parks: agent.parking?.isParked == true)
+                                         depth: depth, afterwards: afterwards(agentID, agent))
             workflowRunFinished(agentID: agentID)
             workflowsRespond(to: next == .finished ? .finished : .stopped,
                              agentID: agentID, depth: depth, causingEvent: cause, endingRun: endingRun)
@@ -1320,9 +1334,9 @@ public actor DaemonCore {
         // Put away (#96), after the ending it came with, so a wait hears the finish first.
         // With the outcome of its last report, when it made one (073 FR-005).
         let lastOutcome = agent.report.map { ["outcome": $0.outcome.rawValue] } ?? [:]
-        if parkedNow {
-            raiseAgentEvent("agent.parked", agentID, sentence: "was parked.", details: lastOutcome,
-                            depth: putAwayDepth, endingRun: endingRun)
+        if requestedNow {
+            raiseAgentEvent("agent.archive_requested", agentID, sentence: "asked to be archived.",
+                            details: lastOutcome, depth: putAwayDepth, endingRun: endingRun)
         }
         if archivedNow {
             let by = agent.archivedReason == .byAgent ? "agent" : "you"

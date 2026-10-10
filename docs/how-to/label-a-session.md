@@ -51,4 +51,4 @@ labels; it does not copy labels from the session whose work you continue.
 ## See also
 
 - [Tools the app gives agents](../reference/agent-tools.md)
-- [Stop, park and archive agents](archive-park-stop.md)
+- [Stop and archive agents](archive-and-stop.md)

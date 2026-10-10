@@ -9,11 +9,12 @@ struct EventCatalogueTests {
         let names = EventCatalogue.all.map(\.name)
         // 30 from 042, 051's agent.retired (agent.deleted since #398), and 052's switch and two allowance kinds,
         // less the ten pull-request kinds that went with GitHub support, and the switch,
-        // which went with the pool (065), and agent.parked and agent.archived (#96), and
+        // which went with the pool (065), and agent.parked (agent.archive_requested since #584)
+        // and agent.archived (#96), and
         // mac.disk_low and mac.disk_ok (#195, machine.* since #372), project.idle (#360),
         // and dropbox.file_added (#231), and agent.messaged (#560).
         #expect(names.count == 30)
-        for name in ["cost.allowance_out", "cost.allowance_back", "agent.parked", "agent.archived",
+        for name in ["cost.allowance_out", "cost.allowance_back", "agent.archive_requested", "agent.archived",
                      "machine.disk_low", "machine.disk_ok", "project.idle", "dropbox.file_added",
                      "agent.messaged"] {
             #expect(names.contains(name), "\(name)")
@@ -60,7 +61,7 @@ struct EventCatalogueTests {
             for key in ["labels", "runtime", "started_by"] { #expect(kind.details.contains(key), "\(kind.name) \(key)") }
         }
         #expect(EventCatalogue.kind(named: "agent.finished")!.details.contains("afterwards"))
-        for name in ["agent.parked", "agent.archived", "workflow.completed"] {
+        for name in ["agent.archive_requested", "agent.archived", "workflow.completed"] {
             #expect(EventCatalogue.kind(named: name)!.details.contains("outcome"), "\(name)")
         }
         let finished = try #require(EventCatalogue.kind(named: "agent.finished"))
@@ -118,7 +119,7 @@ struct EventCatalogueTests {
             EventCatalogue.kind(named: name)?.payloadSchema["properties"]?[key]?["enum"]?.arrayValue?.compactMap(\.stringValue)
         }
         #expect(values("agent.finished", "outcome") == WorkOutcome.allCases.map(\.rawValue))
-        #expect(values("agent.finished", "afterwards") == ["park", "stay"])
+        #expect(values("agent.finished", "afterwards") == ["archive_requested", "archived", "stay"])
         #expect(values("agent.failed", "reason") == EndedReason.allCases.map(\.code))
         #expect(values("workflow.refused", "reason") == WorkflowRefusal.codes)
         #expect(values("machine.disk_low", "level") == ["low", "critical"])

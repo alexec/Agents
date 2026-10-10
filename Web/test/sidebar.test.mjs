@@ -62,6 +62,23 @@ test("smart groups gather by what a session wants, newest started first (#495)",
   assert.equal(sessionMark(agent("paused", 1, { state: "stopped", endedReason: "cancelled" })), null, "its own status mark");
 });
 
+test("To Archive gathers what an agent asked to have archived, each listed once (#584, #587)", async () => {
+  const { smartAgents, smartRows, smartTitles } = await load("src/model/sidebar.ts");
+  const asked = { requested: { at: 1 } };
+  const live = [
+    agent("done", 1, { archiveRequest: asked }),
+    agent("partly", 2, { archiveRequest: asked, report: { outcome: "partly_done", message: "m", at: 1 } }),
+    agent("later", 3, { state: "running", archiveRequest: { whenTurnEnds: { since: 1 } } }),
+    agent("none", 4),
+  ];
+  assert.deepEqual(smartAgents("toArchive", live).map((a) => a.id), ["done"], "asked, not set to ask");
+  assert.deepEqual(smartAgents("needsYou", live).map((a) => a.id), ["partly"], "partly done is listed once, under Needs You");
+  assert.equal(smartRows.at(-1), "toArchive");
+  assert.equal(smartTitles.toArchive, "To Archive");
+  const { sessionMark } = await load("src/model/sidebar.ts");
+  assert.deepEqual(live.map(sessionMark), ["asksToArchive", "needsYou", "working", "read"], "partly done still needs you");
+});
+
 test("a project's sessions are one list, the pinned out of it; Pinned keeps pin order (#495)", async () => {
   const { projectSessions, pinnedSessions, pinnedWorkflows } = await load("src/model/sidebar.ts");
   const live = [agent("a", 1), agent("b", 3), agent("c", 2)];

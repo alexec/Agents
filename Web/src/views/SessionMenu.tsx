@@ -1,6 +1,5 @@
 // A session's actions (071 FR-027): Carry on while it sits in an open block (#250), Stop while it
-// holds a runtime or a block, Park or Unpark
-// (Agent.parkAction), Branch (#342), and Archive, or Bring Back and Delete (#398). In the chat
+// holds a runtime or a block, Branch (#342), and Archive, or Bring Back and Delete (#398). In the chat
 // header's ··· menu, and the sidebar row's menu. The chat's has Open File… first, as the Remote's
 // ··· menu does (#543), for a page with no keyboard to press ⌘P on.
 import { useSignal } from "@preact/signals";
@@ -11,11 +10,11 @@ import { isOpenBlock, projectFolder } from "../model/groups";
 import { carryOnHelp, carryOnLabel, carryOnPrompt, openBlock } from "../model/block";
 import { go } from "../route";
 
-export type Action = "carryOn" | "agents/stop" | "agents/park" | "agents/unpark" | "agents/archive" | "agents/unarchive"
+export type Action = "carryOn" | "agents/stop" | "agents/archive" | "agents/unarchive"
   | "markRead" | "markUnread" | "pin" | "unpin" | "fork" | "delete";
 
 /**
- * What the menu offers, in order, with the window's words (ParkWords, AgentRow's menu). Given
+ * What the menu offers, in order, with the window's words (AgentRow's menu). Given
  * whether it is pinned, Pin or Unpin too (#180).
  */
 export function sessionActions(agent: Agent, pinned?: boolean): { action: Action; label: string; help: string }[] {
@@ -28,12 +27,6 @@ export function sessionActions(agent: Agent, pinned?: boolean): { action: Action
   } else if (agent.state === "queued") {
     // AgentsModel.canStop: Stop takes a queued helper off the queue (#362).
     found.push({ action: "agents/stop", label: "Stop", help: "Take this agent off the queue" });
-  }
-  if (agent.parking) {
-    found.push({ action: "agents/unpark", label: "Unpark",
-      help: "whenTurnEnds" in agent.parking ? "Don't park this chat when its turn ends" : "Put this chat back where it was" });
-  } else if (agent.state !== "archived") {
-    found.push({ action: "agents/park", label: "Park", help: "Put this chat down to come back to later" });
   }
   // The person's own mark (#70): leave something to come back to, or clear it without opening it.
   if (agent.state === "finished") {

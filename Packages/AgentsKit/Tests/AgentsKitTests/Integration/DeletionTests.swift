@@ -89,13 +89,13 @@ struct DeletionTests {
                              createdAt: old, lastActivityAt: old, endedReason: .endTurn)
         let stopped = Agent(runtimeID: "claude", cwd: work, title: "stopped", state: .stopped,
                             createdAt: old, lastActivityAt: old, endedReason: .cancelled)
-        var parked = finished
-        parked.id = UUID()
-        parked.parking = .parked(at: old)
-        let core = try await core(locations, seeded: [finished, stopped, parked],
+        var asking = finished
+        asking.id = UUID()
+        asking.archiveRequest = .requested(at: old)
+        let core = try await core(locations, seeded: [finished, stopped, asking],
                                   settings: RetentionSettings(keepFor: .days7))
         await core.checkRetention()
-        for id in [finished.id, stopped.id, parked.id] {
+        for id in [finished.id, stopped.id, asking.id] {
             #expect(await core.agent(id) != nil)
             #expect(folderExists(locations, id))
         }

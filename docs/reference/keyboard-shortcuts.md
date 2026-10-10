@@ -31,7 +31,6 @@ ones every Mac app has.
 | Option-Command-, | **File ▸ Project Settings…** | Opens the selected project's settings: its instructions, skills, plugins, MCP servers and worktrees. |
 | Command-. | **Session ▸ Stop** | Stops the agent and stays on the conversation. |
 | Shift-Command-Return | **Session ▸ Carry On** | Tells an agent blocked under **Needs you** that its block has gone, or a **Waiting** one that its wait is over early. |
-| Control-Command-P | **Session ▸ Park** or **Unpark** | Puts the session down to come back to later, or puts it back where it was. |
 | Option-Command-Delete | **Session ▸ Archive** or **Bring Back** | Archives the session, or brings an archived one back. |
 | Delete | Selected session(s) in the sessions list | Archives the highlighted session, or every highlighted one that is not already archived (⌘-click to pick several). |
 | Option-Command-B | **Session ▸ Branch** | Starts a new agent from this conversation so far. |

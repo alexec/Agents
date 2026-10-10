@@ -88,9 +88,9 @@ public extension StatusShape {
     }
 
     /// Whether the row draws the shape in the app's one colour: it wants a person, and the
-    /// person has not parked it or been told it waits for an allowance.
-    static func isTinted(_ shape: StatusShape, isParked: Bool, isWaitingForAllowance: Bool = false) -> Bool {
-        shape.wantsAPerson && !isParked && !isWaitingForAllowance
+    /// person has not been told it waits for an allowance.
+    static func isTinted(_ shape: StatusShape, isWaitingForAllowance: Bool = false) -> Bool {
+        shape.wantsAPerson && !isWaitingForAllowance
     }
 
     /// What a screen reader hears for the shape, and what the tooltip says. Precise where

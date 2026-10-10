@@ -180,7 +180,7 @@ struct WarmPoolTests {
         let core = try await core(FakeLauncher(keepsRuntimesWarm: true), locations, clock: clock)
         let stopped = try await chat(core, work)
         let archived = try await chat(core, work)
-        let parked = try await chat(core, work)
+        let asking = try await chat(core, work)
         #expect(await core.warm.count == 3)
 
         try await core.stop(stopped)
@@ -188,8 +188,8 @@ struct WarmPoolTests {
         try await core.archive(archived)
         #expect(await core.live[archived] == nil)
         #expect(await core.liveStateKeys(for: archived).isEmpty)
-        try await core.park(parked)
-        await eventually("parking lets it go") { await core.live[parked] == nil }
+        try await core.requestArchive(asking)
+        await eventually("asking to be archived lets it go") { await core.live[asking] == nil }
         #expect(await core.warm.isEmpty)
     }
 
@@ -265,9 +265,9 @@ struct WarmPoolTests {
         let clock = Clock()
         let core = try await core(launcher, locations, clock: clock)
         let id = try await chat(core, work)
-        try await core.park(id)
-        try await core.unpark(id)
-        await eventually("parking let it go") { await core.live[id] == nil }
+        try await core.requestArchive(id)
+        await core.clearArchiveRequest(id)
+        await eventually("asking let it go") { await core.live[id] == nil }
         let launches = launcher.launchCount
 
         try await core.prewarm(.init(agentID: id, why: .opened))
@@ -287,9 +287,9 @@ struct WarmPoolTests {
         let clock = Clock()
         let core = try await core(FakeLauncher(keepsRuntimesWarm: true), locations, clock: clock)
         let id = try await chat(core, work)
-        try await core.park(id)
-        try await core.unpark(id)
-        await eventually("parking let it go") { await core.live[id] == nil }
+        try await core.requestArchive(id)
+        await core.clearArchiveRequest(id)
+        await eventually("asking let it go") { await core.live[id] == nil }
 
         try await core.prewarm(.init(agentID: id, why: .opened))
         await eventually("it warmed") { await core.warm[id] != nil }
@@ -298,7 +298,7 @@ struct WarmPoolTests {
         #expect(await core.live[id] == nil, "nobody sent anything, so it went")
     }
 
-    @Test func aPrewarmOfAParkedOrArchivedSessionDoesNothing() async throws {
+    @Test func aPrewarmOfAnArchivedSessionDoesNothing() async throws {
         let (locations, work) = try temporary()
         let launcher = FakeLauncher(keepsRuntimesWarm: true)
         let clock = Clock()
@@ -344,14 +344,14 @@ struct WarmPoolTests {
         for id in ids.suffix(3) { #expect(await isWarm(core, id), "the newest intent wins") }
     }
 
-    @Test func aParkedSessionIsNotPrewarmed() async throws {
+    @Test func aSessionAskingToBeArchivedIsNotPrewarmed() async throws {
         let (locations, work) = try temporary()
         let launcher = FakeLauncher(keepsRuntimesWarm: true)
         let clock = Clock()
         let core = try await core(launcher, locations, clock: clock)
         let id = try await chat(core, work)
-        try await core.park(id)
-        await eventually("parking let it go") { await core.live[id] == nil }
+        try await core.requestArchive(id)
+        await eventually("asking let it go") { await core.live[id] == nil }
         let launches = launcher.launchCount
         try await core.prewarm(.init(agentID: id, why: .opened))
         try await Task.sleep(for: .milliseconds(200))
@@ -455,14 +455,14 @@ struct WarmPoolScoreTests {
                 > WarmPool.score(.init(since: now.addingTimeInterval(-20 * 60)), plain, now: now))
     }
 
-    @Test func zeroForErrandsParkedAndPastTheCeiling() {
+    @Test func zeroForErrandsAskingToBeArchivedAndPastTheCeiling() {
         var errand = WarmPool.Signals()
         errand.personsConversation = false
         #expect(WarmPool.score(.init(since: now), errand, now: now) == 0)
-        var parked = WarmPool.Signals()
-        parked.personsConversation = true
-        parked.parked = true
-        #expect(WarmPool.score(.init(since: now), parked, now: now) == 0)
+        var asking = WarmPool.Signals()
+        asking.personsConversation = true
+        asking.asksToArchive = true
+        #expect(WarmPool.score(.init(since: now), asking, now: now) == 0)
         var chat = WarmPool.Signals()
         chat.personsConversation = true
         chat.watchedActive = true
@@ -493,8 +493,8 @@ struct WarmPoolScoreTests {
         #expect(WarmPool.score(.init(since: now), errand, now: now) == 0)
         errand.pendingWake = true
         #expect(WarmPool.score(.init(since: now), errand, now: now) > 0)
-        errand.parked = true
-        #expect(WarmPool.score(.init(since: now), errand, now: now) == 0, "parked still goes")
+        errand.asksToArchive = true
+        #expect(WarmPool.score(.init(since: now), errand, now: now) == 0, "asking to be archived still goes")
     }
 
     @Test func typicalGapWantsThreePrompts() {

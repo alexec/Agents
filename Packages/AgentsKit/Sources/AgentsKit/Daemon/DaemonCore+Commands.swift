@@ -1592,9 +1592,9 @@ extension DaemonCore {
         // unless the person has queued words, which go first. No question about how the
         // turn went: it ended to move (053).
         if movedBy == .agent {
-            // Parked as it also asked (#481): it stays down in the new folder, and the
-            // move's preface waits for whatever starts it next.
-            if agents[agentID]?.parking?.isParked == true { return }
+            // Asked to be archived as well (#481, #584): it stays down in the new folder,
+            // and the move's preface waits for whatever starts it next.
+            if agents[agentID]?.archiveRequest?.isRequested == true { return }
             if agents[agentID]?.queuedPrompts.isEmpty == true {
                 await continueAfterMove(agentID)
             } else {
@@ -1958,13 +1958,14 @@ extension DaemonCore {
         await move(agentID, on: .unarchivedByUser)
     }
 
-    // MARK: Parking (040)
+    // MARK: Requests to archive (#584)
 
-    /// Put a chat down to come back to. A settled chat is parked now; one with a turn in
-    /// flight is marked, and `move` parks it the moment that turn ends, so nothing is cut
-    /// off (FR-006). The runtime, the transcript and the queue are not touched (FR-005).
-    /// An archived chat, or one already so, is left as it is and nothing is said (FR-017).
-    public func park(_ agentID: UUID) throws {
+    /// Ask for a session to be archived, for the person's OK. A settled one carries the
+    /// mark now; one with a turn in flight is set to ask, and `move` settles it the
+    /// moment that turn ends, so nothing is cut off. The runtime, the transcript and
+    /// the queue are not touched. An archived session, or one already asking, is left
+    /// as it is and nothing is said.
+    public func requestArchive(_ agentID: UUID) throws {
         guard var agent = agents[agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
@@ -1972,34 +1973,26 @@ extension DaemonCore {
         dropAllowanceWait(agentID)
         agent = agents[agentID] ?? agent
         let inFlight = agent.state.hasTurnInFlight
-        switch (agent.parking, inFlight) {
-        case (.parked, _), (.whenTurnEnds, true): return
-        case (_, true): agent.parking = .whenTurnEnds(since: now())
-        case (_, false): agent.parking = .parked(at: now())
+        switch (agent.archiveRequest, inFlight) {
+        case (.requested, _), (.whenTurnEnds, true): return
+        case (_, true): agent.archiveRequest = .whenTurnEnds(since: now())
+        case (_, false): agent.archiveRequest = .requested(at: now())
         }
         changed(agent)
-        if agent.parking?.isParked == true {
-            // Put down is not expecting a reply (#183).
-            if warm[agentID] != nil { Task { await self.releaseWarm(agentID, because: "parked") } }
-            raiseAgentEvent("agent.parked", agentID, sentence: "was parked.",
+        if agent.archiveRequest?.isRequested == true {
+            // Waiting for the person to archive it is not expecting a reply (#183).
+            if warm[agentID] != nil { Task { await self.releaseWarm(agentID, because: "asked to be archived") } }
+            raiseAgentEvent("agent.archive_requested", agentID, sentence: "asked to be archived.",
                             details: agent.report.map { ["outcome": $0.outcome.rawValue] } ?? [:])
         }
         reconsider()
     }
 
-    /// Pick a chat back up without saying anything to it: it goes back to the group its
-    /// ending puts it in, or, mid-turn, ends where it would have (FR-008).
-    public func unpark(_ agentID: UUID) throws {
-        guard agents[agentID] != nil else {
-            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
-        }
-        unparkQuietly(agentID)
-    }
-
-    /// Take the mark off, if there is one. Shared with the person's prompt.
-    func unparkQuietly(_ agentID: UUID) {
-        guard var agent = agents[agentID], agent.parking != nil else { return }
-        agent.parking = nil
+    /// Take the mark off, if there is one: the person sent the session something, or
+    /// another agent woke it.
+    func clearArchiveRequest(_ agentID: UUID) {
+        guard var agent = agents[agentID], agent.archiveRequest != nil else { return }
+        agent.archiveRequest = nil
         changed(agent)
         reconsider()
     }

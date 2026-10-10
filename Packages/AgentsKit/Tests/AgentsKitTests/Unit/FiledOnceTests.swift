@@ -58,12 +58,13 @@ struct FiledOnceTests {
             agents.append(agent(web, state, at: Double(index) + 0.5))
             agents.append(agent(api, state, at: Double(index) + 0.25, host: devbox))
         }
-        var older = agent(api, .finished, at: 20); older.parking = .parked(at: t0)
-        var newer = agent(api, .finished, at: 10); newer.parking = .parked(at: t0.addingTimeInterval(60))
+        var older = agent(api, .finished, at: 20); older.archiveRequest = .requested(at: t0)
+        var newer = agent(api, .finished, at: 10); newer.archiveRequest = .requested(at: t0.addingTimeInterval(60))
         var unread = agent(api, .finished, at: 30); unread.isUnread = true
         model.replaceAgents(agents + [older, newer, unread])
         expectAgreement(model, "listed")
-        #expect(model.agents(in: api, group: .parked).map(\.id) == [newer.id, older.id], "most recently parked first")
+        let done = model.agents(in: api, group: .finished).map(\.id)
+        #expect(done.contains(older.id) && done.contains(newer.id), "asking to be archived stays under Done")
 
         var moved = agents[1]
         moved.state = .running
@@ -127,8 +128,8 @@ struct FiledOnceTests {
                 switch Int.random(in: 0..<5, using: &dice) {
                 case 0: changed.state = AgentState.allCases.randomElement(using: &dice)!
                 case 1: changed.lastActivityAt = t0.addingTimeInterval(Double(Int.random(in: 0..<50, using: &dice)))
-                case 2: changed.parking = Bool.random(using: &dice)
-                    ? .parked(at: t0.addingTimeInterval(Double(Int.random(in: 0..<5, using: &dice)))) : nil
+                case 2: changed.archiveRequest = Bool.random(using: &dice)
+                    ? .requested(at: t0.addingTimeInterval(Double(Int.random(in: 0..<5, using: &dice)))) : nil
                 case 3: changed.isUnread.toggle()
                 default: changed.cwd = [api, web].randomElement(using: &dice)!
                 }

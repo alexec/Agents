@@ -387,7 +387,7 @@ struct WorkflowPage: View {
     @ViewBuilder
     private func whenDone(_ summary: WorkflowSummary) -> some View {
         if summary.workflow.mode != .triggering {
-            let current = summary.workflow.whenDone ?? .park
+            let current = summary.workflow.whenDone ?? .keep
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 note(current.sentence)
                 Spacer(minLength: 8)

@@ -163,17 +163,15 @@ struct ChatView: View {
             }
             .chatColumn()
             .padding(.vertical, 8)
-        } else if ParkWords.line(agent.parking) != nil || model.isBlocked(agent) {
-            // Stop is the prompt's own button while the agent works; Park and Archive
-            // are on the session's row. What is left here is only what the page has to
-            // say: why a parked chat is parked, and what a blocked one waits on and the
-            // way on.
+        } else if agent.asksToArchive || model.isBlocked(agent) {
+            // Stop is the prompt's own button while the agent works; Archive is on the
+            // session's row and in the toolbar. What is left here is only what the page
+            // has to say: that an agent asks for it to be archived, with the one click
+            // that agrees (#584), and what a blocked one waits on and the way on.
             HStack(alignment: .top, spacing: 8) {
                 VStack(alignment: .leading, spacing: 4) {
-                    // Said on the page, so a chat opened from Parked says why it is there
-                    // and when (040, FR-011).
-                    if let line = ParkWords.line(agent.parking) {
-                        Label(line, systemImage: ParkWords.symbol)
+                    if let line = ArchiveRequestWords.line(agent) {
+                        Label(line, systemImage: ArchiveRequestWords.symbol)
                             .appText(.fine)
                             .foregroundStyle(.secondary)
                     }
@@ -183,6 +181,17 @@ struct ChatView: View {
                     }
                 }
                 Spacer(minLength: 0)
+                if agent.asksToArchive {
+                    Button {
+                        Task { await model.archive(agent.id, andLeave: true) }
+                    } label: {
+                        Label(ArchiveRequestWords.archive, systemImage: ArchiveRequestWords.symbol)
+                    }
+                    .buttonStyle(.paper)
+                    .appText(.fine)
+                    .help(ArchiveRequestWords.archiveHelp)
+                    .disabled(model.acting(agent.id) != nil)
+                }
                 // A blocked chat (039): what the card's Carry on does.
                 if model.isBlocked(agent) {
                     Button {

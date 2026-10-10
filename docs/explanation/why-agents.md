@@ -27,8 +27,8 @@ They do not all do the same things; [Runtimes](../reference/runtimes.md) lists e
 
 ## It shows which agent needs you
 
-Every agent sits in one group: **Needs you**, **Waiting**, **Working**, **Done**,
-**Paused** or **Parked**. **Needs you** holds questions, unresolved blocks, endings
+Every agent sits in one group: **Needs you**, **Waiting**, **Working**, **Done** or
+**Paused**. **Needs you** holds questions, unresolved blocks, endings
 nobody accounted for and unexpected stops; a finished turn you haven't read keeps an
 unread mark wherever it is; **Waiting** carries on by itself. When an agent
 ends its turn, it says in one sentence how it went. You can read the list and know what to open without reading any

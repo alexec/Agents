@@ -3271,11 +3271,10 @@ final class RemoteModel {
             problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
         }
     }
-    /// Park or unpark, whichever `Agent.parkAction` offers (040). From the card's menu.
-    func perform(_ action: ParkAction, on agentID: UUID) async {
-        await act(AgentAct(action), on: agentID,
-                  action == .park ? DaemonAPI.Method.agentsPark : DaemonAPI.Method.agentsUnpark,
-                  DaemonAPI.AgentRequest(agentID: agentID))
+    /// Archive every session in the projects named that asks to be archived (#584): the
+    /// To Archive group's Archive All, one Archive at a time as on the Mac.
+    func archiveAllRequested(in projects: [ProjectKey]) async {
+        for agent in SidebarSmartRow.toArchive.agents(in: work, projects: projects) { await archive(agent.id) }
     }
 
     /// What is on its way to this agent, if anything: for the control that sent it to
@@ -3346,7 +3345,7 @@ final class RemoteModel {
         }
         do {
             // To the agent's own host: one on another of the control plane's hosts is not
-            // the home host's to stop, park or archive (073).
+            // the home host's to stop or archive (073).
             let request = DaemonAPI.AgentRequest(agentID: agentID)
             try await sendOnce(method, request)
         } catch {
