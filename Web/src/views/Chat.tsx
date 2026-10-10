@@ -477,7 +477,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
             ))}
           </select>
           <button onClick={() => replace({ ...r, files: !r.files })} aria-pressed={!!r.files}>Files</button>
-          <SessionMenu store={store} host={host} agent={agent} disabled={down} />
+          <SessionMenu store={store} host={host} agent={agent} disabled={down} openFile={() => (searchingFiles.value = true)} />
         </span>
       </header>
       {hostDown && <OfflineStrip store={store} host={host} />}
