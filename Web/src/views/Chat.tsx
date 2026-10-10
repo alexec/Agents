@@ -22,7 +22,7 @@ import { Labels } from "./Labels";
 import { Prompt } from "./Prompt";
 import { PromptMenus } from "./PromptMenus";
 import { ContextMeter, CostLimitBanner, SandboxCapsule } from "./PromptStatus";
-import { SessionMenu } from "./SessionMenu";
+import { SessionButtons, SessionMenu } from "./SessionMenu";
 import { drawable } from "../model/options";
 import { projectFolder } from "../model/groups";
 import { CallActionsContext, detailSummaries, detailTitles, fromLine, ItemRow, TurnView, type CallActions, type TurnDetail } from "./chat/Rows";
@@ -477,6 +477,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
             ))}
           </select>
           <button onClick={() => replace({ ...r, files: !r.files })} aria-pressed={!!r.files}>Files</button>
+          <SessionButtons store={store} host={host} agent={agent} disabled={down} />
           <SessionMenu store={store} host={host} agent={agent} disabled={down} openFile={() => (searchingFiles.value = true)} />
         </span>
       </header>

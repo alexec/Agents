@@ -3158,8 +3158,11 @@ final class RemoteModel {
     func stop(_ agentID: UUID) async {
         await act(.stop, on: agentID, DaemonAPI.Method.agentsStop, DaemonAPI.AgentRequest(agentID: agentID))
     }
-    func archive(_ agentID: UUID) async {
-        await act(.archive, on: agentID, DaemonAPI.Method.agentsArchive, DaemonAPI.AgentRequest(agentID: agentID))
+    func archive(_ agentID: UUID, andLeave: Bool = false) async {
+        let archived = await act(.archive, on: agentID, DaemonAPI.Method.agentsArchive,
+                                 DaemonAPI.AgentRequest(agentID: agentID))
+        // Not when it failed: the chat stays in front, under the reason why.
+        if archived, andLeave, selection == agentID { selection = nil }
     }
 
     /// Continue in the project folder (#119): a successor that reads this session and
