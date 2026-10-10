@@ -3,13 +3,13 @@
 // counts, and opened, its diff. Edits or the whole file, as chosen, where both can be shown;
 // Previous and Next through the whole file's changes; Open in Files (#259). Marked by sign, weight
 // and a faint neutral wash; only a file's status square is coloured, as the window's is (#63).
-// Changed words within a line stay unmarked, as #63 left them.
+// Changed words within a line sit on a stronger wash, as the window's CodeLine marks them (#545).
 import { useSignal } from "@preact/signals";
-import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import type { ChangedFile, ChangedFileDetail, ChangesList, DiffLine, GitView } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
-import { canOpenInFiles, changeStep, changeStops, lineDiff, offersDiffChoice, otherAgentsNote, shownDiff, unavailableNote, type DiffShown } from "../model/diff";
+import { canOpenInFiles, changeStep, changeStops, lineDiff, markWords, offersDiffChoice, otherAgentsNote, shownDiff, unavailableNote, type DiffShown } from "../model/diff";
 import { nameOf, paneOf, setPane } from "./files/paneState";
 import { build, lines, sameFile, statusGlyph, statusPhrase, totals, type Totals } from "../model/changeTree";
 
@@ -32,18 +32,33 @@ export function Counts({ added, removed }: { added?: number | undefined; removed
 
 const folderCounts = (t: Totals) => <Counts added={t.added} removed={t.removed} />;
 
+/** A line's text, its changed stretches each in a mark of their own. */
+function Marked({ text, changed }: { text: string; changed: [number, number][] | undefined }) {
+  if (!changed?.length) return <>{text}</>;
+  const pieces = [];
+  let at = 0;
+  for (const [from, to] of changed) {
+    if (from > at) pieces.push(text.slice(at, from));
+    pieces.push(<mark key={from} class="diff-word">{text.slice(from, to)}</mark>);
+    at = to;
+  }
+  if (at < text.length) pieces.push(text.slice(at));
+  return <>{pieces}</>;
+}
+
 export function Lines({ lines, scrollTo, scrollNonce }: { lines: DiffLine[]; scrollTo?: number | undefined; scrollNonce?: number | undefined }) {
   const pre = useRef<HTMLPreElement>(null);
+  const marked = useMemo(() => markWords(lines), [lines]);
   useLayoutEffect(() => {
     if (scrollTo === undefined) return;
     pre.current?.querySelector(`[data-row="${scrollTo}"]`)?.scrollIntoView({ block: "start" });
   }, [scrollTo, scrollNonce, lines]);
   return (
     <pre class="diff-lines" ref={pre}>
-      {lines.map((line, i) => (
+      {marked.map((line, i) => (
         <span key={i} class={`diff-line ${line.kind}`} data-row={i}>
           <span class="sign" aria-hidden="true">{line.kind === "added" ? "+" : line.kind === "removed" ? "−" : " "}</span>
-          {line.text}{"\n"}
+          <Marked text={line.text} changed={line.changed} />{"\n"}
         </span>
       ))}
     </pre>

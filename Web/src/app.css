@@ -824,6 +824,8 @@ button.remove:hover { opacity: 1; }
 .diff-line .sign { display: inline-block; width: 1.2em; opacity: 0.6; }
 .diff-line.added { background: var(--paper-wash); font-weight: 500; }
 .diff-line.removed { opacity: 0.55; text-decoration: line-through; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); }
+/* Changed words: a wash stronger than the line's own, never a colour (CodeLine, #545). */
+.diff-word { color: inherit; background: color-mix(in srgb, var(--paper-ink) 14%, transparent); border-radius: 2px; }
 .live-page .page { line-height: 1.6; max-width: 70ch; margin: 0 auto; }
 .live-page .page.gone { opacity: 0.6; }
 .passage { padding: 2px 8px; margin: 0 -8px 10px; border-radius: var(--radius-control); transition: background 0.6s; }

@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 216 rows: **144 same**, **44 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 216 rows: **145 same**, **44 by design**, **27 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -220,7 +220,7 @@ The deltas are tracked by 29 issues:
 | Changes: tree, squares, total (#63) | `A/Sidebar/ChangesPane.swift:93-199` | Tree, status marks and total: `R/Panes/RemoteChangesPane.swift` | `W/views/Changes.tsx:69-143` | **same** |
 | Changes: *may include other agents' work* | `A/Sidebar/ChangesPane.swift:142, 185-192` | Says git may include others' work: `R/Panes/RemoteChangesPane.swift` | The window's two sentences: `W/views/Changes.tsx` | **same** |
 | Changes: a folder that isn't a repository (#229) | "this folder isn't tracked by git": `A/Sidebar/ChangesPane.swift:269` | "This folder is not a Git repository.", and the other three reasons: `R/Panes/RemoteChangesPane.swift:116` | The Remote's words under the list, or under *Nothing has changed yet.*: `W/views/Changes.tsx`, `W/model/diff.ts` (`unavailableNote`) | **same** (wording: the window's own) |
-| Diff view | Edits / Whole file, Previous / Next, Open in Files, changed words marked: `A/Sidebar/ChangeFileView.swift` | Edits / Whole file, Previous / Next, Open in Files, Show changes, via `changes/file`, refreshed on `files/changed` (#535): `R/Panes/RemoteChangeFileView.swift`; builds, look not walked | Edits / Whole file, Previous / Next, Open in Files: `W/views/Changes.tsx`. Changed words unmarked. | **delta**: changed words unmarked on the page (as #63) |
+| Diff view | Edits / Whole file, Previous / Next, Open in Files, changed words marked: `A/Sidebar/ChangeFileView.swift` | Edits / Whole file, Previous / Next, Open in Files, Show changes, via `changes/file`, refreshed on `files/changed` (#535): `R/Panes/RemoteChangeFileView.swift`; builds, look not walked | Edits / Whole file, Previous / Next, Open in Files, changed words marked (`markWords`, `W/model/diff.ts`, #545): `W/views/Changes.tsx`; look not walked | **same** |
 | An open file follows the disk | `A/Sidebar/FilesPane.swift:94-99` | `R/Panes/FilesPane.swift:75-77` | Read once: `W/views/files/FileView.tsx:55-64` | **delta**: web #258 |
 | Code with line numbers | `S/Page/FileLines.swift` | Shared | No numbers: `W/views/files/FileView.tsx:37-48` | **delta**: web #258 |
 | Markdown in Files | The live page in place: `A/Sidebar/FilesPane.swift:480-514` | To the Page pane: `R/Panes/PaneState.swift:67-70` | Rendered, *Open as Page*: `W/views/FilesPane.tsx:38-40` | **delta**: web #258 |
