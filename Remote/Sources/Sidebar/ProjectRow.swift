@@ -136,10 +136,7 @@ struct SpendingRow: View {
 struct Waiting: View {
     @Environment(RemoteModel.self) private var model
     @State private var pairingAgain = false
-    @State private var folder = ""
-    @State private var gitURL = ""
-    @State private var problem: String?
-    @State private var adding = false
+    @State private var adding: NewProject?
 
     var body: some View {
         if model.needsPairing {
@@ -161,25 +158,13 @@ struct Waiting: View {
                 Text("No projects yet").appText(.title)
                 Text("Add a folder on your Mac or clone a Git repository to get started.")
                     .appText(.supporting).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                TextField("Folder path, such as ~/src/project", text: $folder)
-                    .textInputAutocapitalization(.never).autocorrectionDisabled()
-                    .textFieldStyle(.roundedBorder)
-                Button("Add Project…") {
-                    adding = true
-                    Task { problem = await model.addProject(folder: folder); adding = false }
-                }
-                .buttonStyle(.borderedProminent).disabled(folder.isEmpty || adding)
-                TextField("HTTPS or SSH Git URL", text: $gitURL)
-                    .textInputAutocapitalization(.never).autocorrectionDisabled()
-                    .textFieldStyle(.roundedBorder)
-                Button("Clone Project from Git URL…") {
-                    adding = true
-                    Task { problem = await model.cloneProject(url: gitURL); adding = false }
-                }
-                .buttonStyle(.bordered).disabled(gitURL.isEmpty || adding)
-                if let problem { Text(problem).appText(.fine).tinted(.failure) }
+                Button("Add Project…") { adding = .folder(.mac) }
+                    .buttonStyle(.borderedProminent)
+                Button("Clone Project from Git URL…") { adding = .clone(.mac) }
+                    .buttonStyle(.bordered)
             }
             .padding()
+            .sheet(item: $adding) { NewProjectSheet(adding: $0) }
         }
     }
 }

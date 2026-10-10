@@ -432,23 +432,72 @@ final class RemoteModel {
 
     var projects: [DaemonAPI.ProjectSummary] { work.liveProjects }
 
-    func addProject(folder path: String) async -> String? {
-        let request = DaemonAPI.ProjectRequest(folder: URL(fileURLWithPath: (path as NSString).expandingTildeInPath))
-        do {
-            let summary = try await client.call(DaemonAPI.Method.projectsAdd, request, returning: DaemonAPI.ProjectSummary.self)
-            await catchUp()
-            selectedProject = summary.project.folder
-            return nil
-        } catch { return sentence(for: error) }
+    /// The hosts a project can be added on or cloned to (#537): this Mac, then each
+    /// other host of the control plane, as the window's + menu lists them.
+    var projectHosts: [HostSection] {
+        let sections = hostSections
+        return sections.isEmpty ? [HostSection(id: .mac, title: "This Mac", offline: false)] : sections
     }
 
-    func cloneProject(url: String) async -> String? {
-        let request = DaemonAPI.CloneRequest(url: url)
+    /// The client for `host` itself, for a call that names no project there yet.
+    private func client(on host: HostID) throws -> DaemonClient {
+        if host == .mac { return client }
+        guard let other = otherHosts[host], reachableHosts.contains(host) else { throw HostAway(host: host) }
+        return other
+    }
+
+    /// One folder on `host`, for choosing a project there (#537): `files/browse`, as the
+    /// window's and the page's folder sheets read a server's. `~` is the host's home.
+    func browse(_ path: String, on host: HostID) async -> Result<DirectoryListing, BrowseProblem> {
         do {
-            _ = try await client.call(DaemonAPI.Method.projectsClone, request, returning: DaemonAPI.ProjectSummary.self)
-            await catchUp()
+            return .success(try await client(on: host).call(DaemonAPI.Method.filesBrowse,
+                                                             DaemonAPI.FilesBrowseRequest(path: path),
+                                                             returning: DirectoryListing.self))
+        } catch let error as JSONRPCError {
+            return .failure(BrowseProblem(message: error.message))
+        } catch {
+            return .failure(BrowseProblem(message: notAnswering(host, "its folders can't be shown.")))
+        }
+    }
+
+    struct BrowseProblem: Error {
+        let message: String
+    }
+
+    /// Add a folder on `host` as a project, and open it. Answers why not, or nil.
+    func addProject(_ folder: URL, on host: HostID) async -> String? {
+        do {
+            let summary = try await client(on: host).call(DaemonAPI.Method.projectsAdd,
+                                                          DaemonAPI.ProjectRequest(folder: folder),
+                                                          returning: DaemonAPI.ProjectSummary.self)
+            show(summary, on: host)
             return nil
-        } catch { return sentence(for: error) }
+        } catch {
+            return away(error, "the project was not added.") ?? sentence(for: error)
+        }
+    }
+
+    /// Clone a repository into `host`'s home folder as a project, and open it. Answers
+    /// why not, or nil.
+    func cloneProject(url: String, on host: HostID) async -> String? {
+        do {
+            let summary = try await client(on: host).call(DaemonAPI.Method.projectsClone,
+                                                          DaemonAPI.CloneRequest(url: url),
+                                                          returning: DaemonAPI.ProjectSummary.self)
+            show(summary, on: host)
+            return nil
+        } catch {
+            return away(error, "nothing was cloned.") ?? sentence(for: error)
+        }
+    }
+
+    /// A project just added on `host`, listed and opened at once rather than when the
+    /// host next says so.
+    private func show(_ summary: DaemonAPI.ProjectSummary, on host: HostID) {
+        var added = summary
+        added.host = host
+        work.upsert(added)
+        sidebarItem = .project(added.key)
     }
 
     /// One host's heading in the project list. Several hosts, and the list is grouped
