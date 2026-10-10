@@ -846,22 +846,17 @@ button.remove:hover { opacity: 1; }
   resize: vertical;
 }
 
-/* US5: a workflow row: mark, name and what it is, Run Now on the right. */
-.row.workflow { box-sizing: border-box; grid-template-columns: minmax(0, 1fr) auto auto; column-gap: 4px; align-items: center; padding: 0 4px 0 0; cursor: default; }
-/* The row's name and line open its page (#98): a button of its own, so Run Now and ··· keep their clicks. */
+/* US5: a workflow row: mark and name, as the window's (#547); its actions are in its context menu. */
+.row.workflow { box-sizing: border-box; grid-template-columns: minmax(0, 1fr); align-items: center; padding: 0; cursor: default; }
+/* The row's name opens its page (#98). */
 .row.workflow .pick { display: grid; grid-template-columns: 18px minmax(0, 1fr); column-gap: 8px; align-items: center; min-width: 0;
-  text-align: left; border: none; background: none; padding: 6px 0 6px 10px; color: inherit; font: inherit; }
-.row.workflow .workflow-menu { margin-right: 0; }
-.row.workflow .workflow-menu > button { border: none; background: none; padding: 3px 6px; opacity: 0.6; }
+  text-align: left; border: none; background: none; padding: 6px 4px 6px 10px; color: inherit; font: inherit; }
 .row.workflow:hover { background: none; }
-.row.workflow .body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.row.workflow .subtitle { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* A session's weight (#520): regular, heavier only while it waits for an OK. */
-.row.workflow .title { font-weight: 400; }
+.row.workflow .title { font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row.workflow .title.needs-ok { font-weight: 600; }
 .workflow-mark { opacity: 0.55; text-align: center; }
 .workflow-mark.tinted { color: var(--tint-attention); opacity: 1; }
-.row.workflow .run-now { font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--paper-rule); background: var(--paper-raised); white-space: nowrap; }
 
 /* A workflow's page (#98, #100), in the chat's place. */
 .workflow-page .workflow-body { max-width: 760px; margin: 0 auto; padding: 16px 24px 32px; display: flex; flex-direction: column; gap: 8px; }
