@@ -27,6 +27,8 @@ struct RemoteSidebar: View {
     @AppStorage("showsArchivedProjects") private var showsArchived = false
     /// Activity, open until folded, and kept so, as the window keeps it.
     @AppStorage("showsActivity") private var showsActivity = true
+    /// Add Project… or Clone Project from Git URL…, on a host, from the + (#537).
+    @State private var adding: NewProject?
 
     private var selection: Binding<SidebarItem?> {
         Binding(get: { model.sidebarItem },
@@ -135,6 +137,12 @@ struct RemoteSidebar: View {
         .background(Paper.sidebar)
         .toolbarBackground(Paper.sidebar, for: .navigationBar)
         .navigationTitle("Agents")
+        .toolbar {
+            if !model.needsPairing {
+                ToolbarItem(placement: .primaryAction) { NewProjectMenu(adding: $adding) }
+            }
+        }
+        .sheet(item: $adding) { NewProjectSheet(adding: $0) }
         .searchable(text: $query, prompt: "Search")
         .task(id: query) {
             let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
