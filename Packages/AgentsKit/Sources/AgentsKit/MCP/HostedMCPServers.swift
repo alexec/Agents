@@ -84,15 +84,18 @@ actor HostedMCPServers {
     private let logFolder: URL?
     private let log: @Sendable (String) -> Void
     private let now: @Sendable () -> Date
+    private let runtimeEnvironment: @Sendable () -> [String: String]
     private var onChange: (@Sendable () -> Void)?
     private var onNotification: (@Sendable (Key, String) -> Void)?
     private var stopped = false
 
     init(logFolder: URL?, log: @escaping @Sendable (String) -> Void = { DaemonLog.shared.write($0) },
-         now: @escaping @Sendable () -> Date = { Date() }) {
+         now: @escaping @Sendable () -> Date = { Date() },
+         runtimeEnvironment: @escaping @Sendable () -> [String: String] = { LoginShellPath.environment() }) {
         self.logFolder = logFolder
         self.log = log
         self.now = now
+        self.runtimeEnvironment = runtimeEnvironment
     }
 
     /// Told whenever a server's status changes.
@@ -285,7 +288,7 @@ actor HostedMCPServers {
         do {
             process = try RuntimeProcess(
                 executable: URL(filePath: "/usr/bin/env"), arguments: [command] + args, cwd: held.cwd,
-                environment: RuntimeEnvironment.forRuntimes().merging(env) { $1 },
+                environment: RuntimeEnvironment.forRuntimes(runtimeEnvironment()).merging(env) { $1 },
                 onStandardError: { [weak self] text in
                     stderr?.write(text.trimmingCharacters(in: .newlines))
                     Task { await self?.heard(stderr: text, key: key) }
