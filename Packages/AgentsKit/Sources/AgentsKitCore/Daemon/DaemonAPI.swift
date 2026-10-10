@@ -201,6 +201,13 @@ public enum DaemonAPI {
         public static let projectsSetPinned = "projects/setPinned"
         /// A project's disk space lines (#195), kept in its `.agents/project.json`.
         public static let projectsSetDiskSpace = "projects/setDiskSpace"
+        /// A change to an app-owned file in `.agents` made outside the app (#502): what the
+        /// file was and is, line by line; and the person's Keep (the change is used from
+        /// now on) or Undo (the approved copy is written back). Not in
+        /// `ConnectionRole.agentMethods`: an agent cannot approve its own change.
+        public static let projectsReadGuardedChange = "projects/readGuardedChange"
+        public static let projectsKeepGuardedChange = "projects/keepGuardedChange"
+        public static let projectsUndoGuardedChange = "projects/undoGuardedChange"
         /// Every volume that is low on space, for the window's strip (#195).
         public static let diskState = "disk/state"
         /// Clone a Git URL into the home folder and add it (027). Answers when the
@@ -579,6 +586,20 @@ public enum DaemonAPI {
         }
     }
 
+    /// One guarded file's waiting change (#502): to read, keep or undo. `digest` is the
+    /// change as the person was shown it; Keep and Undo refuse a file that has changed
+    /// again since. nil is a file that was removed.
+    public struct GuardedChangeRequest: Codable, Sendable {
+        public var folder: URL
+        public var path: String
+        public var digest: String?
+        public init(folder: URL, path: String, digest: String? = nil) {
+            self.folder = folder
+            self.path = path
+            self.digest = digest
+        }
+    }
+
     /// A Git URL, as pasted (027).
     public struct CloneRequest: Codable, Sendable {
         public var url: String
@@ -645,6 +666,10 @@ public enum DaemonAPI {
         /// True on the one project this host made for chats (#229), `~/.agents/chat`;
         /// absent on every other, so an older reader sees an ordinary project.
         public var isChat: Bool?
+        /// The app-owned files in `.agents` changed outside the app and waiting for the
+        /// person's Keep or Undo (#502); absent when none is, so an older reader sees
+        /// nothing new. Until then the app goes on using the copy last approved.
+        public var guardedChanges: [GuardedChange]?
         /// Which machine the project is on, stamped by the window that heard of it and
         /// never sent (037). Not in `CodingKeys`.
         public var host: HostID = .mac
@@ -659,7 +684,7 @@ public enum DaemonAPI {
 
         enum CodingKeys: String, CodingKey {
             case project, name, exists, lastActivityAt, counts, costToDate, unmeasuredAgents
-            case retiredCount, isChat
+            case retiredCount, isChat, guardedChanges
         }
 
         /// Whether anything in this project wants the user.
@@ -698,6 +723,7 @@ public enum DaemonAPI {
             costToDate = try c.decode([String: Decimal].self, forKey: .costToDate)
             unmeasuredAgents = try c.decode(Int.self, forKey: .unmeasuredAgents)
             isChat = try c.decodeIfPresent(Bool.self, forKey: .isChat)
+            guardedChanges = try? c.decodeIfPresent([GuardedChange].self, forKey: .guardedChanges)
         }
     }
 

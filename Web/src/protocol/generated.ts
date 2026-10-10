@@ -849,6 +849,15 @@ export type GitView =
   | { sharedFromHead: Record<string, never> }
   | { unavailable: ChangesUnavailable };
 
+export interface GuardedChange {
+  path: string;
+  digest?: string;
+  changedBy: string[];
+  changedByIDs: UUID[];
+  byGit: boolean;
+  since: WireDate;
+}
+
 export interface Headline {
   h1: string;
   h2: string;
@@ -1198,6 +1207,7 @@ export interface ProjectSummary {
   unmeasuredAgents: number;
   retiredCount: number;
   isChat?: boolean;
+  guardedChanges?: GuardedChange[];
 }
 
 export interface ProjectsListRequest {
@@ -2268,6 +2278,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FilesReadRequest: { required: ["agentID", "path"], optional: ["knownStamp"] },
   FilesWatchRequest: { required: ["agentID", "folder"], optional: [] },
   FolderHunk: { required: ["oldStart", "newStart", "noNewlineAtEnd", "lines"], optional: [] },
+  GuardedChange: { required: ["path", "changedBy", "changedByIDs", "byGit", "since"], optional: ["digest"] },
   Headline: { required: ["h1", "h2", "h3"], optional: [] },
   HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive"] },
   HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
@@ -2312,7 +2323,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProjectDetection: { required: ["enabled", "paths"], optional: [] },
   ProjectPins: { required: ["folder", "pins"], optional: ["sessions", "workflows"] },
   ProjectRequest: { required: ["folder"], optional: [] },
-  ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: ["isChat"] },
+  ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: ["isChat", "guardedChanges"] },
   ProjectsListRequest: { required: ["includeArchived"], optional: [] },
   PromptRequest: { required: ["agentID", "text", "attachments", "from"], optional: ["sendID"] },
   QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface"] },

@@ -19,7 +19,8 @@ import Foundation
 ///
 /// Whatever the file says is clamped to the hard maximums where it is enforced
 /// (`HelperLimits.effective`), so editing the file by hand cannot raise a ceiling past
-/// them. The app's tools give agents no way to write it.
+/// them. The app's tools give agents no way to write it, and a change made outside the
+/// app waits for the person's Keep or Undo before it is used (#502).
 public enum ProjectConfig {
     public static let fileName = "project.json"
 
@@ -37,15 +38,24 @@ public enum ProjectConfig {
 
     /// The file's keys, or none when it is not there or is not a JSON object.
     static func read(in project: URL) -> [String: JSONValue] {
-        guard let data = try? Data(contentsOf: url(in: project)),
-              case .object(let keys)? = try? JSONDecoder().decode(JSONValue.self, from: data) else { return [:] }
+        keys(from: try? Data(contentsOf: url(in: project)))
+    }
+
+    /// The keys of the file's bytes, or none: the daemon reads the copy the person last
+    /// approved (#502), which may not be what is on disk.
+    static func keys(from data: Data?) -> [String: JSONValue] {
+        guard let data, case .object(let keys)? = try? JSONDecoder().decode(JSONValue.self, from: data) else { return [:] }
         return keys
     }
 
     /// The helper limits the file sets, or nil when it sets none. A value that is not a
     /// whole number is no setting, and so the default.
     public static func helperLimits(in project: URL) -> HelperLimits? {
-        guard let limits = try? read(in: project)[helperLimitsKey]?.decode(HelperLimits.self) else { return nil }
+        helperLimits(from: try? Data(contentsOf: url(in: project)))
+    }
+
+    public static func helperLimits(from data: Data?) -> HelperLimits? {
+        guard let limits = try? keys(from: data)[helperLimitsKey]?.decode(HelperLimits.self) else { return nil }
         return limits.orNilIfDefault
     }
 
@@ -59,7 +69,11 @@ public enum ProjectConfig {
 
     /// The disk space lines the file sets (#195), or nil when it sets none.
     public static func diskSpace(in project: URL) -> DiskThresholds? {
-        guard let lines = try? read(in: project)[diskSpaceKey]?.decode(DiskThresholds.self) else { return nil }
+        diskSpace(from: try? Data(contentsOf: url(in: project)))
+    }
+
+    public static func diskSpace(from data: Data?) -> DiskThresholds? {
+        guard let lines = try? keys(from: data)[diskSpaceKey]?.decode(DiskThresholds.self) else { return nil }
         return lines.orNilIfDefault
     }
 

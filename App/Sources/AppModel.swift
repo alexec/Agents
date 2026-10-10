@@ -1871,6 +1871,34 @@ final class AppModel {
     }
 
     /// The person's disk space lines for a project (#195), through the window only.
+    /// What a guarded file in `.agents` was and is (#502), for the person deciding.
+    func readGuardedChange(_ change: GuardedChange, for key: ProjectKey) async -> GuardedChangeReading? {
+        do {
+            return try await client(for: key.host).call(
+                DaemonAPI.Method.projectsReadGuardedChange,
+                DaemonAPI.GuardedChangeRequest(folder: key.folder, path: change.path),
+                returning: GuardedChangeReading.self)
+        } catch {
+            problem = describe(error)
+            return nil
+        }
+    }
+
+    /// Keep (the change is used from now on) or Undo (the approved copy goes back), of the
+    /// file as the person was shown it (#502).
+    func settleGuardedChange(_ reading: GuardedChangeReading, keep: Bool, for key: ProjectKey) async {
+        do {
+            var summary = try await client(for: key.host).call(
+                keep ? DaemonAPI.Method.projectsKeepGuardedChange : DaemonAPI.Method.projectsUndoGuardedChange,
+                DaemonAPI.GuardedChangeRequest(folder: key.folder, path: reading.path, digest: reading.digest),
+                returning: DaemonAPI.ProjectSummary.self)
+            summary.host = key.host
+            upsert(summary)
+        } catch {
+            problem = describe(error)
+        }
+    }
+
     func setDiskSpace(_ lines: DiskThresholds, for key: ProjectKey) async {
         do {
             var summary = try await client(for: key.host).call(
