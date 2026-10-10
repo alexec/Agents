@@ -1266,7 +1266,8 @@ public actor AppService {
             Say something to another session in this project, which it reads as a prompt \
             marked as yours, not the person's; the person sees it in that chat too. A session \
             that is working gets it after its turn; one that is done or parked is woken by it, \
-            within the project's running limit; one the person started waits for the person. \
+            within the project's running limit; one the person started, or one that is stopped, \
+            waits until it is next started. \
             It never answers a question that session is waiting on. A reply comes back the \
             same way, as a message to you. Limits: \(AgentMessageLimits.characters) characters, \
             \(AgentMessageLimits.perHour) an hour, and at most \(AgentMessageLimits.hops) messages \
