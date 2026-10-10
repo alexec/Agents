@@ -330,14 +330,16 @@ struct BranchAgentButton: View {
     }
 }
 
-/// Archive: in a row's menu, and its trailing swipe.
+/// Archive: in a row's menu, and its trailing swipe; and the chat's own bar (#586),
+/// where it leaves the chat, as the Mac's toolbar does.
 struct ArchiveAgentButton: View {
     @Environment(RemoteModel.self) private var model
     let agent: Agent
+    var leavesChat = false
 
     var body: some View {
         Button {
-            Task { await model.archive(agent.id) }
+            Task { await model.archive(agent.id, andLeave: leavesChat) }
         } label: {
             Label("Archive", systemImage: "archivebox")
         }

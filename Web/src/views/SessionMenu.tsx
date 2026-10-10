@@ -60,6 +60,39 @@ export function sessionActions(agent: Agent, pinned?: boolean): { action: Action
   return found;
 }
 
+/**
+ * Pin or Unpin, and Archive or Bring Back: the buttons in the chat's header beside its ···
+ * menu (#586), as the window's toolbar has them. No Pin on an archived session.
+ */
+export function headerActions(agent: Agent, pinned: boolean): { action: Action; label: string; help: string }[] {
+  if (agent.state === "archived") {
+    return [{ action: "agents/unarchive", label: "Bring Back", help: "Bring this session back from the archive" }];
+  }
+  return [
+    pinned
+      ? { action: "unpin", label: "Unpin", help: "Take this session out of Pinned in the sidebar" }
+      : { action: "pin", label: "Pin", help: "Keep this session in Pinned, at the top of the sidebar" },
+    { action: "agents/archive", label: "Archive", help: "Archive this session and leave it" },
+  ];
+}
+
+/** `headerActions` as buttons. Archive leaves the chat for its project, once the host has it. */
+export function SessionButtons({ store, host, agent, disabled }: { store: Store; host: string; agent: Agent | undefined; disabled: boolean }) {
+  if (!agent) return null;
+  const pinned = store.sessionPinsIn(host, projectFolder(agent)).includes(agent.id);
+  return (
+    <>
+      {headerActions(agent, pinned).map(({ action, label, help }) => (
+        <button key={action} title={help} disabled={disabled || !!store.onItsWay.value[agent.id]}
+          onClick={() => {
+            if (action !== "agents/archive") return runSessionAction(store, host, agent, action);
+            void store.perform(host, agent.id, action).then((done) => { if (done) go({ host, project: projectFolder(agent) }); });
+          }}>{label}</button>
+      ))}
+    </>
+  );
+}
+
 export function SessionMenu({ store, host, agent, disabled, openFile }:
   { store: Store; host: string; agent: Agent | undefined; disabled: boolean; openFile?: () => void }) {
   const open = useSignal(false);

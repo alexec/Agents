@@ -243,9 +243,9 @@ struct WorkflowPage: View {
                 }
                 .help(pinned ? "Take this workflow out of Pinned in the sidebar"
                              : "Keep this workflow in Pinned, at the top of the sidebar")
-                // One click, and back to the project: the same thing the archive
-                // button on a chat does, so putting a thing away is one gesture
-                // wherever it is.
+                // One click, and back to the project: the same thing the Archive
+                // button in a chat's toolbar does (#586), so putting a thing away is
+                // one gesture wherever it is.
                 Button {
                     Task {
                         await model.setWorkflowArchived(summary, true)

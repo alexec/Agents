@@ -1618,9 +1618,12 @@ export class Store extends Work {
     }, host);
   }
 
+  /** Whether the host took it, so a caller can leave the chat only when it did (#586). */
   async perform(host: string, agentID: string,
-                action: "agents/stop" | "agents/park" | "agents/unpark" | "agents/archive" | "agents/unarchive"): Promise<void> {
-    await this.acting(agentID, action, () => this.act(action, { agentID: agentID as UUID }, host));
+                action: "agents/stop" | "agents/park" | "agents/unpark" | "agents/archive" | "agents/unarchive"): Promise<boolean> {
+    let done = false;
+    await this.acting(agentID, action, async () => { done = await this.act(action, { agentID: agentID as UUID }, host) !== null; });
+    return done;
   }
 
   // MARK: Files, changes and live pages (071 US4)

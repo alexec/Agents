@@ -188,7 +188,8 @@ struct RemoteChatView: View {
         }
         .toolbar {
             // Stop is the prompt's own button while the agent works, as on the Mac;
-            // Archive is on the session's row.
+            // Pin and Archive are in the bar where there is room, as the Mac's toolbar
+            // has them, and in the ··· menu on a phone (#586).
             // Blocked (039): the card's Carry on, where the chat's own controls are.
             if let agent, model.isBlocked(agent) {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -199,6 +200,16 @@ struct RemoteChatView: View {
                     }
                     .disabled(model.isStale(agent))
                     .accessibilityHint(AgentsModel.carryOnHelp(for: agent))
+                }
+            }
+            if let agent, sizeClass == .regular {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    if agent.state == .archived {
+                        BringBackAgentButton(agent: agent)
+                    } else {
+                        PinAgentButton(agent: agent)
+                        ArchiveAgentButton(agent: agent, leavesChat: true)
+                    }
                 }
             }
             if let agent {
@@ -330,10 +341,11 @@ struct RemoteChatView: View {
     }
 }
 
-/// The rarer things to do with this agent. Stop and Archive are buttons in the bar, as
-/// on the Mac (033); what is left here is what the Mac keeps elsewhere.
+/// The rarer things to do with this agent, and on a phone, where the bar has no room
+/// for them, Pin and Archive (#586).
 private struct ChatMenu: View {
     @Environment(RemoteModel.self) private var model
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @AppStorage(TurnDetail.phoneDefaultsKey) private var turnDetail = TurnDetail.outcome
     let agent: Agent
     /// Open File… (#415), over the chat.
@@ -354,6 +366,11 @@ private struct ChatMenu: View {
             if agent.state != .archived {
                 // As the Mac's Session menu has it (#342).
                 BranchAgentButton(agent: agent)
+                if sizeClass != .regular {
+                    Divider()
+                    PinAgentButton(agent: agent)
+                    ArchiveAgentButton(agent: agent, leavesChat: true)
+                }
             } else {
                 Divider()
                 Button("Bring Back", systemImage: "tray.and.arrow.up") {
