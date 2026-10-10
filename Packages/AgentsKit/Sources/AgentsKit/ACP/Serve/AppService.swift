@@ -441,7 +441,10 @@ public actor AppService {
                 }
                 wakeOn = known
             }
-            if let minutes, !Block.checkAgainMinutes.contains(minutes) {
+            guard let minutes else {
+                return .failure(AgentCallProblem(stringLiteral: "Nothing is waited for: " + EventWords.deadlineRequired()))
+            }
+            if !Block.checkAgainMinutes.contains(minutes) {
                 return .failure(AgentCallProblem(stringLiteral: """
                     Nothing is waited for: until_minutes has to be a whole number from \
                     \(Block.checkAgainMinutes.lowerBound) to \(Block.checkAgainMinutes.upperBound).
@@ -1303,6 +1306,9 @@ public actor AppService {
             first, with wake_on any). until_minutes, with agents or alone, resumes you then \
             anyway, to check on something the app can't see, like CI; say what in message. \
             Anything you started in the background stops when the turn ends.
+
+            Every wait needs until_minutes, so none can last for ever: when it runs out you \
+            are started again, and can wait again.
             """,
         "inputSchema": [
             "type": "object",
@@ -1337,7 +1343,10 @@ public actor AppService {
                 ],
                 "until_minutes": [
                     "type": "integer",
-                    "description": "Give up after this many minutes, 1 to 1440. You are started again either way.",
+                    "description": """
+                        Required to wait: give up after this many minutes, 1 to 1440. You are \
+                        started again either way, and can wait again.
+                        """,
                 ],
                 "agents": [
                     "type": "array",

@@ -247,7 +247,7 @@ struct EventWorkflowTests {
         let token = UUID().uuidString
         await core.bindAppToken(token, to: waiter)
         let answer = try await core.waitForEvent(.init(token: token, events: ["agent.finished"],
-                                                       where: ["agent": DetailFilter(own.id.uuidString)], from: 0))
+                                                       where: ["agent": DetailFilter(own.id.uuidString)], from: 0, untilMinutes: 60))
         #expect(answer.hasPrefix("agent.finished happened at "))
         let finished = await core.eventLog.events.last { $0.name == "agent.finished" && $0.details["agent"] == own.id.uuidString }
         #expect(finished?.consequences.contains { if case .woke(waiter, _) = $0 { return true } else { return false } } == true)
@@ -322,7 +322,7 @@ struct EventWorkflowTests {
         let token = UUID().uuidString
         await core.bindAppToken(token, to: waiter)
         let answer = try await core.waitForEvent(.init(token: token, events: ["agent.finished"],
-                                                       where: ["labels": "deploy"], from: from))
+                                                       where: ["labels": "deploy"], from: from, untilMinutes: 60))
         #expect(answer.hasPrefix("agent.finished happened at "))
         // Both had finished already, so the wait is answered from the log at once: with
         // the deploy, not the plain build before it.

@@ -214,14 +214,18 @@ private struct Scorer {
         }
         let seconds = heard.seconds.map { String(format: " in %.1f s", $0) } ?? ""
         let never = RuntimeAssessment.neverEvent
-        let second = calls(DaemonAPI.Method.eventsWait).filter {
-            $0.ok && $0.arguments?["untilMinutes"]?.intValue == nil
-                && ($0.arguments?["events"]?.arrayValue ?? []).contains { $0.stringValue == never }
+        let onNever = calls(DaemonAPI.Method.eventsWait).filter {
+            ($0.arguments?["events"]?.arrayValue ?? []).contains { $0.stringValue == never }
         }
+        // A wait that could last for ever is refused (#572).
+        let unbounded = onNever.filter { $0.arguments?["untilMinutes"]?.intValue == nil }
+        guard !unbounded.isEmpty else { return (.failed, "published \(ping) and heard it, but never waited with no until_minutes") }
+        guard unbounded.allSatisfy({ !$0.ok }) else { return (.failed, "a wait for \(never) with no until_minutes was kept, not refused") }
+        let second = onNever.filter { $0.ok && $0.arguments?["untilMinutes"]?.intValue == RuntimeAssessment.longWaitMinutes }
         guard let open = second.first else { return (.failed, "published \(ping) and heard it, but never made a second wait to cancel") }
         let cancelled = calls(DaemonAPI.Method.eventsCancel).filter { $0.at >= open.at }
         guard ok(cancelled) else { return (.failed, said(cancelled, "cancel_wait")) }
-        return (.passed, "published \(ping); the wait came back with it\(seconds); `cancel_wait` cleared the second")
+        return (.passed, "published \(ping); the wait came back with it\(seconds); a wait with no until_minutes was refused; `cancel_wait` cleared the second")
     }
 
     /// The form's questions, from the call's arguments.
@@ -333,8 +337,11 @@ private struct Scorer {
         let waits = calls(DaemonAPI.Method.eventsWait).filter {
             ($0.arguments?["events"]?.arrayValue ?? []).contains { $0.stringValue == never }
         }
-        guard let call = waits.first(where: { $0.ok && $0.arguments?["untilMinutes"]?.intValue != nil }) else {
-            return (.failed, waits.isEmpty ? "never waited for \(never)" : "waited for \(never) without until_minutes, or was refused")
+        // Not the long wait step `events` cancelled, nor the one refused with no deadline.
+        guard let call = waits.first(where: {
+            $0.ok && $0.arguments?["untilMinutes"]?.intValue.map { $0 != RuntimeAssessment.longWaitMinutes } == true
+        }) else {
+            return (.failed, waits.isEmpty ? "never waited for \(never)" : "never waited for \(never) with a short until_minutes, or was refused")
         }
         if call.answer?.contains("timed out") == true { return (.passed, "the call itself came back timed out") }
         guard appPrompts.contains(where: { $0.at > call.at && $0.text.contains("timed out") }) else {

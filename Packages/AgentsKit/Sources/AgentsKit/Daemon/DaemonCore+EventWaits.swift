@@ -37,9 +37,9 @@ extension DaemonCore {
         let names = (request.events ?? []).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         guard !names.isEmpty else { throw eventRefusal(EventWords.nothingNamed) }
-        if let minutes = request.untilMinutes, !EventWait.deadlineMinutes.contains(minutes) {
-            throw eventRefusal(EventWords.badDeadline())
-        }
+        // Every wait ends by itself (#572), whatever it waits on.
+        guard let minutes = request.untilMinutes else { throw eventRefusal(EventWords.deadlineRequired()) }
+        guard EventWait.deadlineMinutes.contains(minutes) else { throw eventRefusal(EventWords.badDeadline()) }
         var filters = request.where ?? [:]
         if let named = filters["agent"] {
             filters["agent"] = DetailFilter(anyOf: try named.values.map { try agentReference($0, for: caller) }) ?? named
@@ -79,7 +79,7 @@ extension DaemonCore {
 
         let previous = endWait(caller.id, by: .agent, quietly: true)
         let wait = EventWait(patterns: patterns, from: from,
-                             deadline: request.untilMinutes.map { at.addingTimeInterval(TimeInterval($0) * 60) },
+                             deadline: at.addingTimeInterval(TimeInterval(minutes) * 60),
                              since: at)
         guard var agent = agents[caller.id] else { throw noAgent() }
         agent.eventWait = wait
@@ -295,6 +295,15 @@ extension DaemonCore {
     /// nothing was running ends now. Nothing is raised for the time the daemon was down.
     func resumeEventWaitsAfterRestart() async {
         loadEventsIfNeeded()
+        // A wait an earlier build saved with no deadline gets one now (#572), so none
+        // can hang for ever.
+        let latest = now().addingTimeInterval(TimeInterval(EventWait.deadlineMinutes.upperBound) * 60)
+        for id in Array(agents.withEventWait) {
+            guard var agent = agents[id], var wait = agent.eventWait, wait.isOpen, wait.deadline == nil else { continue }
+            wait.deadline = latest
+            agent.eventWait = wait
+            changed(agent)
+        }
         for agent in agents.withEventWait.compactMap({ agents[$0] }) {
             guard let wait = agent.eventWait, !wait.isOpen, let promptID = wait.resumePromptID,
                   agent.queuedPrompts.first?.id == promptID else { continue }

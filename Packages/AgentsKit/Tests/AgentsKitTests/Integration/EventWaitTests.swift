@@ -74,7 +74,7 @@ struct EventWaitTests {
     }
 
     private func wait(_ core: DaemonCore, _ token: String, _ events: [String], where filters: [String: DetailFilter]? = nil,
-                      from: EventPosition? = nil, until: Int? = nil) async throws -> String {
+                      from: EventPosition? = nil, until: Int? = 60) async throws -> String {
         try await calling(core, token) { t in
             try await core.waitForEvent(.init(token: t, events: events, where: filters, from: from, untilMinutes: until))
         }
@@ -365,6 +365,46 @@ struct EventWaitTests {
         }
         let nothing = await refusal { _ = try await wait(core, token, []) }
         #expect(nothing?.message == EventWords.nothingNamed)
+    }
+
+    /// No wait without a deadline (#572): refused in words that say how, and nothing
+    /// is written, so a wait already in place stays.
+    @Test func aWaitWithNoDeadlineIsRefused() async throws {
+        let (locations, work, _) = try temporary()
+        let core = try await makeCore(locations, clock: Clock(), hold: .milliseconds(100))
+        let (a, token) = try await agent(core, in: work, "Forever")
+        _ = try await wait(core, token, ["custom.ping"])
+        let earlier = await core.agents[a]?.eventWait
+        let refused = await refusal { _ = try await wait(core, token, ["custom.never"], until: nil) }
+        #expect(refused?.code == DaemonAPI.Failure.eventRefused)
+        #expect(refused?.message == EventWords.deadlineRequired())
+        #expect(refused?.message.contains("until_minutes is required") == true)
+        #expect(await core.agents[a]?.eventWait == earlier)
+    }
+
+    /// A wait an earlier build saved with no deadline gets one, 24 hours on, when it is
+    /// loaded (#572), and times out then.
+    @Test func aSavedWaitWithNoDeadlineGetsOneOnLoadAndTimesOut() async throws {
+        let clock = Clock()
+        let (locations, work, _) = try temporary()
+        let core = try await makeCore(locations, clock: clock, hold: .milliseconds(100))
+        let (a, token) = try await agent(core, in: work, "Old build")
+        _ = try await wait(core, token, ["custom.never"])
+        var saved = try #require(await core.agents[a])
+        saved.eventWait?.deadline = nil
+        await core.changed(saved)
+        try await AgentStore(locations: locations).save(saved)
+
+        let again = try await makeCore(locations, clock: clock)
+        _ = await again.recover()
+        #expect(await again.agents[a]?.eventWait?.deadline == nil)
+        await again.resumeEventWaitsAfterRestart()
+        #expect(await again.agents[a]?.eventWait?.deadline == clock.now.addingTimeInterval(1440 * 60))
+        clock.advance(minutes: 1441)
+        await again.eventWaitDeadlinesPassed()
+        try await eventually("told it timed out") {
+            try await appPrompts(again, a).contains { $0.hasPrefix("Your wait for custom.never timed out at ") }
+        }
     }
 
     @Test func recentAndListRead() async throws {

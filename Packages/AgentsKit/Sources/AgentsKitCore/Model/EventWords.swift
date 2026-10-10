@@ -42,6 +42,13 @@ public enum EventWords {
         "until_minutes has to be from \(EventWait.deadlineMinutes.lowerBound) to \(EventWait.deadlineMinutes.upperBound)."
     }
 
+    /// A wait with no deadline, refused (#572): nothing else is sure to end it.
+    public static func deadlineRequired() -> String {
+        "until_minutes is required: say how long to wait, from \(EventWait.deadlineMinutes.lowerBound) minute "
+            + "to 24 hours (\(EventWait.deadlineMinutes.upperBound)). When it runs out you are started again "
+            + "and can wait again."
+    }
+
     /// Names only a Mac raises, said on a host that is not one (#372).
     public static func neverHere(_ names: [String]) -> String {
         let one = names.count == 1

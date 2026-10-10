@@ -279,6 +279,16 @@ extension DaemonCore {
     /// the last daemon queued and never sent is sent; and anything that cleared, or came
     /// due, while nothing was running is resumed — each once.
     func resumeBlocksAfterRestart() async {
+        // A wait on agents an earlier build saved with no time to check again gets
+        // one now (#572), so none can hang for ever.
+        let latest = now().addingTimeInterval(TimeInterval(Block.checkAgainMinutes.upperBound) * 60)
+        for var agent in agents.values {
+            guard var block = agent.report?.block, agent.report?.isOpenBlock == true,
+                  !block.waits.isEmpty, block.checkAgainAt == nil else { continue }
+            block.checkAgainAt = latest
+            agent.report?.block = block
+            changed(agent)
+        }
         for agent in agents.values {
             guard let block = agent.report?.block, agent.report?.isOpenBlock == true else { continue }
             for wait in block.waits where wait.ending == nil {

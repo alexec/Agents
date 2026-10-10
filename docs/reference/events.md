@@ -10,7 +10,8 @@ An event is something that happened: an agent finished, a branch moved, the Mac 
 
 The same names work in three places:
 
-- an agent's `wait_for_event` tool, to be started again when one happens (see
+- an agent's `wait_for_event` tool, to be started again when one happens, or when its
+  time limit of 1 minute to 24 hours runs out, which every wait has (see
   [Have an agent wait for something](../how-to/wait-for-something.md)),
 - a workflow's `on:`, to start an agent when one happens (see
   [Workflow triggers and actions](workflows.md)),
