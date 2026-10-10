@@ -8,6 +8,7 @@ import SwiftUI
 /// Asked in the session of the agent that made it, over the prompt as a form is, or on
 /// the project's page when no agent did; and in Project Settings on the Mac. The client
 /// says how to read the change and how to answer it, so the card holds no model of its own.
+/// A workflow waiting for an OK is asked the same way, by its file's path (#569).
 struct GuardedChangeCard: View {
     let change: GuardedChange
     /// What the file was and is; nil when it could not be read, which the client has said.

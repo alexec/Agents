@@ -643,6 +643,8 @@ public actor DaemonCore {
     /// asked again meanwhile (#502).
     var guardedSettling: Set<URL> = []
     var guardedSettleAgain: Set<URL> = []
+    /// The workflows waiting for an OK in each project, as last told to the clients (#569).
+    var workflowQuestions: [URL: [GuardedChange]] = [:]
     /// How many workflow files have been read and hashed, for the tests.
     var workflowDigestReads = 0
     /// One watch per live project, for its workflows, settings, pins and
