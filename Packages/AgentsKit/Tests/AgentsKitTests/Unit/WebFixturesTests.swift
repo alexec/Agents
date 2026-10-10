@@ -270,8 +270,11 @@ struct WebFixturesTests {
             var lines = model.blockLines(agent)
             let checksAgain = model.openBlock(agent)?.block.checkAgainLine() != nil
             if checksAgain { lines.removeLast() }
+            // The row's one line (#582), where it names someone: a time alone is the reader's own.
+            let names = model.openBlock(agent)?.block.waits.isEmpty == false
             return .object(["isBlocked": .bool(model.openBlock(agent) != nil),
                             "lines": .array(lines.map(JSONValue.string)), "checksAgain": .bool(checksAgain),
+                            "waitLine": names ? .string(model.waitMark(of: agent)?.line ?? "") : .null,
                             "carryOnHelp": .string(AgentsModel.carryOnHelp(for: agent))])
         }
     }

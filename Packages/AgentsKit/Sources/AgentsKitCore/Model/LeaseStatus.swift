@@ -83,11 +83,22 @@ public struct LeaseStatus: Equatable, Sendable {
     /// The full line, for a tooltip, a phone's sheet, or a screen reader.
     public var fullLine: String {
         (holding.map { "Holding \($0.displayName), \($0.minutesLeft) min left, until \(LeaseWords.clock($0.expiresAt))" }
-            + waiting.map { wait in
-                "Waiting for \(wait.displayName), held by \(wait.holderName)"
-                    + (wait.until.map { " until \(LeaseWords.clock($0))" } ?? "")
-                    + ", \(LeaseWords.ordinal(wait.place)) in line"
-            }).joined(separator: ". ") + "."
+            + waitingLines).joined(separator: ". ") + "."
+    }
+
+    /// Each wait in full: "Waiting for build, held by “Fix login” until 14:12, 2nd in line".
+    public var waitingLines: [String] {
+        waiting.map { wait in
+            "Waiting for \(wait.displayName), held by \(wait.holderName)"
+                + (wait.until.map { " until \(LeaseWords.clock($0))" } ?? "")
+                + ", \(LeaseWords.ordinal(wait.place)) in line"
+        }
+    }
+
+    /// What it holds and nothing it waits for: a row's lease mark, now its waits are on
+    /// the row's one wait line (#582). Nil when it holds nothing.
+    public var holdingOnly: LeaseStatus? {
+        holding.isEmpty ? nil : LeaseStatus(holding: holding, waiting: [])
     }
 
     /// The first lease or wait, in short: the card's mark and the row's.

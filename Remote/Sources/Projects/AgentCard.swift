@@ -154,21 +154,14 @@ struct AgentCard: View {
                             .accessibilityLabel(running)
                     }
                     // What it holds or waits for, in the Mac row's words (036).
-                    if let leases = model.work.leaseStatus(of: agent.id) {
+                    if let leases = model.work.leaseStatus(of: agent.id)?.holdingOnly {
                         LeaseMark(status: leases)
                     }
-                    // Waiting on events (042), as the Mac's row says it.
-                    if agent.eventWait?.isOpen == true, let wait = model.work.waitStatus(of: agent) {
-                        Text(wait.mark)
-                            .appText(.fine)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                    // Blocked (039): what it waits on and when it looks again, in the
-                    // Mac row's words. Carry on is in the card's menu and the chat, not
-                    // here: the whole card is the one control (see `AgentRow`).
-                    ForEach(model.blockLines(agent), id: \.self) { line in
-                        Text(line)
+                    // What it waits for, on one line as the Mac's row has it (#582).
+                    // Carry on is in the card's menu and the chat, not here: the whole
+                    // card is the one control (see `AgentRow`).
+                    if let wait = model.work.waitMark(of: agent) {
+                        Text(wait.line)
                             .appText(.fine)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -228,7 +221,7 @@ struct AgentCard: View {
     private var accessibilityLabel: String {
         let words = model.queuedLine(agent) ?? StatusShape.words(row: agent, isComingBack: isComingBack)
         return ([agent.title ?? "Untitled", model.startedByAgentLabel(agent), words, agent.report?.message]
-            .compactMap { $0 } + model.blockLines(agent) + [ParkWords.line(agent.parking)].compactMap { $0 })
+            .compactMap { $0 } + [model.work.waitMark(of: agent)?.detail, ParkWords.line(agent.parking)].compactMap { $0 })
             .joined(separator: ", ")
     }
 }

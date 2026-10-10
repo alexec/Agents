@@ -87,9 +87,8 @@ The deltas are tracked by 29 issues:
 | Report line, title owning its line (#68) | `A/AgentList/AgentRow.swift` | `R/Projects/AgentCard.swift` | `W/views/SessionRow.tsx:69-92` | **same** |
 | Started-by mark (workflow, agent) | `A/AgentList/AgentRow.swift:84-208` | Workflow and agent: `R/Projects/AgentCard.swift` | None | **delta**: web #251 |
 | Background line | `A/AgentList/AgentRow.swift` | `BackgroundWords.mark`: `R/Projects/AgentCard.swift` | `W/views/SessionRow.tsx:69-92` | **same** |
-| Lease mark | `A/AgentList/AgentRow.swift:153` | `R/Projects/AgentCard.swift:145` | None | **delta**: web #251 |
-| Event-wait line | `A/AgentList/AgentRow.swift` | `R/Projects/AgentCard.swift` | None | **delta**: web #251 |
-| Block lines (#152, #157) | Under the report: `A/AgentList/AgentRow.swift` | The same | Same words: `W/model/block.ts`, held to `Fixtures/web/block/lines.json` | **same** |
+| Lease mark: what it holds (#582) | `A/AgentList/AgentRow.swift` (`holdingOnly`) | `R/Projects/AgentCard.swift` (the sidebar row is one line, #587) | `W/views/SessionRow.tsx` (`leases.holds`) | **same** (#582); unwalked |
+| Wait line: one line for its block, event wait and lease waits, `◷ Waiting for “X” (+N)`, each in full as its help (#582) | `AgentsModel.waitMark` in `A/AgentList/AgentRow.swift`; Carry on in the menu | `R/Projects/AgentCard.swift` (the sidebar row is one line, #587) | `W/model/rowLines.ts` (`waitMark`), `W/views/SessionRow.tsx`, held to `Fixtures/web/block/lines.json` (`waitLine`) | **same** (#582); unwalked |
 | Carry on | Row button and row menu: `A/AgentList/AgentRow.swift:189-216` | Long press: `R/Projects/AgentCard.swift:180-187` | Chat strip only, not the row menu: `W/views/SessionMenu.tsx:16-44` | **delta**: web #250 (menu). The row button: **by design** (the page's row is itself a button, #157) |
 | Park line | `S/ParkWords.swift` on the row | The same | `W/views/SessionRow.tsx:40-66` | **same** |
 | Worktree badge | ⑂ name, struck when gone, help *branch — path*: `A/AgentList/AgentRow.swift:361-386` | Struck when gone, help *branch — path*: `R/Projects/AgentCard.swift` | Struck; help the branch only: `W/views/SessionRow.tsx:84`, `W/app.css:561` | **same**; web #251 |

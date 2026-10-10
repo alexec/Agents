@@ -1281,6 +1281,32 @@ public final class AgentsModel {
             + [block.checkAgainLine()].compactMap { $0 }
     }
 
+    /// A waiting agent's one row line (#582): the agents its block still waits on, what its wait
+    /// on events waits for and the resources it is in line for, first first, with every
+    /// line they used to be as its detail. A block that names nothing says when it looks
+    /// again. Nil when it waits for nothing.
+    public func waitMark(of agent: Agent) -> WaitMark? {
+        var things: [String] = []
+        var detail: [String] = []
+        if let (_, block) = openBlock(agent) {
+            // Only those still working: one that has finished is waited for no longer.
+            let working = block.waits.filter { $0.ending == nil }
+            things += (working.isEmpty ? block.waits : working).map { "\u{201C}\(waitName($0))\u{201D}" }
+            detail += blockLines(agent)
+        }
+        if let wait = agent.eventWait, wait.isOpen {
+            things += WaitStatus.things(wait.patterns, names: { self.agentTitles[$0] })
+            if let status = waitStatus(of: agent) { detail.append(status.line) }
+        }
+        if let lease = leaseStatus(of: agent.id) {
+            things += lease.waiting.map(\.shortName)
+            detail += lease.waitingLines
+        }
+        guard let line = WaitStatus.rowLine(things) ?? detail.first.map({ "\(WaitStatus.symbol) \($0)" })
+        else { return nil }
+        return WaitMark(line: line, detail: detail.joined(separator: "\n"))
+    }
+
     /// What a queued helper's row says in its report's place (#362): "Queued, 2nd", its
     /// place in its project's queue. Nil for any other agent. Queued agents are under
     /// Waiting, so only that group is counted.

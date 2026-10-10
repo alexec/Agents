@@ -252,7 +252,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
           {!loadingRuns.value && runs.value.length === 0 && <p class="hint">Nothing has run yet.</p>}
           {runs.value.map((agent) => (
             <SessionRow key={agent.id} agent={agent} chosen={false} onPick={() => go({ host, project: folder, session: agent.id })}
-              waits={store.waitsOf(host, agent)} extras={rowExtras(store, host, agent)} />
+              extras={rowExtras(store, host, agent)} />
           ))}
           {runs.value.length === runLimit.value && <button class="link" disabled={loadingRuns.value}
             onClick={() => { runLimit.value += 3; }}>Show more</button>}
