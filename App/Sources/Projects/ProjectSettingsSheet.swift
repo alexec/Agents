@@ -432,7 +432,7 @@ private struct GuardedChangeCard: View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(reading.lines.enumerated()), id: \.offset) { _, line in
                 Text(Self.mark(line.kind) + line.text)
-                    .font(.system(.caption, design: .monospaced))
+                    .appText(.code)
                     .foregroundStyle(Self.style(line.kind))
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
