@@ -261,6 +261,8 @@ extension DaemonCore {
         if configuredHelperLimits(in: project) != limitsBefore { checkQueueSoon(in: project) }
         if let summary = projectSummary(for: project) { sendProject(summary) }
         pinsChanged(project)
+        // The question on every client and the banner on the phone come and go with it (#531).
+        reconsider()
     }
 
     /// The waiting changes, for the project's summary.
@@ -268,10 +270,18 @@ extension DaemonCore {
         let records = guardedRecordsCache ?? guardedRecords()
         let changes = records.states.compactMap { state -> GuardedChange? in
             guard state.folder == project, let pending = state.pending else { return nil }
-            return GuardedChange(path: state.path, digest: pending.digest, changedBy: pending.changedBy,
-                                 changedByIDs: pending.changedByIDs, byGit: pending.byGit, since: pending.since)
+            return guardedChange(project, state.path, pending)
         }
         return changes.isEmpty ? nil : changes.sorted { $0.path < $1.path }
+    }
+
+    /// One waiting change, with the session it is asked in (#531): the first agent named
+    /// that is still there and not archived, or none, which asks the project.
+    func guardedChange(_ project: URL, _ path: String, _ pending: GuardedFileState.Pending) -> GuardedChange {
+        let askedIn = pending.changedByIDs.first { agents.live[$0] != nil }
+        return GuardedChange(path: path, digest: pending.digest, changedBy: pending.changedBy,
+                             changedByIDs: pending.changedByIDs, byGit: pending.byGit, since: pending.since,
+                             askedIn: askedIn)
     }
 
     // MARK: The person's

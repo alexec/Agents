@@ -244,6 +244,13 @@ struct RemoteChatView: View {
                 .frame(maxHeight: 300)
                 .fixedSize(horizontal: false, vertical: true)
             }
+            // A change its agent made to the project's own files waits the same way (#531).
+            if let agent {
+                ForEach(model.guardedChangesForSelection) { change in
+                    GuardedChangeQuestion(change: change, key: ProjectKey(host: agent.host, folder: agent.projectFolder))
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
             // A form waits the same way a permission does and floats with it, never
             // hidden behind one (#243), as on the Mac.
             if let form = model.formForSelection {

@@ -267,6 +267,19 @@ final class AppModel {
         selection = agentID
     }
 
+    /// A project's own page, from a banner with no session behind it (#531): where a
+    /// change git brought to its files is asked.
+    func openProject(_ key: ProjectKey) {
+        showsSpending = false
+        showsResources = false
+        showsEvents = false
+        showsRuntimes = false
+        select(key)
+        openWorkflow = nil
+        projectPage = nil
+        selection = nil
+    }
+
     /// What is picked in the sidebar, as one value.
     ///
     /// Activity, the projects and their sessions and workflows share one list (#145), so
@@ -3081,6 +3094,7 @@ final class AppModel {
             // sidebar and a page that disagree about where you are.
             self.openAgent(agentID)
         }
+        notifier.openProject = { [weak self] folder in self?.openProject(ProjectKey(host: .mac, folder: folder)) }
         let reporter = PresenceReporter { [weak self] watching, active, showing in
             guard let self else { return }
             // Every host hears whether the person is here; only the one the open

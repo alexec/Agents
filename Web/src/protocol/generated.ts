@@ -856,7 +856,29 @@ export interface GuardedChange {
   changedByIDs: UUID[];
   byGit: boolean;
   since: WireDate;
+  askedIn?: UUID;
 }
+
+export interface GuardedChangeReading {
+  path: string;
+  digest?: string;
+  approved?: string;
+  current?: string;
+  lines: GuardedDiffLine[];
+}
+
+export interface GuardedChangeRequest {
+  folder: URLString;
+  path: string;
+  digest?: string;
+}
+
+export interface GuardedDiffLine {
+  kind: GuardedDiffLineKind;
+  text: string;
+}
+
+export type GuardedDiffLineKind = "same" | "removed" | "added";
 
 export interface Headline {
   h1: string;
@@ -993,7 +1015,7 @@ export type MoveTarget =
 
 export interface Need {
   id: NeedID;
-  agentID: UUID;
+  agentID?: UUID;
   folder: URLString;
   kind: NeedKind;
   raisedAt: WireDate;
@@ -1006,7 +1028,7 @@ export type NeedID =
   | { elicitation: UUID }
   | { report: { agentID: UUID; at: WireDate } };
 
-export type NeedKind = "permission" | "elicitation" | "report";
+export type NeedKind = "permission" | "elicitation" | "report" | "guardedChange";
 
 export interface OptionsRequest {
   runtimeID: string;
@@ -2042,9 +2064,12 @@ export interface Methods {
   "projects/chatState": { params: Empty; result: ChatProjectState };
   "projects/clone": { params: CloneRequest; result: ProjectSummary };
   "projects/clones": { params: Empty; result: CloneSummary[] };
+  "projects/keepGuardedChange": { params: GuardedChangeRequest; result: ProjectSummary };
   "projects/list": { params: ProjectsListRequest; result: ProjectSummary[] };
+  "projects/readGuardedChange": { params: GuardedChangeRequest; result: GuardedChangeReading };
   "projects/setPinned": { params: SetPinnedRequest; result: ProjectSummary };
   "projects/unarchive": { params: ProjectRequest; result: ProjectSummary };
+  "projects/undoGuardedChange": { params: GuardedChangeRequest; result: ProjectSummary };
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
   "runtimes/allowances": { params: string | null; result: RuntimeAllowances };
   "runtimes/list": { params: Empty; result: RuntimeStatus[] };
@@ -2143,9 +2168,12 @@ export const MethodTarget = {
   "projects/chatState": "host",
   "projects/clone": "host",
   "projects/clones": "host",
+  "projects/keepGuardedChange": "host",
   "projects/list": "host",
+  "projects/readGuardedChange": "host",
   "projects/setPinned": "host",
   "projects/unarchive": "host",
+  "projects/undoGuardedChange": "host",
   "runtimes/accounts": "host",
   "runtimes/allowances": "host",
   "runtimes/list": "host",
@@ -2278,7 +2306,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FilesReadRequest: { required: ["agentID", "path"], optional: ["knownStamp"] },
   FilesWatchRequest: { required: ["agentID", "folder"], optional: [] },
   FolderHunk: { required: ["oldStart", "newStart", "noNewlineAtEnd", "lines"], optional: [] },
-  GuardedChange: { required: ["path", "changedBy", "changedByIDs", "byGit", "since"], optional: ["digest"] },
+  GuardedChange: { required: ["path", "changedBy", "changedByIDs", "byGit", "since"], optional: ["digest", "askedIn"] },
+  GuardedChangeReading: { required: ["path", "lines"], optional: ["digest", "approved", "current"] },
+  GuardedChangeRequest: { required: ["folder", "path"], optional: ["digest"] },
+  GuardedDiffLine: { required: ["kind", "text"], optional: [] },
   Headline: { required: ["h1", "h2", "h3"], optional: [] },
   HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive"] },
   HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
@@ -2296,7 +2327,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MCPTriggerStatus: { required: ["name", "state"], optional: ["server", "lastPolledAt", "lastEventAt", "missedSince", "failure", "retryAt"] },
   MarkRuntimeAvailable: { required: ["credentialKey"], optional: [] },
   MissingFolder: { required: ["branchKept"], optional: [] },
-  Need: { required: ["id", "agentID", "folder", "kind", "raisedAt", "headline"], optional: [] },
+  Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID"] },
   OptionsRequest: { required: ["runtimeID", "cwd", "mcpServers"], optional: [] },
   OptionsResponse: { required: ["draftID", "options", "commands"], optional: [] },
   PagesChangedNotification: { required: ["folder", "folders"], optional: [] },

@@ -54,6 +54,12 @@ struct GuardedFilesTests {
         #expect(change.path == ".agents/project.json")
         #expect(change.changedBy == ["Lead"])
         #expect(change.headline == "Lead changed .agents/project.json")
+        // Asked in Lead's session, as a need like any question (#531).
+        #expect(change.askedIn == s.lead)
+        let need = try #require(await s.core.needs().first { $0.kind == .guardedChange })
+        #expect(need.id == .guardedChange(s.project, ".agents/project.json"))
+        #expect(need.agentID == s.lead)
+        #expect(need.headline.h3 == "Lead changed .agents/project.json")
 
         await #expect(throws: JSONRPCError.self, "the app does not write over a change nobody kept") {
             _ = try await s.core.setHelperLimits(.init(folder: s.project, limits: HelperLimits(running: 3)))
@@ -66,6 +72,7 @@ struct GuardedFilesTests {
         let kept = try await s.core.keepGuardedChange(.init(folder: s.project, path: change.path, digest: reading.digest))
         #expect(kept.guardedChanges == nil)
         #expect(await s.core.configuredHelperLimits(in: s.project)?.running == 10, "kept, it counts")
+        #expect(await !s.core.needs().contains { $0.kind == .guardedChange }, "answered, it is asked no more")
     }
 
     @Test func undoPutsTheApprovedCopyBack() async throws {
@@ -143,6 +150,11 @@ struct GuardedFilesTests {
         let change = try await waitForChange(s)
         #expect(change.byGit && change.changedBy.isEmpty)
         #expect(change.headline == "A merge or pull changed .agents/project.json")
+        // No session to ask it in: the project's own question (#531).
+        #expect(change.askedIn == nil)
+        let need = try #require(await s.core.needs().first { $0.kind == .guardedChange })
+        #expect(need.agentID == nil && need.folder == s.project)
+        #expect(NeedID.guardedFolder(fromToken: need.id.token)?.path == s.project.path)
         #expect(await s.core.helperLimits(in: s.project).running == 2)
 
         // Edited by hand after, not committed: the person's own.
@@ -153,6 +165,30 @@ struct GuardedFilesTests {
         }
         #expect(await s.core.helperLimits(in: s.project).running == 3)
         #expect(await s.core.projectSummary(for: s.project)?.guardedChanges == nil)
+    }
+
+    @Test func anArchivedAgentsChangeIsAskedOfTheProject() async throws {
+        let s = try await setUp()
+        _ = try await s.core.setHelperLimits(.init(folder: s.project, limits: HelperLimits(running: 2)))
+        await s.core.startTurnForTesting(s.lead)
+        try write(#"{"helperLimits": {"running": 4}}"#, .projectConfig, in: s.project)
+        await s.core.endTurnForTesting(s.lead)
+        #expect(await s.core.projectSummary(for: s.project)?.guardedChanges?.first?.askedIn == s.lead)
+
+        try await s.core.archive(s.lead)
+        let change = try #require(await s.core.projectSummary(for: s.project)?.guardedChanges?.first)
+        #expect(change.changedBy == ["Lead"], "still named")
+        #expect(change.askedIn == nil, "but asked on the project's page")
+        #expect(await s.core.needs().first { $0.kind == .guardedChange }?.agentID == nil)
+    }
+
+    @Test func aGuardedNeedIDCodesAndNamesItsProject() throws {
+        let folder = URL(filePath: "/tmp/some: project", directoryHint: .isDirectory)
+        let id = NeedID.guardedChange(folder, ".agents/pins.json")
+        let decoded = try JSONDecoder().decode(NeedID.self, from: JSONEncoder().encode(id))
+        #expect(decoded == id)
+        #expect(NeedID.guardedFolder(fromToken: id.token)?.path == folder.path)
+        #expect(NeedID.guardedFolder(fromToken: NeedID.permission(UUID()).token) == nil)
     }
 
     @Test func linesAreMarkedKeptRemovedAndAdded() {

@@ -41,17 +41,34 @@ public struct GuardedChange: Codable, Hashable, Sendable, Identifiable {
     public var byGit: Bool
     /// When the change was first seen.
     public var since: Date
+    /// The session the question is asked in (#531): the first agent named that is still
+    /// there, unarchived. nil asks it of the project, on its own page: a change git
+    /// brought, or one whose agents are gone.
+    public var askedIn: UUID?
 
     public var id: String { path }
 
     public init(path: String, digest: String?, changedBy: [String], changedByIDs: [UUID],
-                byGit: Bool, since: Date) {
+                byGit: Bool, since: Date, askedIn: UUID? = nil) {
         self.path = path
         self.digest = digest
         self.changedBy = changedBy
         self.changedByIDs = changedByIDs
         self.byGit = byGit
         self.since = since
+        self.askedIn = askedIn
+    }
+
+    /// The question's title, as a card and a notification put it.
+    public var question: String {
+        "Keep the change to \(path)?"
+    }
+
+    /// What Keep and Undo do, in a person's words.
+    public var explanation: String {
+        let holds = GuardedFile(rawValue: path)?.holds ?? "the file"
+        return "The app goes on using \(holds) as you last approved them until you choose. "
+            + "Keep uses the change from now on; Undo puts the approved copy back in the file."
     }
 
     /// Who changed what, as a sentence's start: "Lead changed .agents/project.json".

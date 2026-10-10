@@ -168,6 +168,13 @@ public extension DaemonAPI {
                 Row(Method.projectsUnarchive, params: ProjectRequest.self, result: ProjectSummary.self, kind: .hostRequest),
                 // Pin and Unpin on a project's row, as the window's sidebar has them.
                 Row(Method.projectsSetPinned, params: SetPinnedRequest.self, result: ProjectSummary.self, kind: .hostRequest),
+                // A change to the project's own files made outside the app (#531): read, Keep, Undo.
+                Row(Method.projectsReadGuardedChange, params: GuardedChangeRequest.self, result: GuardedChangeReading.self,
+                    kind: .hostRequest),
+                Row(Method.projectsKeepGuardedChange, params: GuardedChangeRequest.self, result: ProjectSummary.self,
+                    kind: .hostRequest),
+                Row(Method.projectsUndoGuardedChange, params: GuardedChangeRequest.self, result: ProjectSummary.self,
+                    kind: .hostRequest),
                 // New Chat (#229): why a host has no chat project, asked only when none is listed.
                 Row(Method.projectsChatState, params: Empty.self, result: ChatProjectState.self, kind: .hostRequest),
                 Row(Method.filesWatch, params: FilesWatchRequest.self, result: Empty.self, kind: .hostRequest),
