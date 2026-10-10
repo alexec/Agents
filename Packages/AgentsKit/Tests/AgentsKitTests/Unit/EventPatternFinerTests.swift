@@ -48,8 +48,24 @@ struct EventPatternFinerTests {
 
     @Test func aFiltersValueIsCheckedWhenItHasFixedOnes() {
         let problem = EventPattern.parse("person.away", filters: ["why": "asleep"]).failure
-        #expect(problem?.message == "why on person.away is one of locked, idle; \"asleep\" is not one of them.")
-        #expect(EventPattern.parse("person.back", filters: ["why": any("locked", "nope")]).failure?.isBadValue == true)
+        #expect(problem?.message == "person.away: why is one of locked, idle, not asleep.")
+        #expect(EventPattern.parse("person.back", filters: ["why": any("locked", "nope")]).failure?.isBadFilter == true)
+    }
+
+    /// One checker (#579): a where an app event does not take is refused in the words a
+    /// server's event's would be.
+    @Test func anAppEventsRefusalReadsLikeAServersEvent() {
+        let server: JSONValue = ["type": "object", "additionalProperties": false,
+                                 "properties": ["repo": ["type": "string"],
+                                                "state": ["type": "string", "enum": ["open", "closed"]]]]
+        #expect(JSONSchemaSubset.check(["nope": "x"], against: server, name: "github's pr.merged")
+                == "github's pr.merged takes repo, state; \"nope\" is not one of its arguments.")
+        #expect(EventPattern.parse("branch.moved", filters: ["nope": "x"]).failure?.message
+                == "branch.moved takes branch; \"nope\" is not one of its arguments.")
+        #expect(JSONSchemaSubset.check(["state": "merged"], against: server, name: "github's pr.merged")
+                == "github's pr.merged: state is one of open, closed, not merged.")
+        #expect(EventPattern.parse("person.away", filters: ["why": "merged"]).failure?.message
+                == "person.away: why is one of locked, idle, not merged.")
     }
 
     // MARK: Everything else is refused (#574)
@@ -60,16 +76,16 @@ struct EventPatternFinerTests {
                             ("agent.messaged", "from"), ("agent.deleted", "because")] {
             let problem = EventPattern.parse(name, filters: [key: "x"]).failure
             #expect(problem?.isBadFilter == true, "\(name) \(key)")
-            #expect(problem?.message == "\(name) can't be narrowed, by \"\(key)\" or anything else. "
+            #expect(problem?.message == "\(name) takes no arguments; \"\(key)\" is not one of its arguments. "
                     + "To wait for particular agents, use wait_for_event with agents.")
         }
     }
 
     @Test func otherEventsNameTheFiltersTheyTakeOrSayNone() {
         #expect(EventPattern.parse("branch.moved", filters: ["to": "abc"]).failure?.message
-                == "branch.moved can be narrowed only by branch, not by \"to\".")
+                == "branch.moved takes branch; \"to\" is not one of its arguments.")
         #expect(EventPattern.parse("workflow.completed", filters: ["workflow": "nightly"]).failure?.message
-                == "workflow.completed can't be narrowed, by \"workflow\" or anything else.")
+                == "workflow.completed takes no arguments; \"workflow\" is not one of its arguments.")
         for (name, key) in [("project.idle", "agents"), ("dropbox.file_added", "extension"),
                             ("lease.released", "how"), ("machine.disk_low", "level"), ("cost.allowance_out", "runtime"),
                             ("server.offline", "server"), ("custom.ship", "labels"), ("custom.*", "message"),

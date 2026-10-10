@@ -9,12 +9,10 @@ import Foundation
 public enum EventWords {
     static func clock(_ date: Date) -> String { LeaseWords.clock(date) }
 
-    /// The details written out for an agent: `number=41, branch=main`. `agent_title`
-    /// stands in for the id it reads.
+    /// The details written out for an agent: `branch=main, from=…`, each named as the
+    /// kind's `payloadSchema` names it (#579): `agent` is the id, `agent_title` its title.
     static func detailsLine(_ event: Event) -> String {
-        var details = event.details
-        if let title = details.removeValue(forKey: "agent_title") { details["agent"] = title }
-        return details.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ", ")
+        event.details.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ", ")
     }
 
     // MARK: wait_for_event

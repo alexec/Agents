@@ -92,7 +92,7 @@ struct DiskEventTests {
         #expect(both.problem == nil)
         #expect(both.triggers == [.event(EventPattern("machine.disk_low")), .event(EventPattern("machine.disk_ok"))])
         #expect(parse("  - machine.disk_low:\n      level: critical").problem
-                == .unreadable("machine.disk_low can't be narrowed, by \"level\" or anything else."))
+                == .unreadable("machine.disk_low takes no arguments; \"level\" is not one of its arguments."))
     }
 
     /// Renamed from mac.* (#372), because a Linux server raises them too: a file written

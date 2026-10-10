@@ -45,7 +45,7 @@ struct WorkflowTriggerEventTests {
                   branch: main
             """)
         guard case .unreadable(let detail)? = workflow.problem else { Issue.record("not refused"); return }
-        #expect(detail.contains("workflow.completed can't be narrowed, by \"branch\" or anything else."))
+        #expect(detail.contains("workflow.completed takes no arguments; \"branch\" is not one of its arguments."))
     }
 
     @Test func aNameAboutTheAppsOwnSubjectThisVersionDoesNotKnowStaysInert() {
@@ -115,7 +115,7 @@ struct WorkflowTriggerEventTests {
               - person.back:
                   why: asleep
             """)
-        #expect(workflow.problem == .unreadable("why on person.back is one of locked, idle; \"asleep\" is not one of them."))
+        #expect(workflow.problem == .unreadable("person.back: why is one of locked, idle, not asleep."))
         let mapping = triggers("""
               - branch.moved:
                   branch:
@@ -132,14 +132,14 @@ struct WorkflowTriggerEventTests {
               - agent.finished:
                   outcome: done
             """)
-        #expect(finished.problem == .unreadable("agent.finished can't be narrowed, by \"outcome\" or anything else. "
+        #expect(finished.problem == .unreadable("agent.finished takes no arguments; \"outcome\" is not one of its arguments. "
                                                 + "To wait for particular agents, use wait_for_event with agents."))
         #expect(finished.triggers.isEmpty)
         let moved = triggers("""
               - branch.moved:
                   to: abc
             """)
-        #expect(moved.problem == .unreadable("branch.moved can be narrowed only by branch, not by \"to\"."))
+        #expect(moved.problem == .unreadable("branch.moved takes branch; \"to\" is not one of its arguments."))
     }
 
     @Test func theTriggerTextAPatternWritesReadsBackAsTheSamePattern() throws {

@@ -495,28 +495,7 @@ extension DaemonCore {
                            + (here.isEmpty ? "" : " Servers here: \(here.sorted().joined(separator: ", ")).")
                            + " Nothing is waiting.")
         }
-        // Each server's events as listed now, or why it could not be asked.
-        var offered: [String: (server: ViewServer, events: [EventDefinition])] = [:]
-        var mayComeBack: [String] = []
-        for name in Set(narrowed ?? here).sorted() {
-            switch await mcpEventServer(name, project: project) {
-            case .success(let server):
-                let listing = await mcpEventListing(server)
-                if let events = listing.events {
-                    offered[name] = (server, events.filter { EventCatalogue.isServerEventName($0.name) })
-                } else if let failure = listing.failure {
-                    mayComeBack.append(Self.mcpWords(failure, server: name))
-                }
-            case .failure(.waiting):
-                mayComeBack.append("\(name) is waiting for approval in this project's MCP servers.")
-            case .failure(.signIn):
-                mayComeBack.append("\(name) wants a sign-in first.")
-            case .failure(.unreachable(let why)):
-                mayComeBack.append("Can't reach \(name): \(why)")
-            case .failure:
-                continue
-            }
-        }
+        let (offered, mayComeBack) = await mcpOfferedEvents(Set(narrowed ?? here).sorted(), project: project)
         var check = MCPWaitCheck()
         var warnings: [String] = []
         for name in names {
@@ -558,6 +537,44 @@ extension DaemonCore {
         }
         check.warning = warnings.joined()
         return .success(check)
+    }
+
+    /// Each of these servers' events as listed now, only those it may raise, or why it
+    /// could not be asked. What a wait is checked against, and what `list` lists (#579).
+    func mcpOfferedEvents(_ names: [String], project: URL) async
+        -> (offered: [String: (server: ViewServer, events: [EventDefinition])], mayComeBack: [String]) {
+        var offered: [String: (server: ViewServer, events: [EventDefinition])] = [:]
+        var mayComeBack: [String] = []
+        for name in names {
+            switch await mcpEventServer(name, project: project) {
+            case .success(let server):
+                let listing = await mcpEventListing(server)
+                if let events = listing.events {
+                    offered[name] = (server, events.filter { EventCatalogue.isServerEventName($0.name) })
+                } else if let failure = listing.failure {
+                    mayComeBack.append(Self.mcpWords(failure, server: name))
+                }
+            case .failure(.waiting):
+                mayComeBack.append("\(name) is waiting for approval in this project's MCP servers.")
+            case .failure(.signIn):
+                mayComeBack.append("\(name) wants a sign-in first.")
+            case .failure(.unreachable(let why)):
+                mayComeBack.append("Can't reach \(name): \(why)")
+            case .failure:
+                continue
+            }
+        }
+        return (offered, mayComeBack)
+    }
+
+    /// The one list of events (#579): the app's, then each of the project's servers'
+    /// that it offers by poll, then a line for each server that could not be asked.
+    func mcpEventList(project: URL) async -> String {
+        let (offered, mayComeBack) = await mcpOfferedEvents(mcpServerNames(project: project).sorted(), project: project)
+        let servers = offered.sorted { $0.key < $1.key }.map { name, found in
+            (source: name, events: found.events.filter(\.offersPoll).sorted { $0.name < $1.name })
+        }.filter { !$0.events.isEmpty }
+        return EventList.text(servers: servers, unlisted: mayComeBack.map { "Not listed: \($0)" })
     }
 
     /// `where`'s values as a server's arguments: text, or the number or true/false the

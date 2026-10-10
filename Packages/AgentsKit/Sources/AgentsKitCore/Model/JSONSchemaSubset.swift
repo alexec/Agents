@@ -12,7 +12,7 @@ public enum JSONSchemaSubset {
         if let properties = schema["properties"]?.objectValue, problem.isKey {
             let required = Set(schema["required"]?.arrayValue?.compactMap(\.stringValue) ?? [])
             let keys = properties.keys.sorted().map { required.contains($0) ? "\($0) (required)" : $0 }
-            let takes = keys.isEmpty ? "takes no settings" : "takes \(keys.joined(separator: ", "))"
+            let takes = keys.isEmpty ? "takes no arguments" : "takes \(keys.joined(separator: ", "))"
             return "\(name) \(takes); \(problem.words)."
         }
         return "\(name): \(problem.words)."

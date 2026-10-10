@@ -209,6 +209,14 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         }
     }
 
+    /// Every `code`, in the order of the cases: what `workflow.refused`'s payload
+    /// schema says `reason` can be (#579).
+    public static let codes = [
+        "chain_too_deep", "run_in_flight", "queued", "queue_full", "archived", "disabled", "over_limit",
+        "unreadable", "trigger_not_supported", "agent_unavailable", "no_triggering_agent", "missed_while_closed",
+        "folder_gone", "day_limit_reached", "setting_refused", "awaiting_approval", "denied_here", "cooling_down",
+    ]
+
     /// Whether somebody has to do something, or whether this sorts itself out.
     ///
     /// Only the first kind earns colour on the project page. Colouring every refusal
