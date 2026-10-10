@@ -1,7 +1,7 @@
 ---
 name: Free disk space
 on:
-  - mac.disk_low
+  - machine.disk_low
 agent: new
 runtime: claude
 model: sonnet
