@@ -364,7 +364,7 @@ public enum WorkflowFile {
                     return .event(pattern)
                 // A key it cannot be narrowed by (#574) leaves the trigger unreadable,
                 // saying so, rather than firing for everything.
-                case .failure(let problem) where problem.isBadFilter || problem.isBadValue:
+                case .failure(let problem) where problem.isBadFilter:
                     throw YAMLNode.Failure(problem.message)
                 case .failure:
                     break

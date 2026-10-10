@@ -68,7 +68,7 @@ struct EventPatternTests {
 
     @Test func aFilterTheKindDoesNotCarryIsRefusedNamingWhatItDoes() {
         let problem = EventPattern.parse("branch.moved", filters: ["number": "x"]).failure
-        #expect(problem?.message == "branch.moved can be narrowed only by branch, not by \"number\".")
+        #expect(problem?.message == "branch.moved takes branch; \"number\" is not one of its arguments.")
         #expect(EventPattern.parse("branch.*", filters: ["number": "x"]).failure != nil)
         #expect(EventPattern.parse("branch.*", filters: ["branch": "main"]).failure == nil)
     }

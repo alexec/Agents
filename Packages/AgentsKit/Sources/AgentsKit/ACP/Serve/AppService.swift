@@ -979,9 +979,10 @@ public actor AppService {
             whose file says `enabled: false` are theirs to turn on.
 
             Under on:, besides schedule and today's hyphenated names (agent-finished and \
-            the rest), any event name works, narrowed by the details marked [narrow by …] \
-            below written under it, e.g. `- branch.moved:` with `branch: main` under it.
-            """ + "\n" + EventCatalogue.describe()),
+            the rest), any event name works, narrowed by what its inputSchema below \
+            takes written under it, e.g. `- branch.moved:` with `branch: main` under it. \
+            The project's MCP servers' events are listed by wait_for_event with action list.
+            """ + "\n" + EventList.text()),
         "inputSchema": [
             "type": "object",
             "properties": [
@@ -1331,12 +1332,12 @@ public actor AppService {
                 "where": [
                     "type": "object",
                     "description": """
-                        Narrow them by a filter: branch on branch.moved, e.g. {"branch": "main"}, \
-                        or why on person.away and person.back. A list means any of them, \
-                        e.g. {"why": ["locked", "idle"]}. For an MCP server's event, such as \
-                        pr.merged, these are the server's own filters, sent to it, e.g. \
-                        {"repo": "owner/name"}; server narrows which servers. Nothing else \
-                        narrows an event.
+                        Narrow them by what each event's inputSchema takes in action list: \
+                        branch on branch.moved, e.g. {"branch": "main"}, or why on person.away \
+                        and person.back. A list means any of them, e.g. {"why": ["locked", \
+                        "idle"]}. For an MCP server's event, such as pr.merged, these are its \
+                        own, sent to it, e.g. {"repo": "owner/name"}; server narrows which \
+                        servers. Nothing else narrows an event.
                         """,
                 ],
                 "from": [

@@ -22,7 +22,7 @@ extension DaemonCore {
         let scopes = eventScopes(for: caller)
         switch (request.action ?? "wait").lowercased() {
         case "list":
-            return EventCatalogue.describe()
+            return await mcpEventList(project: caller.projectFolder)
         case "recent":
             let limit = min(max(request.limit ?? 20, 1), 50)
             let page = eventLog.query(limit: limit, scopes: scopes)

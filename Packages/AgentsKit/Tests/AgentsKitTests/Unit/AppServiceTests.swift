@@ -344,7 +344,7 @@ struct AppServiceTests {
     /// (042 FR-024).
     @Test func theWorkflowToolListsTheSameEventsTheWaitToolDoes() {
         let description = AppService.workflowTool["description"]?.stringValue ?? ""
-        #expect(description.hasSuffix(EventCatalogue.describe()))
+        #expect(description.hasSuffix(EventList.text()))
     }
 
     // MARK: 073: where takes a list, and drops nothing
