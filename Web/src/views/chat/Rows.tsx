@@ -131,6 +131,8 @@ export interface CallActions {
   /** The sandbox failure the open agent waits on an answer to (Agent.pendingSandboxFailure, #253). */
   waitingSandbox?: SandboxFailureRecord | undefined;
   answerSandbox?: ((carryOn: boolean) => Promise<void>) | undefined;
+  /** Open a subagent's own steps (ChatActions.subagentSteps, #544). */
+  subagentSteps?: ((item: BackgroundItem) => void) | undefined;
 }
 export const CallActionsContext = createContext<CallActions | null>(null);
 
@@ -373,13 +375,25 @@ function entryBody(entry: TranscriptEntry) {
       return <AppView call={fields(entry, "appView")!._0} />;
     case "background": {
       // As the window's line: how it started or ended, a failure in the failure tint (#253).
-      const item = fields(entry, "background")!._0;
-      return <p class={item.state === "failed" ? "failure" : "quiet"}>{backgroundEntryLine(item)}</p>;
+      return <BackgroundEntryLine item={fields(entry, "background")!._0} />;
     }
     default:
       // Written by a newer build: kept in the record, drawn as nothing.
       return null;
   }
+}
+
+/** BackgroundEntryLine: how it started or ended, and a subagent's Steps (#544). */
+function BackgroundEntryLine({ item }: { item: BackgroundItem }) {
+  const steps = useContext(CallActionsContext)?.subagentSteps;
+  return (
+    <p class={item.state === "failed" ? "failure" : "quiet"}>
+      {backgroundEntryLine(item)}
+      {item.kind === "subagent" && steps && (
+        <> <button class="link" title="See what this subagent did" onClick={() => steps(item)}>Steps</button></>
+      )}
+    </p>
+  );
 }
 
 export function elicitationTitle(request: { message?: string; mode: { form: { _0: { title?: string } } } | { url: { _0: string } } }): string {
@@ -416,8 +430,8 @@ function stepsWords(count: number | undefined, open: boolean): string {
  * Opening loads the last page once, and only for a turn near the end: every turn open at once
  * would fetch them all. One the chat has let go shows a button instead of fetching itself (#291).
  */
-export const TurnView = memo(function TurnView({ turn, detail, fetched, hasEarlier, auto, isLive, background, toggle: toggleTurn, loadDetail: loadTurn, loadEarlier }: {
-  turn: ChatTurn; detail: TurnDetail; fetched: Item[] | undefined; hasEarlier: boolean; auto: boolean; isLive: boolean;
+export const TurnView = memo(function TurnView({ turn, detail, fetched, fetchFailed, hasEarlier, auto, isLive, background, toggle: toggleTurn, loadDetail: loadTurn, loadEarlier }: {
+  turn: ChatTurn; detail: TurnDetail; fetched: Item[] | undefined; fetchFailed: boolean; hasEarlier: boolean; auto: boolean; isLive: boolean;
   background: readonly BackgroundItem[]; toggle: (turn: ChatTurn) => void;
   loadDetail: (turn: ChatTurn) => Promise<void>; loadEarlier: (turn: ChatTurn) => Promise<void>;
 }) {
@@ -462,6 +476,9 @@ export const TurnView = memo(function TurnView({ turn, detail, fetched, hasEarli
       )}
       {open && stepCount !== 0 ? (
         waiting ? (loading.value || (auto && !asked.current) ? <p class="quiet">Loading…</p>
+          // A read that failed says so, as the window's turn does, rather than a bare Load steps (#544).
+          : fetchFailed ? <p class="load-failure" role="status"><span>These steps did not load.</span>
+            <button class="link" onClick={ask}>Try Again</button></p>
           : <button class="steps-control" onClick={ask}>Load steps</button>) : (
           <>
             {hasEarlier && <button class="steps-control" onClick={() => void loadEarlier(turn)}>Earlier steps</button>}

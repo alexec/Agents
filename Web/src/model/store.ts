@@ -61,6 +61,8 @@ export interface TurnDetailPage {
   entries: TranscriptEntry[];
   /** Where this page starts. Earlier steps of the turn exist when this is past the turn's start. */
   firstIndex: number;
+  /** The read failed: said as such, with Try Again, rather than as a turn with nothing in it (#544). */
+  failed?: true;
 }
 
 /** Puts `id` among the newest `cap` entries of `held`, letting the oldest go (#291). */
@@ -1334,7 +1336,8 @@ export class Store extends Work {
     const page = await this.link.call("agents/transcript", {
       agentID: session as never, before: range.end, limit: Math.min(span, turnPage), from: range.start,
     }, host).catch(() => null);
-    return { entries: page?.entries ?? [], firstIndex: page?.firstIndex ?? range.start };
+    if (!page) return { entries: [], firstIndex: range.start, failed: true };
+    return { entries: page.entries, firstIndex: page.firstIndex };
   }
 
   // MARK: What the browser sends (071 US3)

@@ -78,3 +78,16 @@ export function backgroundAge(item: BackgroundItem, now: number): string {
   const s = seconds % 60;
   return h > 0 ? `${h}:${two(m)}:${two(s)}` : `${m}:${two(s)}`;
 }
+
+/** SubagentStepsView's line under the name: running and for how long, or how it ended (#544). */
+export function subagentStatus(item: BackgroundItem, now: number): string {
+  const age = backgroundAge(item, now);
+  if (isRunning(item)) return `Subagent · running ${age} · stops with the agent`;
+  return `${backgroundEnding(item)} · ${age}`;
+}
+
+/** What SubagentStepsView says when none of its steps are loaded (#544). */
+export function subagentNoSteps(item: BackgroundItem): string {
+  return isRunning(item) ? "Nothing yet. Its steps appear here as it takes them."
+    : "Its steps are further back in the conversation than is loaded.";
+}
