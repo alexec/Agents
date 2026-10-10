@@ -1,6 +1,7 @@
-/* The one sidebar (#151), as the window's (#145): Activity, the projects folding
-   open on their sessions and workflows, the hosts' state at the foot; then the chat. Every rule
-   is under .with-sidebar, so it outweighs the three-column rules in app.css. */
+/* The one sidebar (#151), as the window's (#145) and Things-style since #495 (#499): New Session,
+   Activity, the smart groups, a group per project folding open on its sessions and workflows, the
+   hosts' state at the foot; then the chat. Every rule is under .with-sidebar, so it outweighs the
+   three-column rules in app.css. */
 
 .columns.with-sidebar { grid-template-columns: 300px minmax(0, 1fr); }
 .files-open .columns.with-sidebar { grid-template-columns: 300px minmax(0, 1fr) 420px; }
@@ -30,9 +31,10 @@
 .with-sidebar .sidebar .row.workflow .run-now { display: none; }
 .with-sidebar .sidebar-head-label { font-size: 11px; font-weight: 600; opacity: 0.5; margin: 12px 8px 4px; }
 
-/* Activity: the page's name in the projects' type and at their edge (#155), and what it says at a
-   glance on the right. */
-.with-sidebar .activity-row { grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; padding: 4px 8px 4px 18px; }
+/* Activity: an icon in the accent, the page's name in the rows' type (#155, #495), and what it says
+   at a glance on the right. */
+.with-sidebar .activity-row { grid-template-columns: 16px minmax(0, 1fr) auto; column-gap: 8px; align-items: baseline; padding: 4px 8px; }
+.with-sidebar .activity-row .activity-icon { color: var(--accent); text-align: center; }
 .with-sidebar .activity-row .title { font-weight: 500; }
 .with-sidebar .activity-row .detail { font-size: 11.5px; opacity: 0.6; font-variant-numeric: tabular-nums; text-align: right; }
 .with-sidebar .activity-row .detail .dot.failure { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
@@ -47,29 +49,60 @@
   opacity: 0.55; line-height: 1; }
 .with-sidebar .row.project .pick { display: flex; flex-direction: column; align-items: flex-start; min-width: 0;
   border: none; background: none; padding: 4px 0; text-align: left; font: inherit; color: inherit; }
-.with-sidebar .row.project .title { font-weight: 500; max-width: 100%; }
+/* The project is its group's heading (#495): its name in grey, so the sessions under it read first. */
+.with-sidebar .row.project .title { font-weight: 600; font-size: 12px; opacity: 0.6; max-width: 100%; }
 .with-sidebar .row.project .project-chat { font-size: 11px; opacity: 0.6; filter: grayscale(1); }
 .with-sidebar .row.project .project-pin { font-size: 10px; opacity: 0.55; filter: grayscale(1); }
 .with-sidebar .row.project .subtitle { font-size: 11.5px; }
 .with-sidebar .row.project .dot { grid-column: 3; grid-row: 1; }
 .with-sidebar .project-fold.greyed .row, .with-sidebar .project-fold.greyed .subhead { opacity: 0.55; }
 
-/* What folds under a project sits in from it, as the window's outline does. */
-.with-sidebar .fold-body { padding-left: 12px; margin-bottom: 6px; }
-.with-sidebar .fold-body .subhead { margin: 8px 8px 1px; }
-.with-sidebar .fold-body .hint { padding: 2px 8px; font-size: 12px; }
+/* A project's rows sit at the sidebar's edge under its heading, as a group's do (#495). */
+.with-sidebar .fold-body { margin-bottom: 6px; }
+
+/* The groups at the top (#495): Pinned, Needs You, Working, Unread, headed and folding as Activity
+   is, the count on the right, Needs You's in the attention tint. */
+.with-sidebar details.smart > summary { display: flex; align-items: baseline; margin-left: 0; opacity: 1;
+  color: color-mix(in srgb, currentColor 50%, transparent); }
+.with-sidebar details.smart > summary .count { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 500; }
+.with-sidebar details.smart > summary .count.needs { color: var(--tint-attention); }
+
+/* Which project a row is in, after its title, under a group at the top (#495). */
+.with-sidebar .sidebar .place { font-size: 11px; font-weight: 400; opacity: 0.45; }
+
+/* A session's mark in the sidebar (#495): an orange hand, a spinner, two rings unread, an empty
+   ring once read; every icon in the accent but the hand. */
+.sidebar-mark { width: 16px; height: 16px; margin-top: 1px; box-sizing: border-box; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center; color: var(--accent); }
+.sidebar-mark.needsYou { color: var(--tint-attention); font-size: 13px; border-radius: 0; }
+.sidebar-mark.working { border: 1.5px solid var(--paper-rule); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
+.sidebar-mark.unread { border: 1.5px solid currentColor; }
+.sidebar-mark.unread::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.sidebar-mark.read { border: 1.5px solid currentColor; opacity: 0.7; }
+@media (prefers-reduced-motion: reduce) { .sidebar-mark.working { animation-duration: 3s; } }
+
+/* A project's Archived row (#495), opening its page: in the rows' type, its count on the right. */
+.row.page-row { grid-template-columns: minmax(0, 1fr); padding: 0; }
+.row.page-row .pick { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; column-gap: 8px; align-items: center;
+  border: none; background: none; padding: 5px 8px; text-align: left; font: inherit; color: inherit; min-width: 0; }
+.row.page-row .pin-mark { color: var(--accent); text-align: center; }
+.row.page-row .title { font-weight: 400; }
+.row.page-row .count { font-size: 11.5px; opacity: 0.55; font-variant-numeric: tabular-nums; }
+
+/* A project's archive, in the chat's place (#499). */
+.with-sidebar .archive-page .column-head .quiet { font-size: 12px; }
+.with-sidebar .archive-body { max-width: 760px; padding: 8px 12px; }
+.with-sidebar .archive-body .hint { padding: 8px; font-size: 12px; opacity: 0.6; }
 /* Show all N under a fold's first archived matches, and More matches… after the projects (#193):
    fine and secondary, as the window's. */
 .sidebar button.link.show-all, .sidebar button.link.more-matches {
   display: block; padding: 3px 8px; font-size: 12px; color: inherit; opacity: 0.6; cursor: pointer; text-align: left;
 }
 .sidebar button.link.show-all:hover, .sidebar button.link.more-matches:hover { opacity: 0.9; }
-.with-sidebar .fold-body .session { padding: 5px 8px; }
-.with-sidebar :is(details.archived, details.group, details.activity) > summary { list-style: none; cursor: pointer; }
-.with-sidebar :is(details.archived, details.group, details.activity) > summary::before { content: "›"; display: inline-block; width: 12px; opacity: 0.7; }
-.with-sidebar :is(details.archived, details.group, details.activity)[open] > summary::before { content: "⌄"; }
-/* A folded Needs you keeps its count in the attention tint, so folding it hides nobody (#181). */
-.with-sidebar details.group:not([open]) > summary.needs .count:first-of-type { color: var(--tint-attention); opacity: 1; }
+.with-sidebar .sidebar .session { padding: 5px 8px; }
+.with-sidebar :is(details.archived, details.smart, details.activity) > summary { list-style: none; cursor: pointer; }
+.with-sidebar :is(details.archived, details.smart, details.activity) > summary::before { content: "›"; display: inline-block; width: 12px; opacity: 0.7; }
+.with-sidebar :is(details.archived, details.smart, details.activity)[open] > summary::before { content: "⌄"; }
 
 /* Archived projects (#343): a heading that folds, as the window's section, and each project in
    secondary type, when it was put away under it, and Bring Back at its end. */
@@ -120,12 +153,13 @@
 .context-menu button { text-align: left; border: none; background: none; padding: 5px 10px; border-radius: var(--radius-control); }
 .context-menu button:hover:not(:disabled), .context-menu button:focus-visible { background: var(--paper-selection); outline: none; }
 
-/* A project's pinned pages (#159), and its New session row above them (#375): a mark and a
-   title, as a session's row is tall. */
+/* A project's pinned pages (#159), and New Session at the sidebar's top (#495): a mark in the
+   accent and a title, as a session's row is tall. */
 .row.pin, .row.new-session { grid-template-columns: minmax(0, 1fr); padding: 0; }
 .row.pin .pick, .row.new-session .pick { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; column-gap: 8px; align-items: center;
   border: none; background: none; padding: 5px 8px; text-align: left; font: inherit; color: inherit; min-width: 0; }
-.row.pin .pin-mark, .row.new-session .pin-mark { opacity: 0.55; text-align: center; }
+.row.pin .pin-mark, .row.new-session .pin-mark { color: var(--accent); text-align: center; }
+.with-sidebar .new-session-top { margin-top: 6px; }
 .row.pin .title, .row.new-session .title { font-weight: 400; }
 .row.pin.missing .title { opacity: 0.55; }
 .row.pin.dragging { opacity: 0.4; }

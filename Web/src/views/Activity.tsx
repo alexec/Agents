@@ -137,6 +137,9 @@ function useActivity(store: Store): void {
   }, [online]);
 }
 
+/** Each Activity page's icon, the window's SF Symbol as near as text has it (#495). */
+const activityIcons: Record<ActivityPage, string> = { events: "☰\uFE0E", resources: "◫", runtimes: "⚙\uFE0E", spending: "$" };
+
 export function ActivityRows({ store, chosen, onPick }: {
   store: Store; chosen: ActivityPage | undefined; onPick: (page: ActivityPage) => void;
 }) {
@@ -150,10 +153,12 @@ export function ActivityRows({ store, chosen, onPick }: {
   const today = totalWords(todayTotals(costs));
   const mac = costs["mac"];
   const left = headroom(mac);
-  // The page's name in the projects' type, with no glyph, as the window's rows have it (#155).
+  // The page's name in the projects' type, after its icon in the accent, as the window's rows
+  // have it (#155, #495).
   const row = (page: ActivityPage, title: string, help: string, detail: preact.ComponentChildren) => (
     <button class={`row activity-row${chosen === page ? " chosen" : ""}`} aria-current={chosen === page} title={help}
       onClick={() => onPick(page)}>
+      <span class="activity-icon" aria-hidden="true">{activityIcons[page]}</span>
       <span class="title">{title}</span>
       <span class="detail">{detail}</span>
     </button>

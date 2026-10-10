@@ -1,27 +1,20 @@
-// Which projects in the sidebar are unfolded, which of their Archived folds are open (#151), and
-// which of their session groups and Workflows are folded (#181), kept across visits in
-// localStorage, as the window keeps them in defaults (SidebarFolds.swift). A fold is named by
-// host and folder, so the same folder on two hosts folds apart. Archived projects, the one fold
-// under no project, is kept on its own, as the window's `showsArchivedProjects` (#343), and so is
+// Which projects in the sidebar are unfolded (#151) and which of its smart groups (#495) are
+// open, kept across visits in localStorage, as the window keeps them in defaults
+// (SidebarFolds.swift). A project's fold is named by host and folder, so the same folder on two
+// hosts folds apart; a smart group's by its name. Archived projects, the one fold under no
+// project, is kept on its own, as the window's `showsArchivedProjects` (#343), and so is
 // Activity, as its `showsActivity`.
 import { signal } from "@preact/signals";
-import type { AgentGroup } from "../protocol/generated";
 import { folderKey } from "./groups";
-
-export type Fold = "project" | "archivedSessions" | "archivedWorkflows" | "workflows" | "pinned" | `group.${AgentGroup}`;
+import { smartStartsOpen, type SmartRow } from "./sidebar";
 
 const storageKey = "agents.sidebar.folds";
-/** The folds that start open and have been closed: the groups and Workflows (#181). */
+/** The smart groups that start open and have been closed (#495). */
 const closedKey = "agents.sidebar.folded";
 /** Whether Archived projects is open; closed until opened (#343). */
 const archivedProjectsKey = "agents.sidebar.archivedProjects";
 /** Whether Activity is open; open until folded. */
 const activityKey = "agents.sidebar.activity";
-
-/** A project and the Archived folds start folded; the groups, Pinned (#180) and Workflows start open. */
-export function startsOpen(fold: Fold): boolean {
-  return fold === "workflows" || fold === "pinned" || fold.startsWith("group.");
-}
 
 function read(storage: Storage | undefined, key: string): Set<string> {
   try {
@@ -32,9 +25,12 @@ function read(storage: Storage | undefined, key: string): Set<string> {
   }
 }
 
-export function foldName(host: string, folder: string, fold: Fold = "project"): string {
-  const project = `${host}|${folderKey(folder)}`;
-  return fold === "project" ? project : `${fold}:${project}`;
+export function foldName(host: string, folder: string): string {
+  return `${host}|${folderKey(folder)}`;
+}
+
+function smartName(row: SmartRow): string {
+  return `smart:${row}`;
 }
 
 export class Folds {
@@ -78,21 +74,31 @@ export class Folds {
     }
   }
 
-  isOpen(host: string, folder: string, fold: Fold = "project"): boolean {
-    const name = foldName(host, folder, fold);
-    return startsOpen(fold) ? !this.closed.value.has(name) : this.open.value.has(name);
+  isOpen(host: string, folder: string): boolean {
+    return this.open.value.has(foldName(host, folder));
   }
 
-  set(host: string, folder: string, isOpen: boolean, fold: Fold = "project"): void {
-    const name = foldName(host, folder, fold);
-    const kept = startsOpen(fold) ? this.closed : this.open;
-    const has = startsOpen(fold) ? !isOpen : isOpen;
+  set(host: string, folder: string, isOpen: boolean): void {
+    this.change(this.open, storageKey, foldName(host, folder), isOpen);
+  }
+
+  /** Pinned and Needs You open until folded; Working and Unread folded until opened (#495). */
+  isSmartOpen(row: SmartRow): boolean {
+    return smartStartsOpen(row) ? !this.closed.value.has(smartName(row)) : this.open.value.has(smartName(row));
+  }
+
+  setSmart(row: SmartRow, isOpen: boolean): void {
+    if (smartStartsOpen(row)) this.change(this.closed, closedKey, smartName(row), !isOpen);
+    else this.change(this.open, storageKey, smartName(row), isOpen);
+  }
+
+  private change(kept: typeof this.open, key: string, name: string, has: boolean): void {
     if (kept.peek().has(name) === has) return;
     const next = new Set(kept.peek());
     if (has) next.add(name); else next.delete(name);
     kept.value = next;
     try {
-      this.storage?.setItem(startsOpen(fold) ? closedKey : storageKey, JSON.stringify([...next].sort()));
+      this.storage?.setItem(key, JSON.stringify([...next].sort()));
     } catch {
       // A private window may refuse to store; the folds still hold for this visit.
     }

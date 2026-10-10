@@ -1,7 +1,7 @@
 // The Mac window's layout in a tab (071 US2, US6; #151, #235). As the window since #145: one
-// sidebar (Activity, the projects folding open on their sessions, the hosts' state at its foot),
-// then the chat, a project's new-session form, a workflow, an Activity page, or help text with nothing
-// chosen; the files pane a third column from 1440, over the chat below that. Below 760 the same
+// sidebar (New Session, Activity, the smart groups, a group per project, the hosts' state at its
+// foot; #499), then the chat, a project's new-session form, a workflow, its archive, an Activity
+// page, or help text with nothing chosen; the files pane a third column from 1440, over the chat below that. Below 760 the same
 // sidebar is the root list, as the iPhone Remote's is (#226), and what it picks takes its place,
 // with ‹ Agents back to it.
 import { useEffect } from "preact/hooks";
@@ -21,6 +21,7 @@ import { Problem } from "./Errors";
 import { FilesPane } from "./FilesPane";
 import { WorkflowPage } from "./WorkflowPage";
 import { PinnedPage } from "./Pins";
+import { ArchivePage } from "./ArchivePage";
 import { Sidebar } from "./Sidebar";
 import { ActivityPageView } from "./Activity";
 import { ContextMenu } from "./ContextMenu";
@@ -29,7 +30,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
   const r = route.value;
   const down = session.state.value.kind === "down";
   // What a narrow window shows: the list, or what the route opens in the chat's place.
-  const depth = r.activity || r.session || r.workflow || r.page || r.compose ? "chat" : "list";
+  const depth = r.activity || r.session || r.workflow || r.page || r.compose || r.archive ? "chat" : "list";
   const project = r.host && r.project
     ? (store.projects.value[r.host] ?? []).find((p) => folderKey(p.project.folder) === folderKey(r.project!))
     : undefined;
@@ -59,6 +60,8 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
               workflowID={r.workflow} down={down || !store.hostIsOnline(r.host)} />
           ) : r.host && r.project && project && r.page ? (
             <PinnedPage store={store} host={r.host} folder={project.project.folder} path={r.page} down={down || !store.hostIsOnline(r.host)} />
+          ) : r.host && r.project && project && r.archive ? (
+            <ArchivePage store={store} host={r.host} folder={project.project.folder} projectName={project.name} down={down} />
           ) : r.host && r.project && project ? (
             <NewAgent store={store} host={r.host} folder={project.project.folder} projectName={project.name} down={down} />
           ) : <NothingChosen />}
@@ -78,7 +81,7 @@ function NothingChosen() {
     <section class="chat empty nothing-chosen" aria-label="Nothing selected">
       <span class="glyph" aria-hidden="true">◧</span>
       <h2>Nothing selected</h2>
-      <p>Pick a session on the left to read it, or a project's New session row to start one there.</p>
+      <p>Pick a session on the left to read it, or New Session at the top to start one.</p>
       <p>↑ and ↓ move through the list, → and ← unfold and fold a project.</p>
     </section>
   );

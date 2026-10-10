@@ -1,5 +1,5 @@
 // One workflow under a project's sessions (071 US5; ProjectWorkRows.swift): its status mark, its
-// name, what it is in one line, and Run Now. Chosen, it opens its page in the chat's place, as the
+// name (what it is is its page's to say, #495), and Run Now. Chosen, it opens its page in the chat's place, as the
 // window's list does (#98); its ··· menu turns it off or on (#100). A workflow waiting for its OK
 // can be approved, archived or brought back in its menu, as in the window (#260).
 // offering to run it. One turned off still runs now, as the window's does. Its menu pins it to the
@@ -8,15 +8,16 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { WorkflowSummary } from "../protocol/generated";
 import type { Store } from "../model/store";
-import { canBeApproved, canBeDenied, isOn, isUnapproved, workflowStatus, workflowSummary } from "../model/workflows";
+import { canBeApproved, canBeDenied, isOn, isUnapproved, workflowStatus } from "../model/workflows";
 
-export function WorkflowRow({ store, host, summary, disabled, chosen, onPick, pinnedAt }: {
+export function WorkflowRow({ store, host, summary, disabled, chosen, onPick, pinnedAt, place }: {
   store: Store; host: string; summary: WorkflowSummary; disabled: boolean; chosen: boolean; onPick: () => void;
   /** The project's pinned workflows' order, for Move Up and Down: given only under Pinned, with no search. */
   pinnedAt?: string[] | undefined;
+  /** Under Pinned at the top of the sidebar, which gathers every project's: its project's name (#495). */
+  place?: string | undefined;
 }) {
   const status = workflowStatus(summary);
-  const name = (id: string) => (store.runtimes.value[host] ?? []).find((r) => r.runtime.id === id)?.runtime.name;
   return (
     <div class={`row workflow${chosen ? " chosen" : ""}`}>
       <button class="pick" aria-current={chosen} onClick={onPick} title={`Open ${summary.workflow.name}`}>
@@ -26,9 +27,12 @@ export function WorkflowRow({ store, host, summary, disabled, chosen, onPick, pi
             {summary.workflow.name}
             {/* Marked where it stands, rather than moved (#100): off is not put away. */}
             {!isOn(summary) && !summary.isArchived && <span class="faint"> · Off</span>}
+            {place && <span class="place"> {place}</span>}
           </span>
-          <span class="subtitle">{summary.awaitingApproval ? "Waiting for your OK"
-            : summary.deniedHere ? "Denied on this host" : workflowSummary(summary.workflow, name)}</span>
+          {/* Only what wants the person: what it does is its page's to say (#495). */}
+          {(summary.awaitingApproval || summary.deniedHere) && (
+            <span class="subtitle">{summary.awaitingApproval ? "Waiting for your OK" : "Denied on this host"}</span>
+          )}
         </span>
       </button>
       <RunNow store={store} host={host} summary={summary} disabled={disabled} />

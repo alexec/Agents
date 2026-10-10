@@ -12,6 +12,7 @@ import { fromWireDate } from "../protocol/dates";
 import { Telling } from "./Telling";
 import { folderIsMissing, folderPath, missingFolderLabel } from "../model/missingFolder";
 import { shortAgo } from "../model/activity";
+import { sessionMark, type SessionMark } from "../model/sidebar";
 
 const glyphs: Record<StatusShape, string> = { working: "", needsYou: "!", waiting: "⧗", done: "✓", stopped: "■" };
 
@@ -22,6 +23,23 @@ export function StatusMark({ agent, comingBack = false }: { agent: Agent; coming
     <span class={`status ${status.shape}${status.tinted ? " tinted" : ""}`} role="img" aria-label={status.words}
       title={status.words}>
       <span class="glyph" aria-hidden="true">{glyphs[status.shape]}</span>
+    </span>
+  );
+}
+
+const markWords: Record<SessionMark, string> = { needsYou: "Needs you", working: "Working", unread: "Unread", read: "Done" };
+
+/**
+ * A session's mark in the sidebar (#495, #499), the window's and the Remote's: an orange hand when
+ * it needs the person, a spinner while it works, two rings when it finished unread, an empty ring
+ * once read. Any other state keeps its status mark.
+ */
+export function SidebarMark({ agent, comingBack = false }: { agent: Agent; comingBack?: boolean }) {
+  const mark = comingBack ? null : sessionMark(agent);
+  if (!mark) return <StatusMark agent={agent} comingBack={comingBack} />;
+  return (
+    <span class={`sidebar-mark ${mark}`} role="img" aria-label={markWords[mark]} title={markWords[mark]}>
+      {mark === "needsYou" && <span class="glyph" aria-hidden="true">✋&#xFE0E;</span>}
     </span>
   );
 }
@@ -77,8 +95,12 @@ export function rowExtras(store: Store, host: string, agent: Agent): RowExtras {
   };
 }
 
-export function SessionRow({ agent, chosen, onPick, going, waits = [], extras }: {
+export function SessionRow({ agent, chosen, onPick, going, waits = [], extras, inSidebar = false, place }: {
   agent: Agent; chosen: boolean; onPick: () => void;
+  /** In the sidebar (#495): the state is the row's mark, unread among them, rather than a dot. */
+  inSidebar?: boolean;
+  /** Which project it is in, after the title: under a smart group, which gathers every project's. */
+  place?: string | undefined;
   /** What the window's row says from beyond the agent's record (#251). */
   extras?: RowExtras | undefined;
   /** A blocked agent's wait lines (039, #157): blockLines over its host's agents. */
@@ -92,11 +114,13 @@ export function SessionRow({ agent, chosen, onPick, going, waits = [], extras }:
   const labels = agent.labels ?? [];
   return (
     <button class={`row session${chosen ? " chosen" : ""}`} aria-current={chosen} onClick={onPick}>
-      <StatusMark agent={agent} comingBack={extras?.comingBack ?? false} />
+      {inSidebar ? <SidebarMark agent={agent} comingBack={extras?.comingBack ?? false} />
+        : <StatusMark agent={agent} comingBack={extras?.comingBack ?? false} />}
       <span class="body">
-        {/* Unread is a mark, as in Mail (#70): a dot and a heavier title, gone once opened. */}
+        {/* Unread is a mark, as in Mail (#70): a dot (two rings in the sidebar) and a heavier title, gone once opened. */}
         <span class={`title${showsUnread(agent) ? " unread" : ""}`} aria-description={showsUnread(agent) ? "unread" : undefined}>
-          {showsUnread(agent) && <span class="unread-dot" aria-hidden="true" />}{agent.title ?? "Untitled"}
+          {showsUnread(agent) && !inSidebar && <span class="unread-dot" aria-hidden="true" />}{agent.title ?? "Untitled"}
+          {place && <span class="place"> {place}</span>}
           {/* Started by a workflow or another agent, not typed for by the person (028). */}
           {extras?.startedByWorkflow && (
             <span class="started-by" role="img" title={`Started by the workflow ${extras.startedByWorkflow}`}
