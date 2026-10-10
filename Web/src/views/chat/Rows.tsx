@@ -16,7 +16,7 @@ import { outcomeHeadings, queuedLabel, startingLabel } from "../../model/status"
 import {
   callLine, compactionLine, drawnInTurn, fields, isSummaryOnly, isThought, kindOf, turnLine, turnParts, type ChatTurn, type Item,
 } from "../../model/turns";
-import { Markdown } from "../../render/markdown";
+import { fileLinkPath, Markdown } from "../../render/markdown";
 import { AppView } from "./AppView";
 import { switchNote } from "../../model/switchNote";
 import { continueWithout, keepStopped, sandboxCard } from "../../model/sandboxWords";
@@ -33,12 +33,19 @@ export const detailSummaries: Record<TurnDetail, string> = {
 
 /** The text of a message's blocks: text blocks as Markdown, anything else named. */
 export function Blocks({ blocks, text }: { blocks: ContentBlock[] | undefined; text: string }) {
-  if (!blocks?.length) return <Markdown text={text} />;
+  // A file a message links to opens in Files, as a file a call touched does (#548).
+  const openFile = useContext(CallActionsContext)?.open;
+  if (!blocks?.length) return <Markdown text={text} openFile={openFile} />;
   return (
     <>
       {blocks.map((block, index) => {
-        if (block.type === "text") return <Markdown key={index} text={block.text} />;
-        if (block.type === "resource_link") return <p key={index} class="attachment">📎 {block.name}</p>;
+        if (block.type === "text") return <Markdown key={index} text={block.text} openFile={openFile} />;
+        if (block.type === "resource_link") {
+          const path = openFile ? fileLinkPath(block.uri) : null;
+          return path && openFile
+            ? <p key={index} class="attachment">📎 <button class="link reading" title={path} onClick={() => openFile({ path })}>{block.name}</button></p>
+            : <p key={index} class="attachment">📎 {block.name}</p>;
+        }
         if (block.type === "resource") return <p key={index} class="attachment">📎 {block.resource.uri.split("/").pop()}</p>;
         // Drawn from its own bytes, as ChatBlocks does; a remote address stays unloaded (071 FR-030).
         if (block.type === "image") {
@@ -184,7 +191,7 @@ export function ToolCallLine({ call, text, open = false, background, onClick }: 
                 </div>
               );
             }
-            if (piece.type === "content" && piece.content.type === "text") return <Markdown key={index} text={piece.content.text} />;
+            if (piece.type === "content" && piece.content.type === "text") return <Markdown key={index} text={piece.content.text} openFile={actions?.open} />;
             // Any other block as a message draws it: a picture, an attachment (#252).
             if (piece.type === "content") return <div key={index} class="quiet"><Blocks blocks={[piece.content]} text="" /></div>;
             if (piece.type === "terminal") return <p key={index} class="quiet">Terminal output is shown in the Mac window.</p>;

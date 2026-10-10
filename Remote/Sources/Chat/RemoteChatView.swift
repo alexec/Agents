@@ -104,6 +104,13 @@ struct RemoteChatView: View {
                 }
         )
         .environment(\.chatActions, actions)
+        // A file a message links to is on the Mac: it opens in Files, as a file a tool
+        // call touched does (#548). Links to the web are the system's.
+        .environment(\.openURL, OpenURLAction { [actions] url in
+            guard url.isFileURL else { return .systemAction }
+            actions.open(ToolCallLocation(path: url.path(percentEncoded: false)))
+            return .handled
+        })
         .environment(\.appViewStore, views)
         .environment(\.appViewActions, agent.map(appViewActions))
         // A view full screen is drawn in the chat's place, as on the Mac (#187).

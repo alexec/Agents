@@ -15,13 +15,13 @@
 
 ## Counts
 
-Of 216 rows: **145 same**, **44 by design**, **27 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 217 rows: **145 same**, **45 by design**, **27 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
 | Sidebar and project list | 12 | 4 | 5 |
 | Session rows and states | 16 | 2 | 5 |
-| Chat turns and turn detail | 22 | 3 | 2 |
+| Chat turns and turn detail | 22 | 4 | 2 |
 | Prompt bar and queued prompts | 20 | 3 | 0 |
 | Question and permission cards | 13 | 3 | 0 |
 | Start sheet and new project | 17 | 5 | 0 |
@@ -111,6 +111,7 @@ The deltas are tracked by 29 issues:
 | An open call: diff, Argument, Return (#153) | `S/Chat/TranscriptRows.swift:572-675` | Shared | `W/views/chat/Rows.tsx:128-187`; unknown pieces shown raw | **same** (#252) |
 | Show in Changes under an edit (#153) | `A/Chat/ChatView.swift:82-88` | Opens what the agent did to that file, in a sheet (#242): `R/Chat/RemoteChatView.swift`; a Changes of its own is #245 | `W/views/Chat.tsx:76-79` | **same** |
 | A location in a call | Opens in the Mac's editor: `A/Chat/ChatView.swift:74` | Opens in Files at the line: `R/Chat/RemoteChatView.swift:222-228` | Opens in Files: `W/views/Chat.tsx:72-75` | **by design** (only the Mac has an editor) |
+| A file link in a message: a `file://` link in Markdown, an attached file (`resource_link`) (#548) | Opens on the agent's host: `A/ContentView.swift` (`openURL`), `S/Chat/ChatBlocks.swift` | Opens in Files, as a location does: `R/Chat/RemoteChatView.swift` (`openURL`), the shared `S/Chat/ChatBlocks.swift` | Opens in Files, as a location does; any other file: link stays words: `W/render/markdown.ts` (`openFile`), `W/views/chat/Rows.tsx` (`Blocks`) | **by design** (only the Mac has an editor) |
 | Terminal output in a call | `S/Chat/ChatBlocks.swift:151` | Shared | *shown in the Mac window*: `W/views/chat/Rows.tsx:166` | **by design** (no terminal on the page) |
 | Markdown: code colour, task lists | `S/Page/MarkdownText.swift:24, 204`, `S/Code/CodeBlockText.swift` | Shared | Coloured known fences, static task boxes: `W/render/codeHighlight.ts`, `W/render/markdown.ts` | **same** (#252) |
 | Pictures in messages | `S/Chat/ChatBlocks.swift:40-51` | Shared | Image data drawn from a data URL; external addresses stay unloaded: `W/views/chat/Rows.tsx:40-45` | **same** (#252) |
