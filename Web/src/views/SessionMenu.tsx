@@ -1,7 +1,8 @@
 // A session's actions (071 FR-027): Carry on while it sits in an open block (#250), Stop while it
 // holds a runtime or a block, Park or Unpark
 // (Agent.parkAction), Branch (#342), and Archive, or Bring Back and Delete (#398). In the chat
-// header's ··· menu, and the sidebar row's menu.
+// header's ··· menu, and the sidebar row's menu. The chat's has Open File… first, as the Remote's
+// ··· menu does (#543), for a page with no keyboard to press ⌘P on.
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { Agent } from "../protocol/generated";
@@ -59,7 +60,8 @@ export function sessionActions(agent: Agent, pinned?: boolean): { action: Action
   return found;
 }
 
-export function SessionMenu({ store, host, agent, disabled }: { store: Store; host: string; agent: Agent | undefined; disabled: boolean }) {
+export function SessionMenu({ store, host, agent, disabled, openFile }:
+  { store: Store; host: string; agent: Agent | undefined; disabled: boolean; openFile?: () => void }) {
   const open = useSignal(false);
   const anchor = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -76,6 +78,13 @@ export function SessionMenu({ store, host, agent, disabled }: { store: Store; ho
         disabled={!agent || disabled || (agent && !!store.onItsWay.value[agent.id])} onClick={() => (open.value = !open.value)}>···</button>
       {open.value && agent && (
         <div class="popover right" role="menu">
+          {openFile && (
+            <button role="menuitem" title="Find a file in this session's folder by name"
+              onClick={() => {
+                open.value = false;
+                openFile();
+              }}>Open File…</button>
+          )}
           {sessionActions(agent, store.sessionPinsIn(host, projectFolder(agent)).includes(agent.id)).map(({ action, label, help }) => (
             <button key={action} role="menuitem" title={help}
               onClick={() => {

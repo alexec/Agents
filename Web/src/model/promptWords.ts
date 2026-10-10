@@ -30,7 +30,13 @@ export const sendLabel = (queues: boolean) => (queues ? "Queue" : "Send");
 export const sendHelp = (queues: boolean) => (queues ? "Queue this, to go when the turn ends" : "Send");
 
 /** PromptReturn (AgentsKitCore), the same rule in every client (#377): Return and Shift-Return
- * send, and only Option-Return is a line break. */
-export function returnAction(key: { altKey: boolean }): "send" | "lineBreak" {
-  return key.altKey ? "lineBreak" : "send";
+ * send, and only Option-Return is a line break. On a touch screen it is the Remote's on-screen
+ * keyboard instead (#543): with no Option key, Return is a line break and Send is the button. */
+export function returnAction(key: { altKey: boolean }, touch = onTouchScreen()): "send" | "lineBreak" {
+  return touch || key.altKey ? "lineBreak" : "send";
+}
+
+/** A finger is the page's main pointer: a phone or tablet, likely with only the on-screen keyboard. */
+export function onTouchScreen(): boolean {
+  return typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
 }
