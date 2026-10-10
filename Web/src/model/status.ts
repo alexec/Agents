@@ -1,7 +1,7 @@
 // The shape and words beside a session's title: StatusShape (UI/StatusShape.swift) as the Mac's
 // sessions list draws it, ported by hand and held to Fixtures/web/status (research R7).
 import type { Agent, AgentState, EndedReason, WorkOutcome } from "../protocol/generated";
-import { endingIsUnaccountedFor, isParked, isWaiting, outcomeNeedsAPerson, projectFolder } from "./groups";
+import { endingIsUnaccountedFor, isWaiting, outcomeNeedsAPerson, projectFolder } from "./groups";
 
 /** Working is a spinner; the rest are drawn. Only needsYou is ever in colour. */
 export type StatusShape = "working" | "needsYou" | "waiting" | "done" | "stopped";
@@ -64,9 +64,9 @@ export function shapeOf(agent: Agent, isComingBack = false): StatusShape {
   }
 }
 
-/** StatusShape.isTinted: wants a person, and not parked. */
-export function isTinted(shape: StatusShape, parked: boolean): boolean {
-  return shape === "needsYou" && !parked;
+/** StatusShape.isTinted: wants a person. */
+export function isTinted(shape: StatusShape): boolean {
+  return shape === "needsYou";
 }
 
 /** StatusShape.words(row:isComingBack:): the tooltip and what a screen reader hears. */
@@ -117,5 +117,5 @@ export function queuedLine(agent: Agent, among: readonly Agent[]): string | null
 /** Everything a row says about its state at once. */
 export function rowStatus(agent: Agent, isComingBack = false): { shape: StatusShape; tinted: boolean; words: string } {
   const shape = shapeOf(agent, isComingBack);
-  return { shape, tinted: isTinted(shape, isParked(agent)), words: statusWords(agent, isComingBack) };
+  return { shape, tinted: isTinted(shape), words: statusWords(agent, isComingBack) };
 }

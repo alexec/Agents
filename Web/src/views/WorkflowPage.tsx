@@ -211,7 +211,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
           {workflow.mode !== "triggering" && (
             <>
               <WhenDoneMenu summary={summary} disabled={locked} change={change} />
-              <p class="quiet small">{whenDoneSentence(workflow.whenDone ?? "park")}</p>
+              <p class="quiet small">{whenDoneSentence(workflow.whenDone ?? "keep")}</p>
             </>
           )}
 

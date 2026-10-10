@@ -58,6 +58,9 @@
    is, the count on the right, Needs You's in the attention tint. */
 .with-sidebar details.smart > summary { display: flex; align-items: baseline; margin-left: 0; opacity: 1;
   color: color-mix(in srgb, currentColor 50%, transparent); }
+/* To Archive's Archive All (#584): before the count, which it pushes right. */
+.with-sidebar details.smart > summary .archive-all { margin-left: auto; font-size: 11px; padding: 0 6px; }
+.with-sidebar details.smart > summary .archive-all + .count { margin-left: 6px; }
 .with-sidebar details.smart > summary .count { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 500; }
 .with-sidebar details.smart > summary .count.needs { color: var(--tint-attention); }
 
@@ -77,6 +80,8 @@
 .sidebar-mark.unread { border: 1.5px solid currentColor; }
 .sidebar-mark.unread::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .sidebar-mark.read { border: 1.5px solid currentColor; opacity: 0.7; }
+/* Asks to archive (#584): the window's archive box, in the accent. */
+.sidebar-mark.asksToArchive { font-size: 12px; border-radius: 0; }
 @media (prefers-reduced-motion: reduce) { .sidebar-mark.working { animation-duration: 3s; } }
 
 /* A project's Archived row (#495), opening its page: in the rows' type, its count on the right. */

@@ -35,7 +35,7 @@ import { viewPin } from "./chat/appViewBridge";
 import { ViewLayer, type ViewActions } from "./chat/viewLayer";
 import { BackToList } from "./BackToList";
 import { comingBackDescription } from "../model/status";
-import { parkLine } from "./SessionRow";
+import { ArchiveStrip } from "./ArchiveStrip";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
 import { eventWaitCapsule, leaseMark } from "../model/rowLines";
 import { GuardedChangeCards } from "./GuardedChange";
@@ -484,8 +484,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       {hostDown && <OfflineStrip store={store} host={host} />}
       <FolderGoneNotice store={store} host={host} agent={agent} />
       <MissingFolderStrip store={store} host={host} agent={agent} />
-      {/* Why a parked chat is parked, and since when, as the window's strip says it (040, #253). */}
-      {agent && parkLine(agent) && <p class="park-strip quiet" role="status">{parkLine(agent)}</p>}
+      {/* An agent asks for it to be archived (#584): the mark, and Archive, as the window's strip has it. */}
+      <ArchiveStrip store={store} host={host} agent={agent} disabled={down} />
       <BlockStrip store={store} host={host} agent={agent} disabled={down} />
       {/* What it said it would do, under what it waits on, as the Remote has it (#341). */}
       <CurrentPlanStrip agent={agent} />

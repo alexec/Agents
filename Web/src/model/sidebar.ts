@@ -1,19 +1,19 @@
 // What the Things-style sidebar (#495, #499) gathers and in what order, as the window's and the
 // Remote's `SidebarSmartRow` and `SidebarProjectFold` (AgentsKitCore/Sidebar) work it out: the
-// smart groups at the top across every project (Pinned, Needs You, Working, Unread), and each
-// project's sessions as one list, newest started first, the state the row's mark. Each session is
-// listed once, in its first group (#587).
+// smart groups at the top across every project (Pinned, Needs You, Working, Unread, To Archive), and
+// each project's sessions as one list, newest started first, the state the row's mark. Each session
+// is listed once, in its first group (#587).
 import type { Agent, WorkflowSummary } from "../protocol/generated";
-import { byStart, folderKey, groupOf, showsUnread } from "./groups";
+import { asksToArchive, byStart, folderKey, groupOf, showsUnread } from "./groups";
 import { queryMatches, type LabelQuery } from "./labels";
 
-export type SmartRow = "pinned" | "needsYou" | "working" | "unread";
+export type SmartRow = "pinned" | "needsYou" | "working" | "unread" | "toArchive";
 
-/** In the sidebar's order: Pinned first, then by what they want. */
-export const smartRows: readonly SmartRow[] = ["pinned", "needsYou", "working", "unread"];
+/** In the sidebar's order: Pinned first, then by what they want, then what asks to be archived (#584). */
+export const smartRows: readonly SmartRow[] = ["pinned", "needsYou", "working", "unread", "toArchive"];
 
 export const smartTitles: Record<SmartRow, string> = {
-  pinned: "Pinned", needsYou: "Needs You", working: "Working", unread: "Unread",
+  pinned: "Pinned", needsYou: "Needs You", working: "Working", unread: "Unread", toArchive: "To Archive",
 };
 
 /** Pinned and Needs You start open, so the first thing the page says is who is waiting; the others start folded. */
@@ -23,8 +23,9 @@ export function smartStartsOpen(row: SmartRow): boolean {
 
 /**
  * Where a live session is listed (#587), as `SidebarSmartRow.home`: once, in the first of the smart
- * groups it belongs to (Pinned, Needs You, Working, Unread), or, in none of them, under its project
- * (null).
+ * groups it belongs to (Pinned, Needs You, Working, To Archive (#584), Unread), or, in none of them,
+ * under its project (null). To Archive comes before Unread though it is drawn after it, so Archive
+ * All reaches every session that asks.
  */
 export function home(agent: Agent, isPinned: boolean): SmartRow | null {
   if (isPinned) return "pinned";
@@ -32,23 +33,25 @@ export function home(agent: Agent, isPinned: boolean): SmartRow | null {
     case "needsAttention": case "blocked": return "needsYou";
     case "running": return "working";
     case "archived": return null;
-    default: return showsUnread(agent) ? "unread" : null;
+    default: return asksToArchive(agent) ? "toArchive" : showsUnread(agent) ? "unread" : null;
   }
 }
 
-/** Whether a live session, not pinned, is listed under Needs You, Working or Unread. */
+/** Whether a live session, not pinned, is listed under Needs You, Working, Unread or To Archive. */
 export function inSmartRow(row: Exclude<SmartRow, "pinned">, agent: Agent): boolean {
   return home(agent, false) === row;
 }
 
 /** The mark a session's row carries in the sidebar (#495): what it wants, or null for its own status mark. */
-export type SessionMark = "needsYou" | "working" | "unread" | "read";
+export type SessionMark = "needsYou" | "working" | "unread" | "read" | "asksToArchive";
 
 export function sessionMark(agent: Agent): SessionMark | null {
   switch (groupOf(agent)) {
     case "needsAttention": case "blocked": return "needsYou";
     case "running": return "working";
-    case "finished": return showsUnread(agent) ? "unread" : "read";
+    // Asking to be archived (#584) is what the person has left to do with it, as the window's mark says.
+    case "finished": return asksToArchive(agent) ? "asksToArchive" : showsUnread(agent) ? "unread" : "read";
+    case "stopped": return asksToArchive(agent) ? "asksToArchive" : null;
     default: return null;
   }
 }
