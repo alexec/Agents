@@ -1385,6 +1385,7 @@ extension DaemonCore {
                                          pronouns: personSettings.givenPronouns,
                                          startedBy: starter.map { $0 ?? "" })
             let briefing = [Briefing.text(for: ToolPolicyCatalog.policy(for: runtimeID), managesAgents: managesAgents,
+                                          movesItself: RuntimeCatalog.canMoveFolders(runtimeID: runtimeID),
                                           naming: naming),
                             LeaseWords.declaredBriefing(declaredResources)].compactMap { $0 }
             outgoing.append(.text(briefing.joined(separator: "\n\n")))

@@ -380,6 +380,26 @@ struct BriefingTests {
         }
     }
 
+    // MARK: Worktrees through the app (#615)
+
+    /// Agents that only had the tool description made worktrees with git, and the app
+    /// never knew they had moved.
+    @Test func anAgentThatCanMoveIsToldToMoveThroughTheApp() {
+        for policy in ToolPolicyCatalog.builtIn {
+            #expect(Briefing.lines(for: policy).contains(Briefing.worktrees), "\(policy.runtimeID)")
+            #expect(Briefing.text(for: policy, managesAgents: false).contains(Briefing.worktrees))
+        }
+        #expect(Briefing.worktrees.contains(AppTool.moveWorktree))
+        #expect(Briefing.worktrees.contains("git worktree add"))
+    }
+
+    @Test func anAgentThatCannotMoveIsNotToldAboutMoveWorktree() {
+        for policy in ToolPolicyCatalog.builtIn {
+            #expect(!Briefing.text(for: policy, movesItself: false).contains(AppTool.moveWorktree),
+                    "\(policy.runtimeID)")
+        }
+    }
+
     /// After the workflow line, where the other standing things an agent can set going
     /// are said, and before anything about residue, which is last on purpose.
     @Test func theLineComesAfterTheWorkflowLine() {
