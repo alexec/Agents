@@ -34,6 +34,24 @@ struct HostInstallTests {
         #expect(HostInstall.say(.keyLocked, keyGiven: false).contains("ssh-add"))
     }
 
+    /// #514: a generated config's `UserKnownHostsFile /dev/null` is replaced by ssh's own
+    /// files, so `StrictHostKeyChecking=yes` checks the person's known_hosts; real files stay.
+    @Test func aKnownHostsOfDevNullIsTheDefaultFilesInstead() {
+        let devNull = "hostname 10.0.0.5\nuserknownhostsfile /dev/null\nstricthostkeychecking false\n"
+        #expect(HostInstall.knownHostsOverride(resolved: devNull)
+            == ["-o", "UserKnownHostsFile=~/.ssh/known_hosts ~/.ssh/known_hosts2"])
+        #expect(HostInstall.knownHostsOverride(resolved: "userknownhostsfile /Users/a/.ssh/known_hosts /Users/a/.ssh/known_hosts2\n").isEmpty)
+        #expect(HostInstall.knownHostsOverride(resolved: "hostname devbox\n").isEmpty)
+    }
+
+    @Test func aFailureIsASentence() {
+        #expect(HostInstall.say(.hostKeyChanged, keyGiven: false).contains("known_hosts"))
+        #expect(HostInstall.say(.installFailed(""), keyGiven: false) == "ssh failed without saying why.")
+        #expect(HostInstall.say(.installFailed("kex_exchange_identification: closed"), keyGiven: false)
+            == "kex_exchange_identification: closed")
+        #expect(!HostInstall.say(.timedOut("connect"), keyGiven: false).contains("timedOut"))
+    }
+
     @Test func aRequestNeedNotCarryAKey() throws {
         let request = try JSONDecoder().decode(HostInstall.Request.self, from: Data(#"{"destination":"agents@devbox.lan"}"#.utf8))
         #expect(request.destination == "agents@devbox.lan")

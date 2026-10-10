@@ -128,4 +128,17 @@ struct ProbeParseTests {
         let without = try ServerInstaller.parseProbe(Self.bare + "\nsignin.codex:none")
         #expect(!without.hasOwnSignIn("codex"))
     }
+
+    /// #514: an ssh that never got in says why, not an empty `installFailed("")`.
+    @Test func anSSHThatFailsSaysWhyNotAnEmptyAnswer() async throws {
+        #expect(throws: HostProblem.installFailed("The server sent nothing back.")) { try ServerInstaller.parseProbe("") }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("probe-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let fake = folder.appendingPathComponent("ssh")
+        try "#!/bin/sh\necho 'Host key verification failed.' >&2\nexit 255\n".write(to: fake, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fake.path)
+        let installer = ServerInstaller(ssh: SSHCommand(executable: fake, name: "cws.devstack", controlPath: nil))
+        await #expect(throws: HostProblem.hostKeyChanged) { try await installer.probe() }
+    }
 }

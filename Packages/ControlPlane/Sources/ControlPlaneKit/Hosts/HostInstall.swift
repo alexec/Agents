@@ -92,6 +92,7 @@ public struct HostInstall: Sendable {
         var ssh = SSHCommand(executable: Self.sshExecutable, name: destination, controlPath: nil,
                              environment: Self.environment(keepAgent: !keyGiven))
         ssh.options = Self.options(keyFile: keyFile, knownHosts: personsKnownHosts ? nil : knownHosts)
+        if personsKnownHosts { ssh.options += await Self.personsKnownHosts(ssh) }
 
         // The host key: shown once, trusted when its fingerprint comes back.
         await progress(name, "connect")
@@ -172,6 +173,29 @@ public struct HostInstall: Sendable {
         return only + hosts + ["-o", "StrictHostKeyChecking=yes"]
     }
 
+    /// The person's own known_hosts, for a server whose ssh config checks against none:
+    /// `UserKnownHostsFile /dev/null`, as generated configs often write beside
+    /// `StrictHostKeyChecking no` (#514). Checking a key against /dev/null always fails, so
+    /// ssh's default files are named instead. A config that names real files keeps them.
+    static func personsKnownHosts(_ ssh: SSHCommand) async -> [String] {
+        guard let resolved = try? await ssh.run(ssh.options + ssh.resolveArguments), resolved.status == 0 else { return [] }
+        return knownHostsOverride(resolved: resolved.stdout)
+    }
+
+    /// From `ssh -G` output: the default known_hosts files when every one it names is
+    /// /dev/null, otherwise nothing.
+    static func knownHostsOverride(resolved: String) -> [String] {
+        var files: [Substring] = []
+        for line in resolved.split(whereSeparator: \.isNewline) {
+            let parts = line.split(separator: " ", maxSplits: 1)
+            guard parts.count == 2, parts[0].lowercased() == "userknownhostsfile" else { continue }
+            files = parts[1].split(separator: " ")
+            break
+        }
+        guard !files.isEmpty, files.allSatisfy({ $0 == "/dev/null" }) else { return [] }
+        return ["-o", "UserKnownHostsFile=~/.ssh/known_hosts ~/.ssh/known_hosts2"]
+    }
+
     /// What ssh runs with: nothing of this process's own. The agent stays only when no key
     /// was given, so a refused key is never followed by another identity.
     static func environment(keepAgent: Bool, from inherited: [String: String] = ProcessInfo.processInfo.environment) -> [String: String] {
@@ -195,6 +219,12 @@ public struct HostInstall: Sendable {
             "The server refused every key ssh offered. If yours has a passphrase, add it to the agent (ssh-add), or choose a key."
         case .loginRefused: "The server refused that key."
         case .keyLocked: "That key has a passphrase. Give a key without one for the install, or run the command instead."
+        case .hostKeyChanged:
+            "ssh could not check the server’s host key: it is not in your known_hosts, or it has changed. Add it to ~/.ssh/known_hosts (ssh-keyscan prints it) and try again."
+        case .timedOut: "It did not answer: the connection timed out or was refused."
+        case .installFailed(let words) where words.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty:
+            "ssh failed without saying why."
+        case .installFailed(let words): words
         default: "\(problem)"
         }
     }
