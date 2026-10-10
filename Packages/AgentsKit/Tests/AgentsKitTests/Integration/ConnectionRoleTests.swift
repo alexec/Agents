@@ -157,7 +157,7 @@ struct ConnectionRoleTests {
         defer { close(fd) }
 
         for method in [DaemonAPI.Method.agentsFinishTurn, DaemonAPI.Method.agentsStartHelper,
-                       DaemonAPI.Method.agentsStopHelper, DaemonAPI.Method.agentsParkHelper,
+                       DaemonAPI.Method.agentsStopHelper, DaemonAPI.Method.agentsRequestArchiveHelper,
                        DaemonAPI.Method.agentsArchiveHelper, DaemonAPI.Method.agentsListHelpers,
                        DaemonAPI.Method.leasesLease, DaemonAPI.Method.eventsWait] {
             #expect(errorCode(await ask(fd, method)) == nil, "\(method)")
