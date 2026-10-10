@@ -251,7 +251,7 @@ The deltas are tracked by 29 issues:
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
 | Status card (#142) | `A/Projects/WorkflowPage.swift:225-273`, `S/WorkflowStatus.swift` | `R/Projects/WorkflowPage.swift:120-165` | `W/views/WorkflowPage.tsx:83-95` | **same** |
-| An unreadable workflow file | Its text under *The file is below*: `A/Projects/WorkflowPage.swift:211-218` | Its text under *The file is below*: `R/Projects/WorkflowPage.swift` | *Fix its file*: `W/model/workflows.ts:541` | **delta**: web #260 |
+| An unreadable workflow file | Its text under *The file is below*: `A/Projects/WorkflowPage.swift:211-218` | Its text under *The file is below*: `R/Projects/WorkflowPage.swift` | Its text under *The file is below*, read with `pins/read`: `W/views/WorkflowPage.tsx` (`UnreadableFile`) | **same** (#540) |
 | Triggers, next runs, last ran (#98, #99) | `A/Projects/WorkflowPage.swift:285-452` | `R/Projects/WorkflowPage.swift` | `W/views/WorkflowPage.tsx` | **same** |
 | A workflow run only by hand (#432) | `on: manual` or no `on:`: "By hand, with Run now" on the row, a hand mark, Triggers "None: it runs only by hand", the status line "Runs only by hand": `A/Projects/WorkflowRow.swift`, `A/Projects/WorkflowPage.swift`, `S/WorkflowStatus.swift` | The same words and mark: `R/Sidebar/SidebarRows.swift` (`WorkflowMark`), `R/Projects/WorkflowPage.swift` | The same words, a ☝ mark: `W/model/workflows.ts`, `W/views/WorkflowPage.tsx` | **same**; unwalked |
 | An event trigger's words | Its catalogue meaning | n/a | Catalogue meaning, including “An agent here publishes custom.<name>” | **same** |
