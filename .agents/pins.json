@@ -20,13 +20,13 @@
       "pinned_by" : {
         "person" : true
       },
-      "workflow" : "check-the-batch"
+      "workflow" : "fill-free-slots"
     },
     {
       "pinned_by" : {
         "person" : true
       },
-      "workflow" : "fill-free-slots"
+      "workflow" : "check-the-batch"
     }
   ]
 }

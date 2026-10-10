@@ -7,7 +7,7 @@ runtime: claude
 model: sonnet
 effort: low
 permission-mode: auto
-cooldown: 30m
+cooldown: 1h
 labels: [disk, clean-up]
 when-done: archive
 ---
