@@ -1,6 +1,6 @@
 // Where the page is, in the URL's fragment (071 research R2): #/h/<host>/p/<folder>/s/<session>, or
-// /w/<workflow> for a workflow's page in the chat's place (#98), or #/a/<page> for an Activity page
-// of the sidebar (#151): events, resources, runtimes or spending.
+// /w/<workflow> for a workflow's page in the chat's place (#98), /ar/1 for the project's archive (#499),
+// or #/a/<page> for an Activity page of the sidebar (#151): events, resources, runtimes or spending.
 // Every step is a history entry, so the browser's own Back moves between columns (US6).
 import { signal } from "@preact/signals";
 
@@ -23,6 +23,8 @@ export interface Route {
   files?: boolean | undefined;
   /** A new session's form, which is the project's empty pane: shown on a narrow window too. */
   compose?: boolean | undefined;
+  /** The project's archived sessions and workflows (#495, #499), a page opened from one row of the sidebar. */
+  archive?: boolean | undefined;
 }
 
 export function parseRoute(hash: string): Route {
@@ -38,6 +40,7 @@ export function parseRoute(hash: string): Route {
       case "pg": route.page = value; break;
       case "f": route.files = value === "1"; break;
       case "n": route.compose = value === "1"; break;
+      case "ar": route.archive = value === "1"; break;
       case "a": if ((activityPages as readonly string[]).includes(value)) route.activity = value as ActivityPage; break;
     }
   }
@@ -54,6 +57,7 @@ export function routeHash(route: Route): string {
   else if (route.host && route.project && route.page) parts.push("pg", route.page);
   if (route.session && route.files) parts.push("f", "1");
   if (route.host && route.project && !route.session && !route.workflow && !route.page && route.compose) parts.push("n", "1");
+  else if (route.host && route.project && !route.session && !route.workflow && !route.page && route.archive) parts.push("ar", "1");
   return "#/" + parts.map(encodeURIComponent).join("/");
 }
 

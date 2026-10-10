@@ -1,5 +1,6 @@
-// The one sidebar (#151): folds kept in localStorage by host and folder, Activity pages in the
-// address, and what the Activity rows say at a glance.
+// The one sidebar (#151, #499): folds kept in localStorage by host and folder, the smart groups and
+// what they gather, Activity pages and a project's archive in the address, and what the Activity
+// rows say at a glance.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";
@@ -15,31 +16,101 @@ test("a fold is kept, and read back by the next visit", async () => {
   const storage = new Memory();
   const first = new Folds(storage);
   first.set("mac", "file:///w/Agents/", true);
-  first.set("box", "file:///w/Agents", true, "archivedSessions");
   const next = new Folds(storage);
   assert.equal(next.isOpen("mac", "file:///w/Agents"), true, "a trailing slash is the same folder");
   assert.equal(next.isOpen("box", "file:///w/Agents"), false, "the same folder on another host folds apart");
-  assert.equal(next.isOpen("box", "file:///w/Agents", "archivedSessions"), true);
   next.set("mac", "file:///w/Agents", false);
   assert.equal(new Folds(storage).isOpen("mac", "file:///w/Agents"), false);
 });
 
-test("a session group and Workflows start open, and a fold of one is kept (#181)", async () => {
+test("Pinned and Needs You start open, Working and Unread folded, and a fold of one is kept (#495)", async () => {
   const { Folds } = await load("src/model/folds.ts");
   const storage = new Memory();
   const first = new Folds(storage);
-  assert.equal(first.isOpen("mac", "file:///w/a", "group.running"), true, "open until folded");
-  assert.equal(first.isOpen("mac", "file:///w/a", "workflows"), true);
-  first.set("mac", "file:///w/a", false, "group.running");
-  first.set("mac", "file:///w/a", false, "workflows");
+  assert.equal(first.isSmartOpen("pinned"), true);
+  assert.equal(first.isSmartOpen("needsYou"), true);
+  assert.equal(first.isSmartOpen("working"), false);
+  assert.equal(first.isSmartOpen("unread"), false);
+  first.setSmart("needsYou", false);
+  first.setSmart("working", true);
   const next = new Folds(storage);
-  assert.equal(next.isOpen("mac", "file:///w/a", "group.running"), false, "kept folded");
-  assert.equal(next.isOpen("mac", "file:///w/a", "group.finished"), true, "only that group");
-  assert.equal(next.isOpen("box", "file:///w/a", "workflows"), true, "only that host's");
-  assert.equal(next.isOpen("mac", "file:///w/a"), false, "the project's own fold is untouched");
-  next.set("mac", "file:///w/a", true, "group.running");
-  assert.equal(new Folds(storage).isOpen("mac", "file:///w/a", "group.running"), true);
-  assert.deepEqual(JSON.parse(storage.getItem("agents.sidebar.folded")), ["workflows:mac|file:///w/a"]);
+  assert.equal(next.isSmartOpen("needsYou"), false, "kept folded");
+  assert.equal(next.isSmartOpen("pinned"), true, "only that group");
+  assert.equal(next.isSmartOpen("working"), true, "kept open");
+  assert.equal(next.isOpen("mac", "file:///w/a"), false, "no project's fold is touched");
+  assert.deepEqual(JSON.parse(storage.getItem("agents.sidebar.folded")), ["smart:needsYou"]);
+  assert.deepEqual(JSON.parse(storage.getItem("agents.sidebar.folds")), ["smart:working"]);
+});
+
+const agent = (id, createdAt, fields = {}) => ({ id, createdAt, lastActivityAt: createdAt, state: "finished",
+  cwd: "file:///w/a", title: id, ...fields });
+
+test("smart groups gather by what a session wants, newest started first (#495)", async () => {
+  const { smartAgents, sessionMark } = await load("src/model/sidebar.ts");
+  const live = [
+    agent("asked", 1, { state: "waitingOnUser" }),
+    agent("old-work", 2, { state: "running" }),
+    agent("new-work", 5, { state: "running" }),
+    agent("unread", 3, { isUnread: true }),
+    agent("read", 4),
+  ];
+  assert.deepEqual(smartAgents("needsYou", live).map((a) => a.id), ["asked"]);
+  assert.deepEqual(smartAgents("working", live).map((a) => a.id), ["new-work", "old-work"], "by start, not activity");
+  assert.deepEqual(smartAgents("unread", live).map((a) => a.id), ["unread"]);
+  assert.deepEqual(smartAgents("working", live, { label: null, text: "old" }).map((a) => a.id), ["old-work"], "a search narrows it");
+  assert.deepEqual(live.map(sessionMark), ["needsYou", "working", "working", "unread", "read"]);
+  assert.equal(sessionMark(agent("paused", 1, { state: "stopped", endedReason: "cancelled" })), null, "its own status mark");
+});
+
+test("a project's sessions are one list, the pinned out of it; Pinned keeps pin order (#495)", async () => {
+  const { projectSessions, pinnedSessions, pinnedWorkflows } = await load("src/model/sidebar.ts");
+  const live = [agent("a", 1), agent("b", 3, { state: "running" }), agent("c", 2, { state: "waitingOnUser" })];
+  assert.deepEqual(projectSessions(live, []).map((a) => a.id), ["b", "c", "a"], "newest started first, no headings");
+  assert.deepEqual(projectSessions(live, ["b"]).map((a) => a.id), ["c", "a"]);
+  assert.deepEqual(pinnedSessions(live, ["a", "gone", "b"]).map((a) => a.id), ["a", "b"], "pin order, held only");
+  const flow = (workflowID, isArchived = false) => ({ workflow: { workflowID }, isArchived });
+  assert.deepEqual(pinnedWorkflows([flow("x"), flow("y", true), flow("z")], ["z", "y", "x"]).map((w) => w.workflow.workflowID),
+    ["z", "x"], "an archived one only under Archived");
+});
+
+test("Unread keeps the session opened from it in its place (#495)", async () => {
+  const { withKept } = await load("src/model/sidebar.ts");
+  const shown = [agent("new", 5), agent("old", 1)];
+  assert.deepEqual(withKept(shown, agent("mid", 3)).map((a) => a.id), ["new", "mid", "old"]);
+  assert.deepEqual(withKept(shown, agent("oldest", 0)).map((a) => a.id), ["new", "old", "oldest"]);
+  assert.deepEqual(withKept(shown, shown[0]).map((a) => a.id), ["new", "old"], "already there, not twice");
+  assert.deepEqual(withKept(shown, undefined).map((a) => a.id), ["new", "old"]);
+});
+
+test("New Session starts in the project last started in, while it is live (#495)", async () => {
+  const { newSessionProject, rememberedProject, rememberProject } = await load("src/model/sidebar.ts");
+  const live = [{ host: "mac", folder: "file:///w/a/" }, { host: "box", folder: "file:///w/b" }];
+  assert.deepEqual(newSessionProject(live, { host: "box", folder: "file:///w/b/" }, undefined), live[1]);
+  assert.deepEqual(newSessionProject(live, { host: "mac", folder: "file:///w/gone" }, live[1]), live[1], "else the one open");
+  assert.deepEqual(newSessionProject(live, undefined, undefined), live[0], "else the first");
+  assert.equal(newSessionProject([], undefined, undefined), undefined);
+  const storage = new Memory();
+  assert.equal(rememberedProject(storage), undefined);
+  rememberProject(storage, live[1]);
+  assert.deepEqual(rememberedProject(storage), live[1]);
+  storage.setItem("agents.sidebar.newSessionProject", "{bad");
+  assert.equal(rememberedProject(storage), undefined, "stored badly, none");
+});
+
+test("a project's archive is in the address (#499)", async () => {
+  globalThis.location = { hash: "" };
+  globalThis.addEventListener = () => {};
+  try {
+    const { parseRoute, routeHash } = await load("src/route.ts");
+    const hash = routeHash({ host: "mac", project: "file:///w/a", archive: true });
+    assert.equal(hash, "#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/ar/1");
+    assert.deepEqual(parseRoute(hash), { host: "mac", project: "file:///w/a", archive: true });
+    assert.equal(routeHash({ host: "mac", project: "file:///w/a", session: "s", archive: true }),
+      "#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/s/s", "a session opened from it is a page of its own");
+  } finally {
+    delete globalThis.location;
+    delete globalThis.addEventListener;
+  }
 });
 
 test("folds stored badly, or a storage that refuses, leave everything folded", async () => {

@@ -1025,3 +1025,9 @@ button.plain:hover { opacity: 1; }
 .capsule { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--paper-raised); border: 1px solid var(--paper-rule);
   box-shadow: 0 1px 2px var(--paper-shadow); opacity: 0.85; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .capsules .hint { margin: 0; }
+
+/* The new-session page's project name, a menu of every project (#495, #499): the browser's own
+   menu over the name, as a pill's. */
+.new-heading h1.project-switch { position: relative; cursor: pointer; }
+.new-heading h1.project-switch .caret { font-size: 13px; opacity: 0.5; }
+.new-heading h1.project-switch select { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; font: inherit; }
