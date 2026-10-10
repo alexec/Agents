@@ -47,11 +47,19 @@ ones every Mac app has.
 | Option-Command-R | **View ▸ Runtimes** | Opens the Runtimes page, which shows what each runtime can be started on right now and where its allowance stands. |
 | Option-Command-S | **View ▸ Spending** | Opens the Spending page. See [Limit what agents spend](../how-to/limit-spending.md). |
 | Command-F | **View ▸ Find Session** | Puts the keyboard in the sessions column's search field. |
+| Command-P | **Go ▸ Open File…** | Finds a file in the open session's folders by name, to read or edit. |
 | Command-? | **Help ▸ Agents Help** | Opens these docs. |
 | Command-, | **Agents ▸ Settings…** | Opens [Settings and the Resources page](settings.md). |
 | Return, Escape | In a sheet or dialog | Takes the highlighted button, or cancels. |
 | Return | On a permission or question card | Takes the first allowing answer, or **Submit** on a multi-step form. |
 | Command-1 to Command-9 | On a permission or question card | Picks that option by position. |
+| Command-. | In a shell | Interrupts what is running, as Control-C does, instead of stopping the agent. |
+| Command-K | In a shell | Clears the screen and what scrolled off it. |
+| Command-F | In a shell | Finds in the shell's text, instead of finding a session. |
+| Command-T, Command-W | In a shell | Opens another shell, or closes this one. |
+
+While a shell has the keyboard, every other shortcut on this page still works, with no
+need to click out of it first. See [Use a shell in an agent's folder](../how-to/use-a-shell.md#keys-in-a-shell).
 
 ## See also
 
