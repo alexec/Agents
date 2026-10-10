@@ -305,6 +305,11 @@ lists, adapted to touch and width.
 - Events, Resources, Runtimes and Cost come back into the sidebar as an **Activity** group, after the smart rows, folding like a project's group, each with an icon in the accent. The sidebar's toolbar has none of them. (This replaces the toolbar answer in the Clarifications above.)
 - Activity goes above the smart groups (New Session stays first), and every icon in the sidebar is in the accent, but for the orange hand of Needs You.
 
+### After the walks, 2026-10-09 (Alex, #507)
+
+- A smart group (Pinned, Needs You, Working, Unread) with nothing in it is not drawn; Unread stays while it keeps the session opened from it.
+- An empty project keeps its heading. While searching, a group or project with no match is not drawn.
+
 ## Assumptions
 
 - "Done" sessions stay in their project's flat list (plain, no mark); there is no Done

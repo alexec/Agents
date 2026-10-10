@@ -7,29 +7,43 @@ import Foundation
 /// three may wait for the person's OK in one project (#132). Approved ones do not count
 /// towards it — somebody has read those. The total one is about the machine: ten
 /// approved workflows is already more unattended agents than a person can read after a
-/// weekend away, and it holds across every project.
+/// weekend away, and it holds across every project. Only the ones turned on count
+/// towards it (#506): one turned off runs nothing, so it takes no place.
 ///
-/// Both are fixed, and deliberately not settable — the same reasoning as the chain
-/// depth limit, which this sits beside. A ceiling something can raise for itself is not
-/// a ceiling.
+/// The per-project one is fixed, as the chain depth limit is. The total is the
+/// person's to set (#506), in Settings, from ten by default up to `maximumTotal`, and
+/// only the person's: `workflows/setLimit` is not in an agent's allowlist, for the
+/// reason the chain limit is fixed — a ceiling something can raise for itself is not a
+/// ceiling.
 public enum WorkflowLimit: String, Codable, Hashable, Sendable {
     /// Three workflows waiting for approval in one project.
     case project
-    /// Ten approved workflows across every project.
+    /// The approved workflows turned on, across every project: ten unless the person
+    /// set another number.
     case total
 
-    public var allowed: Int {
+    /// How many may wait for approval in one project.
+    public static let projectAllowed = 3
+    /// The total when the person has set none.
+    public static let defaultTotal = 10
+    /// The most the total can be set to, whatever a request or a hand-edited file says.
+    public static let maximumTotal = 50
+    /// The numbers the setting offers, in all three clients.
+    public static let totalRange = 1...maximumTotal
+
+    /// How many this ceiling allows, given the total in force.
+    public func allowed(total: Int) -> Int {
         switch self {
-        case .project: return 3
-        case .total: return 10
+        case .project: return Self.projectAllowed
+        case .total: return total
         }
     }
 
     /// What a person is told on the row, and an agent in a refusal.
-    public var message: String {
+    public func message(total: Int) -> String {
         switch self {
-        case .project: return "this project already has \(allowed) workflows waiting for approval"
-        case .total: return "\(allowed) workflows are already running, across every project"
+        case .project: return "this project already has \(allowed(total: total)) workflows waiting for approval"
+        case .total: return "\(allowed(total: total)) workflows are already running, across every project"
         }
     }
 
@@ -37,19 +51,42 @@ public enum WorkflowLimit: String, Codable, Hashable, Sendable {
     /// anybody reaches for.
     public var remedy: String {
         switch self {
-        case .project: return "Approve or remove one of the \(allowed) workflows waiting for approval first"
-        case .total: return "Archive one, in any project, to let it run"
+        case .project: return "Approve or remove one of the \(Self.projectAllowed) workflows waiting for approval first"
+        case .total: return "Turn one off or archive one, in any project, to let it run"
         }
     }
 
     /// The same fact as a sentence of its own, for a row or a heading rather than the
     /// tail of a refusal. One renderer either way, so the page and the agent cannot
     /// come to describe the same ceiling differently.
-    public var sentence: String {
+    public func sentence(total: Int) -> String {
         switch self {
-        case .project: return "This project already has \(allowed) workflows waiting for approval"
-        case .total: return "\(allowed) workflows are already running, across every project"
+        case .project: return "This project already has \(allowed(total: total)) workflows waiting for approval"
+        case .total: return "\(allowed(total: total)) workflows are already running, across every project"
         }
+    }
+}
+
+/// The person's setting for the total (#506), kept by the daemon in its own folder as
+/// `workflow-limit.json`, beside the wake settings, and copied to every server the way
+/// retention is. Nil until they set it, which is the default.
+public struct WorkflowLimitSettings: Codable, Hashable, Sendable {
+    public var total: Int?
+
+    public init(total: Int? = nil) {
+        self.total = total
+    }
+
+    /// What is enforced: the person's number, or the default, between 1 and the
+    /// maximum whatever the file says.
+    public var effectiveTotal: Int {
+        Swift.max(1, Swift.min(total ?? WorkflowLimit.defaultTotal, WorkflowLimit.maximumTotal))
+    }
+
+    /// Why a setting cannot be kept, in the person's words; nil when it can.
+    public var problem: String? {
+        guard let total, !WorkflowLimit.totalRange.contains(total) else { return nil }
+        return "Workflows turned on must be between 1 and \(WorkflowLimit.maximumTotal)."
     }
 }
 
@@ -77,11 +114,13 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
     /// rather than a circumstance, which is why it is checked before all of them.
     case archived
     /// The person turned it off (#100). Like archiving, a decision rather than a
-    /// circumstance; unlike it, the workflow keeps its place on the list and under the
-    /// ceiling, and Run now still runs it.
+    /// circumstance; unlike it, the workflow keeps its place on the list, and Run now
+    /// still runs it. Like archiving, it takes no place under the total (#506).
     case disabled
     /// A ceiling has been reached — this project's, or every project's together.
-    case overLimit(WorkflowLimit)
+    /// `allowed` is the number that ceiling stood at then (#506), since the total can
+    /// be changed after; nil from a host before it, which ran the ten.
+    case overLimit(WorkflowLimit, allowed: Int? = nil)
     /// The file could not be read.
     case unreadable(String)
     /// Every trigger it has names something this version does not know.
@@ -128,7 +167,7 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         case .queueFull(let limit): return "\(limit) triggers are already queued for it"
         case .archived: return "it is archived"
         case .disabled: return "it is turned off"
-        case .overLimit(let limit): return limit.message
+        case .overLimit(let limit, let allowed): return limit.message(total: allowed ?? WorkflowLimit.defaultTotal)
         case .unreadable(let detail): return detail
         case .triggerNotSupported(let name): return "\"\(name)\" is not something this version can watch for"
         case .agentUnavailable: return "the agent it would have resumed is gone"
@@ -178,7 +217,7 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
     public var needsAPerson: Bool {
         switch self {
         // Over the limit earns the colour: unlike a skipped fire, this one keeps
-        // happening until somebody archives or removes another workflow. A refused
+        // happening until somebody turns off, archives or removes another workflow. A refused
         // setting is the same shape and earns it on the same terms: nothing resolves it
         // on its own, and it refuses every fire until either the file changes or the
         // runtime starts offering what the file asked for. Left grey, a workflow that
@@ -209,7 +248,9 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
              (.awaitingApproval, .awaitingApproval), (.deniedHere, .deniedHere),
              (.coolingDown, .coolingDown), (.queued, .queued), (.queueFull, .queueFull):
             return true
-        case (.overLimit(let a), .overLimit(let b)): return a == b
+        // The ceiling only, not the number it stood at: raising it by one is not a
+        // different reason to be past it.
+        case (.overLimit(let a, _), .overLimit(let b, _)): return a == b
         case (.unreadable(let a), .unreadable(let b)): return a == b
         case (.triggerNotSupported(let a), .triggerNotSupported(let b)): return a == b
         // The setting only, and never the detail — the same rule `chainTooDeep` follows
@@ -304,6 +345,7 @@ extension Workflow {
                                  isArchived: Bool = false,
                                  isDisabled: Bool = false,
                                  overLimit: WorkflowLimit? = nil,
+                                 totalLimit: Int = WorkflowLimit.defaultTotal,
                                  dayLimitReached: Bool = false,
                                  folderExists: Bool = true,
                                  triggeringAgentIsUsable: Bool? = nil,
@@ -322,7 +364,7 @@ extension Workflow {
         // After the file's own problems, because "this one is broken" is the more
         // useful thing to hear about a broken file, and before the rest, because no
         // amount of unpausing will help.
-        if let overLimit { return .overLimit(overLimit) }
+        if let overLimit { return .overLimit(overLimit, allowed: overLimit.allowed(total: totalLimit)) }
         // After archived and paused, and after the file's own problems: a workflow
         // the person put away is refused for that reason, not for the budget. It
         // does not pause the workflow or alter its schedule — it refused one fire

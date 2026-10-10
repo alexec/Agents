@@ -1329,6 +1329,8 @@ public struct TurnEvidence: Sendable, Hashable {
     /// The agent's last message in the turn, whole: what the app reads an ending from
     /// when the agent said nothing about it (#479).
     public private(set) var closingWords = ""
+    /// Whether the turn's last word was a retried error, with no tool call after (#513).
+    public private(set) var endsOnRetriedError = false
     private var closingID: String?
     private var speaking = false
     private var seen: Set<String> = []
@@ -1344,6 +1346,7 @@ public struct TurnEvidence: Sendable, Hashable {
         switch kind {
         case .toolCall(let call), .toolCallUpdate(let call):
             speaking = false
+            endsOnRetriedError = false
             guard call.status == "completed" || call.status == "failed",
                   let id = call.toolCallID, seen.insert(id).inserted, outputs.count < 200 else { return }
             let changes = ["execute", "edit", "delete", "move"].contains(call.kind ?? "")
@@ -1354,6 +1357,7 @@ public struct TurnEvidence: Sendable, Hashable {
             closingWords = speaking && id == closingID ? String((closingWords + text).suffix(8 * 1024)) : text
             closingID = id
             speaking = true
+            endsOnRetriedError = IntermittentError.endsOn(closingWords)
         // A thought between chunks is not the agent starting over.
         case .agentThought:
             break

@@ -26,26 +26,35 @@ in the project's `.agents/mcp.json` as `ci`, and the **Fix failed checks** workf
 
 ## Running it
 
-```sh
-node Integrations/ci-watcher/server.ts --port 8795    # in the foreground
-Integrations/ci-watcher/run.sh start                  # as a LaunchAgent, com.agents.ci-watcher
-Integrations/ci-watcher/run.sh status
-Integrations/ci-watcher/run.sh stop                   # unloads and deletes the LaunchAgent
-Integrations/ci-watcher/run.sh plist                  # prints the LaunchAgent, changes nothing
+The Agents daemon runs it. The project's `.agents/mcp.json` has
+
+```json
+{ "mcpServers": { "ci": { "command": "node", "args": ["Integrations/ci-watcher/server.ts"], "hosted": true } } }
 ```
 
-The LaunchAgent runs `server.ts` from the folder `run.sh` is in, so start it from the
-project's main checkout, not from a worktree that will be removed.
+and `"hosted": true` asks the daemon for one copy per host, shared by every agent's tools
+and the workflows that hear its events (#488). It starts on the first call, idles once
+nothing uses it, and is started again with backoff if it stops while in use. Its stderr
+goes to `mcp-logs/ci-<digest>.log` in the daemon's folder; its state is on the Resources
+page. A changed entry is approved again in Project Settings ▸ MCP, as any project server is.
 
-Port 8795 because Agents Host holds 8791 (the control plane) and 8792 (the web page), and
-the phone bridge 8790. It listens on `127.0.0.1` only, at `POST /mcp` (JSON-RPC, JSON answers), with
-`GET /health`. It refuses any `Origin` other than none or `http://127.0.0.1:*`. `--port 0`
-picks a free port and prints it. The LaunchAgent logs to `~/Library/Logs/ci-watcher.log`.
+It is a plain stdio MCP server, newline-delimited JSON-RPC on stdin and stdout:
+
+```sh
+node Integrations/ci-watcher/server.ts    # in the foreground, speaking on stdin/stdout
+```
+
+Before #488 it ran as a LaunchAgent on `127.0.0.1:8795`. One still loaded from then is
+taken away with
+
+```sh
+launchctl bootout "gui/$(id -u)/com.agents.ci-watcher"; rm -f ~/Library/LaunchAgents/com.agents.ci-watcher.plist
+```
 
 ## The fake mode
 
 ```sh
-CI_WATCHER_FAKE=fixtures/ci.json node Integrations/ci-watcher/server.ts --port 8796
+CI_WATCHER_FAKE=fixtures/ci.json node Integrations/ci-watcher/server.ts
 ```
 
 With `CI_WATCHER_FAKE` set, nothing calls `gh` or GitHub: pull requests, runs and job logs
@@ -61,4 +70,4 @@ the fixture before writing to it; `fixtures/ci.json` is what the tests start fro
 node --test Integrations/ci-watcher/
 ```
 
-They run the server in the fake mode on a free port, against a copy of the fixture.
+They run the server in the fake mode on stdio, against a copy of the fixture.

@@ -885,6 +885,24 @@ export interface HostTunnel {
   problem?: string;
 }
 
+export interface HostedMCPSnapshot {
+  servers: HostedMCPStatus[];
+  at: WireDate;
+}
+
+export type HostedMCPState = "idle" | "starting" | "running" | "restarting";
+
+export interface HostedMCPStatus {
+  name: string;
+  project?: string;
+  state: HostedMCPState;
+  since?: WireDate;
+  retryAt?: WireDate;
+  lastError?: string;
+  restarts: number;
+  users: number;
+}
+
 export interface LabelVocabularyRequest {
   folder: URLString;
 }
@@ -1813,7 +1831,7 @@ export type WorkflowRefusal =
   | { queueFull: { limit: number } }
   | { archived: Record<string, never> }
   | { disabled: Record<string, never> }
-  | { overLimit: { _0: WorkflowLimit } }
+  | { overLimit: { _0: WorkflowLimit; allowed?: number } }
   | { unreadable: { _0: string } }
   | { triggerNotSupported: { name: string } }
   | { agentUnavailable: Record<string, never> }
@@ -1868,6 +1886,7 @@ export interface WorkflowSummary {
   isArchived: boolean;
   isEnabled: boolean;
   overLimit?: WorkflowLimit;
+  totalLimit?: number;
   nextFireAt?: WireDate;
   nextFireAtByTrigger: (WireDate | null)[];
   lastOutcome?: WorkflowOutcome;
@@ -2001,6 +2020,7 @@ export interface Methods {
   "files/watch": { params: FilesWatchRequest; result: Empty };
   "hosts/list": { params: Empty; result: ControlHost[] };
   "leases/snapshot": { params: Empty; result: LeaseSnapshot };
+  "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
   "modes/remembered": { params: Empty; result: Record<string, JSONValue> };
   "options/remembered": { params: RememberedOptionsRequest; result: ConfigOption[] };
   "permissions/answer": { params: AnswerRequest; result: Empty };
@@ -2101,6 +2121,7 @@ export const MethodTarget = {
   "files/watch": "host",
   "hosts/list": "control",
   "leases/snapshot": "host",
+  "mcp/hosted": "host",
   "modes/remembered": "host",
   "options/remembered": "host",
   "permissions/answer": "host",
@@ -2164,6 +2185,7 @@ export interface Notifications {
   "disk/changed": DiskState;
   "files/changed": FilesChangedNotification;
   "leases/changed": LeaseSnapshot;
+  "mcp/hostedChanged": HostedMCPSnapshot;
   "modes/changed": Record<string, JSONValue>;
   "pages/changed": PagesChangedNotification;
   "pins/changed": PinsChangedNotification;
@@ -2261,6 +2283,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive"] },
   HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
   HostTunnel: { required: ["up"], optional: ["problem"] },
+  HostedMCPSnapshot: { required: ["servers", "at"], optional: [] },
+  HostedMCPStatus: { required: ["name", "state", "restarts", "users"], optional: ["project", "since", "retryAt", "lastError"] },
   LabelVocabularyRequest: { required: ["folder"], optional: [] },
   Lease: { required: ["resource", "displayName", "holder", "grantedAt", "expiresAt", "warned"], optional: [] },
   LeaseSnapshot: { required: ["resources", "at"], optional: [] },
@@ -2372,7 +2396,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
   WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort"] },
   WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "hosts", "whenDone"] },
-  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["overLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
+  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
   WorkflowsListRequest: { required: [], optional: ["folder"] },
   WorktreeStatus: { required: ["uncommitted"], optional: ["ahead", "behind", "unmerged"] },
   WorktreeSummary: { required: ["name", "root", "isProjectFolder", "exists", "madeByApp", "agents"], optional: ["branch", "status"] },

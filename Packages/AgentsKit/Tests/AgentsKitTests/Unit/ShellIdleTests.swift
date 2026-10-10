@@ -3,7 +3,7 @@ import Testing
 @testable import AgentsKit
 @testable import AgentsKitCore
 
-/// The idle rule is a pure function of three inputs, so it is tested as one. No pty, no
+/// The idle rule is a pure function of its inputs, so it is tested as one. No pty, no
 /// daemon, no clock to wait on.
 @Suite("When a shell counts as idle")
 struct ShellIdleTests {
@@ -14,33 +14,50 @@ struct ShellIdleTests {
         // The case the whole thing exists for: a build started before lunch. Nobody has
         // typed for hours and the shell must not be let go (FR-026, FR-027).
         let longAgo = now.addingTimeInterval(-threshold * 10)
-        #expect(ShellSession.isIdle(isBusy: true, lastInputAt: longAgo, now: now, threshold: threshold) == false)
+        #expect(ShellSession.isIdle(isBusy: true, lastInputAt: longAgo, lastOutputAt: longAgo, now: now, threshold: threshold) == false)
     }
 
     @Test func aQuietShellPastTheThresholdIsIdle() {
         let longAgo = now.addingTimeInterval(-threshold - 1)
-        #expect(ShellSession.isIdle(isBusy: false, lastInputAt: longAgo, now: now, threshold: threshold))
+        #expect(ShellSession.isIdle(isBusy: false, lastInputAt: longAgo, lastOutputAt: longAgo, now: now, threshold: threshold))
     }
 
     @Test func aQuietShellInsideTheThresholdIsNot() {
         let recently = now.addingTimeInterval(-threshold + 1)
-        #expect(ShellSession.isIdle(isBusy: false, lastInputAt: recently, now: now, threshold: threshold) == false)
+        #expect(ShellSession.isIdle(isBusy: false, lastInputAt: recently, lastOutputAt: recently, now: now, threshold: threshold) == false)
     }
 
     @Test func exactlyTheThresholdCounts() {
         let onTheDot = now.addingTimeInterval(-threshold)
-        #expect(ShellSession.isIdle(isBusy: false, lastInputAt: onTheDot, now: now, threshold: threshold))
+        #expect(ShellSession.isIdle(isBusy: false, lastInputAt: onTheDot, lastOutputAt: onTheDot, now: now, threshold: threshold))
     }
 
     @Test func aShellJustTypedIntoIsNotIdle() {
-        #expect(ShellSession.isIdle(isBusy: false, lastInputAt: now, now: now, threshold: threshold) == false)
+        #expect(ShellSession.isIdle(isBusy: false, lastInputAt: now, lastOutputAt: now, now: now, threshold: threshold) == false)
+    }
+
+    @Test func aShellStillPrintingIsNotIdle() {
+        // Nobody has typed for hours, nothing counts as in front, and a dev server or
+        // `tail -f` is still writing to it (#516).
+        let longAgo = now.addingTimeInterval(-threshold * 10)
+        let recently = now.addingTimeInterval(-threshold + 1)
+        #expect(ShellSession.isIdle(isBusy: false, lastInputAt: longAgo, lastOutputAt: recently, now: now, threshold: threshold) == false)
+        #expect(ShellSession.isIdle(isBusy: false, lastInputAt: longAgo, lastOutputAt: now, now: now, threshold: threshold) == false)
+    }
+
+    @Test func idleNeedsBothQuietPastTheThreshold() {
+        let longAgo = now.addingTimeInterval(-threshold - 1)
+        let recently = now.addingTimeInterval(-threshold + 1)
+        #expect(ShellSession.isIdle(isBusy: false, lastInputAt: recently, lastOutputAt: longAgo, now: now, threshold: threshold) == false)
+        #expect(ShellSession.isIdle(isBusy: false, lastInputAt: longAgo, lastOutputAt: recently, now: now, threshold: threshold) == false)
+        #expect(ShellSession.isIdle(isBusy: false, lastInputAt: longAgo, lastOutputAt: longAgo, now: now, threshold: threshold))
     }
 
     @Test func busyBeatsEveryOtherInput() {
         // Whatever the clock says, and whatever the threshold is.
         for seconds in [0.0, 1.0, threshold, threshold * 100] {
             let then = now.addingTimeInterval(-seconds)
-            #expect(ShellSession.isIdle(isBusy: true, lastInputAt: then, now: now, threshold: threshold) == false)
+            #expect(ShellSession.isIdle(isBusy: true, lastInputAt: then, lastOutputAt: then, now: now, threshold: threshold) == false)
         }
     }
 }

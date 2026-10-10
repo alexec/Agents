@@ -1,11 +1,11 @@
 // One workflow, opened in the chat's place (#98, #100, #142; the window's WorkflowPage and the
 // Remote's), in their order: its name and what it is; Run Now or Approve, the Enabled switch and
-// Archive or Bring Back; the status card, why it is or isn't running; what it does (who gets the
-// prompt and, for a standing one, its agent; the prompt; its settings; its labels); what makes it
-// run, a line a trigger, its cooldown, and which computers run it; what its file says that this
-// version does not know; and the sessions it started. Every attribute is shown; the settings,
-// labels, cooldown and hosts are edited here as in the window (#162, #317), what the workflow is
-// (name, triggers, prompt, agent mode) is not.
+// Archive or Bring Back; the status card, why it is or isn't running; a file that cannot be read,
+// as it is (#540); what it does (who gets the prompt and, for a standing one, its agent; the
+// prompt; its settings; its labels); what makes it run, a line a trigger, its cooldown, and which
+// computers run it; what its file says that this version does not know; and the sessions it
+// started. Every attribute is shown; the settings, labels, cooldown and hosts are edited here as in
+// the window (#162, #317), what the workflow is (name, triggers, prompt, agent mode) is not.
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { Agent } from "../protocol/generated";
@@ -146,6 +146,8 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
             ))}
           </ul>
 
+          {workflow.problem && "unreadable" in workflow.problem && <UnreadableFile store={store} host={host} folder={folder} workflowID={workflowID} />}
+
           <h2 class="section-head">What it does</h2>
           <RuntimeRow store={store} host={host} summary={summary} disabled={locked} change={change} />
           <p class="agent-mode">
@@ -257,5 +259,32 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
         </div>
       </div>
     </section>
+  );
+}
+
+/** A file whose front matter cannot be read is shown as it is, so it can be fixed (#260, #540). */
+function UnreadableFile({ store, host, folder, workflowID }: {
+  store: Store; host: string; folder: string; workflowID: string;
+}) {
+  const path = `.agents/workflows/${workflowID}.md`;
+  const raw = useSignal<{ text: string; truncated: boolean } | null | undefined>(undefined);
+  useEffect(() => {
+    let current = true;
+    raw.value = undefined;
+    store.readPage(host, folder, path).then(
+      (r) => { if (current) raw.value = r.kind === "text" ? { text: r.text, truncated: r.isTruncated } : null; },
+      () => { if (current) raw.value = null; });
+    return () => { current = false; };
+  }, [host, folder, path]);
+  return (
+    <>
+      <h2 class="section-head">The file is below</h2>
+      {raw.value === undefined ? <p class="hint">Loading…</p>
+        : raw.value === null ? <p class="hint">The workflow file could not be read from the host.</p>
+        : <>
+            {raw.value.truncated && <p class="quiet small">Only the start of {path} is shown.</p>}
+            <pre class="prompt-text">{raw.value.text}</pre>
+          </>}
+    </>
   );
 }

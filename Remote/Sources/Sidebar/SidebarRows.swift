@@ -8,9 +8,13 @@ struct SidebarSessionRow: View {
     @Environment(RemoteModel.self) private var model
     /// The agent as the list had it when it drew this row. Only its id is trusted.
     private let given: Agent
+    /// Which project it is in, after the title: under a smart group of the sidebar
+    /// (#495, #498), which gathers sessions from every project, and nowhere else.
+    private let place: String?
 
-    init(agent: Agent) {
+    init(agent: Agent, place: String? = nil) {
         given = agent
+        self.place = place
     }
 
     /// The agent as the phone has it now, read from the model rather than kept: see the
@@ -19,26 +23,31 @@ struct SidebarSessionRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            StatusIcon(state: agent.state, isComingBack: model.isComingBack(agent),
-                       outcome: agent.report?.outcome,
-                       isWaiting: agent.isWaiting,
-                       endedReason: agent.endedReason,
-                       outcomeUnknown: agent.endingIsUnaccountedFor,
-                       isParked: agent.parking?.isParked == true)
+            // What it wants, as the window's sidebar says it (#495): the state is the
+            // row's mark, unread among them. Any other state keeps its icon.
+            if let mark = SessionMark(agent: agent, group: model.work.group(of: agent)) {
+                mark
+            } else {
+                StatusIcon(state: agent.state, isComingBack: model.isComingBack(agent),
+                           outcome: agent.report?.outcome,
+                           isWaiting: agent.isWaiting,
+                           endedReason: agent.endedReason,
+                           outcomeUnknown: agent.endingIsUnaccountedFor,
+                           isParked: agent.parking?.isParked == true)
+            }
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
-                    // Unread is a mark on the row, never a group (#70).
-                    if agent.showsUnread {
-                        Circle()
-                            .fill(.secondary)
-                            .frame(width: 7, height: 7)
-                            .alignmentGuide(.firstTextBaseline) { $0[.bottom] }
-                            .accessibilityHidden(true)
-                    }
                     Text(agent.title ?? "Untitled")
                         .appText(.supporting)
                         .fontWeight(agent.showsUnread ? .semibold : .regular)
                         .lineLimit(1)
+                    if let place {
+                        Text(place)
+                            .appText(.fine)
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                            .layoutPriority(-1)
+                    }
                     if model.startedByAgentLabel(agent) != nil {
                         Image(systemName: AgentsModel.startedByAgentSymbol)
                             .appText(.fine)
@@ -134,8 +143,55 @@ struct SidebarSessionRow: View {
     }
 }
 
-/// One workflow under its project: its name, what it is, and Off where it is (#100).
-/// Its page opens in the detail as a session's chat does.
+/// A session's mark in the sidebar (#495, #498), the window's: what it wants, in four
+/// shapes — an orange hand when it needs the person, a spinner while it works, two rings
+/// when it finished unread, an empty ring once read. Any other state keeps its
+/// `StatusIcon`.
+private struct SessionMark: View {
+    private enum Kind { case needsYou, working, unread, read }
+    private let kind: Kind
+
+    init?(agent: Agent, group: AgentGroup) {
+        switch group {
+        case .needsAttention, .blocked: kind = .needsYou
+        case .running: kind = .working
+        case .finished: kind = agent.showsUnread ? .unread : .read
+        default: return nil
+        }
+    }
+
+    var body: some View {
+        Group {
+            switch kind {
+            case .needsYou:
+                Image(systemName: "hand.raised.fill").foregroundStyle(.orange)
+            case .working:
+                SyncedSpinner(diameter: 14)
+            case .unread:
+                Image(systemName: "circle.inset.filled").foregroundStyle(Paper.accent)
+            case .read:
+                Image(systemName: "circle").foregroundStyle(Paper.accent)
+            }
+        }
+        // Decorative: a mark filling the rows' 20-point well, as `WorkflowMark` (FR-015).
+        .font(.system(size: 14))
+        .frame(width: 20, height: 20)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+    }
+
+    private var label: String {
+        switch kind {
+        case .needsYou: "Needs you"
+        case .working: "Working"
+        case .unread: "Unread"
+        case .read: "Done"
+        }
+    }
+}
+
+/// One workflow under its project: its name, and Off where it is (#100). What it does is
+/// its page's to say (#495). Its page opens in the detail as a session's chat does.
 struct SidebarWorkflowRow: View {
     @Environment(RemoteModel.self) private var model
     let summary: WorkflowSummary
@@ -146,11 +202,7 @@ struct SidebarWorkflowRow: View {
             WorkflowMark(summary: summary)
             VStack(alignment: .leading, spacing: 3) {
                 Text(summary.workflow.name)
-                    .appText(.supporting).fontWeight(.semibold)
-                    .lineLimit(1)
-                Text(summary.workflow.summary)
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
+                    .appText(.supporting)
                     .lineLimit(1)
             }
             Spacer(minLength: 4)
@@ -242,8 +294,8 @@ struct PinWorkflowButton: View {
     }
 }
 
-/// Whether a workflow is running, waiting, refused or put away. Grey, all of it: the
-/// app's one colour means something needs a person.
+/// Whether a workflow is running, waiting, refused or put away: in the accent, as every
+/// icon in the sidebar is (#495), and the attention colour when it needs a person.
 struct WorkflowMark: View {
     let summary: WorkflowSummary
 
@@ -255,7 +307,9 @@ struct WorkflowMark: View {
                 Image(systemName: symbol)
                     // Decorative: the workflow's mark filling a 20-point well, not text (FR-015).
                     .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
+                    // In the accent, as the sidebar's icons are, unless it wants a person (#495).
+                    .foregroundStyle(summary.needsAPerson ? StateTint.attention.style(or: .secondary)
+                                     : AnyShapeStyle(Paper.accent))
             }
         }
         .frame(width: 20, height: 20)
@@ -288,7 +342,7 @@ struct PinnedPageRows: View {
         ForEach(Array(pins.enumerated()), id: \.element.path) { index, pin in
             HStack(spacing: 8) {
                 Image(systemName: pin.kind == .view ? "square.grid.2x2" : pin.kind == .html ? "globe" : "doc.text")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.accent)
                     .frame(width: 20)
                     .accessibilityHidden(true)
                 Text(pin.title)

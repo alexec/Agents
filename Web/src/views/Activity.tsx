@@ -6,7 +6,7 @@ import type { Store } from "../model/store";
 import type { AllowanceState, Consequence, ControlHost, CostState, Event, ProjectSummary, RuntimeAvailability, RuntimeStatus } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import type { ActivityPage } from "../route";
-import { Resources } from "./Resources";
+import { HostedMCP, Resources } from "./Resources";
 import { BackToList } from "./BackToList";
 import { folderKey, projectFolder } from "../model/groups";
 import { runtimeTally } from "../model/runtimes";
@@ -137,6 +137,9 @@ function useActivity(store: Store): void {
   }, [online]);
 }
 
+/** Each Activity page's icon, the window's SF Symbol as near as text has it (#495). */
+const activityIcons: Record<ActivityPage, string> = { events: "☰\uFE0E", resources: "◫", runtimes: "⚙\uFE0E", spending: "$" };
+
 export function ActivityRows({ store, chosen, onPick }: {
   store: Store; chosen: ActivityPage | undefined; onPick: (page: ActivityPage) => void;
 }) {
@@ -150,10 +153,12 @@ export function ActivityRows({ store, chosen, onPick }: {
   const today = totalWords(todayTotals(costs));
   const mac = costs["mac"];
   const left = headroom(mac);
-  // The page's name in the projects' type, with no glyph, as the window's rows have it (#155).
+  // The page's name in the projects' type, after its icon in the accent, as the window's rows
+  // have it (#155, #495).
   const row = (page: ActivityPage, title: string, help: string, detail: preact.ComponentChildren) => (
     <button class={`row activity-row${chosen === page ? " chosen" : ""}`} aria-current={chosen === page} title={help}
       onClick={() => onPick(page)}>
+      <span class="activity-icon" aria-hidden="true">{activityIcons[page]}</span>
       <span class="title">{title}</span>
       <span class="detail">{detail}</span>
     </button>
@@ -205,9 +210,11 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
                 <section key={host.id}>
                   {several && <h2 class="section-head">{hostName(host.id)}</h2>}
                   <Resources store={store} host={host.id} open />
+                  <HostedMCP store={store} host={host.id} />
                 </section>
               ))}
-              {Object.values(store.leases.value).every((s) => s.resources.length === 0) && (
+              {Object.values(store.leases.value).every((s) => s.resources.length === 0)
+                && Object.values(store.hostedMCP.value).every((s) => s.servers.length === 0) && (
                 <p class="hint">Nothing is declared or held. Resources are declared on the Mac, in Settings ▸ Resources.</p>
               )}
             </>

@@ -141,6 +141,8 @@ public actor DaemonCore {
     lazy var wakeStore = WakeSettingsStore(locations: locations)
     var wakeSettings = WakeSettings()
     var wakeSettingsLoaded = false
+    /// The person's total for workflows turned on (#506), read once and kept.
+    var workflowLimitSettings: WorkflowLimitSettings?
     /// When the last agent stopped, if a grace is running. In memory only: the hold
     /// dies with this process, and a grace is not resumed by the next one.
     var graceStartedAt: Date?
@@ -194,13 +196,17 @@ public actor DaemonCore {
     #endif
     /// The app's own `agents` MCP server, served here over loopback http to every
     /// runtime (#185). It listens only once a session needs it.
-    lazy var appTools = AppToolsEndpoint { [weak self] method, params in
+    lazy var appTools = AppToolsEndpoint(relay: { [weak self] method, params in
         guard let self else {
             return .failure(JSONRPCError(code: DaemonAPI.Failure.noSuchAgent,
                                          message: "The app is not running, so nothing was shown."))
         }
         return await self.appToolCall(method: method, params: params)
-    }
+    }, hosted: hostedServers)
+    /// The MCP servers this host runs one copy of for every agent (#488), served beside
+    /// the app's own tools.
+    lazy var hostedServers = HostedMCPServers(
+        logFolder: locations.root.appending(path: "mcp-logs", directoryHint: .isDirectory))
     /// Agents whose next prompt carries the `Briefing`: the few things about this app
     /// an agent is told in words. Set when a conversation starts, and again only if a
     /// runtime loses one and we have to begin a new one — the briefing lives in the
@@ -580,6 +586,11 @@ public actor DaemonCore {
     var rateLimitStreaks: [UUID: [Date]] = [:]
     /// How rate limits are retried. A test shortens the waits; nothing else changes it.
     var rateLimitPolicy = RateLimitPolicy.standard
+    /// Tries so far at carrying each agent on past a turn that ended on a retried error
+    /// (#513). Cleared by a turn that ends any other way, and by the person's next prompt.
+    var retriedErrorAttempts: [UUID: Int] = [:]
+    /// How those are tried. A test shortens the waits; nothing else changes it.
+    var retriedErrorPolicy = RetriedErrorPolicy.standard
     /// The last cost figure each agent's runtime quoted, per currency.
     ///
     /// A runtime's cost is a **running total for its session**, not what the last turn
@@ -1726,6 +1737,8 @@ public actor DaemonCore {
         bridge.stopAll()
         #endif
         appTools.stop()
+        // The servers it hosts are this daemon's, and end with it (#488).
+        await hostedServers.stopAll()
 
         // Two different things, both going. The agent's terminals are 003's and are
         // killed because the agent owning them is stopping. The user's shells are this

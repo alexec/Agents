@@ -42,6 +42,7 @@ final class RemoteModel {
             selection = nil
             openWorkflow = nil
             openPin = nil
+            openArchive = false
             if selectedProject != nil { openActivity = nil }
             letGoOfProjects(keeping: selectedProject)
         }
@@ -53,6 +54,9 @@ final class RemoteModel {
             guard selection != oldValue else { return }
             work.watching = selection
             presence?.watching(selection)
+            // Opened from Unread, it stays there until something else is opened (#495,
+            // #498), as a read message stays in Mail's Unread mailbox while it is selected.
+            keptInUnread = selection.flatMap { work.agent($0) }.flatMap { $0.showsUnread ? $0.id : nil }
             letGoOfChats(keeping: selection)
             Task { await loadTranscript() }
         }
@@ -494,6 +498,12 @@ final class RemoteModel {
     var openWorkflow: Workflow.ID?
     /// The project's pinned page (#159) pushed over the project page, by its path in it.
     var openPin: String?
+    /// The project's archive (#495, #498): its archived sessions and workflows, a page
+    /// opened from one row in the sidebar rather than folds inside the project's.
+    var openArchive = false
+    /// The session opened while it was unread, kept in the sidebar's Unread until another
+    /// is opened (#495), so it does not leave the list under the finger on the tap.
+    private(set) var keptInUnread: UUID?
     /// One of the pages about all the work, from the sidebar's Activity (#226): Events,
     /// Resources, Runtimes or Spending. Nil, or one of those.
     var openActivity: SidebarItem? {
@@ -513,6 +523,7 @@ final class RemoteModel {
             if let openActivity { return openActivity }
             guard let folder = selectedProject else { return nil }
             let key = ProjectKey(host: selectedSummary?.host ?? .mac, folder: folder)
+            if openArchive { return .archive(key) }
             if let openPin { return .pin(openPin, in: key) }
             if let openWorkflow { return .workflow(openWorkflow, in: key) }
             if let selection { return .session(selection) }
@@ -526,39 +537,68 @@ final class RemoteModel {
                 selection = nil
                 openWorkflow = nil
                 openPin = nil
+                openArchive = false
             case .project(let key):
                 selectedProject = key.folder
                 selection = nil
                 openPin = nil
                 openWorkflow = nil
+                openArchive = false
+                // The next New Session at the sidebar's top starts here too (#495).
+                rememberNewSessionProject(key)
             case .session(let id):
                 if let folder = work.agent(id)?.projectFolder { selectedProject = folder }
                 openPin = nil
                 openWorkflow = nil
+                openArchive = false
                 selection = id
             case .workflow(let id, let key):
                 selectedProject = key.folder
                 openPin = nil
                 selection = nil
+                openArchive = false
                 openWorkflow = id
             case .pin(let path, let key):
                 selectedProject = key.folder
                 openWorkflow = nil
                 selection = nil
+                openArchive = false
                 openPin = path
             case .spending, .resources, .events, .runtimes:
                 openActivity = newValue
             case .archive(let key):
-                // The Mac's archive page (#495); the Remote's sidebar has no rows for
-                // them yet, so the project it is in is as far as one goes.
+                // The project's archive page (#495, #498), with what is opened from it
+                // pushed over it.
                 selectedProject = key.folder
                 selection = nil
                 openPin = nil
                 openWorkflow = nil
+                openArchive = true
             }
         }
     }
     var selectedSummary: DaemonAPI.ProjectSummary? { work.project(selectedProject) }
+
+    /// The project New Session at the top of the sidebar starts in (#495, #498): the last
+    /// one a new session was opened in, while it is still a live project; otherwise the
+    /// selected one, otherwise the first. The window's rule.
+    var newSessionProject: ProjectKey? {
+        let live = projects.map(\.key)
+        if let remembered = rememberedNewSessionProject, live.contains(remembered) { return remembered }
+        if let summary = selectedSummary, live.contains(summary.key) { return summary.key }
+        return live.first
+    }
+
+    private var rememberedNewSessionProject: ProjectKey? =
+        UserDefaults.standard.string(forKey: RemoteModel.newSessionProjectDefault).flatMap(ProjectKey.init(stored:))
+
+    static let newSessionProjectDefault = "newSessionProject"
+
+    private func rememberNewSessionProject(_ key: ProjectKey) {
+        guard rememberedNewSessionProject != key else { return }
+        rememberedNewSessionProject = key
+        UserDefaults.standard.set(key.stored, forKey: Self.newSessionProjectDefault)
+    }
     var selectedAgent: Agent? { work.agent(selection) }
     var entries: [TranscriptEntry] { work.entries }
     var transcriptItems: [TranscriptItem] { work.transcriptItems }
@@ -1054,14 +1094,12 @@ final class RemoteModel {
     /// The question the open conversation is blocked on, if it still is.
     var questionsForSelection: [PermissionRequest] { work.permissions(for: selection) }
 
-    /// The form it is blocked on instead, if it is one of those.
+    /// The form it is blocked on, if it is one of those.
     ///
-    /// The two never share the screen, and the permission wins where both somehow
-    /// exist: it is the one the runtime is most likely to be sitting on, and two
-    /// blocking cards at once on a phone is a card nobody can read.
-    var formForSelection: ElicitationRequest? {
-        questionsForSelection.isEmpty ? work.elicitation(for: selection) : nil
-    }
+    /// Shown beside any permission rather than behind it, as on the Mac and the page
+    /// (#243, #539): each waits on its own, and a form hidden until a permission is
+    /// answered is a form that cannot be answered first.
+    var formForSelection: ElicitationRequest? { work.elicitation(for: selection) }
 
     /// A file being read, by path, or nothing.
     ///
@@ -1462,6 +1500,7 @@ final class RemoteModel {
                         continue
                     }
                     if note.method == DaemonAPI.Notification.leasesChanged
+                        || note.method == DaemonAPI.Notification.mcpHostedChanged
                         || note.method == DaemonAPI.Notification.eventsChanged { continue }
                     guard let update = AgentsModel.read(note.method, note.params, showing: shown.id) else { continue }
                     await self?.work.apply(update, from: id)
@@ -2306,6 +2345,11 @@ final class RemoteModel {
                                                     Optional<String>.none,
                                                     returning: DaemonAPI.LeaseSnapshot.self) else { return }
         work.replaceLeases(snapshot)
+        // The servers the Mac hosts for every agent (#488), on the same page.
+        if let hosted = try? await client.call(DaemonAPI.Method.mcpHosted, Optional<String>.none,
+                                               returning: DaemonAPI.HostedMCPSnapshot.self) {
+            work.replaceHostedMCP(hosted)
+        }
     }
 
     /// Every volume on the Mac low on space (#196), for the strip under the banner. A Mac

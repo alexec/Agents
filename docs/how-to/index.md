@@ -75,6 +75,8 @@ something particular done.
   in your own `secrets.env`.
 - [Add an MCP server by hand](add-an-mcp-server-by-hand.md): a local command or a remote
   URL that is not on the registry, verified to answer before anything is written.
+- [Share one copy of a local MCP server](share-one-copy-of-a-local-mcp-server.md): mark a
+  server `"hosted": true` so the app runs it once per host for every agent and workflow.
 - [Sign in to an MCP server](sign-in-to-an-mcp-server.md): a remote server that asks for
   OAuth, such as GitHub's, signed in to in your browser so agents start with it.
 - [Keep going when a runtime runs out](keep-going-when-a-runtime-runs-out.md): see which

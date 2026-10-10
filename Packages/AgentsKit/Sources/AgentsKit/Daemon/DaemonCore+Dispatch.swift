@@ -252,6 +252,13 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.WorkflowArchiveRequest.self)
                 return .success(try JSONValue.encoding(try archiveWorkflow(request)))
 
+            case DaemonAPI.Method.workflowsLimit:
+                return .success(try JSONValue.encoding(readWorkflowLimit()))
+
+            case DaemonAPI.Method.workflowsSetLimit:
+                let settings = try require(params, as: WorkflowLimitSettings.self)
+                return .success(try JSONValue.encoding(try setWorkflowLimit(settings)))
+
             case DaemonAPI.Method.workflowsEnable:
                 let request = try require(params, as: DaemonAPI.WorkflowEnableRequest.self)
                 return .success(try JSONValue.encoding(try setWorkflowEnabled(request)))
@@ -321,6 +328,9 @@ extension DaemonCore {
             case DaemonAPI.Method.mcpList:
                 let request = try require(params, as: DaemonAPI.MCPListRequest.self)
                 return .success(try JSONValue.encoding(try await mcpList(request)))
+
+            case DaemonAPI.Method.mcpHosted:
+                return .success(try JSONValue.encoding(await hostedServers.snapshot()))
 
             case DaemonAPI.Method.mcpApprove:
                 let request = try require(params, as: DaemonAPI.MCPApproveRequest.self)

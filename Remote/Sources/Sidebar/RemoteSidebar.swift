@@ -2,16 +2,17 @@ import AgentsKitCore
 import SwiftUI
 import UIKit
 
-/// The Mac's one sidebar, on an iPad or an iPhone (#226): Activity at the top, then every
-/// project, each a row that folds open on its pinned pages, its sessions in their groups,
-/// its archived sessions and its workflows; then the archived projects, folded, each with
-/// Bring Back (#343).
+/// The Mac's one sidebar, on an iPad or an iPhone (#226, #498): New Session at the top,
+/// then Activity, then what wants the person across every project — Pinned, Needs You,
+/// Working, Unread — then a group per project, its sessions newest first with their state
+/// the row's mark, its workflows, and one Archived row opening a page; then the archived
+/// projects, folded, each with Bring Back (#343). Never more than two levels deep (#495).
 ///
-/// The rules are the Mac's own, from `SidebarProjectFold`, `SidebarOrder` and
-/// `SidebarFolds` in AgentsKitCore: the same groups, order, pins and folds, kept the same
-/// way. The views are this device's: on an iPad the list sits beside what it picked; on
-/// an iPhone it is the screen the app opens on and a pick is pushed over it. Swipe
-/// actions and a long press stand in for the Mac's context menus.
+/// The rules are the Mac's own, from `SidebarProjectFold`, `SidebarSmartRow`,
+/// `SidebarOrder` and `SidebarFolds` in AgentsKitCore: the same groups, order, pins and
+/// folds, kept the same way. The views are this device's: on an iPad the list sits beside
+/// what it picked; on an iPhone it is the screen the app opens on and a pick is pushed
+/// over it. Swipe actions and a long press stand in for the Mac's context menus.
 struct RemoteSidebar: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -42,28 +43,41 @@ struct RemoteSidebar: View {
     }
 
     var body: some View {
+        let projects = SidebarOrder.projects(model.projects, servers: servers)
         List(selection: selection) {
             if !model.projects.isEmpty {
-                // Pages about all the work rather than one project, at the top so what
-                // they say at a glance is never folded or scrolled away. Plain titles, as
-                // on the Mac (#155). It folds, as Archived projects does.
+                // One way to start a session (#495), in the project last started in.
+                // A project's long press starts one in it.
+                Section {
+                    NewSessionTopRow()
+                }
+
+                // Pages about all the work rather than one project, above the smart
+                // groups, as the window has them (#495). Plain titles beside their icons
+                // in the accent (#155). It folds, as a project does.
                 Section(isExpanded: $showsActivity) {
-                    EventsRow().appText(.supporting).tag(SidebarItem.events)
-                    ResourcesRow().appText(.supporting).tag(SidebarItem.resources)
-                    RuntimesRow().appText(.supporting).tag(SidebarItem.runtimes)
-                    SpendingRow().appText(.supporting).tag(SidebarItem.spending)
+                    EventsRow().activityIcon("list.bullet.rectangle").appText(.supporting).tag(SidebarItem.events)
+                    ResourcesRow().activityIcon("square.stack.3d.up").appText(.supporting).tag(SidebarItem.resources)
+                    RuntimesRow().activityIcon("cpu").appText(.supporting).tag(SidebarItem.runtimes)
+                    SpendingRow().activityIcon("dollarsign.circle").appText(.supporting).tag(SidebarItem.spending)
                 } header: {
                     Text("Activity")
                 }
+
+                // Pinned, Needs You, Working, Unread: a group each across every project
+                // and host (#495), headed and folding as a project's is.
+                ForEach(SidebarSmartRow.allCases, id: \.self) { row in
+                    RemoteSmartFold(row: row, projects: projects, folds: folds, query: searched)
+                }
             }
 
-            Section("Projects") {
-                ForEach(SidebarOrder.projects(model.projects, servers: servers), id: \.key) { summary in
-                    RemoteProjectFold(summary: summary, folds: folds, query: searched,
-                                      label: SidebarOrder.label(summary) { model.hostLabel($0) },
-                                      showsAllMatches: showingAllMatches.contains(summary.key),
-                                      showAllMatches: { showingAllMatches.insert(summary.key) })
-                }
+            // One group per project (#495), its name the group's heading, its sessions
+            // the rows: Mail's accounts rather than a Projects heading with folds under it.
+            ForEach(projects, id: \.key) { summary in
+                RemoteProjectFold(summary: summary, folds: folds, query: searched,
+                                  label: SidebarOrder.label(summary) { model.hostLabel($0) },
+                                  showsAllMatches: showingAllMatches.contains(summary.key),
+                                  showAllMatches: { showingAllMatches.insert(summary.key) })
             }
 
             // Projects put away, closed until opened, as the window's (#343).
@@ -78,6 +92,20 @@ struct RemoteSidebar: View {
                     }
                 } header: {
                     Text("Archived projects")
+                }
+            }
+
+            // A server gone quiet greys its projects; this says why, once, as the window's
+            // sidebar foot does (#534).
+            let offline = servers.filter { model.hostIsOffline($0) }
+            if !offline.isEmpty {
+                Section {
+                    ForEach(offline, id: \.self) { host in
+                        Label("\(model.hostLabel(host)) is offline", systemImage: "bolt.horizontal.circle")
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .accessibilityElement(children: .combine)
+                    }
                 }
             }
 
@@ -107,7 +135,7 @@ struct RemoteSidebar: View {
         .background(Paper.sidebar)
         .toolbarBackground(Paper.sidebar, for: .navigationBar)
         .navigationTitle("Agents")
-        .searchable(text: $query, prompt: "Search sessions and workflows")
+        .searchable(text: $query, prompt: "Search")
         .task(id: query) {
             let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
             if !words.isEmpty { try? await Task.sleep(for: .milliseconds(150)) }
@@ -147,9 +175,132 @@ struct RemoteSidebar: View {
     }
 }
 
-/// One project in the sidebar: its row, and folded under it its pinned pages and
-/// sessions, then its archived sessions and its workflows. The Mac's `ProjectFold`, drawn
-/// from the same `SidebarProjectFold`.
+/// One of the groups at the top of the sidebar (#495, #498): Pinned, Needs You, Working
+/// or Unread, across every project and host, each row naming its project. The window's
+/// `SmartFold`. Folded, it reads its count off each project's shelf and lists nothing
+/// (#356).
+private struct RemoteSmartFold: View {
+    @Environment(RemoteModel.self) private var model
+    let row: SidebarSmartRow
+    /// The projects in the sidebar, in its order.
+    let projects: [DaemonAPI.ProjectSummary]
+    let folds: SidebarFolds
+    /// The search's words, already trimmed; empty when there is no search.
+    let query: String
+
+    var body: some View {
+        let keys = projects.map(\.key)
+        // Empty, or with no match for a search, the group is not drawn (#507); Unread
+        // with nothing unread still is while it keeps the open session.
+        if row.isShown(in: model.work, projects: keys, query: query) || keptUnread != nil {
+            fold(keys)
+        }
+    }
+
+    private func fold(_ keys: [ProjectKey]) -> some View {
+        let isOpen = folds.isOpen(row)
+        return Section(isExpanded: Binding(get: { isOpen }, set: { folds.set(row, open: $0) })) {
+            if isOpen {
+                if row == .pinned {
+                    ForEach(keys, id: \.self) { key in pinnedRows(key) }
+                } else {
+                    ForEach(shown(keys)) { agent in
+                        SidebarSessionRow(agent: agent, place: place(of: agent))
+                    }
+                }
+            }
+        } header: {
+            SmartHeading(row: row, count: row.count(in: model.work, projects: keys))
+        }
+    }
+
+    /// What the group lists. Unread keeps the session opened from it (`keptInUnread`) in
+    /// its place, read now, until another is opened: its count has already dropped.
+    private func shown(_ keys: [ProjectKey]) -> [Agent] {
+        var agents = row.agents(in: model.work, projects: keys, query: query)
+        if let kept = keptUnread, !agents.contains(where: { $0.id == kept.id }) {
+            let at = agents.firstIndex { $0.createdAt < kept.createdAt } ?? agents.endIndex
+            agents.insert(kept, at: at)
+        }
+        return agents
+    }
+
+    /// The session Unread keeps, read, while it is the one open; none while searching.
+    private var keptUnread: Agent? {
+        guard row == .unread, query.isEmpty, let id = model.keptInUnread,
+              let kept = model.work.agent(id), kept.state != .archived else { return nil }
+        return kept
+    }
+
+    /// One project's pinned sessions (#180), then its pinned workflows (#432), each
+    /// dragged in the list's edit mode into the order wanted among its own project's and
+    /// its own kind, or moved from a row's menu.
+    @ViewBuilder
+    private func pinnedRows(_ key: ProjectKey) -> some View {
+        let searching = !query.isEmpty
+        let sessions = SidebarSmartRow.pinned.agents(in: model.work, projects: [key], query: query)
+        ForEach(sessions) { agent in
+            SidebarSessionRow(agent: agent, place: place(of: agent))
+        }
+        // The whole order, which a search shows only some of.
+        .onMove { from, to in
+            guard !searching else { return }
+            var ids = sessions.map(\.id)
+            ids.move(fromOffsets: from, toOffset: to)
+            let shown = Set(ids)
+            let rest = model.pinnedSessions(in: key.folder).filter { !shown.contains($0) }
+            Task { await model.arrangeSessionPins(ids + rest, in: key.folder) }
+        }
+        let flows = SidebarSmartRow.pinned.workflows(in: model.work, projects: [key], query: query).map(\.workflow)
+        ForEach(flows) { summary in
+            SidebarWorkflowRow(summary: summary, project: key)
+        }
+        .onMove { from, to in
+            guard !searching else { return }
+            var ids = flows.map(\.workflowID)
+            ids.move(fromOffsets: from, toOffset: to)
+            let shown = Set(ids)
+            let rest = model.pinnedWorkflows(in: key.folder).filter { !shown.contains($0) }
+            Task { await model.arrangeWorkflowPins(ids + rest, in: key.folder) }
+        }
+    }
+
+    /// The project's name as its group in the sidebar says it: `server:Project` on a server.
+    private func place(of agent: Agent) -> String? {
+        guard let summary = projects.first(where: { $0.host == agent.host && $0.folder == agent.projectFolder })
+        else { return nil }
+        return SidebarOrder.label(summary) { model.hostLabel($0) }
+    }
+}
+
+/// A smart group's heading: its name, and how many, the count in the attention tint for
+/// Needs You and absent at none, so the heading stays put. No icon (Alex, #495): the
+/// sessions under it carry the marks.
+private struct SmartHeading: View {
+    let row: SidebarSmartRow
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(row.title).lineLimit(1)
+            Spacer(minLength: 4)
+            if count > 0 {
+                Text("\(count)")
+                    .monospacedDigit()
+                    .foregroundStyle(row == .needsYou ? StateTint.attention.style(or: .secondary)
+                                                      : AnyShapeStyle(.secondary))
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(count > 0 ? "\(row.title), \(count)" : "\(row.title), none")
+    }
+}
+
+/// One project in the sidebar (#495, #498): a group headed by its row, its pinned pages,
+/// then its live sessions newest started first, their state the row's mark, then its
+/// workflows, then one Archived row opening a page. Its pinned sessions and workflows are
+/// in Pinned at the top. The Mac's `ProjectFold`, drawn from the same
+/// `SidebarProjectFold`.
 private struct RemoteProjectFold: View {
     @Environment(RemoteModel.self) private var model
     let summary: DaemonAPI.ProjectSummary
@@ -168,184 +319,110 @@ private struct RemoteProjectFold: View {
         let fold = SidebarProjectFold(key, label: label, in: model.work, query: query, isOpen: folds.isOpen(key))
         let isOpen = fold.isUnfolded
         if fold.isShown {
-            DisclosureGroup(isExpanded: Binding(get: { isOpen }, set: { folds.set(key, open: $0) })) {
-                // Folded, nothing at all is under the row (#356): see `isUnfolded`.
-                // First, where a session starts (#375): the project's own row only folds.
-                NewSessionRow(project: key)
+            // A search holds every match open.
+            Section(isExpanded: Binding(get: { isOpen },
+                                        set: { if !fold.isSearching { folds.set(key, open: $0) } })) {
+                // Folded, nothing at all is under the heading (#356): see `isUnfolded`.
                 if fold.showsPinnedPages {
                     PinnedPageRows(project: key)
                 }
-                if fold.hasPinned {
-                    pinnedSessions(fold)
-                }
-                ForEach(fold.groups) { part in
-                    sessionGroup(part, searching: fold.isSearching)
-                }
-                if fold.showsNoSessions {
-                    Text("No sessions yet")
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                }
-                archivedSessions(fold)
-                workflows(fold)
-            } label: {
-                // A tap folds or unfolds it, and nothing else (#375): a button, so the
-                // list's own row handling has nothing left to do with the tap. A search
-                // holds every match open. No tag: the New session row carries `.project`.
-                Button {
-                    if !fold.isSearching { folds.set(key, open: !isOpen) }
-                } label: {
-                    ProjectRow(summary: summary, label: label, isFolded: !isOpen)
-                        .contentShape(Rectangle())
-                }
-                    .buttonStyle(.plain)
-                    .accessibilityHint(isOpen ? "Folds the project" : "Unfolds the project")
-                    .appText(.supporting)
-                    .foregroundStyle(model.hostIsOffline(summary.host) ? .secondary : .primary)
-                    .contextMenu { ProjectMenuItems(summary: summary) { fillingDropbox = true } }
-                    .swipeActions(edge: .leading) {
-                        NewSessionButton(folder: summary.folder).tint(Paper.accent)
-                    }
-                    .sheet(isPresented: $fillingDropbox) {
-                        DropboxSheet(project: key, label: label)
-                    }
-            }
-            // The rest of its live sessions when the first page did not hold them all.
-            .task(id: isOpen) {
-                if isOpen { await model.fillProject(summary.folder) }
-            }
-        }
-    }
-
-    /// One group of sessions, folding at its heading (#181).
-    private func sessionGroup(_ part: SidebarProjectFold.Group, searching: Bool) -> some View {
-        let group = part.group
-        let isOpen = searching || folds.isOpen(key, .group(group))
-        return DisclosureGroup(isExpanded: Binding(get: { isOpen },
-                                                   set: { folds.set(key, .group(group), open: $0) })) {
-            ForEach(part.agents) { agent in
-                SidebarSessionRow(agent: agent)
-            }
-        } label: {
-            SidebarSubheading(title: part.heading.title, count: part.agents.count, unread: part.unread,
-                              tint: !isOpen && group == .needsAttention ? .attention : .none)
-        }
-    }
-
-    /// The pinned sessions (#180), then the pinned workflows (#432), folding as a group
-    /// does, in the order they were put in: dragged into another of their kind in the
-    /// list's edit mode, or moved from a row's menu.
-    private func pinnedSessions(_ fold: SidebarProjectFold) -> some View {
-        let pinned = fold.pinned
-        let pinnedFlows = fold.pinnedWorkflows
-        let searching = fold.isSearching
-        let isOpen = searching || folds.isOpen(key, .pinned)
-        return DisclosureGroup(isExpanded: Binding(get: { isOpen }, set: { folds.set(key, .pinned, open: $0) })) {
-            ForEach(pinned) { agent in
-                SidebarSessionRow(agent: agent)
-            }
-            .onMove { from, to in
-                guard !searching else { return }
-                var ids = pinned.map(\.id)
-                ids.move(fromOffsets: from, toOffset: to)
-                let shown = Set(ids)
-                let rest = model.pinnedSessions(in: key.folder).filter { !shown.contains($0) }
-                Task { await model.arrangeSessionPins(ids + rest, in: key.folder) }
-            }
-            ForEach(pinnedFlows) { summary in
-                SidebarWorkflowRow(summary: summary, project: key)
-            }
-            .onMove { from, to in
-                guard !searching else { return }
-                var ids = pinnedFlows.map(\.workflowID)
-                ids.move(fromOffsets: from, toOffset: to)
-                let shown = Set(ids)
-                let rest = model.pinnedWorkflows(in: key.folder).filter { !shown.contains($0) }
-                Task { await model.arrangeWorkflowPins(ids + rest, in: key.folder) }
-            }
-        } label: {
-            SidebarSubheading(title: "Pinned", count: fold.pinnedCount,
-                              unread: pinned.count(where: \.showsUnread),
-                              tint: !isOpen && fold.pinnedWantsAPerson(in: model.work) ? .attention : .none)
-        }
-    }
-
-    /// Archived sessions, folded under the live ones, a page of them held while the fold
-    /// is open (#165).
-    @ViewBuilder
-    private func archivedSessions(_ fold: SidebarProjectFold) -> some View {
-        let isOpen = fold.isSearching || folds.isOpen(key, .archivedSessions)
-        if fold.showsArchivedFold(summary) {
-            DisclosureGroup(isExpanded: Binding(get: { isOpen },
-                                                set: { folds.set(key, .archivedSessions, open: $0) })) {
-                let shown = fold.archivedShown(showingAll: showsAllMatches)
-                ForEach(shown) { agent in
+                ForEach(fold.sessions) { agent in
                     SidebarSessionRow(agent: agent)
                 }
-                if fold.isSearching, fold.archived.count > shown.count {
-                    Button("Show all \(fold.archived.count)", action: showAllMatches)
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                }
-            } label: {
-                SidebarSubheading(title: "Archived sessions", count: fold.archivedCount(summary))
-            }
-            .task(id: !fold.isSearching && isOpen) {
-                if !fold.isSearching && isOpen {
-                    await model.loadArchived(in: key.folder)
-                } else if !fold.isSearching {
-                    model.letGoOfArchived(in: key.folder)
-                }
-            }
-        }
-    }
-
-    /// The project's workflows, and its archived ones folded at their foot.
-    @ViewBuilder
-    private func workflows(_ fold: SidebarProjectFold) -> some View {
-        if !fold.workflows.isEmpty || !fold.archivedWorkflows.isEmpty {
-            DisclosureGroup(isExpanded: Binding(get: { fold.isSearching || folds.isOpen(key, .workflows) },
-                                                set: { folds.set(key, .workflows, open: $0) })) {
+                // Its workflows after the sessions (Alex, #495): rows, not a page.
                 ForEach(fold.workflows) { summary in
                     SidebarWorkflowRow(summary: summary, project: key)
                 }
-            } label: {
-                SidebarSubheading(title: "Workflows", count: fold.workflows.count)
-            }
-            if !fold.archivedWorkflows.isEmpty {
-                DisclosureGroup(isExpanded: Binding(get: { fold.isSearching || folds.isOpen(key, .archivedWorkflows) },
-                                                    set: { folds.set(key, .archivedWorkflows, open: $0) })) {
-                    ForEach(fold.archivedWorkflows) { summary in
-                        SidebarWorkflowRow(summary: summary, project: key)
+                if fold.isSearching {
+                    // What matched in the archive, in the group while searching, so a
+                    // match is one tap away.
+                    searchMatches(fold)
+                } else if isOpen {
+                    // The archive, one row opening a page (#495): never a fold inside
+                    // the group.
+                    let archived = fold.archivedCount(summary) + fold.archivedWorkflows.count
+                    if archived > 0 {
+                        ProjectPageRow(title: "Archived", systemImage: "archivebox",
+                                       count: archived, item: .archive(key))
                     }
-                } label: {
-                    SidebarSubheading(title: "Archived workflows", count: fold.archivedWorkflows.count)
                 }
+            } header: {
+                ProjectRow(summary: summary, label: label, isFolded: !isOpen, asHeading: true)
+                    .foregroundStyle(model.hostIsOffline(summary.host) ? .secondary : .primary)
+                    .contextMenu { ProjectMenuItems(summary: summary) { fillingDropbox = true } }
+                    .sheet(isPresented: $fillingDropbox) {
+                        DropboxSheet(project: key, label: label)
+                    }
+                    .accessibilityHint(isOpen ? "Folds the project" : "Unfolds the project")
+                    // The rest of its live sessions when the first page did not hold them
+                    // all. On the heading, which is always there, not on every row.
+                    .task(id: isOpen) {
+                        if isOpen { await model.fillProject(summary.folder) }
+                    }
             }
+        }
+    }
+
+    /// While searching: the archived workflows and sessions that matched, after the live
+    /// ones, the sessions capped until Show all (#176).
+    @ViewBuilder
+    private func searchMatches(_ fold: SidebarProjectFold) -> some View {
+        ForEach(fold.archivedWorkflows) { summary in
+            SidebarWorkflowRow(summary: summary, project: key)
+        }
+        let shown = fold.archivedShown(showingAll: showsAllMatches)
+        ForEach(shown) { agent in
+            SidebarSessionRow(agent: agent)
+        }
+        if fold.archived.count > shown.count {
+            Button("Show all \(fold.archived.count)", action: showAllMatches)
+                .appText(.fine)
+                .foregroundStyle(.secondary)
         }
     }
 }
 
-/// A group within a project's fold, with how many under it are unread (#70). Folded, a
-/// Needs you group keeps its count in the attention tint. The Mac's `SidebarSubheading`.
-struct SidebarSubheading: View {
+/// A row under a project that opens a page about it (#495, #498): its archive. One row
+/// where there used to be folds inside the project's fold.
+private struct ProjectPageRow: View {
     let title: String
+    let systemImage: String
     let count: Int
-    var unread: Int = 0
-    var tint: StateTint = .none
+    let item: SidebarItem
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
+            Image(systemName: systemImage)
+                .foregroundStyle(Paper.accent)
+                .frame(width: 20)
+                .accessibilityHidden(true)
             Text(title)
-            Text("\(count)").monospacedDigit().foregroundStyle(tint.style(or: .tertiary))
-            if unread > 0 {
-                Text("· \(unread) unread").monospacedDigit()
-            }
+                .lineLimit(1)
+            Spacer(minLength: 4)
+            Text("\(count)")
+                .monospacedDigit()
+                .appText(.fine)
+                .foregroundStyle(.secondary)
         }
-        .appText(.fine)
-        .foregroundStyle(.secondary)
+        .appText(.supporting)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(unread > 0 ? "\(title), \(count), \(unread) unread" : "\(title), \(count)")
+        .accessibilityLabel("\(title), \(count)")
+        .tag(item)
+    }
+}
+
+/// A page about all the work in the sidebar's Activity group (#495): its icon, in the
+/// accent, before the row. Beside the row rather than a `Label`, whose title a sidebar
+/// list draws in its own style (#155).
+private extension View {
+    func activityIcon(_ systemImage: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: systemImage)
+                .foregroundStyle(Paper.accent)
+                .frame(width: 20)
+                .accessibilityHidden(true)
+            self
+        }
     }
 }
 
@@ -414,29 +491,43 @@ struct NewSessionButton: View {
     }
 }
 
-/// The first row under an unfolded project (#375): a new session in it, the start form.
-/// It carries the project's own item, which the list lights while that form is open. On
-/// a phone it is the way in, now that a tap on the project only folds it.
-private struct NewSessionRow: View {
+/// The first row of the sidebar (#495, #498): a new session, in the project the last one
+/// was started in, as the window's. It carries that project's own item, which the list
+/// lights while that form is open. A project's long press starts one in that project
+/// instead.
+private struct NewSessionTopRow: View {
     @Environment(RemoteModel.self) private var model
-    let project: ProjectKey
 
     var body: some View {
+        let project = model.newSessionProject
         HStack(spacing: 8) {
             Image(systemName: "square.and.pencil")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Paper.accent)
                 .frame(width: 20)
                 .accessibilityHidden(true)
-            Text("New session")
+            Text("New Session")
                 .lineLimit(1)
             Spacer(minLength: 0)
         }
         .appText(.supporting)
-        .foregroundStyle(model.isStale ? .secondary : .primary)
+        .foregroundStyle(model.isStale || project == nil ? .secondary : .primary)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("New session")
-        .tag(SidebarItem.project(project))
-        .selectionDisabled(model.isStale)
+        .accessibilityLabel("New Session")
+        .modifier(NewSessionTag(project: project))
+        .selectionDisabled(model.isStale || project == nil)
+    }
+}
+
+/// The row's item while there is a project to start in; none while there is not.
+private struct NewSessionTag: ViewModifier {
+    let project: ProjectKey?
+
+    func body(content: Content) -> some View {
+        if let project {
+            content.tag(SidebarItem.project(project))
+        } else {
+            content
+        }
     }
 }
 

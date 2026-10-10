@@ -34,6 +34,16 @@ struct ResourcesListView: View {
                 ForEach(busy) { ResourceListRow(state: $0, at: model.work.leases?.at ?? Date()) }
                     .paperListRow()
             }
+            if let hosted = model.work.hostedMCP?.servers, !hosted.isEmpty {
+                Section {
+                    ForEach(hosted) { HostedMCPListRow(status: $0) }
+                        .paperListRow()
+                } header: {
+                    Text("Hosted MCP servers")
+                } footer: {
+                    Text("Run once on the Mac for every agent, from \"hosted\": true in mcp.json.")
+                }
+            }
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
@@ -74,6 +84,28 @@ private struct ResourceListRow: View {
 
     private func name(_ id: UUID) -> String {
         LeaseWords.agentName(model.work.agent(id)?.title)
+    }
+}
+
+/// A server the Mac hosts for every agent (#488): what it is doing, and why it last stopped.
+private struct HostedMCPListRow: View {
+    let status: DaemonAPI.HostedMCPStatus
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(status.name).fontWeight(.semibold)
+                Spacer()
+                Text(HostedMCPWords.place(status)).appText(.fine).foregroundStyle(.secondary)
+            }
+            Text(HostedMCPWords.line(status)).appText(.fine).foregroundStyle(.secondary)
+            if let error = HostedMCPWords.lastError(status) {
+                Text(error).appText(.fine)
+                    .foregroundStyle(status.state == .restarting
+                                     ? StateTint.failure.style(or: .secondary) : AnyShapeStyle(.secondary))
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 

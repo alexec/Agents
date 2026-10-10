@@ -6,7 +6,7 @@ import type {
   Agent, AgentRemovedNotification, ResumingNotification, ControlHost, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
-  StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, DiskState, StoreNotes,
+  StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, DiskState, StoreNotes,
   ChatProjectState, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
 } from "../protocol/generated";
@@ -300,6 +300,8 @@ export class Work {
   readonly draftOptions = signal<DraftOptionsNotification | null>(null);
   /** Each host's resources and who holds them (036, #116): read-only on the page. */
   readonly leases = signal<Record<string, LeaseSnapshot>>({});
+  /** The MCP servers each host runs for every agent (#488), replaced whole by `mcp/hostedChanged`. */
+  readonly hostedMCP = signal<Record<string, HostedMCPSnapshot>>({});
   /** Each host's chats it is bringing back by itself after a restart: Coming back (#251). */
   readonly resuming = signal<Record<string, readonly string[]>>({});
   /** Each host's volumes low on space (#196), replaced whole by each disk/changed, never merged. */
@@ -446,6 +448,9 @@ export class Work {
       }
       case "leases/changed":
         this.leases.value = { ...this.leases.value, [host]: params as LeaseSnapshot };
+        return true;
+      case "mcp/hostedChanged":
+        this.hostedMCP.value = { ...this.hostedMCP.value, [host]: params as HostedMCPSnapshot };
         return true;
       case "disk/changed":
         this.disk.value = { ...this.disk.value, [host]: params as DiskState };
@@ -990,6 +995,7 @@ export class Store extends Work {
       this.sessionPins.value = notOf(this.sessionPins.value);
       this.workflowPins.value = notOf(this.workflowPins.value);
       this.leases.value = without(this.leases.value);
+      this.hostedMCP.value = without(this.hostedMCP.value);
       this.runtimes.value = without(this.runtimes.value);
       this.accounts.value = without(this.accounts.value);
       this.sandboxDefaults.value = without(this.sandboxDefaults.value);
@@ -1060,6 +1066,10 @@ export class Store extends Work {
     void this.link.call("leases/snapshot", {}, host).then((snapshot) => {
       this.leases.value = { ...this.leases.value, [host]: snapshot };
     }).catch(failed("leases/snapshot"));
+    // A host from before #488 doesn't know the method, and hosts no servers.
+    void this.link.call("mcp/hosted", {}, host).then((snapshot) => {
+      this.hostedMCP.value = { ...this.hostedMCP.value, [host]: snapshot };
+    }).catch(failed("mcp/hosted"));
     // A host too old to know disk/state says nothing, and no strip is drawn.
     void this.link.call("disk/state", {}, host).then((state) => {
       this.disk.value = { ...this.disk.value, [host]: state };

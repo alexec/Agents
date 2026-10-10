@@ -227,7 +227,7 @@ struct WorkflowRow: View {
         // Ahead of everything else: nothing about it matters until somebody has read it,
         // and one waiting its turn cannot be read into running until another goes.
         if summary.waitsItsTurn, let limit = summary.overLimit {
-            return "\(limit.sentence). \(limit.remedy)"
+            return "\(limit.sentence(total: summary.limitTotal)). \(limit.remedy)"
         }
         if let waiting = summary.awaitingApproval {
             // The mode it would run in is on the line above, where every row says it.
@@ -238,7 +238,7 @@ struct WorkflowRow: View {
         // Ahead of the pause, because unpausing it would change nothing: what has to
         // happen is that something else goes.
         if let limit = summary.overLimit {
-            return "\(limit.sentence). \(limit.remedy)"
+            return "\(limit.sentence(total: summary.limitTotal)). \(limit.remedy)"
         }
         if let queued = summary.queuedSentence { return queued }
         guard let outcome = summary.lastOutcome else { return nil }

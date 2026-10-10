@@ -4,6 +4,7 @@
 import type { ComponentChildren } from "preact";
 import type { ConfigOption, JSONValue } from "../protocol/generated";
 import { choiceGroups, closedTitle, isAboutPermission, same } from "../model/options";
+import { nothingToAdjust } from "../model/promptWords";
 
 export function OptionControl({ option, value, onChange, disabled }: {
   option: ConfigOption; value: JSONValue | undefined; onChange: (value: JSONValue) => void; disabled?: boolean | undefined;
@@ -42,14 +43,16 @@ export function OptionControl({ option, value, onChange, disabled }: {
 }
 
 /** Every drawn option: permission first, then the rest, as the window lays them out. */
-export function PromptMenus({ options, value, onChange, disabled, besideMode, trailing }: {
+export function PromptMenus({ options, value, onChange, disabled, runtime, besideMode, trailing }: {
   options: ConfigOption[]; value: (option: ConfigOption) => JSONValue | undefined;
   onChange: (option: ConfigOption, value: JSONValue) => void; disabled?: boolean | undefined;
+  /** The runtime's name, as the note says it when it offers nothing. */
+  runtime?: string | undefined;
   /** Beside the permission mode, as the window draws the command sandbox there (064). */
   besideMode?: ComponentChildren;
   trailing?: ComponentChildren;
 }) {
-  if (!options.length && !besideMode) return <div class="menus options-note">This runtime has nothing to adjust.</div>;
+  if (!options.length && !besideMode) return <div class="menus options-note">{nothingToAdjust(runtime)}</div>;
   const permission = options.filter(isAboutPermission);
   const others = options.filter((o) => !isAboutPermission(o));
   const control = (option: ConfigOption) => (
@@ -60,7 +63,7 @@ export function PromptMenus({ options, value, onChange, disabled, besideMode, tr
     <div class="menus" role="group" aria-label="Settings for this session">
       {permission.map(control)}
       {besideMode}
-      {!options.length && <span class="options-note">This runtime has nothing to adjust.</span>}
+      {!options.length && <span class="options-note">{nothingToAdjust(runtime)}</span>}
       <span class="spacer" />
       {/* Together on the right, wrapping there rather than under the mode at phone width. */}
       {(others.length > 0 || trailing) && <span class="menus-right">{modelEffort(others, value, onChange, disabled)}{others.filter((o) => !isModelOrEffort(o)).map(control)}{trailing}</span>}

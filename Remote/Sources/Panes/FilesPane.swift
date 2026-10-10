@@ -173,7 +173,7 @@ struct FilesPane: View {
                 pageControls(file)
             }
             if let file = state.openFile, PinRules.kind(file.path) == .html,
-               let path = PinRules.relative(file.path, in: agent.projectFolder) {
+               let path = agent.pinPath(file.path) {
                 pinButton(path)
             }
             if let file = state.openFile, !ChangesView.changes(to: file.path, in: model.entries).isEmpty {
@@ -728,4 +728,12 @@ private struct Said: View {
 struct UIImageBox: Equatable {
     let image: UIImage
     static func == (lhs: UIImageBox, rhs: UIImageBox) -> Bool { lhs.image === rhs.image }
+}
+
+extension Agent {
+    /// A file's path in the project, as a pin names it (#536): from a worktree, the same
+    /// path in the project folder, where the pin opens it, as on the Mac and the web.
+    func pinPath(_ file: String) -> String? {
+        PinRules.relative(file, in: worktree != nil ? cwd : projectFolder)
+    }
 }

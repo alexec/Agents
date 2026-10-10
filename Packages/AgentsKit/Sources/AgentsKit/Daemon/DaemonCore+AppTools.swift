@@ -58,6 +58,8 @@ extension DaemonCore {
     func endAppTools(for token: String) {
         appTools.revoke(token)
         endBridgeRoutes(for: token)
+        let hosted = hostedServers
+        Task { await hosted.release(token) }
     }
 
     func dropAppTokens(for agentID: UUID) {
@@ -695,23 +697,14 @@ extension DaemonCore {
         let existing = existingText.map { WorkflowFile.parse($0, workflowID: workflowID, in: project) }
         let isArchived = existing?.isArchived ?? false
         let waiting = ceilings.waiting[Project.standardize(project)] ?? []
-        if !isArchived, !waiting.contains(workflowID), waiting.count >= WorkflowLimit.project.allowed {
-            let names = waiting.prefix(WorkflowLimit.project.allowed).joined(separator: ", ")
+        if !isArchived, !waiting.contains(workflowID), waiting.count >= WorkflowLimit.projectAllowed {
+            let names = waiting.prefix(WorkflowLimit.projectAllowed).joined(separator: ", ")
             throw JSONRPCError(code: DaemonAPI.Failure.workflowLimitReached,
                                message: """
                                 \(WorkflowLimit.project.remedy). Nothing was written: \
                                 \(names) are waiting for their OK in this project. Change one \
                                 of those instead, or ask them to approve or remove one to \
                                 make room.
-                                """)
-        }
-        if !exists, ceilings.approved.count >= WorkflowLimit.total.allowed {
-            throw JSONRPCError(code: DaemonAPI.Failure.workflowLimitReached,
-                               message: """
-                                Nothing was written: \(WorkflowLimit.total.allowed) \
-                                workflows are already running across their projects, which \
-                                is as many as this app runs at once. Ask them to archive \
-                                one — anywhere — to make room.
                                 """)
         }
         // The switch and the archive are the person's, and live in the file (#125), so

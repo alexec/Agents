@@ -1,11 +1,10 @@
 // The CI watcher MCP server (#383): this repo's pull requests' CI as events, tools and a
-// view, over plain JSON-RPC on http at 127.0.0.1. The contract is
+// view, over MCP's stdio transport. The Agents daemon hosts it (#488). The contract is
 // specs/383-mcp-integrations/contracts/ci-watcher-server.md.
 //
-//   node server.ts [--port 8795]          gh as the signed-in person
+//   node server.ts                        gh as the signed-in person
 //   CI_WATCHER_FAKE=<file> node server.ts reads and writes <file> instead
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { randomUUID } from "node:crypto";
+import { createInterface } from "node:readline";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -317,66 +316,31 @@ async function answer(gh: GitHub, message: any) {
   }
 }
 
-// MARK: http
+// MARK: stdio
 
-/** No Origin (not a browser), or a page on 127.0.0.1 itself. */
-function originAllowed(origin: string | undefined) {
-  return origin === undefined || /^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin);
-}
-
-function send(res: ServerResponse, status: number, body?: unknown, headers: Record<string, string> = {}) {
-  const text = body === undefined ? "" : JSON.stringify(body);
-  res.writeHead(status, { ...(body === undefined ? {} : { "content-type": "application/json" }), ...headers });
-  res.end(text);
-}
-
-function readBody(req: IncomingMessage): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let size = 0;
-    const chunks: Buffer[] = [];
-    req.on("data", (chunk: Buffer) => {
-      size += chunk.length;
-      if (size > MAX_BODY) { reject(new Error("too large")); req.destroy(); return; }
-      chunks.push(chunk);
-    });
-    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
-    req.on("error", reject);
-  });
-}
-
-export function start(gh: GitHub, port: number, fake: string | undefined) {
-  const server = createServer(async (req, res) => {
-    if (!originAllowed(req.headers.origin)) return send(res, 403, { error: "Origin not allowed" });
-    const path = (req.url ?? "/").split("?")[0];
-    if (path === "/health" && req.method === "GET") {
-      return send(res, 200, { ok: true, name: "ci-watcher", version: VERSION, fake: fake !== undefined });
+/**
+ * Newline-delimited JSON-RPC on stdin and stdout, as MCP's stdio transport has it. The
+ * Agents daemon runs one copy per host and shares it with every agent (#488). Requests are
+ * answered as they finish, so a slow tool does not hold up a poll. Logging goes to stderr.
+ */
+export function serve(gh: GitHub, input: NodeJS.ReadableStream, output: NodeJS.WritableStream) {
+  const write = (message: unknown) => { output.write(JSON.stringify(message) + "\n"); };
+  createInterface({ input, crlfDelay: Infinity }).on("line", async (line) => {
+    if (!line.trim()) return;
+    if (Buffer.byteLength(line) > MAX_BODY) {
+      return write({ jsonrpc: "2.0", id: null, error: { code: -32600, message: "message too large" } });
     }
-    if (path !== "/mcp") return send(res, 404, { error: "not found" });
-    // The server keeps no session state, so any session id is good, and ending one is a no-op.
-    if (req.method === "DELETE") return send(res, 204);
-    if (req.method !== "POST") return send(res, 405, { error: "POST JSON-RPC to /mcp" }, { allow: "POST, DELETE" });
-
     let parsed: any;
     try {
-      parsed = JSON.parse(await readBody(req));
+      parsed = JSON.parse(line);
     } catch {
-      return send(res, 400, { jsonrpc: "2.0", id: null, error: { code: -32700, message: "parse error" } });
+      return write({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "parse error" } });
     }
     const batch = Array.isArray(parsed);
-    const answers = (await Promise.all((batch ? parsed : [parsed]).map((m: any) => answer(gh, m)))).filter((a) => a !== undefined);
-    const initializing = (batch ? parsed : [parsed]).some((m: any) => m?.method === "initialize");
-    const headers: Record<string, string> = initializing
-      ? { "mcp-session-id": randomUUID() }
-      : typeof req.headers["mcp-session-id"] === "string" ? { "mcp-session-id": req.headers["mcp-session-id"] } : {};
-    if (answers.length === 0) return send(res, 202, undefined, headers);
-    send(res, 200, batch ? answers : answers[0], headers);
+    const answers = (await Promise.all((batch ? parsed : [parsed]).map((m: any) => answer(gh, m))))
+      .filter((a) => a !== undefined);
+    if (answers.length > 0) write(batch ? answers : answers[0]);
   });
-  server.listen(port, "127.0.0.1", () => {
-    const address = server.address();
-    const actual = typeof address === "object" && address ? address.port : port;
-    console.log(`ci-watcher listening on http://127.0.0.1:${actual}/mcp${fake ? ` (fake: ${fake})` : ""}`);
-  });
-  return server;
 }
 
 function fakePath(): string | undefined {
@@ -387,16 +351,11 @@ function fakePath(): string | undefined {
 }
 
 if (import.meta.main) {
-  const i = process.argv.indexOf("--port");
-  const port = i > 0 ? Number(process.argv[i + 1]) : 8795;
-  if (!Number.isInteger(port) || port < 0 || port > 65535) {
-    console.error("usage: node server.ts [--port 8795]");
-    process.exit(2);
-  }
   const fake = fakePath();
   if (fake && !existsSync(fake)) {
     console.error(`ci-watcher: no such file ${fake}`);
     process.exit(2);
   }
-  start(fake ? fakeGitHub(fake) : realGitHub(), port, fake);
+  console.error(`ci-watcher ${VERSION} on stdio${fake ? ` (fake: ${fake})` : ""}`);
+  serve(fake ? fakeGitHub(fake) : realGitHub(), process.stdin, process.stdout);
 }

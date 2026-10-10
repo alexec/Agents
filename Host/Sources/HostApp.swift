@@ -10,6 +10,12 @@ import SwiftUI
 enum HostEntry {
     static func main() {
         if CommandLine.arguments.contains(ControlLauncher.argument) { ControlLauncher.run() }
+        // With no window server to reach (an agent's sandbox, ssh, a launchd job outside
+        // the login session), AppKit aborts in _RegisterApplication (#505): say why and stop.
+        guard CGSessionCopyCurrentDictionary() != nil else {
+            FileHandle.standardError.write(Data("Agents Host: no window server to draw on (a sandbox, ssh or no login session); start it from the logged-in desktop.\n".utf8))
+            exit(78) // EX_CONFIG
+        }
         AgentsHostApp.main()
     }
 }

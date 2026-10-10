@@ -38,7 +38,8 @@ struct ProjectListView: View {
     /// Which machine the New project menu was pointed at (037).
     @State private var targetHost: HostID = .mac
     @State private var isChoosingServerFolder = false
-    @State private var isAddingServer = false
+    /// File ▸ Add Server…'s own view of the control plane, while its sheet is open (#503).
+    @State private var addingServer: ControlSettingsModel?
 
     /// This Mac's projects, then each server's: no headings for hosts (Alex, #145), the
     /// host is in a server project's own name.
@@ -49,9 +50,8 @@ struct ProjectListView: View {
     var body: some View {
         List(selection: $picked) {
             // What wants the person, across every project and host (#495): Things'
-            // Inbox and Today, Mail's smart mailboxes. Always drawn, so the list does not
-            // move as states change; the pages about all the work that used to be here
-            // are in the toolbar and the View menu.
+            // Inbox and Today, Mail's smart mailboxes, each drawn only with something in
+            // it (#507).
             Section {
                 // One way to start a session (#495), in the project last started in; the
                 // page it opens can switch project.
@@ -77,7 +77,8 @@ struct ProjectListView: View {
             }
 
             // Pinned, Needs You, Working, Unread: a group each, headed and folding as a
-            // project's is, so every group in the list lines up alike (#495).
+            // project's is, so every group in the list lines up alike (#495). Empty, or
+            // with no match for a search, a group is not drawn (#507).
             ForEach(SidebarSmartRow.allCases, id: \.self) { row in
                 SmartFold(row: row, projects: orderedProjects.map(\.key), folds: folds, query: searched)
             }
@@ -207,6 +208,15 @@ struct ProjectListView: View {
                                     set: { if !$0 { requests.dropboxProject = nil } })) {
             if let project = requests.dropboxProject { DropboxSheet(project: project).paperSheet() }
         }
+        // The sheet Settings ▸ Control plane ▸ Add a Server… shows (#503).
+        .sheet(isPresented: Binding(get: { addingServer != nil }, set: { if !$0 { addingServer = nil } })) {
+            if let control = addingServer {
+                ControlAddServerSheet(control: control)
+                    .task { await control.start() }
+                    .onDisappear { control.stop() }
+                    .paperSheet()
+            }
+        }
         // File ▸ Add Project…, Clone Project from Git URL…, their On menus for a server,
         // and Add Server….
         .onChange(of: requests.projectSheet) { _, sheet in
@@ -220,8 +230,7 @@ struct ProjectListView: View {
                 targetHost = host
                 isCloning = true
             case .addServer:
-                targetHost = .mac
-                isAddingServer = true
+                addingServer = ControlConfig.endpoint.flatMap { ControlSettingsModel(endpoint: $0) }
             }
         }
     }

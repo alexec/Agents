@@ -100,7 +100,8 @@ struct WorkflowWaitingLimitTests {
     @Test func theMessageIsTheOneAgreedOn() {
         #expect(WorkflowLimit.project.remedy + "."
                 == "Approve or remove one of the 3 workflows waiting for approval first.")
-        #expect(WorkflowLimit.total.allowed == 10)
+        #expect(WorkflowLimit.defaultTotal == 10)
+        #expect(WorkflowLimit.total.remedy == "Turn one off or archive one, in any project, to let it run")
     }
 
     @Test func approvingOneFreesAPlace() async throws {

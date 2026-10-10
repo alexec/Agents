@@ -1,4 +1,4 @@
-// The CI watcher in its fake mode, on a free port, against a copy of fixtures/ci.json.
+// The CI watcher in its fake mode, on stdio, against a copy of fixtures/ci.json.
 // Nothing here calls gh or GitHub.
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
@@ -7,30 +7,27 @@ import { mkdtempSync, copyFileSync, readFileSync, writeFileSync, rmSync } from "
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createInterface } from "node:readline";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const REPO = "alexec/Agents";
 let scratch = "";
 let fixture = "";
 let server: ChildProcess | undefined;
-let base = "";
+const waiting = new Map<number, (message: any) => void>();
 
 before(async () => {
   scratch = mkdtempSync(join(tmpdir(), "ci-watcher-test-"));
   fixture = join(scratch, "ci.json");
   copyFileSync(join(here, "fixtures", "ci.json"), fixture);
-  server = spawn(process.execPath, [join(here, "server.ts"), "--port", "0"], {
+  server = spawn(process.execPath, [join(here, "server.ts")], {
     env: { ...process.env, CI_WATCHER_FAKE: fixture, PATH: "/nonexistent" },
-    stdio: ["ignore", "pipe", "inherit"],
+    stdio: ["pipe", "pipe", "inherit"],
   });
-  base = await new Promise<string>((resolve, reject) => {
-    let out = "";
-    server!.stdout!.on("data", (chunk) => {
-      out += chunk;
-      const m = out.match(/listening on (http:\/\/127\.0\.0\.1:\d+)/);
-      if (m) resolve(m[1]);
-    });
-    server!.on("exit", (code) => reject(new Error(`server exited ${code}`)));
+  createInterface({ input: server.stdout! }).on("line", (line) => {
+    const message = JSON.parse(line);
+    waiting.get(message.id)?.(message);
+    waiting.delete(message.id);
   });
 });
 
@@ -49,17 +46,15 @@ const repoData = (data: any) => data.repos[REPO];
 const read = () => JSON.parse(readFileSync(fixture, "utf8"));
 
 let nextID = 1;
-async function post(body: unknown, headers: Record<string, string> = {}) {
-  return fetch(`${base}/mcp`, {
-    method: "POST",
-    headers: { "content-type": "application/json", accept: "application/json, text/event-stream", ...headers },
-    body: JSON.stringify(body),
-  });
+function send(message: unknown) {
+  server!.stdin!.write(JSON.stringify(message) + "\n");
 }
-async function rpc(method: string, params: unknown = {}) {
-  const res = await post({ jsonrpc: "2.0", id: nextID++, method, params });
-  assert.equal(res.status, 200);
-  return res.json();
+function rpc(method: string, params: unknown = {}): Promise<any> {
+  const id = nextID++;
+  return new Promise((resolve) => {
+    waiting.set(id, resolve);
+    send({ jsonrpc: "2.0", id, method, params });
+  });
 }
 async function ok(method: string, params: unknown = {}) {
   const body = await rpc(method, params);
@@ -83,20 +78,9 @@ function failedRun(id: number, branch: string, updatedAt: string, attempt = 1) {
   };
 }
 
-test("health", async () => {
-  const res = await fetch(`${base}/health`);
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.equal(body.ok, true);
-  assert.equal(body.fake, true);
-});
-
-test("initialize gives the contract's capabilities and a session", async () => {
-  const res = await post({ jsonrpc: "2.0", id: nextID++, method: "initialize",
-    params: { protocolVersion: "2026-07-28", capabilities: {}, clientInfo: { name: "t", version: "1" } } });
-  assert.equal(res.status, 200);
-  assert.ok(res.headers.get("mcp-session-id"));
-  const { result } = await res.json();
+test("initialize gives the contract's capabilities", async () => {
+  const result = await ok("initialize",
+    { protocolVersion: "2026-07-28", capabilities: {}, clientInfo: { name: "t", version: "1" } });
   assert.equal(result.protocolVersion, "2026-07-28");
   assert.deepEqual(result.capabilities, {
     tools: {}, resources: {}, events: { listChanged: false },
@@ -107,9 +91,10 @@ test("initialize gives the contract's capabilities and a session", async () => {
   assert.equal(older.protocolVersion, "2025-06-18");
 });
 
-test("a notification is accepted with 202", async () => {
-  const res = await post({ jsonrpc: "2.0", method: "notifications/initialized" });
-  assert.equal(res.status, 202);
+test("a notification is answered with nothing", async () => {
+  send({ jsonrpc: "2.0", method: "notifications/initialized" });
+  // The next request's answer is the next line: nothing came for the notification.
+  assert.deepEqual(await ok("ping"), {});
 });
 
 test("events/list gives both events, poll only, with their schemas", async () => {
@@ -337,12 +322,9 @@ test("list_prs feeds the board, which resources/read serves", async () => {
   assert.equal(missing.error.code, -32002);
 });
 
-test("a non-local Origin is refused", async () => {
-  const body = { jsonrpc: "2.0", id: nextID++, method: "ping" };
-  assert.equal((await post(body, { origin: "https://evil.example" })).status, 403);
-  assert.equal((await post(body, { origin: "http://localhost:3000" })).status, 403);
-  assert.equal((await post(body, { origin: "http://127.0.0.1.evil.example" })).status, 403);
-  assert.equal((await post(body, { origin: "null" })).status, 403);
-  assert.equal((await post(body, { origin: "http://127.0.0.1:5173" })).status, 200);
-  assert.equal((await post(body)).status, 200);
+test("a line that is not JSON is a parse error, and the server goes on", async () => {
+  const answered = new Promise<any>((resolve) => waiting.set(null as any, resolve));
+  server!.stdin!.write("not json\n");
+  assert.equal((await answered).error.code, -32700);
+  assert.deepEqual(await ok("ping"), {});
 });

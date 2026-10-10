@@ -79,7 +79,7 @@ struct RemoteView: View {
     /// one the sidebar lights; the rest are pushed over it. With none, the project's page
     /// is a new session in it (#366).
     private var routes: [RemoteRoute] {
-        let open = [model.openPin.map(RemoteRoute.page),
+        let open = [model.openArchive ? RemoteRoute.archive : nil, model.openPin.map(RemoteRoute.page),
                     model.openWorkflow.map(RemoteRoute.workflow), model.selection.map(RemoteRoute.agent)]
             .compactMap { $0 }
         // A project with nothing open over it starts a session (#366): its New session row (#375).
@@ -92,6 +92,7 @@ struct RemoteView: View {
                 set: { more in
                     guard let root = routes.first else { return }
                     let all = [root] + more
+                    model.openArchive = all.contains(.archive)
                     model.openPin = all.lazy.compactMap(\.pinPath).first
                     model.openWorkflow = all.lazy.compactMap(\.workflowID).first
                     model.selection = all.compactMap(\.agentID).last
@@ -210,6 +211,10 @@ struct RemoteView: View {
         case .agent:
             RemoteChatView().paperGround()
         case .workflow(let id): WorkflowPage(workflowID: id).paperGround()
+        case .archive:
+            if let summary = model.selectedSummary {
+                ArchivePage(project: summary.key).paperGround()
+            }
         case .start:
             if let folder = model.selectedProject {
                 // Held open while it is on screen: the runtime behind its choices is let
@@ -253,6 +258,8 @@ enum RemoteRoute: Hashable {
     case start
     /// One of the project's pinned pages (#159), by its path in the project.
     case page(String)
+    /// What the project has archived (#495, #498), from its Archived row in the sidebar.
+    case archive
 
     var pinPath: String? {
         if case .page(let path) = self { return path }

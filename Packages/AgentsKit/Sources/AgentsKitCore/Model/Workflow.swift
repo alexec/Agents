@@ -226,15 +226,21 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     /// heading, where they can be brought back — and never run.
     public var isArchived: Bool
     /// Switched on or off by the person (#100), and on unless they said otherwise.
-    /// Unlike archiving, an off workflow stays where it is on the list and keeps its
-    /// place under the ceiling, so turning one off for an afternoon moves nothing else;
-    /// none of its triggers fire, and Run now still runs it.
+    /// Unlike archiving, an off workflow stays where it is on the list; like it, it takes
+    /// no place under the total (#506), since it runs nothing. None of its triggers
+    /// fire, and Run now still runs it.
     public var isEnabled: Bool
     /// Which ceiling this one is past, if any: listed, and inert until something else
     /// is approved, archived or removed — `.project` for a waiting one past the three
-    /// a project may have waiting (#132), `.total` for an approved one past the ten. Resolved by the daemon because it is a fact about every project at
+    /// a project may have waiting (#132), `.total` for an approved one turned on past the
+    /// total. Resolved by the daemon because it is a fact about every project at
     /// once rather than about this workflow, and two windows must not count differently.
     public var overLimit: WorkflowLimit?
+    /// The total in force on its host (#506), which the person sets: what the row's
+    /// "N workflows are already running" says. Nil from a host before it, which ran ten.
+    public var totalLimit: Int?
+    /// The total, as the words say it.
+    public var limitTotal: Int { totalLimit ?? WorkflowLimit.defaultTotal }
     /// When a clock will next make it run. `nil` when nothing will.
     public var nextFireAt: Date?
     /// The same, for each trigger in the file's order (#98): a time for each schedule
@@ -288,7 +294,7 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     public var workflowID: String { workflow.workflowID }
 
     public init(workflow: Workflow, isArchived: Bool = false, isEnabled: Bool = true,
-                overLimit: WorkflowLimit? = nil, nextFireAt: Date? = nil,
+                overLimit: WorkflowLimit? = nil, totalLimit: Int? = nil, nextFireAt: Date? = nil,
                 lastOutcome: WorkflowOutcome? = nil, isRunning: Bool = false,
                 causingEvent: EventPosition? = nil, causingEventName: String? = nil,
                 awaitingApproval: WorkflowApproval? = nil,
@@ -315,6 +321,7 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         self.workflow = workflow
         self.isArchived = isArchived
         self.overLimit = overLimit
+        self.totalLimit = totalLimit
         self.nextFireAt = nextFireAt
         self.lastOutcome = lastOutcome
         self.isRunning = isRunning
@@ -360,7 +367,7 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         // Nothing runs until somebody has looked at it.
         if awaitingApproval != nil { return true }
         // Nothing resolves this one on its own: it stays over the limit until somebody
-        // archives or removes another.
+        // turns off, archives or removes another, or raises the total.
         if overLimit != nil { return true }
         if workflow.problem?.needsAPerson == true { return true }
         if case .refused(let refusal, _, _) = lastOutcome { return refusal.needsAPerson }
@@ -368,10 +375,10 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     }
 
     /// What a page says about a workflow turned off (#100), on the Mac and the phone
-    /// alike: that nothing fires it, that it still holds its place under the ceiling,
-    /// and that Run now still works, the three things that set it apart from archived.
+    /// alike: that nothing fires it, that it takes no place under the total (#506), and
+    /// that Run now still works, the three things that set it apart from archived.
     public static let turnedOffSentence = "Turned off — none of its triggers run it. "
-        + "It still counts towards the workflow limits, "
+        + "It doesn't count towards the workflows running, "
         + "and Run now still runs it"
 
     /// The same, led by why it is off when that is something the person is waiting on
@@ -379,7 +386,7 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     public var turnedOffSentence: String {
         guard let why = offReason?.sentence else { return Self.turnedOffSentence }
         return why + ". None of its triggers run it until it is turned on. "
-            + "It still counts towards the workflow limits, "
+            + "It doesn't count towards the workflows running, "
             + "and Run now still runs it"
     }
 
@@ -400,6 +407,7 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         isArchived = try c.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
         isEnabled = try c.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
         overLimit = try? c.decodeIfPresent(WorkflowLimit.self, forKey: .overLimit)
+        totalLimit = try? c.decodeIfPresent(Int.self, forKey: .totalLimit)
         nextFireAt = try c.decodeIfPresent(Date.self, forKey: .nextFireAt)
         nextFireAtByTrigger = (try? c.decodeIfPresent([Date?].self, forKey: .nextFireAtByTrigger)) ?? []
         lastOutcome = (try? c.decodeIfPresent(WorkflowOutcome.self, forKey: .lastOutcome)) ?? nil

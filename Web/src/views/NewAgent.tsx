@@ -29,6 +29,7 @@ import { Prompt } from "./Prompt";
 import { OfflineStrip } from "./OfflineStrip";
 import { PromptMenus } from "./PromptMenus";
 import { BackToList } from "./BackToList";
+import { orderedProjects, projectLabel } from "./Sidebar";
 
 type Where = { kind: "project" } | { kind: "new" } | { kind: "existing"; root: string } | { kind: "branch"; name: string };
 
@@ -240,7 +241,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
       {/* The same strip as over a chat: a prompt here goes to that host too (#83). */}
       {!down && <OfflineStrip store={store} host={host} />}
       <div class="scroll new-heading">
-        <h1>{projectName}</h1>
+        <ProjectSwitch store={store} host={host} folder={folder} projectName={projectName} down={down} />
         <p class="quiet" title={path}>{path} · {machine}</p>
       </div>
       <footer class="foot">
@@ -325,7 +326,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
           {saying}
           {(!saying || form.value.state === "ready") && (
             <PromptMenus options={form.value.options} value={(o) => form.value.chosen[o.id]}
-              onChange={(o, v) => setChosen(o.id, v)} disabled={down}
+              onChange={(o, v) => setChosen(o.id, v)} disabled={down} runtime={chosenRuntime ? runtimeName : undefined}
               besideMode={chosenRuntime && (
                 <SandboxPill runtimeID={chosenRuntime} name={runtimeName} override={sandbox.value} runtimeDefault={runtimeDefault}
                   codexMode={typeof codexMode === "string" ? codexMode : undefined} disabled={down}
@@ -393,5 +394,29 @@ function SandboxPill({ runtimeID, name, override, runtimeDefault, codexMode, dis
         ))}
       </select>
     </label>
+  );
+}
+
+/**
+ * The project's name, a menu of every project to start in another instead (#495, #499): the
+ * sidebar has one New Session, at its top, in the project last started in.
+ */
+function ProjectSwitch({ store, host, folder, projectName, down }: {
+  store: Store; host: string; folder: string; projectName: string; down: boolean;
+}) {
+  const projects = orderedProjects(store.hosts.value, store.projects.value);
+  const at = projects.findIndex((p) => p.host.id === host && folderKey(p.project.project.folder) === folderKey(folder));
+  if (projects.length < 2 || at < 0) return <h1>{projectName}</h1>;
+  return (
+    <h1 class="project-switch" title="Start it in another project">
+      <span aria-hidden="true">{projectLabel(projects[at]!.host, projects[at]!.project)} <span class="caret">▾</span></span>
+      <select aria-label="Project" disabled={down} value={String(at)}
+        onChange={(e) => {
+          const picked = projects[Number((e.currentTarget as HTMLSelectElement).value)];
+          if (picked) go({ host: picked.host.id, project: picked.project.project.folder, compose: true });
+        }}>
+        {projects.map(({ host: h, project: p }, i) => <option key={`${h.id}|${p.project.folder}`} value={String(i)}>{projectLabel(h, p)}</option>)}
+      </select>
+    </h1>
   );
 }

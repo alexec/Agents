@@ -519,6 +519,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         <Cards store={store} host={host} session={session} down={down} />
         <Prompt store={store} draftKey={`${host}|${session}`} placeholder={promptPlaceholder(agent)} disabled={down || !agent}
           stop={agent && hasTurnInFlight(agent) ? () => void store.perform(host, agent.id, "agents/stop") : undefined}
+          acting={agent && store.onItsWay.value[agent.id]}
           queues={willQueue(agent)} suggestion={agent?.suggestedPrompts?.[0]}
           banner={agent && <CostLimitBanner agent={agent} costs={store.costs.value[host]}
             goOn={() => void store.letAgentGoOn(host, agent)} />}
@@ -540,7 +541,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           )}
           runtime={agent && <RuntimeLabel store={store} host={host} runtimeID={agent.runtimeID} />}>
           {agent && (
-          <PromptMenus options={drawable(agent.advertisedOptions, [])} disabled={down}
+          <PromptMenus options={drawable(agent.advertisedOptions, [])} disabled={down} runtime={runtimeNameOn(store, host, agent.runtimeID)}
               value={(o) => store.pendingOptions.value[agent.id]?.[o.id] ?? agent.startOptions.values[o.id] ?? o.currentValue}
               onChange={(o, v) => void store.setOption(host, agent.id, o.id, v)}
               trailing={<ContextMeter agent={agent} />}
@@ -575,8 +576,12 @@ function Place({ store, host, agent }: { store: Store; host: string; agent: Agen
 }
 
 /** The runtime the conversation is on (PromptBar's runtimeLabel): said, not offered. */
+function runtimeNameOn(store: Store, host: string, runtimeID: string): string {
+  return (store.runtimes.value[host] ?? []).find((r) => r.runtime.id === runtimeID)?.runtime.name ?? runtimeID;
+}
+
 function RuntimeLabel({ store, host, runtimeID }: { store: Store; host: string; runtimeID: string }) {
-  const name = (store.runtimes.value[host] ?? []).find((r) => r.runtime.id === runtimeID)?.runtime.name ?? runtimeID;
+  const name = runtimeNameOn(store, host, runtimeID);
   return <span class="pill" title="Runtime" aria-label={`Runtime: ${name}`}>{name}</span>;
 }
 
