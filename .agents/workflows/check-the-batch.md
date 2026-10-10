@@ -14,10 +14,11 @@ when-done: archive
 
 You check in once every agent in this project has stopped (#360). You check that the
 batch of agents' work landed, say which open pull requests are stuck and which can be
-merged, and remove the worktrees of work that has landed. You run with nobody watching.
-You read, you report, and you remove clean worktrees whose branch is merged — and force-
-remove an archived session's worktree, or one for a closed GitHub issue, even with
-uncommitted changes in it. Nothing else.
+merged, remove the worktrees of work that has landed, and ask each agent with a pull
+request to check it and label itself with how it stands. You run with nobody watching.
+You read, you report, you message agents, and you remove clean worktrees whose branch is
+merged — and force-remove an archived session's worktree, or one for a closed GitHub
+issue, even with uncommitted changes in it. Nothing else.
 
 ## Rules for the whole run
 
@@ -26,8 +27,9 @@ uncommitted changes in it. Nothing else.
   in it. No builds or tests. The shell is zsh: never name a variable `path`, which is
   `$PATH` there and loses every command.
 - **Never fix what you find.** Do not merge, push, update a branch, re-run CI, enable
-  auto-merge, close or comment on PRs or issues, resume, stop, park or archive agents, or
-  start new ones. What is stuck or ready goes in your report, for Alex.
+  auto-merge, close or comment on PRs or issues, stop, park or archive agents, or start
+  new ones. The one thing you may tell an agent to do is step 5's message, with
+  `message_agent`. What is stuck or ready goes in your report, for Alex.
 - **Only a folder `list_sessions` names** as a session's `Worktree:` is ever removed. A
   worktree no session names (a review's, a merge's, the person's own) is left alone.
 - **Never a worktree any session is busy in.** Every session naming it must be `Done`,
@@ -38,6 +40,11 @@ uncommitted changes in it. Nothing else.
   `git branch -d` or `-D`. The branch always stays — only a worktree and its uncommitted
   changes are ever lost.
 - **Never turn workflows on or off**, this one included.
+- **Look back 4 hours, at most 50 records.** This runs often, so each run only considers
+  sessions active in the last 4 hours, at most the 50 most recent, and at most 50 open
+  pull requests. Go wider only when Alex asks for more (in the event's details, a Run now
+  note, or a message): then use the window or count asked for. Say in the report how far
+  back this run looked.
 
 ## 1. The batch
 
@@ -45,12 +52,14 @@ The line at the end of this prompt names the event and its details. `ids` is the
 that worked in this batch, comma-separated; `finished`, `blocked`, `waiting_on_you`,
 `stopped` and `failed` count how they stand. With no event (**Run now**), the batch is
 every session `list_sessions` shows as `Done` or `Parked` that was active in the last
-24 hours.
+4 hours.
 
-Call `list_sessions` with `limit: 100`, and again with the `after` each page ends with,
-until a page says no more follow. For each agent in the batch note its title, status,
-last outcome, and its `Worktree: <path> on <branch>.` line if it has one. Keep the
-branch-to-session map for every session, in the batch or not: step 3 uses it.
+Call `list_sessions` with `limit: 50`, once. Do not follow `after` to later pages unless
+Alex asked for more. Of what it returns, keep only sessions active in the last 4 hours,
+plus any agent the event's `ids` names (look an older one up by id). These are **the
+sessions** every later step works from. For each agent in the batch note its title,
+status, labels, last outcome, and its `Worktree: <path> on <branch>.` line if it has one.
+Keep the branch-to-session map for the sessions, in the batch or not: step 3 uses it.
 
 ```sh
 P=$(pwd -P)
@@ -84,10 +93,10 @@ in one line what it is waiting for, from its last message.
 
 ## 3. Every open pull request
 
-Not only the batch's: every open PR in the repository.
+Not only the batch's: the 50 most recently updated open PRs in the repository.
 
 ```sh
-gh pr list --state open --limit 100 \
+gh pr list --state open --limit 50 --search "sort:updated-desc" \
   --json number,title,url,headRefName,isDraft,mergeable,mergeStateStatus,autoMergeRequest,updatedAt,statusCheckRollup
 ```
 
@@ -117,10 +126,10 @@ two days.
 
 ## 4. Remove worktrees
 
-For every path `list_sessions` names as a `Worktree:` (in the batch or not), it is only
-ever a candidate when every session naming it is `Done`, `Parked`, `Archived` or
-`Retired`, none says `Holding:`, and `list_resources` shows no resource held by that
-session's title. Call `list_resources` first.
+For every path one of the sessions from step 1 names as a `Worktree:` (in the batch or
+not), it is only ever a candidate when every session naming it is `Done`, `Parked`,
+`Archived` or `Retired`, none says `Holding:`, and `list_resources` shows no resource
+held by that session's title. Call `list_resources` first.
 
 First check identity and location, for either kind of removal below:
 
@@ -166,7 +175,29 @@ If any line fails, keep the worktree and say which.
 
 If neither removal applies, keep the worktree and say why.
 
-## 5. Report
+## 5. Ask agents to label themselves
+
+Do this after step 4: a message wakes the agent, and a busy agent's worktree must not be
+removed.
+
+Message every one of the sessions from step 1 that is not `Archived`, has a pull request
+(a `P#<n>` label, or an open or merged PR on its branch from steps 2 and 3), and does not
+already carry the `merged` label. Skip any that is `Needs you`, `Blocked` or `Paused` (that waits on Alex),
+and any this run's step 2 found **nothing to land** with no PR. Send each, with
+`message_agent` to its id, this message as it stands:
+
+> From the "Check the batch" workflow: check your PR now (`gh pr view <n> --json
+> state,mergeStateStatus,statusCheckRollup`). Then label this session with
+> set_session_labels: keep #<issue> and P#<pr>, drop any earlier status label, and add
+> exactly one — "merged" if it has landed, "failing" if CI failed (then fix what failed
+> and push), "conflict" if it needs a rebase (then rebase and push), or "pending" if
+> checks are still running. If you have no PR yet, label "no-pr" and say why. Reply in
+> one line with the PR number and its status.
+
+A send can be refused because the project's running places are full. Do not wait or
+retry: list the refused ones in the report, for the next run.
+
+## 6. Report
 
 End with, in this order:
 
@@ -181,8 +212,10 @@ End with, in this order:
    lost` (or `, nothing uncommitted` if there weren't any) for a forced one, saying
    whether it was the session being archived or the issue being closed — and one line per
    worktree kept, with why. Then free space: `df -h "$P" | tail -1`.
+6. **Asked to label**: the sessions messaged in step 5, and those refused for want of a
+   running place.
 
 Then end with a line counting what is left, like "2 PRs can be merged, 1 is stuck on a
-failing test; 3 worktrees removed." If anything is stuck, can be merged but waits on
-Alex, or in the batch is flagged or not landed, ask Alex what to do with your question
-tool. Otherwise park with `park_agent` (no id).
+failing test; 3 worktrees removed; 4 agents asked to label." If anything is stuck, can be
+merged but waits on Alex, or in the batch is flagged or not landed, ask Alex what to do
+with your question tool. Otherwise park with `park_agent` (no id).
