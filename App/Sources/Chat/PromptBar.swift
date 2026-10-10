@@ -567,24 +567,26 @@ struct PromptBar: View {
         }
     }
 
-    /// Stops the Mac's dictation before a send, and answers the words the field shows
-    /// when dictation was still unsure of some of them.
+    /// Ends any dictation in the field before a send, and answers the words the field
+    /// shows when dictation was still unsure of some of them.
     ///
-    /// Stopping alone is not enough (#449): the words still underlined are the
-    /// system's to finish, and it can write its final copy of them after the field has
-    /// been emptied, bringing #318 back. So while any are underlined they are kept as
-    /// shown, and the field gives up the caret, which ends the session they belong to,
-    /// and takes it back once it has been emptied.
+    /// It never sends `stopDictation:` (#517): AppKit gives that the same toggle as
+    /// `startDictation:`, so a send with dictation off turned it on. The field gives up
+    /// the caret instead, which ends whatever session it had, and takes it back once it
+    /// has been emptied. The words still underlined are the system's to finish, and it
+    /// can write its final copy of them after the field has been emptied, bringing #318
+    /// back (#449), so they are kept as shown first.
     private func endDictation() -> String? {
-        NSApp.sendAction(Selector(("stopDictation:")), to: nil, from: nil)
         guard focused,
               let window = NSApp.keyWindow,
               let editor = window.firstResponder as? NSTextView,
-              editor.isFieldEditor,
-              editor.hasMarkedText()
+              editor.isFieldEditor
         else { return nil }
-        editor.unmarkText()
-        let shown = editor.string
+        var shown: String?
+        if editor.hasMarkedText() {
+            editor.unmarkText()
+            shown = editor.string
+        }
         window.makeFirstResponder(nil)
         DispatchQueue.main.async { focused = true }
         return shown
