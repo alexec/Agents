@@ -35,11 +35,6 @@ Check the build and say whether it is green.
 | `on:` | One trigger, or a list of them | What makes the workflow run. With a list, any one of them runs it. |
 | `on:` `manual` | No settings | Nothing runs it but **Run now**, on its page or its row. Leaving `on:` out says the same. Its row reads "By hand, with Run now". See [Run only by hand](#run-only-by-hand). |
 | `on:` `schedule` | `at:`, and optionally `between:` and `days:` | Runs at set times. **At** is a list of minutes past the hour, `":00"` or `":30"` and nothing else. **Between** is a range of hours such as `"09:00-18:00"`; without it, every hour. **Days** is a list of `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun`; without it, every day. A time missed while the Mac slept or the app was closed is not run later; the workflow's page says it was missed. |
-| `on:` `agent-finished` | No settings | Runs when an agent in this project finishes a turn. |
-| `on:` `agent-asked-permission` | No settings | Runs when an agent in this project asks for permission. |
-| `on:` `agent-asked-form` | No settings | Runs when an agent in this project asks you to fill in a form. |
-| `on:` `agent-stopped` | No settings | Runs when an agent in this project stops without finishing. |
-| `on:` `workflow-completed` | Optionally `id:`, a workflow's id | Runs when that workflow's run finishes, or when any workflow's run finishes if there is no `id:`. |
 | `on:` an event name, such as `branch.moved` or `custom.build_green` | Optionally the event's details, as filters | Runs when that event happens. Any name on [Events](events.md) works, or a subject with `.*`, such as `agent.*`, for all of its events. Under the name, list its filters to narrow it: `branch` on `branch.moved`, such as `branch: main`, and `why` on `person.away` and `person.back`. A filter can take a list, meaning any of them, such as `branch: [main, develop]`. Any other key, or a value a filter cannot have, is an error in the file, naming the right ones; the workflow never runs until it is fixed. An event about this Mac runs matching workflows in every project. A name this version does not know is shown on the workflow's page and never runs. |
 | `on:` a server's event, such as `checks.failed` | Optionally `server:`, and the event's own filters | Runs when an MCP server reports that event. Its name is `noun.verbed`, with no prefix, as the server names it. Without `server:`, it hears every MCP server this project can use that offers the name, including one added later. `server:` narrows it to one server's name, or a list of names. Every other key is the event's own filter, sent to the server as it is: a list is a list argument, not "any of". A filter the event doesn't take, or a value of the wrong type, is an error on the workflow's page, naming the filters it takes. A name whose noun is one of the app's subjects, such as `branch.created`, is never a server's event. See [Events from MCP servers](events.md#events-from-mcp-servers). |
 | `agent:` `new` | The default | Each run starts a new agent. |
@@ -168,11 +163,13 @@ workflow on `agent.finished` runs once when another agent finishes, not again wh
 agent does. A `triggering` workflow's agent is only its own for the run: when you next
 prompt that agent and it finishes, the workflow runs again. Waits still hear every event.
 
-The older hyphenated names still work, and each answers to the events listed under
-[Older trigger names](events.md#older-trigger-names). The pull-request triggers
-(`pull-request-checks-failed`, `pull-request-review-comments` and
-`pull-request-conflicts`) have been removed: a workflow that names one shows it on its
-page and never runs on it. On a workflow's page, its latest run
+The hyphenated names from before events (`agent-finished`, `agent-asked-permission`,
+`agent-asked-form`, `agent-stopped` and `workflow-completed`) and the pull-request
+triggers (`pull-request-checks-failed`, `pull-request-review-comments` and
+`pull-request-conflicts`) have been removed. A workflow that names one shows it on its
+page and never runs on it; for a hyphenated name, the page says which event to use, such
+as "Did you mean agent.finished?". `manage_workflows` will not write one, and
+`wait_for_event` will not wait for one, and both name the event to use. On a workflow's page, its latest run
 shows the event that caused it, with a link to it on the Events page.
 
 A setting the runtime does not offer stops the workflow running, rather than falling back

@@ -118,9 +118,9 @@ struct EventWorkflowTests {
         #expect(await core.eventLog.events.contains { $0.name == "workflow.refused" })
     }
 
-    @Test func todaysAgentFinishedFiresOnceAndIsNowOnTheLog() async throws {
+    @Test func agentFinishedFiresOnceAndIsOnTheLog() async throws {
         let (locations, work) = try temporary()
-        try write("  - agent-finished", as: "on-finish", in: work)
+        try write("  - agent.finished", as: "on-finish", in: work)
         let core = try await core(locations)
         await core.rescanWorkflows(in: work)
         let first = try await core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: work, prompt: "Do a thing"))
@@ -159,10 +159,9 @@ struct EventWorkflowTests {
             .count
     }
 
-    @Test(arguments: ["  - agent.finished", "  - agent-finished"])
-    func anAgentFinishedWorkflowRunsOncePerRealFinish(_ on: String) async throws {
+    @Test func anAgentFinishedWorkflowRunsOncePerRealFinish() async throws {
         let (locations, work) = try temporary()
-        try write(on, as: "on-finish", in: work)
+        try write("  - agent.finished", as: "on-finish", in: work)
         let core = try await core(locations)
         await core.rescanWorkflows(in: work)
         _ = try await core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: work, prompt: "Do a thing"))

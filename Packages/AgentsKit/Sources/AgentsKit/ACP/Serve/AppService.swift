@@ -978,10 +978,10 @@ public actor AppService {
             person turned off, one an agent wrote and nobody has turned on yet, and one \
             whose file says `enabled: false` are theirs to turn on.
 
-            Under on:, besides schedule and today's hyphenated names (agent-finished and \
-            the rest), any event name works, narrowed by what its inputSchema below \
-            takes written under it, e.g. `- branch.moved:` with `branch: main` under it. \
-            The project's MCP servers' events are listed by wait_for_event with action list.
+            Under on:, besides schedule, any event name works, narrowed by what its \
+            inputSchema below takes written under it, e.g. `- branch.moved:` with \
+            `branch: main` under it. The project's MCP servers' events are listed by \
+            wait_for_event with action list.
             """ + "\n" + EventList.text()),
         "inputSchema": [
             "type": "object",

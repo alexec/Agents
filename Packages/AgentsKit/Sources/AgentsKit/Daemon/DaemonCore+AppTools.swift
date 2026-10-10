@@ -683,6 +683,14 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.workflowUnreadable,
                                message: "That front matter could not be read: \(why). Nothing was written.")
         }
+        // A trigger this version does not know never fires, so an agent is told while it
+        // can fix it, with the nearest name when there is one (#575).
+        for case .unrecognised(let name, _) in parsed.triggers {
+            let guess = WorkflowTrigger.guess(for: name)
+            throw JSONRPCError(code: DaemonAPI.Failure.workflowUnreadable,
+                               message: "\"\(name)\" is not a trigger\(guess.isEmpty ? "." : guess) "
+                                + "Under on: go schedule and event names. Nothing was written.")
+        }
 
         // Whatever an agent writes waits for the person's OK, so a fourth waiting one in
         // this project is refused here rather than written and left inert (#132): an

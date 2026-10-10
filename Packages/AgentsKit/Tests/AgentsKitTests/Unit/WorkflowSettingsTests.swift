@@ -73,7 +73,7 @@ struct WorkflowSettingsTests {
         let workflow = parse("""
             ---
             on:
-              - agent-finished
+              - agent.finished
             agent: triggering
             permission-mode: plan
             ---

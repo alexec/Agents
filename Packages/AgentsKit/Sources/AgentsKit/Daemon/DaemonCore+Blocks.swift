@@ -170,7 +170,7 @@ extension DaemonCore {
     // MARK: Clearing
 
     /// How an agent's ending closes the waits on it, if it does (research R5): the same
-    /// endings the agent-finished workflow fires on. A finish still sitting in a block of
+    /// endings the agent.finished workflow fires on. A finish still sitting in a block of
     /// its own is not one, nor is a restart the daemon is about to undo.
     func waitEnding(for agent: Agent, next: AgentState, event: AgentEvent,
                     reasonThisEventSet: EndedReason?) -> WaitEnding.How? {

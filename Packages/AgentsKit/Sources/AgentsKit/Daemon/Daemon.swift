@@ -124,7 +124,7 @@ public final class Daemon: @unchecked Sendable {
     public func start() async throws {
         // Endings are about to be discovered, and no workflow has been read yet. Hold
         // what they raise rather than firing it into a layer that cannot act — see
-        // `deferredLifecycleEvents`. `startWorkflows()` below drains it.
+        // `deferredEventsForWorkflows`. `startWorkflows()` below drains it.
         // A host of a control plane is kept running by launchd, not by a window being
         // there, so it never leaves for being idle (058, R5).
         await core.setExitsWhenIdle(!serve && control == nil)

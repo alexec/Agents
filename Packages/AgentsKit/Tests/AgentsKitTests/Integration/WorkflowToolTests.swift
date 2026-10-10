@@ -446,6 +446,23 @@ struct WorkflowToolTests {
             atPath: WorkflowFile.url(for: "broken", in: work).path) == false)
     }
 
+    /// A name from before events (#575) is unknown, so it is refused with the one to
+    /// use, rather than written to wait for something that never happens.
+    @Test func anOldTriggerNameIsRefusedWithTheEventToUse() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let (core, token, _) = try await core(locations, in: work)
+
+        do {
+            _ = try await call(core, token, .write, id: "old", content: "---\non: agent-finished\n---\n\nGo.\n")
+            Issue.record("written")
+        } catch let error as JSONRPCError {
+            #expect(error.message.contains("\"agent-finished\" is not a trigger. Did you mean agent.finished?"),
+                    "\(error.message)")
+        }
+        #expect(FileManager.default.fileExists(atPath: WorkflowFile.url(for: "old", in: work).path) == false)
+    }
+
     @Test func aPathOutOfTheWorkflowFolderIsRefused() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)

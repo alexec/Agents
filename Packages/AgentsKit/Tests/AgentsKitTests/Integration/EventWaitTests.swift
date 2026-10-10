@@ -344,13 +344,17 @@ struct EventWaitTests {
         #expect(!quiet.contains("server"), "\(quiet)")
     }
 
-    /// The disk events' old names still wait (#372).
-    @Test func anOldDiskNameWaitsOnTheNewOne() async throws {
+    /// An old name is refused with the one to use (#575): the disk events' before #372,
+    /// and the hyphenated trigger names.
+    @Test func anOldNameIsRefusedWithTheNewOne() async throws {
         let (locations, work, _) = try temporary()
         let core = try await makeCore(locations, clock: Clock(), hold: .milliseconds(100))
         let (a, token) = try await agent(core, in: work, "Old")
-        _ = try await wait(core, token, ["mac.disk_low"])
-        #expect(await core.agents[a]?.eventWait?.patterns == [EventPattern("machine.disk_low")])
+        for (old, now) in [("mac.disk_low", "machine.disk_low"), ("agent-finished", "agent.finished")] {
+            let refused = await refusal { _ = try await wait(core, token, [old]) }
+            #expect(refused?.message.contains("Did you mean \(now)?") == true, "\(old): \(refused?.message ?? "waited")")
+        }
+        #expect(await core.agents[a]?.eventWait == nil)
     }
 
     @Test func itIsNeverWokenByNewsOfItself() async throws {

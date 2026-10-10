@@ -254,8 +254,7 @@ Each keeps its findings, and the commit of `main` it reviewed through, in its ow
 never pushed (`agents/reviews-security`, `agents/reviews-performance`): a security
 finding is not published before it is fixed. Both arrive turned off; **Run now** tries one.
 
-**Free disk space** (`.agents/workflows/free-disk-space.md`, #199) runs on `machine.disk_low` (its file still says
-`mac.disk_low`, the name before #372, which a build from before the rename also reads). It
+**Free disk space** (`.agents/workflows/free-disk-space.md`, #199) runs on `machine.disk_low`. It
 deletes build output (the folders `.gitignore` ignores and git tracks nothing in, such as
 `build/`, `.build`, `DerivedData` and `Web/node_modules`) from the worktrees of agents that are
 Done or Archived and hold no lease. At the critical level it also removes archived

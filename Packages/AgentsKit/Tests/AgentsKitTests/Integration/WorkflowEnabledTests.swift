@@ -133,7 +133,7 @@ struct WorkflowEnabledTests {
 
     @Test func eachScheduleHasItsOwnNextTimeAndOffHasNone() async throws {
         let (locations, work) = try temporary()
-        try write("  - agent-finished\n  - schedule:\n      at: [\":00\"]\n  - schedule:\n      at: [\":30\"]",
+        try write("  - agent.finished\n  - schedule:\n      at: [\":00\"]\n  - schedule:\n      at: [\":30\"]",
                   as: "two-clocks", in: work)
         let core = try await core(locations)
         await core.rescanWorkflows(in: work)

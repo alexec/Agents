@@ -42,16 +42,13 @@ public struct EventPattern: Hashable, Sendable {
     // MARK: Reading one
 
     /// A pattern checked against the catalogue, or the sentence saying what is wrong
-    /// with it. An event's old name is read as its new one (#372). Only a filter may
-    /// narrow it (#574): `branch` on `branch.moved`, `why` on `person.away` and
-    /// `person.back`. The filters are checked against the kind's `inputSchema` by
-    /// `JSONSchemaSubset`, as a server's event's arguments are (#579), so a refusal
-    /// reads the same for both. A server's event is not checked here: its keys are the
-    /// server's (#383, #577).
+    /// with it. Only a filter may narrow it (#574): `branch` on `branch.moved`, `why` on
+    /// `person.away` and `person.back`. The filters are checked against the kind's
+    /// `inputSchema` by `JSONSchemaSubset`, as a server's event's arguments are (#579), so
+    /// a refusal reads the same for both. A server's event is not checked here: its keys
+    /// are the server's (#383, #577). An old name is unknown like any other (#575).
     public static func parse(_ given: String, filters: [String: DetailFilter] = [:]) -> Result<EventPattern, EventPatternProblem> {
-        // An old name is read as today's (#372), so a file written before a rename
-        // keeps firing.
-        let name = EventCatalogue.currentName(given.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+        let name = given.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let filters = Dictionary(filters.map { key, filter in
             (key.trimmingCharacters(in: .whitespaces),
              DetailFilter(anyOf: filter.values.map { $0.trimmingCharacters(in: .whitespaces) }) ?? filter)
@@ -173,7 +170,7 @@ extension EventPattern: Codable {
         for (key, values) in try c.decodeIfPresent([String: [String]].self, forKey: .anyOf) ?? [:] {
             if let filter = DetailFilter(anyOf: values) { filters[key] = filter }
         }
-        self = EventPattern(EventCatalogue.currentName(name), filters: filters)
+        self = EventPattern(name, filters: filters)
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -215,11 +212,18 @@ public enum EventPatternProblem: Error, Hashable, Sendable {
         }
     }
 
-    /// The catalogue name nearest to a mistyped one, if any is near enough to suggest.
+    /// The catalogue name nearest to a mistyped one, if any is near enough to suggest:
+    /// a few letters off (`agent-finished`), or, under another of the app's own nouns,
+    /// the one event with the same verb (`mac.disk_low` for `machine.disk_low`). A
+    /// server's noun is its own, so `ci.failed` is never `agent.failed`.
     public static func closest(to name: String) -> String? {
         let scored = EventCatalogue.all.map { ($0.name, distance(name, $0.name)) }
-        guard let best = scored.min(by: { $0.1 < $1.1 }), best.1 <= max(2, name.count / 4) else { return nil }
-        return best.0
+        if let best = scored.min(by: { $0.1 < $1.1 }), best.1 <= max(2, name.count / 4) { return best.0 }
+        guard let dot = name.firstIndex(of: "."), name.index(after: dot) < name.endIndex,
+              EventCatalogue.reservedNouns.contains(String(name[..<dot])) else { return nil }
+        let verb = name[dot...]
+        let same = EventCatalogue.all.filter { $0.name.hasSuffix(verb) }
+        return same.count == 1 ? same[0].name : nil
     }
 
     private static func distance(_ a: String, _ b: String) -> Int {

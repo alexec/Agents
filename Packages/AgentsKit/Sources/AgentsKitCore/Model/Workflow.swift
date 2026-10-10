@@ -18,7 +18,7 @@ public enum WorkflowProblem: Codable, Hashable, Sendable {
         switch self {
         case .unreadable(let detail): return detail
         case .triggerNotSupported(let name):
-            return "Waits for \"\(name)\", which this version does not know about yet"
+            return "Waits for \"\(name)\", which this version does not know about yet" + WorkflowTrigger.guess(for: name)
         case .unsupportedMode(let name):
             return "Runs \"\(name)\", which this version does not know about yet"
         }
@@ -194,24 +194,6 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
     public func nextDue(after date: Date, calendar: Calendar = .current) -> Date? {
         guard problem == nil else { return nil }
         return schedules.compactMap { $0.nextDue(after: date, calendar: calendar) }.min()
-    }
-
-    /// Whether an agent event should fire this workflow.
-    public func responds(to event: WorkflowAgentEvent) -> Bool {
-        problem == nil && triggers.contains { $0.matches(event) }
-    }
-
-    /// Whether another workflow's run completing should fire this one.
-    public func respondsToCompletion(of otherID: String) -> Bool {
-        guard problem == nil else { return false }
-        return triggers.contains { trigger in
-            guard case .workflowCompleted(let id) = trigger else { return false }
-            // A workflow watching every workflow must not watch itself: that is a loop
-            // with nothing in it, and the depth limit should not have to be what stops
-            // something this obvious.
-            guard otherID != workflowID else { return false }
-            return id == nil || id == otherID
-        }
     }
 }
 

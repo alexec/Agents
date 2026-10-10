@@ -8,14 +8,10 @@ import Foundation
 /// the rules (which events are the Mac's, which carry an agent) are read from the
 /// catalogue the daemon fires on rather than restated.
 extension WorkflowTrigger {
-    /// The details it is narrowed by, as the file writes them. `workflow-completed`
-    /// with an `id:` is a `workflow` filter, which is what it is on the event log.
+    /// The details it is narrowed by, as the file writes them.
     public var filters: [String: DetailFilter] {
-        switch self {
-        case .event(let pattern): return pattern.filters
-        case .workflowCompleted(let id): return id.map { ["workflow": DetailFilter($0)] } ?? [:]
-        default: return [:]
-        }
+        if case .event(let pattern) = self { return pattern.filters }
+        return [:]
     }
 
     /// Whose agents and events it listens to: the project's, the host's as a whole
@@ -27,8 +23,6 @@ extension WorkflowTrigger {
         case .schedule, .unrecognised: return nil
         // A server's events are the project's: its servers are found by its folder.
         case .serverEvent: return .project
-        case .agentFinished, .agentAskedPermission, .agentAskedForm, .agentStopped, .workflowCompleted:
-            return .project
         case .event(let pattern):
             if EventCatalogue.isCustom(pattern.name) { return .project }
             if let subject = pattern.wholeSubject {
@@ -50,11 +44,6 @@ extension WorkflowTrigger {
             return "Never runs it"
         case .serverEvent:
             return "A server's events are about no agent, so this never runs it"
-        case .agentFinished: return "Resumes the agent that finished"
-        case .agentAskedPermission: return "Resumes the agent that asked"
-        case .agentAskedForm: return "Resumes the agent that raised the form"
-        case .agentStopped: return "Resumes the agent that stopped"
-        case .workflowCompleted: return "Resumes the agent the finished run started"
         case .event(let pattern):
             if EventCatalogue.isCustom(pattern.name) || pattern.wholeSubject == .custom {
                 return "Resumes the agent that published it"

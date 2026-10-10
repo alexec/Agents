@@ -37,16 +37,27 @@ struct EventCatalogueTests {
         #expect(EventList.text().contains(#""name":"mac.wake","source":"app","description":"This Mac woke up. Only a Mac raises it"#))
     }
 
-    @Test func everyOldTriggerNameAnswersToAKind() {
-        let old = ["agent-finished", "agent-asked-permission", "agent-asked-form", "agent-stopped",
-                   "workflow-completed"]
-        for alias in old { #expect(!EventCatalogue.kinds(forAlias: alias).isEmpty, "\(alias)") }
-        #expect(EventCatalogue.kinds(forAlias: "schedule").isEmpty)
-    }
-
-    @Test func agentStoppedCoversStoppedAndFailed() {
-        #expect(Set(EventCatalogue.kinds(forAlias: "agent-stopped").map(\.name))
-                == ["agent.stopped", "agent.failed"])
+    /// The names from before events and renames (#575) are unknown, and each is refused
+    /// with the event to use, where the suggestion can find one.
+    @Test func oldNamesAreRefusedWithTheEventToUse() {
+        let expected = ["agent-finished": "agent.finished", "agent-asked-permission": "agent.asked_permission",
+                        "agent-asked-form": "agent.asked_form", "agent-stopped": "agent.stopped",
+                        "workflow-completed": "workflow.completed", "mac.disk_low": "machine.disk_low",
+                        "mac.disk_ok": "machine.disk_ok"]
+        for (old, now) in expected {
+            #expect(EventCatalogue.kind(named: old) == nil, "\(old)")
+            guard case .failure(let problem) = EventPattern.parse(old) else {
+                Issue.record("\(old) was read as an event")
+                continue
+            }
+            #expect(problem.message.contains("Did you mean \(now)?"), "\(old)")
+        }
+        for old in ["agent.retired", "agent.parked"] {
+            guard case .failure = EventPattern.parse(old) else {
+                Issue.record("\(old) was read as an event")
+                continue
+            }
+        }
     }
 
     @Test func theDescriptionNamesEveryKindAndTheCustomFamily() {

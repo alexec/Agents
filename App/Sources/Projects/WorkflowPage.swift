@@ -493,8 +493,6 @@ struct WorkflowPage: View {
     private func symbol(for trigger: WorkflowTrigger) -> String {
         switch trigger {
         case .schedule: return "clock"
-        case .agentFinished, .agentAskedPermission, .agentAskedForm, .agentStopped: return "person.crop.circle"
-        case .workflowCompleted: return "arrow.triangle.2.circlepath"
         case .event(let pattern):
             switch EventSubject(name: pattern.name) {
             case .agent: return "person.crop.circle"

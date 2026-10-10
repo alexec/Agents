@@ -24,8 +24,11 @@
   {
     "expected" : "WorkflowTrigger",
     "input" : {
-      "agentFinished" : {
+      "unrecognised" : {
+        "keys" : {
 
+        },
+        "name" : "agent.finished"
       }
     },
     "name" : "agent finished"
@@ -33,38 +36,14 @@
   {
     "expected" : "WorkflowTrigger",
     "input" : {
-      "agentAskedPermission" : {
+      "unrecognised" : {
+        "keys" : {
 
+        },
+        "name" : "agent-finished"
       }
     },
-    "name" : "asked permission"
-  },
-  {
-    "expected" : "WorkflowTrigger",
-    "input" : {
-      "agentAskedForm" : {
-
-      }
-    },
-    "name" : "asked a form"
-  },
-  {
-    "expected" : "WorkflowTrigger",
-    "input" : {
-      "agentStopped" : {
-
-      }
-    },
-    "name" : "stopped"
-  },
-  {
-    "expected" : "WorkflowTrigger",
-    "input" : {
-      "workflowCompleted" : {
-        "id" : "nightly"
-      }
-    },
-    "name" : "workflow completed"
+    "name" : "an unknown name"
   },
   {
     "expected" : "WorkflowTrigger",

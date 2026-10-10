@@ -43,16 +43,9 @@ extension DaemonCore {
         // happened — which for a restart is `recover`'s order, most recently active
         // first. Taken out of the array before any of it is replayed, so an event that
         // somehow defers again lands on an empty queue instead of a growing one.
-        let waiting = deferredLifecycleEvents
-        deferredLifecycleEvents.removeAll()
-        for held in waiting {
-            workflowsRespond(to: held.event, agentID: held.agentID, depth: held.depth, causingEvent: held.cause,
-                             endingRun: held.endingRun)
-        }
-        // And the events whose new-style triggers could not be matched yet (042).
         let events = deferredEventsForWorkflows
         deferredEventsForWorkflows.removeAll()
-        for event in events { fireWorkflows(for: event) }
+        for held in events { fireWorkflows(for: held.event, endingRun: held.endingRun) }
     }
 
     /// Take a project's workflows on: read them once, and watch for more.
@@ -1136,11 +1129,11 @@ extension DaemonCore {
         }
         let name = agent.title ?? "an untitled agent"
         let what: String
-        switch run.trigger {
-        case .agentFinished: what = "has just finished its work"
-        case .agentAskedPermission: what = "is waiting for permission"
-        case .agentAskedForm: what = "is waiting on a form"
-        case .agentStopped: what = "stopped without finishing"
+        switch event?.name {
+        case "agent.finished": what = "has just finished its work"
+        case "agent.asked_permission": what = "is waiting for permission"
+        case "agent.asked_form": what = "is waiting on a form"
+        case "agent.stopped", "agent.failed": what = "stopped without finishing"
         default: what = "triggered this"
         }
         return """
@@ -1309,47 +1302,6 @@ extension DaemonCore {
         return workflow.mode != .triggering && agents[starter]?.startedByWorkflow == workflow.workflowID
     }
 
-    /// Called from the one funnel every agent state change goes through.
-    func workflowsRespond(to event: WorkflowAgentEvent, agentID: UUID, depth: Int? = nil,
-                          causingEvent: EventPosition? = nil, endingRun: String? = nil) {
-        guard let agent = agents[agentID] else { return }
-        // Before anything is read off `workflows`, because at this point that
-        // dictionary is empty and the guard below would swallow the event without
-        // leaving a trace. See `deferredLifecycleEvents` for why the whole of this
-        // problem exists.
-        guard workflowsAreStarted else {
-            deferredLifecycleEvents.append(
-                (event: event, agentID: agentID,
-                 depth: depth ?? workflowChainDepth(causedBy: agentID), cause: causingEvent,
-                 endingRun: endingRun ?? runInFlight(for: agentID)?.key))
-            return
-        }
-        let folder = agent.projectFolder
-        guard let byID = workflows[folder], !byID.isEmpty else { return }
-        let depth = depth ?? workflowChainDepth(causedBy: agentID)
-
-        let trigger: WorkflowTrigger
-        switch event {
-        case .finished: trigger = .agentFinished
-        case .askedPermission: trigger = .agentAskedPermission
-        case .askedForm: trigger = .agentAskedForm
-        case .stopped: trigger = .agentStopped
-        }
-
-        for workflow in byID.values where workflow.runs(on: MachineID.current)
-            && workflow.responds(to: event)
-            && !workflow.isArchived
-            && !isOwnAgent(agentID, of: workflow, endingRun: endingRun) {
-            // Detached, because this is called from inside the actor by `move`, and
-            // firing awaits things that can call back into it. The shape `beginTurn`
-            // already uses for a turn.
-            Task { [weak self] in
-                await self?.fire(workflow, on: trigger,
-                                 triggeringAgentID: agentID, depth: depth, causingEvent: causingEvent)
-            }
-        }
-    }
-
     /// A run is over. Release the workflow, and let anything chained off it go.
     func workflowRunFinished(agentID: UUID) {
         guard let (key, run) = runInFlight(for: agentID) else { return }
@@ -1364,7 +1316,8 @@ extension DaemonCore {
         }
 
         let folder = Project.standardize(run.folder)
-        // On the log (042), a step deeper than the run, as the old trigger fires.
+        // On the log (042), a step deeper than the run, so a chain of workflows meets the
+        // depth limit.
         raise(EventDraft(name: "workflow.completed", at: now(), scope: .project(folder: folder),
                          sentence: "Workflow \(workflow(run.workflowID, in: run.folder)?.name ?? run.workflowID) finished.",
                          details: ["workflow": run.workflowID]
@@ -1374,15 +1327,6 @@ extension DaemonCore {
                             .merging(run.agentID.flatMap { agents[$0]?.report }
                                 .map { ["outcome": $0.outcome.rawValue] } ?? [:]) { $1 },
                          chainDepth: run.depth + 1))
-        guard let byID = workflows[folder] else { return }
-        for other in byID.values where other.runs(on: MachineID.current)
-            && other.respondsToCompletion(of: run.workflowID)
-            && !other.isArchived {
-            Task { [weak self] in
-                await self?.fire(other, on: .workflowCompleted(id: run.workflowID),
-                                 depth: run.depth + 1)
-            }
-        }
     }
 
     // MARK: Cooldowns (#103)

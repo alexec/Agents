@@ -128,7 +128,7 @@ struct AgentStateTests {
     /// An agent stopped by `daemonGone` and then archived comes back out of the
     /// archive as `stopped`/`daemonGone` with no pick-ups — so it answers true to
     /// `mayBePickedUpAfterRestart` even though nothing is about to pick it up.
-    /// Suppressing its `agentStopped` trigger on the strength of that record alone
+    /// Suppressing the `agent.stopped` it raises on the strength of that record alone
     /// would silently change what unarchiving does, which is why `move` gates on the
     /// event as well.
     @Test func anUnarchivedAgentLooksPickUpAbleAndIsNot() throws {

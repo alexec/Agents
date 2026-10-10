@@ -50,10 +50,11 @@ struct WorkflowRestartTests {
         """
     }
 
-    /// Something that runs when another workflow completes — or any, with no id.
-    private func after(_ workflowID: String?) -> String {
-        let trigger = workflowID.map { "  - workflow-completed:\n      id: \($0)" }
-            ?? "  - workflow-completed"
+    /// Something that runs when another workflow completes. `workflow.completed` takes no
+    /// filter since #574, and `workflow-completed`'s `id:` went with #575, so it hears
+    /// every workflow's completion but its own.
+    private func afterAnother() -> String {
+        let trigger = "  - workflow.completed"
         return """
             ---
             on:
@@ -123,7 +124,7 @@ struct WorkflowRestartTests {
         defer { try? FileManager.default.removeItem(at: locations.root) }
         let work = try project(root)
         try write(byHand(), as: "first", in: work)
-        try write(after("first"), as: "second", in: work)
+        try write(afterAnother(), as: "second", in: work)
 
         // The first daemon fires the first workflow, whose agent is still working when
         // the daemon goes.
@@ -180,7 +181,7 @@ struct WorkflowRestartTests {
         defer { try? FileManager.default.removeItem(at: locations.root) }
         let work = try project(root)
         try write(byHand(), as: "first", in: work)
-        try write(after("first"), as: "second", in: work)
+        try write(afterAnother(), as: "second", in: work)
         // As `start` first writes it: working, and nothing yet about any workflow.
         let agent = Agent(runtimeID: "claude", cwd: work, title: "cut off", state: .running,
                           endedReason: nil)
@@ -208,11 +209,11 @@ struct WorkflowRestartTests {
         defer { try? FileManager.default.removeItem(at: locations.root) }
         let work = try project(root)
         try write(byHand(), as: "deep", in: work)
-        try write(after("deep"), as: "next", in: work)
+        try write(afterAnother(), as: "next", in: work)
         let runID = UUID()
         let agent = cutOff(in: work, by: "deep", run: runID)
         leaveOnDisk([WorkflowRun(id: runID, workflowID: "deep", folder: work,
-                                 trigger: .workflowCompleted(id: "earlier"),
+                                 trigger: .event(EventPattern("workflow.completed")),
                                  depth: Workflow.chainDepthLimit, agentID: agent.id,
                                  startedAt: Date())], at: locations)
 
@@ -237,11 +238,11 @@ struct WorkflowRestartTests {
         defer { try? FileManager.default.removeItem(at: locations.root) }
         let work = try project(root)
         try write(byHand(), as: "deep", in: work)
-        try write(after("deep"), as: "next", in: work)
+        try write(afterAnother(), as: "next", in: work)
         let runID = UUID()
         let agent = cutOff(in: work, by: "deep", run: runID)
         leaveOnDisk([WorkflowRun(id: runID, workflowID: "deep", folder: work,
-                                 trigger: .workflowCompleted(id: "earlier"),
+                                 trigger: .event(EventPattern("workflow.completed")),
                                  depth: Workflow.chainDepthLimit - 1, agentID: agent.id,
                                  startedAt: Date())], at: locations)
 
@@ -263,7 +264,7 @@ struct WorkflowRestartTests {
         let runID = UUID()
         let agent = cutOff(in: work, by: "deep", run: runID)
         leaveOnDisk([WorkflowRun(id: runID, workflowID: "deep", folder: work,
-                                 trigger: .workflowCompleted(id: "earlier"),
+                                 trigger: .event(EventPattern("workflow.completed")),
                                  agentID: agent.id, startedAt: Date())], at: locations)
 
         // Picked back up into a turn that does not end, so the run stays in flight.
@@ -291,7 +292,7 @@ struct WorkflowRestartTests {
         for id in ["archived", "missing", "deleted", "stale", "finished"] {
             try write(byHand(), as: id, in: work)
         }
-        try write(after(nil), as: "watcher", in: work)
+        try write(afterAnother(), as: "watcher", in: work)
 
         let archived = Agent(runtimeID: "claude", cwd: work, title: "put away", state: .archived,
                              endedReason: .endTurn, archivedReason: .byUser,

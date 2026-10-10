@@ -83,7 +83,7 @@ struct FrontMatterEditTests {
         let twice = """
             ---
             model: one
-            on: agent-finished
+            on: agent.finished
             model: two
             ---
 
@@ -100,7 +100,7 @@ struct FrontMatterEditTests {
             model:
               - one
               - two
-            on: agent-finished
+            on: agent.finished
             ---
 
             Go.
@@ -109,7 +109,7 @@ struct FrontMatterEditTests {
             try FrontMatterEdit.set("model", to: "three", in: listed)
         }
         #expect(throws: FrontMatterEdit.Refusal.self) {
-            try FrontMatterEdit.set("on", to: "agent-stopped", in: sample)
+            try FrontMatterEdit.set("on", to: "agent.stopped", in: sample)
         }
     }
 

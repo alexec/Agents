@@ -12,7 +12,9 @@ struct WorkflowTriggerEventTests {
         WorkflowFile.parse("---\non:\n\(on)\n---\n\nDo it.\n", workflowID: "w", in: project)
     }
 
-    @Test func todaysNamesReadExactlyAsTheyDid() {
+    /// The hyphenated names are gone (#575): each is a trigger this version does not
+    /// know, and a file of nothing else never runs.
+    @Test func theHyphenatedNamesAreUnrecognised() {
         let workflow = triggers("""
               - agent-finished
               - agent-asked-permission
@@ -20,9 +22,8 @@ struct WorkflowTriggerEventTests {
               - agent-stopped
               - workflow-completed
             """)
-        #expect(workflow.problem == nil)
-        #expect(workflow.triggers == [.agentFinished, .agentAskedPermission, .agentAskedForm, .agentStopped,
-                                      .workflowCompleted(id: nil)])
+        #expect(workflow.problem == .triggerNotSupported("agent-finished"))
+        #expect(workflow.triggers.allSatisfy { !$0.isSupported })
     }
 
     @Test func dottedNamesAreEvents() {
@@ -71,19 +72,19 @@ struct WorkflowTriggerEventTests {
         #expect(try JSONDecoder().decode(WorkflowTrigger.self, from: encoder.encode(event)) == event)
     }
 
-    @Test func todaysNamesAnswerToTheirKinds() {
-        #expect(WorkflowTrigger.agentFinished.patterns == [EventPattern("agent.finished")])
-        #expect(Set(WorkflowTrigger.agentStopped.patterns.map(\.name)) == ["agent.stopped", "agent.failed"])
-        #expect(WorkflowTrigger.workflowCompleted(id: "nightly").patterns
-                == [EventPattern("workflow.completed", filters: ["workflow": "nightly"])])
+    @Test func aScheduleAnswersToNoEvent() {
         #expect(WorkflowTrigger.schedule(WorkflowExample.schedule).patterns.isEmpty)
+        #expect(WorkflowTrigger.event(EventPattern("agent.finished")).patterns == [EventPattern("agent.finished")])
     }
 
-    @Test func onlyTheEventCaseMatchesEventsSoNothingFiresTwice() {
-        let finished = Event(position: 1, name: "agent.finished", at: Date(), scope: .project(folder: project),
-                             sentence: "")
-        #expect(!WorkflowTrigger.agentFinished.matches(finished))
-        #expect(WorkflowTrigger.event(EventPattern("agent.finished")).matches(finished))
+    /// A run's cause saved under a hyphenated trigger still loads, as the unknown name
+    /// it now is (#575).
+    @Test func aSavedHyphenatedTriggerReadsAsUnknown() throws {
+        let finished = try JSONDecoder().decode(WorkflowTrigger.self, from: Data(#"{"agentFinished":{}}"#.utf8))
+        #expect(finished == .unrecognised(name: "agent-finished", keys: [:]))
+        let chained = try JSONDecoder().decode(WorkflowTrigger.self,
+                                               from: Data(#"{"workflowCompleted":{"id":"nightly"}}"#.utf8))
+        #expect(chained == .unrecognised(name: "workflow-completed", keys: ["id": .string("nightly")]))
     }
 
     @Test func anEventTriggerSaysWhatItWaitsFor() {

@@ -52,8 +52,7 @@ const event = (name, keys = {}) => ({ unrecognised: { name, keys } });
 const schedule = { schedule: { _0: { minutes: [0], hours: [3, 3], days: ["sun"], startMinute: 0, endMinute: 0 } } };
 
 test("each trigger listens where its events are", () => {
-  assert.equal(w.listensIn({ agentFinished: {} }), "project");
-  assert.equal(w.listensIn({ workflowCompleted: {} }), "project");
+  assert.equal(w.listensIn(event("agent.finished")), "project");
   assert.equal(w.listensIn(event("branch.moved")), "project");
   assert.equal(w.listensIn(event("mac.wake")), "mac");
   assert.equal(w.listensIn(event("machine.disk_low", { level: "critical" })), "mac");
@@ -68,14 +67,12 @@ test("each trigger listens where its events are", () => {
   assert.equal(w.scopeLine(schedule, "work", "this Mac"), "By the clock on this Mac");
 });
 
-test("filters are the file's own, including a workflow id", () => {
+test("filters are the file's own", () => {
   assert.deepEqual(w.triggerFilters(event("branch.moved", { branch: "main" })), [["branch", "main"]]);
-  assert.deepEqual(w.triggerFilters({ workflowCompleted: { id: "nightly" } }), [["workflow", "nightly"]]);
-  assert.deepEqual(w.triggerFilters({ agentFinished: {} }), []);
+  assert.deepEqual(w.triggerFilters(event("agent.finished")), []);
 });
 
 test("a triggering run says which agent it resumes, or that there is none", () => {
-  assert.equal(w.resumedAgent({ agentFinished: {} }), "Resumes the agent that finished");
   assert.equal(w.resumedAgent(event("custom.ready")), "Resumes the agent that published it");
   assert.match(w.resumedAgent(event("mac.wake")), /never runs/);
   assert.match(w.resumedAgent(schedule), /never runs/);
@@ -86,7 +83,8 @@ test("what set a run off reads after Last ran", () => {
   assert.equal(w.causePhrase({ byHand: {} }), "by hand, with Run now");
   assert.equal(w.causePhrase({ trigger: { _0: schedule } }), "on its schedule");
   assert.equal(w.causePhrase({ trigger: { _0: event("branch.moved", { branch: "main" }) } }), "on branch.moved branch main");
-  assert.equal(w.causePhrase({ trigger: { _0: { agentFinished: {} } } }), "when an agent finishes");
+  assert.equal(w.causePhrase({ trigger: { _0: event("agent-finished") } }),
+    'waits for "agent-finished", which this version does not know about yet. Did you mean agent.finished?');
 });
 
 test("off says so in place of a next time, and in what is happening (#100)", () => {

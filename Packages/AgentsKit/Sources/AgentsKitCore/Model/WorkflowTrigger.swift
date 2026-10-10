@@ -16,17 +16,6 @@ import Foundation
 public enum WorkflowTrigger: Hashable, Sendable {
     /// On a clock.
     case schedule(WorkflowSchedule)
-    /// An agent in this project ended a turn having completed its work.
-    case agentFinished
-    /// An agent in this project asked for permission. Fires while the question is
-    /// still outstanding, which is the only time an answer to it is any use.
-    case agentAskedPermission
-    /// An agent in this project raised a form to be filled in.
-    case agentAskedForm
-    /// An agent in this project stopped or failed without finishing.
-    case agentStopped
-    /// Another workflow's run completed. `nil` means any workflow in this project.
-    case workflowCompleted(id: String?)
     /// Any event in the catalogue, a whole subject, or `custom.<name>`, narrowed by
     /// details (042 FR-021): the same pattern a wait uses, so the two cannot drift.
     case event(EventPattern)
@@ -41,36 +30,24 @@ public enum WorkflowTrigger: Hashable, Sendable {
     public var name: String {
         switch self {
         case .schedule: return "schedule"
-        case .agentFinished: return "agent-finished"
-        case .agentAskedPermission: return "agent-asked-permission"
-        case .agentAskedForm: return "agent-asked-form"
-        case .agentStopped: return "agent-stopped"
-        case .workflowCompleted: return "workflow-completed"
         case .event(let pattern): return pattern.name
         case .serverEvent(let trigger): return trigger.event
         case .unrecognised(let name, _): return name
         }
     }
 
-    /// The events this trigger answers to, as patterns (042 FR-022). Today's names map
-    /// to their catalogue kinds — `agent-stopped` to both `agent.stopped` and
-    /// `agent.failed` — so the page and the log can say which events a workflow
-    /// watches in one vocabulary. A schedule is not an event, and answers to none.
+    /// The events this trigger answers to, as patterns (042 FR-022), so the page and
+    /// the log can say which events a workflow watches in one vocabulary. A schedule is
+    /// not an event, and answers to none.
     public var patterns: [EventPattern] {
         switch self {
         case .event(let pattern): return [pattern]
         case .serverEvent(let trigger): return [EventPattern(trigger.event)]
         case .schedule, .unrecognised: return []
-        case .workflowCompleted(let id):
-            return [EventPattern("workflow.completed", filters: id.map { ["workflow": DetailFilter($0)] } ?? [:])]
-        default:
-            return EventCatalogue.kinds(forAlias: name).map { EventPattern($0.name) }
         }
     }
 
-    /// Whether an event fires this trigger. Only the `event` case: today's triggers keep
-    /// firing from where they always have (research R7, as built), so matching them here
-    /// as well would run them twice.
+    /// Whether an event fires this trigger. A schedule fires from the clock instead.
     public func matches(_ event: Event) -> Bool {
         switch self {
         case .event(let pattern): return pattern.matches(event)
@@ -95,32 +72,21 @@ public enum WorkflowTrigger: Hashable, Sendable {
     public var summary: String {
         switch self {
         case .schedule(let schedule): return schedule.summary
-        case .agentFinished: return "When an agent finishes"
-        case .agentAskedPermission: return "When an agent asks for permission"
-        case .agentAskedForm: return "When an agent raises a form"
-        case .agentStopped: return "When an agent stops without finishing"
-        case .workflowCompleted(let id):
-            return id.map { "When \($0) finishes" } ?? "When any workflow finishes"
         case .event(let pattern): return "When " + Self.lowercasedFirst(pattern.summary)
         case .serverEvent(let trigger): return trigger.summary
         case .unrecognised(let name, _):
-            return "Waits for \"\(name)\", which this version does not know about yet"
-        }
-    }
-
-    /// Whether an agent event of this kind should fire this trigger.
-    public func matches(_ event: WorkflowAgentEvent) -> Bool {
-        switch (self, event) {
-        case (.agentFinished, .finished), (.agentAskedPermission, .askedPermission),
-             (.agentAskedForm, .askedForm), (.agentStopped, .stopped):
-            return true
-        default:
-            return false
+            return "Waits for \"\(name)\", which this version does not know about yet" + Self.guess(for: name)
         }
     }
 }
 
 extension WorkflowTrigger {
+    /// " Did you mean agent.finished?" for a name near one the catalogue has, such as
+    /// a trigger name from before events (#575); empty for anything else.
+    public static func guess(for name: String) -> String {
+        EventPatternProblem.closest(to: name).map { ". Did you mean \($0)?" } ?? ""
+    }
+
     static func lowercasedFirst(_ text: String) -> String {
         guard let first = text.first else { return text }
         // "One of my …" reads on after "When"; a name or a code does not change.
@@ -154,22 +120,38 @@ extension WorkflowTrigger {
 extension WorkflowTrigger: Codable {
     private enum Stored: Codable {
         case schedule(WorkflowSchedule)
-        case agentFinished
-        case agentAskedPermission
-        case agentAskedForm
-        case agentStopped
-        case workflowCompleted(id: String?)
         case unrecognised(name: String, keys: [String: JSONValue])
     }
 
+    /// The hyphenated triggers a run's cause or an older peer may still carry, by the key
+    /// they were stored under (#575). Read as the unknown names they now are, so the
+    /// record still loads and matches nothing.
+    private static let removed = [
+        "agentFinished": "agent-finished", "agentAskedPermission": "agent-asked-permission",
+        "agentAskedForm": "agent-asked-form", "agentStopped": "agent-stopped",
+        "workflowCompleted": "workflow-completed",
+    ]
+
+    private struct AnyKey: CodingKey {
+        var stringValue: String
+        var intValue: Int? { nil }
+        init(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { nil }
+    }
+
     public init(from decoder: any Decoder) throws {
-        switch try Stored(from: decoder) {
+        let stored: Stored
+        do {
+            stored = try Stored(from: decoder)
+        } catch {
+            let c = try decoder.container(keyedBy: AnyKey.self)
+            guard let key = c.allKeys.first, let name = Self.removed[key.stringValue] else { throw error }
+            let keys = (try? c.decode([String: JSONValue].self, forKey: key)) ?? [:]
+            self = .unrecognised(name: name, keys: keys)
+            return
+        }
+        switch stored {
         case .schedule(let schedule): self = .schedule(schedule)
-        case .agentFinished: self = .agentFinished
-        case .agentAskedPermission: self = .agentAskedPermission
-        case .agentAskedForm: self = .agentAskedForm
-        case .agentStopped: self = .agentStopped
-        case .workflowCompleted(let id): self = .workflowCompleted(id: id)
         case .unrecognised(let name, let keys):
             // A server's event (#383) goes as an unknown trigger does, and is read back
             // as one by its name.
@@ -193,11 +175,6 @@ extension WorkflowTrigger: Codable {
         let stored: Stored
         switch self {
         case .schedule(let schedule): stored = .schedule(schedule)
-        case .agentFinished: stored = .agentFinished
-        case .agentAskedPermission: stored = .agentAskedPermission
-        case .agentAskedForm: stored = .agentAskedForm
-        case .agentStopped: stored = .agentStopped
-        case .workflowCompleted(let id): stored = .workflowCompleted(id: id)
         // An older Mac or phone reads it as a trigger it does not know yet, and lists it
         // as inert (042 FR-025).
         case .event(let pattern):
@@ -211,15 +188,6 @@ extension WorkflowTrigger: Codable {
         }
         try stored.encode(to: encoder)
     }
-}
-
-/// The agent events a workflow can watch, which are a subset of everything that happens
-/// to an agent — the ones worth reacting to.
-public enum WorkflowAgentEvent: String, Codable, Hashable, Sendable, CaseIterable {
-    case finished
-    case askedPermission
-    case askedForm
-    case stopped
 }
 
 /// Which agent a fired workflow's prompt goes to.
