@@ -300,6 +300,10 @@ struct BlockedTests {
         // The unknown-name refusal lists what it could have meant, by id.
         let unknown = await refusal { try await self.finish(core, token, "blocked", "W.", waitingOn: ["Nobody"]) }
         #expect(unknown?.contains("\(done.id.uuidString): \u{201C}Finished one\u{201D}") == true)
+        // wait_for_event on agents needs a time too (#572), so no wait can hang.
+        let forever = await refusal { _ = try await core.waitOn(.init(token: token, agents: ["Twin"])) }
+        #expect(forever?.contains("until_minutes is required") == true)
+        #expect(await core.agent(lead.id)?.report == nil)
     }
 
     /// A circle is refused however long it is, and names the agents in it.
@@ -469,6 +473,29 @@ struct BlockedTests {
     }
 
     // MARK: FR-020 — restarts
+
+    /// A wait on an agent an earlier build saved with no time to check again gets one,
+    /// 24 hours on, when it is loaded (#572), so it cannot hang for ever.
+    @Test func aSavedWaitWithNoTimeGetsOneOnLoad() async throws {
+        let (locations, work) = try temporary()
+        let helper = Agent(runtimeID: "claude", cwd: work, title: "Helper", state: .finished, endedReason: .endTurn,
+                           report: WorkReport(outcome: .blocked, message: "On a review.", at: Date(), block: Block()))
+        let lead = Agent(runtimeID: "claude", cwd: work, title: "Lead", state: .finished, endedReason: .endTurn,
+                         report: WorkReport(outcome: .blocked, message: "On the helper.", at: Date(),
+                                            block: Block(waits: [Wait(agentID: helper.id, nameAtReport: "Helper")])))
+        let store = try AgentStore(locations: locations)
+        for agent in [helper, lead] { try await store.save(agent) }
+
+        let core = try await makeCore(locations, FakeLauncher(script: .init()))
+        let before = Date()
+        await core.resumeBlocksAfterRestart()
+        let at = try #require(await core.agent(lead.id)?.report?.block?.checkAgainAt)
+        #expect(at >= before.addingTimeInterval(86_400 - 1) && at <= Date().addingTimeInterval(86_400 + 1))
+        #expect(await core.agent(helper.id)?.report?.block?.checkAgainAt == nil, "a block on nothing is the person's")
+        await core.tickWorkflows(now: at.addingTimeInterval(1))
+        await eventually("the lead was resumed") { (try? await self.resumes(core, lead.id).count) == 1 }
+    }
+
 
     /// A block whose helper ended while the daemon was away, and a resume queued by the
     /// last daemon and never sent: each is sent once, and only once.

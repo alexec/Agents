@@ -52,7 +52,10 @@ struct RuntimeAssessmentTests {
             call(9, DaemonAPI.Method.eventsPublish, ["name": s(RuntimeAssessment.pingEvent)]),
             call(10, DaemonAPI.Method.eventsWait, ["events": .array([s(RuntimeAssessment.pingEvent)]), "from": .int(4)],
                  answer: "custom.assess_ping happened at 10:00"),
-            call(10.1, DaemonAPI.Method.eventsWait, ["events": .array([s(RuntimeAssessment.neverEvent)])],
+            call(10.05, DaemonAPI.Method.eventsWait, ["events": .array([s(RuntimeAssessment.neverEvent)])], ok: false,
+                 answer: "until_minutes is required: say how long to wait, from 1 minute to 24 hours (1440)."),
+            call(10.1, DaemonAPI.Method.eventsWait, ["events": .array([s(RuntimeAssessment.neverEvent)]),
+                                                    "untilMinutes": .int(RuntimeAssessment.longWaitMinutes)],
                  answer: "Still waiting for custom.assess_never, since 10:00."),
             call(10.2, DaemonAPI.Method.eventsCancel, [:], answer: "Stopped waiting for custom.assess_never."),
             call(11, DaemonAPI.Method.agentsAskForm, ["questions": .array([
@@ -326,6 +329,16 @@ struct RuntimeAssessmentTests {
     @Test func aWaitNeverCancelledFails() {
         var record = goodRecord()
         record.calls.removeAll { $0.method == DaemonAPI.Method.eventsCancel }
+        #expect(verdicts(record)["events"] == .failed)
+    }
+
+    /// A wait with no until_minutes must be refused (#572), and must have been tried.
+    @Test func aWaitWithNoDeadlineMustBeRefused() {
+        var record = goodRecord()
+        let i = record.calls.firstIndex { $0.method == DaemonAPI.Method.eventsWait && !$0.ok }!
+        record.calls[i].ok = true
+        #expect(verdicts(record)["events"] == .failed)
+        record.calls.remove(at: i)
         #expect(verdicts(record)["events"] == .failed)
     }
 

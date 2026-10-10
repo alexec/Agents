@@ -81,7 +81,7 @@ struct MachineEventTests {
         await core.rescanWorkflows(in: q)
         let waiter = try await core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: p, prompt: "Wait"))
         await core.bindAppToken("t", to: waiter)
-        _ = try await core.waitForEvent(.init(token: "t", events: ["mac.wake"]))
+        _ = try await core.waitForEvent(.init(token: "t", events: ["mac.wake"], untilMinutes: 60))
         let watch = FakeMachineWatch()
         await core.startWatchingMachine(watch)
         watch.send(.wake)

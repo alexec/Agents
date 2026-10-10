@@ -27,7 +27,9 @@ and then carry on.
    ```
 
    You do not need to know the event's name. The agent finds it, here
-   `branch.moved` with `branch: main`, and sets a time limit if you gave one.
+   `branch.moved` with `branch: main`, and sets a time limit: yours if you gave one,
+   otherwise its own. Every wait has one, from 1 minute to 24 hours, so none can last
+   for ever; when it runs out the agent is started again and can wait again.
 
    A detail can name more than one value, meaning any of them. *Wake me when any agent
    labelled `deploy` finishes* is `agent.finished` with `{"labels": "deploy"}`, and
