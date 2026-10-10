@@ -719,7 +719,7 @@ struct HelperAgentTests {
         let (lead, token) = try await caller(core, in: work)
         // Its own first turn over, so that ending does not let the run go.
         await settled(core, lead, "the lead's first turn ended")
-        let run = WorkflowRun(workflowID: "nightly", folder: work, trigger: .agentFinished,
+        let run = WorkflowRun(workflowID: "nightly", folder: work, trigger: .event(EventPattern("agent.finished")),
                               depth: 2, agentID: lead)
         await core.setWorkflowRunForTesting(run)
         if var agent = await core.agent(lead) {
@@ -741,7 +741,7 @@ struct HelperAgentTests {
         let work = try project(root)
         let core = try await makeCore(locations, FakeLauncher())
         let (lead, token) = try await caller(core, in: work)
-        let run = WorkflowRun(workflowID: "nightly", folder: work, trigger: .agentFinished,
+        let run = WorkflowRun(workflowID: "nightly", folder: work, trigger: .event(EventPattern("agent.finished")),
                               depth: 2, agentID: lead)
         await core.setWorkflowRunForTesting(run)
         if var agent = await core.agent(lead) {

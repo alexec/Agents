@@ -284,7 +284,8 @@ struct WorkflowFiringTests {
         """
         ---
         on:
-          - agent-stopped
+          - agent.stopped
+          - agent.failed
         ---
 
         An agent stopped. Go and look.
@@ -350,7 +351,7 @@ struct WorkflowFiringTests {
     /// The deferral itself, asserted directly rather than inferred from a fire.
     ///
     /// Worth its own test because the failure mode it guards is silence: if
-    /// `workflowsRespond` dropped the event instead of holding it, every assertion
+    /// `fireWorkflows` dropped the event instead of holding it, every assertion
     /// above would still pass in a world where the queue did nothing, so long as
     /// nothing fired for other reasons.
     @Test func anEventRaisedBeforeWorkflowsStartedIsHeldAndNotDropped() async throws {
@@ -365,15 +366,14 @@ struct WorkflowFiringTests {
         // — so the ending is raised by hand, inside the closed window, exactly as
         // `move` would raise one that was final.
         let id = try #require(recovered.first)
-        await core.workflowsRespond(to: .stopped, agentID: id)
+        await core.raiseAgentEnding(id, next: .stopped, reason: .cancelled, depth: 0)
         // Deliberately not started yet. The ending has happened and nothing has acted.
         #expect(await core.allAgents().contains { $0.startedByWorkflow == "on-stop" } == false)
-        #expect(await core.deferredLifecycleEvents.count == 1,
+        #expect(await core.deferredEventsForWorkflows.map(\.event.name) == ["agent.stopped"],
                 "the ending was dropped rather than held")
-        #expect(await core.deferredLifecycleEvents.first?.event == .stopped)
 
         await core.startWorkflows()
-        #expect(await core.deferredLifecycleEvents.isEmpty, "the queue was not drained")
+        #expect(await core.deferredEventsForWorkflows.isEmpty, "the queue was not drained")
         await eventually("the held event fired once the layer could act") {
             await core.allAgents().contains { $0.startedByWorkflow == "on-stop" }
         }
@@ -415,7 +415,7 @@ struct WorkflowFiringTests {
         try write("""
             ---
             on:
-              - agent-finished
+              - agent.finished
             ---
 
             Look at what just happened.
@@ -492,7 +492,7 @@ struct WorkflowFiringTests {
         try write("""
             ---
             on:
-              - agent-finished
+              - agent.finished
             agent: triggering
             ---
 

@@ -88,8 +88,6 @@ public struct EventKind: Hashable, Sendable {
     public var detailDescriptions: [EventDetail]
     /// What it means, in the one sentence every place that lists it uses (FR-024).
     public var meaning: String
-    /// Today's trigger names that answer to it (FR-022).
-    public var aliases: [String]
     /// Raised only by a daemon on a Mac: a Linux host has nothing that hears it (#372).
     public var isMacOnly: Bool
 
@@ -127,13 +125,12 @@ public struct EventKind: Hashable, Sendable {
     }
 
     init(_ name: String, _ scope: EventScopeKind, _ details: [EventDetail], _ meaning: String,
-         aliases: [String] = [], macOnly: Bool = false) {
+         macOnly: Bool = false) {
         self.name = name
         self.isMacOnly = macOnly
         self.scope = scope
         self.detailDescriptions = details
         self.meaning = meaning
-        self.aliases = aliases
     }
 }
 
@@ -147,17 +144,17 @@ public enum EventCatalogue {
     public static let all: [EventKind] = [
         EventKind("agent.started", .project, about(), "An agent in this project started working."),
         EventKind("agent.finished", .project, about(outcome, EventDetail("afterwards", values: ["archive_requested", "archived", "stay"])),
-                  "An agent in this project ended a turn having done its work.", aliases: ["agent-finished"]),
+                  "An agent in this project ended a turn having done its work."),
         EventKind("agent.asked_permission", .project, about(),
-                  "An agent in this project is asking for permission.", aliases: ["agent-asked-permission"]),
+                  "An agent in this project is asking for permission."),
         EventKind("agent.asked_form", .project, about(),
-                  "An agent in this project raised a form to fill in.", aliases: ["agent-asked-form"]),
+                  "An agent in this project raised a form to fill in."),
         EventKind("agent.blocked", .project, about(EventDetail("waiting_on")),
                   "An agent in this project ended its turn waiting on something."),
         EventKind("agent.stopped", .project, about(EventDetail("by", values: ["you", "cost_limit", "unknown"])),
-                  "An agent in this project was stopped before finishing.", aliases: ["agent-stopped"]),
+                  "An agent in this project was stopped before finishing."),
         EventKind("agent.failed", .project, about(EventDetail("reason", values: EndedReason.allCases.map(\.code))),
-                  "An agent in this project ended in an error.", aliases: ["agent-stopped"]),
+                  "An agent in this project ended in an error."),
         EventKind("agent.archive_requested", .project, about(outcome),
                   "An agent in this project asked to be archived, and waits for the person's OK."),
         EventKind("agent.messaged", .project, about(EventDetail("from"), EventDetail("from_title")),
@@ -165,13 +162,13 @@ public enum EventCatalogue {
         EventKind("agent.archived", .project, about(EventDetail("by", values: ["agent", "you"]), outcome),
                   "An agent in this project was archived."),
         EventKind("agent.deleted", .project, about(EventDetail("because", values: ["age", "person"])),
-                  "An archived agent was deleted with its conversation.", aliases: ["agent.retired"]),
+                  "An archived agent was deleted with its conversation."),
         EventKind("project.idle", .project,
                   shown("agents", "finished", "blocked", "waiting_on_you", "stopped", "failed", "since", "ids"),
                   "Every agent in this project has stopped working."),
         EventKind("workflow.ran", .project, shown("workflow", "agent"), "A workflow in this project started an agent."),
         EventKind("workflow.completed", .project, shown("workflow", "agent") + [outcome],
-                  "A workflow's run in this project finished.", aliases: ["workflow-completed"]),
+                  "A workflow's run in this project finished."),
         EventKind("workflow.refused", .project,
                   shown("workflow") + [EventDetail("reason", values: WorkflowRefusal.codes)],
                   "A workflow in this project did not run, and why."),
@@ -256,19 +253,6 @@ public enum EventCatalogue {
 
     public static func kind(named name: String) -> EventKind? { byName[name] }
 
-    /// Names an event went by before it was renamed, and what it is called now (#372):
-    /// the disk events fire on a Linux server too, so they are the machine's, not the
-    /// Mac's. A trigger or a wait naming the old one is read as the new one.
-    public static let renamed: [String: String] = [
-        "mac.disk_low": "machine.disk_low",
-        "mac.disk_ok": "machine.disk_ok",
-        // Parking became a request to archive (#584).
-        "agent.parked": "agent.archive_requested",
-    ]
-
-    /// The name as the catalogue has it today.
-    public static func currentName(_ name: String) -> String { renamed[name] ?? name }
-
     /// Whether only a Mac raises what a pattern names: a Mac-only kind, or a subject
     /// whose every kind is (#372). A custom event or a name the catalogue does not know
     /// is not.
@@ -279,11 +263,6 @@ public enum EventCatalogue {
             return !kinds.isEmpty && kinds.allSatisfy(\.isMacOnly)
         }
         return kind(named: name)?.isMacOnly ?? false
-    }
-
-    /// The kinds an old trigger name answers to. Empty for a name that is not one.
-    public static func kinds(forAlias alias: String) -> [EventKind] {
-        all.filter { $0.aliases.contains(alias) }
     }
 
     /// `custom.` and a name of lowercase letters, digits and `_`, up to 40 characters.
@@ -303,9 +282,9 @@ public enum EventCatalogue {
     }
 
     /// Whether a name can only be a server's event: shaped `noun.verbed`, not in the
-    /// catalogue (an old name included), and not about one of the app's own subjects.
+    /// catalogue, and not about one of the app's own subjects.
     public static func isServerEventName(_ name: String) -> Bool {
-        guard isEventName(name), kind(named: currentName(name)) == nil,
+        guard isEventName(name), kind(named: name) == nil,
               let dot = name.firstIndex(of: ".") else { return false }
         return !reservedNouns.contains(String(name[..<dot]))
     }

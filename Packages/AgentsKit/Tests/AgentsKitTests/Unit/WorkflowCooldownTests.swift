@@ -9,7 +9,7 @@ struct WorkflowCooldownTests {
     private let project = URL(filePath: "/tmp/p")
 
     private func file(_ cooldown: String) -> Workflow {
-        WorkflowFile.parse("---\non:\n  - agent-finished\ncooldown: \(cooldown)\n---\n\nGo.\n",
+        WorkflowFile.parse("---\non:\n  - agent.finished\ncooldown: \(cooldown)\n---\n\nGo.\n",
                            workflowID: "w", in: project)
     }
 
@@ -22,7 +22,7 @@ struct WorkflowCooldownTests {
     }
 
     @Test func withoutTheKeyThereIsNone() {
-        let plain = WorkflowFile.parse("---\non:\n  - agent-finished\n---\n\nGo.\n", workflowID: "w", in: project)
+        let plain = WorkflowFile.parse("---\non:\n  - agent.finished\n---\n\nGo.\n", workflowID: "w", in: project)
         #expect(plain.cooldown == nil)
         #expect(plain.problem == nil)
     }
@@ -37,7 +37,7 @@ struct WorkflowCooldownTests {
         #expect(file("0m").problem == .unreadable("`cooldown:` must be at least a minute, not \"0m\""))
         #expect(file("[15m]").problem == .unreadable("`cooldown:` must be a single value, like 15m"))
         // What can still be read of a broken file is still shown.
-        #expect(file("soon").triggers == [.agentFinished])
+        #expect(file("soon").triggers == [.event(EventPattern("agent.finished"))])
     }
 
     @Test func itIsKnownSoNotKeptAsAnUnknownField() {
@@ -49,7 +49,8 @@ struct WorkflowCooldownTests {
         #expect(WorkflowCooldown.words(90 * 60) == "1 hour 30 minutes")
         #expect(WorkflowCooldown.fileText(90 * 60) == "1h30m")
         #expect(WorkflowCooldown.fileText(86_400) == "1d")
-        #expect(file("15m").summary == "When an agent finishes, in a new agent, at most once every 15 minutes")
+        #expect(file("15m").summary == "When an agent in this project ended a turn having done its work, "
+                + "in a new agent, at most once every 15 minutes")
     }
 
     // MARK: The rule
@@ -77,7 +78,7 @@ struct WorkflowCooldownTests {
         #expect(refusal(file("15m"), isRunning: true, lastStartedAt: start, now: start.addingTimeInterval(3_600))
             == .coolingDown(until: nil))
         // Without a cooldown: queued, each to run on its own (#422).
-        let plain = WorkflowFile.parse("---\non:\n  - agent-finished\n---\n\nGo.\n", workflowID: "w", in: project)
+        let plain = WorkflowFile.parse("---\non:\n  - agent.finished\n---\n\nGo.\n", workflowID: "w", in: project)
         #expect(refusal(plain, isRunning: true, lastStartedAt: start, now: start.addingTimeInterval(60)) == .queued)
     }
 

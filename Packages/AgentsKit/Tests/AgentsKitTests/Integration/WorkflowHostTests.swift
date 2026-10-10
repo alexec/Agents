@@ -42,7 +42,7 @@ struct WorkflowHostTests {
         let (locations, work) = try temporary()
         let open = try write("""
             ---
-            on: agent-finished
+            on: agent.finished
             claim: one
             ---
 
@@ -50,7 +50,7 @@ struct WorkflowHostTests {
             """, as: "open", in: work)
         try write("""
             ---
-            on: agent-finished
+            on: agent.finished
             hosts:
               - \(here)
             ---
@@ -59,7 +59,7 @@ struct WorkflowHostTests {
             """, as: "here", in: work)
         try write("""
             ---
-            on: agent-finished
+            on: agent.finished
             hosts:
               - some-other-computer
             ---
@@ -102,7 +102,7 @@ struct WorkflowHostTests {
         #expect(await core.allAgents().count == 2, "a schedule for another computer starts nothing here")
 
         let foreign = try #require(await core.workflow("there", in: work))
-        _ = await core.fire(foreign, on: .agentStopped)
+        _ = await core.fire(foreign, on: .event(EventPattern("agent.stopped")))
         #expect(await core.allAgents().count == 2, "an event for another computer starts nothing here")
 
         let before = try String(contentsOf: open, encoding: .utf8)
@@ -131,7 +131,7 @@ struct WorkflowHostTests {
         let (locations, work) = try temporary()
         let url = try write("""
             ---
-            on: agent-finished
+            on: agent.finished
             hosts: some-other-computer
             claim: one
             ---

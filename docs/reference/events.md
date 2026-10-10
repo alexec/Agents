@@ -92,10 +92,10 @@ an event already on the log.
 | `agent.blocked` | — | agent, waiting_on | An agent ended its turn waiting on something. When `waiting_on` names agents or a time to check again, the agent resumes by itself; otherwise it needs you to carry it on. See [Statuses and groups](statuses.md). |
 | `agent.stopped` | — | agent, by | An agent was stopped before finishing. `by` is `you`, `cost_limit` or `unknown`. |
 | `agent.failed` | — | agent, reason | An agent ended in an error. `reason` is `allowance_spent`, `rate_limited`, `process_died`, `sign_in_refused`, `runtime_error`, `sandbox_failed`, `max_tokens`, `max_turn_requests`, `refusal`, `daemon_gone`, `stopped_by_agent` or `unrecognised`. |
-| `agent.archive_requested` | — | agent, outcome | An agent's turn ended asking for its session to be archived, and it waits for you to agree. `outcome` is its last report's, when it made one. A trigger or wait on `agent.parked`, its name before #584, is read as this. |
+| `agent.archive_requested` | — | agent, outcome | An agent's turn ended asking for its session to be archived, and it waits for you to agree. `outcome` is its last report's, when it made one. |
 | `agent.messaged` | — | agent, from, from_title | An agent was sent a message by another agent with `message_agent`. `agent` is the one it was sent to; `from` is the sender's id and `from_title` its title. |
 | `agent.archived` | — | agent, by, outcome | An agent was archived. `by` is `you`, or `agent` when the agent that started it archived it with `archive_agent`. `outcome` is its last report's, when it made one. |
-| `agent.deleted` | — | agent, because | An archived agent was deleted with its conversation. `because` is `age` or `person`. A trigger on `agent.retired`, its name before #398, still answers. |
+| `agent.deleted` | — | agent, because | An archived agent was deleted with its conversation. `because` is `age` or `person`. |
 
 ## Projects
 
@@ -140,8 +140,7 @@ These belong to the machine the host runs on, not to a project. Any agent can wa
 server has nothing that hears them. On a server, a `wait_for_event` naming only these is
 refused, one naming them with others says so in its answer, and `manage_workflows` says so
 when it writes or lists a workflow that triggers on them. The disk events fire on both, so
-they are `machine.`; their names before, `mac.disk_low` and `mac.disk_ok`, still work in a
-workflow file and a wait, and are read as the new ones.
+they are `machine.`.
 
 | Event | Filter by | Details | What it means |
 | --- | --- | --- | --- |
@@ -249,18 +248,6 @@ Each workflow page shows a line for each server its event triggers hear, on the 
 iPhone and iPad and the web page: when it was last asked and when the last event came, or
 why not (**Can't reach ci**, the server no longer offers the event, refused it, or doesn't
 take the filters).
-
-## Older trigger names
-
-Workflows written before events keep working. Each older name answers to these events:
-
-| Older trigger | Events |
-| --- | --- |
-| `agent-finished` | `agent.finished` |
-| `agent-asked-permission` | `agent.asked_permission` |
-| `agent-asked-form` | `agent.asked_form` |
-| `agent-stopped` | `agent.stopped`, `agent.failed` |
-| `workflow-completed` | `workflow.completed` |
 
 ## The Events page
 

@@ -182,7 +182,7 @@
     "expected" : {
       "canFire" : true,
       "needsAPerson" : false,
-      "summary" : "When an agent finishes, and When an agent stops without finishing, in a new agent, in plan mode, on Grok, using grok-4, at high effort, without beta, with fast, with voice calm"
+      "summary" : "Every day at 2am, in a new agent, in plan mode, on Grok, using grok-4, at high effort, without beta, with fast, with voice calm"
     },
     "input" : {
       "holdsAFire" : false,
@@ -214,13 +214,27 @@
         },
         "triggers" : [
           {
-            "agentFinished" : {
-
-            }
-          },
-          {
-            "agentStopped" : {
-
+            "schedule" : {
+              "_0" : {
+                "days" : [
+                  "fri",
+                  "mon",
+                  "sat",
+                  "sun",
+                  "thu",
+                  "tue",
+                  "wed"
+                ],
+                "endMinute" : 30,
+                "hours" : [
+                  2,
+                  2
+                ],
+                "minutes" : [
+                  0
+                ],
+                "startMinute" : 0
+              }
             }
           }
         ],
@@ -230,13 +244,13 @@
         "workflowID" : "review"
       }
     },
-    "name" : "agent events, with settings"
+    "name" : "with settings"
   },
   {
     "expected" : {
       "canFire" : true,
       "needsAPerson" : false,
-      "summary" : "When an agent asks for permission, and When an agent raises a form, in the agent that triggered it"
+      "summary" : "Every day at 2am, in the agent that triggered it"
     },
     "input" : {
       "holdsAFire" : false,
@@ -263,13 +277,27 @@
         },
         "triggers" : [
           {
-            "agentAskedPermission" : {
-
-            }
-          },
-          {
-            "agentAskedForm" : {
-
+            "schedule" : {
+              "_0" : {
+                "days" : [
+                  "fri",
+                  "mon",
+                  "sat",
+                  "sun",
+                  "thu",
+                  "tue",
+                  "wed"
+                ],
+                "endMinute" : 30,
+                "hours" : [
+                  2,
+                  2
+                ],
+                "minutes" : [
+                  0
+                ],
+                "startMinute" : 0
+              }
             }
           }
         ],
@@ -279,13 +307,13 @@
         "workflowID" : "answer"
       }
     },
-    "name" : "asked, triggering, settings left unsaid"
+    "name" : "triggering, settings left unsaid"
   },
   {
     "expected" : {
       "canFire" : true,
       "needsAPerson" : false,
-      "summary" : "When nightly finishes, and When any workflow finishes, in a new agent, on mystery"
+      "summary" : "Every day at 2am, in a new agent, on mystery"
     },
     "input" : {
       "holdsAFire" : false,
@@ -312,13 +340,27 @@
         },
         "triggers" : [
           {
-            "workflowCompleted" : {
-              "id" : "nightly"
-            }
-          },
-          {
-            "workflowCompleted" : {
-
+            "schedule" : {
+              "_0" : {
+                "days" : [
+                  "fri",
+                  "mon",
+                  "sat",
+                  "sun",
+                  "thu",
+                  "tue",
+                  "wed"
+                ],
+                "endMinute" : 30,
+                "hours" : [
+                  2,
+                  2
+                ],
+                "minutes" : [
+                  0
+                ],
+                "startMinute" : 0
+              }
             }
           }
         ],
@@ -328,7 +370,7 @@
         "workflowID" : "chain"
       }
     },
-    "name" : "after another, on an unknown runtime"
+    "name" : "on an unknown runtime"
   },
   {
     "expected" : {
@@ -375,6 +417,57 @@
       }
     },
     "name" : "only an unknown trigger"
+  },
+  {
+    "expected" : {
+      "canFire" : false,
+      "needsAPerson" : false,
+      "summary" : "Waits for \"agent-finished\", which this version does not know about yet. Did you mean agent.finished?"
+    },
+    "input" : {
+      "holdsAFire" : false,
+      "isArchived" : false,
+      "isEnabled" : true,
+      "isRunning" : false,
+      "nextFireAtByTrigger" : [
+
+      ],
+      "queued" : 0,
+      "workflow" : {
+        "folder" : "file:///fixture/project",
+        "mode" : "new",
+        "name" : "Legacy",
+        "problem" : {
+          "triggerNotSupported" : {
+            "_0" : "agent-finished"
+          }
+        },
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+          {
+            "unrecognised" : {
+              "keys" : {
+
+              },
+              "name" : "agent-finished"
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "legacy"
+      }
+    },
+    "name" : "an old trigger name"
   },
   {
     "expected" : {
@@ -494,8 +587,27 @@
         },
         "triggers" : [
           {
-            "agentFinished" : {
-
+            "schedule" : {
+              "_0" : {
+                "days" : [
+                  "fri",
+                  "mon",
+                  "sat",
+                  "sun",
+                  "thu",
+                  "tue",
+                  "wed"
+                ],
+                "endMinute" : 30,
+                "hours" : [
+                  2,
+                  2
+                ],
+                "minutes" : [
+                  0
+                ],
+                "startMinute" : 0
+              }
             }
           }
         ],
@@ -555,7 +667,7 @@
     "expected" : {
       "canFire" : true,
       "needsAPerson" : true,
-      "summary" : "When an agent finishes, in a new agent"
+      "summary" : "Every day at 2am, in a new agent"
     },
     "input" : {
       "holdsAFire" : false,
@@ -582,8 +694,27 @@
         },
         "triggers" : [
           {
-            "agentFinished" : {
-
+            "schedule" : {
+              "_0" : {
+                "days" : [
+                  "fri",
+                  "mon",
+                  "sat",
+                  "sun",
+                  "thu",
+                  "tue",
+                  "wed"
+                ],
+                "endMinute" : 30,
+                "hours" : [
+                  2,
+                  2
+                ],
+                "minutes" : [
+                  0
+                ],
+                "startMinute" : 0
+              }
             }
           }
         ],
@@ -599,7 +730,7 @@
     "expected" : {
       "canFire" : true,
       "needsAPerson" : true,
-      "summary" : "When an agent finishes, in a new agent"
+      "summary" : "Every day at 2am, in a new agent"
     },
     "input" : {
       "awaitingApproval" : {
@@ -629,8 +760,27 @@
         },
         "triggers" : [
           {
-            "agentFinished" : {
-
+            "schedule" : {
+              "_0" : {
+                "days" : [
+                  "fri",
+                  "mon",
+                  "sat",
+                  "sun",
+                  "thu",
+                  "tue",
+                  "wed"
+                ],
+                "endMinute" : 30,
+                "hours" : [
+                  2,
+                  2
+                ],
+                "minutes" : [
+                  0
+                ],
+                "startMinute" : 0
+              }
             }
           }
         ],
@@ -646,7 +796,7 @@
     "expected" : {
       "canFire" : true,
       "needsAPerson" : false,
-      "summary" : "When an agent finishes, in a new agent"
+      "summary" : "Every day at 2am, in a new agent"
     },
     "input" : {
       "holdsAFire" : false,
@@ -683,8 +833,27 @@
         },
         "triggers" : [
           {
-            "agentFinished" : {
-
+            "schedule" : {
+              "_0" : {
+                "days" : [
+                  "fri",
+                  "mon",
+                  "sat",
+                  "sun",
+                  "thu",
+                  "tue",
+                  "wed"
+                ],
+                "endMinute" : 30,
+                "hours" : [
+                  2,
+                  2
+                ],
+                "minutes" : [
+                  0
+                ],
+                "startMinute" : 0
+              }
             }
           }
         ],
@@ -700,7 +869,7 @@
     "expected" : {
       "canFire" : true,
       "needsAPerson" : false,
-      "summary" : "When an agent finishes, in a new agent"
+      "summary" : "Every day at 2am, in a new agent"
     },
     "input" : {
       "holdsAFire" : false,
@@ -737,8 +906,27 @@
         },
         "triggers" : [
           {
-            "agentFinished" : {
-
+            "schedule" : {
+              "_0" : {
+                "days" : [
+                  "fri",
+                  "mon",
+                  "sat",
+                  "sun",
+                  "thu",
+                  "tue",
+                  "wed"
+                ],
+                "endMinute" : 30,
+                "hours" : [
+                  2,
+                  2
+                ],
+                "minutes" : [
+                  0
+                ],
+                "startMinute" : 0
+              }
             }
           }
         ],
@@ -754,7 +942,7 @@
     "expected" : {
       "canFire" : true,
       "needsAPerson" : false,
-      "summary" : "When an agent finishes, in a new agent"
+      "summary" : "Every day at 2am, in a new agent"
     },
     "input" : {
       "holdsAFire" : false,
@@ -791,8 +979,27 @@
         },
         "triggers" : [
           {
-            "agentFinished" : {
-
+            "schedule" : {
+              "_0" : {
+                "days" : [
+                  "fri",
+                  "mon",
+                  "sat",
+                  "sun",
+                  "thu",
+                  "tue",
+                  "wed"
+                ],
+                "endMinute" : 30,
+                "hours" : [
+                  2,
+                  2
+                ],
+                "minutes" : [
+                  0
+                ],
+                "startMinute" : 0
+              }
             }
           }
         ],
@@ -808,7 +1015,7 @@
     "expected" : {
       "canFire" : true,
       "needsAPerson" : true,
-      "summary" : "When an agent finishes, in a new agent"
+      "summary" : "Every day at 2am, in a new agent"
     },
     "input" : {
       "holdsAFire" : false,
@@ -845,8 +1052,27 @@
         },
         "triggers" : [
           {
-            "agentFinished" : {
-
+            "schedule" : {
+              "_0" : {
+                "days" : [
+                  "fri",
+                  "mon",
+                  "sat",
+                  "sun",
+                  "thu",
+                  "tue",
+                  "wed"
+                ],
+                "endMinute" : 30,
+                "hours" : [
+                  2,
+                  2
+                ],
+                "minutes" : [
+                  0
+                ],
+                "startMinute" : 0
+              }
             }
           }
         ],
@@ -924,7 +1150,7 @@
     "expected" : {
       "canFire" : true,
       "needsAPerson" : false,
-      "summary" : "When an agent finishes, in a new agent"
+      "summary" : "Every day at 2am, in a new agent"
     },
     "input" : {
       "holdsAFire" : false,
@@ -961,8 +1187,27 @@
         },
         "triggers" : [
           {
-            "agentFinished" : {
-
+            "schedule" : {
+              "_0" : {
+                "days" : [
+                  "fri",
+                  "mon",
+                  "sat",
+                  "sun",
+                  "thu",
+                  "tue",
+                  "wed"
+                ],
+                "endMinute" : 30,
+                "hours" : [
+                  2,
+                  2
+                ],
+                "minutes" : [
+                  0
+                ],
+                "startMinute" : 0
+              }
             }
           }
         ],
@@ -978,7 +1223,7 @@
     "expected" : {
       "canFire" : true,
       "needsAPerson" : false,
-      "summary" : "When an agent finishes, in a new agent, at most once every 1 hour 30 minutes, in plan mode"
+      "summary" : "Every day at 2am, in a new agent, at most once every 1 hour 30 minutes, in plan mode"
     },
     "input" : {
       "holdsAFire" : false,
@@ -1006,8 +1251,27 @@
         },
         "triggers" : [
           {
-            "agentFinished" : {
-
+            "schedule" : {
+              "_0" : {
+                "days" : [
+                  "fri",
+                  "mon",
+                  "sat",
+                  "sun",
+                  "thu",
+                  "tue",
+                  "wed"
+                ],
+                "endMinute" : 30,
+                "hours" : [
+                  2,
+                  2
+                ],
+                "minutes" : [
+                  0
+                ],
+                "startMinute" : 0
+              }
             }
           }
         ],
@@ -1023,7 +1287,7 @@
     "expected" : {
       "canFire" : true,
       "needsAPerson" : false,
-      "summary" : "When an agent finishes, in the agent that triggered it, at most once every 1 day"
+      "summary" : "Every day at 2am, in the agent that triggered it, at most once every 1 day"
     },
     "input" : {
       "cooldownEndsAt" : 812500600,
@@ -1062,8 +1326,27 @@
         },
         "triggers" : [
           {
-            "agentFinished" : {
-
+            "schedule" : {
+              "_0" : {
+                "days" : [
+                  "fri",
+                  "mon",
+                  "sat",
+                  "sun",
+                  "thu",
+                  "tue",
+                  "wed"
+                ],
+                "endMinute" : 30,
+                "hours" : [
+                  2,
+                  2
+                ],
+                "minutes" : [
+                  0
+                ],
+                "startMinute" : 0
+              }
             }
           }
         ],

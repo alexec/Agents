@@ -131,14 +131,6 @@ function scalar(value: JSONValue): string | null {
 /** WorkflowTrigger.summary, with an event said by its catalogue meaning and filters in words. */
 export function triggerSummary(trigger: WorkflowTriggerStored): string {
   if ("schedule" in trigger) return scheduleSummary(trigger.schedule._0);
-  if ("agentFinished" in trigger) return "When an agent finishes";
-  if ("agentAskedPermission" in trigger) return "When an agent asks for permission";
-  if ("agentAskedForm" in trigger) return "When an agent raises a form";
-  if ("agentStopped" in trigger) return "When an agent stops without finishing";
-  if ("workflowCompleted" in trigger) {
-    const id = trigger.workflowCompleted.id;
-    return id ? `When ${id} finishes` : "When any workflow finishes";
-  }
   const { name } = trigger.unrecognised;
   const server = serverEvent(trigger);
   if (server) return serverEventSummary(server);
@@ -149,12 +141,45 @@ export function triggerSummary(trigger: WorkflowTriggerStored): string {
       : subject ? `Anything about ${subject}s` : eventMeanings[name] ?? name;
     return filters ? `${meaning} (${filters})` : meaning;
   }
-  return `Waits for "${name}", which this version does not know about yet`;
+  return `Waits for "${name}", which this version does not know about yet${guess(name)}`;
+}
+
+function distance(a: string, b: string): number {
+  let previous = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const current = [i];
+    for (let j = 1; j <= b.length; j++) {
+      current[j] = Math.min(previous[j]! + 1, current[j - 1]! + 1, previous[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    previous = current;
+  }
+  return previous[b.length]!;
+}
+
+/** WorkflowTrigger.guess (EventPattern.closest): the catalogue name nearest an unknown one, as ". Did you mean …?". */
+export function guess(name: string): string {
+  const names = Object.keys(eventMeanings);
+  let best: [string, number] | null = null;
+  for (const n of names) {
+    const d = distance(name, n);
+    if (!best || d < best[1]) best = [n, d];
+  }
+  if (best && best[1] <= Math.max(2, Math.floor(name.length / 4))) return `. Did you mean ${best[0]}?`;
+  const dot = name.indexOf(".");
+  if (dot < 0 || dot === name.length - 1) return "";
+  // Only under the app's own nouns: a server's `ci.failed` is never `agent.failed`.
+  const nouns = new Set(["custom", ...names.map((n) => n.split(".")[0]!)]);
+  if (!nouns.has(name.slice(0, dot))) return "";
+  const same = names.filter((n) => n.endsWith(name.slice(dot)));
+  return same.length === 1 ? `. Did you mean ${same[0]}?` : "";
 }
 
 function problemMessage(problem: WorkflowProblem): string {
   if ("unreadable" in problem) return problem.unreadable._0;
-  if ("triggerNotSupported" in problem) return `Waits for "${problem.triggerNotSupported._0}", which this version does not know about yet`;
+  if ("triggerNotSupported" in problem) {
+    const name = problem.triggerNotSupported._0;
+    return `Waits for "${name}", which this version does not know about yet${guess(name)}`;
+  }
   return `Runs "${problem.unsupportedMode._0}", which this version does not know about yet`;
 }
 
@@ -346,8 +371,6 @@ function eventFilters(trigger: WorkflowTriggerStored): [string, string[]][] {
       const values = filterValues(v);
       return values === null ? [] : [[k, values] as [string, string[]]];
     });
-  } else if ("workflowCompleted" in trigger && trigger.workflowCompleted.id) {
-    found = [["workflow", [trigger.workflowCompleted.id]]];
   }
   return found.sort(([a], [b]) => (a < b ? -1 : 1));
 }
@@ -394,11 +417,6 @@ export function scopeLine(trigger: WorkflowTriggerStored, project: string, host:
 /** WorkflowTrigger.resumedAgent: which agent a `triggering` run resumes. */
 export function resumedAgent(trigger: WorkflowTriggerStored): string {
   if ("schedule" in trigger) return "A clock has no agent to resume, so this never runs it";
-  if ("agentFinished" in trigger) return "Resumes the agent that finished";
-  if ("agentAskedPermission" in trigger) return "Resumes the agent that asked";
-  if ("agentAskedForm" in trigger) return "Resumes the agent that raised the form";
-  if ("agentStopped" in trigger) return "Resumes the agent that stopped";
-  if ("workflowCompleted" in trigger) return "Resumes the agent the finished run started";
   if (!isEvent(trigger)) return "Never runs it";
   if (serverEvent(trigger)) return "A server's events are about no agent, so this never runs it";
   const name = trigger.unrecognised.name;
@@ -414,7 +432,6 @@ export function resumedAgent(trigger: WorkflowTriggerStored): string {
 /** The symbol beside a trigger, as a glyph (the window's symbol(for:)). */
 export function triggerGlyph(trigger: WorkflowTriggerStored): string {
   if ("schedule" in trigger) return "◷";
-  if ("workflowCompleted" in trigger) return "⟳";
   if (!("unrecognised" in trigger)) return "●";
   if (!isEvent(trigger)) return "?";
   const subject = trigger.unrecognised.name.split(".")[0];

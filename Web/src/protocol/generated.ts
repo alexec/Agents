@@ -1955,11 +1955,6 @@ export type WorkflowTrigger = WorkflowTriggerStored;
 
 export type WorkflowTriggerStored =
   | { schedule: { _0: WorkflowSchedule } }
-  | { agentFinished: Record<string, never> }
-  | { agentAskedPermission: Record<string, never> }
-  | { agentAskedForm: Record<string, never> }
-  | { agentStopped: Record<string, never> }
-  | { workflowCompleted: { id?: string } }
   | { unrecognised: { name: string; keys: Record<string, JSONValue> } };
 
 export type WorkflowWhenDone = "keep" | "archive-allowed" | "archive";

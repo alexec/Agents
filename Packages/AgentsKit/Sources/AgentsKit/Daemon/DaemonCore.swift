@@ -485,9 +485,15 @@ public actor DaemonCore {
     /// Servers' events as workflow triggers (#383): the subscriptions, their polls and
     /// what each has got to.
     var mcpEvents = MCPEventsState()
-    /// Events raised before the workflows were read, held for their new-style triggers
-    /// until `startWorkflows`, as `deferredLifecycleEvents` holds today's (042).
-    var deferredEventsForWorkflows: [Event] = []
+    /// Events raised before the workflows were read, held for their triggers until
+    /// `startWorkflows`, with the run each ended, kept in the order they happened.
+    ///
+    /// This exists because of one deliberate ordering: `Daemon.start()` runs
+    /// `recover()` first and `startWorkflows()` only afterwards, so that a workflow is
+    /// never fired at an agent the daemon has not yet worked out is dead. So `move`
+    /// always raises; whether the event can be matched now, or has to wait a moment,
+    /// is the workflow layer's business and not the funnel's (FR-014).
+    var deferredEventsForWorkflows: [(event: Event, endingRun: String?)] = []
     /// The projects whose `.git` is looked at for branch tips moving (042 R9), through
     /// the project's one watch (#173).
     var branchFolders: Set<URL> = []
@@ -720,22 +726,6 @@ public actor DaemonCore {
     /// their triggers forever with nothing to drain them — the silent failure D4 is
     /// about, reintroduced by the fix for it.
     var workflowsAreStarted = true
-    /// Lifecycle events that happened before the workflow layer could act on them,
-    /// kept in the order they happened.
-    ///
-    /// This exists because of one deliberate ordering: `Daemon.start()` runs
-    /// `recover()` first and `startWorkflows()` only afterwards, so that a workflow is
-    /// never fired at an agent the daemon has not yet worked out is dead. That
-    /// ordering is why `recover` used to write the state by hand and go round `move`
-    /// entirely — routing it through the funnel without this queue would call
-    /// `workflowsRespond` before a single workflow had been read, and it would
-    /// silently do nothing. That trades a bypass somebody can see for one nobody can,
-    /// which is worse than the bypass.
-    ///
-    /// So `move` always emits. Whether the emission can be acted on now, or has to
-    /// wait a moment, is the workflow layer's business and not the funnel's (FR-014).
-    var deferredLifecycleEvents: [(event: WorkflowAgentEvent, agentID: UUID, depth: Int, cause: EventPosition?,
-                                   endingRun: String?)] = []
 
     /// Where notifications go, in a box rather than in a stored closure.
     ///
@@ -1316,13 +1306,11 @@ public actor DaemonCore {
             // finished agent's depth unfindable, and a depth that quietly resets to
             // zero is a loop the limit never stops.
             let depth = workflowChainDepth(causedBy: agentID)
-            // The event first (042): it is what a waiting agent hears, and what the
-            // log keeps. Workflows still fire from the line below until US3 moves them.
-            let cause = raiseAgentEnding(agentID, next: next, reason: reasonThisEventSet ?? agent.endedReason,
-                                         depth: depth, afterwards: afterwards(agentID, agent))
+            // The event first (042): it is what a waiting agent hears, what the log
+            // keeps, and what fires workflows.
+            raiseAgentEnding(agentID, next: next, reason: reasonThisEventSet ?? agent.endedReason,
+                             depth: depth, afterwards: afterwards(agentID, agent), endingRun: endingRun)
             workflowRunFinished(agentID: agentID)
-            workflowsRespond(to: next == .finished ? .finished : .stopped,
-                             agentID: agentID, depth: depth, causingEvent: cause, endingRun: endingRun)
             // A runtime assessment's last turn is scored from the record (#47).
             if next == .finished { scoreAssessmentIfDue(agentID) }
         // An agent that has started has neither finished nor stopped, so it fires
@@ -1589,8 +1577,7 @@ public actor DaemonCore {
 
         case .elicitationRequested(let request):
             await holdElicitation(request, agentID: agentID)
-            let cause = raiseAgentEvent("agent.asked_form", agentID, sentence: "is asking for a form to be filled in.")
-            workflowsRespond(to: .askedForm, agentID: agentID, causingEvent: cause)
+            raiseAgentEvent("agent.asked_form", agentID, sentence: "is asking for a form to be filled in.")
 
         case .elicitationWithdrawn(let requestID):
             await withdrawElicitation(requestID, agentID: agentID)
@@ -1642,8 +1629,7 @@ public actor DaemonCore {
                       DaemonAPI.PermissionNotification(agentID: agentID, request: request))
             // After the request is held and broadcast, so a workflow that fires on this
             // runs while the question is still outstanding.
-            let cause = raiseAgentEvent("agent.asked_permission", agentID, sentence: "is asking for permission.")
-            workflowsRespond(to: .askedPermission, agentID: agentID, causingEvent: cause)
+            raiseAgentEvent("agent.asked_permission", agentID, sentence: "is asking for permission.")
             // The plan, as a page beside the question about it. Asked to approve
             // something is asked to read it first.
             if let plan = request.toolCall.planFile,

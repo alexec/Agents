@@ -38,13 +38,13 @@ struct WorkflowTriggerCodingTests {
             ---
             on:
               - pull-request-conflicts
-              - agent-finished
+              - agent.finished
             ---
             Look.
             """
         let workflow = WorkflowFile.parse(text, workflowID: "w", in: project)
         #expect(workflow.problem == nil)
-        #expect(workflow.supportedTriggers == [.agentFinished])
+        #expect(workflow.supportedTriggers == [.event(EventPattern("agent.finished"))])
     }
 
     /// What an older build wrote on the wire comes back as the same inert trigger, so
@@ -57,8 +57,8 @@ struct WorkflowTriggerCodingTests {
     }
 
     @Test func existingTriggersKeepTheirShape() throws {
-        let data = try JSONEncoder().encode(WorkflowTrigger.agentFinished)
-        #expect(String(decoding: data, as: UTF8.self) == #"{"agentFinished":{}}"#)
+        let data = try JSONEncoder().encode(WorkflowTrigger.unrecognised(name: "x", keys: [:]))
+        #expect(String(decoding: data, as: UTF8.self) == #"{"unrecognised":{"name":"x","keys":{}}}"#)
     }
 
     /// A state written while a pull request's run was refused: the refusal is one this

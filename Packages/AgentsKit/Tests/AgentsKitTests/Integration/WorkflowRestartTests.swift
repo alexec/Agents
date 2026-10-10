@@ -52,8 +52,8 @@ struct WorkflowRestartTests {
 
     /// Something that runs when another workflow completes — or any, with no id.
     private func after(_ workflowID: String?) -> String {
-        let trigger = workflowID.map { "  - workflow-completed:\n      id: \($0)" }
-            ?? "  - workflow-completed"
+        let trigger = workflowID.map { "  - workflow.completed:\n      workflow: \($0)" }
+            ?? "  - workflow.completed"
         return """
             ---
             on:
@@ -212,7 +212,7 @@ struct WorkflowRestartTests {
         let runID = UUID()
         let agent = cutOff(in: work, by: "deep", run: runID)
         leaveOnDisk([WorkflowRun(id: runID, workflowID: "deep", folder: work,
-                                 trigger: .workflowCompleted(id: "earlier"),
+                                 trigger: .event(EventPattern("workflow.completed", filters: ["workflow": DetailFilter("earlier")])),
                                  depth: Workflow.chainDepthLimit, agentID: agent.id,
                                  startedAt: Date())], at: locations)
 
@@ -241,7 +241,7 @@ struct WorkflowRestartTests {
         let runID = UUID()
         let agent = cutOff(in: work, by: "deep", run: runID)
         leaveOnDisk([WorkflowRun(id: runID, workflowID: "deep", folder: work,
-                                 trigger: .workflowCompleted(id: "earlier"),
+                                 trigger: .event(EventPattern("workflow.completed", filters: ["workflow": DetailFilter("earlier")])),
                                  depth: Workflow.chainDepthLimit - 1, agentID: agent.id,
                                  startedAt: Date())], at: locations)
 
@@ -263,7 +263,7 @@ struct WorkflowRestartTests {
         let runID = UUID()
         let agent = cutOff(in: work, by: "deep", run: runID)
         leaveOnDisk([WorkflowRun(id: runID, workflowID: "deep", folder: work,
-                                 trigger: .workflowCompleted(id: "earlier"),
+                                 trigger: .event(EventPattern("workflow.completed", filters: ["workflow": DetailFilter("earlier")])),
                                  agentID: agent.id, startedAt: Date())], at: locations)
 
         // Picked back up into a turn that does not end, so the run stays in flight.

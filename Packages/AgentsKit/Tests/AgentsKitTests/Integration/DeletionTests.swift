@@ -323,7 +323,7 @@ struct DeletionTests {
         let (locations, work) = try temporary()
         let inRun = archived(work, daysAgo: 40), watched = archived(work, daysAgo: 40)
         let core = try await core(locations, seeded: [inRun, watched])
-        await core.putRun(WorkflowRun(workflowID: "nightly", folder: work, trigger: .agentFinished, agentID: inRun.id))
+        await core.putRun(WorkflowRun(workflowID: "nightly", folder: work, trigger: .event(EventPattern("agent.finished")), agentID: inRun.id))
         try await core.reportPresence(.init(watching: watched.id, active: true), from: .mac, connection: UUID())
         await core.checkRetention()
         #expect(await core.agent(inRun.id) != nil)
@@ -389,7 +389,7 @@ struct DeletionTests {
         let live = Agent(runtimeID: "claude", cwd: work, title: "live", state: .finished, endedReason: .endTurn)
         let held = archived(work, daysAgo: 3)
         let core = try await core(locations, seeded: [live, held])
-        await core.putRun(WorkflowRun(workflowID: "nightly", folder: work, trigger: .agentFinished, agentID: held.id))
+        await core.putRun(WorkflowRun(workflowID: "nightly", folder: work, trigger: .event(EventPattern("agent.finished")), agentID: held.id))
 
         do {
             try await core.deleteNow(live.id)

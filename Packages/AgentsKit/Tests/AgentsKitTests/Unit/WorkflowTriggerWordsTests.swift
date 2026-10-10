@@ -9,8 +9,7 @@ struct WorkflowTriggerWordsTests {
     private let project = URL(fileURLWithPath: "/tmp/words-project")
 
     @Test func eachTriggerListensWhereItsEventsAre() {
-        #expect(WorkflowTrigger.agentFinished.listensIn == .project)
-        #expect(WorkflowTrigger.workflowCompleted(id: nil).listensIn == .project)
+        #expect(WorkflowTrigger.event(EventPattern("agent.finished")).listensIn == .project)
         #expect(WorkflowTrigger.event(EventPattern("branch.moved")).listensIn == .project)
         #expect(WorkflowTrigger.event(EventPattern("mac.wake")).listensIn == .mac)
         #expect(WorkflowTrigger.event(EventPattern("cost.limit_reached")).listensIn == .either)
@@ -22,15 +21,13 @@ struct WorkflowTriggerWordsTests {
         #expect(WorkflowTrigger.unrecognised(name: "x", keys: [:]).listensIn == nil)
     }
 
-    @Test func filtersAreTheFilesOwnIncludingAWorkflowId() {
+    @Test func filtersAreTheFilesOwn() {
         #expect(WorkflowTrigger.event(EventPattern("branch.moved", filters: ["branch": "main"])).filters
                 == ["branch": "main"])
-        #expect(WorkflowTrigger.workflowCompleted(id: "nightly").filters == ["workflow": "nightly"])
-        #expect(WorkflowTrigger.agentFinished.filters.isEmpty)
+        #expect(WorkflowTrigger.event(EventPattern("agent.finished")).filters.isEmpty)
     }
 
     @Test func aTriggeringRunSaysWhichAgentItResumesOrThatThereIsNone() {
-        #expect(WorkflowTrigger.agentFinished.resumedAgent == "Resumes the agent that finished")
         #expect(WorkflowTrigger.event(EventPattern("custom.ready")).resumedAgent
                 == "Resumes the agent that published it")
         #expect(WorkflowTrigger.event(EventPattern("mac.wake")).resumedAgent.contains("never runs"))
@@ -43,7 +40,8 @@ struct WorkflowTriggerWordsTests {
         #expect(WorkflowCause.trigger(.schedule(WorkflowSchedule())).phrase == "on its schedule")
         #expect(WorkflowCause.trigger(.event(EventPattern("branch.moved", filters: ["branch": "main"]))).phrase
                 == "on branch.moved branch main")
-        #expect(WorkflowCause.trigger(.agentFinished).phrase == "when an agent finishes")
+        #expect(WorkflowCause.trigger(.unrecognised(name: "agent-finished", keys: [:])).phrase
+                == "waits for \"agent-finished\", which this version does not know about yet. Did you mean agent.finished?")
     }
 
     @Test func aBrokenFileStillShowsTheTriggersItCouldRead() {

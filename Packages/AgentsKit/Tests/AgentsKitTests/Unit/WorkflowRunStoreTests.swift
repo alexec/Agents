@@ -20,7 +20,7 @@ struct WorkflowRunStoreTests {
     private func run(_ workflowID: String = "morning-tests", depth: Int = 1) -> WorkflowRun {
         WorkflowRun(workflowID: workflowID,
                     folder: URL(filePath: "/tmp/somewhere/api"),
-                    trigger: .workflowCompleted(id: "nightly"),
+                    trigger: .event(EventPattern("workflow.completed", filters: ["workflow": DetailFilter("nightly")])),
                     triggeringAgentID: UUID(),
                     depth: depth,
                     agentID: UUID(),
