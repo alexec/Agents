@@ -9,7 +9,7 @@ description: Drop a file into a project's drop box, and have a workflow pick it 
 Each project has a drop box: the folder `.agents/dropbox/` in the project. A file that
 arrives there raises the event `dropbox.file_added`, and a workflow in that project can
 run on it. This guide sets up a workflow that reviews every PDF or Markdown file dropped
-into `dropbox/review/`.
+into `dropbox/review/`, and leaves every other file alone.
 
 ## Before you start
 
@@ -25,26 +25,27 @@ into `dropbox/review/`.
    ---
    name: Review what lands in the drop box
    on:
-     - dropbox.file_added:
-         folder: review
-         extension: [pdf, md]
+     - dropbox.file_added
    agent: new
    ---
 
-   Read the dropped file and review it. Move it to .agents/dropbox/done/ when finished.
+   If the event's folder is not review, or its extension is not pdf or md, stop: it is
+   not yours. Otherwise read the dropped file and review it, then move it out of
+   .agents/dropbox/, to reviewed/ at the project's top.
    ```
 
-   `folder` is where the file is inside the drop box: `review` for
-   `.agents/dropbox/review/`, and empty for the drop box's top. `extension` is the
-   file's extension in lower case, without the dot. Leave either out to take every file.
+   An arrival can't be narrowed in `on:`, so the workflow runs for every file and the
+   prompt says which to take. The event tells the agent `folder`, where the file is
+   inside the drop box (`review` for `.agents/dropbox/review/`, empty at its top), and
+   `extension`, in lower case without the dot.
 
 2. Put a file into `.agents/dropbox/review/`, from Finder, a script, `cp` or `scp`. Make
    the folder if it is not there.
 
    On the Mac, you can also drag files from Finder onto the project's row in the sidebar,
    or onto any of its sessions' rows. They go into the top of the project's drop box,
-   never into a session's worktree, so a workflow with `folder:` set does not see them
-   there. To put them in a folder such as `review`, right click the project's row,
+   never into a session's worktree, so a prompt that takes only `review` leaves them.
+   To put them in a folder such as `review`, right click the project's row,
    choose **Put Files in Drop Box…**, type the folder, then drag the files onto the
    sheet or press **Choose Files…**. A file sent from the Mac can be up to 25 MB; copy a
    bigger one into the folder in Finder. A folder dragged onto the list is added as a
@@ -72,9 +73,9 @@ it: leave it, move it or delete it.
 
 - **A file dropped under a name already there replaces it, and fires again.** So does a
   file changed where it lies, which an agent editing it would do. Have the agent move a
-  file out of the folder its workflow watches before it changes it.
-- **Moving a file to another folder in the drop box is an arrival there.** A workflow
-  that watches `review` does not hear a file moved to `done`; one with no `folder` does.
+  file out of the drop box before it changes it.
+- **Moving a file to another folder in the drop box is an arrival there**, and runs the
+  workflow again. Have the agent move a file it is done with out of `.agents/dropbox/`.
 - **Files already in the drop box when the app starts do nothing.** Only new arrivals
   fire.
 - **A file still being written fires once, after it stops changing.**

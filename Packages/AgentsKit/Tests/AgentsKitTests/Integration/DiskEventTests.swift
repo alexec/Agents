@@ -82,32 +82,26 @@ struct DiskEventTests {
         #expect(await core.diskState().alarms.isEmpty)
     }
 
-    @Test func aWorkflowCanTriggerOnItAndNarrowByLevel() {
+    /// Not narrowed by level or anything else (#574).
+    @Test func aWorkflowCanTriggerOnItButNotNarrowIt() {
         func parse(_ on: String) -> Workflow {
             WorkflowFile.parse("---\non:\n\(on)\n---\n\nClean up.\n", workflowID: "w",
                                in: URL(fileURLWithPath: "/tmp/project"))
         }
-        let both = parse("  - machine.disk_low:\n      level: critical\n  - machine.disk_ok")
+        let both = parse("  - machine.disk_low\n  - machine.disk_ok")
         #expect(both.problem == nil)
-        #expect(both.triggers == [.event(EventPattern("machine.disk_low", filters: ["level": "critical"])),
-                                  .event(EventPattern("machine.disk_ok"))])
-        guard case .unreadable(let detail)? = parse("  - machine.disk_low:\n      level: full").problem else {
-            Issue.record("a level it cannot have was taken")
-            return
-        }
-        #expect(detail.contains("low"), "\(detail)")
-        #expect(EventCatalogue.describe().contains("- machine.disk_low [volume, free_bytes, free_percent, "
-                                                   + "level=low|critical, threshold, worktrees]"))
+        #expect(both.triggers == [.event(EventPattern("machine.disk_low")), .event(EventPattern("machine.disk_ok"))])
+        #expect(parse("  - machine.disk_low:\n      level: critical").problem
+                == .unreadable("machine.disk_low can't be narrowed, by \"level\" or anything else."))
     }
 
     /// Renamed from mac.* (#372), because a Linux server raises them too: a file written
     /// before still triggers, as the new name, and so does a wait kept on a record.
     @Test func theOldNamesAreReadAsTheNewOnes() throws {
-        let old = WorkflowFile.parse("---\non:\n  - mac.disk_low:\n      level: critical\n  - Mac.Disk_OK\n---\n\nGo.\n",
+        let old = WorkflowFile.parse("---\non:\n  - mac.disk_low\n  - Mac.Disk_OK\n---\n\nGo.\n",
                                      workflowID: "w", in: URL(fileURLWithPath: "/tmp/project"))
         #expect(old.problem == nil)
-        #expect(old.triggers == [.event(EventPattern("machine.disk_low", filters: ["level": "critical"])),
-                                 .event(EventPattern("machine.disk_ok"))])
+        #expect(old.triggers == [.event(EventPattern("machine.disk_low")), .event(EventPattern("machine.disk_ok"))])
         let stored = try JSONDecoder().decode(EventPattern.self,
                                               from: Data(#"{"name":"mac.disk_ok","filters":{}}"#.utf8))
         #expect(stored == EventPattern("machine.disk_ok"))

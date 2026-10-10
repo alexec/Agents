@@ -170,7 +170,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
                   <li key={index} class="trigger">
                     <span class="glyph" aria-hidden="true">{triggerGlyph(trigger)}</span>
                     <span class="what">
-                      <span>{triggerSummary(trigger, runtimeName)}
+                      <span>{triggerSummary(trigger)}
                         {!isSupportedTrigger(trigger) && (
                           <span class="unknown" title="This version does not know this trigger, so it never runs the workflow"> Unknown</span>
                         )}

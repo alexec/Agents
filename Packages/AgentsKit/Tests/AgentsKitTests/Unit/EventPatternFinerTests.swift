@@ -2,8 +2,9 @@ import Foundation
 import Testing
 @testable import AgentsKitCore
 
-/// Finer matching (073): agent context, any of, codes, and values checked, through
-/// the one matcher a wait and a trigger share.
+/// Filters (073, #574): only `branch` on `branch.moved` and `why` on `person.away` and
+/// `person.back` narrow an event, any of a list, through the one matcher a wait and a
+/// trigger share. Every other key is refused naming what the event does take.
 @Suite("Event patterns, finer")
 struct EventPatternFinerTests {
     private let folder = URL(fileURLWithPath: "/tmp/project")
@@ -14,9 +15,8 @@ struct EventPatternFinerTests {
     }
 
     /// An agent event as the daemon raises one: the agent and its context, then its own.
-    private func about(_ name: String, labels: String = "", runtime: String = "claude",
-                       startedBy: String = "person", _ own: [String: String] = [:]) -> Event {
-        event(name, ["agent": UUID().uuidString, "labels": labels, "runtime": runtime, "started_by": startedBy]
+    private func about(_ name: String, labels: String = "", _ own: [String: String] = [:]) -> Event {
+        event(name, ["agent": UUID().uuidString, "labels": labels, "runtime": "claude", "started_by": "person"]
             .merging(own) { $1 })
     }
 
@@ -26,153 +26,65 @@ struct EventPatternFinerTests {
 
     private func any(_ values: String...) -> DetailFilter { DetailFilter(anyOf: values)! }
 
-    // MARK: SC-001: each trigger fires on its event and not on a near miss
+    // MARK: The filters left
 
-    @Test func t1FinishedLabelledBugAndParked() throws {
-        let t1 = try pattern("agent.finished", ["labels": "bug", "afterwards": "park"])
-        #expect(t1.matches(about("agent.finished", labels: "bug,p1", ["outcome": "done", "afterwards": "park"])))
-        #expect(!t1.matches(about("agent.finished", labels: "bug", ["afterwards": "stay"])))
-        #expect(!t1.matches(about("agent.finished", labels: "perf", ["afterwards": "park"])))
-        #expect(!t1.matches(about("agent.finished", ["afterwards": "park"])))
+    @Test func aBranchOrAListOfThem() throws {
+        let main = try pattern("branch.moved", ["branch": "main"])
+        #expect(main.matches(event("branch.moved", ["branch": "main", "from": "a", "to": "b"])))
+        #expect(!main.matches(event("branch.moved", ["branch": "develop"])))
+        let either = try pattern("branch.moved", ["branch": any("main", "release/1.0")])
+        #expect(either.matches(event("branch.moved", ["branch": "release/1.0"])))
+        #expect(!either.matches(event("branch.moved")))
     }
 
-    @Test func t2ClaudeFailedForAQuotaReason() throws {
-        let t2 = try pattern("agent.failed", ["runtime": "claude", "reason": any("allowance_spent", "rate_limited")])
-        #expect(t2.matches(about("agent.failed", ["reason": "allowance_spent"])))
-        #expect(t2.matches(about("agent.failed", ["reason": "rate_limited"])))
-        #expect(!t2.matches(about("agent.failed", runtime: "codex", ["reason": "allowance_spent"])))
-        #expect(!t2.matches(about("agent.failed", ["reason": "process_died"])))
+    @Test func whyOnAwayAndBack() throws {
+        let locked = try pattern("person.away", ["why": "locked"])
+        #expect(locked.matches(event("person.away", ["why": "locked"])))
+        #expect(!locked.matches(event("person.away", ["why": "idle"])))
+        let back = try pattern("person.*", ["why": "idle"])
+        #expect(back.matches(event("person.back", ["why": "idle"])))
+        #expect(!back.matches(event("branch.moved", ["why": "idle"])))
     }
 
-    @Test func t4FinishedDoneOrNothingToDo() throws {
-        let t4 = try pattern("agent.finished", ["outcome": any("done", "nothing_to_do")])
-        #expect(t4.matches(about("agent.finished", ["outcome": "nothing_to_do"])))
-        #expect(!t4.matches(about("agent.finished", ["outcome": "stuck"])))
-        #expect(!t4.matches(about("agent.finished")))
+    @Test func aFiltersValueIsCheckedWhenItHasFixedOnes() {
+        let problem = EventPattern.parse("person.away", filters: ["why": "asleep"]).failure
+        #expect(problem?.message == "why on person.away is one of locked, idle; \"asleep\" is not one of them.")
+        #expect(EventPattern.parse("person.back", filters: ["why": any("locked", "nope")]).failure?.isBadValue == true)
     }
 
-    @Test func t6AWorkflowsAgentFailed() throws {
-        let t6 = try pattern("agent.failed", ["started_by": "workflow"])
-        #expect(t6.matches(about("agent.failed", startedBy: "workflow", ["reason": "process_died"])))
-        #expect(!t6.matches(about("agent.failed", startedBy: "agent", ["reason": "process_died"])))
-    }
+    // MARK: Everything else is refused (#574)
 
-    @Test func t9NightlyCompletedStuckOrPartlyDone() throws {
-        let t9 = try pattern("workflow.completed", ["workflow": "nightly", "outcome": any("stuck", "partly_done")])
-        #expect(t9.matches(event("workflow.completed", ["workflow": "nightly", "outcome": "stuck"])))
-        #expect(!t9.matches(event("workflow.completed", ["workflow": "nightly", "outcome": "done"])))
-        #expect(!t9.matches(event("workflow.completed", ["workflow": "weekly", "outcome": "stuck"])))
-        #expect(!t9.matches(event("workflow.completed", ["workflow": "nightly"])))
-    }
-
-    @Test func t10ArchivedByYouLabelledBugOrRegression() throws {
-        let t10 = try pattern("agent.archived", ["by": "you", "labels": any("bug", "regression")])
-        #expect(t10.matches(about("agent.archived", labels: "regression", ["by": "you"])))
-        #expect(!t10.matches(about("agent.archived", labels: "bug", ["by": "agent"])))
-        #expect(!t10.matches(about("agent.archived", labels: "docs", ["by": "you"])))
-    }
-
-    @Test func t12TheSimulatorLeaseExpired() throws {
-        let t12 = try pattern("lease.released", ["resource": "simulator", "how": "expired"])
-        #expect(t12.matches(event("lease.released", ["resource": "simulator", "how": "expired"])))
-        #expect(!t12.matches(event("lease.released", ["resource": "simulator", "how": "released"])))
-    }
-
-    @Test func t14GeminiOrGrokFailed() throws {
-        let t14 = try pattern("agent.failed", ["runtime": any("gemini", "grok")])
-        #expect(t14.matches(about("agent.failed", runtime: "grok", ["reason": "process_died"])))
-        #expect(!t14.matches(about("agent.failed", runtime: "claude", ["reason": "process_died"])))
-    }
-
-    @Test func w1AWaitForADeployLabelledFinish() throws {
-        let w1 = try pattern("agent.finished", ["labels": "deploy", "outcome": "done"])
-        #expect(w1.matches(about("agent.finished", labels: "deploy", ["outcome": "done"])))
-        #expect(!w1.matches(about("agent.finished", labels: "deploy", ["outcome": "stuck"])))
-        #expect(!w1.matches(about("agent.finished", labels: "", ["outcome": "done"])))
-    }
-
-    @Test func aWholeSubjectNarrowsByStarterAndOnlyWhereTheDetailIsCarried() throws {
-        let started = try pattern("agent.*", ["started_by": "workflow"])
-        #expect(started.matches(about("agent.parked", startedBy: "workflow")))
-        #expect(!started.matches(about("agent.parked")))
-        let outcome = try pattern("agent.*", ["outcome": "done"])
-        #expect(outcome.matches(about("agent.finished", ["outcome": "done"])))
-        #expect(!outcome.matches(about("agent.started")))
-    }
-
-    @Test func aCustomEventsLabelsAreItsPublishersAndNotASet() throws {
-        let custom = try pattern("custom.ship", ["labels": "bug"])
-        #expect(!custom.matches(event("custom.ship", ["labels": "bug,p1"])))
-        #expect(custom.matches(event("custom.ship", ["labels": "bug"])))
-    }
-
-    // MARK: US4: a wrong value is named
-
-    @Test func aWrongValueIsRefusedListingTheRightOnes() {
-        let problem = EventPattern.parse("agent.finished", filters: ["outcome": "complete"]).failure
-        #expect(problem?.message == "outcome on agent.finished is one of done, nothing_to_do, needs_answer, "
-                + "partly_done, stuck, blocked; \"complete\" is not one of them.")
-        let listed = EventPattern.parse("agent.finished", filters: ["outcome": any("done", "finished")]).failure
-        #expect(listed?.message.hasSuffix("\"finished\" is not one of them.") == true)
-        let runtime = EventPattern.parse("agent.failed", filters: ["runtime": "nope"]).failure
-        #expect(runtime?.message.contains("claude") == true)
-    }
-
-    @Test func openDetailsTakeAnything() throws {
-        _ = try pattern("agent.finished", ["labels": "anything at all"])
-        _ = try pattern("workflow.ran", ["workflow": "whatever"])
-        _ = try pattern("branch.moved", ["branch": "release/1.0"])
-        _ = try pattern("custom.ship", ["outcome": "complete"])
-    }
-
-    @Test func aWholeSubjectChecksAgainstEveryKindsValues() throws {
-        _ = try pattern("agent.*", ["by": "cost_limit"])
-        _ = try pattern("agent.*", ["by": "agent"])
-        #expect(EventPattern.parse("agent.*", filters: ["by": "nope"]).failure?.message
-                == "by on agent.* is one of you, cost_limit, unknown, agent; \"nope\" is not one of them.")
-        #expect(EventPattern.parse("agent.*", filters: ["outcome": "complete"]).failure != nil)
-    }
-
-    // MARK: US3: today's words are read as codes
-
-    @Test func todaysWordsAreReadAsTheirCodes() throws {
-        #expect(try pattern("agent.failed", ["reason": "its allowance ran out"]).filters["reason"] == "allowance_spent")
-        #expect(try pattern("agent.failed", ["reason": "Rate limited, and still limited after retrying"])
-            .filters["reason"] == "rate_limited")
-        #expect(try pattern("agent.stopped", ["by": "stopped by you"]).filters["by"] == "you")
-        #expect(try pattern("agent.stopped", ["by": "stopped"]).filters["by"] == "unknown")
-        #expect(try pattern("agent.archived", ["by": "another agent"]).filters["by"] == "agent")
-        #expect(try pattern("workflow.refused", ["reason": "this chain is already 3 deep"]).filters["reason"]
-                == "chain_too_deep")
-        #expect(try pattern("workflow.refused", ["reason": "10 workflows are already running, across every project"])
-            .filters["reason"] == "over_limit")
-        #expect(try pattern("workflow.refused", ["reason": "a run is still going"]).filters["reason"] == "run_in_flight")
-    }
-
-    @Test func wordsThatStandForNoCodeAreRefusedNamingTheCodes() {
-        let problem = EventPattern.parse("workflow.refused", filters: ["reason": "Line 3 is not a key"]).failure
-        #expect(problem?.message.contains("run_in_flight") == true)
-        #expect(problem?.message.contains("\"Line 3 is not a key\"") == true)
-    }
-
-    @Test func everyCodeIsAValueAndSaysTodaysWords() {
-        let failed = EventCatalogue.kind(named: "agent.failed")!.detail("reason")!
-        #expect(failed.values == ["max_tokens", "max_turn_requests", "refusal", "process_died", "daemon_gone",
-                                  "unrecognised", "stopped_by_agent", "sign_in_refused", "runtime_error",
-                                  "allowance_spent", "rate_limited", "sandbox_failed"])
-        for reason in EventCatalogue.failedReasons {
-            #expect(failed.code(forOldWords: reason.summary!) == reason.code)
-        }
-        let refused = EventCatalogue.kind(named: "workflow.refused")!.detail("reason")!
-        for refusal in [WorkflowRefusal.runInFlight, .chainTooDeep(depth: 4), .archived, .overLimit(.project),
-                        .overLimit(.total), .triggerNotSupported(name: "x.y"), .agentUnavailable, .noTriggeringAgent,
-                        .missedWhileClosed, .folderGone, .dayLimitReached, .awaitingApproval] {
-            #expect(refused.values?.contains(refusal.code) == true, "\(refusal)")
-            #expect(refused.code(forOldWords: refusal.message) == refusal.code, "\(refusal)")
+    @Test func anAgentEventCannotBeNarrowedAndSaysHowToWaitForAgents() {
+        for (name, key) in [("agent.finished", "outcome"), ("agent.finished", "labels"), ("agent.failed", "runtime"),
+                            ("agent.finished", "agent"), ("agent.stopped", "by"), ("agent.*", "started_by"),
+                            ("agent.messaged", "from"), ("agent.deleted", "because")] {
+            let problem = EventPattern.parse(name, filters: [key: "x"]).failure
+            #expect(problem?.isBadFilter == true, "\(name) \(key)")
+            #expect(problem?.message == "\(name) can't be narrowed, by \"\(key)\" or anything else. "
+                    + "To wait for particular agents, use wait_for_event with agents.")
         }
     }
 
-    // MARK: Storage and the wire (FR-028, FR-029)
+    @Test func otherEventsNameTheFiltersTheyTakeOrSayNone() {
+        #expect(EventPattern.parse("branch.moved", filters: ["to": "abc"]).failure?.message
+                == "branch.moved can be narrowed only by branch, not by \"to\".")
+        #expect(EventPattern.parse("workflow.completed", filters: ["workflow": "nightly"]).failure?.message
+                == "workflow.completed can't be narrowed, by \"workflow\" or anything else.")
+        for (name, key) in [("project.idle", "agents"), ("dropbox.file_added", "extension"),
+                            ("lease.released", "how"), ("machine.disk_low", "level"), ("cost.allowance_out", "runtime"),
+                            ("server.offline", "server"), ("custom.ship", "labels"), ("custom.*", "message"),
+                            ("workflow.*", "workflow")] {
+            #expect(EventPattern.parse(name, filters: [key: "x"]).failure?.isBadFilter == true, "\(name) \(key)")
+        }
+    }
+
+    @Test func aServersEventKeepsItsKeys() throws {
+        // Out of scope here (#577): compared with the event's details, as before.
+        _ = try pattern("pr.merged", ["server": "github"])
+        _ = try pattern("ci.*", ["event": "checks.failed"])
+    }
+
+    // MARK: Waits already stored (#574)
 
     /// What the previous version decodes a pattern as.
     private struct OldPattern: Codable {
@@ -180,9 +92,19 @@ struct EventPatternFinerTests {
         var filters: [String: String]
     }
 
+    @Test func aStoredWaitWithARemovedKeyIsReadAndStillMatches() throws {
+        let stored = Data(#"{"name":"agent.finished","filters":{"outcome":"done"}}"#.utf8)
+        let read = try JSONDecoder().decode(EventPattern.self, from: stored)
+        #expect(read.matches(about("agent.finished", ["outcome": "done"])))
+        #expect(!read.matches(about("agent.finished", ["outcome": "stuck"])))
+        let list = Data(#"{"name":"workflow.completed","filters":{"outcome":"stuck|partly_done"},"anyOf":{"outcome":["stuck","partly_done"]}}"#.utf8)
+        #expect(try JSONDecoder().decode(EventPattern.self, from: list)
+            .matches(event("workflow.completed", ["workflow": "nightly", "outcome": "partly_done"])))
+    }
+
     @Test func singleValuesAreStoredExactlyAsBefore() throws {
-        let old = OldPattern(name: "agent.finished", filters: ["outcome": "done"])
-        let new = try pattern("agent.finished", ["outcome": "done"])
+        let old = OldPattern(name: "branch.moved", filters: ["branch": "main"])
+        let new = try pattern("branch.moved", ["branch": "main"])
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         #expect(try encoder.encode(new) == encoder.encode(old))
@@ -190,53 +112,44 @@ struct EventPatternFinerTests {
     }
 
     @Test func aListIsReadBackAndAnOlderBuildReadsItAsNeverMatching() throws {
-        let new = try pattern("agent.finished", ["outcome": any("done", "nothing_to_do")])
+        let new = try pattern("person.away", ["why": any("locked", "idle")])
         let data = try JSONEncoder().encode(new)
         #expect(try JSONDecoder().decode(EventPattern.self, from: data) == new)
         let old = try JSONDecoder().decode(OldPattern.self, from: data)
-        #expect(old.filters == ["outcome": "done|nothing_to_do"])
+        #expect(old.filters == ["why": "locked|idle"])
     }
 
-    @Test func aStoredWaitInTodaysWordsStillMatches() throws {
-        let stored = Data(#"{"name":"agent.stopped","filters":{"by":"stopped by you"}}"#.utf8)
-        let read = try JSONDecoder().decode(EventPattern.self, from: stored)
-        #expect(read.matches(about("agent.stopped", ["by": "you"])))
-        // Words that stand for nothing are kept as they were, and refuse nothing.
-        let odd = Data(#"{"name":"workflow.refused","filters":{"reason":"Line 3 is not a key"}}"#.utf8)
-        #expect(try JSONDecoder().decode(EventPattern.self, from: odd).filters["reason"] == "Line 3 is not a key")
-    }
+    // MARK: Words
 
-    // MARK: Words (FR-022 to FR-025)
-
-    @Test func theSummarySaysEachFilterInWords() throws {
-        #expect(try pattern("agent.finished", ["labels": "bug", "afterwards": "park"]).summary
-                == "An agent in this project ended a turn having done its work (labelled bug, and parked)")
-        #expect(try pattern("agent.finished", ["outcome": any("done", "nothing_to_do")]).summary
-                == "An agent in this project ended a turn having done its work (done or nothing to do)")
-        #expect(try pattern("agent.failed", ["runtime": any("gemini", "grok")]).summary
-                == "An agent in this project ended in an error (on Gemini or Grok)")
-        #expect(try pattern("agent.failed", ["reason": any("allowance_spent", "rate_limited")]).summary
-                == "An agent in this project ended in an error (its allowance ran out or "
-                + "rate limited, and still limited after retrying)")
-        #expect(try pattern("agent.*", ["started_by": "workflow"]).summary
-                == "Anything about agents (started by a workflow)")
-        #expect(try pattern("agent.finished", ["afterwards": "stay"]).summary
-                == "An agent in this project ended a turn having done its work (not parked)")
-        #expect(try pattern("workflow.completed", ["workflow": "nightly"]).summary
-                == "A workflow's run in this project finished (workflow nightly)")
+    @Test func theSummarySaysEachFilterAsItsKeyAndValues() throws {
+        #expect(try pattern("branch.moved", ["branch": any("main", "develop")]).summary
+                == "A branch moved: the default branch, or one an agent works on (branch main or develop)")
+        #expect(try pattern("person.away", ["why": "locked"]).summary
+                == "You locked the screen or stepped away for 5 minutes (why locked)")
+        #expect(try pattern("person.*", ["why": "idle"]).summary == "Anything about persons (why idle)")
     }
 
     @Test func theLabelAndTheTriggerTextWriteAListOneLine() throws {
-        let t4 = try pattern("agent.finished", ["outcome": any("done", "nothing_to_do")])
-        #expect(t4.label == "agent.finished outcome done|nothing_to_do")
-        #expect(t4.asTrigger == "on:\n  - agent.finished:\n      outcome: [done, nothing_to_do]")
+        let either = try pattern("branch.moved", ["branch": any("main", "develop")])
+        #expect(either.label == "branch.moved branch main|develop")
+        #expect(either.asTrigger == "on:\n  - branch.moved:\n      branch: [main, develop]")
     }
 
-    @Test func copyAsTriggerLeavesOutTheAgentAndItsContext() {
-        let finished = about("agent.finished", labels: "bug", ["outcome": "done"])
-        #expect(EventPattern.matching(finished).asTrigger == "on:\n  - agent.finished:\n      outcome: done")
-        let custom = event("custom.ship", ["labels": "bug", "agent": "x"])
-        #expect(EventPattern.matching(custom).filters == ["labels": "bug", "agent": "x"])
+    @Test func copyAsTriggerCopiesOnlyTheFilters() throws {
+        let moved = event("branch.moved", ["branch": "main", "from": "a1", "to": "b2"])
+        #expect(EventPattern.matching(moved).asTrigger == "on:\n  - branch.moved:\n      branch: main")
+        #expect(EventPattern.matching(event("person.back", ["why": "idle"])).asTrigger
+                == "on:\n  - person.back:\n      why: idle")
+        let finished = about("agent.finished", labels: "bug", ["outcome": "done", "afterwards": "park"])
+        #expect(EventPattern.matching(finished).asTrigger == "on:\n  - agent.finished")
+        #expect(EventPattern.matching(event("custom.ship", ["labels": "bug"])).asTrigger == "on:\n  - custom.ship")
+        let dropped = event("dropbox.file_added", ["path": "a.txt", "extension": "txt"])
+        #expect(EventPattern.matching(dropped).asTrigger == "on:\n  - dropbox.file_added")
+        // What it copies reads back.
+        for copied in [moved, finished, dropped] {
+            let pattern = EventPattern.matching(copied)
+            #expect(try EventPattern.parse(pattern.name, filters: pattern.filters).get() == pattern)
+        }
     }
 }
 

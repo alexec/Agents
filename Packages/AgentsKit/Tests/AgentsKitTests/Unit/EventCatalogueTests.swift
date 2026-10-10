@@ -65,17 +65,22 @@ struct EventCatalogueTests {
         }
         let finished = try #require(EventCatalogue.kind(named: "agent.finished"))
         let granted = try #require(EventCatalogue.kind(named: "lease.granted"))
-        #expect(finished.detail("labels")?.isSet == true)
+        #expect(finished.filters.isEmpty)
         #expect(granted.details == ["resource", "agent"])
     }
 
-    @Test func theDescriptionListsFixedValuesAndTheContextOnce() {
+    /// Only three events take a filter (#574), and the description names only those.
+    @Test func theDescriptionNamesOnlyTheFilters() {
+        let filtered = EventCatalogue.all.filter { !$0.filters.isEmpty }
+            .map { "\($0.name) \($0.filters.map(\.key).joined(separator: ","))" }
+        #expect(filtered == ["branch.moved branch", "person.away why", "person.back why"])
         let text = EventCatalogue.describe()
-        #expect(text.contains("- agent.finished [agent, outcome=done|nothing_to_do|needs_answer|partly_done|stuck|blocked, "
-                              + "afterwards=park|stay, …]"))
-        #expect(text.contains("Every agent event also carries labels"))
-        #expect(text.contains("started_by=person|workflow|agent"))
-        #expect(text.contains("outcome: [done, nothing_to_do]"))
+        #expect(text.contains("- branch.moved [narrow by branch]: "))
+        #expect(text.contains("- person.away [narrow by why=locked|idle]: "))
+        #expect(text.contains("- agent.finished: "))
+        #expect(!text.contains("outcome"))
+        #expect(!text.contains("labels"))
+        #expect(text.contains("use wait_for_event with agents"))
     }
 
     @Test func customNamesAreLowercaseAndShort() {

@@ -3,7 +3,7 @@ import Foundation
 /// The values one detail of an event must have for a pattern to match it (073 FR-014):
 /// one value, as every filter was before, or a list meaning any of them.
 ///
-/// A list of one is the single value, so `outcome: [done]` and `outcome: done` are the
+/// A list of one is the single value, so `branch: [main]` and `branch: main` are the
 /// same filter, stored and sent the same way.
 public struct DetailFilter: Hashable, Sendable, ExpressibleByStringLiteral {
     /// Never empty.
@@ -26,15 +26,11 @@ public struct DetailFilter: Hashable, Sendable, ExpressibleByStringLiteral {
     /// The one value, when it is not a list.
     public var single: String? { values.count == 1 ? values[0] : nil }
 
-    /// Whether an event's detail has one of these values. A detail the event does not
-    /// carry never matches. A set detail (`labels`) is the event's members, comma-joined,
-    /// and matches when it holds any of these, compared the way labels are compared for
-    /// sameness (073 FR-002).
-    public func matches(_ detail: String?, isSet: Bool) -> Bool {
+    /// Whether an event's detail is one of these values. A detail the event does not
+    /// carry never matches.
+    public func matches(_ detail: String?) -> Bool {
         guard let detail else { return false }
-        guard isSet else { return values.contains(detail) }
-        let members = Set(detail.split(separator: ",").map { SessionLabelPolicy.key(String($0)) })
-        return values.contains { members.contains(SessionLabelPolicy.key($0)) }
+        return values.contains(detail)
     }
 
     // MARK: Words
