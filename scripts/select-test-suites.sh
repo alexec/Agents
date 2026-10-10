@@ -14,6 +14,10 @@
 # scan those views (ConsistencyTests, OneGroupingTests), and one to App/Resources/toolsets
 # the two that read the bundled toolsets.
 #
+# CI's macOS jobs are chosen here as well (#594): `apps` is skip only when every changed
+# path is prose or agent config that no build reads, and `packages` (the job that runs
+# WebTypes and ControlPlane) is skip when neither of those is selected.
+#
 # Usage: scripts/select-test-suites.sh <base-commit> >> "$GITHUB_OUTPUT"
 set -euo pipefail
 
@@ -24,6 +28,7 @@ webtypes=skip
 controlplane=skip
 agentskit_filter=
 codetext_filter=
+apps=build
 
 full_both() {
 	agentskit=full
@@ -56,8 +61,13 @@ else
 		codetext_only_tests=true
 		agentskit_suites=()
 		codetext_suites=()
+		apps=skip
 
 		while IFS= read -r -d '' path; do
+			case "$path" in
+				docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|*.md) ;;
+				*) apps=build ;;
+			esac
 			case "$path" in
 				# Quarantine annotations and their inventory do not change test behavior.
 				Packages/AgentsKit/Tests/AgentsKitTests/Support/FlakyUnderLoad.swift)
@@ -216,4 +226,10 @@ fi
 	printf 'webtypes=%s\n' "$webtypes"
 	printf 'controlplane=%s\n' "$controlplane"
 	printf 'agentsd=%s\n' "$agentsd"
+	printf 'apps=%s\n' "$apps"
+	if [[ "$webtypes" == skip && "$controlplane" == skip ]]; then
+		printf 'packages=skip\n'
+	else
+		printf 'packages=run\n'
+	fi
 } >> "${GITHUB_OUTPUT:-/dev/stdout}"
