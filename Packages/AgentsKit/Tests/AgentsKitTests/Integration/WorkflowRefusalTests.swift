@@ -278,7 +278,7 @@ struct WorkflowRefusalTests {
         for work in folders { await core.rescanWorkflows(in: work) }
         try await core.runWorkflow(DaemonAPI.WorkflowRequest(folder: folders[3], workflowID: "c"))
 
-        #expect(await refusal(core, folders[3], "c") == .overLimit(.total))
+        #expect(await refusal(core, folders[3], "c") == .overLimit(.total, allowed: 10))
         #expect(await core.allAgents().isEmpty)
     }
 
@@ -300,6 +300,101 @@ struct WorkflowRefusalTests {
         try await core.runWorkflow(DaemonAPI.WorkflowRequest(folder: folders[3], workflowID: "b"))
 
         #expect(await core.allAgents().count == 1)
+    }
+
+    // MARK: The total is the person's, and counts only what is on (#506)
+
+    /// Four projects of three, all approved and on: twelve against the ten.
+    private func twelve() async throws -> (DaemonCore, [URL], StoreLocations) {
+        let (locations, root) = try temporary()
+        var folders: [URL] = []  // index-ok: the loop adds four
+        for index in 0..<4 {
+            let work = try project(root, "p\(index)")
+            folders.append(work)
+            for name in ["a", "b", "c"] { try write(onSchedule, as: name, in: work) }
+        }
+        let core = try await core(locations)
+        for work in folders { await core.rescanWorkflows(in: work) }
+        return (core, folders, locations)
+    }
+
+    private func turn(_ core: DaemonCore, _ folder: URL, _ id: String, on: Bool) async throws {
+        _ = try await core.setWorkflowEnabled(.init(folder: folder, workflowID: id, enabled: on))
+    }
+
+    @Test func aWorkflowTurnedOffTakesNoPlace() async throws {
+        let (core, folders, _) = try await twelve()
+        try await turn(core, folders[0], "a", on: false)
+        try await turn(core, folders[0], "b", on: false)
+
+        let all = await core.allWorkflows()
+        #expect(all.allSatisfy { $0.overLimit == nil }, "two off leave ten on, which is the ten")
+        try await core.runWorkflow(DaemonAPI.WorkflowRequest(folder: folders[3], workflowID: "c"))
+        #expect(await core.allAgents().count == 1)
+    }
+
+    @Test func turningOneOnPastTheTotalIsRefusedWithTheRemedy() async throws {
+        let (core, folders, _) = try await twelve()
+        try await turn(core, folders[3], "b", on: false)
+        try await turn(core, folders[3], "c", on: false)
+
+        do {
+            try await turn(core, folders[3], "c", on: true)
+            Issue.record("an eleventh workflow was turned on")
+        } catch let error as JSONRPCError {
+            #expect(error.code == DaemonAPI.Failure.workflowLimitReached)
+            #expect(error.message.hasPrefix("10 workflows are already running, across every project"))
+            #expect(error.message.hasSuffix("Turn one off or archive one, in any project, to let it run."))
+        }
+        let c = await core.allWorkflows(in: folders[3]).first { $0.workflowID == "c" }
+        #expect(c?.isEnabled == false)
+        #expect(c?.overLimit == nil)
+    }
+
+    @Test func raisingTheTotalLetsTheOnesPastItRunAndLoweringItStopsTheLast() async throws {
+        let (daemon, folders, locations) = try await twelve()
+        let core = daemon
+        #expect(await core.allWorkflows().filter { $0.overLimit == .total }.count == 2)
+
+        let raised = try await core.setWorkflowLimit(WorkflowLimitSettings(total: 12))
+        #expect(raised.effectiveTotal == 12)
+        let all = await core.allWorkflows()
+        #expect(all.allSatisfy { $0.overLimit == nil && $0.totalLimit == 12 })
+        try await core.runWorkflow(DaemonAPI.WorkflowRequest(folder: folders[3], workflowID: "c"))
+        #expect(await core.allAgents().count == 1)
+
+        _ = try await core.setWorkflowLimit(WorkflowLimitSettings(total: 9))
+        let over = await core.allWorkflows().filter { $0.overLimit == .total }
+        // The same order as ever: by project path, then by name.
+        #expect(over.allSatisfy { $0.folder == folders[3] })
+        #expect(over.map(\.workflowID).sorted() == ["a", "b", "c"])
+        try await core.runWorkflow(DaemonAPI.WorkflowRequest(folder: folders[3], workflowID: "a"))
+        #expect(await refusal(core, folders[3], "a") == .overLimit(.total, allowed: 9))
+        #expect(await refusal(core, folders[3], "a")?.message
+                == "9 workflows are already running, across every project")
+
+        // Kept by the daemon, so a restart keeps it.
+        let again = try await self.core(locations)
+        #expect(await again.readWorkflowLimit().total == 9)
+    }
+
+    @Test func theTotalIsHeldToItsRangeAndTheDefaultIsNoSetting() async throws {
+        let (core, _, locations) = try await twelve()
+        for bad in [0, WorkflowLimit.maximumTotal + 1] {
+            await #expect(throws: JSONRPCError.self) {
+                try await core.setWorkflowLimit(WorkflowLimitSettings(total: bad))
+            }
+        }
+        #expect(WorkflowLimitSettings(total: 500).effectiveTotal == WorkflowLimit.maximumTotal)
+        _ = try await core.setWorkflowLimit(WorkflowLimitSettings(total: 12))
+        #expect(FileManager.default.fileExists(atPath: locations.workflowLimit.path))
+        let back = try await core.setWorkflowLimit(WorkflowLimitSettings(total: WorkflowLimit.defaultTotal))
+        #expect(back.total == nil)
+        #expect(!FileManager.default.fileExists(atPath: locations.workflowLimit.path))
+    }
+
+    @Test func anAgentCannotSetTheTotal() {
+        #expect(!ConnectionRole.agentMethods.contains(DaemonAPI.Method.workflowsSetLimit))
     }
 
     // MARK: Files that cannot run

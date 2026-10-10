@@ -66,8 +66,13 @@ struct WorkflowOutcomeTests {
     }
 
     @Test func eitherCeilingBlocksIt() {
-        #expect(refusal(workflow(), overLimit: .project) == .overLimit(.project))
-        #expect(refusal(workflow(), overLimit: .total) == .overLimit(.total))
+        #expect(refusal(workflow(), overLimit: .project) == .overLimit(.project, allowed: 3))
+        #expect(refusal(workflow(), overLimit: .total) == .overLimit(.total, allowed: 10))
+        // The number in force goes into the refusal, so its words outlast a change (#506).
+        let raised = workflow().refusalIfBlocked(isRunning: false, depth: 0, overLimit: .total, totalLimit: 12)
+        #expect(raised == .overLimit(.total, allowed: 12))
+        #expect(raised?.message == "12 workflows are already running, across every project")
+        #expect(raised?.isSameReason(as: .overLimit(.total, allowed: 10)) == true)
     }
 
     @Test func aDecisionOfThePersonsOutranksEverythingElseWrongWithIt() {

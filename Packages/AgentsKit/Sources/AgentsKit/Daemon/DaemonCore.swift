@@ -141,6 +141,8 @@ public actor DaemonCore {
     lazy var wakeStore = WakeSettingsStore(locations: locations)
     var wakeSettings = WakeSettings()
     var wakeSettingsLoaded = false
+    /// The person's total for workflows turned on (#506), read once and kept.
+    var workflowLimitSettings: WorkflowLimitSettings?
     /// When the last agent stopped, if a grace is running. In memory only: the hold
     /// dies with this process, and a grace is not resumed by the next one.
     var graceStartedAt: Date?

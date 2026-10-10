@@ -105,14 +105,15 @@ extension DaemonCore {
         // and approvable once one of the ones ahead of it is approved or removed.
         if limitReached(by: workflow, records: records) == .project {
             throw JSONRPCError(code: DaemonAPI.Failure.workflowLimitReached,
-                               message: "\(WorkflowLimit.project.sentence). \(WorkflowLimit.project.remedy).")
+                               message: "\(WorkflowLimit.project.sentence(total: workflowTotalLimit())). \(WorkflowLimit.project.remedy).")
         }
         approve(workflow, digest: request.digest, in: &records)
         try keep("this workflow's settings") { try workflowStore.save(records, replacing: true) }
         let summary = summary(for: workflow, records: records)
         announceWorkflow(workflow, records: records)
-        // Its place among the waiting is free for the next in line.
-        rebroadcastWorkflows(in: workflow.folder, except: [workflow.workflowID])
+        // Its place among the waiting is free for the next in line, and one turned on
+        // now takes a place under the total, which every project shares (#506).
+        rebroadcastAllWorkflows(except: (folder: workflow.folder, workflowID: workflow.workflowID))
         return summary
     }
 

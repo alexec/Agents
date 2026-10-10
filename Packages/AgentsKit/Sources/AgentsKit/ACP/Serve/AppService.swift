@@ -949,11 +949,12 @@ public actor AppService {
             only when they asked for it, and say in your reply what you set up, that it \
             is waiting for their OK, and that they turn it on once approved.
 
-            A project may have at most \(WorkflowLimit.project.allowed) workflows \
+            A project may have at most \(WorkflowLimit.projectAllowed) workflows \
             waiting for approval; a write that would make another is refused until the \
             person approves or removes one. Approved workflows do not count towards \
-            that, only towards the \(WorkflowLimit.total.allowed) that may run across \
-            every project.
+            that. Those turned on count towards how many may run across every project, \
+            which only the person sets (\(WorkflowLimit.defaultTotal) unless they changed \
+            it); turning one on past it is refused until they turn one off or archive one.
 
             `disable` turns a workflow off without touching its file: it stays listed, \
             marked off, and none of its triggers run it; `list` says which are off and \

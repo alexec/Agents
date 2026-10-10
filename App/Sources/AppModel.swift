@@ -110,6 +110,9 @@ final class AppModel {
     /// The switch and the hours (Settings ▸ General ▸ Sleep). Nil until the daemon has
     /// said, including a daemon too old to know the method.
     private(set) var wakeSettings: WakeSettings?
+    /// How many workflows turned on may run across every project (#506): the Mac's,
+    /// copied to every server.
+    private(set) var workflowLimit: WorkflowLimitSettings?
 
     /// Which project this window is looking at.
     ///
@@ -1067,13 +1070,16 @@ final class AppModel {
         }
     }
 
-    /// Turn one on or off, keeping its place on the list (#100).
+    /// Turn one on or off, keeping its place on the list (#100). Turning one on when
+    /// the total is already running is refused, and said (#506).
     func setWorkflowEnabled(_ summary: WorkflowSummary, _ enabled: Bool) async {
-        _ = try? await client(for: selectedProjectHost).call(
-            DaemonAPI.Method.workflowsEnable,
-            DaemonAPI.WorkflowEnableRequest(folder: summary.folder,
-                                            workflowID: summary.workflowID,
-                                            enabled: enabled))
+        await attempt(on: selectedProjectHost) {
+            try await self.client(for: self.selectedProjectHost).call(
+                DaemonAPI.Method.workflowsEnable,
+                DaemonAPI.WorkflowEnableRequest(folder: summary.folder,
+                                                workflowID: summary.workflowID,
+                                                enabled: enabled))
+        }
     }
 
     /// Clear a server's event trigger's missed-events mark (#383).
@@ -1534,6 +1540,24 @@ final class AppModel {
                 DaemonAPI.Method.retentionSet,
                 DaemonAPI.RetentionSetRequest(settings: settings, confirmed: true),
                 returning: DaemonAPI.RetentionSetResult.self)
+        }
+    }
+
+    func refreshWorkflowLimit() async {
+        workflowLimit = try? await client.call(DaemonAPI.Method.workflowsLimit, Optional<String>.none,
+                                               returning: WorkflowLimitSettings.self)
+    }
+
+    /// The person changing the total (#506): here, then on every server, which keeps to
+    /// the Mac's settings the way it keeps to its retention.
+    func setWorkflowLimit(_ settings: WorkflowLimitSettings) async {
+        await attempt {
+            self.workflowLimit = try await self.client.call(DaemonAPI.Method.workflowsSetLimit, settings,
+                                                            returning: WorkflowLimitSettings.self)
+        }
+        for host in hosts.hosts.all where !hosts.isOffline(host.id) {
+            _ = try? await client(for: host.id).call(DaemonAPI.Method.workflowsSetLimit, settings,
+                                                     returning: WorkflowLimitSettings.self)
         }
     }
 
@@ -2529,6 +2553,11 @@ final class AppModel {
         // And Cursor/Grok permission mode (061).
         _ = try? await server.call(DaemonAPI.Method.clientPermissionsSet, clientPermissions,
                                    returning: ClientPermissionSettings.self)
+        // And how many workflows may run (#506).
+        if let workflowLimit {
+            _ = try? await server.call(DaemonAPI.Method.workflowsSetLimit, workflowLimit,
+                                       returning: WorkflowLimitSettings.self)
+        }
         // And what agents call the person, as this Mac resolves it (#121).
         if let person {
             _ = try? await server.call(DaemonAPI.Method.personSet, person.resolved(), returning: PersonSettings.self)
