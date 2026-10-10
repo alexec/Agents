@@ -242,15 +242,18 @@ struct BriefingTests {
     ///
     /// Lowered in #599, to 2,200 and 2,000: every line cut to its rule, the reasons
     /// dropped but the one that earns its place (a question in a reply goes unread),
-    /// and leasing said once with what the person declared joined to it.
+    /// and leasing said once with what the person declared joined to it. Raised in the
+    /// same change, to 2,700 and 2,450, for what landed meanwhile: what not to ask
+    /// about (#601) and moving into worktrees (#615). Measured then at 2,621 for the
+    /// longest (Copilot, with a long name and a helper's starter).
     @Test func itStaysShortEnoughToBeRead() {
         let naming = Briefing.Naming(runtime: "Antigravity", person: "Alexandra", pronouns: "they/them",
                                      startedBy: "#121 agent names and questions")
         for policy in ToolPolicyCatalog.builtIn {
             let text = Briefing.text(for: policy, naming: naming)
-            #expect(text.count < 2_200, "\(policy.runtimeID): \(text.count)")
+            #expect(text.count < 2_700, "\(policy.runtimeID): \(text.count)")
             #expect(Briefing.lines(for: policy, naming: naming).count <= 10, "\(policy.runtimeID)")
-            #expect(Briefing.text(for: policy, managesAgents: false, naming: naming).count < 2_000,
+            #expect(Briefing.text(for: policy, managesAgents: false, naming: naming).count < 2_450,
                     "\(policy.runtimeID), for an agent another agent started")
         }
     }
