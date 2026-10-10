@@ -23,7 +23,8 @@ export function WorkflowRow({ store, host, summary, disabled, chosen, onPick, pi
       <button class="pick" aria-current={chosen} onClick={onPick} title={`Open ${summary.workflow.name}`}>
         <span class={`workflow-mark${status.tinted ? " tinted" : ""}`} role="img" aria-label={status.words} title={status.words}>{status.mark}</span>
         <span class="body">
-          <span class="title">
+          {/* Heavier only while it waits for an OK (#520), as a session's title is while unread. */}
+          <span class={`title${summary.awaitingApproval && !summary.isArchived ? " needs-ok" : ""}`}>
             {summary.workflow.name}
             {/* Marked where it stands, rather than moved (#100): off is not put away. */}
             {!isOn(summary) && !summary.isArchived && <span class="faint"> · Off</span>}

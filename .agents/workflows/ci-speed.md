@@ -10,6 +10,7 @@ permission-mode: auto
 cooldown: 20h
 hosts: [8AB85821-9D24-59CE-9737-8FC556923733]
 labels: [nightly, ci]
+when-done: archive
 ---
 
 You are the nightly CI speed check. You run with nobody watching. Look at how long the
@@ -95,8 +96,9 @@ of them is now the cause, say so and propose rather than change.
 5. Push and open a pull request with auto-merge (squash), as every agent here does:
    `gh pr create --fill` then `gh pr merge --auto --squash`. The body holds the table
    from step 1 and the reasoning from step 2.
-6. Wait for its checks with wait_for_event (or call it with `until_minutes: 20` and no
-   events, and pick up here when started again). When they finish,
+6. Wait for its checks: call wait_for_event with `until_minutes: 20` and no events, and
+   when started again check them with `gh pr checks`; if they are still running, wait
+   again the same way. When they finish,
    measure the PR's own run as in step 1. Note that the first run of a cache-key change
    is cold by design; if that is why it is slow, push an empty commit
    (`git commit --allow-empty -m "Re-run CI warm"`) once and measure the second run.

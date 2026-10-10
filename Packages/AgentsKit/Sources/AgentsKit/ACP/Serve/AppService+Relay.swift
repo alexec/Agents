@@ -115,6 +115,10 @@ extension AppService {
                 return await send(DaemonAPI.Method.agentsReadSession,
                                   DaemonAPI.ReadSessionRequest(token: token, session: session),
                                   fallback: SessionLookup.unavailable)
+            case .message(let to, let text):
+                return await send(DaemonAPI.Method.agentsMessageAgent,
+                                  DaemonAPI.MessageAgentRequest(token: token, to: to, message: text),
+                                  fallback: "Sent.")
             }
         } itself: { call in
             // The agent's own session (#481): the daemon takes which from the token.

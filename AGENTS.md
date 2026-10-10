@@ -33,3 +33,8 @@
 - **Build through `scripts/build-cache.sh`** (`… xcodebuild …`, `… swift test …`): one package and compilation cache in `~/Library/Caches/Agents-build/` for every worktree, so a fresh worktree is not a cold build. Deleting a worktree's own `build/` and `.build` when done is still the rule; the cache stays. Its `swift test` sets `AGENTS_QUARANTINE=1`, so tests marked `.flakyUnderLoad` skip as on CI; `AGENTS_QUARANTINE=0` runs them.
 - **Before any xcodebuild, swift build, swift test, scripts/web.sh build or ship.sh, lease the resource "build" with lease_resource (minutes sized to the job, at most 60), and release it with release_resource the moment the command ends.** Never hold it while reading, editing or waiting on the screen.
 - **A walk does not hold a place:** a lane that needs one commits, hands the walk on, and ends.
+
+## Landing a change
+
+- **Every change has an issue and a pull request.** Work on a branch of your own, push it, open the PR with `gh pr create`, turn on `gh pr merge --auto --squash` at once, and wait for it to land; fix what CI fails. Never push to `main`.
+- **Label your session as you go** with set_session_labels: `#<n>` for the issue, `P#<n>` for the PR, and `merged` once it lands.

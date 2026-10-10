@@ -288,6 +288,17 @@ button.link {
   margin: 0;
 }
 
+/* Another agent's message (#560): the .bubble's place, with who sent it above. */
+.from-agent {
+  align-self: flex-end;
+  max-width: 70%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+.from-agent .bubble { max-width: 100%; }
+
 .reply { margin: 0; line-height: 1.5; }
 
 /* Agent text, through the Markdown renderer. */
@@ -470,6 +481,8 @@ button.link.reading:hover { text-decoration: underline; }
 .card .question { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
 .card .options { display: flex; flex-direction: column; gap: 6px; }
 .card .choices { min-height: 0; max-height: 320px; overflow-y: auto; }
+/* A paged form's page scrolls inside the window's 260 pt cap, so Submit and No thanks stay under it (#546). */
+.card .page { min-height: 0; max-height: 260px; overflow-y: auto; flex-shrink: 1; }
 .card .plan-shown { display: flex; align-items: center; gap: 8px; margin: 4px 0 0; }
 .card .plan-text { margin-top: 6px; user-select: text; }
 .card .row-options { flex-direction: row; flex-wrap: wrap; }
@@ -833,6 +846,9 @@ button.remove:hover { opacity: 1; }
 .row.workflow:hover { background: none; }
 .row.workflow .body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .row.workflow .subtitle { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* A session's weight (#520): regular, heavier only while it waits for an OK. */
+.row.workflow .title { font-weight: 400; }
+.row.workflow .title.needs-ok { font-weight: 600; }
 .workflow-mark { opacity: 0.55; text-align: center; }
 .workflow-mark.tinted { color: var(--tint-attention); opacity: 1; }
 .row.workflow .run-now { font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--paper-rule); background: var(--paper-raised); white-space: nowrap; }

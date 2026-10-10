@@ -56,12 +56,20 @@ public struct ServerInstaller: Sendable {
 
     public func probe() async throws -> ServerFacts {
         let out = try await run(Self.probeScript)
+        // ssh itself failing (255), or nothing at all coming back, is said from ssh's own
+        // words: a host key it could not check is not an empty answer (#514).
+        if out.status == 255 || (out.status != 0 && out.stdout.isEmpty),
+           let problem = SSHCommand.classify(status: out.status, stderr: out.stderr, agentHasKeys: true) {
+            throw problem
+        }
         return try Self.parseProbe(out.stdout)
     }
 
     static func parseProbe(_ text: String) throws -> ServerFacts {
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        guard lines.count >= 5 else { throw HostProblem.installFailed(text) }
+        guard lines.count >= 5 else {
+            throw HostProblem.installFailed(text.isEmpty ? "The server sent nothing back." : text)
+        }
         let uname = lines[0].split(separator: " ").map(String.init)
         guard uname.count == 2, lines[1].hasPrefix("/") else { throw HostProblem.installFailed(text) }
         // POSIX `df -P`: filesystem, 1024-blocks, used, available, capacity, mounted on.

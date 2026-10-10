@@ -105,7 +105,12 @@ public enum SessionHistory {
             switch entry.kind {
             case .userMessage(let text, _, let from):
                 close()
-                current = [.line("**\(from == .app ? "The app" : "The person"):** \(text)")]
+                let who = switch from {
+                case .person: "The person"
+                case .app: "The app"
+                case .agent: "\u{201C}\(entry.sender?.title ?? "Another agent")\u{201D}"
+                }
+                current = [.line("**\(who):** \(text)")]
             case .agentMessage:
                 current.append(.reply(entry))
                 replyOpen = true

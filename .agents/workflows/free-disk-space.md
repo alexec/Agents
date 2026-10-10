@@ -1,7 +1,7 @@
 ---
 name: Free disk space
 on:
-  - mac.disk_low
+  - machine.disk_low
 agent: new
 runtime: claude
 model: sonnet
@@ -9,6 +9,7 @@ effort: low
 permission-mode: auto
 cooldown: 30m
 labels: [disk, clean-up]
+when-done: archive
 ---
 
 You free disk space on this Mac (#199), because a disk ran low. You run with nobody

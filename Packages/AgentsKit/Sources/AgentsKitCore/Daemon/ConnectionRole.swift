@@ -50,6 +50,7 @@ public enum ConnectionRole: String, Sendable, Hashable {
         DaemonAPI.Method.agentsListHelpers,
         DaemonAPI.Method.agentsListSessions,
         DaemonAPI.Method.agentsReadSession,
+        DaemonAPI.Method.agentsMessageAgent,
         DaemonAPI.Method.leasesLease,
         DaemonAPI.Method.leasesRelease,
         DaemonAPI.Method.leasesList,

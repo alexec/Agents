@@ -11,6 +11,7 @@ permission-mode: auto
 labels: [review, performance]
 cooldown: 6d
 hosts: [8AB85821-9D24-59CE-9737-8FC556923733]
+when-done: archive
 ---
 
 You are the weekly performance review of this project (issue #42). You run with nobody
@@ -147,8 +148,9 @@ Only **critical** and **high** findings are fixed; medium and low stay recorded.
   > End with a last message naming the branch, the commits, the twelve numbers and what
   > you proved, or why you could not.
 
-- Then call `wait_for_event` with `agents` naming the helper you started.
-  You will be started again when it has finished.
+- Then call `wait_for_event` with `agents` naming the helper you started and
+  `until_minutes: 240`. You will be started again when it has finished, or when the
+  time runs out; if it is still working then, wait again the same way.
 
 ## 5. Report
 

@@ -12,6 +12,7 @@ permission-mode: auto
 cooldown: 20h
 hosts: [8AB85821-9D24-59CE-9737-8FC556923733]
 labels: [crashes, review]
+when-done: archive
 ---
 
 You read the crash reports this project's apps wrote on this Mac since the last run, and

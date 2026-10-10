@@ -137,6 +137,8 @@ public enum EventCatalogue {
                   "An agent in this project ended in an error.", aliases: ["agent-stopped"]),
         EventKind("agent.parked", .project, about(outcome),
                   "An agent in this project was parked: put down to come back to."),
+        EventKind("agent.messaged", .project, about(EventDetail("from"), EventDetail("from_title")),
+                  "An agent in this project was sent a message by another, with message_agent."),
         EventKind("agent.archived", .project, about(archivedBy, outcome), "An agent in this project was archived."),
         EventKind("agent.deleted", .project, about(fixed("because", ["age", "person"])),
                   "An archived agent was deleted with its conversation.", aliases: ["agent.retired"]),

@@ -16,21 +16,14 @@ struct RemoteChangesPane: View {
     var body: some View {
         Group {
             if let selectedPath = selectedPath ?? paneState.changesPath {
-                VStack(spacing: 0) {
-                    HStack {
-                        Button {
-                            self.selectedPath = nil
-                            paneState.changesPath = nil
-                        } label: {
-                            Label("All changed files", systemImage: "chevron.left")
-                        }
-                        .buttonStyle(.borderless)
-                        Spacer()
-                    }
-                    .padding(12)
-                    Divider()
-                    ChangesView(path: selectedPath)
+                // Asked of the Mac, as the window and the page do (#535).
+                RemoteChangeFileView(agent: agent, path: selectedPath,
+                                     listed: list?.files.first { $0.path == selectedPath },
+                                     hasGit: list?.git.isAvailable ?? false) {
+                    self.selectedPath = nil
+                    paneState.changesPath = nil
                 }
+                .id(selectedPath)
             } else if let list {
                 if list.files.isEmpty, !list.reportsEdits, case .unavailable(let why) = list.git {
                     ContentUnavailableView("Changes unavailable", systemImage: "arrow.triangle.2.circlepath",
@@ -47,7 +40,21 @@ struct RemoteChangesPane: View {
                 ProgressView()
             }
         }
-        .task(id: revision) { await fetch() }
+        .task(id: revision) {
+            // A moment's pause, so the folder events of one save are one ask.
+            if revision > 0 { try? await Task.sleep(for: .milliseconds(300)) }
+            guard !Task.isCancelled else { return }
+            await fetch()
+        }
+        .task {
+            // The folder is watched while the pane shows it, so `files/changed` brings
+            // a change git sees outside the conversation (#535).
+            await model.files.watch(agentID: agent.id, folder: agent.cwd)
+            await untilCancelled()
+            await model.files.unwatch(agentID: agent.id, folder: agent.cwd)
+        }
+        .onChange(of: model.files.anyChange[agent.id] ?? 0) { revision += 1 }
+        .onChange(of: model.files.reconnections) { revision += 1 }
         .onChange(of: model.entries.count) { revision += 1 }
         .onChange(of: agent.state) { revision += 1 }
         .onChange(of: agent.cwd) { revision += 1 }

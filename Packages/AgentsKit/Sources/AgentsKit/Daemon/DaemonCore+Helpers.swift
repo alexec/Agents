@@ -267,7 +267,7 @@ extension DaemonCore {
 
     /// Agents being brought back after a restart: running, though their record has not
     /// caught up yet.
-    private var comingBack: Set<UUID> { resuming.union(interrupted.keys) }
+    var comingBack: Set<UUID> { resuming.union(interrupted.keys) }
 
     /// "2 of 3 running, 4 of 5 not archived": the project's places as a tool result
     /// says them, with its own limits. Reserved starts count in both, since each will

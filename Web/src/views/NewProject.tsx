@@ -3,7 +3,6 @@
 // Git URL…, on the host the project is for. The browser can't see the host's disk, so every host's
 // folder is chosen the way the window chooses a server's.
 import { signal, useSignal } from "@preact/signals";
-import type { ComponentChildren } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import type { ControlHost, DirectoryEntry, DirectoryListing, RuntimeStatus } from "../protocol/generated";
 import type { Store } from "../model/store";
@@ -13,6 +12,7 @@ import { describe } from "../model/errors";
 import { emptyListRuntimeLine, noAgentRuntime } from "../model/runtimes";
 import { isSafeLink } from "../render/markdown";
 import { go } from "../route";
+import { Modal } from "./Modal";
 
 type Adding = { kind: "folder" | "clone"; host: string };
 
@@ -217,21 +217,6 @@ export function NewProjectDialog({ store }: { store: Store }) {
   return open.kind === "folder"
     ? <FolderDialog key={`folder-${open.host}`} store={store} host={open.host} close={close} />
     : <CloneDialog key={`clone-${open.host}`} store={store} host={open.host} close={close} />;
-}
-
-/** A modal `<dialog>`: Escape and the backdrop's focus come with it. */
-export function Modal({ label, close, children }: { label: string; close: () => void; children: ComponentChildren }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const dialog = ref.current;
-    if (dialog && !dialog.open) dialog.showModal();
-    return () => dialog?.close();
-  }, []);
-  return (
-    <dialog class="sheet" ref={ref} aria-label={label} onClose={close}>
-      {children}
-    </dialog>
-  );
 }
 
 /** The path of a `file://` URL, as the field shows it. */

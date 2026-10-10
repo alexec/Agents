@@ -14,5 +14,19 @@
         "uri" : "ui://ci/board"
       }
     }
+  ],
+  "workflows" : [
+    {
+      "pinned_by" : {
+        "person" : true
+      },
+      "workflow" : "check-the-batch"
+    },
+    {
+      "pinned_by" : {
+        "person" : true
+      },
+      "workflow" : "fill-free-slots"
+    }
   ]
 }

@@ -920,6 +920,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.ReadSessionRequest.self)
                 return .success(["note": .string(try await readSession(request))])
 
+            case DaemonAPI.Method.agentsMessageAgent:
+                let request = try require(params, as: DaemonAPI.MessageAgentRequest.self)
+                return .success(["note": .string(try await messageAgent(request))])
+
             case DaemonAPI.Method.agentsReportOutcome:
                 let request = try require(params, as: DaemonAPI.ReportOutcomeRequest.self)
                 return .success(["note": .string(try await reportOutcome(request))])

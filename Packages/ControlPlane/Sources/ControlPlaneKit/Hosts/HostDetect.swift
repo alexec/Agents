@@ -10,7 +10,9 @@ import Foundation
 ///    through is a way in, not a server. Hosts behind one stay, and are probed through it.
 /// 3. A host the control plane has by that name is left alone.
 /// 4. The rest are probed, a few at once: `BatchMode`, the person's known_hosts,
-///    `StrictHostKeyChecking=yes`, a short timeout. One that does not answer is not added.
+///    `StrictHostKeyChecking=yes`, a short timeout; a config whose `UserKnownHostsFile` is
+///    /dev/null is pointed at ssh's default files instead (#514). One that does not answer
+///    is not added.
 /// 5. What answered is installed as `hosts/install` would with no key, trusting the host
 ///    key the person's known_hosts already has. One with Agents installed already is
 ///    joined the same way (#485): an install left from another control plane, or a join
@@ -62,7 +64,9 @@ public struct HostDetect: Sendable {
                 return SSHConfigHosts.Resolved(alias: alias, output: out.stdout)
             },
             probe: { alias in
-                let installer = ServerInstaller(ssh: Self.ssh(alias, options: file + ["-o", "StrictHostKeyChecking=yes"]))
+                var ssh = Self.ssh(alias, options: file + ["-o", "StrictHostKeyChecking=yes"])
+                ssh.options += await HostInstall.personsKnownHosts(ssh)
+                let installer = ServerInstaller(ssh: ssh)
                 do {
                     let facts = try await Self.within(.seconds(30)) { try await installer.probe() }
                     return .answered(installed: facts.installedSHA256 != nil)

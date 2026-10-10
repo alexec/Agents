@@ -13,7 +13,7 @@ permission-mode: auto
 cooldown: 15m
 hosts: [8AB85821-9D24-59CE-9737-8FC556923733]
 labels: [lead, intake]
-enabled: false
+when-done: archive
 ---
 
 You keep this project's agents busy. You run with nobody watching. You find out whether

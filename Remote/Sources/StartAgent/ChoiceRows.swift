@@ -92,12 +92,15 @@ struct ChoiceRows: View {
 
     /// What is said under the name, and nothing more. Why it cannot start wins: that is
     /// the one thing a person needs before choosing. Otherwise what its allowance says,
-    /// which is a reason in the out run and a throttle in the other.
+    /// which is a reason in the out run and a throttle in the other, and in the
+    /// available run with no throttle, whether it is signed in (#538), as the Mac says.
     private func detail(for status: RuntimeStatus, out: Bool) -> String? {
         if let reason = status.unavailableReason { return reason }
-        // The allowances are the Mac's, and say nothing of a server's runtime (#240).
+        // The allowances and accounts are the Mac's, and say nothing of a server's
+        // runtime (#240).
         guard splitsByAllowance else { return nil }
-        return out ? outNote(status.runtime.id) : availableNote(status.runtime.id)
+        if out { return outNote(status.runtime.id) }
+        return availableNote(status.runtime.id) ?? model.signInNote(for: status.runtime.id)
     }
 
     /// The runtimes in two runs, as the Mac's chooser draws them (065): those that can

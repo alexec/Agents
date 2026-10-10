@@ -8,6 +8,7 @@ cooldown: 5m
 labels: [ci]
 permission-mode: auto
 enabled: false
+when-done: archive
 ---
 
 A pull request's checks failed. The event's data says which PR, branch and jobs.
