@@ -10,6 +10,8 @@ import Foundation
 /// - the project is the caller's own, as for `read_session`;
 /// - a session the person started is never woken, only queued, so an agent cannot take
 ///   over a chat somebody is driving;
+/// - a stopped session is never woken either: a stop is somebody's decision, and a
+///   message waits in its chat until it is started again;
 /// - a question or permission card the target waits on is never answered by one;
 /// - waking an agent another agent started takes one of the project's running places;
 /// - a chain of messages with no prompt from the person stops at `AgentMessageLimits.hops`,
@@ -68,8 +70,9 @@ extension DaemonCore {
             || turnTasks[target.id] != nil || sending.contains(target.id)
         let persons = target.startedByAgent == nil && target.startedByWorkflow == nil
         let waitsOnPerson = target.report?.outcome == .needsAnswer && target.state == .finished
-        // Woken only when it is free, not the person's, and not waiting on the person.
-        let wakes = !busy && !persons && !waitsOnPerson
+        let stopped = target.state == .stopped
+        // Woken only when it is free, not the person's, not stopped, and not waiting on the person.
+        let wakes = !busy && !persons && !stopped && !waitsOnPerson
         if wakes, target.startedByAgent != nil {
             let folder = target.projectFolder
             let limits = helperLimits(in: folder)
@@ -107,6 +110,10 @@ extension DaemonCore {
             : ""
         if busy {
             return "Sent to \(name). It is working, so it reads this once its turn ends.\(then)"
+        }
+        if stopped {
+            return "Sent to \(name), which is stopped, so it waits in that chat until it is started again; "
+                + "a message does not start a stopped session.\(then)"
         }
         if persons {
             return "Sent to \(name), which the person started, so it waits in that chat until the person "
