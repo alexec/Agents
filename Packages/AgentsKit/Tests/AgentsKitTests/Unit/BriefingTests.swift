@@ -130,6 +130,16 @@ struct BriefingTests {
         }
     }
 
+    /// And says what is not the person's to ask about (#601): most questions asked had
+    /// a recommended answer the person took, or were reports with nothing to choose.
+    @Test func theEscalationLineSaysWhatNotToAsk() {
+        let line = Briefing.escalation(named: "AskUserQuestion")
+        #expect(line.contains("recommended"))
+        #expect(line.contains("easy to undo"))
+        #expect(line.contains("next step"))
+        #expect(line.contains("twice"))
+    }
+
     /// And names the tool on top of it where the policy has one. Claude's question
     /// arrives as a held elicitation, so an agent that knows the name can raise one.
     @Test func andNamesTheToolWhereThePolicyKnowsIt() {
