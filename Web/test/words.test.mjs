@@ -14,6 +14,14 @@ test("background transcript lines include starts, subagents and failure tint wor
   assert.equal(background.backgroundEntryLine({ ...item, state: "failed" }), "Task “Build” failed");
 });
 
+test("a subagent's steps say how it runs or ended, and why none are shown (#544)", () => {
+  const item = { id: "sub", kind: "subagent", name: "Explore", state: "running", canStop: false, isStopping: false, startedAt: 0 };
+  assert.equal(background.subagentStatus(item, 65), "Subagent · running 1:05 · stops with the agent");
+  assert.equal(background.subagentStatus({ ...item, state: "completed", endedAt: 7 }, 65), "Subagent “Explore” finished · 0:07");
+  assert.match(background.subagentNoSteps(item), /Nothing yet/);
+  assert.match(background.subagentNoSteps({ ...item, state: "failed" }), /further back/);
+});
+
 const sandboxWords = await load("src/model/sandboxWords.ts");
 
 test("sandbox failure card explains the recovery and preserves the two choices", () => {

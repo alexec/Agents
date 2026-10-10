@@ -432,7 +432,7 @@ test("an opened turn asks for its last page, and a miss reports the turn's start
   assert.equal(again.params.limit, turnPage);
   await earlier;
   const missed = await new Store(fakeLink(() => undefined)).turnEntries("mac", "s", { start: 4, end: 9 });
-  assert.deepEqual(missed, { entries: [], firstIndex: 4 });
+  assert.deepEqual(missed, { entries: [], firstIndex: 4, failed: true }, "a failed read says so (#544)");
   const empty = await store.turnEntries("mac", "s", { start: 3, end: 3 });
   assert.deepEqual(empty, { entries: [], firstIndex: 3 });
   assert.equal(link.out.length, 0, "an empty span asks for nothing");

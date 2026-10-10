@@ -460,6 +460,9 @@ button.link.reading:hover { text-decoration: underline; }
 .background li { align-items: baseline; }
 .background li.stopping { opacity: 0.5; }
 .background .stop { font-size: 11px; padding: 0 8px; }
+dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 64px); }
+.subagent-steps p { margin: 0; }
+.subagent-steps .asked { padding: 10px; border-radius: 8px; background: var(--paper-ground); display: flex; flex-direction: column; gap: 3px; }
 
 /* Cards above the prompt: a question or a permission, answered here or elsewhere. */
 /* In a short window the cards give up height, not the prompt: the foot is never taller than the
