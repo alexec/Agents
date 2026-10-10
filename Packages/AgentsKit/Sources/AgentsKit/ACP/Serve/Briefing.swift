@@ -166,6 +166,16 @@ public enum Briefing {
     /// on the catalogue — is named as the fallback, or as the only name where the
     /// runtime has no channel that reaches us. Naming a runtime tool that is not there
     /// is still worse than silence (FR-008); naming the app tool is not.
+    ///
+    /// The last two sentences say what is not the person's to decide, and they too have
+    /// a count behind them (#601). Of 191 questions asked between 2026-09-20 and
+    /// 2026-10-10, 150 answers had an option marked recommended, and 117 of those took
+    /// it. The rest were mostly mechanics: accept a failure main has too, leave the
+    /// person's uncommitted edits alone, discard the agent's own scratch, carry on to the
+    /// next step of what was asked. The person also skipped questions that were really
+    /// reports, and questions asking them to look at something the agent could have
+    /// looked at itself. Where they picked something else, it was scope or design, and
+    /// that is still theirs.
     public static func escalation(named tool: String?) -> String {
         let named: String
         if let tool, tool != AppTool.askForm {
@@ -179,7 +189,11 @@ public enum Briefing {
             form tool rather than guessing at it or ending the turn with the question \
             in your reply.\(named) Your question reaches me wherever I am, including on \
             my phone, and it waits for me. A question in the middle of a reply I may \
-            not read does not.
+            not read does not. But when one answer is the one you would mark as \
+            recommended and it is easy to undo, that is not mine: take it, say so in \
+            your reply, and carry on. Do not ask me whether to do the next step of \
+            what I asked for, about a report with nothing to choose, about anything \
+            you can find out for yourself, or the same thing twice.
             """
     }
 
