@@ -26,6 +26,8 @@ public enum GuardedFile: String, Codable, CaseIterable, Sendable {
 }
 
 /// A change to a guarded file made outside the app, waiting for the person (#502).
+///
+/// A workflow waiting for an OK is asked the same way (#569), by its file's path.
 public struct GuardedChange: Codable, Hashable, Sendable, Identifiable {
     /// The file, relative to the project folder.
     public var path: String
@@ -64,8 +66,29 @@ public struct GuardedChange: Codable, Hashable, Sendable, Identifiable {
         "Keep the change to \(path)?"
     }
 
+    /// The path a workflow's waiting change is asked by (#569): its file, relative to
+    /// the project folder.
+    public static func workflowPath(_ workflowID: String) -> String {
+        "\(WorkflowPaths.folderName)/\(workflowID).\(WorkflowPaths.fileExtension)"
+    }
+
+    /// The workflow a path names, or nil when it is not a workflow's file.
+    public static func workflowID(inPath path: String) -> String? {
+        let folder = WorkflowPaths.folderName + "/", suffix = "." + WorkflowPaths.fileExtension
+        guard path.hasPrefix(folder), path.hasSuffix(suffix) else { return nil }
+        let id = String(path.dropFirst(folder.count).dropLast(suffix.count))
+        return id.isEmpty || id.contains("/") ? nil : id
+    }
+
+    /// A workflow waiting for an OK, rather than one of the `GuardedFile`s.
+    public var isWorkflow: Bool { Self.workflowID(inPath: path) != nil }
+
     /// What Keep and Undo do, in a person's words.
     public var explanation: String {
+        if isWorkflow {
+            return "The workflow does not run until you choose. Keep approves the change; Undo puts back "
+                + "the copy you last approved, or removes the file when you never approved one."
+        }
         let holds = GuardedFile(rawValue: path)?.holds ?? "the file"
         return "The app goes on using \(holds) as you last approved them until you choose. "
             + "Keep uses the change from now on; Undo puts the approved copy back in the file."

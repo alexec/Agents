@@ -1,7 +1,8 @@
 // A change to one of the app's own files in a project's `.agents`, made outside the app (#502), as
 // the question every client asks (#531; Shared/UI/Chat/GuardedChangeCard.swift): who made it, what
 // changed line by line, and Keep or Undo. Asked over the prompt of the agent that made it, or on the
-// project's page when no agent did. Until then the host goes on with the copy last approved.
+// project's page when no agent did. Until then the host goes on with the copy last approved. A workflow
+// waiting for an OK is asked the same way, by its file's path (#569).
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { DiffLine, GuardedChange, GuardedChangeReading } from "../protocol/generated";
@@ -32,6 +33,21 @@ function holds(path: string): string {
     case ".agents/pins.json": return "the pins";
     default: return "the file";
   }
+}
+
+/** A workflow waiting for an OK (#569), as GuardedChange.isWorkflow has it. */
+function isWorkflow(path: string): boolean {
+  return /^\.agents\/workflows\/[^/]+\.md$/.test(path);
+}
+
+/** What Keep and Undo do, as GuardedChange.explanation has it. */
+function explanation(path: string): string {
+  if (isWorkflow(path)) {
+    return "The workflow does not run until you choose. Keep approves the change; Undo puts back "
+      + "the copy you last approved, or removes the file when you never approved one.";
+  }
+  return `The app goes on using ${holds(path)} as you last approved them until you choose. `
+    + "Keep uses the change from now on; Undo puts the approved copy back in the file.";
 }
 
 /** Who changed what, as GuardedChange.headline has it. */
@@ -70,10 +86,7 @@ function GuardedChangeCard({ store, host, folder, change, down }: {
   return (
     <div class="card guarded-change" role="alert" aria-label={`Keep the change to ${change.path}?`}>
       <p class="strong">{guardedHeadline(change)}</p>
-      <p class="quiet">
-        The app goes on using {holds(change.path)} as you last approved them until you choose. Keep uses the change
-        from now on; Undo puts the approved copy back in the file.
-      </p>
+      <p class="quiet">{explanation(change.path)}</p>
       {reading.value ? <div class="question"><Lines lines={lines} /></div> : <p class="quiet">Reading the change…</p>}
       <p class="guarded-answers">
         <button disabled={held} onClick={() => answer(false)}>Undo</button>

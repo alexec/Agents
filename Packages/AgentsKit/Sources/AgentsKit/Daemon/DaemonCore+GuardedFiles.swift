@@ -128,7 +128,11 @@ extension DaemonCore {
     /// still running's.
     func guardedTurnEnded(_ agentID: UUID) {
         guard let agent = agents[agentID] else { return }
-        markGuardedChanges(in: Project.standardize(agent.projectFolder), witness: agent)
+        let project = Project.standardize(agent.projectFolder)
+        markGuardedChanges(in: project, witness: agent)
+        // And a workflow it wrote (#569), read now rather than by the watch, which may
+        // see it only once the turn is no longer running.
+        if workflows[project] != nil { rescanWorkflows(in: project, witness: agent) }
     }
 
     /// Look for changes now: from the project's watch, and from a read that found one.
@@ -245,8 +249,13 @@ extension DaemonCore {
 
     /// Whether `data` is what the project's HEAD holds for `file`: it came by git.
     static func isCommitted(_ data: Data?, _ file: GuardedFile, in project: URL) async -> Bool {
+        await isCommitted(data, path: file.path, in: project)
+    }
+
+    /// Whether `data` is what HEAD holds at `path`, relative to the project.
+    static func isCommitted(_ data: Data?, path: String, in project: URL) async -> Bool {
         guard let data,
-              let outcome = try? await GitChanges.run(["show", "HEAD:./" + file.path], in: project) else { return false }
+              let outcome = try? await GitChanges.run(["show", "HEAD:./" + path], in: project) else { return false }
         return Data(outcome.output.utf8) == data
     }
 
@@ -265,14 +274,15 @@ extension DaemonCore {
         reconsider()
     }
 
-    /// The waiting changes, for the project's summary.
+    /// The waiting changes, for the project's summary: the guarded files', then the
+    /// workflows waiting for an OK (#569).
     func guardedChanges(in project: URL) -> [GuardedChange]? {
         let records = guardedRecordsCache ?? guardedRecords()
         let changes = records.states.compactMap { state -> GuardedChange? in
             guard state.folder == project, let pending = state.pending else { return nil }
             return guardedChange(project, state.path, pending)
-        }
-        return changes.isEmpty ? nil : changes.sorted { $0.path < $1.path }
+        }.sorted { $0.path < $1.path } + waitingWorkflowChanges(in: project)
+        return changes.isEmpty ? nil : changes
     }
 
     /// One waiting change, with the session it is asked in (#531): the first agent named
@@ -287,6 +297,7 @@ extension DaemonCore {
     // MARK: The person's
 
     public func readGuardedChange(_ request: DaemonAPI.GuardedChangeRequest) throws -> GuardedChangeReading {
+        if let id = GuardedChange.workflowID(inPath: request.path) { return try readWorkflowChange(request, workflowID: id) }
         let (project, file) = try guardedTarget(request)
         let disk = guardedDiskRead(file, in: project)
         let approved = guardedRecords().state(project, file)?.approvedContent
@@ -297,6 +308,7 @@ extension DaemonCore {
 
     /// Keep: the file as the person was shown it is approved, and used from now on.
     public func keepGuardedChange(_ request: DaemonAPI.GuardedChangeRequest) throws -> DaemonAPI.ProjectSummary {
+        if let id = GuardedChange.workflowID(inPath: request.path) { return try keepWorkflowChange(request, workflowID: id) }
         let (project, file) = try guardedTarget(request)
         let disk = try guardedShown(request, file, in: project, verb: "kept")
         var records = guardedRecords()
@@ -312,6 +324,7 @@ extension DaemonCore {
 
     /// Undo: the approved copy is written back, or the file taken away when there was none.
     public func undoGuardedChange(_ request: DaemonAPI.GuardedChangeRequest) throws -> DaemonAPI.ProjectSummary {
+        if let id = GuardedChange.workflowID(inPath: request.path) { return try undoWorkflowChange(request, workflowID: id) }
         let (project, file) = try guardedTarget(request)
         _ = try guardedShown(request, file, in: project, verb: "undone")
         var records = guardedRecords()

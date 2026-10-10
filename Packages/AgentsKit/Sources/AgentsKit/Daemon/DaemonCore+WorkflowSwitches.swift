@@ -35,6 +35,7 @@ extension DaemonCore {
         records.update(folder: workflow.folder, workflowID: workflow.workflowID) {
             if carryApproval, $0.approvedDigest == before {
                 $0.approvedDigest = after
+                $0.approvedContent = Data(edited.utf8)
                 // A refusal for waiting belonged to the file before this one.
                 if case .refused(.awaitingApproval, _, _) = $0.lastOutcome { $0.lastOutcome = nil }
             }

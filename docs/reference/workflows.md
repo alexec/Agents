@@ -373,6 +373,22 @@ On the Mac or server that denied it:
 `hosts:` in the file is not the same thing: it is a list written into the shared file,
 and taking a computer off it is a change you commit.
 
+### Asked as a question
+
+A workflow waiting for your OK is also asked as a question, the same one a change to
+`.agents/project.json` or `.agents/pins.json` made outside the app is (#569): over the
+prompt of the agent whose turn was running when the file changed, or on the project's
+page when none was (a merge or pull, or something outside the app), and notified like
+any question. It says who changed the file, the lines removed and added against the copy
+you last approved, and offers **Keep** and **Undo**:
+
+- **Keep** is **Approve**, of the file as you were shown it.
+- **Undo** writes the copy you last approved back into the file, or removes the file
+  when you never approved one. The app keeps that copy beside its approval, outside the
+  project, from the moment it is approved. A workflow approved before copies were kept
+  gets one the next time its file is seen as approved; until then Undo says it has
+  nothing to put back, and **Keep** or **Deny on This Host** are the answers.
+
 ## Off and archived
 
 Both stop a workflow running, and both are kept in the workflow's own file, as

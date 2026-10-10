@@ -78,6 +78,7 @@ extension DaemonCore {
             broadcast(DaemonAPI.Notification.workflowChanged,
                       summary(for: workflow, records: records, ceilings: ceilings))
         }
+        markWorkflowChanges(in: standardized)
     }
 
 
@@ -343,11 +344,19 @@ extension DaemonCore {
 
     /// Re-read one project's workflow folder and tell the windows what moved.
     public func rescanWorkflows(in folder: URL) {
+        rescanWorkflows(in: folder, witness: nil)
+    }
+
+    /// `witness` is an agent whose turn just ended, named as having changed a workflow
+    /// now waiting if no one was named yet (#569).
+    func rescanWorkflows(in folder: URL, witness: Agent?) {
         let standardized = Project.standardize(folder)
         workflowRescans.removeValue(forKey: standardized)
         let before = workflows[standardized] ?? [:]
         loadWorkflows(in: standardized)
         let after = workflows[standardized] ?? [:]
+        // Who changed one now waiting, and the question every client asks (#569).
+        defer { markWorkflowChanges(in: standardized, witness: witness) }
 
         // The list a window sees is the workflows this computer may run (#317). One
         // pinned to another host leaves this list, which is a removal, even while the

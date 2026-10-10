@@ -65,8 +65,10 @@ extension DaemonCore {
         for (_, byID) in workflows {
             for workflow in byID.values {
                 guard let digest = workflowDigest(workflow) else { continue }
+                let content = approvedCopy(of: workflow, digest: digest)
                 records.update(folder: workflow.folder, workflowID: workflow.workflowID) {
                     $0.approvedDigest = digest
+                    $0.approvedContent = content
                 }
             }
         }
@@ -76,8 +78,11 @@ extension DaemonCore {
 
     /// Record `digest` as approved for the workflow, in the records given.
     func approve(_ workflow: Workflow, digest: String, in records: inout WorkflowRecords) {
+        let content = approvedCopy(of: workflow, digest: digest)
         records.update(folder: workflow.folder, workflowID: workflow.workflowID) {
             $0.approvedDigest = digest
+            $0.approvedContent = content
+            $0.waitingChange = nil
             // Approve on this host takes back a denial on it (#391).
             $0.deniedDigest = nil
             // A refusal for waiting, or for being denied, belonged to before this.
@@ -86,6 +91,14 @@ extension DaemonCore {
             default: break
             }
         }
+    }
+
+    /// The file's bytes when they are still `digest`'s, kept beside the approval so Undo
+    /// can write them back (#569); nil when the file moved under the read.
+    func approvedCopy(of workflow: Workflow, digest: String) -> Data? {
+        let url = WorkflowFile.url(for: workflow.workflowID, in: workflow.folder)
+        guard let data = try? Data(contentsOf: url), ContentDigest.sha256(data) == digest else { return nil }
+        return data
     }
 
     /// The person's Approve. Only the file they were shown: if it has changed since,
@@ -114,6 +127,8 @@ extension DaemonCore {
         // Its place among the waiting is free for the next in line, and one turned on
         // now takes a place under the total, which every project shares (#506).
         rebroadcastAllWorkflows(except: (folder: workflow.folder, workflowID: workflow.workflowID))
+        // Its question leaves every client (#569).
+        markWorkflowChanges(in: workflow.folder)
         return summary
     }
 
@@ -142,6 +157,7 @@ extension DaemonCore {
         announceWorkflow(workflow, records: records)
         // Like Approve and Archive, it frees a place among the waiting.
         rebroadcastWorkflows(in: workflow.folder, except: [workflow.workflowID])
+        markWorkflowChanges(in: workflow.folder)
         return summary
     }
 }

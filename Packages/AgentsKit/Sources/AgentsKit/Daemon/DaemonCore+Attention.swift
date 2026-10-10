@@ -113,16 +113,24 @@ extension DaemonCore {
         }
         // A change to the app's own files, made outside it (#531): asked in the session of
         // the agent that made it, or of the project when no agent did.
+        // A workflow waiting for an OK is asked the same way (#569).
+        var changes: [(folder: URL, change: GuardedChange)] = []
         for state in guardedRecords().states where !archived.contains(state.folder) {
             guard let pending = state.pending else { continue }
-            let change = guardedChange(state.folder, state.path, pending)
-            let id = NeedID.guardedChange(state.folder, state.path)
+            changes.append((state.folder, guardedChange(state.folder, state.path, pending)))
+        }
+        let workflowRecords = workflows.isEmpty ? nil : workflowStore.load()
+        for folder in workflows.keys where !archived.contains(folder) {
+            changes += waitingWorkflowChanges(in: folder, records: workflowRecords).map { (folder, $0) }
+        }
+        for (folder, change) in changes {
+            let id = NeedID.guardedChange(folder, change.path)
             let raisedAt = needRaisedAt[id] ?? now
             needRaisedAt[id] = raisedAt
             let agent = change.askedIn.flatMap { agents[$0] }
-            found.append(Need(id: id, agentID: agent?.id, folder: state.folder, kind: .guardedChange,
+            found.append(Need(id: id, agentID: agent?.id, folder: folder, kind: .guardedChange,
                               raisedAt: raisedAt,
-                              headline: Headline(h1: state.folder.lastPathComponent,
+                              headline: Headline(h1: folder.lastPathComponent,
                                                  h2: agent?.title ?? "",
                                                  h3: change.headline).truncating()))
         }
