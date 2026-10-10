@@ -20,8 +20,8 @@ It listens on no port, and holds no token: every GitHub call is `gh api` (or `gh
 
 | Name | `inputSchema` | `data` | `eventId` |
 |---|---|---|---|
-| `checks.failed` | `repo` (string, `owner/name`, required), `branch` (string) | `{ pr: {number, title, branch, url}, headSha, run: {id, attempt, name, url}, failedJobs: [{name, url}] }` | `checks.failed:{repo}:{runId}:{attempt}` |
-| `pr.merged` | `repo` (required) | `{ pr: {number, title, branch, url}, mergedAt, mergeSha }` | `pr.merged:{repo}:{number}` |
+| `checks.failed` | `repo` (string, `owner/name`, required), `branch` (string, only runs on that PR branch), `pr` (positive integer, only that pull request); given filters must all hold | `{ pr: {number, title, branch, url}, headSha, run: {id, attempt, name, url}, failedJobs: [{name, url}] }` | `checks.failed:{repo}:{runId}:{attempt}` |
+| `pr.merged` | `repo` (required), `branch` (string, only the PR from that branch), `pr` (positive integer, only that pull request); given filters must all hold | `{ pr: {number, title, branch, url}, mergedAt, mergeSha }` | `pr.merged:{repo}:{number}` |
 
 Both have `delivery: ["poll"]`. Both names are `noun.verbed`, and neither noun is one the
 app reserves, so workflows name them as they are (`checks.failed`), with no prefix. The cursor and paging rules are in
