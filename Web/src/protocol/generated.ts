@@ -971,6 +971,11 @@ export interface MarkRuntimeAvailable {
   credentialKey: string;
 }
 
+export interface MessageSender {
+  agentID: UUID;
+  title: string;
+}
+
 export interface MissingFolder {
   branchKept: boolean;
 }
@@ -1204,7 +1209,7 @@ export interface ProjectsListRequest {
   includeArchived: boolean;
 }
 
-export type PromptOrigin = "person" | "app";
+export type PromptOrigin = "person" | "app" | "agent";
 
 export interface PromptRequest {
   agentID: UUID;
@@ -1221,6 +1226,8 @@ export interface QueuedPrompt {
   queuedAt: WireDate;
   from: PromptOrigin;
   preface?: string;
+  sender?: MessageSender;
+  hops?: number;
 }
 
 export interface QueuedStart {
@@ -1555,6 +1562,7 @@ export interface TranscriptEntry {
   at: WireDate;
   kind: TranscriptEntryKind;
   subagentID?: string;
+  sender?: MessageSender;
 }
 
 export type TranscriptEntryKind =
@@ -2284,6 +2292,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MCPTriggerFailure: { required: ["code", "message", "since"], optional: [] },
   MCPTriggerStatus: { required: ["name", "state"], optional: ["server", "lastPolledAt", "lastEventAt", "missedSince", "failure", "retryAt"] },
   MarkRuntimeAvailable: { required: ["credentialKey"], optional: [] },
+  MessageSender: { required: ["agentID", "title"], optional: [] },
   MissingFolder: { required: ["branchKept"], optional: [] },
   Need: { required: ["id", "agentID", "folder", "kind", "raisedAt", "headline"], optional: [] },
   OptionsRequest: { required: ["runtimeID", "cwd", "mcpServers"], optional: [] },
@@ -2315,7 +2324,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: ["isChat"] },
   ProjectsListRequest: { required: ["includeArchived"], optional: [] },
   PromptRequest: { required: ["agentID", "text", "attachments", "from"], optional: ["sendID"] },
-  QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface"] },
+  QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface", "sender", "hops"] },
   QueuedStart: { required: ["labels"], optional: ["runtimeID", "permissionMode", "model", "worktree"] },
   RateLimitInfo: { required: [], optional: ["status", "resetsAt", "rateLimitType", "utilization", "overageStatus", "overageResetsAt", "isUsingOverage", "overageInUse", "overageDisabledReason"] },
   RememberedOptionsRequest: { required: ["runtimeID", "cwd"], optional: [] },
@@ -2352,7 +2361,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SwitchRecordSide: { required: ["runtimeID"], optional: ["entryID", "model", "mode"] },
   ToolCall: { required: ["title", "content", "locations"], optional: ["toolCallID", "name", "kind", "status", "rawInput", "rawOutput", "raw"] },
   ToolCallLocation: { required: ["path"], optional: ["line"] },
-  TranscriptEntry: { required: ["id", "at", "kind"], optional: ["subagentID"] },
+  TranscriptEntry: { required: ["id", "at", "kind"], optional: ["subagentID", "sender"] },
   TranscriptPage: { required: ["firstIndex", "total", "entries"], optional: [] },
   TranscriptRequest: { required: ["agentID", "limit"], optional: ["before", "from"] },
   TurnSummary: { required: ["id", "start", "end"], optional: ["ask", "last", "concise", "outcome", "steps", "usage"] },

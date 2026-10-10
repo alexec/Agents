@@ -286,7 +286,11 @@ extension ChatTurn {
 
 extension TranscriptItem {
     public var isPersonsAsk: Bool {
-        if case .entry(let entry) = self, case .userMessage(_, _, .person) = entry.kind { return true }
+        // Another agent's message starts a turn as the person's prompt does (#560); the
+        // app's own question does not.
+        if case .entry(let entry) = self, case .userMessage(_, _, let from) = entry.kind {
+            return from != .app
+        }
         return false
     }
 

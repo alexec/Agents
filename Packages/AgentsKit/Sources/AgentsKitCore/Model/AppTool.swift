@@ -64,6 +64,10 @@ public enum AppTool {
     /// One session's history, by id or exact title.
     public static let readSession = "read_session"
 
+    /// Say something to another session in the project (#560), which it reads as a
+    /// prompt marked as this agent's. Offered to every agent, as reading is.
+    public static let messageAgent = "message_agent"
+
     // Three more for taking turns with the Mac's shared things (036). Offered to every
     // agent, including one another agent started: waiting for the simulator is not
     // managing anyone.
@@ -113,7 +117,7 @@ public enum AppTool {
         finishTurn, showFile, manageWorkflows, askForm, startAgent, stopAgent, parkAgent,
         listMyAgents, leaseResource, releaseResource, listResources, waitForEvent,
         cancelWait, publishEvent, listSessions, readSession, archiveAgent,
-        pinPage, unpinPage, movePin, pinSession, setSessionLabels, moveWorktree,
+        pinPage, unpinPage, movePin, pinSession, setSessionLabels, moveWorktree, messageAgent,
     ]
 
     /// How runtimes put the server's name in front of a tool's, as measured: Claude's

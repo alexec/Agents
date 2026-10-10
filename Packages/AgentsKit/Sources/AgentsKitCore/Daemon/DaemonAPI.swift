@@ -253,6 +253,8 @@ public enum DaemonAPI {
         /// `list_sessions` and `read_session` (065): the caller's project, read only.
         public static let agentsListSessions = "agents/listSessions"
         public static let agentsReadSession = "agents/readSession"
+        /// `message_agent` (#560): words for another session in the caller's project.
+        public static let agentsMessageAgent = "agents/messageAgent"
         /// What the MCP helper relays for `lease_resource`, `release_resource` and
         /// `list_resources` (036). The caller is the token. `leases/lease` may stay open
         /// for up to `LeaseLimits.waitLimit` while the agent waits its turn.
@@ -2552,6 +2554,19 @@ public enum DaemonAPI {
         public init(token: String, session: String) {
             self.token = token
             self.session = session
+        }
+    }
+
+    /// `message_agent` (#560): `to` is a session id or exact title in the caller's project.
+    public struct MessageAgentRequest: Codable, Sendable {
+        public var token: String
+        public var to: String
+        public var message: String
+
+        public init(token: String, to: String, message: String) {
+            self.token = token
+            self.to = to
+            self.message = message
         }
     }
 

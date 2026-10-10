@@ -288,6 +288,17 @@ button.link {
   margin: 0;
 }
 
+/* Another agent's message (#560): the .bubble's place, with who sent it above. */
+.from-agent {
+  align-self: flex-end;
+  max-width: 70%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+.from-agent .bubble { max-width: 100%; }
+
 .reply { margin: 0; line-height: 1.5; }
 
 /* Agent text, through the Markdown renderer. */

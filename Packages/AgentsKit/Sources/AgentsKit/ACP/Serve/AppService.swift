@@ -44,6 +44,7 @@ public actor AppService {
     public static let listMyAgentsToolName = AppTool.listMyAgents
     public static let listSessionsToolName = AppTool.listSessions
     public static let readSessionToolName = AppTool.readSession
+    public static let messageAgentToolName = AppTool.messageAgent
     public static let leaseResourceToolName = AppTool.leaseResource
     public static let waitForEventToolName = AppTool.waitForEvent
     public static let cancelWaitToolName = AppTool.cancelWait
@@ -137,6 +138,8 @@ public actor AppService {
     public enum SessionCall: Sendable, Equatable {
         case list(limit: Int? = nil, after: String? = nil)
         case read(session: String)
+        /// `message_agent` (#560): the daemon decides whether it goes now, waits, or not at all.
+        case message(to: String, text: String)
     }
 
     /// Where those go.
@@ -502,6 +505,15 @@ public actor AppService {
             guard !value.isEmpty else { return .failure(AgentCallProblem(stringLiteral: SessionLookup.noValue)) }
             return .success(.read(session: value))
         }
+        if name.hasSuffix(messageAgentToolName) {
+            let to = arguments?["to"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !to.isEmpty else {
+                return .failure("Nothing was sent: say which session, by id or exact title, in `to`.")
+            }
+            let text = arguments?["message"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !text.isEmpty else { return .failure("Nothing was sent: say what to tell it, in `message`.") }
+            return .success(.message(to: to, text: text))
+        }
         return nil
     }
 
@@ -611,8 +623,9 @@ public actor AppService {
         let leaseTools = [Self.leaseResourceTool, Self.releaseResourceTool, Self.listResourcesTool]
         // The three event tools, for every agent (042).
         let eventTools = [Self.waitForEventTool, Self.cancelWaitTool, Self.publishEventTool]
-        // The two for reading another session in this project, for every agent (065).
-        let sessionTools = [Self.listSessionsTool, Self.readSessionTool]
+        // The two for reading another session in this project, and the one for telling it
+        // something, for every agent (065, #560).
+        let sessionTools = [Self.listSessionsTool, Self.readSessionTool, Self.messageAgentTool]
         // The three for the project's pinned pages and the one for pinning its own
         // session, for every agent (#159, #180).
         let pinTools = [Self.pinPageTool, Self.unpinPageTool, Self.movePinTool, Self.pinSessionTool]
@@ -1239,6 +1252,35 @@ public actor AppService {
                 ],
             ],
             "required": ["session"],
+        ],
+    ]
+
+    static let messageAgentTool: JSONValue = [
+        "name": .string(messageAgentToolName),
+        "title": "Tell another session something",
+        "description": .string("""
+            Say something to another session in this project, which it reads as a prompt \
+            marked as yours, not the person's; the person sees it in that chat too. A session \
+            that is working gets it after its turn; one that is done or parked is woken by it, \
+            within the project's running limit; one the person started waits for the person. \
+            It never answers a question that session is waiting on. A reply comes back the \
+            same way, as a message to you. Limits: \(AgentMessageLimits.characters) characters, \
+            \(AgentMessageLimits.perHour) an hour, and at most \(AgentMessageLimits.hops) messages \
+            between agents in a row with no prompt from the person.
+            """),
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "to": [
+                    "type": "string",
+                    "description": "The session's id, as list_sessions gave it, or its exact title.",
+                ],
+                "message": [
+                    "type": "string",
+                    "description": "What to tell it.",
+                ],
+            ],
+            "required": ["to", "message"],
         ],
     ]
 

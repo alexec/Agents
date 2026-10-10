@@ -193,6 +193,11 @@ private struct StepRow: View {
 private struct EntryRow: View {
     let entry: TranscriptEntry
 
+    /// Who another agent's message is from (#560), as the queued bubble says it too.
+    static func fromLine(_ sender: MessageSender?) -> String {
+        "From \u{201C}\(sender?.title ?? "another agent")\u{201D}"
+    }
+
     var body: some View {
         switch entry.kind {
         case .userMessage(let text, let blocks, let from):
@@ -207,6 +212,19 @@ private struct EntryRow: View {
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+            } else if from == .agent {
+                // Another agent's message (#560): a prompt like the person's, at the right,
+                // but named as the sender's so it is never taken for theirs.
+                VStack(alignment: .trailing, spacing: 3) {
+                    Text(Self.fromLine(entry.sender)).appText(.reading).foregroundStyle(.tertiary)
+                    BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
+                        .environment(\.textFillsWidth, false)
+                        .appText(.reading)
+                        .padding(12)
+                        .paperWell(in: RoundedRectangle(cornerRadius: 12))
+                }
+                .padding(.leading, 60)
+                .frame(maxWidth: .infinity, alignment: .trailing)
             } else {
                 // Theirs, so at the right, as wide as its words and no wider.
                 BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
@@ -400,6 +418,10 @@ struct QueuedPromptRow: View {
         // right, as wide as its words, with what can be done to it underneath, so the
         // buttons never push it off the edge (#95).
         VStack(alignment: .trailing, spacing: 2) {
+            // Another agent's, waiting (#560): named, as it is once sent.
+            if prompt.from == .agent {
+                Text(EntryRow.fromLine(prompt.sender)).appText(.reading).foregroundStyle(.tertiary)
+            }
             BlocksView(blocks: prompt.blocks)
                 .environment(\.textFillsWidth, false)
                 .appText(.reading)
@@ -413,7 +435,9 @@ struct QueuedPromptRow: View {
                 // No title says it is waiting, so the label does; one element, so the
                 // label never sits over a child's (stacked labels crash AppKit).
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Queued: \(prompt.text)")
+                .accessibilityLabel(prompt.from == .agent
+                    ? "Queued, \(EntryRow.fromLine(prompt.sender)): \(prompt.text)"
+                    : "Queued: \(prompt.text)")
                 .accessibilityAction(named: "Send now") {
                     guard canSendNow, acting == nil else { return }
                     Task { await actions.sendNow(prompt, agentID) }
