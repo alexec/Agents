@@ -100,7 +100,7 @@ struct PagePane: View {
 
     @ViewBuilder
     private func pageActionsBar(_ url: URL) -> some View {
-        if let path = PinRules.relative(url.path, in: agent.projectFolder),
+        if let path = agent.pinPath(url.path),
            PinRules.kind(path) != nil {
             let pinned = model.pins(in: agent.projectFolder).contains { $0.path == path }
             HStack {
