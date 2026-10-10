@@ -173,21 +173,21 @@ public enum LeaseWords {
     // MARK: The briefing (FR-015)
 
     public static let briefing = """
-        Only one agent at a time should use a simulator, a browser or the screen (mouse, \
-        keyboard, front window). Lease it with lease_resource before you use it and release \
-        it with release_resource as soon as you are done; keep leases short and extend them, \
-        and take several in the same order every time. If you are told you are in line, you \
-        may end your turn: you will be started again when it is yours.
+        Lease a shared resource with lease_resource before using it and release_resource \
+        the moment you are done. Keep leases short and extend them, and take several in the \
+        same order every time. A simulator, a browser and the screen (mouse, keyboard, front \
+        window) are for one agent at a time. If told you are in line, you may end your turn; \
+        you will be started again when it is yours.
         """
 
-    /// What the person declared, said after the briefing (#116): each resource with
-    /// its description, and the rule that goes with them. Nil when nothing is declared.
-    public static func declaredBriefing(_ declared: [DeclaredResource]) -> String? {
-        guard !declared.isEmpty else { return nil }
+    /// The briefing with what the person declared joined to it (#116, #599): each
+    /// resource with its description, and when to lease it. The paragraph alone when
+    /// nothing is declared.
+    public static func briefing(declared: [DeclaredResource]) -> String {
+        guard !declared.isEmpty else { return briefing }
         let lines = declared.map { "- \($0.displayName) (\(placesWords($0.holders))): \($0.description)" }
-        return "The person declared these resources on this machine. Lease one with lease_resource "
-            + "whenever its description applies to what you are about to do, and release it the moment "
-            + "you are done:\n" + lines.joined(separator: "\n")
+        return briefing + " Also declared, each to lease whenever its description applies:\n"
+            + lines.joined(separator: "\n")
     }
 
     /// "one at a time", "3 at once".

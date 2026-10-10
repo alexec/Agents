@@ -192,9 +192,9 @@ public enum EventWords {
     /// may end while waiting, publish to tell others, and where the names are.
     public static let briefing = """
         Wait for something to happen (checks passing, an agent finishing, this Mac waking) \
-        with wait_for_event rather than checking again and again; if told you are still \
-        waiting, you may end your turn and will be started again when it happens. Tell \
-        others something happened with publish_event, using a custom. name.
+        with wait_for_event, not repeated checks. If told you are still waiting, you may \
+        end your turn; you will be started again when it happens. Announce events with \
+        publish_event under a `custom.` name.
         """
 
     // MARK: The person's side

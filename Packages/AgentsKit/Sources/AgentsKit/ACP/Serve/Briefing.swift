@@ -42,8 +42,8 @@ public enum Briefing {
     /// documents — the page follows whatever the agent writes with the tools it
     /// already has, so there is nothing else to ask for.
     public static let liveDocument = """
-        When you start writing a Markdown document for me, call \(AppTool.showFile) \
-        on it once, first, before your first write, so I can watch it take shape.
+        Before your first write to a Markdown document for me, call \(AppTool.showFile) \
+        on it once.
         """
 
     /// Standing arrangements are a thing this app owns, and an agent that does not know
@@ -61,14 +61,12 @@ public enum Briefing {
     /// the fallback, not the first line.
     public static func workflows(scheduling isRemoved: Bool) -> String {
         let restraint = isRemoved ? "" : """
-            Do not write cron entries, launch agents, or scripts that nothing will \
-            run.\u{20}
+            Write no cron entries, launch agents or scripts that nothing will run.\u{20}
             """
         return """
-            If I ask for something to happen on its own — on a schedule, or whenever an \
-            agent finishes, stops, or asks for something — that is a workflow, and \
-            \(AppTool.manageWorkflows) is how you read and write them. \(restraint)Do \
-            not create a workflow I did not ask for.
+            Anything I want to happen on its own (on a schedule, or when an agent \
+            finishes, stops or asks) is a workflow: use \(AppTool.manageWorkflows). \
+            \(restraint)Create none I did not ask for.
             """
     }
 
@@ -81,11 +79,10 @@ public enum Briefing {
     /// they are known before the first call rather than learned from a refusal. Without
     /// their numbers, which are the project's and can change mid-conversation (#64).
     public static let helpers = """
-        If a piece of the work can go on alongside the rest, you can start agents in \
-        this project with \(AppTool.startAgent), up to the limits the person set on how \
-        many may run and how many may be kept, stop or park them when their part is \
-        done, and archive them once their work is merged or abandoned. Do not start one \
-        for work you could simply do yourself.
+        For work that can run alongside yours, use \(AppTool.startAgent) within my \
+        limits on how many may run and be kept. Stop or park helpers when they are done, \
+        and archive them once their work is merged or abandoned. Do not start one for \
+        work you could simply do yourself.
         """
 
     /// Take turns with what only one agent can use at a time (036 FR-015). Every
@@ -93,14 +90,20 @@ public enum Briefing {
     /// likely to be running alongside something else.
     public static let leases = LeaseWords.briefing
 
+    /// The same paragraph with what the person declared on this machine joined to it
+    /// (#116), so leasing is said once (#599).
+    public static func leases(declared: [DeclaredResource]) -> String {
+        LeaseWords.briefing(declared: declared)
+    }
+
     /// Waiting on what happens, and saying that something has (042).
     public static let events = EventWords.briefing
 
     /// Carrying on another session's work (065). Told to every agent, a helper too: the
     /// person says "continue Login redirect" to whichever chat they opened.
     public static let sessions = """
-        To continue another session in this project, read it with \(AppTool.readSession), \
-        by id or exact title; \(AppTool.listSessions) lists them. Reading leaves it as it was.
+        To continue another session in this project, read it with \(AppTool.readSession) \
+        (by id or exact title; reading changes nothing). \(AppTool.listSessions) lists them.
         """
 
     /// Worktrees through the app (#615). With `move_worktree` only described, agents
@@ -110,10 +113,9 @@ public enum Briefing {
     /// a runtime that cannot carry its conversation into another folder is not told
     /// about a tool it does not have.
     public static let worktrees = """
-        To work on a branch of your own, move into a worktree with \(AppTool.moveWorktree) \
-        and end your turn; you are started again there, and the app shows where you \
-        are. Never edit in a worktree you have not moved into this way, and do not \
-        make one with `git worktree add` when \(AppTool.moveWorktree) can.
+        For a branch of your own, move into a worktree with \(AppTool.moveWorktree) and \
+        end your turn; you are started again there. Never edit in a worktree you did not \
+        move into this way, nor make one with `git worktree add` when it can.
         """
 
     /// Who is who, for the sentence below (#121).
@@ -147,16 +149,15 @@ public enum Briefing {
     /// never a guess. A helper is told who started it, by title, so it can name that
     /// agent the same way.
     public static func naming(_ naming: Naming) -> String {
-        let you = naming.startedBy.map { "\(naming.runtime), started by \(LeaseWords.agentName($0))," }
+        let you = naming.startedBy.map { "\(naming.runtime), started by \(LeaseWords.agentName($0))" }
             ?? naming.runtime
         let refer = naming.pronouns.map { "as \($0)" } ?? "as \"they\""
         return """
-            You are \(you) and I am \(naming.person): in a question to me (a form card, \
-            a turn ending on my answer, or a question in a reply), never write a bare \
-            "I" or "you" — say "\(naming.runtime) (this agent) will…" and \
-            "\(naming.person), do you want…?" — while anywhere else plain "I" and "you" \
-            are fine; name any other agent by its title, and refer to me by name or \
-            \(refer).
+            You are \(you); I am \(naming.person). In a question to me (a form card, a turn \
+            ending on my answer, a question in a reply), write "\(naming.runtime) (this \
+            agent) will…" and "\(naming.person), do you want…?", never a bare "I" or \
+            "you". Elsewhere, plain "I" and "you" are fine. Name other agents by their \
+            title; refer to me by name or \(refer).
             """
     }
 
@@ -192,21 +193,18 @@ public enum Briefing {
     public static func escalation(named tool: String?) -> String {
         let named: String
         if let tool, tool != AppTool.askForm {
-            named = " Yours is called `\(tool)`. If you do not have it, use `\(AppTool.askForm)`."
+            named = "`\(tool)` (or `\(AppTool.askForm)` if you lack it)"
         } else {
-            named = " Yours is called `\(AppTool.askForm)`."
+            named = "`\(AppTool.askForm)`"
         }
         return """
-            When something is mine to decide — a choice between real alternatives, a \
-            missing credential, anything hard to undo — ask me with your question or \
-            form tool rather than guessing at it or ending the turn with the question \
-            in your reply.\(named) Your question reaches me wherever I am, including on \
-            my phone, and it waits for me. A question in the middle of a reply I may \
-            not read does not. But when one answer is the one you would mark as \
-            recommended and it is easy to undo, that is not mine: take it, say so in \
-            your reply, and carry on. Do not ask me whether to do the next step of \
-            what I asked for, about a report with nothing to choose, about anything \
-            you can find out for yourself, or the same thing twice.
+            When something is mine to decide (a real choice, a missing credential, \
+            anything hard to undo), ask me with \(named) rather than guessing or asking \
+            in your reply. That question reaches me anywhere and waits for me; a question \
+            inside a reply may go unread. But when one answer is the one you would mark \
+            recommended and it is easy to undo, take it, say so, and carry on. Do not ask \
+            about the next step of what I asked for, a report with nothing to choose, \
+            anything you can find out yourself, or the same thing twice.
             """
     }
 
@@ -297,24 +295,29 @@ public enum Briefing {
     /// `naming` is who is who (#121), first because the lines after it say "I" and
     /// "me" and that is the person it names. Nil says nothing, for a caller that does
     /// not know.
+    ///
+    /// `declared` is what the person declared on this machine (#116), said inside the
+    /// lease line rather than after everything else (#599).
     public static func lines(for policy: ToolPolicy, managesAgents: Bool = true,
-                             movesItself: Bool = true, naming: Naming? = nil) -> [String] {
+                             movesItself: Bool = true, naming: Naming? = nil,
+                             declared: [DeclaredResource] = []) -> [String] {
         let schedulingRemoved = policy.removed.contains { $0.category == .standingArrangements }
         return [naming.map(Self.naming)].compactMap { $0 }
             + [liveDocument,
                 escalation(named: policy.escalationTool),
                 workflows(scheduling: schedulingRemoved)]
             + (managesAgents ? [helpers] : [])
-            + [leases, events, sessions]
+            + [leases(declared: declared), events, sessions]
             + (movesItself ? [worktrees] : [])
             + [residue(policy.residue)].compactMap { $0 }
     }
 
     /// The whole of it, as the one block the daemon appends to a first prompt.
     public static func text(for policy: ToolPolicy, managesAgents: Bool = true,
-                            movesItself: Bool = true, naming: Naming? = nil) -> String {
+                            movesItself: Bool = true, naming: Naming? = nil,
+                            declared: [DeclaredResource] = []) -> String {
         var blocks = lines(for: policy, managesAgents: managesAgents, movesItself: movesItself,
-                           naming: naming)
+                           naming: naming, declared: declared)
         if policy.appToolSchemaDelivery == .firstPrompt {
             blocks.append(AppToolPreface.firstPrompt)
         }

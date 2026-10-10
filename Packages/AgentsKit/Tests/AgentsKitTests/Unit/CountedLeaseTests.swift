@@ -159,10 +159,13 @@ struct CountedLeaseTests {
     }
 
     @Test func theBriefingListsWhatWasDeclared() {
-        #expect(LeaseWords.declaredBriefing([]) == nil)
-        let text = LeaseWords.declaredBriefing([DeclaredResource(name: build, description: "Before builds.",
-                                                                 holders: 2)])
-        #expect(text?.contains("- build (2 at once): Before builds.") == true)
-        #expect(text?.contains("whenever its description applies") == true)
+        #expect(LeaseWords.briefing(declared: []) == LeaseWords.briefing)
+        let text = LeaseWords.briefing(declared: [DeclaredResource(name: build, description: "Before builds.",
+                                                                   holders: 2)])
+        // One paragraph about leasing, not two (#599).
+        #expect(text.hasPrefix(LeaseWords.briefing))
+        #expect(text.components(separatedBy: "with lease_resource").count == 2)
+        #expect(text.contains("- build (2 at once): Before builds."))
+        #expect(text.contains("whenever its description applies"))
     }
 }
