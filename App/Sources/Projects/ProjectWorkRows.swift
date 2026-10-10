@@ -143,15 +143,12 @@ struct WorkflowListRow: View {
             // The title only (Alex, #495): what it does is the tooltip and the page's.
             EmptyView()
         } trailing: {
-            // Marked where it stands, rather than moved (#100): off is not put away.
-            if !summary.isEnabled, !summary.isArchived {
-                Text("Off")
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
-            }
+            // Nothing (#587): only a session's row has a time there. Off is marked where
+            // it stands, rather than moved (#100), by its icon and its tooltip.
+            EmptyView()
         }
         .listRowInsets(.vertical, 2)
-        .help(summary.workflow.summary)
+        .help(!summary.isEnabled && !summary.isArchived ? "Turned off. \(summary.workflow.summary)" : summary.workflow.summary)
         .sidebarInk(.workflow(summary.id, in: project))
         .tag(SidebarItem.workflow(summary.id, in: project))
         .accessibilityElement(children: .combine)

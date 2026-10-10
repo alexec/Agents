@@ -39,14 +39,48 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
     public func count(in work: AgentsModel, projects: [ProjectKey]) -> Int {
         projects.reduce(0) { total, key in
             let shelf = work.shelf(key)
+            if self == .pinned {
+                return total + Self.pinnedSessions(in: work, key).count + Self.pinnedWorkflows(in: work, key).count
+            }
+            // Less the pinned that would be here: they are listed once, in Pinned (#587).
+            let pinnedHere = Self.pinnedSessions(in: work, key).count {
+                Self.home(of: $0, in: work.group(of: $0), isPinned: false) == self
+            }
             switch self {
-            case .needsYou: return total + (shelf.counts[.needsAttention] ?? 0) + (shelf.counts[.blocked] ?? 0)
-            case .working: return total + (shelf.counts[.running] ?? 0)
-            case .unread: return total + shelf.unread
-            case .pinned: return total + Self.pinnedSessions(in: work, key).count
-                + Self.pinnedWorkflows(in: work, key).count
+            case .needsYou:
+                return total + (shelf.counts[.needsAttention] ?? 0) + (shelf.counts[.blocked] ?? 0) - pinnedHere
+            case .working:
+                return total + (shelf.counts[.running] ?? 0) - pinnedHere
+            case .unread:
+                return total + Self.unreadAtRest(in: shelf) - pinnedHere
+            case .pinned:
+                return total
             }
         }
+    }
+
+    /// Where a live session is listed (#587): once, in the first of the smart groups it
+    /// belongs to — Pinned, Needs You, Working, Unread — or, in none of them, under its
+    /// project. Nil for its project.
+    public static func home(of agent: Agent, in group: AgentGroup, isPinned: Bool) -> SidebarSmartRow? {
+        if isPinned { return .pinned }
+        switch group {
+        case .needsAttention, .blocked: return .needsYou
+        case .running: return .working
+        case .archived: return nil
+        default: return agent.showsUnread ? .unread : nil
+        }
+    }
+
+    /// The groups whose sessions go to Needs You or Working whatever else they are.
+    static let busyGroups: [AgentGroup] = [.needsAttention, .blocked, .running]
+
+    /// The unread that are neither waiting on a person nor working: Unread's share. The
+    /// busy groups are few, so this is the shelf's count less a short count of theirs.
+    @MainActor
+    static func unreadAtRest(in shelf: ProjectShelf) -> Int {
+        shelf.unread - busyGroups.reduce(0) { $0 + (shelf.groups[$1] ?? []).count(where: \.showsUnread) }
+            - (shelf.groups[.archived] ?? []).count(where: \.showsUnread)
     }
 
     /// Whether the sidebar draws it at all (#507): only with something in it, and while
@@ -73,12 +107,16 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
         }
         let gathered = projects.flatMap { key -> [Agent] in
             let shelf = work.shelf(key)
-            switch self {
-            case .pinned: return []
-            case .needsYou: return (shelf.groups[.needsAttention] ?? []) + (shelf.groups[.blocked] ?? [])
-            case .working: return shelf.groups[.running] ?? []
-            case .unread: return AgentGroup.live.flatMap { shelf.groups[$0] ?? [] }.filter(\.showsUnread)
+            let held: [Agent] = switch self {
+            case .pinned: []
+            case .needsYou: (shelf.groups[.needsAttention] ?? []) + (shelf.groups[.blocked] ?? [])
+            case .working: shelf.groups[.running] ?? []
+            case .unread: AgentGroup.live.filter { !Self.busyGroups.contains($0) }
+                .flatMap { shelf.groups[$0] ?? [] }.filter(\.showsUnread)
             }
+            // A pinned session is listed in Pinned and nowhere else (#587).
+            let pinned = Set(work.pinnedSessions(in: key.folder))
+            return pinned.isEmpty ? held : held.filter { !pinned.contains($0.id) }
         }
         let shown = matcher.map { gathered.filter($0.matches) } ?? gathered
         return shown.sorted { $0.createdAt > $1.createdAt }

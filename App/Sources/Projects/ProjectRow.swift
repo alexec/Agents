@@ -46,7 +46,7 @@ struct ProjectRow: View {
                     Text("Folder is missing")
                         .appText(.fine)
                         .foregroundStyle(.secondary)
-                } else if isFolded, let subtitle {
+                } else if isFolded, !asHeading, let subtitle {
                     Text(subtitle)
                         .appText(.fine)
                         .foregroundStyle(.secondary)
@@ -54,14 +54,24 @@ struct ProjectRow: View {
                 }
             }
             Spacer(minLength: 4)
-            if needsPerson {
+            if asHeading {
+                // How many its group lists, as every group's heading says it (#587). Who
+                // needs you is in Needs You at the top, so no dot.
+                let own = SidebarProjectFold.ownCount(summary.key, in: model.work)
+                if own > 0 {
+                    Text("\(own)")
+                        .monospacedDigit()
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                }
+            } else if needsPerson {
                 Circle()
                     .fill(StateTint.attention.style(or: .secondary))
                     .frame(width: 7, height: 7)
                     .accessibilityHidden(true)
             }
         }
-        // As a group's heading, its dot over the rows' counts and times (#495).
+        // As a group's heading, its count over the rows' times (#495).
         .padding(.trailing, asHeading ? SidebarHeading.trailingInset : 0)
         .contentShape(Rectangle())
         // Clicking a project folds or unfolds it (#375); the detail stays as it was.
@@ -129,7 +139,12 @@ struct ProjectRow: View {
         if summary.isChat == true { parts.append("chat project") }
         if summary.project.isPinned { parts.append("pinned") }
         if !summary.exists { parts.append("folder is missing") }
-        if let subtitle { parts.append(subtitle) }
+        if asHeading {
+            let own = SidebarProjectFold.ownCount(summary.key, in: model.work)
+            if own > 0 { parts.append("\(own)") }
+        } else if let subtitle {
+            parts.append(subtitle)
+        }
         return parts.joined(separator: ", ")
     }
 }

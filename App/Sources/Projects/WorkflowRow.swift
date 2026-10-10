@@ -271,8 +271,10 @@ struct WorkflowStatusIcon: View {
 
     private var name: String {
         if summary.isArchived { return "archivebox" }
-        if summary.awaitingApproval != nil { return "hand.raised" }
-        if summary.deniedHere != nil { return "hand.raised.slash" }
+        // A shield, not a hand (#587): the hand is a session's Needs You mark, and a
+        // workflow waiting for an OK beside it read as one more session asking.
+        if summary.awaitingApproval != nil { return "checkmark.shield" }
+        if summary.deniedHere != nil { return "xmark.shield" }
         if !summary.isEnabled { return "pause.circle" }
         if summary.needsAPerson { return "exclamationmark.triangle" }
         if summary.isRunning { return "circle.dotted" }
