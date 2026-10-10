@@ -129,8 +129,7 @@ function scalar(value: JSONValue): string | null {
 }
 
 /** WorkflowTrigger.summary, with an event said by its catalogue meaning and filters in words. */
-export function triggerSummary(trigger: WorkflowTriggerStored,
-  runtimeName: (id: string) => string | undefined = () => undefined): string {
+export function triggerSummary(trigger: WorkflowTriggerStored): string {
   if ("schedule" in trigger) return scheduleSummary(trigger.schedule._0);
   if ("agentFinished" in trigger) return "When an agent finishes";
   if ("agentAskedPermission" in trigger) return "When an agent asks for permission";
@@ -144,9 +143,7 @@ export function triggerSummary(trigger: WorkflowTriggerStored,
   const server = serverEvent(trigger);
   if (server) return serverEventSummary(server);
   if (isEvent(trigger)) {
-    const phrases = eventFilters(trigger).map(([k, values]) => filterWords(name, k, values, runtimeName));
-    let filters = [...phrases.filter((p) => !p.startsWith("and ")), ...phrases.filter((p) => p.startsWith("and "))].join(", ");
-    if (filters.startsWith("and ")) filters = filters.slice(4);
+    const filters = eventFilters(trigger).map(([k, values]) => filterWords(k, values)).join(", ");
     const subject = name.endsWith(".*") ? name.slice(0, -2) : null;
     const meaning = name.startsWith("custom.") ? `An agent here publishes ${name}`
       : subject ? `Anything about ${subject}s` : eventMeanings[name] ?? name;
@@ -203,7 +200,7 @@ export function workflowSummary(w: Workflow, runtimeName: (id: string) => string
   const supported = w.triggers.filter(isSupported);
   if (!supported.length && w.triggers[0]) return triggerSummary(w.triggers[0]);
   // No triggers: run only by hand, with Run now (#432).
-  const triggerPart = w.triggers.length ? supported.map((t) => triggerSummary(t, runtimeName)).join(", and ") : byHandSummary;
+  const triggerPart = w.triggers.length ? supported.map((t) => triggerSummary(t)).join(", and ") : byHandSummary;
   let base = `${triggerPart}, ${modeWords[w.mode]}`;
   if (w.cooldown !== undefined) base += `, at most once every ${cooldownWords(w.cooldown)}`;
   if (w.mode === "triggering") return base;
@@ -270,7 +267,7 @@ export function workflowStatus(s: WorkflowSummary): { mark: string; words: strin
 // window's WorkflowPage, ported by hand.
 
 /** Whose events a kind is: EventCatalogue's scope, and the details it carries (042). */
-/** What every agent event carries about its agent (EventCatalogue.context, 073). */
+/** What every agent event carries about its agent (073). */
 const context = ["labels", "runtime", "started_by"];
 
 const catalogue: Record<string, { scope: "mac" | "project" | "either"; details: string[] }> = {
@@ -358,55 +355,9 @@ export function triggerFilters(trigger: WorkflowTriggerStored): [string, string]
   return eventFilters(trigger).map(([k, values]) => [k, values.join(" | ")]);
 }
 
-// The words a summary says a filter in (EventDetail.words, 073 FR-022).
-
-const failedWords: Record<string, string> = {
-  max_tokens: "ran out of room", max_turn_requests: "hit its limit", refusal: "refused",
-  process_died: "the runtime crashed", daemon_gone: "stopped with the daemon",
-  unrecognised: "stopped for a reason we do not know", stopped_by_agent: "stopped by the agent that started it",
-  sign_in_refused: "its sign-in was refused", runtime_error: "the runtime reported an error",
-  allowance_spent: "its allowance ran out", rate_limited: "rate limited, and still limited after retrying",
-  sandbox_failed: "its sandbox could not start",
-};
-const refusedWords: Record<string, string> = {
-  run_in_flight: "a run is still going", chain_too_deep: "its chain was too deep", archived: "it is archived",
-  over_limit: "over a workflow limit", unreadable: "its file could not be read",
-  trigger_not_supported: "it watches for something this version cannot",
-  agent_unavailable: "the agent it would have resumed is gone",
-  no_triggering_agent: "nothing triggered it, so there was no agent to resume",
-  missed_while_closed: "the app was closed", folder_gone: "the project folder is not there",
-  day_limit_reached: "the day's spending limit has been reached", setting_refused: "a setting it names cannot be had",
-  awaiting_approval: "it is waiting for your OK", denied_here: "it is denied on this host",
-};
-const codeWords: Record<string, Record<string, string>> = {
-  "agent.failed reason": failedWords,
-  "workflow.refused reason": refusedWords,
-  "agent.stopped by": { you: "stopped by you", cost_limit: "at its cost limit", unknown: "with no reason recorded" },
-  "agent.archived by": { you: "by you", agent: "by another agent" },
-};
-const startedByWords: Record<string, string> = { person: "you", workflow: "a workflow", agent: "another agent" };
-
-/** One filter in words, as the Mac's summary says it. */
-function filterWords(name: string, key: string, values: string[], runtimeName: (id: string) => string | undefined): string {
-  const or = (parts: string[]) => parts.join(" or ");
-  const subject = wholeSubject(name);
-  if (isCustom(name) || subject === "custom") return `${key} ${or(values)}`;
-  const kinds = subject ? kindsIn(subject).map(([n]) => n) : [name];
-  if (!kinds.some((n) => catalogue[n]?.details.includes(key))) return `${key} ${or(values)}`;
-  if (context.includes(key) || ["outcome", "afterwards"].includes(key)) {
-    switch (key) {
-      case "labels": return `labelled ${or(values)}`;
-      case "runtime": return `on ${or(values.map((id) => runtimeName(id) ?? id))}`;
-      case "started_by": return `started by ${or(values.map((v) => startedByWords[v] ?? v))}`;
-      case "outcome": return or(values.map((v) => v.replaceAll("_", " ")));
-      case "afterwards":
-        if (values.includes("park") && values.includes("stay")) return "and parked or not";
-        return values[0] === "stay" ? "and not parked" : "and parked";
-    }
-  }
-  const words = Object.assign({}, ...kinds.map((n) => codeWords[`${n} ${key}`] ?? {})) as Record<string, string>;
-  if (Object.keys(words).length) return or(values.map((v) => words[v] ?? v));
-  return `${key} ${or(values)}`;
+/** One filter in words, as the Mac's summary says it (EventPattern.summary, #574): "branch main or develop". */
+function filterWords(key: string, values: string[]): string {
+  return `${key} ${values.join(" or ")}`;
 }
 
 /** WorkflowTrigger.listensIn. */

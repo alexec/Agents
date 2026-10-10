@@ -40,10 +40,7 @@ extension DaemonCore {
         // Every wait ends by itself (#572), whatever it waits on.
         guard let minutes = request.untilMinutes else { throw eventRefusal(EventWords.deadlineRequired()) }
         guard EventWait.deadlineMinutes.contains(minutes) else { throw eventRefusal(EventWords.badDeadline()) }
-        var filters = request.where ?? [:]
-        if let named = filters["agent"] {
-            filters["agent"] = DetailFilter(anyOf: try named.values.map { try agentReference($0, for: caller) }) ?? named
-        }
+        let filters = request.where ?? [:]
         var patterns: [EventPattern] = []
         for name in names {
             switch EventPattern.parse(name, filters: filters) {
@@ -379,22 +376,6 @@ extension DaemonCore {
         return ["agent": agent.id.uuidString, "agent_title": agent.title ?? "Untitled",
                 "labels": Set(agent.labels.map(\.normalizedValue)).sorted().joined(separator: ","),
                 "runtime": agent.runtimeID, "started_by": startedBy]
-    }
-
-    /// An agent named in `where.agent`, by id or by title in the caller's project.
-    private func agentReference(_ given: String, for caller: Agent) throws -> String {
-        let trimmed = given.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let id = UUID(uuidString: trimmed), agents[id] != nil { return id.uuidString }
-        let folder = caller.projectFolder
-        let here = agents.live.values.filter { $0.projectFolder == folder && $0.id != caller.id }
-        let named = here.filter { ($0.title ?? "").caseInsensitiveCompare(trimmed) == .orderedSame }
-        if named.count == 1 { return named[0].id.uuidString }
-        let listing = here.compactMap(\.title).sorted().map { "\u{201C}\($0)\u{201D}" }.joined(separator: ", ")
-        if named.count > 1 {
-            throw eventRefusal("More than one agent here is called \u{201C}\(trimmed)\u{201D}; use its id.")
-        }
-        throw eventRefusal("No agent in this project is called \u{201C}\(trimmed)\u{201D}."
-                           + (listing.isEmpty ? "" : " Agents here: \(listing)."))
     }
 
     private func eventRefusal(_ message: String) -> JSONRPCError {

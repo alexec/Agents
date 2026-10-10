@@ -35,19 +35,18 @@ public struct EventPattern: Hashable, Sendable {
         } else if event.name != name {
             return false
         }
-        // A custom event's details are its publisher's, never a set.
-        let kind = EventCatalogue.kind(named: event.name)
-        return filters.allSatisfy { key, filter in
-            filter.matches(event.details[key], isSet: kind?.detail(key)?.isSet ?? false)
-        }
+        // Any key at all: a wait stored before #574 keeps matching as it was written.
+        return filters.allSatisfy { key, filter in filter.matches(event.details[key]) }
     }
 
     // MARK: Reading one
 
     /// A pattern checked against the catalogue, or the sentence saying what is wrong
-    /// with it, listing what would have been right. An older build's words for a code
-    /// are read as the code (073 FR-012), and an event's old name as its new one (#372);
-    /// a value a detail cannot have is refused (FR-019).
+    /// with it. An event's old name is read as its new one (#372). Only a filter may
+    /// narrow it (#574): `branch` on `branch.moved`, `why` on `person.away` and
+    /// `person.back`; any other key, a custom event's own details included, is refused
+    /// naming the ones it takes, and a value a filter cannot have names the ones it can.
+    /// A server's event is the exception: its keys are the server's to check (#383).
     public static func parse(_ given: String, filters: [String: DetailFilter] = [:]) -> Result<EventPattern, EventPatternProblem> {
         // An old name is read as today's (#372), so a file written before a rename
         // keeps firing.
@@ -57,96 +56,44 @@ public struct EventPattern: Hashable, Sendable {
              DetailFilter(anyOf: filter.values.map { $0.trimmingCharacters(in: .whitespaces) }) ?? filter)
         }, uniquingKeysWith: { $1 })
 
-        // A whole subject.
         if name.hasSuffix(".*") {
-            let subjectName = String(name.dropLast(2))
-            guard let subject = EventSubject(rawValue: subjectName) else {
+            guard EventSubject(rawValue: String(name.dropLast(2))) != nil else {
                 // A server's noun (#383): its details are the server's, so none is checked.
-                if EventCatalogue.isServerEventName(subjectName + ".any") { return .success(EventPattern(name, filters: filters)) }
+                if EventCatalogue.isServerEventName(String(name.dropLast(2)) + ".any") {
+                    return .success(EventPattern(name, filters: filters))
+                }
                 return .failure(.unknown(name))
             }
-            if subject != .custom {
-                let carried = Set(EventCatalogue.kinds(in: subject).flatMap(\.details))
-                if let bad = filters.keys.sorted().first(where: { !carried.contains($0) }) {
-                    return .failure(.badFilter(name: name, key: bad, valid: carried.sorted()))
-                }
-                return checked(name, filters)
+        } else if !EventCatalogue.isCustom(name) {
+            if name.hasPrefix("custom.") { return .failure(.badCustomName(name)) }
+            guard EventCatalogue.kind(named: name) != nil else {
+                // A server's event (#383): its details are open, as its trigger's keys are.
+                if EventCatalogue.isServerEventName(name) { return .success(EventPattern(name, filters: filters)) }
+                return .failure(.unknown(name))
             }
-            return .success(EventPattern(name, filters: filters))
         }
-
-        if EventCatalogue.isCustom(name) {
-            return .success(EventPattern(name, filters: filters))
-        }
-        if name.hasPrefix("custom.") {
-            return .failure(.badCustomName(name))
-        }
-        guard let kind = EventCatalogue.kind(named: name) else {
-            // A server's event (#383): its details are open, as a custom event's are.
-            if EventCatalogue.isServerEventName(name) { return .success(EventPattern(name, filters: filters)) }
-            return .failure(.unknown(name))
-        }
-        if let bad = filters.keys.sorted().first(where: { !kind.details.contains($0) }) {
-            return .failure(.badFilter(name: name, key: bad, valid: kind.details))
-        }
-        return checked(name, filters)
-    }
-
-    /// Old words mapped to codes, then every value checked against its detail's.
-    private static func checked(_ name: String, _ filters: [String: DetailFilter]) -> Result<EventPattern, EventPatternProblem> {
-        var result: [String: DetailFilter] = [:]
+        let allowed = EventCatalogue.filters(for: name)
         for key in filters.keys.sorted() {
-            guard let filter = filters[key] else { continue }
-            guard let detail = EventCatalogue.detail(key, in: name), let valid = detail.values else {
-                result[key] = filter
-                continue
+            guard let detail = allowed.first(where: { $0.key == key }) else {
+                return .failure(.badFilter(name: name, key: key, valid: allowed.map(\.key)))
             }
-            var values: [String] = []
-            for value in filter.values {
-                guard let code = valid.contains(value) ? value : detail.code(forOldWords: value) else {
-                    return .failure(.badValue(name: name, key: key, valid: valid, given: value))
-                }
-                // A code and today's words for it are one value, not two.
-                if !values.contains(code) { values.append(code) }
+            if let valid = detail.values, let given = filters[key]?.values.first(where: { !valid.contains($0) }) {
+                return .failure(.badValue(name: name, key: key, valid: valid, given: given))
             }
-            result[key] = DetailFilter(anyOf: values) ?? filter
         }
-        return .success(EventPattern(name, filters: result))
-    }
-
-    /// A stored pattern's old words as codes, without judging anything else: a record
-    /// is read, not refused (073 FR-012, research R3).
-    func withOldWordsMapped() -> EventPattern {
-        var copy = self
-        for (key, filter) in filters {
-            guard let detail = EventCatalogue.detail(key, in: name), let valid = detail.values else { continue }
-            var values: [String] = []
-            for value in filter.values {
-                let code = valid.contains(value) ? value : detail.code(forOldWords: value) ?? value
-                if !values.contains(code) { values.append(code) }
-            }
-            copy.filters[key] = DetailFilter(anyOf: values) ?? filter
-        }
-        return copy
+        return .success(EventPattern(name, filters: filters))
     }
 
     // MARK: From an event
 
     /// The pattern that matches this event and ones like it: its name, narrowed by the
-    /// event's own details. What Copy as trigger starts from. Not by `agent`, nor by the
-    /// agent's labels, runtime or starter (073 FR-025): a copied trigger that fired for
-    /// one agent only is rarely what a workflow wants. A custom event keeps every detail
-    /// its publisher gave.
+    /// event's own values of the filters its kind takes, and nothing else (#574). What
+    /// Copy as trigger starts from, so what it copies reads back.
     public static func matching(_ event: Event) -> EventPattern {
-        let keys: [String]
-        if EventCatalogue.isCustom(event.name) {
-            keys = Array(event.details.keys)
-        } else {
-            keys = EventCatalogue.kind(named: event.name)?.detailDescriptions
-                .filter { !$0.isContext && $0.key != "agent" }.map(\.key) ?? []
-        }
         var filters: [String: DetailFilter] = [:]
-        for key in keys { if let value = event.details[key] { filters[key] = DetailFilter(value) } }
+        for detail in EventCatalogue.filters(for: event.name) {
+            if let value = event.details[detail.key] { filters[detail.key] = DetailFilter(value) }
+        }
         return EventPattern(event.name, filters: filters)
     }
 
@@ -171,8 +118,7 @@ public struct EventPattern: Hashable, Sendable {
     // MARK: Words
 
     /// The kind's meaning, narrowed by what it is filtered on, for the project page:
-    /// "An agent in this project ended a turn having done its work (labelled bug, and
-    /// parked)". Each filter in its detail's words (073 FR-022); "and …" ones last.
+    /// "A branch moved: the default branch, or one an agent works on (branch main)".
     public var summary: String {
         let meaning: String
         if let subject = wholeSubject {
@@ -183,19 +129,13 @@ public struct EventPattern: Hashable, Sendable {
             meaning = EventCatalogue.kind(named: name).map { String($0.meaning.dropLast()) } ?? name
         }
         guard !filters.isEmpty else { return meaning }
-        let custom = EventCatalogue.isCustom(name) || wholeSubject == .custom
-        let phrases = filters.sorted { $0.key < $1.key }.map { key, filter in
-            (custom ? nil : EventCatalogue.detail(key, in: name))?.words(filter.values)
-                ?? "\(key) \(filter.values.joined(separator: " or "))"
-        }
-        let ordered = phrases.filter { !$0.hasPrefix("and ") } + phrases.filter { $0.hasPrefix("and ") }
-        var narrowed = ordered.joined(separator: ", ")
-        if narrowed.hasPrefix("and ") { narrowed.removeFirst(4) }
-        return "\(meaning) (\(narrowed))"
+        let narrowed = filters.sorted { $0.key < $1.key }
+            .map { "\($0.key) \($0.value.values.joined(separator: " or "))" }
+        return "\(meaning) (\(narrowed.joined(separator: ", ")))"
     }
 
     /// The name with its filters, as the status line writes it:
-    /// "workflow.completed workflow nightly", "agent.finished outcome done|nothing_to_do".
+    /// "branch.moved branch main", "person.away why locked|idle".
     public var label: String {
         var parts = [name]
         for (key, filter) in filters.sorted(by: { $0.key < $1.key }) {
@@ -205,7 +145,8 @@ public struct EventPattern: Hashable, Sendable {
     }
 }
 
-/// Stored inside a wait on an agent's record and inside a run's cause, so a pattern
+/// Stored inside a wait on an agent's record and inside a run's cause, read as written
+/// whatever its keys (#574): a record is read, not refused. So a pattern
 /// with only single values is written exactly as it always was (073 FR-028). A list
 /// is written twice (research R1): joined by `|` under `filters`, which an older build
 /// reads as one value that matches nothing rather than as a record it cannot read
@@ -222,7 +163,7 @@ extension EventPattern: Codable {
         for (key, values) in try c.decodeIfPresent([String: [String]].self, forKey: .anyOf) ?? [:] {
             if let filter = DetailFilter(anyOf: values) { filters[key] = filter }
         }
-        self = EventPattern(EventCatalogue.currentName(name), filters: filters).withOldWordsMapped()
+        self = EventPattern(EventCatalogue.currentName(name), filters: filters)
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -243,6 +184,11 @@ public enum EventPatternProblem: Error, Hashable, Sendable {
     /// first wrong one.
     case badValue(name: String, key: String, valid: [String], given: String)
 
+    public var isBadFilter: Bool {
+        if case .badFilter = self { return true }
+        return false
+    }
+
     public var isBadValue: Bool {
         if case .badValue = self { return true }
         return false
@@ -259,8 +205,12 @@ public enum EventPatternProblem: Error, Hashable, Sendable {
             return "\"\(name)\" is not a custom event name: after custom. it is lowercase letters, digits "
                 + "and _, up to 40 characters."
         case .badFilter(let name, let key, let valid):
-            guard !valid.isEmpty else { return "\(name) carries no details, so it cannot be narrowed by \"\(key)\"." }
-            return "\(name) carries \(valid.joined(separator: ", ")); \"\(key)\" is not one of its details."
+            guard !valid.isEmpty else {
+                let agents = EventSubject(name: name) == .agent
+                    ? " To wait for particular agents, use wait_for_event with agents." : ""
+                return "\(name) can't be narrowed, by \"\(key)\" or anything else.\(agents)"
+            }
+            return "\(name) can be narrowed only by \(valid.joined(separator: ", ")), not by \"\(key)\"."
         case .badValue(let name, let key, let valid, let given):
             return "\(key) on \(name) is one of \(valid.joined(separator: ", ")); \"\(given)\" is not one of them."
         }

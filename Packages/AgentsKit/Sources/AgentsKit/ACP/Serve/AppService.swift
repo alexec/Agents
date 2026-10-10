@@ -571,7 +571,7 @@ public actor AppService {
                 guard let filter = object[key].flatMap(WorkflowTrigger.filter) else {
                     return .failure(AgentCallProblem(stringLiteral:
                         "Nothing is waited for: the \"\(key)\" in where is not a value. A value is text, "
-                        + "a number, true or false, or a list of those, e.g. {\"outcome\": [\"done\", \"nothing_to_do\"]}."))
+                        + "a number, true or false, or a list of those, e.g. {\"branch\": [\"main\", \"develop\"]}."))
                 }
                 out[key] = filter
             }
@@ -979,8 +979,8 @@ public actor AppService {
             whose file says `enabled: false` are theirs to turn on.
 
             Under on:, besides schedule and today's hyphenated names (agent-finished and \
-            the rest), any event name works, narrowed by its details written under it, \
-            e.g. `- workflow.completed:` with `workflow: nightly` under it.
+            the rest), any event name works, narrowed by the details marked [narrow by …] \
+            below written under it, e.g. `- branch.moved:` with `branch: main` under it.
             """ + "\n" + EventCatalogue.describe()),
         "inputSchema": [
             "type": "object",
@@ -1329,9 +1329,9 @@ public actor AppService {
                 "where": [
                     "type": "object",
                     "description": """
-                        Narrow them by their details, e.g. {"workflow": "nightly"} or \
-                        {"agent": "Fix login"}. A list means any of them, e.g. \
-                        {"labels": "deploy", "outcome": ["done", "nothing_to_do"]}.
+                        Narrow them by a filter: branch on branch.moved, e.g. {"branch": "main"}, \
+                        or why on person.away and person.back. A list means any of them, \
+                        e.g. {"why": ["locked", "idle"]}. Nothing else narrows an event.
                         """,
                 ],
                 "from": [

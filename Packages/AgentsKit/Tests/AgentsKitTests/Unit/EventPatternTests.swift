@@ -25,20 +25,19 @@ struct EventPatternTests {
     }
 
     @Test func filtersNarrowByDetailComparedAsStrings() throws {
-        let nightly = try pattern("workflow.completed", ["workflow": "nightly"])
-        #expect(nightly.matches(event("workflow.completed", ["workflow": "nightly"])))
-        #expect(!nightly.matches(event("workflow.completed", ["workflow": "weekly"])))
-        #expect(!nightly.matches(event("workflow.completed")))
-        #expect(!nightly.matches(event("workflow.ran", ["workflow": "nightly"])))
+        let main = try pattern("branch.moved", ["branch": "main"])
+        #expect(main.matches(event("branch.moved", ["branch": "main"])))
+        #expect(!main.matches(event("branch.moved", ["branch": "develop"])))
+        #expect(!main.matches(event("branch.moved")))
+        #expect(!main.matches(event("workflow.ran", ["branch": "main"])))
     }
 
     @Test func aCustomNameMatchesOnlyItself() throws {
         let green = try pattern("custom.build_green")
         #expect(green.matches(event("custom.build_green")))
         #expect(!green.matches(event("custom.build_red")))
-        // Custom filters are free-form: whatever the publisher put in its details.
-        let tagged = try pattern("custom.build_green", ["branch": "main"])
-        #expect(tagged.matches(event("custom.build_green", ["branch": "main"])))
+        // A custom event's details are shown, not matched on (#574).
+        #expect(EventPattern.parse("custom.build_green", filters: ["branch": "main"]).failure?.isBadFilter == true)
     }
 
     @Test func anUnknownNameIsRefusedWithASuggestionAndTheList() {
@@ -69,7 +68,7 @@ struct EventPatternTests {
 
     @Test func aFilterTheKindDoesNotCarryIsRefusedNamingWhatItDoes() {
         let problem = EventPattern.parse("branch.moved", filters: ["number": "x"]).failure
-        #expect(problem?.message == "branch.moved carries branch, from, to; \"number\" is not one of its details.")
+        #expect(problem?.message == "branch.moved can be narrowed only by branch, not by \"number\".")
         #expect(EventPattern.parse("branch.*", filters: ["number": "x"]).failure != nil)
         #expect(EventPattern.parse("branch.*", filters: ["branch": "main"]).failure == nil)
     }
@@ -82,14 +81,12 @@ struct EventPatternTests {
         #expect(try pattern("  Mac.Wake ").name == "mac.wake")
     }
 
-    @Test func copyAsTriggerNarrowsByTheKindsDetailsOnly() {
-        let moved = event("branch.moved", ["branch": "main", "from": "a1", "to": "b2", "extra": "x"])
-        #expect(EventPattern.matching(moved).asTrigger
-                == "on:\n  - branch.moved:\n      branch: main\n      from: a1\n      to: b2")
+    @Test func copyAsTriggerNarrowsByTheKindsFiltersOnly() {
+        let moved = event("branch.moved", ["branch": "feature x", "from": "a1", "to": "b2", "extra": "x"])
+        #expect(EventPattern.matching(moved).asTrigger == "on:\n  - branch.moved:\n      branch: \"feature x\"")
         #expect(EventPattern.matching(event("mac.wake")).asTrigger == "on:\n  - mac.wake")
-        let custom = event("custom.build_green", ["branch": "feature x"])
-        #expect(EventPattern.matching(custom).asTrigger
-                == "on:\n  - custom.build_green:\n      branch: \"feature x\"")
+        let custom = event("custom.build_green", ["branch": "main"])
+        #expect(EventPattern.matching(custom).asTrigger == "on:\n  - custom.build_green")
     }
 
     @Test func theLabelWritesEachFilterAfterTheName() throws {

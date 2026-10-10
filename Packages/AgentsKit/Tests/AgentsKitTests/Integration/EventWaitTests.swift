@@ -144,22 +144,21 @@ struct EventWaitTests {
         #expect(event?.consequences == [.woke(agentID: a, title: "Waiter")])
     }
 
-    /// Any of, in a wait (073 US2): a `stuck` finish does not wake a wait for done or
-    /// nothing to do, and the matching one does.
+    /// Any of, in a wait (073 US2): a branch not listed does not wake it, and a listed
+    /// one does.
     @Test func aListInWhereWaitsForAnyOfItsValues() async throws {
         let (locations, work, _) = try temporary()
         let core = try await makeCore(locations, clock: Clock())
         let (a, token) = try await agent(core, in: work, "Waiter")
         let call = Task {
-            try await wait(core, token, ["agent.finished"],
-                           where: ["outcome": DetailFilter(anyOf: ["done", "nothing_to_do"])!])
+            try await wait(core, token, ["branch.moved"], where: ["branch": DetailFilter(anyOf: ["main", "develop"])!])
         }
         try await eventually("held") { await isHeld(core, a) }
-        await core.raise(draft("agent.finished", in: work, ["agent": UUID().uuidString, "outcome": "stuck"]))
+        await core.raise(draft("branch.moved", in: work, ["branch": "feature", "from": "a", "to": "b"]))
         try await Task.sleep(for: .milliseconds(100))
-        #expect(await isHeld(core, a), "a stuck finish does not wake it")
-        await core.raise(draft("agent.finished", in: work, ["agent": UUID().uuidString, "outcome": "nothing_to_do"]))
-        #expect(try await call.value.hasPrefix("agent.finished happened at "))
+        #expect(await isHeld(core, a), "another branch does not wake it")
+        await core.raise(draft("branch.moved", in: work, ["branch": "develop", "from": "a", "to": "b"]))
+        #expect(try await call.value.hasPrefix("branch.moved happened at "))
     }
 
     /// A wrong value is refused in a wait with the sentence a file's problem says (073 US4).
@@ -167,23 +166,35 @@ struct EventWaitTests {
         let (locations, work, _) = try temporary()
         let core = try await makeCore(locations, clock: Clock())
         let (_, token) = try await agent(core, in: work, "Waiter")
-        let refused = await refusal { _ = try await wait(core, token, ["agent.finished"], where: ["outcome": "complete"]) }
-        #expect(refused?.message == "outcome on agent.finished is one of done, nothing_to_do, needs_answer, "
-                + "partly_done, stuck, blocked; \"complete\" is not one of them.")
+        let refused = await refusal { _ = try await wait(core, token, ["person.away"], where: ["why": "asleep"]) }
+        #expect(refused?.message == "why on person.away is one of locked, idle; \"asleep\" is not one of them.")
+    }
+
+    /// Only a filter narrows a wait (#574); anything else is refused, and nothing waits.
+    @Test func aRemovedKeyInAWaitIsRefusedSayingWhatToDo() async throws {
+        let (locations, work, _) = try temporary()
+        let core = try await makeCore(locations, clock: Clock())
+        let (a, token) = try await agent(core, in: work, "Waiter")
+        for (name, key) in [("agent.finished", "agent"), ("agent.finished", "labels"), ("agent.*", "outcome")] {
+            let refused = await refusal { _ = try await wait(core, token, [name], where: [key: "x"]) }
+            #expect(refused?.code == DaemonAPI.Failure.eventRefused)
+            #expect(refused?.message == "\(name) can't be narrowed, by \"\(key)\" or anything else. "
+                    + "To wait for particular agents, use wait_for_event with agents.")
+        }
+        let custom = await refusal { _ = try await wait(core, token, ["custom.ping"], where: ["by": "x"]) }
+        #expect(custom?.message == "custom.ping can't be narrowed, by \"by\" or anything else.")
+        #expect(!(await isHeld(core, a)))
     }
 
     /// `server.offline` and `server.online` come from the window, which holds the
-    /// servers' connections: its word wakes a wait on the server it names, and no other.
+    /// servers' connections: its word wakes a wait on them.
     @Test func theWindowSayingAServerWentWakesAWaitOnIt() async throws {
         let (locations, work, _) = try temporary()
         let core = try await makeCore(locations, clock: Clock())
         let (a, token) = try await agent(core, in: work, "Watcher")
 
-        let call = Task { try await wait(core, token, ["server.offline"], where: ["server": "devbox"]) }
+        let call = Task { try await wait(core, token, ["server.offline"]) }
         try await eventually("held") { await isHeld(core, a) }
-        let other = try JSONValue.encoding(DaemonAPI.ServerReachabilityChange(server: "buildbox", online: false))
-        _ = await core.handle(method: DaemonAPI.Method.eventsServer, params: other, from: .mac)
-        #expect(await isHeld(core, a))
         let params = try JSONValue.encoding(DaemonAPI.ServerReachabilityChange(server: "devbox", online: false))
         guard case .success = await core.handle(method: DaemonAPI.Method.eventsServer, params: params, from: .mac) else {
             Issue.record("the window's word was refused"); return
@@ -358,7 +369,7 @@ struct EventWaitTests {
         #expect(unknown?.code == DaemonAPI.Failure.eventRefused)
         #expect(unknown?.message.contains("Did you mean workflow.completed?") == true)
         let filter = await refusal { _ = try await wait(core, token, ["branch.moved"], where: ["number": "x"]) }
-        #expect(filter?.message == "branch.moved carries branch, from, to; \"number\" is not one of its details.")
+        #expect(filter?.message == "branch.moved can be narrowed only by branch, not by \"number\".")
         for minutes in [0, 1441] {
             let deadline = await refusal { _ = try await wait(core, token, ["mac.wake"], until: minutes) }
             #expect(deadline?.message == EventWords.badDeadline())

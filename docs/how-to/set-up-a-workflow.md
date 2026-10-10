@@ -49,19 +49,20 @@ an agent finishes.
      `agent-asked-permission`, `agent-asked-form`, `workflow-completed`, a `schedule`
      (on the hour or half hour, with optional hours and days), and any name on
      [Events](../reference/events.md).
-   - An event can be narrowed by its details. To review only bug fixes that were
-     finished and parked, use this in place of `agent-finished`:
+   - Only a few events can be narrowed: `branch.moved` by `branch`, and `person.away` and
+     `person.back` by `why`. To run when `main` moves:
 
      ```yaml
      on:
-       - agent.finished:
-           labels: bug
-           afterwards: park
+       - branch.moved:
+           branch: main
      ```
 
-     The project page then says *When an agent in this project ended a turn having done
-     its work (labelled bug, and parked)*. A list, such as `labels: [bug, regression]`,
-     means any of them.
+     The project page then says *When a branch moved: the default branch, or one an agent
+     works on (branch main)*. A list, such as `branch: [main, develop]`, means any of them.
+     Any other detail under an event is an error in the file. To act only on some agents,
+     such as bug fixes, say which in the prompt: the agent it starts is told which agent
+     set it off, and its labels.
    - `agent` is who gets the prompt: `new` starts a fresh agent every time, `standing`
      keeps one agent for this workflow and prompts it again each time, and `triggering`
      prompts the agent that set it off.

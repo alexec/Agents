@@ -31,11 +31,12 @@ and then carry on.
    otherwise its own. Every wait has one, from 1 minute to 24 hours, so none can last
    for ever; when it runs out the agent is started again and can wait again.
 
-   A detail can name more than one value, meaning any of them. *Wake me when any agent
-   labelled `deploy` finishes* is `agent.finished` with `{"labels": "deploy"}`, and
-   *when it finishes done or with nothing to do* adds `"outcome": ["done", "nothing_to_do"]`.
-   A value a detail cannot have, such as `outcome: complete`, is refused with the values
-   it can have, so the agent fixes it rather than waiting for something that never comes.
+   Only two details narrow an event: `branch` on `branch.moved`, and `why` (`locked` or
+   `idle`) on `person.away` and `person.back`. Either can name more than one value,
+   meaning any of them, such as `{"branch": ["main", "develop"]}`. Anything else, such as
+   `agent.finished` with `{"labels": "deploy"}`, is refused saying what the event takes, so
+   the agent fixes it rather than waiting for something that never comes. To wait for
+   particular agents to finish, the agent names them in `agents` instead.
 
 2. If the runtime asks permission to use `wait_for_event`, allow it. Claude and Cursor may
    ask, and Copilot always does.

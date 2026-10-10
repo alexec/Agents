@@ -143,34 +143,22 @@ test("a workflow denied on this host stays listed, runs nothing here, and can be
   assert.equal(w.refusalMessage({ deniedHere: {} }), "it is denied on this host");
 });
 
-// Finer matching (073): filters in words, lists included, held to EventPatternFinerTests.swift's
+// Filters in words (#574): the key and its values, held to EventPatternFinerTests.swift's
 // summaries, with the page using catalogue meanings as the Mac does.
 test("an event trigger's filters are said in the Mac's words, lists included", () => {
-  const runtime = (id) => ({ claude: "Claude", gemini: "Gemini", grok: "Grok" })[id];
-  const say = (name, keys) => w.triggerSummary(event(name, keys), runtime);
-  assert.equal(say("agent.finished", { labels: "bug", afterwards: "park" }), "An agent in this project ended a turn having done its work (labelled bug, and parked)");
-  assert.equal(say("agent.finished", { outcome: ["done", "nothing_to_do"] }), "An agent in this project ended a turn having done its work (done or nothing to do)");
-  assert.equal(say("agent.failed", { runtime: ["gemini", "grok"] }), "An agent in this project ended in an error (on Gemini or Grok)");
-  assert.equal(say("agent.failed", { runtime: "claude", reason: ["allowance_spent", "rate_limited"] }),
-    "An agent in this project ended in an error (its allowance ran out or rate limited, and still limited after retrying, on Claude)");
-  assert.equal(say("agent.*", { started_by: "workflow" }), "Anything about agents (started by a workflow)");
-  assert.equal(say("agent.finished", { afterwards: "stay" }), "An agent in this project ended a turn having done its work (not parked)");
-  assert.equal(say("agent.archived", { by: "you", labels: ["bug", "regression"] }),
-    "An agent in this project was archived (by you, labelled bug or regression)");
-  assert.equal(say("workflow.completed", { workflow: "nightly", outcome: ["stuck", "partly_done"] }),
-    "A workflow's run in this project finished (stuck or partly done, workflow nightly)");
-  assert.equal(say("workflow.refused", { reason: "run_in_flight" }), "A workflow in this project did not run, and why (a run is still going)");
-  assert.equal(say("lease.released", { resource: "simulator", how: "expired" }),
-    "A lease was given back, ended or ran out (how expired, resource simulator)");
-  assert.equal(say("custom.ship", { labels: "bug" }), "An agent here publishes custom.ship (labels bug)");
+  const say = (name, keys) => w.triggerSummary(event(name, keys));
+  assert.equal(say("branch.moved", { branch: ["main", "develop"] }),
+    "A branch moved: the default branch, or one an agent works on (branch main or develop)");
+  assert.equal(say("person.away", { why: "locked" }), "You locked the screen or stepped away for 5 minutes (why locked)");
+  assert.equal(say("person.*", { why: "idle" }), "Anything about persons (why idle)");
 });
 
 test("a list is a capsule joined by | and a cause joined by |", () => {
-  const t = event("agent.finished", { outcome: ["done", "nothing_to_do"], labels: "bug" });
-  assert.deepEqual(w.triggerFilters(t), [["labels", "bug"], ["outcome", "done | nothing_to_do"]]);
-  assert.equal(w.causePhrase({ trigger: { _0: t } }), "on agent.finished labels bug outcome done|nothing_to_do");
+  const t = event("branch.moved", { branch: ["main", "develop"] });
+  assert.deepEqual(w.triggerFilters(t), [["branch", "main | develop"]]);
+  assert.equal(w.causePhrase({ trigger: { _0: t } }), "on branch.moved branch main|develop");
   // A value that is neither one value nor a list is not dropped into a wider trigger's words.
-  assert.deepEqual(w.triggerFilters(event("agent.finished", { outcome: { is: "done" } })), []);
+  assert.deepEqual(w.triggerFilters(event("branch.moved", { branch: { is: "main" } })), []);
 });
 
 test("the page says the switch is a line in the workflow's file, in the window's words (#125)", () => {
