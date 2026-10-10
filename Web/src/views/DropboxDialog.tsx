@@ -3,7 +3,7 @@
 // or a session's row goes to the drop box's top without asking, as the window's drop does.
 import { signal, useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
-import { Modal } from "./NewProject";
+import { Modal } from "./Modal";
 
 type Filling = { host: string; folder: string; label: string };
 

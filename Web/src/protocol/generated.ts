@@ -333,6 +333,10 @@ export interface BranchSummary {
   remote?: string;
 }
 
+export interface CancelWaitRequest {
+  agentID: UUID;
+}
+
 export interface CarriedSetting {
   optionID: string;
   name: string;
@@ -2001,6 +2005,7 @@ export interface Methods {
   "dropbox/put": { params: DropboxPutRequest; result: DropboxPutResponse };
   "elicitations/answer": { params: AnswerElicitationRequest; result: Empty };
   "elicitations/pending": { params: Empty; result: ElicitationRequest[] };
+  "events/cancelWait": { params: CancelWaitRequest; result: WaitingAgent[] };
   "events/list": { params: EventsListRequest; result: EventsPage };
   "files/browse": { params: FilesBrowseRequest; result: DirectoryListing };
   "files/list": { params: FilesListRequest; result: DirectoryListing };
@@ -2102,6 +2107,7 @@ export const MethodTarget = {
   "dropbox/put": "host",
   "elicitations/answer": "host",
   "elicitations/pending": "host",
+  "events/cancelWait": "host",
   "events/list": "host",
   "files/browse": "host",
   "files/list": "host",
@@ -2212,6 +2218,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BackgroundItem: { required: ["id", "kind", "name", "state", "canStop", "isStopping", "startedAt"], optional: ["taskType", "detail", "command", "parentID", "toolCallID", "outputFilePath", "summary", "lastToolName", "endedAt"] },
   Block: { required: ["waits"], optional: ["checkAgainAt", "wakeOn", "clearedAt", "clearedBy"] },
   BranchSummary: { required: ["name"], optional: ["remote"] },
+  CancelWaitRequest: { required: ["agentID"], optional: [] },
   CarriedSetting: { required: ["optionID", "name", "source"], optional: ["from", "to"] },
   ChangedFile: { required: ["path", "source", "state", "editCount", "beyondReported", "inProgress", "outsideFolder"], optional: ["relativePath", "added", "removed", "firstLine", "oldPath"] },
   ChangedFileDetail: { required: ["file", "edits"], optional: ["hunks", "whole"] },

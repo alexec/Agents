@@ -163,6 +163,28 @@ test("Activity rows: spending added up by currency, headroom, out of the pool", 
   assert.equal(isOut({ runtime, availability: { available: { path: "/x", supportsResume: true } }, poolNote: "Out until 4pm" }), true);
 });
 
+test("Events: where an event is, and everything it carries (#541)", async () => {
+  const { eventIsIn, eventDetailRows } = await load("src/views/Activity.tsx");
+  const event = (scope, fields = {}) => ({ position: 7, name: "agent.finished", at: 0, count: 1, scope, sentence: "x",
+    details: {}, chainDepth: 0, consequences: [], ...fields });
+  const inProject = event({ project: { _0: "file:///w/api/" } });
+  const onMac = event({ mac: {} });
+  assert.equal(eventIsIn("all", "mac", inProject), true);
+  assert.equal(eventIsIn("mac", "mac", onMac), true);
+  assert.equal(eventIsIn("mac", "mac", inProject), false);
+  assert.equal(eventIsIn("mac|file:///w/api", "mac", inProject), true, "a trailing slash is the same folder");
+  assert.equal(eventIsIn("box|file:///w/api", "mac", inProject), false, "the same folder on another host is apart");
+  assert.equal(eventIsIn("mac|file:///w/api", "mac", onMac), false);
+  const rows = eventDetailRows(event({ mac: {} }, {
+    count: 3, lastAt: 60_000, publisher: { agentID: "a", title: "Fix it" }, message: "done", details: { b: "2", a: "1" },
+  }), "This Mac");
+  assert.deepEqual(rows.map(([name]) => name), ["When", "Where", "Repeats", "Published by", "Message", "a", "b", "Position"]);
+  assert.equal(rows[1][1], "This Mac");
+  assert.match(rows[2][1], /^3 times, last at \d\d:\d\d$/);
+  assert.equal(rows.at(-1)[1], "7");
+  assert.deepEqual(eventDetailRows(onMac, "This Mac").map(([name]) => name), ["When", "Where", "Position"]);
+});
+
 test("Archived projects: every host's, the latest worked on first, apart from the live ones (#343)", async () => {
   globalThis.location = { hash: "" };
   globalThis.addEventListener = () => {};

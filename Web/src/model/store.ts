@@ -1970,6 +1970,14 @@ export class Store extends Work {
     }
   }
 
+  /** Events ▸ Waiting now's ✕ (#541): the wait ends and nothing starts the agent again for it. */
+  async cancelWait(host: string, agentID: string): Promise<void> {
+    const waiting = await this.act("events/cancelWait", { agentID: agentID as UUID }, host);
+    const held = this.events.value[host];
+    if (waiting && held) this.events.value = { ...this.events.value, [host]: { ...held, waiting } };
+    await this.loadEvents(host);
+  }
+
   /** Appends one older page without losing the current head or waiting rows. */
   async loadOlderEvents(host: string): Promise<void> {
     const current = this.events.value[host];
