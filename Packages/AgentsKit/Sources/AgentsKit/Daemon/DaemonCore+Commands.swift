@@ -1384,11 +1384,10 @@ extension DaemonCore {
                                          person: personSettings.effectiveName(),
                                          pronouns: personSettings.givenPronouns,
                                          startedBy: starter.map { $0 ?? "" })
-            let briefing = [Briefing.text(for: ToolPolicyCatalog.policy(for: runtimeID), managesAgents: managesAgents,
-                                          movesItself: RuntimeCatalog.canMoveFolders(runtimeID: runtimeID),
-                                          naming: naming),
-                            LeaseWords.declaredBriefing(declaredResources)].compactMap { $0 }
-            outgoing.append(.text(briefing.joined(separator: "\n\n")))
+            outgoing.append(.text(Briefing.text(for: ToolPolicyCatalog.policy(for: runtimeID),
+                                                managesAgents: managesAgents,
+                                                movesItself: RuntimeCatalog.canMoveFolders(runtimeID: runtimeID),
+                                                naming: naming, declared: declaredResources)))
         }
         // What the person changed on a live page since this agent last took a turn
         // (022 FR-016). Told once, here, after their words and in the briefing's
