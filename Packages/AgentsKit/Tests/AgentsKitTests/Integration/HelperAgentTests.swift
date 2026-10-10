@@ -121,7 +121,7 @@ struct HelperAgentTests {
         let told = try #require(await briefings().first { $0.contains(", started by") })
         // By the lead's title as it stands, or "another agent" while it has none.
         let starter = LeaseWords.agentName(await core.agent(lead)?.title)
-        #expect(told.contains("You are Claude, started by \(starter), and I am Sam"))
+        #expect(told.contains("You are Claude, started by \(starter); I am Sam"))
         #expect(await core.agent(helper)?.startedByAgent == lead)
     }
 

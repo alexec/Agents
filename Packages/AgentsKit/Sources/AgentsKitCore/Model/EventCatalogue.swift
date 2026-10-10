@@ -146,7 +146,7 @@ public struct EventKind: Hashable, Sendable {
 public enum EventCatalogue {
     public static let all: [EventKind] = [
         EventKind("agent.started", .project, about(), "An agent in this project started working."),
-        EventKind("agent.finished", .project, about(outcome, EventDetail("afterwards", values: ["park", "stay"])),
+        EventKind("agent.finished", .project, about(outcome, EventDetail("afterwards", values: ["archive_requested", "archived", "stay"])),
                   "An agent in this project ended a turn having done its work.", aliases: ["agent-finished"]),
         EventKind("agent.asked_permission", .project, about(),
                   "An agent in this project is asking for permission.", aliases: ["agent-asked-permission"]),

@@ -119,7 +119,7 @@ struct EventCatalogueTests {
             EventCatalogue.kind(named: name)?.payloadSchema["properties"]?[key]?["enum"]?.arrayValue?.compactMap(\.stringValue)
         }
         #expect(values("agent.finished", "outcome") == WorkOutcome.allCases.map(\.rawValue))
-        #expect(values("agent.finished", "afterwards") == ["park", "stay"])
+        #expect(values("agent.finished", "afterwards") == ["archive_requested", "archived", "stay"])
         #expect(values("agent.failed", "reason") == EndedReason.allCases.map(\.code))
         #expect(values("workflow.refused", "reason") == WorkflowRefusal.codes)
         #expect(values("machine.disk_low", "level") == ["low", "critical"])
