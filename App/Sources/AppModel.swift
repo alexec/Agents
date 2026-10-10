@@ -158,6 +158,7 @@ final class AppModel {
             showsResources = false
             showsEvents = false
             showsRuntimes = false
+            showsMCPServers = false
             // The same rule as picking a project: what you picked is what you see,
             // and a conversation or a workflow left open underneath would be waiting
             // to reappear when the bill is closed, which is a place nobody chose to
@@ -178,6 +179,7 @@ final class AppModel {
             showsSpending = false
             showsEvents = false
             showsRuntimes = false
+            showsMCPServers = false
             selection = nil
             openWorkflow = nil
             projectPage = nil
@@ -193,6 +195,7 @@ final class AppModel {
             showsSpending = false
             showsResources = false
             showsRuntimes = false
+            showsMCPServers = false
             selection = nil
             openWorkflow = nil
             projectPage = nil
@@ -211,6 +214,24 @@ final class AppModel {
             showsSpending = false
             showsResources = false
             showsEvents = false
+            showsMCPServers = false
+            selection = nil
+            openWorkflow = nil
+            projectPage = nil
+            composing = false
+        }
+    }
+
+    /// Whether the window is showing MCP Servers: the servers this Mac runs once for
+    /// every agent, and why each last stopped (#488, #589). A page like Runtimes, and not
+    /// persisted for the same reason.
+    var showsMCPServers = false {
+        didSet {
+            guard showsMCPServers, showsMCPServers != oldValue else { return }
+            showsSpending = false
+            showsResources = false
+            showsEvents = false
+            showsRuntimes = false
             selection = nil
             openWorkflow = nil
             projectPage = nil
@@ -260,6 +281,7 @@ final class AppModel {
         showsResources = false
         showsEvents = false
         showsRuntimes = false
+        showsMCPServers = false
         if let agent = agents.first(where: { $0.id == agentID }) {
             select(ProjectKey(host: agent.host, folder: agent.projectFolder))
         }
@@ -279,6 +301,7 @@ final class AppModel {
             if showsEvents { return .events }
             if showsResources { return .resources }
             if showsRuntimes { return .runtimes }
+            if showsMCPServers { return .mcpServers }
             if showsSpending { return .spending }
             guard let key = selectedProjectKey else { return nil }
             if let id = openWorkflow { return .workflow(id, in: key) }
@@ -296,6 +319,7 @@ final class AppModel {
                 showsResources = false
                 showsEvents = false
                 showsRuntimes = false
+                showsMCPServers = false
                 select(key)
                 openWorkflow = id
             case .pin(let path, let key):
@@ -310,11 +334,14 @@ final class AppModel {
                 showEvents()
             case .runtimes:
                 showRuntimes()
+            case .mcpServers:
+                showsMCPServers = true
             case .project(let key):
                 showsSpending = false
                 showsResources = false
                 showsEvents = false
                 showsRuntimes = false
+                showsMCPServers = false
                 showProject(key)
             case nil:
                 // A list that clears its own selection — which macOS does while rows
@@ -331,6 +358,7 @@ final class AppModel {
         showsResources = false
         showsEvents = false
         showsRuntimes = false
+        showsMCPServers = false
         select(key)
         projectPage = page
     }
@@ -355,6 +383,7 @@ final class AppModel {
         showsResources = false
         showsEvents = false
         showsRuntimes = false
+        showsMCPServers = false
         select(key)
         // A new session in it (#366): the project's own page is where a session starts,
         // as New Session has it. The project's row in the sidebar only folds (#375).
@@ -517,6 +546,7 @@ final class AppModel {
         showsResources = false
         showsEvents = false
         showsRuntimes = false
+        showsMCPServers = false
         select(key)
         openPin = path
     }

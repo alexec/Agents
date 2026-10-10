@@ -69,6 +69,8 @@ struct ProjectListView: View {
                     .appText(.supporting).sidebarInk(.resources).tag(SidebarItem.resources)
                 RuntimesRow().activityIcon("cpu")
                     .appText(.supporting).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
+                MCPServersRow().activityIcon("server.rack")
+                    .appText(.supporting).sidebarInk(.mcpServers).tag(SidebarItem.mcpServers)
                 SpendingRow(selection: $selection).activityIcon("dollarsign.circle")
                     .appText(.supporting).sidebarInk(.spending).tag(SidebarItem.spending)
             } header: {

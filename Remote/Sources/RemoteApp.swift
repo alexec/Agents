@@ -245,6 +245,7 @@ struct RemoteView: View {
         case .events: EventsListView().paperGround()
         case .resources: ResourcesListView().paperGround()
         case .runtimes: RuntimesView().paperGround()
+        case .mcpServers: MCPServersListView().paperGround()
         default: TotalsView().paperGround()
         }
     }

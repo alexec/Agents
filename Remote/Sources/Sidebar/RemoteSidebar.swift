@@ -59,6 +59,7 @@ struct RemoteSidebar: View {
                     EventsRow().activityIcon("list.bullet.rectangle").appText(.supporting).tag(SidebarItem.events)
                     ResourcesRow().activityIcon("square.stack.3d.up").appText(.supporting).tag(SidebarItem.resources)
                     RuntimesRow().activityIcon("cpu").appText(.supporting).tag(SidebarItem.runtimes)
+                    MCPServersRow().activityIcon("server.rack").appText(.supporting).tag(SidebarItem.mcpServers)
                     SpendingRow().activityIcon("dollarsign.circle").appText(.supporting).tag(SidebarItem.spending)
                 } header: {
                     Text("Activity")

@@ -28,4 +28,7 @@ public enum SidebarItem: Hashable, Sendable {
     /// Each runtime and where its allowance stands (065). Status, not a control, so it
     /// is here rather than in Settings.
     case runtimes
+    /// The MCP servers a host runs once for every agent (#488, #589): what each is doing
+    /// and why it last stopped.
+    case mcpServers
 }

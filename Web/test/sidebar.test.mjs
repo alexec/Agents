@@ -132,11 +132,20 @@ test("an Activity page is in the address on its own, and an unknown one is ignor
     const { parseRoute, routeHash } = await load("src/route.ts");
     assert.equal(routeHash({ activity: "events", host: "mac", project: "file:///w/a" }), "#/a/events");
     assert.deepEqual(parseRoute("#/a/spending"), { activity: "spending" });
+    assert.deepEqual(parseRoute("#/a/mcp"), { activity: "mcp" }, "MCP Servers has a page of its own (#589)");
     assert.deepEqual(parseRoute("#/a/settings"), {});
   } finally {
     delete globalThis.location;
     delete globalThis.addEventListener;
   }
+});
+
+test("the MCP Servers row: none hosted says nothing, one stopped in use is the count (#589)", async () => {
+  const { hostedTally } = await load("src/model/hostedMCP.ts");
+  const server = (name, state) => ({ name, state, restarts: 0, users: 1 });
+  assert.equal(hostedTally([]), null);
+  assert.deepEqual(hostedTally([server("gh", "running"), server("ci", "idle")]), { words: "1 running", stopped: false });
+  assert.deepEqual(hostedTally([server("gh", "running"), server("ci", "restarting")]), { words: "1 stopped", stopped: true });
 });
 
 test("Activity rows: spending added up by currency, headroom, out of the pool", async () => {
