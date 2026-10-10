@@ -468,6 +468,8 @@ button.link.reading:hover { text-decoration: underline; }
 .card .question { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
 .card .options { display: flex; flex-direction: column; gap: 6px; }
 .card .choices { min-height: 0; max-height: 320px; overflow-y: auto; }
+/* A paged form's page scrolls inside the window's 260 pt cap, so Submit and No thanks stay under it (#546). */
+.card .page { min-height: 0; max-height: 260px; overflow-y: auto; flex-shrink: 1; }
 .card .plan-shown { display: flex; align-items: center; gap: 8px; margin: 4px 0 0; }
 .card .plan-text { margin-top: 6px; user-select: text; }
 .card .row-options { flex-direction: row; flex-wrap: wrap; }
