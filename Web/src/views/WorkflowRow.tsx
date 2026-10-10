@@ -1,14 +1,14 @@
 // One workflow under a project's sessions (071 US5; ProjectWorkRows.swift): its status mark, its
-// name (what it is is its page's to say, #495), and Run Now. Chosen, it opens its page in the chat's place, as the
-// window's list does (#98); its ··· menu turns it off or on (#100). A workflow waiting for its OK
-// can be approved, archived or brought back in its menu, as in the window (#260).
-// offering to run it. One turned off still runs now, as the window's does. Its menu pins it to the
-// top of its project (#432), and a pinned one's moves it among the pinned.
+// name and Off, as the window's and the Remote's rows (#547); what it is is its page's to say (#495).
+// Chosen, it opens its page in the chat's place, as the window's list does (#98). Its actions are in
+// its right-click / menu-key menu, as a session row's are (#151): Run Now, Approve or Deny on This
+// Host while it waits for its OK, Pin (#432) and, under Pinned, Move Up and Down, Turn Off or On
+// (#100), Archive or Bring Back (#260).
 import { useSignal } from "@preact/signals";
-import { useEffect, useRef } from "preact/hooks";
 import type { WorkflowSummary } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { canBeApproved, canBeDenied, isOn, isUnapproved, workflowStatus } from "../model/workflows";
+import { isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
 
 export function WorkflowRow({ store, host, summary, disabled, chosen, onPick, pinnedAt, place }: {
   store: Store; host: string; summary: WorkflowSummary; disabled: boolean; chosen: boolean; onPick: () => void;
@@ -18,26 +18,20 @@ export function WorkflowRow({ store, host, summary, disabled, chosen, onPick, pi
   place?: string | undefined;
 }) {
   const status = workflowStatus(summary);
+  const menu = () => workflowMenu(store, host, summary, disabled, onPick, pinnedAt);
   return (
-    <div class={`row workflow${chosen ? " chosen" : ""}`}>
+    <div class={`row workflow${chosen ? " chosen" : ""}`} onContextMenu={(e) => openContextMenu(e, menu())}
+      onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }}>
       <button class="pick" aria-current={chosen} onClick={onPick} title={`Open ${summary.workflow.name}`}>
         <span class={`workflow-mark${status.tinted ? " tinted" : ""}`} role="img" aria-label={status.words} title={status.words}>{status.mark}</span>
-        <span class="body">
-          {/* Heavier only while it waits for an OK (#520), as a session's title is while unread. */}
-          <span class={`title${summary.awaitingApproval && !summary.isArchived ? " needs-ok" : ""}`}>
-            {summary.workflow.name}
-            {/* Marked where it stands, rather than moved (#100): off is not put away. */}
-            {!isOn(summary) && !summary.isArchived && <span class="faint"> · Off</span>}
-            {place && <span class="place"> {place}</span>}
-          </span>
-          {/* Only what wants the person: what it does is its page's to say (#495). */}
-          {(summary.awaitingApproval || summary.deniedHere) && (
-            <span class="subtitle">{summary.awaitingApproval ? "Waiting for your OK" : "Denied on this host"}</span>
-          )}
+        {/* Heavier only while it waits for an OK (#520), as a session's title is while unread. */}
+        <span class={`title${summary.awaitingApproval && !summary.isArchived ? " needs-ok" : ""}`}>
+          {summary.workflow.name}
+          {/* Marked where it stands, rather than moved (#100): off is not put away. */}
+          {!isOn(summary) && !summary.isArchived && <span class="faint"> · Off</span>}
+          {place && <span class="place"> {place}</span>}
         </span>
       </button>
-      <RunNow store={store} host={host} summary={summary} disabled={disabled} />
-      <WorkflowMenu store={store} host={host} summary={summary} disabled={disabled} pinnedAt={pinnedAt} />
     </div>
   );
 }
@@ -59,21 +53,41 @@ export function RunNow({ store, host, summary, disabled, wide }: {
   );
 }
 
-/** The row's workflow actions, as the window's row menu has them. */
-function WorkflowMenu({ store, host, summary, disabled, pinnedAt }: {
-  store: Store; host: string; summary: WorkflowSummary; disabled: boolean; pinnedAt?: string[] | undefined;
-}) {
-  const open = useSignal(false);
-  const anchor = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    if (!open.value) return;
-    const close = (e: Event) => { if (!anchor.current?.contains(e.target as Node)) open.value = false; };
-    const escape = (e: KeyboardEvent) => { if (e.key === "Escape") open.value = false; };
-    addEventListener("pointerdown", close);
-    addEventListener("keydown", escape);
-    return () => { removeEventListener("pointerdown", close); removeEventListener("keydown", escape); };
-  }, [open.value]);
-  const on = isOn(summary);
+/** What a workflow row's menu offers, in the window's order (ProjectWorkRows.swift `WorkflowListRow`). */
+export type WorkflowAction = "open" | "bringBack" | "approve" | "deny" | "runNow" | "pin" | "unpin" | "moveUp" | "moveDown"
+  | "turnOff" | "turnOn" | "archive";
+
+export function workflowActions(summary: WorkflowSummary, pinned: boolean, pinnedAt?: string[]): WorkflowAction[] {
+  const actions: WorkflowAction[] = ["open"];
+  if (summary.isArchived) return [...actions, "bringBack"];
+  if (isUnapproved(summary)) {
+    if (canBeApproved(summary)) actions.push("approve");
+    // Not on this host, without archiving it everywhere (#391).
+    if (canBeDenied(summary)) actions.push("deny");
+  } else {
+    actions.push("runNow");
+  }
+  actions.push(pinned ? "unpin" : "pin");
+  // The window orders the pinned by drag; the page has no drag, so its menu moves them.
+  if (pinned && pinnedAt) actions.push("moveUp", "moveDown");
+  actions.push(isOn(summary) ? "turnOff" : "turnOn", "archive");
+  return actions;
+}
+
+const words: Record<WorkflowAction, string> = {
+  open: "Open", bringBack: "Bring Back", approve: "Approve", deny: "Deny on This Host", runNow: "Run Now",
+  pin: "Pin", unpin: "Unpin", moveUp: "Move Up", moveDown: "Move Down", turnOff: "Turn Off", turnOn: "Turn On",
+  archive: "Archive",
+};
+
+const helps: Partial<Record<WorkflowAction, string>> = {
+  pin: "Keep it in Pinned, at the top of its project", unpin: "Take it out of Pinned",
+  turnOff: "None of its triggers run it until it is turned on again; Run Now still does",
+  turnOn: "Let its triggers run it again",
+};
+
+function workflowMenu(store: Store, host: string, summary: WorkflowSummary, disabled: boolean, onPick: () => void,
+  pinnedAt?: string[]): MenuItem[] {
   const id = summary.workflow.workflowID;
   const folder = summary.workflow.folder as unknown as string;
   const pinned = store.workflowPinsIn(host, folder).includes(id);
@@ -84,39 +98,28 @@ function WorkflowMenu({ store, host, summary, disabled, pinnedAt }: {
     [ids[at], ids[at + by]] = [ids[at + by]!, ids[at]!];
     void store.arrangeWorkflowPins(host, folder, ids);
   };
-  return (
-    <span class="menu-anchor workflow-menu" ref={anchor}>
-      <button class="icon" aria-label={`More for ${summary.workflow.name}`} title="More" aria-haspopup="menu"
-        aria-expanded={open.value} disabled={disabled} onClick={() => (open.value = !open.value)}>···</button>
-      {open.value && (
-        <div class="popover right" role="menu">
-          {summary.isArchived ? (
-            <button role="menuitem" disabled={disabled} onClick={() => { open.value = false; void store.setWorkflowArchived(host, summary, false); }}>Bring Back</button>
-          ) : <>
-            {canBeApproved(summary) && <button role="menuitem" disabled={disabled || (!summary.deniedHere && summary.overLimit !== undefined)}
-              onClick={() => { open.value = false; void store.approveWorkflow(host, summary); }}>Approve</button>}
-            {/* Not on this host, without archiving it everywhere (#391). */}
-            {canBeDenied(summary) && <button role="menuitem" disabled={disabled}
-              onClick={() => { open.value = false; void store.denyWorkflow(host, summary); }}>Deny on This Host</button>}
-            <button role="menuitem" disabled={disabled} title={pinned ? "Take it out of Pinned" : "Keep it in Pinned, at the top of its project"}
-              onClick={() => { open.value = false; void store.setWorkflowPinned(host, folder, id, !pinned); }}>
-              {pinned ? "Unpin" : "Pin"}
-            </button>
-            {pinned && pinnedAt && <>
-              <button role="menuitem" disabled={disabled || pinnedAt[0] === id}
-                onClick={() => { open.value = false; step(-1); }}>Move Up</button>
-              <button role="menuitem" disabled={disabled || pinnedAt[pinnedAt.length - 1] === id}
-                onClick={() => { open.value = false; step(1); }}>Move Down</button>
-            </>}
-            <button role="menuitem" disabled={disabled} title={on ? "None of its triggers run it until it is turned on again; Run Now still does"
-              : "Let its triggers run it again"}
-              onClick={() => { open.value = false; void store.setWorkflowEnabled(host, summary, !on); }}>
-              {on ? "Turn Off" : "Turn On"}
-            </button>
-            <button role="menuitem" disabled={disabled} onClick={() => { open.value = false; void store.setWorkflowArchived(host, summary, true); }}>Archive</button>
-          </>}
-        </div>
-      )}
-    </span>
-  );
+  const run: Record<WorkflowAction, () => void> = {
+    open: onPick,
+    bringBack: () => void store.setWorkflowArchived(host, summary, false),
+    approve: () => void store.approveWorkflow(host, summary),
+    deny: () => void store.denyWorkflow(host, summary),
+    runNow: () => void store.runWorkflow(host, summary),
+    pin: () => void store.setWorkflowPinned(host, folder, id, true),
+    unpin: () => void store.setWorkflowPinned(host, folder, id, false),
+    moveUp: () => step(-1),
+    moveDown: () => step(1),
+    turnOff: () => void store.setWorkflowEnabled(host, summary, false),
+    turnOn: () => void store.setWorkflowEnabled(host, summary, true),
+    archive: () => void store.setWorkflowArchived(host, summary, true),
+  };
+  const off: Partial<Record<WorkflowAction, boolean>> = {
+    approve: !summary.deniedHere && summary.overLimit !== undefined,
+    runNow: summary.isRunning,
+    moveUp: pinnedAt?.[0] === id,
+    moveDown: pinnedAt?.[pinnedAt.length - 1] === id,
+  };
+  return workflowActions(summary, pinned, pinnedAt).map((action) => ({
+    label: words[action], ...(helps[action] ? { help: helps[action] } : {}), run: run[action],
+    disabled: action !== "open" && (disabled || !!off[action]),
+  }));
 }

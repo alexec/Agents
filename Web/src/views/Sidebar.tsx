@@ -135,14 +135,13 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
       <div class="scroll" onKeyDown={(e) => moveWithKeys(e)}>
         {projects.length > 0 && <NewSessionTopRow store={store} projects={projects} linkDown={linkDown} />}
         {/* Pages about all the work rather than one project, above the smart groups, as the
-            window's (#495). It folds, as a project does. */}
-        {!query && (
-          <details class="activity" aria-label="Activity" open={folds.showsActivity.value}
-            onToggle={(e) => folds.setShowsActivity((e.currentTarget as HTMLDetailsElement).open)}>
-            <summary class="sidebar-head-label" data-fold="activity">Activity</summary>
-            <ActivityRows store={store} chosen={r.activity} onPick={(page: ActivityPage) => go({ activity: page })} />
-          </details>
-        )}
+            window's (#495). It folds, as a project does, and stays while searching, as the
+            window's and the Remote's do (#547). */}
+        <details class="activity" aria-label="Activity" open={folds.showsActivity.value}
+          onToggle={(e) => folds.setShowsActivity((e.currentTarget as HTMLDetailsElement).open)}>
+          <summary class="sidebar-head-label" data-fold="activity">Activity</summary>
+          <ActivityRows store={store} chosen={r.activity} onPick={(page: ActivityPage) => go({ activity: page })} />
+        </details>
         {/* Pinned, Needs You, Working, Unread: a group each across every project and host (#495). */}
         {projects.length > 0 && smartRows.map((row) => (
           <SmartFold key={row} row={row} store={store} projects={projects} query={query} linkDown={linkDown} />
