@@ -173,9 +173,6 @@ struct AgentsCommands: Commands {
             Button("Carry On") { act { await model.carryOn($0.id) } }
                 .keyboardShortcut(.return, modifiers: [.command, .shift])
                 .disabled(agent.map { !model.isBlocked($0) } ?? true)
-            Button(agent?.parkAction.map(ParkWords.label) ?? ParkWords.label(.park)) { park() }
-                .keyboardShortcut("p", modifiers: [.command, .control])
-                .disabled(agent?.parkAction == nil || acting)
             if agent?.state == .archived {
                 Button("Bring Back") { act { await model.unarchive($0.id) } }
                     .keyboardShortcut(.delete, modifiers: [.command, .option])
@@ -198,7 +195,7 @@ struct AgentsCommands: Commands {
         }
 
         CommandMenu("Go") {
-            // ⌘P, as in every editor: the session's files by name (#415). Park is ⌃⌘P.
+            // ⌘P, as in every editor: the session's files by name (#415).
             Button("Open File…") { requests.showsFileSearch = true }
                 .keyboardShortcut("p")
                 .disabled(model.selectedAgent == nil)
@@ -297,17 +294,6 @@ struct AgentsCommands: Commands {
     private func act(_ work: @escaping (Agent) async -> Void) {
         guard let agent = model.selectedAgent else { return }
         Task { await work(agent) }
-    }
-
-    /// As the chat's own buttons do: Park and Archive go back to the project, because
-    /// the person has said they are done with it for now; Unpark stays.
-    private func park() {
-        guard let agent = model.selectedAgent, let action = agent.parkAction else { return }
-        Task {
-            // Not when it failed, or was a second press: the chat stays, under the reason.
-            if await model.perform(action, on: agent.id), action == .park,
-               model.selection == agent.id { model.selection = nil }
-        }
     }
 
     private func archive() {

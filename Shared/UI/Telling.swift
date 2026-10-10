@@ -3,7 +3,7 @@ import SwiftUI
 /// What something sent looks like while it is on its way: a small spinner and "telling
 /// your Mac", on the control that sent it, with every control that would send it again
 /// held, so a double click or a repeated key is not a second action. First on the
-/// permission and question cards (#86), then on start, send, Send now, stop, park and
+/// permission and question cards (#86), then on start, send, Send now, stop and
 /// archive (#87), in both apps.
 ///
 /// Inside a button's own label rather than over it: a card or a row is often the button,

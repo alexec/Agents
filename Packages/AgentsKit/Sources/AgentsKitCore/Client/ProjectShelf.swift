@@ -23,6 +23,8 @@ public final class ProjectShelf {
     public private(set) var counts: [AgentGroup: Int] = [:]
     /// Finished and not opened since, whichever group they are under (#70).
     public private(set) var unread = 0
+    /// Asking the person to archive them, whichever group they are under (#584).
+    public private(set) var asking = 0
     /// Needs you, Blocked, and the unread under the rest: what the badge counts.
     public private(set) var attention = 0
     /// Needs you, and the unread under the rest: what Next Needing Attention visits.
@@ -75,6 +77,8 @@ public final class ProjectShelf {
         if self.counts != counts { self.counts = counts }
         let unread = groups.values.reduce(0) { $0 + $1.count(where: \.showsUnread) }
         if self.unread != unread { self.unread = unread }
+        let asking = groups.values.reduce(0) { $0 + $1.count(where: \.asksToArchive) }
+        if self.asking != asking { self.asking = asking }
         let attention = groups.reduce(0) { total, bucket in
             total + (bucket.key == .needsAttention || bucket.key == .blocked
                 ? bucket.value.count : bucket.value.count(where: \.showsUnread))

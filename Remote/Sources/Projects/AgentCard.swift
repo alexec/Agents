@@ -69,8 +69,7 @@ struct AgentCard: View {
                            outcome: agent.report?.outcome,
                            isWaiting: agent.isWaiting,
                            endedReason: agent.endedReason,
-                           outcomeUnknown: agent.endingIsUnaccountedFor,
-                           isParked: agent.parking?.isParked == true)
+                           outcomeUnknown: agent.endingIsUnaccountedFor)
                     .padding(.top, 1)
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -127,7 +126,7 @@ struct AgentCard: View {
                     // The agent's own account of its last turn, and nothing else — the
                     // same two lines as the Mac's row. The state is the icon's; what it
                     // is doing is the title, which the agent keeps current.
-                    // Stop, park or archive on its way, as on the Mac's row (#87).
+                    // Stop or archive on its way, as on the Mac's row (#87).
                     if let acting = model.acting(agent.id) {
                         Telling(host: model.answerRecipient(agent.id), doing: acting.doing)
                     } else if let queued = model.queuedLine(agent) {
@@ -166,11 +165,12 @@ struct AgentCard: View {
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
-                    // As on the Mac's row (040).
-                    if let line = ParkWords.line(agent.parking) {
-                        Text(line)
+                    // As on the Mac's row (#584). Archive itself is the swipe and the menu:
+                    // the card is a link, and a button inside it would open the chat too.
+                    if let line = ArchiveRequestWords.line(agent) {
+                        Label(line, systemImage: ArchiveRequestWords.symbol)
                             .appText(.fine)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.secondary)
                     }
                 }
                 Spacer(minLength: 0)
@@ -221,12 +221,12 @@ struct AgentCard: View {
     private var accessibilityLabel: String {
         let words = model.queuedLine(agent) ?? StatusShape.words(row: agent, isComingBack: isComingBack)
         return ([agent.title ?? "Untitled", model.startedByAgentLabel(agent), words, agent.report?.message]
-            .compactMap { $0 } + [model.work.waitMark(of: agent)?.detail, ParkWords.line(agent.parking)].compactMap { $0 })
+            .compactMap { $0 } + [model.work.waitMark(of: agent)?.detail, ArchiveRequestWords.line(agent)].compactMap { $0 })
             .joined(separator: ", ")
     }
 }
 
-/// A session's long-press menu, wherever its row is drawn: Carry on, Park, Mark as Read
+/// A session's long-press menu, wherever its row is drawn: Carry on, Mark as Read
 /// or Unread, Pin and where among the pinned, Branch, Archive, or Bring Back and Delete.
 /// The Mac's row menu, less what the phone leaves to the Mac (Show in Finder).
 struct AgentMenuItems: View {
@@ -247,16 +247,6 @@ struct AgentMenuItems: View {
                 Label(AgentsModel.carryOnLabel, systemImage: "play.circle")
             }
             .help(AgentsModel.carryOnHelp(for: agent))
-        }
-        // Here rather than over the chat, as on the Mac: the chat is for reading.
-        if let action = agent.parkAction {
-            Button {
-                Task { await model.perform(action, on: agent.id) }
-            } label: {
-                Label(ParkWords.label(action), systemImage: ParkWords.symbol(action))
-            }
-            .disabled(model.isStale(agent) || isActing)
-            .accessibilityHint(ParkWords.help(action, isMarkedOnly: agent.parking?.isParked == false))
         }
         // Leave it to come back to, or clear it unopened (#70).
         if agent.state == .finished {
@@ -386,8 +376,6 @@ struct StatusIcon: View {
     var endedReason: EndedReason?
     var outcomeUnknown = false
     var isWaitingForAllowance = false
-    /// Parked (040): the shape, but not orange. See the Mac's `StatusIcon`.
-    var isParked = false
 
     private var shape: StatusShape {
         StatusShape(state: state, outcome: outcome, isWaiting: isWaiting, isComingBack: isComingBack,
@@ -402,7 +390,7 @@ struct StatusIcon: View {
                 Image(systemName: symbol)
                     // Decorative: a glyph filling a 20-point well, not text (FR-015).
                     .font(.system(size: 16))
-                    .foregroundStyle((shape.wantsAPerson && !isParked ? StateTint.attention : .none)
+                    .foregroundStyle((shape.wantsAPerson ? StateTint.attention : .none)
                         .style(or: .secondary))
             } else {
                 SyncedSpinner(diameter: 18)
