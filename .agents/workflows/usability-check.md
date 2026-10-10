@@ -91,8 +91,9 @@ For the screen in depth, and for anything the week's changes touched:
      works on a locked Mac.
    - **Mac:** screenshot the scratch window by id and move through it by AX presses, as
      the skill says. If the Mac is locked, finish everything else, then call
-     `wait_for_event` on `person.back` once, and take the Mac shots when started again
-     (check the lock again first). If it is still locked, say the Mac look was skipped.
+     `wait_for_event` on `person.back` with `until_minutes: 480` once, and take the Mac shots
+     when started again (check the lock again first). If it is still locked, say the Mac
+     look was skipped.
    - **Remote:** build it for the generic simulator only, as the skill says, and judge it
      from the code. List every Remote screen you judged without seeing it.
    Keep the screenshots under `.agents/reviews/usability/<date>/`, shrunk with

@@ -228,8 +228,8 @@ ioreg -n Root -d1 -a | grep -c CGSSessionScreenIsLocked
 ```
 
 If it is locked, do everything the socket can prove first, then wait for the
-user to unlock with `wait_for_event` on `person.back` (its `why` is `locked` for
-an unlock) and do the look when you are started again. Check the lock once more
+user to unlock with `wait_for_event` on `person.back` with an `until_minutes`
+(its `why` is `locked` for an unlock; every wait needs a time limit, #572) and do the look when you are started again. Check the lock once more
 before you shoot. Keep the scratch root with `stop.sh $ROOT --keep` if you
 stop meanwhile, so the look is quick to redo with `launch.sh --no-build`.
 A locked screen is a wait, not a failure: end the turn waiting and say what is
