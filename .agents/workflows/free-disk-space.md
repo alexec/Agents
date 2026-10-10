@@ -27,7 +27,7 @@ this project's worktrees only.
 - **Only a folder `list_sessions` names** as a session's `Worktree:` is ever looked at.
   A worktree no session names (a review's, a merge's, the person's own) is left alone.
 - **Never a worktree any session is busy in.** Every session naming it must be `Done`,
-  `Parked` or `Archived`, and none may say `Holding:`. `Working`, `Waiting`, `Blocked`,
+  `Archived`, and none may say `Holding:`. `Working`, `Waiting`, `Blocked`,
   `Needs you` and `Paused` all leave it alone.
 - **Never source, and never uncommitted work.** `rm` only a folder that passes the check in
   step 3. Never `git worktree remove --force`, `git clean`, `git reset`, `git checkout`,
@@ -51,7 +51,7 @@ df -k "$P" | tail -1
 1. Call `list_sessions` with `limit: 100`, and again with the `after` each page ends with,
    until a page says no more follow: a project has more sessions than one page (#210). A
    line with `Worktree: <path> on <branch>.` ties that folder to that session. Group the lines by path.
-2. A path is **finished** if every session naming it is `Done`, `Parked` or
+2. A path is **finished** if every session naming it is `Done` or
    `Archived` and none says `Holding:`. It is **archived** if every session naming it is
    `Archived` and none says `Holding:`. Every other path is kept.
 3. Call `list_resources`. If a holder named there has the title of a session naming a
@@ -128,4 +128,4 @@ du -sk "$P"/.agents/worktrees/* 2>/dev/null | sort -rn | head -5
 
 End with one line per worktree touched (`freed <GB> from <name>` or `removed <name>,
 branch <branch> kept`), then the free space before and after, then what was kept and why
-(busy, holding, not named by a session, not clean). Then call `park_agent` with no id.
+(busy, holding, not named by a session, not clean). Then call `request_archive` with no id.

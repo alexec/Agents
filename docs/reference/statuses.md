@@ -8,7 +8,7 @@ description: Every status an agent can have, the group it is listed under, and w
 
 This page lists every status an agent can show, and the group it sits under on its
 project's page. The groups appear in this order: **Needs you**, **Waiting**,
-**Working**, **Done**, **Paused**, **Parked**. A group with no agents in it is not
+**Working**, **Done**, **Paused**. A group with no agents in it is not
 shown. Archived chats stay under **Archived sessions**, folded away until you open it.
 
 The status is what the agent's icon says when you hover over it, and what a screen reader
@@ -17,25 +17,23 @@ colour. Session labels appear beneath the title on Mac rows and phone cards; age
 
 | Status | Group | What it means | What you can do |
 | --- | --- | --- | --- |
-| **Starting** | Working | The agent has been made and its first turn is about to begin. | **Stop**, **Park**, **Archive**, **Branch**. |
-| **Working** | Working | A turn is in progress. | **Stop**, **Park**, **Archive**, **Branch**. A prompt you send waits until the turn ends, unless you click **Send now** on it. |
+| **Starting** | Working | The agent has been made and its first turn is about to begin. | **Stop**, **Archive**, **Branch**. |
+| **Working** | Working | A turn is in progress. | **Stop**, **Archive**, **Branch**. A prompt you send waits until the turn ends, unless you click **Send now** on it. |
 | **Coming back after a restart** | Working | The app is bringing the conversation back by itself after the app or the Mac restarted. | **Stop**. |
-| **Waiting on you** | Needs you | The agent has asked you something in the middle of its turn, such as permission to run a command, and is paused until you answer. | Answer the card above the prompt. **Stop**, **Park**, **Archive**, **Branch**. |
-| **Waiting on your answer** | Needs you | The turn ended with a question for you. | Reply in the prompt. **Park**, **Archive**, **Branch**. |
-| **Partly done** | Needs you | The turn ended with some of the work done; the rest needs a decision from you. | Reply in the prompt. **Park**, **Archive**, **Branch**. |
-| **Stuck** | Needs you | The turn ended without the work done, and the agent says why. | Reply in the prompt. **Park**, **Archive**, **Branch**. |
-| **Blocked** | Needs you | The turn ended blocked on something the app cannot watch, such as a review. | **Carry on**, once the block has gone. **Stop**, **Park**, **Archive**, **Branch**. |
+| **Waiting on you** | Needs you | The agent has asked you something in the middle of its turn, such as permission to run a command, and is paused until you answer. | Answer the card above the prompt. **Stop**, **Archive**, **Branch**. |
+| **Waiting on your answer** | Needs you | The turn ended with a question for you. | Reply in the prompt. **Archive**, **Branch**. |
+| **Partly done** | Needs you | The turn ended with some of the work done; the rest needs a decision from you. | Reply in the prompt. **Archive**, **Branch**. |
+| **Stuck** | Needs you | The turn ended without the work done, and the agent says why. | Reply in the prompt. **Archive**, **Branch**. |
+| **Blocked** | Needs you | The turn ended blocked on something the app cannot watch, such as a review. | **Carry on**, once the block has gone. **Stop**, **Archive**, **Branch**. |
 | **Outcome unknown** | Needs you | The turn ended without a report saying how the work went. | Read the conversation and reply if needed. |
 | **Unexpected stop** | Needs you | The runtime crashed, failed, hit a limit or otherwise stopped short without you choosing to stop it. | Read the reason on the row and reply to resume. |
 | A session that asked you to look at a file | Needs you | The agent opened a file for you to look at, and you have not looked. | Open the conversation. |
-| **Waiting** | Waiting | The agent is waiting on something the app watches: agents it started, a time to check again, or an event such as checks passing. The card says what it is waiting for. It carries on by itself when that comes, so you need not do anything. Its icon is an hourglass. | **Carry on**, to tell it the wait is over early. **Stop**, so it does not carry on. **Park**, **Archive**, **Branch**. |
-| **Complete** | Done | The agent did what was asked. | Reply in the prompt. **Mark as Unread**, **Park**, **Archive**, **Branch**. |
-| **Nothing to do** | Done | The agent found nothing that needed doing. | Reply in the prompt. **Mark as Unread**, **Park**, **Archive**, **Branch**. |
-| **Stopped by you** or **Stopped by the agent that started it** | Paused | The turn was deliberately cut short. | Reply in the prompt to start a new turn. **Park**, **Archive**, **Branch**. |
-| **Its allowance ran out** | Paused | The runtime refused the turn because its plan's allowance, or a key's credit, is spent. The chat stays on that runtime, and nothing carries it on. | Start a new chat on another runtime and ask it to continue this one; see [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md). Or reply here once the runtime is back. **Park**, **Archive**, **Branch**. |
-| **Parked** | Parked | You put the conversation down to come back to later. The card says when, such as **Parked 3 days ago**. It stays parked even if its turn ends wanting you, unless it asks you something mid-turn. | **Unpark**, to put it back in its group. **Archive**, **Branch**. |
-| **Parks when this turn ends** | Where it is now | You parked a conversation while its turn was still going. It moves to **Parked** when the turn ends. | **Unpark**, to cancel. **Stop**, **Archive**, **Branch**. |
-| **Archived** | Archived | You, or the agent that started it, put it away. If the app made a worktree for it and everything in it is committed, the worktree is removed; its branch is deleted too if it was merged. | **Bring Back**. |
+| **Waiting** | Waiting | The agent is waiting on something the app watches: agents it started, a time to check again, or an event such as checks passing. The card says what it is waiting for. It carries on by itself when that comes, so you need not do anything. Its icon is an hourglass. | **Carry on**, to tell it the wait is over early. **Stop**, so it does not carry on. **Archive**, **Branch**. |
+| **Complete** | Done | The agent did what was asked. | Reply in the prompt. **Mark as Unread**, **Archive**, **Branch**. |
+| **Nothing to do** | Done | The agent found nothing that needed doing. | Reply in the prompt. **Mark as Unread**, **Archive**, **Branch**. |
+| **Stopped by you** or **Stopped by the agent that started it** | Paused | The turn was deliberately cut short. | Reply in the prompt to start a new turn. **Archive**, **Branch**. |
+| **Its allowance ran out** | Paused | The runtime refused the turn because its plan's allowance, or a key's credit, is spent. The chat stays on that runtime, and nothing carries it on. | Start a new chat on another runtime and ask it to continue this one; see [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md). Or reply here once the runtime is back. **Archive**, **Branch**. |
+| **Archived** | Archived | You, the agent that started it, or a workflow's run allowed to, put it away. If the app made a worktree for it and everything in it is committed, the worktree is removed; its branch is deleted too if it was merged. | **Bring Back**. |
 
 **Show in Finder** is on every agent's menu on the Mac.
 
@@ -55,6 +53,32 @@ To leave a finished conversation to come back to, choose **Mark as Unread** from
 menu. It stays unread until you open it again. **Mark as Read** clears the mark without
 opening it.
 
+## Asks to archive
+
+**Asks to archive** is a mark on a row, like the unread mark, not a group. An agent that
+thinks its work is finished asks for its session to be archived, and once its turn ends the
+row carries the mark. The session stays where its ending puts it: usually **Done**, or
+**Needs you** with the mark beside it for one that is **Partly done**. Nothing is hidden
+until you archive it.
+
+- **Archive** beside the mark on the Mac's row, or in the strip over the chat on the Mac,
+  iPhone, iPad and web page, archives it with one click. On the Remote and the web page the
+  row shows the mark, and **Archive** is in the row's menu and its swipe.
+- **To Archive**, at the top of the sidebar after **Pinned**, **Needs You**, **Working** and
+  **Unread**, gathers every session that asks, across every project and host. It is shown
+  only when one does. **Archive All** in its heading archives them all; on the Mac it is
+  also in the heading's right-click menu.
+- The mark goes when you send the session a prompt, when a later turn ends wanting you
+  (with a question, stuck, blocked or crashed), or when the session is archived. Bringing
+  it back does not bring the mark back. A workflow's prompt, or the app's own, leaves it.
+- A session that may already archive itself is archived instead of asking, if its turn
+  ends **Complete** or **Nothing to do**: a workflow's run whose workflow says
+  `when-done: archive-allowed` or `archive`, and a helper in a project where agents may
+  archive the helpers they started.
+
+A session parked before parking was taken out comes back, on first load, to the group its
+last ending puts it in, usually **Done**, marked read.
+
 ## The phone's connection
 
 The line at the top of the iPhone and iPad screens says how they are reaching the Mac.
@@ -72,6 +96,6 @@ The line at the top of the iPhone and iPad screens says how they are reaching th
 ## See also
 
 - [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md)
-- [Stop, park and archive agents](../how-to/archive-park-stop.md)
+- [Stop and archive agents](../how-to/archive-and-stop.md)
 - [Answer a question or a permission request](../how-to/answer-a-question.md)
 - [Events](events.md)

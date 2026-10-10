@@ -158,4 +158,4 @@ rm -rf "$OUT"
 ## 6. End
 
 End with one line per signature as in the note, plus the Remote line. If anything was
-left, ask Alex about it with your question tool. Otherwise call `park_agent` with no id.
+left, ask Alex about it with your question tool. Otherwise call `request_archive` with no id.

@@ -28,13 +28,13 @@ issue, even with uncommitted changes in it. Nothing else.
   in it. No builds or tests. The shell is zsh: never name a variable `path`, which is
   `$PATH` there and loses every command.
 - **Never fix what you find.** Do not merge, push, update a branch, re-run CI, enable
-  auto-merge, close or comment on PRs or issues, stop, park or archive agents, or start
+  auto-merge, close or comment on PRs or issues, stop or archive agents, or start
   new ones. The one thing you may tell an agent to do is step 5's message, with
   `message_agent`. What is stuck or ready goes in your report, for Alex.
 - **Only a folder `list_sessions` names** as a session's `Worktree:` is ever removed. A
   worktree no session names (a review's, a merge's, the person's own) is left alone.
 - **Never a worktree any session is busy in.** Every session naming it must be `Done`,
-  `Parked`, `Archived` or `Retired`, and none may say `Holding:`.
+  `Archived` or `Retired`, and none may say `Holding:`.
 - **Never source.** Never touch the project folder itself (see above).
 - **Uncommitted work stays, unless step 4 says it can be force-removed.** Outside that,
   never `git worktree remove --force`, `git clean`, `git reset`, `git checkout`,
@@ -52,7 +52,7 @@ issue, even with uncommitted changes in it. Nothing else.
 The line at the end of this prompt names the event and its details. `ids` is the agents
 that worked in this batch, comma-separated; `finished`, `blocked`, `waiting_on_you`,
 `stopped` and `failed` count how they stand. With no event (**Run now**), the batch is
-every session `list_sessions` shows as `Done` or `Parked` that was active in the last
+every session `list_sessions` shows as `Done` that was active in the last
 4 hours.
 
 Call `list_sessions` with `limit: 50`, once. Do not follow `after` to later pages unless
@@ -128,7 +128,7 @@ two days.
 ## 4. Remove worktrees
 
 For every path one of the sessions from step 1 names as a `Worktree:` (in the batch or
-not), it is only ever a candidate when every session naming it is `Done`, `Parked`,
+not), it is only ever a candidate when every session naming it is `Done`,
 `Archived` or `Retired`, none says `Holding:`, and `list_resources` shows no resource
 held by that session's title. Call `list_resources` first.
 
@@ -219,4 +219,4 @@ End with, in this order:
 Then end with a line counting what is left, like "2 PRs can be merged, 1 is stuck on a
 failing test; 3 worktrees removed; 4 agents asked to label." If anything is stuck, can be
 merged but waits on Alex, or in the batch is flagged or not landed, ask Alex what to do
-with your question tool. Otherwise park with `park_agent` (no id).
+with your question tool. Otherwise call `request_archive` (no id).

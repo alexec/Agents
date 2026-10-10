@@ -40,7 +40,7 @@ so a pass never rests on the agent's word.
    passed, failed or not offered, and what the app's record shows. The agent's own report is
    beside it, in the files pane.
 
-If every step passed, the agent parks itself. If not, it waits under **Needs you**, naming
+If every step passed, the agent asks to be archived. If not, it waits under **Needs you**, naming
 each failure and its likely fix: the app, the runtime's adapter, the runtime's version, or a
 setting.
 

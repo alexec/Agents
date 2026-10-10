@@ -72,7 +72,7 @@ iPhone and iPad do, on every host:
   an HTTPS or SSH address into the host's home folder. With more than one host, the menu
   names each one;
 - start an agent in the project folder or in a new or existing worktree;
-- stop, park, unpark, archive and bring back a session, mark it read or unread, and add or
+- stop, archive and bring back a session, archive one that asks to be archived, mark it read or unread, and add or
   remove its labels;
 - see a project's workflows and run one now;
 - open the agent's files and its changes, and follow a live page as the agent writes it, and
