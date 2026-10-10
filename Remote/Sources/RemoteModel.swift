@@ -2240,10 +2240,11 @@ final class RemoteModel {
         openArchivedFolds.union(folder.map { [Project.standardize($0)] } ?? [])
     }
 
-    /// A project's Archived fold has opened: a page of its newest archived sessions.
-    func loadArchived(in folder: URL) async {
-        openArchivedFolds.insert(Project.standardize(folder))
-        await loadArchivedAgents(in: folder, limit: SidebarProjectFold.archivedShown)
+    /// A project's Archived fold has opened: a page of its newest archived sessions, from
+    /// the project's own host (#533).
+    func loadArchived(in key: ProjectKey) async {
+        openArchivedFolds.insert(Project.standardize(key.folder))
+        await loadArchivedAgents(in: key, limit: SidebarProjectFold.archivedShown)
     }
 
     /// A project's Archived fold has closed: what it held is let go, but for the chat open
@@ -2255,43 +2256,66 @@ final class RemoteModel {
             .filter { !searched.contains($0) })
     }
 
-    /// The most a search brings back, a page from the Mac: the sidebar holds the live
-    /// sessions and filters those itself (#165, #176).
+    /// The most a search brings back from each host, a page at a time: the sidebar holds
+    /// the live sessions and filters those itself (#165, #176).
     static let searchShown = 200
     /// Archived sessions a search brought in, let go when the search ends.
     private var searched: Set<UUID> = []
+    /// The next page of matches, for each host whose last page was full (#176).
+    private var searchNext: [HostID: DaemonAPI.ListRequest] = [:]
+    /// Whether a host has more matches than it has sent: More matches… asks for them.
+    var searchHasMore: Bool { !searchNext.isEmpty }
 
-    /// The archived sessions matching `words`, one capped page; nothing when it is empty.
+    /// The archived sessions matching `words`, a capped page from every host that answers,
+    /// as the window asks (#533); nothing when it is empty.
     func searchSessions(_ words: String) async {
         let earlier = searched
         searched = []
+        searchNext = [:]
         if !earlier.isEmpty {
             let unseen = Set(ClientHolding.archivedToLetGo(work.agents, projects: archivedHeldFor, chat: selection))
             work.forget(earlier.filter { unseen.contains($0) })
         }
         guard !words.isEmpty else { return }
         let request = DaemonAPI.ListRequest(archivedCommands: false, limit: Self.searchShown, lean: true, query: words)
-        guard let found = try? await client.call(DaemonAPI.Method.agentsList, request, returning: [Agent].self),
+        let hosts: [HostID] = [.mac] + reachableHosts.sorted { $0.rawValue < $1.rawValue }
+        for host in hosts { await search(request, on: host) }
+    }
+
+    /// The next page from each host that has more, newest first as the host lists them.
+    func searchMore() async {
+        let next = searchNext
+        searchNext = [:]
+        for (host, request) in next { await search(request, on: host) }
+    }
+
+    private func search(_ request: DaemonAPI.ListRequest, on host: HostID) async {
+        guard let target = hostClient(host),
+              let found = try? await target.call(DaemonAPI.Method.agentsList, request, returning: [Agent].self),
+              // A search ended or changed while this was on its way: not what is asked now.
               !Task.isCancelled else { return }
         let archived = found.filter { $0.state == .archived }
-        searched = Set(archived.filter { work.agent($0.id) == nil }.map(\.id))
-        work.takeListed(archived)
+        searched.formUnion(archived.filter { work.agent($0.id) == nil }.map(\.id))
+        work.takeListed(archived.map { var agent = $0; agent.host = host; return agent })
+        searchNext[host] = request.next(after: found)
     }
 
-    func loadArchivedAgents(in folder: URL, limit: Int) async {
+    /// A project's newest archived sessions, asked of the project's own host and stamped
+    /// as its own, as the window's (#533).
+    func loadArchivedAgents(in key: ProjectKey, limit: Int) async {
         let request = DaemonAPI.ListRequest(archivedCommands: false, archivedOnly: true,
-                                            folder: folder, limit: limit, lean: true)
-        guard let listed = try? await client.call(DaemonAPI.Method.agentsList, request,
+                                            folder: key.folder, limit: limit, lean: true)
+        guard let target = hostClient(key.host),
+              let listed = try? await target.call(DaemonAPI.Method.agentsList, request,
                                                   returning: [Agent].self) else { return }
-        work.takeListed(listed)
+        work.takeListed(listed.map { var agent = $0; agent.host = key.host; return agent })
     }
 
-    func loadAllArchivedAgents(in folder: URL) async {
-        let request = DaemonAPI.ListRequest(archivedCommands: false, archivedOnly: true,
-                                            folder: folder, lean: true)
-        guard let listed = try? await client.call(DaemonAPI.Method.agentsList, request,
-                                                  returning: [Agent].self) else { return }
-        work.takeListed(listed)
+    /// The client for `host`: the Mac's own, or a server's while it answers.
+    private func hostClient(_ host: HostID) -> DaemonClient? {
+        if host == .mac { return client }
+        guard reachableHosts.contains(host) else { return nil }
+        return otherHosts[host]
     }
 
     /// A workflow's newest `limit` runs, archived ones included, for its page. Answers

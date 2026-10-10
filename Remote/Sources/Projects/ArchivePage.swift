@@ -39,7 +39,7 @@ struct ArchivePage: View {
         .navigationTitle("Archived")
         // A page of them while the page is open, let go when it closes (#165): not when a
         // chat is only pushed over it.
-        .task(id: project) { await model.loadArchived(in: project.folder) }
+        .task(id: project) { await model.loadArchived(in: project) }
         .onDisappear {
             if !model.openArchive || model.selectedProject != project.folder {
                 model.letGoOfArchived(in: project.folder)

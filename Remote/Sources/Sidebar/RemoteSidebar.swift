@@ -81,6 +81,12 @@ struct RemoteSidebar: View {
                                   showsAllMatches: showingAllMatches.contains(summary.key),
                                   showAllMatches: { showingAllMatches.insert(summary.key) })
             }
+            // A host had more matches than its page: the next page, on asking (#176, #533).
+            if !searched.isEmpty, model.searchHasMore {
+                Button("More matches…") { Task { await model.searchMore() } }
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+            }
 
             // Projects put away, closed until opened, as the window's (#343).
             if !model.shelvedProjects.isEmpty, searched.isEmpty {
