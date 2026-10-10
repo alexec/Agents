@@ -87,6 +87,7 @@ extension DaemonCore {
             costToDate: tally?.costToDate ?? [:],
             unmeasuredAgents: tally?.unmeasured ?? 0)
         if isChatProject(folder) { summary.isChat = true }
+        summary.guardedChanges = guardedChanges(in: folder)
         summary.project.pinned = Self.isPinned(project, chat: summary.isChat == true) ? true : nil
         return summary
     }
@@ -449,6 +450,10 @@ extension DaemonCore {
 
     /// Write the limits into the project's file, in the person's words when it can't be.
     private func writeHelperLimits(_ limits: HelperLimits?, in folder: URL) throws {
+        guard guardedFileIsSettled(.projectConfig, in: folder) else {
+            throw JSONRPCError(code: JSONRPCError.invalidParams,
+                               message: guardedRefusal(.projectConfig, lead: "The helper limits were not changed: "))
+        }
         do {
             try ProjectConfig.setHelperLimits(limits, in: folder)
         } catch let unreadable as ProjectConfig.Unreadable {
@@ -459,6 +464,7 @@ extension DaemonCore {
             throw JSONRPCError(code: JSONRPCError.internalError,
                                message: "\(name) could not be written: \(error.localizedDescription)")
         }
+        approveGuardedWrite(.projectConfig, in: folder)
         projectConfigCache[folder] = nil
     }
 
@@ -470,7 +476,7 @@ extension DaemonCore {
         if let known = projectConfigCache[standardized] {
             fromFile = known
         } else {
-            fromFile = ProjectConfig.helperLimits(in: standardized)
+            fromFile = ProjectConfig.helperLimits(from: guardedContent(.projectConfig, in: standardized).data)
             projectConfigCache[standardized] = .some(fromFile)
         }
         return fromFile ?? projectRecords()[standardized]?.helperLimits
@@ -513,10 +519,12 @@ extension DaemonCore {
         var records = projectRecords()
         var changed = false
         for (folder, record) in records {
-            guard let limits = record.helperLimits, Self.isDirectory(folder) else { continue }
+            guard let limits = record.helperLimits, Self.isDirectory(folder),
+                  guardedFileIsSettled(.projectConfig, in: folder) else { continue }
             do {
                 if ProjectConfig.helperLimits(in: folder) == nil {
                     try ProjectConfig.setHelperLimits(limits, in: folder)
+                    approveGuardedWrite(.projectConfig, in: folder)
                     DaemonLog.shared.write("wrote \(folder.lastPathComponent)'s helper limits into its project file")
                 }
                 records[folder]?.helperLimits = nil

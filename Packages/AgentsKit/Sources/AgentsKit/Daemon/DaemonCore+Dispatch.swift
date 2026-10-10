@@ -204,6 +204,18 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.SetDiskSpaceRequest.self)
                 return .success(try JSONValue.encoding(try setDiskSpace(request)))
 
+            case DaemonAPI.Method.projectsReadGuardedChange:
+                let request = try require(params, as: DaemonAPI.GuardedChangeRequest.self)
+                return .success(try JSONValue.encoding(try readGuardedChange(request)))
+
+            case DaemonAPI.Method.projectsKeepGuardedChange:
+                let request = try require(params, as: DaemonAPI.GuardedChangeRequest.self)
+                return .success(try JSONValue.encoding(try keepGuardedChange(request)))
+
+            case DaemonAPI.Method.projectsUndoGuardedChange:
+                let request = try require(params, as: DaemonAPI.GuardedChangeRequest.self)
+                return .success(try JSONValue.encoding(try undoGuardedChange(request)))
+
             case DaemonAPI.Method.diskState:
                 return .success(try JSONValue.encoding(diskState()))
 

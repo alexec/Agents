@@ -125,6 +125,10 @@ struct ProjectSettingsSheet: View {
                         Text(each.title)
                             .lineLimit(1)
                         Spacer()
+                        if each == .general, !(summary?.guardedChanges ?? []).isEmpty {
+                            Circle().fill(StateTint.attention.style(or: .secondary)).frame(width: 7, height: 7)
+                                .accessibilityLabel("Waiting for your OK")
+                        }
                         if each == .plugins, waitingPlugins > 0 {
                             Circle().fill(StateTint.attention.style(or: .secondary)).frame(width: 7, height: 7)
                                 .accessibilityLabel("Waiting for your OK")
@@ -197,6 +201,11 @@ private struct ProjectGeneralPane: View {
                 .appText(.title).fontWeight(.semibold)
                 .padding(.bottom, 18)
             if let summary {
+                // Changes made outside the app to its own files wait here (#502).
+                ForEach(summary.guardedChanges ?? []) { change in
+                    GuardedChangeCard(change: change, key: summary.key)
+                        .padding(.bottom, 18)
+                }
                 Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 12) {
                     row("Name") { Text(summary.name).textSelection(.enabled) }
                     row("Folder") {
@@ -371,6 +380,92 @@ private struct ProjectGeneralPane: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
+}
+
+/// A change to one of the app's own files in `.agents`, made outside the app (#502): who
+/// made it, what changed line by line, and Keep or Undo. Until then the app goes on with
+/// the copy last approved.
+private struct GuardedChangeCard: View {
+    @Environment(AppModel.self) private var model
+    let change: GuardedChange
+    let key: ProjectKey
+
+    @State private var reading: GuardedChangeReading?
+    @State private var busy = false
+
+    private var file: GuardedFile? { GuardedFile(rawValue: change.path) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(change.headline, systemImage: "exclamationmark.shield")
+                .appText(.supporting).fontWeight(.semibold)
+                .tinted(.attention)
+            Text("The app goes on using \(file?.holds ?? "the file") as you last approved them until you choose. "
+                 + "Keep uses the change from now on; Undo puts the approved copy back in the file.")
+                .appText(.fine)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let reading {
+                diff(reading)
+            } else {
+                ProgressView().controlSize(.small)
+            }
+            HStack(spacing: 8) {
+                Button("Keep") { settle(keep: true) }
+                    .buttonStyle(.paperProminent)
+                Button("Undo") { settle(keep: false) }
+                    .buttonStyle(.paper)
+            }
+            .disabled(reading == nil || busy || model.hosts.isOffline(key.host))
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Paper.sidebar))
+        .task(id: change) {
+            reading = await model.readGuardedChange(change, for: key)
+        }
+    }
+
+    private func diff(_ reading: GuardedChangeReading) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(reading.lines.enumerated()), id: \.offset) { _, line in
+                Text(Self.mark(line.kind) + line.text)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(Self.style(line.kind))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .textSelection(.enabled)
+        .padding(8)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Paper.ground))
+    }
+
+    /// The colours Changes draws a removed and an added file in (`ChangeTint`); the
+    /// mark beside each line says it without them.
+    private static func style(_ kind: GuardedDiffLine.Kind) -> AnyShapeStyle {
+        switch kind {
+        case .same: AnyShapeStyle(.secondary)
+        case .removed: AnyShapeStyle(ChangeTint.color(.deleted))
+        case .added: AnyShapeStyle(ChangeTint.color(.added))
+        }
+    }
+
+    private static func mark(_ kind: GuardedDiffLine.Kind) -> String {
+        switch kind {
+        case .same: "  "
+        case .removed: "− "
+        case .added: "+ "
+        }
+    }
+
+    private func settle(keep: Bool) {
+        guard let reading else { return }
+        busy = true
+        Task {
+            await model.settleGuardedChange(reading, keep: keep, for: key)
+            busy = false
         }
     }
 }

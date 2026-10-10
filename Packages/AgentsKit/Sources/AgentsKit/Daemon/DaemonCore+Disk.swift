@@ -215,7 +215,7 @@ extension DaemonCore {
     func configuredDiskSpace(in folder: URL) -> DiskThresholds? {
         let standardized = Project.standardize(folder)
         if let known = diskSpaceConfigCache[standardized] { return known }
-        let found = ProjectConfig.diskSpace(in: standardized)
+        let found = ProjectConfig.diskSpace(from: guardedContent(.projectConfig, in: standardized).data)
         diskSpaceConfigCache[standardized] = .some(found)
         return found
     }
@@ -230,6 +230,10 @@ extension DaemonCore {
         if let problem = request.diskSpace.problem {
             throw JSONRPCError(code: JSONRPCError.invalidParams, message: problem)
         }
+        guard guardedFileIsSettled(.projectConfig, in: standardized) else {
+            throw JSONRPCError(code: JSONRPCError.invalidParams,
+                               message: guardedRefusal(.projectConfig, lead: "The disk space lines were not changed: "))
+        }
         do {
             try ProjectConfig.setDiskSpace(request.diskSpace, in: standardized)
         } catch let unreadable as ProjectConfig.Unreadable {
@@ -238,6 +242,7 @@ extension DaemonCore {
             throw JSONRPCError(code: JSONRPCError.internalError,
                                message: "\(DotAgents.folder)/\(ProjectConfig.fileName) could not be written: \(error.localizedDescription)")
         }
+        approveGuardedWrite(.projectConfig, in: standardized)
         diskSpaceConfigCache[standardized] = nil
         guard let summary = projectSummary(for: standardized) else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchProject, message: "\(standardized.path) is not a project.")

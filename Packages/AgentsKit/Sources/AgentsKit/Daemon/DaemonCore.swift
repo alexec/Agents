@@ -619,6 +619,14 @@ public actor DaemonCore {
     var workflows: [URL: [String: Workflow]] = [:]
     /// Each workflow file's SHA-256 by path, with the stamp it was taken at (#218).
     var workflowDigests: [String: (stamp: DigestStamp, digest: String)] = [:]
+    /// The guarded files' records (#502), read once and kept with every write.
+    var guardedRecordsCache: GuardedFileRecords?
+    /// Each guarded file as last read from disk, by path, kept by its stamp.
+    var guardedDisk: [String: (stamp: DigestStamp?, digest: String?, data: Data?)] = [:]
+    /// Projects whose changes made with no turn running are being settled, and those
+    /// asked again meanwhile (#502).
+    var guardedSettling: Set<URL> = []
+    var guardedSettleAgain: Set<URL> = []
     /// How many workflow files have been read and hashed, for the tests.
     var workflowDigestReads = 0
     /// One watch per live project, for its workflows, settings, pins and

@@ -141,6 +141,10 @@ public struct StoreLocations: Sendable {
     /// (security review, S2). Outside the project for the reason `workflows` is: a thing
     /// an agent can write to the project must not be able to approve itself.
     public var pluginApprovals: URL { root.appendingPathComponent("plugin-approvals.json") }
+    /// The last approved copy of each app-owned file in a project's `.agents` (#502):
+    /// `project.json` and `pins.json`, with a change made outside the app that waits for
+    /// the person's Keep or Undo. Outside the project for the reason `workflows` is.
+    public var guardedFiles: URL { root.appendingPathComponent("guarded-files.json") }
     /// Every device that has announced itself to this daemon.
     /// One file beside `projects.json`, because a device is a fact about this root
     /// rather than about any project or agent in it.

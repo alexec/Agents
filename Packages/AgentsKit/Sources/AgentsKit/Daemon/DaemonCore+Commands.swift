@@ -1415,6 +1415,7 @@ extension DaemonCore {
 
     func finishTurn(agentID: UUID, result: TurnResult) async {
         turnTasks.removeValue(forKey: agentID)
+        guardedTurnEnded(agentID)
         // What the turn's usage updates banked so far is on disk before the turn is
         // over; any still arriving follow within `spendSaveDelay`.
         flushSpend()
@@ -1608,6 +1609,7 @@ extension DaemonCore {
         }
         endWatch(agentID)
         turnTasks.removeValue(forKey: agentID)
+        guardedTurnEnded(agentID)
         // Before anything else is said, so the record reads: the question, that nobody
         // answered it, why the agent stopped, and that it did. And at all, which it was
         // not until 025: a turn that fails ahead of the process-exit event reaches here
@@ -1799,6 +1801,7 @@ extension DaemonCore {
         await cancelViews(for: agentID, reason: "The turn was stopped.")
         if let session = live[agentID] { await session.cancel() }
         turnTasks.removeValue(forKey: agentID)?.cancel()
+        guardedTurnEnded(agentID)
         // Re-read, rather than trusting the `agent` captured at the top of this
         // function: several `await`s have happened since, and the turn may have ended
         // under us. It used to be kept roughly in step by the `endedReason` pre-write
