@@ -1067,6 +1067,15 @@ final class RemoteModel {
         runtimeID.flatMap { accounts[$0]?.promptCapabilities } ?? ACP.PromptCapabilities()
     }
 
+    /// Whether this runtime is signed in, as the window's runtime list says it (#538):
+    /// "Needs signing in", else the account it is using ("Claude Max"). The accounts
+    /// are the Mac's own.
+    func signInNote(for runtimeID: String) -> String? {
+        let account = accounts[runtimeID]
+        if account?.state == .needsSignIn { return "Needs signing in" }
+        return account?.signedInAs?.label
+    }
+
     /// Whether this runtime said it takes words in the middle of a turn.
     func canSteer(_ runtimeID: String?) -> Bool {
         runtimeID.flatMap { accounts[$0]?.canSteer } ?? false
