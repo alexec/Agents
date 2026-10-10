@@ -16,7 +16,7 @@ import { useEffect, useRef } from "preact/hooks";
 import type { ComponentChildren } from "preact";
 import type { ACPPromptCapabilities, Attachment, FileMentionDTO, SlashCommand, SuggestedPrompt, UUID } from "../protocol/generated";
 import { returnAction, sendHelp, sendLabel, stopHelp } from "../model/promptWords";
-import type { Store } from "../model/store";
+import { tellingWords, type AgentAct, type Store } from "../model/store";
 import { attach, pastedFiles, pastedWords, refusal, totalRefusal } from "../model/attachments";
 import { Telling } from "./Telling";
 import { commandQuery, completeCommand, completeMention, fileName, fileURL, matchingCommands, mentionQuery } from "../model/completions";
@@ -28,7 +28,7 @@ const slowSend = 400;
 const mentionPause = 150;
 
 export function Prompt({ store, draftKey, placeholder, capabilities, disabled, send, recipient, starting = false, where, runtime, onTyping, children,
-  stop, queues = false, suggestion, commands = [], findFiles, banner }: {
+  stop, acting, queues = false, suggestion, commands = [], findFiles, banner }: {
   store: Store;
   /** Where the draft is kept: a session, or a new-agent form. */
   draftKey: string;
@@ -52,6 +52,8 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
   onTyping?: () => void;
   /** While the agent works: Send is this, with nothing typed (#254). */
   stop?: (() => void) | undefined;
+  /** What is on its way to this agent (#87): Stop turns while it is a stop, and is held while it is anything else. */
+  acting?: AgentAct | undefined;
   /** What is typed now will wait for the turn to end. */
   queues?: boolean;
   /** What the agent offers to be asked next (031). */
@@ -318,7 +320,11 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
           {/* Bright while its own spinner turns, as the answer that went stays bright on the cards (#86). */}
           {stop && !sending.value && text.value.trim() === "" && attachments.value.length === 0 ? (
             // The one way to stop it, where Send is, as PromptWords.stopSymbol (#254).
-            <button class="send stop" aria-label="Stop" title={stopHelp} disabled={disabled} onClick={stop}>■</button>
+            <button class={`send stop${acting === "agents/stop" ? " going" : ""}`} aria-label="Stop"
+              title={acting === "agents/stop" ? tellingWords("Stopping", recipient) : stopHelp}
+              disabled={disabled || (!!acting && acting !== "agents/stop")} onClick={stop}>
+              {acting === "agents/stop" ? <span class="spinner" aria-hidden="true" /> : "■"}
+            </button>
           ) : (
             <button class={`send${sending.value ? " going" : ""}`} aria-label={sending.value ? tellingLabel(starting, recipient) : sendLabel(queues)}
               title={`${sendHelp(queues)} (Return)`} disabled={!canSend && !sending.value} onClick={() => void submit()}>
