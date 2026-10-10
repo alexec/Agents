@@ -173,8 +173,9 @@ in poll mode, and only for servers whose `initialize` declares the `events` capa
   subscription's arguments, checked against the event's own filter schema. A list is a list
   argument, not "any of".
 - **Asked for while something listens.** Only for workflows that are on, not archived,
-  approved, and run on this Mac or server. Two workflows with the same event and filters
-  share one subscription.
+  approved, and run on this Mac or server, and for agents' open waits. Two workflows, or a
+  workflow and a wait, with the same server, event and filters share one subscription. It
+  ends when the last of them goes.
 - **Pace.** As often as the server asks, but never more than every 10 seconds, and at least
   every 5 minutes; every 30 seconds when it doesn't say. Each subscription is asked on its
   own, so a slow server never holds another up.
@@ -205,9 +206,24 @@ A server's event carries:
 | `payload_cut` | `true` when the data was cut |
 | `missed_since` | On the first event after a gap, when events may have been missed from |
 
-A wait on a server's event, such as `checks.failed` or `checks.*`, hears it while some
-workflow on this Mac or server listens to it. A wait does not ask a server for events by
-itself.
+A wait on a server's event, such as `checks.failed` or `checks.*`, is a subscription, as a
+trigger is:
+
+- **Checked when it is made.** The name is checked against what the project's servers offer
+  (`events/list`). If none offers it, the wait is refused, saying what each one does offer:
+  *No server here offers pr.merge. ci offers checks.failed, pr.merged.*
+- **`where` is the server's.** Its keys are the subscription's arguments, sent to the server
+  and checked against the event's filter schema, as a trigger's are: *ci's pr.merged takes
+  repo (required); repo is needed.* They are not matched against the event's details.
+  `server:` narrows it to the servers named.
+- **It subscribes for as long as it waits**, from now, sharing a workflow's subscription
+  when they ask for the same thing. When it is answered, times out or is cancelled, the
+  subscription ends unless a workflow or another wait still holds it. A restart keeps it.
+- **A server that can't be reached, or isn't approved yet,** is a warning, not a refusal:
+  the wait subscribes once the server can be asked.
+
+The wait's answer and its line under **Waiting now** say which servers it subscribed to:
+**Waiting for pr.merged on ci (repo alexec/Agents)**.
 
 Each workflow page shows a line for each server its event triggers hear, on the Mac, the
 iPhone and iPad and the web page: when it was last asked and when the last event came, or

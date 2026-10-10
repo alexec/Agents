@@ -766,6 +766,7 @@ export interface EventWait {
   since: WireDate;
   ending?: EventWaitEnding;
   resumePromptID?: UUID;
+  serverEvents?: WaitServerEvent[];
 }
 
 export type EventWaitEnding =
@@ -969,6 +970,12 @@ export interface ListRequest {
   agentID?: UUID;
   after?: ListCursor;
   query?: string;
+}
+
+export interface MCPEventTrigger {
+  event: string;
+  servers?: string[];
+  arguments: Record<string, JSONValue>;
 }
 
 export interface MCPServer {
@@ -1760,6 +1767,11 @@ export type WaitEndingHow =
   | { archived: Record<string, never> }
   | { gone: Record<string, never> };
 
+export interface WaitServerEvent {
+  trigger: MCPEventTrigger;
+  servers: string[];
+}
+
 export interface WaitStatus {
   line: string;
   mark: string;
@@ -2309,7 +2321,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   EntryNotification: { required: ["agentID", "entry"], optional: ["index", "oversized"] },
   Event: { required: ["position", "name", "at", "count", "scope", "sentence", "details", "chainDepth", "consequences"], optional: ["lastAt", "publisher", "message"] },
   EventPublisher: { required: ["agentID", "title"], optional: [] },
-  EventWait: { required: ["id", "patterns", "from", "since"], optional: ["deadline", "ending", "resumePromptID"] },
+  EventWait: { required: ["id", "patterns", "from", "since"], optional: ["deadline", "ending", "resumePromptID", "serverEvents"] },
   EventsListRequest: { required: ["limit"], optional: ["before", "scope", "groups"] },
   EventsPage: { required: ["events", "waiting", "hasMore"], optional: [] },
   FileMentionDTO: { required: ["path", "relativePath"], optional: [] },
@@ -2337,6 +2349,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
   ListCursor: { required: ["lastActivityAt", "id"], optional: [] },
   ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query"] },
+  MCPEventTrigger: { required: ["event", "arguments"], optional: ["servers"] },
   MCPServer: { required: ["name", "transport"], optional: [] },
   MCPTriggerFailure: { required: ["code", "message", "since"], optional: [] },
   MCPTriggerStatus: { required: ["name", "state"], optional: ["server", "lastPolledAt", "lastEventAt", "missedSince", "failure", "retryAt"] },
@@ -2428,6 +2441,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ViewShowRequest: { required: ["agentID", "server", "uri", "hash", "show"], optional: ["project"] },
   Wait: { required: ["agentID", "nameAtReport"], optional: ["ending"] },
   WaitEnding: { required: ["at", "how"], optional: [] },
+  WaitServerEvent: { required: ["trigger", "servers"], optional: [] },
   WaitStatus: { required: ["line", "mark", "cancellable"], optional: [] },
   WaitingAgent: { required: ["agentID", "title", "folder", "status"], optional: [] },
   WebRemoteStatus: { required: ["port", "served"], optional: ["reason", "detail"] },

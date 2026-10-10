@@ -25,11 +25,11 @@ struct JSONSchemaSubsetTests {
     }
 
     @Test func aMissingRequiredKeyNamesTheKeys() {
-        #expect(check([:]) == "ci's checks.failed takes branch, labels, limit, repo, state; repo is needed.")
+        #expect(check([:]) == "ci's checks.failed takes branch, labels, limit, repo (required), state; repo is needed.")
     }
 
     @Test func anExtraKeyIsRefusedOnlyWhenTheSchemaSaysSo() {
-        #expect(check(["repo": "x", "brnch": "main"]) == "ci's checks.failed takes branch, labels, limit, repo, state; not brnch.")
+        #expect(check(["repo": "x", "brnch": "main"]) == #"ci's checks.failed takes branch, labels, limit, repo (required), state; "brnch" is not one of its arguments."#)
         let open: JSONValue = ["type": "object", "properties": ["repo": ["type": "string"]]]
         #expect(check(["repo": "x", "brnch": "main"], open) == nil)
     }

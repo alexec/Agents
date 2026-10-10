@@ -327,19 +327,21 @@ struct EventWaitTests {
         #expect(answer.hasPrefix(EventWords.neverHere(["mac.wake"]) + " custom.ping happened at "), "\(answer)")
     }
 
-    /// A server's event nothing here asks for is kept, and the reply says it may never
-    /// come; a mistyped app event, which reads as one, is told its near name.
-    @Test func aWaitOnAServersEventNobodyAsksForIsTold() async throws {
+    /// A server's event no server here offers is refused (#577); a mistyped app event,
+    /// which reads as one, is told its near name.
+    @Test func aWaitOnAServersEventNoServerOffersIsRefused() async throws {
         let (locations, work, _) = try temporary()
         let core = try await makeCore(locations, clock: Clock(), hold: .milliseconds(100))
         let (a, token) = try await agent(core, in: work, "Hopeful")
-        let answer = try await wait(core, token, ["ci.failed", "agnet.finished", "custom.ping"])
-        #expect(answer.hasPrefix(EventWords.unheard(["ci.failed", "agnet.finished"], heard: [])), "\(answer)")
-        #expect(answer.contains("Did you mean agnet.finished → agent.finished?"), "\(answer)")
-        #expect(await isWaiting(core, a))
+        let refused = await refusal { _ = try await wait(core, token, ["ci.failed", "custom.ping"]) }
+        #expect(refused?.code == DaemonAPI.Failure.eventRefused)
+        #expect(refused?.message == EventWords.notOffered("ci.failed", offers: [:]) + " Nothing is waiting.")
+        #expect(await !isWaiting(core, a))
+        let typo = await refusal { _ = try await wait(core, token, ["agnet.finished"]) }
+        #expect(typo?.message.contains("Did you mean agent.finished?") == true, "\(typo?.message ?? "")")
 
         let quiet = try await wait(core, token, ["custom.ping", "agent.*"])
-        #expect(!quiet.contains("no workflow in this project"), "\(quiet)")
+        #expect(!quiet.contains("server"), "\(quiet)")
     }
 
     /// The disk events' old names still wait (#372).

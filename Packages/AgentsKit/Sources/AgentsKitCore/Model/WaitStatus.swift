@@ -28,7 +28,7 @@ public struct WaitStatus: Codable, Hashable, Sendable {
     /// Nil when the agent is waiting on nothing.
     public static func of(_ agent: Agent, names: (UUID) -> String?) -> WaitStatus? {
         if let wait = agent.eventWait, wait.isOpen {
-            let what = described(wait.patterns, names: names)
+            let what = described(wait, names: names)
             var line = "\(symbol) Waiting for \(what) · since \(LeaseWords.clock(wait.since))"
             if let deadline = wait.deadline { line += " · until \(LeaseWords.clock(deadline))" }
             return WaitStatus(line: line, mark: "\(symbol) Waiting for \(what)", cancellable: true)
@@ -43,14 +43,15 @@ public struct WaitStatus: Codable, Hashable, Sendable {
 
     /// A wait's patterns in words. `agent.finished` narrowed to one agent is written as
     /// that agent finishing, which is how a block says it.
-    static func described(_ patterns: [EventPattern], names: (UUID) -> String?) -> String {
+    static func described(_ wait: EventWait, names: (UUID) -> String?) -> String {
+        let patterns = wait.patterns
         let agents = patterns.compactMap { pattern -> String? in
             guard pattern.name == "agent.finished", pattern.filters.count == 1,
                   let id = pattern.filters["agent"]?.single else { return nil }
             return UUID(uuidString: id).flatMap(names) ?? id
         }
         if agents.count == patterns.count, !agents.isEmpty { return finishing(agents) }
-        return patterns.map(\.label).joined(separator: " or ")
+        return wait.label
     }
 
     static func finishing(_ names: [String]) -> String {

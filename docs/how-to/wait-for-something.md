@@ -38,6 +38,12 @@ and then carry on.
    the agent fixes it rather than waiting for something that never comes. To wait for
    particular agents to finish, the agent names them in `agents` instead.
 
+   An agent can also wait on an MCP server's event, such as `pr.merged` from a `ci`
+   server. Then `where` is what the server is asked for, such as
+   `{"repo": "alexec/Agents"}`, and the wait subscribes to the server until it ends. A name
+   no server here offers, or a filter the server doesn't take, is refused with what the
+   server does take. See [Events from MCP servers](../reference/events.md#events-from-mcp-servers).
+
 2. If the runtime asks permission to use `wait_for_event`, allow it. Claude and Cursor may
    ask, and Copilot always does.
 

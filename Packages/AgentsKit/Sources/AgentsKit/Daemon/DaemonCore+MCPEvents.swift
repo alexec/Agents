@@ -2,7 +2,8 @@ import AgentsKitCore
 import Foundation
 
 /// A subscription to a server's event (#383, data-model.md): one server, event and set of
-/// arguments in one project on this host, shared by every workflow whose trigger makes it.
+/// arguments in one project on this host, shared by every workflow whose trigger makes it
+/// and every open wait that names it (#577). It ends when the last of them goes.
 struct MCPSubscription: Sendable, Equatable {
     var key: String
     var project: URL
@@ -11,6 +12,8 @@ struct MCPSubscription: Sendable, Equatable {
     var arguments: [String: JSONValue]
     /// The workflows whose triggers make it, by id, sorted.
     var workflows: [String]
+    /// The agents whose open waits hold it, sorted.
+    var waits: [UUID] = []
     var pool: MCPClientPool.Key
     var filled: MCPServer
     var cwd: URL
@@ -90,14 +93,6 @@ extension DaemonCore {
     static let mcpPayloadLimit = 256 * 1024
 
     var mcpEventStore: MCPEventStore { MCPEventStore(root: locations.root) }
-
-    /// The servers' events some subscription asks for in a project, sorted: the only
-    /// server events a wait there can hear.
-    func mcpEventsHeard(in project: URL) -> [String] {
-        let folder = Project.standardize(project)
-        return Set(mcpEvents.subscriptions.values.filter { Project.standardize($0.project) == folder }.map(\.event))
-            .sorted()
-    }
 
     // MARK: Starting and stopping
 
@@ -318,6 +313,7 @@ extension DaemonCore {
             }
             lines[workflow.id] = workflowLines
         }
+        await addMCPWaits(to: &wanted, resolved: &resolved)
         // A workflow's file is part of what a stopped subscription waits on.
         for (id, subscription) in wanted {
             let digests = subscription.workflows.map { workflowID in
@@ -385,8 +381,9 @@ extension DaemonCore {
             guard restart else { continue }
             mcpEvents.tasks.removeValue(forKey: id)?.cancel()
             mcpEvents.live[id] = .init(state: .pending)
+            let holders = subscription.workflows + subscription.waits.map { "wait of \($0.uuidString)" }
             DaemonLog.shared.write("mcp events: \(subscription.server) \(subscription.event) subscribed for "
-                                   + "\(subscription.workflows.joined(separator: ", ")) (key \(subscription.key))")
+                                   + "\(holders.joined(separator: ", ")) (key \(subscription.key))")
             mcpEvents.tasks[id] = Task { [weak self] in await self?.runMCPSubscription(id) }
         }
     }
@@ -466,6 +463,192 @@ extension DaemonCore {
         }
         mcpEvents.listings[server.poolKey] = listing
         return listing
+    }
+
+    // MARK: Waits (#577)
+
+    /// What a wait's servers' events come to when it is made: the subscriptions it will
+    /// hold, what to warn of, and the records a new subscription starts afresh.
+    struct MCPWaitCheck {
+        var events: [WaitServerEvent] = []
+        var warning = ""
+        /// Records of subscriptions it would make that nothing holds now: cleared, so the
+        /// subscription starts from now rather than from an old wait's cursor.
+        var fresh: [String] = []
+    }
+
+    /// Check a wait's servers' events as a trigger's are checked: each name against the
+    /// project's servers' `events/list`, and `where` against each one's `inputSchema`, as
+    /// the subscription's arguments. Refused, with the sentence, when no server offers a
+    /// name or its arguments fit none; a server that could not be asked is a warning.
+    func checkMCPWait(_ names: [String], where filters: [String: DetailFilter],
+                      project: URL) async -> Result<MCPWaitCheck, JSONRPCError> {
+        func refused(_ message: String) -> Result<MCPWaitCheck, JSONRPCError> {
+            .failure(JSONRPCError(code: DaemonAPI.Failure.eventRefused, message: message))
+        }
+        guard !names.isEmpty else { return .success(MCPWaitCheck()) }
+        var given = filters
+        let narrowed = given.removeValue(forKey: MCPEventTrigger.serverKey)?.values
+        let here = mcpServerNames(project: project)
+        if let narrowed, let missing = narrowed.first(where: { !here.contains($0) }) {
+            return refused("\(missing) is not an MCP server here."
+                           + (here.isEmpty ? "" : " Servers here: \(here.sorted().joined(separator: ", ")).")
+                           + " Nothing is waiting.")
+        }
+        // Each server's events as listed now, or why it could not be asked.
+        var offered: [String: (server: ViewServer, events: [EventDefinition])] = [:]
+        var mayComeBack: [String] = []
+        for name in Set(narrowed ?? here).sorted() {
+            switch await mcpEventServer(name, project: project) {
+            case .success(let server):
+                let listing = await mcpEventListing(server)
+                if let events = listing.events {
+                    offered[name] = (server, events.filter { EventCatalogue.isServerEventName($0.name) })
+                } else if let failure = listing.failure {
+                    mayComeBack.append(Self.mcpWords(failure, server: name))
+                }
+            case .failure(.waiting):
+                mayComeBack.append("\(name) is waiting for approval in this project's MCP servers.")
+            case .failure(.signIn):
+                mayComeBack.append("\(name) wants a sign-in first.")
+            case .failure(.unreachable(let why)):
+                mayComeBack.append("Can't reach \(name): \(why)")
+            case .failure:
+                continue
+            }
+        }
+        var check = MCPWaitCheck()
+        var warnings: [String] = []
+        for name in names {
+            let probe = MCPEventTrigger(event: name, servers: narrowed)
+            var servers: [String] = []
+            var arguments: [String: JSONValue]?
+            var problems: [String] = []
+            var keys: [String] = []
+            for (server, found) in offered.sorted(by: { $0.key < $1.key }) {
+                for definition in found.events where probe.covers(definition.name) && definition.offersPoll {
+                    let typed = Self.mcpWaitArguments(given, schema: definition.inputSchema)
+                    if let schema = definition.inputSchema,
+                       let problem = JSONSchemaSubset.check(.object(typed), against: schema,
+                                                            name: "\(server)'s \(definition.name)") {
+                        problems.append(problem)
+                        continue
+                    }
+                    if arguments == nil { arguments = typed }
+                    if !servers.contains(server) { servers.append(server) }
+                    let key = MCPEventTrigger(event: definition.name, servers: narrowed, arguments: arguments ?? typed)
+                        .subscriptionKey(server: server)
+                    keys.append(MCPEventRecords.key(project: project, subscription: key))
+                }
+            }
+            let trigger = MCPEventTrigger(event: name, servers: narrowed,
+                                          arguments: arguments ?? Self.mcpWaitArguments(given, schema: nil))
+            if !servers.isEmpty {
+                check.events.append(WaitServerEvent(trigger: trigger, servers: servers))
+                check.fresh += keys.filter { mcpEvents.subscriptions[$0] == nil }
+            } else if !problems.isEmpty {
+                return refused(problems.joined(separator: " ") + " Nothing is waiting.")
+            } else if !mayComeBack.isEmpty {
+                check.events.append(WaitServerEvent(trigger: trigger, servers: []))
+                warnings.append(EventWords.serversMayComeBack(name, why: mayComeBack))
+            } else {
+                let offers = offered.mapValues { found in found.events.map(\.name).sorted() }
+                return refused(EventWords.notOffered(name, offers: offers) + " Nothing is waiting.")
+            }
+        }
+        check.warning = warnings.joined()
+        return .success(check)
+    }
+
+    /// `where`'s values as a server's arguments: text, or the number or true/false the
+    /// server's schema asks for, since the wait tool's `where` comes as text. A list is a
+    /// list.
+    static func mcpWaitArguments(_ filters: [String: DetailFilter], schema: JSONValue?) -> [String: JSONValue] {
+        func typed(_ text: String, _ schema: JSONValue?) -> JSONValue {
+            let types = schema?["type"]?.stringValue.map { [$0] } ?? schema?["type"]?.arrayValue?.compactMap(\.stringValue) ?? []
+            if types.contains("integer") || types.contains("number"), let number = Int(text) { return .int(number) }
+            if types.contains("number"), let number = Double(text) { return .double(number) }
+            if types.contains("boolean"), text == "true" || text == "false" { return .bool(text == "true") }
+            return .string(text)
+        }
+        var arguments: [String: JSONValue] = [:]
+        for (key, filter) in filters {
+            let property = schema?["properties"]?[key]
+            if let one = filter.single, property?["type"]?.stringValue != "array" {
+                arguments[key] = typed(one, property)
+            } else {
+                arguments[key] = .array(filter.values.map { typed($0, property?["items"]) })
+            }
+        }
+        return arguments
+    }
+
+    /// A new wait's subscriptions start from now: an old wait's record, kept a day, is
+    /// not where this one starts. Then the next pass subscribes.
+    func startMCPWait(_ check: MCPWaitCheck) {
+        guard !check.events.isEmpty else { return }
+        var records = mcpRecords()
+        var cleared = false
+        for id in check.fresh where mcpEvents.subscriptions[id] == nil && records.subscriptions[id] != nil {
+            records.subscriptions[id] = nil
+            cleared = true
+        }
+        if cleared {
+            mcpEvents.records = records
+            saveMCPRecords()
+        }
+        scheduleMCPEventsReconcile()
+    }
+
+    /// A wait holding subscriptions ended: the next pass lets go of what nothing else holds.
+    func mcpWaitEnded(_ wait: EventWait) {
+        guard wait.serverEvents?.isEmpty == false else { return }
+        scheduleMCPEventsReconcile()
+    }
+
+    /// The subscriptions every open wait holds, beside the workflows'. A server that
+    /// could not be asked when the wait was made is subscribed to once it can be.
+    private func addMCPWaits(to wanted: inout [String: MCPSubscription],
+                             resolved: inout [URL: [String: Result<ViewServer, ViewServerProblem>]]) async {
+        let waiting = agents.withEventWait.compactMap { agents[$0] }.filter {
+            $0.eventWait?.isOpen == true && $0.eventWait?.serverEvents?.isEmpty == false
+        }.sorted { $0.id.uuidString < $1.id.uuidString }
+        for agent in waiting {
+            guard let held = agent.eventWait?.serverEvents else { continue }
+            let folder = agent.projectFolder
+            let names = mcpServerNames(project: folder)
+            if resolved[folder] == nil {
+                var servers: [String: Result<ViewServer, ViewServerProblem>] = [:]
+                for name in names { servers[name] = await mcpEventServer(name, project: folder) }
+                resolved[folder] = servers
+            }
+            for event in held {
+                for name in (event.trigger.servers ?? names).sorted() {
+                    guard case .success(let server) = resolved[folder]?[name] else { continue }
+                    let listing = await mcpEventListing(server)
+                    for definition in listing.events ?? [] where event.trigger.covers(definition.name)
+                        && EventCatalogue.isServerEventName(definition.name) && definition.offersPoll {
+                        let trigger = event.trigger.narrowed(to: definition.name)
+                        if let schema = definition.inputSchema,
+                           JSONSchemaSubset.check(.object(trigger.arguments), against: schema, name: name) != nil {
+                            continue
+                        }
+                        let key = trigger.subscriptionKey(server: name)
+                        let id = MCPEventRecords.key(project: folder, subscription: key)
+                        if var already = wanted[id] {
+                            already.waits = Array(Set(already.waits + [agent.id])).sorted { $0.uuidString < $1.uuidString }
+                            wanted[id] = already
+                        } else {
+                            wanted[id] = MCPSubscription(
+                                key: key, project: folder, server: name, event: definition.name,
+                                arguments: trigger.arguments, workflows: [], waits: [agent.id],
+                                pool: server.poolKey, filled: server.filled, cwd: server.cwd,
+                                fingerprint: MCPEventTrigger.canonicalJSON(definition.wire) + "\n" + server.entry)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // MARK: Polling

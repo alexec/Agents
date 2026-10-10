@@ -1299,7 +1299,9 @@ public actor AppService {
             are started again with it. The call itself waits up to 45 seconds; if nothing \
             has happened by then it says you are still waiting and keeps your place. Use \
             this instead of polling. Also lists recent events (action "recent") and every \
-            event you can wait on (action "list"). The same names work as workflow triggers.
+            event you can wait on (action "list"). The same names work as workflow triggers. \
+            An MCP server's event (such as pr.merged) is checked against what the project's \
+            servers offer, and the wait subscribes to it until it ends.
 
             To wait for agents, name them in agents instead of events: your turn ends at \
             once, and you are resumed with how each ended when all have finished (or the \
@@ -1331,7 +1333,10 @@ public actor AppService {
                     "description": """
                         Narrow them by a filter: branch on branch.moved, e.g. {"branch": "main"}, \
                         or why on person.away and person.back. A list means any of them, \
-                        e.g. {"why": ["locked", "idle"]}. Nothing else narrows an event.
+                        e.g. {"why": ["locked", "idle"]}. For an MCP server's event, such as \
+                        pr.merged, these are the server's own filters, sent to it, e.g. \
+                        {"repo": "owner/name"}; server narrows which servers. Nothing else \
+                        narrows an event.
                         """,
                 ],
                 "from": [

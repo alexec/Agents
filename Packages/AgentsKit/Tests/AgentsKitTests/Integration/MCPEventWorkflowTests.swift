@@ -113,34 +113,142 @@ struct MCPEventWorkflowTests {
 
     // MARK: User Story 1
 
-    /// A wait on a server's event a workflow here subscribes to is heard, and says nothing
-    /// of it; one on an event nothing asks for is told so, with what is heard.
-    @Test func aWaitIsToldWhetherAServersEventIsHeard() async throws {
-        let s = try await setUp(workflows: [("fix", "  - checks.failed:\n      repo: alexec/Agents")])
-        try await subscribed(s)
+    // MARK: Waits (#577)
+
+    struct Waiter: Sendable {
+        var id: UUID
+        var token: String
+    }
+
+    /// An agent in the project to wait as.
+    private func waiter(_ s: Setup) async throws -> Waiter {
         let id = try await s.core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: s.project, prompt: "Wait"))
-        let token = UUID().uuidString
-        // The fake's session ending unbinds the token, as in `EventWaitTests.calling`:
-        // bound again, and asked again.
-        func calling<T>(_ body: () async throws -> T) async throws -> T {
-            for _ in 0..<5 {
-                await s.core.bindAppToken(token, to: id)
-                do { return try await body() } catch let error as JSONRPCError
-                    where error.message == LeaseWords.noConversation {}
-            }
-            return try await body()
+        return Waiter(id: id, token: UUID().uuidString)
+    }
+
+    /// The fake's session ending unbinds the token, as in `EventWaitTests.calling`: bound
+    /// again, and asked again.
+    private func calling<T>(_ s: Setup, _ agent: Waiter, _ body: () async throws -> T) async throws -> T {
+        for _ in 0..<5 {
+            await s.core.bindAppToken(agent.token, to: agent.id)
+            do { return try await body() } catch let error as JSONRPCError
+                where error.message == LeaseWords.noConversation {}
         }
-        func answer(_ events: [String]) async throws -> String {
-            let call = Task {
-                try await calling { try await s.core.waitForEvent(.init(token: token, events: events, untilMinutes: 1)) }
-            }
-            try await eventually("held") { await s.core.openEventWaits[id] != nil }
-            _ = try await calling { try await s.core.cancelWait(.init(token: token)) }
-            return try await call.value
+        return try await body()
+    }
+
+    private func wait(_ s: Setup, _ agent: Waiter, _ events: [String], where filters: [String: DetailFilter]? = nil,
+                      minutes: Int = 60) async throws -> String {
+        try await calling(s, agent) {
+            try await s.core.waitForEvent(DaemonAPI.EventWaitRequest(token: agent.token, events: events, where: filters,
+                                                                      untilMinutes: minutes))
         }
-        #expect(try await !answer(["checks.failed"]).contains("no workflow in this project"))
-        #expect(try await answer(["checks.passed"]).hasPrefix(EventWords.unheard(["checks.passed"],
-                                                                                 heard: ["checks.failed"])))
+    }
+
+    private func cancel(_ s: Setup, _ agent: Waiter) async throws {
+        _ = try await calling(s, agent) { try await s.core.cancelWait(.init(token: agent.token)) }
+    }
+
+    private func refusal(_ body: () async throws -> String) async -> String? {
+        do {
+            _ = try await body()
+            return nil
+        } catch let error as JSONRPCError {
+            return error.message
+        } catch {
+            return "\(error)"
+        }
+    }
+
+    /// The subscriptions some wait holds.
+    private func heldByWaits(_ s: Setup) async -> [MCPSubscription] {
+        await s.core.mcpEvents.subscriptions.values.filter { !$0.waits.isEmpty }
+    }
+
+    /// A name no server offers, and arguments that fit no server's schema, are refused
+    /// when the wait is made, and nothing waits.
+    @Test func aWaitOnAnEventNotOfferedOrWithBadArgumentsIsRefused() async throws {
+        let s = try await setUp(workflows: [])
+        let agent = try await waiter(s)
+        let unoffered = await refusal { try await wait(s, agent, ["checks.passd"], where: ["repo": "x"]) }
+        #expect(unoffered == "No server here offers checks.passd. ci offers checks.failed. Nothing is waiting.")
+        let badArguments = await refusal { try await wait(s, agent, ["checks.failed"], where: ["pr": "41"]) }
+        #expect(badArguments == "ci's checks.failed takes branch, repo (required); repo is needed. Nothing is waiting.")
+        let noSuchServer = await refusal {
+            try await wait(s, agent, ["checks.failed"], where: ["server": "cd", "repo": "x"])
+        }
+        #expect(noSuchServer == "cd is not an MCP server here. Servers here: ci. Nothing is waiting.")
+        #expect(await s.core.agents[agent.id]?.eventWait == nil)
+        #expect(await s.core.mcpEvents.subscriptions.isEmpty)
+    }
+
+    /// A wait subscribes, with `where` as the arguments sent in the poll, from now; a
+    /// polled event answers it, and the subscription ends with it.
+    @Test func aWaitSubscribesAndIsWokenByAPolledEvent() async throws {
+        let s = try await setUp(workflows: [])
+        let agent = try await waiter(s)
+        let call = Task { try await self.wait(s, agent, ["checks.failed"], where: ["repo": "alexec/Agents"]) }
+        try await subscribed(s)
+        #expect(s.stand.polls.first?.arguments == ["repo": "alexec/Agents"])
+        #expect(await heldByWaits(s).map(\.waits) == [[agent.id]])
+        #expect(await s.core.agents[agent.id]?.eventWait?.label == "checks.failed on ci (repo alexec/Agents)")
+        s.stand.raise("e1", data: ["pr": 41])
+        // Not `tick`: the loop does not wait again, since its subscription ends.
+        s.clock.tick()
+        let answer = try await call.value
+        #expect(answer.hasPrefix("Subscribed to checks.failed on ci (repo alexec/Agents). checks.failed happened at "),
+                "\(answer)")
+        try await eventually("the subscription ended with the wait") { await s.core.mcpEvents.subscriptions.isEmpty }
+    }
+
+    /// A wait shares a workflow's subscription with the same server, event and
+    /// arguments; when the wait is cancelled the workflow keeps it.
+    @Test func aWaitSharesAWorkflowsSubscription() async throws {
+        let s = try await setUp(workflows: [("fix", "  - checks.failed:\n      repo: x")])
+        try await subscribed(s)
+        let agent = try await waiter(s)
+        let call = Task { try await self.wait(s, agent, ["checks.failed"], where: ["repo": "x"]) }
+        try await eventually("the wait holds it") { await !heldByWaits(s).isEmpty }
+        let shared = try #require(await s.core.mcpEvents.subscriptions.values.first)
+        #expect(await s.core.mcpEvents.subscriptions.count == 1)
+        #expect(shared.workflows == ["fix"] && shared.waits == [agent.id])
+        try await cancel(s, agent)
+        _ = try await call.value
+        try await eventually("the wait let go") { await heldByWaits(s).isEmpty }
+        #expect(await s.core.mcpEvents.subscriptions.values.map(\.workflows) == [["fix"]])
+    }
+
+    /// A wait that times out lets go of its subscription.
+    @Test func aWaitThatTimesOutEndsItsSubscription() async throws {
+        let s = try await setUp(workflows: [])
+        let agent = try await waiter(s)
+        let call = Task { try await self.wait(s, agent, ["checks.failed"], where: ["repo": "x"], minutes: 1) }
+        try await subscribed(s)
+        s.now.advance(120)
+        await s.core.eventWaitDeadlinesPassed()
+        _ = try await call.value
+        try await eventually("the subscription ended") { await s.core.mcpEvents.subscriptions.isEmpty }
+    }
+
+    /// A restart keeps a wait's subscription, and carries on from its cursor.
+    @Test func aRestartKeepsAWaitsSubscription() async throws {
+        let first = try await setUp(workflows: [])
+        await first.core.useForEvents(holdLimit: .milliseconds(100))
+        let agent = try await waiter(first)
+        let answer = try await wait(first, agent, ["checks.failed"], where: ["repo": "x"])
+        #expect(answer.contains("Still waiting for checks.failed on ci (repo x)"), "\(answer)")
+        try await subscribed(first)
+        await first.core.stopMCPEvents()
+
+        first.stand.raise("while-down")
+        let second = try await setUp(first.stands, workflows: [], locations: (first.locations, first.project),
+                                     now: first.now)
+        try await eventually("held again") { await heldByWaits(second).map(\.waits) == [[agent.id]] }
+        try await eventually("keeping the pace") { second.clock.sleeping > 0 }
+        second.clock.tick()
+        try await eventually("polled from the cursor") { first.stand.polls.filter { $0.cursor != nil }.count >= 1 }
+        try await eventually("raised") { await raised(second).count == 1 }
+        try await eventually("the wait ended") { await second.core.agents[agent.id]?.eventWait?.isOpen != true }
     }
 
     /// (a) One event, one run, with the data in a fence marked as the server's.
@@ -285,7 +393,7 @@ struct MCPEventWorkflowTests {
         #expect(lines.map(\.server) == ["a", "b"])
         #expect(lines[1].state == .stopped)
         #expect(lines[1].failure?.code == .badArguments)
-        #expect(lines[1].failure?.message == "b's checks.failed takes project; not repo.")
+        #expect(lines[1].failure?.message == #"b's checks.failed takes project; "repo" is not one of its arguments."#)
         a.raise("a1")
         try await tick(s, polls: 1, of: a)
         try await eventually("a still runs") { await fired(s, "fix") == 1 }
