@@ -14,7 +14,7 @@ struct GuardedFileState: Codable, Equatable, Sendable {
     var pending: Pending?
 
     /// A change seen and not yet decided.
-    struct Pending: Codable, Equatable, Sendable {
+    struct Pending: Codable, Hashable, Sendable {
         var digest: String?
         var since: Date
         var changedByIDs: [UUID] = []

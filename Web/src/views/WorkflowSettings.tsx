@@ -161,7 +161,7 @@ export function CooldownMenu({ summary, disabled, change }: {
 export function WhenDoneMenu({ summary, disabled, change }: {
   summary: WorkflowSummary; disabled: boolean; change: (change: Change) => void;
 }) {
-  const current: WhenDone = summary.workflow.whenDone ?? "park";
+  const current: WhenDone = summary.workflow.whenDone ?? "keep";
   const option: ConfigOption = {
     id: "when-done", name: "When done", type: "select", currentValue: null,
     options: whenDoneChoices.map((w) => ({ value: w, name: whenDoneWords(w) })),

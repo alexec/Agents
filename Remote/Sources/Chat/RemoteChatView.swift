@@ -132,13 +132,23 @@ struct RemoteChatView: View {
                 if let agent, agent.missingFolder != nil, agent.state != .archived {
                     RemoteMissingFolderStrip(agent: agent)
                 }
-                // Why it is under Parked, and since when (040, FR-011).
-                if let line = ParkWords.line(agent?.parking) {
-                    Label(line, systemImage: ParkWords.symbol)
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
+                // An agent asks for it to be archived (#584): the mark, and the one tap
+                // that agrees, as over the Mac's chat.
+                if let agent, let line = ArchiveRequestWords.line(agent) {
+                    HStack(spacing: 10) {
+                        Label(line, systemImage: ArchiveRequestWords.symbol)
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                        Button(ArchiveRequestWords.archive) {
+                            Task { await model.archive(agent.id) }
+                        }
+                        .buttonStyle(.paper)
+                        .controlSize(.small)
+                        .disabled(model.isStale(agent) || model.acting(agent.id) != nil)
+                        .accessibilityHint(ArchiveRequestWords.archiveHelp)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
                 }
                 // Blocked (039): what it waits on, as the row says it (#341). Carry on is
                 // the toolbar's.

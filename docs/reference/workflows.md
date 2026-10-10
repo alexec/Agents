@@ -35,11 +35,6 @@ Check the build and say whether it is green.
 | `on:` | One trigger, or a list of them | What makes the workflow run. With a list, any one of them runs it. |
 | `on:` `manual` | No settings | Nothing runs it but **Run now**, on its page or its row. Leaving `on:` out says the same. Its row reads "By hand, with Run now". See [Run only by hand](#run-only-by-hand). |
 | `on:` `schedule` | `at:`, and optionally `between:` and `days:` | Runs at set times. **At** is a list of minutes past the hour, `":00"` or `":30"` and nothing else. **Between** is a range of hours such as `"09:00-18:00"`; without it, every hour. **Days** is a list of `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun`; without it, every day. A time missed while the Mac slept or the app was closed is not run later; the workflow's page says it was missed. |
-| `on:` `agent-finished` | No settings | Runs when an agent in this project finishes a turn. |
-| `on:` `agent-asked-permission` | No settings | Runs when an agent in this project asks for permission. |
-| `on:` `agent-asked-form` | No settings | Runs when an agent in this project asks you to fill in a form. |
-| `on:` `agent-stopped` | No settings | Runs when an agent in this project stops without finishing. |
-| `on:` `workflow-completed` | Optionally `id:`, a workflow's id | Runs when that workflow's run finishes, or when any workflow's run finishes if there is no `id:`. |
 | `on:` an event name, such as `branch.moved` or `custom.build_green` | Optionally the event's details, as filters | Runs when that event happens. Any name on [Events](events.md) works, or a subject with `.*`, such as `agent.*`, for all of its events. Under the name, list its filters to narrow it: `branch` on `branch.moved`, such as `branch: main`, and `why` on `person.away` and `person.back`. A filter can take a list, meaning any of them, such as `branch: [main, develop]`. Any other key, or a value a filter cannot have, is an error in the file, naming the right ones; the workflow never runs until it is fixed. An event about this Mac runs matching workflows in every project. A name this version does not know is shown on the workflow's page and never runs. |
 | `on:` a server's event, such as `checks.failed` | Optionally `server:`, and the event's own filters | Runs when an MCP server reports that event. Its name is `noun.verbed`, with no prefix, as the server names it. Without `server:`, it hears every MCP server this project can use that offers the name, including one added later. `server:` narrows it to one server's name, or a list of names. Every other key is the event's own filter, sent to the server as it is: a list is a list argument, not "any of". A filter the event doesn't take, or a value of the wrong type, is an error on the workflow's page, naming the filters it takes. A name whose noun is one of the app's subjects, such as `branch.created`, is never a server's event. See [Events from MCP servers](events.md#events-from-mcp-servers). |
 | `agent:` `new` | The default | Each run starts a new agent. |
@@ -55,7 +50,7 @@ Check the build and say whether it is green.
 | `archived:` | `true` or `false` | Whether it is archived. **Archive** adds `archived: true` and **Bring Back** takes the line out, so it is archived wherever the file goes. See [Off and archived](#off-and-archived). Anything else stops the workflow running, and its page says what is wrong. |
 | `cooldown:` | A length of time in minutes, hours or days, such as `15m`, `2h`, `1h30m` or `1d`; at least a minute | The least time from the start of one run to the start of the next. See [Cooldown](#cooldown). A value that is not a length of time stops the workflow running, and its page says what is wrong. |
 | `hosts:` | A list of machine ids | Which computers run it. Without it, or with an empty list, every host that has the project runs it and lists it. With ids, only those hosts do, on a schedule, on an event, or from **Run now**. An id is the computer's: a Mac's hardware UUID, or on Linux the contents of `/etc/machine-id`. The host name is used only when neither of those exists. The workflow's page offers the computers it knows by the names already on screen and writes the id, so renaming a computer does not unpin the workflow. A value that is not a list of ids stops the workflow running, and its page says what is wrong. |
-| `when-done:` | `park`, `archive-allowed` or `archive` | What a run may do with its session when it is done. Without it, `park`: every run stays in the list. See [When a run is done](#when-a-run-is-done). Anything else stops the workflow running, and its page says what is wrong. |
+| `when-done:` | `keep`, `archive-allowed` or `archive` | What a run may do with its session when it is done. Without it, `keep`: every run stays in the list. `park`, the word before #584, is read as `keep`. See [When a run is done](#when-a-run-is-done). Anything else stops the workflow running, and its page says what is wrong. |
 
 For example, to start a new agent whenever `main` moves, or another agent publishes
 `custom.build_green`:
@@ -168,11 +163,13 @@ workflow on `agent.finished` runs once when another agent finishes, not again wh
 agent does. A `triggering` workflow's agent is only its own for the run: when you next
 prompt that agent and it finishes, the workflow runs again. Waits still hear every event.
 
-The older hyphenated names still work, and each answers to the events listed under
-[Older trigger names](events.md#older-trigger-names). The pull-request triggers
-(`pull-request-checks-failed`, `pull-request-review-comments` and
-`pull-request-conflicts`) have been removed: a workflow that names one shows it on its
-page and never runs on it. On a workflow's page, its latest run
+The hyphenated names from before events (`agent-finished`, `agent-asked-permission`,
+`agent-asked-form`, `agent-stopped` and `workflow-completed`) and the pull-request
+triggers (`pull-request-checks-failed`, `pull-request-review-comments` and
+`pull-request-conflicts`) have been removed. A workflow that names one shows it on its
+page and never runs on it; for a hyphenated name, the page says which event to use, such
+as "Did you mean agent.finished?". `manage_workflows` will not write one, and
+`wait_for_event` will not wait for one, and both name the event to use. On a workflow's page, its latest run
 shows the event that caused it, with a link to it on the Events page.
 
 A setting the runtime does not offer stops the workflow running, rather than falling back
@@ -267,8 +264,8 @@ that starts a helper decides what becomes of it.
 
 | Value | What happens |
 |---|---|
-| `park` | The default. Every run stays in the list. A run may still park itself. |
-| `archive-allowed` | A run that finishes **Complete** or **Nothing to do** may archive itself, when there is nothing for you to look at. It is told it may. Otherwise it stays. |
+| `keep` | The default, **Keep each run**. Every run stays in the list when it is done. A run may ask you to archive it. |
+| `archive-allowed` | A run that finishes **Complete** or **Nothing to do** may archive itself, with `request_archive` or `archive_agent` and no id, when there is nothing for you to look at. It is told it may. Otherwise it stays. |
 | `archive` | A run that finishes **Complete** or **Nothing to do** is archived, whatever the agent asks. |
 
 - A run that ends **Waiting on your answer**, **Partly done**, **Stuck** or **Blocked** is
@@ -375,6 +372,22 @@ On the Mac or server that denied it:
 
 `hosts:` in the file is not the same thing: it is a list written into the shared file,
 and taking a computer off it is a change you commit.
+
+### Asked as a question
+
+A workflow waiting for your OK is also asked as a question, the same one a change to
+`.agents/project.json` or `.agents/pins.json` made outside the app is (#569): over the
+prompt of the agent whose turn was running when the file changed, or on the project's
+page when none was (a merge or pull, or something outside the app), and notified like
+any question. It says who changed the file, the lines removed and added against the copy
+you last approved, and offers **Keep** and **Undo**:
+
+- **Keep** is **Approve**, of the file as you were shown it.
+- **Undo** writes the copy you last approved back into the file, or removes the file
+  when you never approved one. The app keeps that copy beside its approval, outside the
+  project, from the moment it is approved. A workflow approved before copies were kept
+  gets one the next time its file is seen as approved; until then Undo says it has
+  nothing to put back, and **Keep** or **Deny on This Host** are the answers.
 
 ## Off and archived
 

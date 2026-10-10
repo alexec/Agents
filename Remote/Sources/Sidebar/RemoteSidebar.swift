@@ -238,7 +238,9 @@ private struct RemoteSmartFold: View {
                 }
             }
         } header: {
-            SmartHeading(row: row, count: row.count(in: model.work, projects: keys))
+            SmartHeading(row: row, count: row.count(in: model.work, projects: keys),
+                         archiveAll: row == .toArchive && !model.isStale
+                            ? { Task { await model.archiveAllRequested(in: keys) } } : nil)
         }
     }
 
@@ -307,11 +309,19 @@ private struct RemoteSmartFold: View {
 private struct SmartHeading: View {
     let row: SidebarSmartRow
     let count: Int
+    /// To Archive's Archive All (#584); nil on every other group.
+    var archiveAll: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 6) {
             Text(row.title).lineLimit(1)
             Spacer(minLength: 4)
+            if let archiveAll, count > 0 {
+                Button(ArchiveRequestWords.archiveAll, action: archiveAll)
+                    .buttonStyle(.paper)
+                    .controlSize(.mini)
+                    .accessibilityHint(ArchiveRequestWords.archiveAllHelp(count))
+            }
             if count > 0 {
                 Text("\(count)")
                     .monospacedDigit()
@@ -321,6 +331,11 @@ private struct SmartHeading: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(count > 0 ? "\(row.title), \(count)" : "\(row.title), none")
+        .accessibilityActions {
+            if let archiveAll, count > 0 {
+                Button(ArchiveRequestWords.archiveAll, action: archiveAll)
+            }
+        }
     }
 }
 

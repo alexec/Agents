@@ -105,8 +105,6 @@ public extension DaemonAPI {
                 Row(Method.eventsCancelWait, params: CancelWaitRequest.self, result: [WaitingAgent].self,
                     kind: .hostRequest),
                 Row(Method.agentsStopBackground, params: StopBackgroundRequest.self, result: JSONValue.self, kind: .hostRequest),
-                Row(Method.agentsPark, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
-                Row(Method.agentsUnpark, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsArchive, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsDelete, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
                 // The ways on from a missing folder (#119), as the window's header has them.

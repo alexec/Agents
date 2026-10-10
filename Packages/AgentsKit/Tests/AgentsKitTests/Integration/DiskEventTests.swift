@@ -92,19 +92,20 @@ struct DiskEventTests {
         #expect(both.problem == nil)
         #expect(both.triggers == [.event(EventPattern("machine.disk_low")), .event(EventPattern("machine.disk_ok"))])
         #expect(parse("  - machine.disk_low:\n      level: critical").problem
-                == .unreadable("machine.disk_low can't be narrowed, by \"level\" or anything else."))
+                == .unreadable("machine.disk_low takes no arguments; \"level\" is not one of its arguments."))
     }
 
-    /// Renamed from mac.* (#372), because a Linux server raises them too: a file written
-    /// before still triggers, as the new name, and so does a wait kept on a record.
-    @Test func theOldNamesAreReadAsTheNewOnes() throws {
-        let old = WorkflowFile.parse("---\non:\n  - mac.disk_low\n  - Mac.Disk_OK\n---\n\nGo.\n",
+    /// Renamed from mac.* (#372), because a Linux server raises them too. The old names
+    /// are gone (#575): a file naming one never runs, and says the name to use, and a
+    /// wait kept on a record under one matches nothing.
+    @Test func theOldNamesAreUnknown() throws {
+        let old = WorkflowFile.parse("---\non:\n  - mac.disk_low\n---\n\nGo.\n",
                                      workflowID: "w", in: URL(fileURLWithPath: "/tmp/project"))
-        #expect(old.problem == nil)
-        #expect(old.triggers == [.event(EventPattern("machine.disk_low")), .event(EventPattern("machine.disk_ok"))])
+        #expect(old.problem == .triggerNotSupported("mac.disk_low"))
+        #expect(old.problem?.message.hasSuffix("Did you mean machine.disk_low?") == true)
         let stored = try JSONDecoder().decode(EventPattern.self,
                                               from: Data(#"{"name":"mac.disk_ok","filters":{}}"#.utf8))
-        #expect(stored == EventPattern("machine.disk_ok"))
+        #expect(stored.name == "mac.disk_ok")
         #expect(EventCatalogue.kind(named: "mac.disk_low") == nil, "the catalogue lists only today's name")
     }
 

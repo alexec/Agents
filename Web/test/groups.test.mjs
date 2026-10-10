@@ -11,14 +11,16 @@ for (const { name, input, expected } of cases("groups/agents.json")) {
   test(`group: ${name}`, () => {
     const group = groups.groupOf(input.agent, input.wantsEyes);
     assert.deepEqual({ group, title: groups.groupTitles[group], needsAPerson: groups.needsAPerson(input.agent),
-                       isWaiting: groups.isWaiting(input.agent), showsUnread: groups.showsUnread(input.agent) }, expected);
+                       isWaiting: groups.isWaiting(input.agent), showsUnread: groups.showsUnread(input.agent),
+                       asksToArchive: groups.asksToArchive(input.agent) }, expected);
   });
 }
 
 for (const { name, input, expected } of cases("groups/panels.json")) {
   test(`column: ${name}`, () => {
     const headings = groups.headings(input.agents, input.folder)
-      .map((h) => ({ group: h.group, title: h.title, ids: h.agents.map((a) => a.id), unread: h.agents.filter(groups.showsUnread).length }));
+      .map((h) => ({ group: h.group, title: h.title, ids: h.agents.map((a) => a.id), unread: h.agents.filter(groups.showsUnread).length,
+                     asking: h.agents.filter(groups.asksToArchive).length }));
     const counts = groups.counts(input.agents, input.folder);
     assert.deepEqual({
       headings,
@@ -43,6 +45,6 @@ for (const { name, input, expected } of cases("status/rows.json")) {
 
 test("a project row says Needs you first, unread beside it (ProjectRow.subtitle, #70)", () => {
   const [{ input }] = cases("groups/panels.json");
-  assert.equal(groups.projectSubtitle(input.agents, input.folder), "Needs you · 2 unread");
+  assert.equal(groups.projectSubtitle(input.agents, input.folder), "Needs you · 3 unread");
   assert.equal(groups.projectSubtitle([], input.folder), null);
 });

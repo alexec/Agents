@@ -11,7 +11,7 @@ preview with `scripts/docs.sh serve`). This README is for building and working o
 
 The window is a list of the projects you work in — a project is a folder, named by that
 folder, on this Mac or on a Linux server — with that project's agents beside it, grouped
-by what happens next: needs you, waiting, working, done, paused, parked. Unread finished
+by what happens next: needs you, waiting, working, done, paused. Unread finished
 sessions need you until you open them. An agent can start helpers of its own (three running and five kept per project unless you change it),
 and a project's workflows (Markdown files under `.agents/workflows/`) start agents
 by themselves on a schedule or when something happens.
@@ -254,11 +254,10 @@ Each keeps its findings, and the commit of `main` it reviewed through, in its ow
 never pushed (`agents/reviews-security`, `agents/reviews-performance`): a security
 finding is not published before it is fixed. Both arrive turned off; **Run now** tries one.
 
-**Free disk space** (`.agents/workflows/free-disk-space.md`, #199) runs on `machine.disk_low` (its file still says
-`mac.disk_low`, the name before #372, which a build from before the rename also reads). It
+**Free disk space** (`.agents/workflows/free-disk-space.md`, #199) runs on `machine.disk_low`. It
 deletes build output (the folders `.gitignore` ignores and git tracks nothing in, such as
 `build/`, `.build`, `DerivedData` and `Web/node_modules`) from the worktrees of agents that are
-Done, Parked or Archived and hold no lease. At the critical level it also removes archived
+Done or Archived and hold no lease. At the critical level it also removes archived
 agents' worktrees that have nothing uncommitted, keeping the branch. It never touches the
 project folder, a worktree no session names, or a busy agent's. It too arrives turned off.
 

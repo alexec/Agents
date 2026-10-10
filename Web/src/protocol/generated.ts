@@ -97,7 +97,7 @@ export interface ACPProviderInfo {
   configured?: boolean;
 }
 
-export type AfterTurn = "park" | "archive";
+export type AfterTurn = "request_archive" | "archive";
 
 export interface Agent {
   id: UUID;
@@ -138,7 +138,7 @@ export interface Agent {
   restartPickUps?: number;
   report?: WorkReport;
   outcomeAsked?: boolean;
-  parking?: Parking;
+  archiveRequest?: ArchiveRequest;
   afterTurn?: AfterTurn;
   archivedAt?: WireDate;
   sandboxOverride?: SandboxChoice;
@@ -152,7 +152,7 @@ export interface Agent {
 
 export type AgentArchivedReason = "byUser" | "byAgent";
 
-export type AgentGroup = "needsAttention" | "blocked" | "waiting" | "running" | "finished" | "stopped" | "parked" | "archived";
+export type AgentGroup = "needsAttention" | "blocked" | "waiting" | "running" | "finished" | "stopped" | "archived";
 
 export interface AgentRemovedNotification {
   agentID: UUID;
@@ -257,6 +257,10 @@ export interface AppViewPolicy {
   baseUriDomains: string[];
   refused: string[];
 }
+
+export type ArchiveRequest =
+  | { whenTurnEnds: { since: WireDate } }
+  | { requested: { at: WireDate } };
 
 export interface ArtifactWriteRequest {
   agentID: UUID;
@@ -1062,10 +1066,6 @@ export interface PagesChangedNotification {
   folder: URLString;
   folders: string[];
 }
-
-export type Parking =
-  | { whenTurnEnds: { since: WireDate } }
-  | { parked: { at: WireDate } };
 
 export type Payment =
   | { allowance: { label?: string } }
@@ -1955,14 +1955,9 @@ export type WorkflowTrigger = WorkflowTriggerStored;
 
 export type WorkflowTriggerStored =
   | { schedule: { _0: WorkflowSchedule } }
-  | { agentFinished: Record<string, never> }
-  | { agentAskedPermission: Record<string, never> }
-  | { agentAskedForm: Record<string, never> }
-  | { agentStopped: Record<string, never> }
-  | { workflowCompleted: { id?: string } }
   | { unrecognised: { name: string; keys: Record<string, JSONValue> } };
 
-export type WorkflowWhenDone = "park" | "archive-allowed" | "archive";
+export type WorkflowWhenDone = "keep" | "archive-allowed" | "archive";
 
 export interface WorkflowsListRequest {
   folder?: URLString;
@@ -2024,7 +2019,6 @@ export interface Methods {
   "agents/labelVocabulary": { params: LabelVocabularyRequest; result: string[] };
   "agents/list": { params: ListRequest; result: Agent[] };
   "agents/options": { params: OptionsRequest; result: OptionsResponse };
-  "agents/park": { params: AgentRequest; result: Empty };
   "agents/prewarm": { params: PrewarmRequest; result: Empty };
   "agents/prompt": { params: PromptRequest; result: Empty };
   "agents/recreateWorktree": { params: AgentRequest; result: Agent };
@@ -2042,7 +2036,6 @@ export interface Methods {
   "agents/transcript": { params: TranscriptRequest; result: TranscriptPage };
   "agents/turns": { params: TurnsRequest; result: TurnsPage };
   "agents/unarchive": { params: AgentRequest; result: Empty };
-  "agents/unpark": { params: AgentRequest; result: Empty };
   "agents/unqueue": { params: UnqueueRequest; result: Empty };
   "artifact/write": { params: ArtifactWriteRequest; result: Empty };
   "attention/pending": { params: Empty; result: AttentionPending };
@@ -2129,7 +2122,6 @@ export const MethodTarget = {
   "agents/labelVocabulary": "host",
   "agents/list": "host",
   "agents/options": "host",
-  "agents/park": "host",
   "agents/prewarm": "host",
   "agents/prompt": "host",
   "agents/recreateWorktree": "host",
@@ -2147,7 +2139,6 @@ export const MethodTarget = {
   "agents/transcript": "host",
   "agents/turns": "host",
   "agents/unarchive": "host",
-  "agents/unpark": "host",
   "agents/unqueue": "host",
   "artifact/write": "host",
   "attention/pending": "host",
@@ -2255,7 +2246,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ACPAuthMethod: { required: ["id"], optional: ["name", "description", "_meta"] },
   ACPPromptCapabilities: { required: [], optional: ["image", "audio", "embeddedContext"] },
   ACPProviderInfo: { required: ["id"], optional: ["name", "protocol", "configured"] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "restartPickUps", "report", "outcomeAsked", "parking", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "madeInRoot", "queuedStart"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "madeInRoot", "queuedStart"] },
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },
   AgentWorktree: { required: ["name", "root", "project", "madeByApp"], optional: ["branch", "base"] },

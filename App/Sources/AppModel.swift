@@ -3778,13 +3778,12 @@ final class AppModel {
         }
     }
 
-    /// Park or unpark, whichever `Agent.parkAction` offers (040).
-    @discardableResult
-    func perform(_ action: ParkAction, on id: UUID) async -> Bool {
-        let method = action == .park ? DaemonAPI.Method.agentsPark : DaemonAPI.Method.agentsUnpark
-        return await act(AgentAct(action), on: id) {
-            try await self.client(forAgent: id).call(method, DaemonAPI.AgentRequest(agentID: id))
-        }
+    /// Archive every session in the projects named that asks to be archived (#584): the
+    /// To Archive group's Archive All. One at a time, each as its own Archive, so each
+    /// shows on its way and one that fails says why without stopping the rest.
+    func archiveAllRequested(in projects: [ProjectKey]) async {
+        let asking = SidebarSmartRow.toArchive.agents(in: work, projects: projects)
+        for agent in asking { await archive(agent.id, andLeave: true) }
     }
 
     /// Whether the answer went, so the card can give its buttons back when it did not.

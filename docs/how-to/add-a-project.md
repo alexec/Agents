@@ -51,7 +51,7 @@ chats that need no project. See [Chat without a project](chat-without-a-project.
 **Archive a project you are done with**
 
 1. Stop any agent in the project that is still working. See
-   [Stop, park and archive agents](archive-park-stop.md).
+   [Stop and archive agents](archive-and-stop.md).
 2. Right-click the project in the list and choose **Archive**.
 
    The project moves under **Archived** at the bottom of the list, with when you archived

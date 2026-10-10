@@ -23,8 +23,8 @@ brings them back under, on a pull request of its own.
 - **Never touch the project folder you start in.** It is the shared checkout of `main`.
   Do any edits in a worktree of your own (step 3).
 - One optimisation pull request per night at most. If an earlier one from this workflow
-  (branch `agents/ci-speed-*`) is still open, do not open another: say so and park
-  with `park_agent` (no id).
+  (branch `agents/ci-speed-*`) is still open, do not open another: say so and call
+  `request_archive` (no id).
 - A macOS job may be skipped by its `if:` when the diff gives it nothing to run (#594);
   that is not weakening it. Keep it starting whenever the selection fails.
 - Never weaken the checks to make them fast: no skipping or deleting tests, no dropping
@@ -59,8 +59,8 @@ brings them back under, on a pull request of its own.
    the step log: `gh run view <id> --log --job <job id> | grep -i cache`).
 
 If the median time to green of the completed PR runs is **15 minutes or less**, and no run
-in the last 10 went over 20, say so with the median, and park with
-`park_agent` (no id). Otherwise go on.
+in the last 10 went over 20, say so with the median, and call
+`request_archive` (no id). Otherwise go on.
 
 ## 2. Find the cause
 
@@ -92,9 +92,10 @@ of them is now the cause, say so and propose rather than change.
 
 ## 3. Change it
 
-1. Make a worktree off the latest `main` on a new branch
-   `agents/ci-speed-<today, YYYY-MM-DD>`:
-   `git fetch origin && git worktree add -b agents/ci-speed-<date> .agents/worktrees/ci-speed-<date> origin/main`.
+1. Move into a worktree off the latest `main` through the app (#615): `git fetch origin`,
+   check `main` here is `origin/main` (`git merge --ff-only origin/main` if not), then
+   move_worktree with worktree `ci-speed-<today, YYYY-MM-DD>` and end your turn; you are
+   started again in it, on `agents/ci-speed-<date>`.
 2. Make the **one** change with the biggest expected saving (or a few small ones with
    the same cause). Keep the existing comment style in `ci.yml`: say why, in a comment,
    for anything non-obvious.
@@ -123,4 +124,4 @@ of them is now the cause, say so and propose rather than change.
    keeps the commits.
 2. End with the table's medians (before, and the PR's own run after), the cause, the
    PR link and whether it is set to merge. If it is left for Alex or a bigger fix needs a
-   decision, ask Alex with your question tool; otherwise park with `park_agent` (no id).
+   decision, ask Alex with your question tool; otherwise call `request_archive` (no id).

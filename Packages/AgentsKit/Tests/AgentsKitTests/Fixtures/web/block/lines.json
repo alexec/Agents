@@ -8,7 +8,8 @@
         "Carries on when all of these have finished",
         "Haiku one, renamed — still working",
         "Haiku two — finished: complete"
-      ]
+      ],
+      "waitLine" : "◷ Waiting for “Haiku one, renamed”"
     },
     "input" : {
       "agentID" : "00000000-0000-0000-0000-000000000062",
@@ -126,7 +127,8 @@
         "Carries on when all of these have finished",
         "Haiku one, renamed — still working",
         "Haiku two — finished: complete"
-      ]
+      ],
+      "waitLine" : "◷ Waiting for “Haiku one, renamed”"
     },
     "input" : {
       "agentID" : "00000000-0000-0000-0000-000000000062",
@@ -245,7 +247,8 @@
         "Carries on when any of these finishes",
         "Haiku one, renamed — still working",
         "Haiku two — finished: complete"
-      ]
+      ],
+      "waitLine" : "◷ Waiting for “Haiku one, renamed”"
     },
     "input" : {
       "agentID" : "00000000-0000-0000-0000-000000000062",
@@ -362,7 +365,8 @@
       "isBlocked" : true,
       "lines" : [
         "Haiku one, renamed — still working"
-      ]
+      ],
+      "waitLine" : "◷ Waiting for “Haiku one, renamed”"
     },
     "input" : {
       "agentID" : "00000000-0000-0000-0000-000000000062",
@@ -467,7 +471,8 @@
       "isBlocked" : true,
       "lines" : [
 
-      ]
+      ],
+      "waitLine" : null
     },
     "input" : {
       "agentID" : "00000000-0000-0000-0000-000000000062",
@@ -575,7 +580,8 @@
         "Stopped, ended its turn — stopped",
         "Archived — archived",
         "Gone — gone"
-      ]
+      ],
+      "waitLine" : "◷ Waiting for “No outcome” (+6)"
     },
     "input" : {
       "agentID" : "00000000-0000-0000-0000-000000000062",
@@ -759,7 +765,8 @@
       "isBlocked" : false,
       "lines" : [
 
-      ]
+      ],
+      "waitLine" : null
     },
     "input" : {
       "agentID" : "00000000-0000-0000-0000-000000000062",
@@ -877,7 +884,8 @@
       "isBlocked" : true,
       "lines" : [
 
-      ]
+      ],
+      "waitLine" : null
     },
     "input" : {
       "agentID" : "00000000-0000-0000-0000-000000000062",
@@ -972,7 +980,8 @@
       "isBlocked" : false,
       "lines" : [
 
-      ]
+      ],
+      "waitLine" : null
     },
     "input" : {
       "agentID" : "00000000-0000-0000-0000-000000000062",

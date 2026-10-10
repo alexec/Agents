@@ -2,7 +2,7 @@ import AgentsKitCore
 import SwiftUI
 
 /// Over a chat whose folder has gone (#119): that it has, which folder, and the ways on.
-/// Where the park line and Carry on are, so it is read before anything is typed.
+/// Where the Asks to archive line and Carry on are, so it is read before anything is typed.
 struct MissingFolderStrip: View {
     @Environment(AppModel.self) private var model
     let agent: Agent

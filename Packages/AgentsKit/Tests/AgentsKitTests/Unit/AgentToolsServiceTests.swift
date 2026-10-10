@@ -35,7 +35,7 @@ struct AgentToolsServiceTests {
     }
 
     private let agentTools = [AppService.startAgentToolName, AppService.stopAgentToolName,
-                              AppService.parkAgentToolName, AppService.archiveAgentToolName,
+                              AppService.requestArchiveToolName, AppService.archiveAgentToolName,
                               AppService.listMyAgentsToolName]
 
     @Test func anAgentThePersonStartedIsOfferedThem() async throws {
@@ -45,12 +45,12 @@ struct AgentToolsServiceTests {
         await service.close()
     }
 
-    /// All but park_agent, which with no id parks the caller itself (#481).
+    /// All but request_archive, which with no id asks for the caller itself (#481).
     @Test func anAgentAnotherAgentStartedIsNotOfferedThem() async throws {
         let (client, service) = await pair(managesAgents: false)
         let listed = try await names(client)
-        for tool in agentTools where tool != AppService.parkAgentToolName { #expect(!listed.contains(tool), "\(tool)") }
-        #expect(listed.contains(AppService.parkAgentToolName))
+        for tool in agentTools where tool != AppService.requestArchiveToolName { #expect(!listed.contains(tool), "\(tool)") }
+        #expect(listed.contains(AppService.requestArchiveToolName))
         #expect(listed.contains(AppService.showFileToolName), "and keeps the rest")
         await service.close()
     }
@@ -83,20 +83,20 @@ struct AgentToolsServiceTests {
         await service.close()
     }
 
-    @Test func stopParkAndListReachTheDaemon() async throws {
+    @Test func stopRequestArchiveAndListReachTheDaemon() async throws {
         let calls = Calls()
         let (client, service) = await pair(calls: calls)
         _ = try await client.call("tools/call", [
             "name": .string(AppService.stopAgentToolName), "arguments": ["id": "abc"],
         ])
         _ = try await client.call("tools/call", [
-            "name": .string(AppService.parkAgentToolName), "arguments": ["id": "abc"],
+            "name": .string(AppService.requestArchiveToolName), "arguments": ["id": "abc"],
         ])
         _ = try await client.call("tools/call", [
             "name": .string(AppService.archiveAgentToolName), "arguments": ["id": "abc"],
         ])
         _ = try await client.call("tools/call", ["name": .string(AppService.listMyAgentsToolName)])
-        #expect(await calls.seen == [.stop(agentID: "abc"), .park(agentID: "abc"), .archive(agentID: "abc"), .list])
+        #expect(await calls.seen == [.stop(agentID: "abc"), .requestArchive(agentID: "abc"), .archive(agentID: "abc"), .list])
         await service.close()
     }
 
@@ -134,7 +134,7 @@ struct AgentToolsServiceTests {
 
     /// No helper tool says how many: the project's limits are in each result (#64).
     @Test func noHelperToolHardCodesANumber() {
-        for tool in [AppService.startAgentTool, AppService.stopAgentTool, AppService.parkAgentTool,
+        for tool in [AppService.startAgentTool, AppService.stopAgentTool, AppService.requestArchiveTool,
                      AppService.archiveAgentTool, AppService.listMyAgentsTool] {
             let description = tool["description"]?.stringValue ?? ""
             for number in ["three", "five", " 3 ", " 5 "] {

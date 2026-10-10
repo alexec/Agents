@@ -61,13 +61,13 @@ struct WebFixturesTests {
 
     static func agent(_ n: Int, _ state: AgentState, title: String? = nil, minutes: Double = 0,
                       isUnread: Bool = false, endedReason: EndedReason? = nil, report: WorkReport? = nil,
-                      outcomeAsked: Bool = false, parking: Parking? = nil, eventWait: EventWait? = nil,
+                      outcomeAsked: Bool = false, archiveRequest: ArchiveRequest? = nil, eventWait: EventWait? = nil,
                       labels: [SessionLabel] = [], background: [BackgroundItem] = [],
                       cwd: URL = folderURL) -> Agent {
         Agent(id: id(n), runtimeID: "claude", cwd: cwd, title: title ?? "Session \(n)", labels: labels, state: state,
               createdAt: base, lastActivityAt: at(minutes), isUnread: isUnread, endedReason: endedReason,
               background: background, eventWait: eventWait, report: report, outcomeAsked: outcomeAsked,
-              parking: parking)
+              archiveRequest: archiveRequest)
     }
 
     static func report(_ outcome: WorkOutcome, _ message: String = "It went.", block: Block? = nil) -> WorkReport {
@@ -118,12 +118,13 @@ struct WebFixturesTests {
             ("stopped with the daemon", agent(28, .stopped, endedReason: .daemonGone), false),
             ("stopped, no reason", agent(29, .stopped), false),
             ("stopped, a needs-answer report kept", agent(30, .stopped, endedReason: .cancelled, report: report(.needsAnswer)), false),
-            ("parked, done", agent(31, .finished, report: report(.done), parking: .parked(at: at(5))), false),
-            ("parked, stuck", agent(32, .finished, report: report(.stuck), parking: .parked(at: at(6))), false),
-            ("parked, but asking", agent(33, .waitingOnUser, parking: .parked(at: at(5))), false),
-            ("parked when the turn ends, running", agent(34, .running, parking: .whenTurnEnds(since: at(4))), false),
+            ("asks to archive, done", agent(31, .finished, report: report(.done), archiveRequest: .requested(at: at(5))), false),
+            ("asks to archive, partly done, unread", agent(32, .finished, isUnread: true, report: report(.partlyDone),
+                                                           archiveRequest: .requested(at: at(6))), false),
+            ("asks to archive, stopped", agent(33, .stopped, endedReason: .cancelled, archiveRequest: .requested(at: at(5))), false),
+            ("asks to archive when the turn ends, running", agent(34, .running, archiveRequest: .whenTurnEnds(since: at(4))), false),
             ("archived", agent(35, .archived), false),
-            ("archived and parked", agent(36, .archived, parking: .parked(at: at(5))), false),
+            ("archived, a request left on it", agent(36, .archived, archiveRequest: .requested(at: at(5))), false),
             ("queued for a place (#362)", agent(37, .queued), false),
         ]
     }
@@ -270,8 +271,11 @@ struct WebFixturesTests {
             var lines = model.blockLines(agent)
             let checksAgain = model.openBlock(agent)?.block.checkAgainLine() != nil
             if checksAgain { lines.removeLast() }
+            // The row's one line (#582), where it names someone: a time alone is the reader's own.
+            let names = model.openBlock(agent)?.block.waits.isEmpty == false
             return .object(["isBlocked": .bool(model.openBlock(agent) != nil),
                             "lines": .array(lines.map(JSONValue.string)), "checksAgain": .bool(checksAgain),
+                            "waitLine": names ? .string(model.waitMark(of: agent)?.line ?? "") : .null,
                             "carryOnHelp": .string(AgentsModel.carryOnHelp(for: agent))])
         }
     }
@@ -287,7 +291,7 @@ struct WebFixturesTests {
             let group = agent.group(wantsEyes: input["wantsEyes"]?.boolValue ?? false)
             return .object(["group": .string(group.rawValue), "title": .string(group.title),
                             "needsAPerson": .bool(agent.needsAPerson), "isWaiting": .bool(agent.isWaiting),
-                            "showsUnread": .bool(agent.showsUnread)])
+                            "showsUnread": .bool(agent.showsUnread), "asksToArchive": .bool(agent.asksToArchive)])
         }
     }
 
@@ -328,7 +332,8 @@ struct WebFixturesTests {
                 for heading in group.headings(model.agents(in: folder, group: group)) {
                     headings.append(.object(["group": .string(group.rawValue), "title": .string(heading.title),
                                              "ids": .array(heading.agents.map { .string($0.id.uuidString) }),
-                                             "unread": .int(heading.agents.filter(\.showsUnread).count)]))
+                                             "unread": .int(heading.agents.filter(\.showsUnread).count),
+                                             "asking": .int(heading.agents.filter(\.asksToArchive).count)]))
                 }
             }
             let counts = model.counts(in: folder)
@@ -356,7 +361,7 @@ struct WebFixturesTests {
             return .object([
                 "shape": .string(Self.name(of: shape)),
                 "symbol": shape.symbol.map(JSONValue.string) ?? .null,
-                "tinted": .bool(StatusShape.isTinted(shape, isParked: agent.parking?.isParked == true)),
+                "tinted": .bool(StatusShape.isTinted(shape)),
                 "words": .string(StatusShape.words(row: agent, isComingBack: back)),
             ])
         }
@@ -1100,41 +1105,43 @@ struct WebFixturesTests {
             ("nightly, at a time", WorkflowSummary(workflow: flow("nightly", [.schedule(nightly)]))),
             ("office hours on the half hour", WorkflowSummary(workflow: flow("office", [.schedule(office)], mode: .standing))),
             ("a few days, all hours", WorkflowSummary(workflow: flow("days", [.schedule(WorkflowSchedule(minutes: [30], days: [.mon]))]))),
-            ("agent events, with settings", WorkflowSummary(workflow: flow("review", [.agentFinished, .agentStopped],
+            ("with settings", WorkflowSummary(workflow: flow("review", [.schedule(nightly)],
                 settings: WorkflowSettings(permissionMode: "plan", runtimeID: "grok", model: "grok-4", effort: "high",
                                            options: ["fast": "true", "beta": "off", "voice": "calm"])))),
-            ("asked, triggering, settings left unsaid", WorkflowSummary(workflow: flow("answer", [.agentAskedPermission, .agentAskedForm],
+            ("triggering, settings left unsaid", WorkflowSummary(workflow: flow("answer", [.schedule(nightly)],
                 mode: .triggering, settings: WorkflowSettings(permissionMode: "plan")),
                 isRunning: true)),
-            ("after another, on an unknown runtime", WorkflowSummary(workflow: flow("chain", [.workflowCompleted(id: "nightly"), .workflowCompleted(id: nil)],
+            ("on an unknown runtime", WorkflowSummary(workflow: flow("chain", [.schedule(nightly)],
                 settings: WorkflowSettings(runtimeID: "mystery")))),
             ("only an unknown trigger", WorkflowSummary(workflow: flow("future", [.unrecognised(name: "on-push", keys: [:])]))),
+            ("an old trigger name", WorkflowSummary(workflow: flow("legacy", [.unrecognised(name: "agent-finished", keys: [:])],
+                problem: .triggerNotSupported("agent-finished")))),
             ("no triggers", WorkflowSummary(workflow: flow("handmade", []))),
             ("unreadable", WorkflowSummary(workflow: flow("broken", [], problem: .unreadable("Line 3: no closing ---")))),
-            ("an unknown mode", WorkflowSummary(workflow: flow("odd", [.agentFinished], problem: .unsupportedMode("swarm")))),
+            ("an unknown mode", WorkflowSummary(workflow: flow("odd", [.schedule(nightly)], problem: .unsupportedMode("swarm")))),
             ("archived and unreadable", WorkflowSummary(workflow: flow("old", [], problem: .unreadable("bad")), isArchived: true)),
-            ("over the limit", WorkflowSummary(workflow: flow("many", [.agentFinished]), overLimit: .project)),
-            ("waiting for approval", WorkflowSummary(workflow: flow("new", [.agentFinished]),
+            ("over the limit", WorkflowSummary(workflow: flow("many", [.schedule(nightly)]), overLimit: .project)),
+            ("waiting for approval", WorkflowSummary(workflow: flow("new", [.schedule(nightly)]),
                                                      awaitingApproval: WorkflowApproval(digest: "abc", isNew: true))),
-            ("refused, sorting itself out", WorkflowSummary(workflow: flow("busy", [.agentFinished]),
+            ("refused, sorting itself out", WorkflowSummary(workflow: flow("busy", [.schedule(nightly)]),
                                                             lastOutcome: .refused(.runInFlight, at: Self.base, repeats: 2))),
             // Queued behind a run (#422): said as a count, and grey.
-            ("running, two queued", WorkflowSummary(workflow: flow("fix-checks", [.agentFinished]),
+            ("running, two queued", WorkflowSummary(workflow: flow("fix-checks", [.schedule(nightly)]),
                                                     lastOutcome: .refused(.queued, at: Self.base, repeats: 2),
                                                     isRunning: true, queued: 2)),
-            ("the queue full", WorkflowSummary(workflow: flow("swamped", [.agentFinished]),
+            ("the queue full", WorkflowSummary(workflow: flow("swamped", [.schedule(nightly)]),
                                                lastOutcome: .refused(.queueFull(limit: Workflow.queueLimit), at: Self.base, repeats: 1),
                                                isRunning: true, queued: Workflow.queueLimit)),
-            ("refused, needing a person", WorkflowSummary(workflow: flow("deep", [.agentFinished]),
+            ("refused, needing a person", WorkflowSummary(workflow: flow("deep", [.schedule(nightly)]),
                                                           lastOutcome: .refused(.chainTooDeep(depth: 3), at: Self.base, repeats: 1))),
             // Turned off (#100): grey, and so is the refusal it gives a trigger.
             ("turned off", WorkflowSummary(workflow: flow("quiet", [.schedule(nightly)]), isEnabled: false)),
-            ("turned off, a trigger refused", WorkflowSummary(workflow: flow("hushed", [.agentFinished]), isEnabled: false,
+            ("turned off, a trigger refused", WorkflowSummary(workflow: flow("hushed", [.schedule(nightly)]), isEnabled: false,
                                                               lastOutcome: .refused(.disabled, at: Self.base, repeats: 1))),
             // A cooldown (#103): said on the row, and a held trigger is grey.
-            ("a cooldown, with settings", WorkflowSummary(workflow: flow("close-landed", [.agentFinished],
+            ("a cooldown, with settings", WorkflowSummary(workflow: flow("close-landed", [.schedule(nightly)],
                 settings: WorkflowSettings(permissionMode: "plan"), cooldown: 90 * 60))),
-            ("a cooldown, triggering, a trigger held", WorkflowSummary(workflow: flow("steady", [.agentFinished],
+            ("a cooldown, triggering, a trigger held", WorkflowSummary(workflow: flow("steady", [.schedule(nightly)],
                 mode: .triggering, cooldown: 24 * 60 * 60),
                 lastOutcome: .refused(.coolingDown(until: Self.base.addingTimeInterval(600)), at: Self.base, repeats: 3),
                 cooldownEndsAt: Self.base.addingTimeInterval(600), holdsAFire: true)),
@@ -1216,11 +1223,8 @@ struct WebFixturesTests {
             ("WorkflowTrigger", [
                 // One minute and one day: a Set encodes in no fixed order.
                 ("schedule", WorkflowTrigger.schedule(WorkflowSchedule(minutes: [30], hours: 9...17, days: [.mon]))),
-                ("agent finished", WorkflowTrigger.agentFinished),
-                ("asked permission", WorkflowTrigger.agentAskedPermission),
-                ("asked a form", WorkflowTrigger.agentAskedForm),
-                ("stopped", WorkflowTrigger.agentStopped),
-                ("workflow completed", WorkflowTrigger.workflowCompleted(id: "nightly")),
+                ("agent finished", WorkflowTrigger.event(EventPattern("agent.finished"))),
+                ("an unknown name", WorkflowTrigger.unrecognised(name: "agent-finished", keys: [:])),
                 ("event", WorkflowTrigger.event(EventPattern("ci.finished", filters: ["branch": "main"]))),
             ]),
         ]

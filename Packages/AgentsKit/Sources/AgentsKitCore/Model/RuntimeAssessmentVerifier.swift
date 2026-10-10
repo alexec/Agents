@@ -291,17 +291,15 @@ private struct Scorer {
         guard resumed || blockFoundHelperDone(id) else {
             return (.failed, "never started again when the helper finished")
         }
-        let parked = calls(DaemonAPI.Method.agentsParkHelper).filter { $0.arguments?["agentID"]?.stringValue?.uppercased() == id.uuidString }
-        guard ok(parked) else { return (.failed, said(parked, "park_agent")) }
-        guard record.events.contains(where: { $0.name == "agent.parked" && $0.details["agent"] == id.uuidString }) else {
-            return (.failed, "no agent.parked for the helper on the log")
-        }
-        let archived = calls(DaemonAPI.Method.agentsArchiveHelper).filter { $0.arguments?["agentID"]?.stringValue?.uppercased() == id.uuidString }
-        guard ok(archived) else { return (.failed, said(archived, "archive_agent")) }
+        let requested = calls(DaemonAPI.Method.agentsRequestArchiveHelper)
+            .filter { $0.arguments?["agentID"]?.stringValue?.uppercased() == id.uuidString }
+        guard ok(requested) else { return (.failed, said(requested, "request_archive")) }
+        // Archived by the request where the project lets agents archive their helpers
+        // (#584), or by archive_agent after it asked: either way, by an agent.
         guard helper.archivedAt != nil, helper.archivedReason == .byAgent else {
             return (.failed, "the helper is not archived by an agent")
         }
-        return (.passed, "helper \(id.uuidString.prefix(8)) on \(helper.runtimeID): marked as this agent's, resumed this one when it finished, parked, archived")
+        return (.passed, "helper \(id.uuidString.prefix(8)) on \(helper.runtimeID): marked as this agent's, resumed this one when it finished, archived on request")
     }
 
     /// A block on the helper refused because the helper had already ended: the daemon's

@@ -111,5 +111,5 @@ conversation and everything around it are still there.
 ## Related
 
 - [The control plane](control-plane.md).
-- [Stop, park and archive agents](../how-to/archive-park-stop.md).
+- [Stop and archive agents](../how-to/archive-and-stop.md).
 - [Statuses and groups](../reference/statuses.md).

@@ -1047,8 +1047,10 @@ button.plain:hover { opacity: 1; }
 .view-ask .buttons { display: flex; gap: 8px; margin: 0; }
 .view-context { font-size: 12px; }
 .view-box[hidden] { display: none !important; }
-/* A parked chat's line under its head (040, #253). */
-.park-strip { margin: 0; padding: 4px 16px; font-size: 12px; border-bottom: 1px solid var(--paper-rule); }
+/* A session an agent asks to have archived: the mark and Archive under its head (#584). */
+.archive-strip { display: flex; align-items: center; gap: 8px; margin: 0; padding: 4px 16px; font-size: 12px;
+  border-bottom: 1px solid var(--paper-rule); }
+.archive-strip button { font-size: 12px; }
 /* The plan in force, one line under the chat's head, opened to every step (#341). */
 .plan-strip { padding: 4px 16px; font-size: 12px; border-bottom: 1px solid var(--paper-rule); }
 .plan-strip .plan-summary { display: flex; gap: 4px; width: 100%; text-align: left; background: none; border: none; padding: 2px 0;

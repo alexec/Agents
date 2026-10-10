@@ -131,6 +131,25 @@ struct MessageAgentTests {
         #expect(try await entries(core, mine).count == before)
     }
 
+    @Test func aStoppedHelperIsQueuedNotWoken() async throws {
+        let (locations, root) = try temporary()
+        let api = try project(root)
+        let core = try await makeCore(locations)
+        let lead = try await session(core, in: api, title: "Lead", prompt: "Lead")
+        let reviewer = try await helper(core, of: lead, title: "Reviewer")
+        await core.stopForTesting(reviewer)
+        let before = try await entries(core, reviewer).count
+
+        let note = try await send(core, from: lead, to: "Reviewer", "Pick the review back up.")
+        #expect(note.contains("which is stopped"))
+        let agent = try #require(await core.agent(reviewer))
+        #expect(agent.state == .stopped)
+        #expect(agent.queuedPrompts.count == 1)
+        #expect(agent.queuedPrompts.first?.sender?.title == "Lead")
+        #expect(await core.live[reviewer] == nil)
+        #expect(try await entries(core, reviewer).count == before)
+    }
+
     @Test func aMessageRaisesAnEventNamingTheSender() async throws {
         let (locations, root) = try temporary()
         let api = try project(root)
@@ -243,5 +262,13 @@ extension DaemonCore {
 
     func setMessagesSentForTesting(_ id: UUID, _ times: [Date]) {
         messagesSent[id] = times
+    }
+}
+
+extension DaemonCore {
+    /// Stopped as the person's stop leaves it, without a turn to cut short.
+    func stopForTesting(_ id: UUID) {
+        agents[id]?.state = .stopped
+        agents[id]?.endedReason = .cancelled
     }
 }

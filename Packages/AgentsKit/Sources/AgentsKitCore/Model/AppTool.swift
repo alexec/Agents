@@ -12,8 +12,8 @@ import Foundation
 /// whole.
 public enum AppTool {
     /// The optional call that says how a turn ended: what one passes to it becomes the
-    /// line under the agent's name. Since #481 it says only that; waiting, parking,
-    /// moving and labels each have a tool of their own.
+    /// line under the agent's name. Since #481 it says only that; waiting, asking to be
+    /// archived, moving and labels each have a tool of their own.
     public static let finishTurn = "finish_turn"
 
     /// Add or remove the agent's own labels on its session (#481).
@@ -36,8 +36,8 @@ public enum AppTool {
     /// `ask_question` so it does not collide with Antigravity's own tool.
     public static let askForm = "ask_form"
 
-    // Five that act on other agents (028): start one in this project, and stop, park,
-    // archive (#120) or list the ones this agent started. An agent never archives itself
+    // Five that act on other agents (028): start one in this project, and stop, ask to
+    // archive (#584), archive (#120) or list the ones this agent started. An agent never archives itself
     // or the person's sessions. Never offered to an agent another agent started.
 
     /// Start an agent in the caller's own project.
@@ -46,8 +46,13 @@ public enum AppTool {
     /// Stop an agent the caller started.
     public static let stopAgent = "stop_agent"
 
-    /// Park an agent the caller started, to come back to later.
-    public static let parkAgent = "park_agent"
+    /// Ask for the caller, or an agent it started, to be archived (#584). Archives at
+    /// once where the caller may already archive it; otherwise waits for the person.
+    public static let requestArchive = "request_archive"
+
+    /// What `requestArchive` was called until #584. No longer offered or answered;
+    /// kept so a conversation that called it still draws as the app's own call.
+    public static let retiredParkAgent = "park_agent"
 
     /// Archive an agent the caller started, once it has stopped working (#120).
     public static let archiveAgent = "archive_agent"
@@ -114,7 +119,7 @@ public enum AppTool {
 
     /// Every tool the app's MCP server serves.
     public static let all: [String] = [
-        finishTurn, showFile, manageWorkflows, askForm, startAgent, stopAgent, parkAgent,
+        finishTurn, showFile, manageWorkflows, askForm, startAgent, stopAgent, requestArchive,
         listMyAgents, leaseResource, releaseResource, listResources, waitForEvent,
         cancelWait, publishEvent, listSessions, readSession, archiveAgent,
         pinPage, unpinPage, movePin, pinSession, setSessionLabels, moveWorktree, messageAgent,
@@ -129,7 +134,8 @@ public enum AppTool {
     /// `list_resources` of its own — and only the server in front says whose it is.
     public static func isServedByTheApp(_ called: String) -> Bool {
         serverPrefixes.contains { prefix in
-            called.hasPrefix(prefix) && all.contains(String(called.dropFirst(prefix.count)))
+            called.hasPrefix(prefix)
+                && (all + [retiredParkAgent]).contains(String(called.dropFirst(prefix.count)))
         }
     }
 }

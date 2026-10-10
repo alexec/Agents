@@ -6,7 +6,7 @@ import Foundation
 /// A worktree removed after a merge, a project folder moved or deleted, a disk ejected:
 /// the session still lists and its prompt bar still takes words. So the record says so
 /// (`Agent.missingFolder`), looked at on the heartbeat and before every send, and a send,
-/// Send now or unpark is refused with `folderGone` and words naming the folder, before
+/// Send now is refused with `folderGone` and words naming the folder, before
 /// anything is queued, so the words stay in the bar that sent them (#88).
 ///
 /// The ways on: a successor in the project folder that reads this session (065's

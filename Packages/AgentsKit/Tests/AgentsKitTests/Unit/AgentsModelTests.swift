@@ -515,8 +515,6 @@ struct AgentsModelTests {
         model.end(.archive, on: id)
         #expect(model.acting[id] == nil)
         #expect(model.act(of: id) == nil)
-        #expect(model.begin(.park, on: id))
-        #expect(AgentAct(.unpark) == .unpark)
     }
 
     /// A followed chat lets old turns go. One being read does not (#285).

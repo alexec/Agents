@@ -299,14 +299,14 @@ public enum WorkflowFile {
     }
 
     private static func parseTrigger(_ node: YAMLNode) throws -> WorkflowTrigger {
-        // A bare name: `- agent-finished`.
+        // A bare name: `- agent.finished`.
         if let name = node.scalar { return try trigger(named: name, keys: [:]) }
         // A single-key mapping: `- schedule:` with its settings under it.
         guard case .mapping(let pairs) = node, let (name, value) = pairs.first, pairs.count == 1 else {
             throw YAMLNode.Failure("A trigger must be a name, or a name with settings under it")
         }
         guard case .mapping(let settings) = value else {
-            // `- workflow-completed:` with nothing under it is the bare form.
+            // `- workflow.completed:` with nothing under it is the bare form.
             if value.scalar?.isEmpty ?? false { return try trigger(named: name, keys: [:]) }
             throw YAMLNode.Failure("The settings for \"\(name)\" are not a list of keys")
         }
@@ -316,11 +316,6 @@ public enum WorkflowFile {
     private static func trigger(named name: String, keys: [String: YAMLNode]) throws -> WorkflowTrigger {
         switch name {
         case "schedule": return .schedule(try parseSchedule(keys))
-        case "agent-finished": return .agentFinished
-        case "agent-asked-permission": return .agentAskedPermission
-        case "agent-asked-form": return .agentAskedForm
-        case "agent-stopped": return .agentStopped
-        case "workflow-completed": return .workflowCompleted(id: keys["id"]?.scalar)
         default:
             // A server's event (#383): `noun.verbed`, not the app's, its keys the
             // subscription's arguments rather than details matched here. Whether a server
@@ -364,7 +359,7 @@ public enum WorkflowFile {
                     return .event(pattern)
                 // A key it cannot be narrowed by (#574) leaves the trigger unreadable,
                 // saying so, rather than firing for everything.
-                case .failure(let problem) where problem.isBadFilter || problem.isBadValue:
+                case .failure(let problem) where problem.isBadFilter:
                     throw YAMLNode.Failure(problem.message)
                 case .failure:
                     break

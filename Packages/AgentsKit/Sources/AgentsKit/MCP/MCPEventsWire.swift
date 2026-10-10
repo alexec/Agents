@@ -17,44 +17,6 @@ enum MCPEventsWire {
     static let pollMode = "poll"
 }
 
-/// One event a server offers, from `events/list`.
-struct EventDefinition: Equatable, Sendable {
-    var name: String
-    var description: String?
-    /// How it can be delivered: `poll`, `push`, `webhook`.
-    var delivery: [String]
-    /// Its filters, as JSON Schema. Checked with `JSONSchemaSubset`.
-    var inputSchema: JSONValue?
-    /// What its `data` holds. Not enforced: a payload is untrusted data whatever it says.
-    var payloadSchema: JSONValue?
-
-    init(name: String, description: String? = nil, delivery: [String] = [MCPEventsWire.pollMode],
-         inputSchema: JSONValue? = nil, payloadSchema: JSONValue? = nil) {
-        self.name = name
-        self.description = description
-        self.delivery = delivery
-        self.inputSchema = inputSchema
-        self.payloadSchema = payloadSchema
-    }
-
-    init?(_ raw: JSONValue) {
-        guard let name = raw["name"]?.stringValue else { return nil }
-        self.init(name: name, description: raw["description"]?.stringValue,
-                  delivery: raw["delivery"]?.arrayValue?.compactMap(\.stringValue) ?? [],
-                  inputSchema: raw["inputSchema"], payloadSchema: raw["payloadSchema"])
-    }
-
-    var wire: JSONValue {
-        var object: [String: JSONValue] = ["name": .string(name), "delivery": .array(delivery.map(JSONValue.string))]
-        if let description { object["description"] = .string(description) }
-        if let inputSchema { object["inputSchema"] = inputSchema }
-        if let payloadSchema { object["payloadSchema"] = payloadSchema }
-        return .object(object)
-    }
-
-    var offersPoll: Bool { delivery.contains(MCPEventsWire.pollMode) }
-}
-
 /// `events/list`'s answer.
 struct EventsListResult: Equatable, Sendable {
     var events: [EventDefinition]

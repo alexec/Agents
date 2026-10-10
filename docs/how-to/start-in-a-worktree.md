@@ -55,8 +55,8 @@ An agent that started in the project folder can move into a worktree later, or b
 
 Agents can also move themselves, with `move_worktree` (see
 [Tools the app gives agents](../reference/agent-tools.md)). An agent that asks is moved when
-its turn ends and started again there to carry on, or left parked there if it also asked
-to be parked.
+its turn ends and started again there to carry on, or left there asking to be archived if it
+also asked that.
 
 Nothing uncommitted comes along: a new worktree starts from the last commit of the folder
 the agent is leaving, and what was not committed stays where it was.
@@ -69,7 +69,7 @@ tooltip says why. Start a new agent in a worktree instead.
 
 1. Have the agent commit what it did, and merge or push the branch the way you usually
    would.
-2. Archive the agent. See [Stop, park and archive agents](archive-park-stop.md).
+2. Archive the agent. See [Stop and archive agents](archive-and-stop.md).
 
    If the app made the worktree, no other agent is working in it, and everything in it
    is committed, archiving removes the worktree. Its branch is deleted too if it has

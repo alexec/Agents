@@ -16,13 +16,15 @@ import Observation
 @MainActor
 @Observable
 public final class ProjectShelf {
-    /// Each group's agents, newest started first (#182); Parked, most recently parked
-    /// first (040, FR-003); Archived, newest activity first, as the host pages them.
+    /// Each group's agents, newest started first (#182); Archived, newest activity
+    /// first, as the host pages them.
     public private(set) var groups: [AgentGroup: [Agent]] = [:]
     /// How many agents are in each group, by the client's own grouping.
     public private(set) var counts: [AgentGroup: Int] = [:]
     /// Finished and not opened since, whichever group they are under (#70).
     public private(set) var unread = 0
+    /// Asking the person to archive them, whichever group they are under (#584).
+    public private(set) var asking = 0
     /// Needs you, Blocked, and the unread under the rest: what the badge counts.
     public private(set) var attention = 0
     /// Needs you, and the unread under the rest: what Next Needing Attention visits.
@@ -75,6 +77,8 @@ public final class ProjectShelf {
         if self.counts != counts { self.counts = counts }
         let unread = groups.values.reduce(0) { $0 + $1.count(where: \.showsUnread) }
         if self.unread != unread { self.unread = unread }
+        let asking = groups.values.reduce(0) { $0 + $1.count(where: \.asksToArchive) }
+        if self.asking != asking { self.asking = asking }
         let attention = groups.reduce(0) { total, bucket in
             total + (bucket.key == .needsAttention || bucket.key == .blocked
                 ? bucket.value.count : bucket.value.count(where: \.showsUnread))
@@ -106,17 +110,11 @@ public final class ProjectShelf {
         return a.id.uuidString < b.id.uuidString
     }
 
-    /// Parked reads most recently parked first; Archived, newest activity first; the
-    /// rest, newest started first.
+    /// Archived reads newest activity first; the rest, newest started first.
     nonisolated static func order(_ group: AgentGroup) -> (Agent, Agent) -> Bool {
         switch group {
         case .archived:
             return byActivity
-        case .parked:
-            return { a, b in
-                let at = a.parking?.parkedAt ?? .distantPast, bt = b.parking?.parkedAt ?? .distantPast
-                return at != bt ? at > bt : byStart(a, b)
-            }
         default:
             return byStart
         }

@@ -10,7 +10,7 @@ import Testing
 @Suite("Whether a workflow may fire")
 struct WorkflowOutcomeTests {
     private func workflow(mode: WorkflowMode = .new,
-                          triggers: [WorkflowTrigger] = [.agentFinished],
+                          triggers: [WorkflowTrigger] = [.event(EventPattern("agent.finished"))],
                           problem: WorkflowProblem? = nil) -> Workflow {
         Workflow(workflowID: "w", folder: URL(filePath: "/tmp/p"),
                  triggers: triggers, mode: mode, prompt: "go", problem: problem)
@@ -192,27 +192,5 @@ struct WorkflowOutcomeTests {
         #expect(!WorkflowRefusal.archived.needsAPerson)
         #expect(!WorkflowRefusal.missedWhileClosed.needsAPerson)
         #expect(!WorkflowRefusal.agentUnavailable.needsAPerson)
-    }
-
-    // MARK: Responding to events
-
-    @Test func aWorkflowRespondsOnlyToWhatItNames() {
-        let onFinish = workflow(triggers: [.agentFinished])
-        #expect(onFinish.responds(to: .finished))
-        #expect(!onFinish.responds(to: .stopped))
-    }
-
-    @Test func aBrokenWorkflowRespondsToNothing() {
-        let broken = workflow(triggers: [.agentFinished], problem: .unreadable("x"))
-        #expect(!broken.responds(to: .finished))
-    }
-
-    @Test func aWorkflowWatchingEveryWorkflowDoesNotWatchItself() {
-        // A loop with nothing in it. The depth limit should not have to be what stops
-        // something this obvious.
-        let chained = Workflow(workflowID: "w", folder: URL(filePath: "/tmp/p"),
-                               triggers: [.workflowCompleted(id: nil)], prompt: "go")
-        #expect(!chained.respondsToCompletion(of: "w"))
-        #expect(chained.respondsToCompletion(of: "other"))
     }
 }

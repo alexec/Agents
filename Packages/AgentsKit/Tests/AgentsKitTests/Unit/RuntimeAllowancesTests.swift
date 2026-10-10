@@ -99,7 +99,7 @@ struct RuntimeChooserAllowanceTests {
 struct SpentAllowanceGroupTests {
     @Test func itIsPausedNotNeedsYouNorWaiting() {
         let group = AgentGroup(for: .stopped, wantsEyes: false, report: nil, outcomeAsked: false,
-                               parked: false, endedReason: .allowanceSpent)
+                               endedReason: .allowanceSpent)
         #expect(group == .stopped)
         #expect(group.title == "Paused")
         #expect(EndedReason.allowanceSpent.summary == "Its allowance ran out")
@@ -114,7 +114,7 @@ struct SpentAllowanceGroupTests {
 
     @Test func aRateLimitThatPersistedStillNeedsYou() {
         let group = AgentGroup(for: .stopped, wantsEyes: false, report: nil, outcomeAsked: false,
-                               parked: false, endedReason: .rateLimited)
+                               endedReason: .rateLimited)
         #expect(group == .needsAttention)
     }
 }

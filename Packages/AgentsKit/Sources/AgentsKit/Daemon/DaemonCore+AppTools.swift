@@ -142,8 +142,8 @@ extension DaemonCore {
             afterwards = after
         }
         // A move is the agent carrying on somewhere else, so it does not go with an
-        // ending that waits for someone (053), or with being archived. With a park it
-        // does since #481: the agent moves, and stays parked there.
+        // ending that waits for someone (053), or with being archived. With a request to archive it does since #481: the agent
+        // moves, and stays there asking.
         if request.move != nil {
             let waits = [WorkOutcome.needsAnswer, .blocked].contains(checked.report.outcome)
             guard !waits, afterwards != .archive else {
@@ -267,7 +267,7 @@ extension DaemonCore {
     /// and say what became of it.
     ///
     /// `afterwards`, when the call carries one, replaces the ask. A call without one keeps
-    /// an ask `park_agent` made (#481) — unless this ending does not go with it: an ask
+    /// an ask `request_archive` made (#481) — unless this ending does not go with it: an ask
     /// left under a later `stuck` would put away work that needs somebody, so it is
     /// dropped, and the agent told.
     private func land(_ report: WorkReport, prompts: [SuggestedPrompt]?,
@@ -285,8 +285,8 @@ extension DaemonCore {
             agent.afterTurn = nil
             dropped = asked
         }
-        let droppedNote = dropped.map {
-            " Your ask to be \($0 == .park ? "parked" : "archived") is dropped: it does not go with \(report.outcome.rawValue)."
+        let droppedNote = dropped.map { _ in
+            " Your ask to be archived is dropped: it does not go with \(report.outcome.rawValue)."
         } ?? ""
         if let labels { agent.labels = labels }
         // Said in front of the person, so already seen: no banner for what they watched.
@@ -332,7 +332,7 @@ extension DaemonCore {
     /// because nothing happens yet, and the person can still move the work on.
     static func afterTurnNote(_ after: AfterTurn) -> String {
         switch after {
-        case .park: return "Once this turn ends, this conversation will be parked."
+        case .requestArchive: return "Once this turn ends, the person will be asked to archive this conversation."
         case .archive: return "Once this turn ends, this conversation will be archived, as its workflow allows."
         }
     }
@@ -682,6 +682,14 @@ extension DaemonCore {
         if case .unreadable(let why) = parsed.problem {
             throw JSONRPCError(code: DaemonAPI.Failure.workflowUnreadable,
                                message: "That front matter could not be read: \(why). Nothing was written.")
+        }
+        // A trigger this version does not know never fires, so an agent is told while it
+        // can fix it, with the nearest name when there is one (#575).
+        for case .unrecognised(let name, _) in parsed.triggers {
+            let guess = WorkflowTrigger.guess(for: name)
+            throw JSONRPCError(code: DaemonAPI.Failure.workflowUnreadable,
+                               message: "\"\(name)\" is not a trigger\(guess.isEmpty ? "." : guess) "
+                                + "Under on: go schedule and event names. Nothing was written.")
         }
 
         // Whatever an agent writes waits for the person's OK, so a fourth waiting one in

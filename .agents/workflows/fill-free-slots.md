@@ -10,16 +10,17 @@ runtime: claude
 model: sonnet
 effort: low
 permission-mode: auto
-cooldown: 15m
-hosts: [8AB85821-9D24-59CE-9737-8FC556923733]
+cooldown: 30m
 labels: [lead, intake]
 when-done: archive
+hosts: [8AB85821-9D24-59CE-9737-8FC556923733]
+enabled: false
 ---
 
 You keep this project's agents busy. You run with nobody watching. You find out whether
 there are free slots for agents in this project and, if there are, start an agent on each
 open GitHub issue nobody is working on, until the slots are full. Nothing else: no
-clean-up, no parking, archiving or stopping agents, no merging, no builds or tests.
+clean-up, no asking to archive, archiving or stopping agents, no merging, no builds or tests.
 
 ## 1. Free slots
 
@@ -27,10 +28,10 @@ clean-up, no parking, archiving or stopping agents, no merging, no builds or tes
   may run at once in this project).
 - Count the agents running now: `list_sessions` with `limit: 100`, paging with `after`
   until no more follow; count every session whose status is running or working (not
-  `Done`, `Parked`, `Archived`, `Retired`, `Needs you`, `Blocked` or `Paused`). Do not
+  `Done`, `Archived`, `Retired`, `Needs you`, `Blocked` or `Paused`). Do not
   count yourself.
 - Free slots = the running limit minus that count. If it is 0 or less, say "No free slots:
-  N of N running." and park with `park_agent` (no id).
+  N of N running." and call `request_archive` (no id).
 
 ## 2. Issues nobody is working on
 
@@ -42,8 +43,16 @@ gh issue list --state open --search "no:assignee -label:parked" --limit 100 \
   --json number,title,labels,createdAt
 ```
 
-Order them: `bug` first, then everything else; within each, oldest first. If there are
-none, say "No unassigned issues to start." and park with `park_agent` (no id).
+Order them: `bug` first, then everything else; within each, oldest first.
+
+**Untried work first (#611).** Count the issues labelled `needs-walk` (merged UI changes
+nobody has run): `gh issue list --state all --label needs-walk --json number,title,assignees`.
+While there are more than 5, start no enhancements: after the bugs, take the unassigned
+`needs-walk` issues instead, oldest first, as walk lanes (step 3). See
+`docs/explanation/direction.md`.
+
+If there is nothing to start, say "No unassigned issues to start." and call
+`request_archive` (no id).
 
 ## 3. Start one agent per free slot
 
@@ -57,7 +66,19 @@ For each of the first (free slots) issues, in order:
    > you touch, building through scripts/build-cache.sh with the "build" lease, and say
    > in each UI commit what the other two clients do. Commit, push, open a pull request
    > that says "Fixes #<n>", and turn on auto-merge (squash) at once. Then call
-   > move_worktree with leave_worktree: remove, and park_agent with no id.
+   > move_worktree with leave_worktree: remove, and request_archive with no id.
+
+   For a walk lane, name the worktree `walk-github-issue-<n>`, title it
+   `Walk #<n>: <issue title>`, and use this prompt instead:
+
+   > Issue #<n>'s UI change has merged but nobody has run it (`gh issue view <n>`; its
+   > pull request says what changed). Walk it on main with the run-app skill (the web page
+   > in headless Chrome; Remote screens only by building, never a simulator), on a scratch
+   > root, never the real app. Follow AGENTS.md for the "build" lease. If the Mac is
+   > locked, leave everything as it is and end your turn. If it works, comment on the issue what you
+   > ran and saw, and remove the `needs-walk` label. If not, file a bug for each problem,
+   > linked to #<n>, then remove the label. Then call move_worktree with leave_worktree:
+   > remove, and request_archive with no id.
 
 3. If start_agent refuses because the limit is reached, unassign that issue
    (`gh issue edit <n> --remove-assignee alexec`) and stop starting more.
@@ -66,4 +87,4 @@ For each of the first (free slots) issues, in order:
 
 One line per agent started: `#<n> <title>: started`, and one per issue that could not be
 started, with why, then a line like "Started 2 agents on #427 and #432; 4 of 4 slots
-now in use." Then park with `park_agent` (no id).
+now in use." Then call `request_archive` (no id).

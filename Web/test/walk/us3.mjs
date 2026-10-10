@@ -121,14 +121,8 @@ say(`model on the record: ${JSON.stringify(before)} → ${JSON.stringify(changed
 await page.shot(`${out}/us3-3-model.png`);
 window("shot", `${out}/us3-window-3-model.png`);
 
-// 4. Park, unpark, stop and archive (and bring it back).
+// 4. Stop and archive (and bring it back).
 await until("the turn to hold its runtime", async () => ["running", "waitingOnUser"].includes((await record(id)).state), 60);
-await menu("Park");
-const parked = await until("parking", async () => (await record(id)).parking, 15);
-say(`Park while it runs: ${JSON.stringify(parked)}`);
-await menu("Unpark");
-await until("unparked", async () => !(await record(id)).parking, 15);
-say("Unpark: no parking on the record");
 await menu("Stop");
 const stopped = await until("stopped", async () => { const a = await record(id); return a.state === "stopped" ? a : null; }, 30);
 say(`Stop: ${stopped.state}, ${stopped.endedReason}`);

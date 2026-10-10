@@ -2,17 +2,18 @@ import Foundation
 
 /// The jobs `finish_turn` used to carry, each on a tool of its own (#481).
 ///
-/// Park, move and the end of a wait all happen once the turn ends, so each tool records
+/// A request to archive, a move and the end of a wait all happen once the turn ends, so each tool records
 /// its effect on the agent for then, and a conflict between two is refused by the second,
-/// in a sentence saying why. Only the wait ends the turn (#139), as `blocked` did: park,
+/// in a sentence saying why. Only the wait ends the turn (#139), as `blocked` did: requests,
 /// labels and moves leave the agent to carry on.
 ///
-/// - park and a move go together: the agent moves, and stays parked there rather than
-///   being started again.
+/// - a request to archive and a move go together: the agent moves, and stays there
+///   asking rather than being started again.
 /// - a wait does not go with a move (a move starts the agent again elsewhere) or an
-///   archive; a wait drops an ask to be parked, since a parked agent is never woken.
+///   archive; a wait does not go with a request either, since one asking to be archived
+///   is not waiting to be woken.
 extension DaemonCore {
-    /// `park_agent` or `archive_agent` with no id: put this agent away once its turn ends.
+    /// `request_archive` or `archive_agent` with no id: put this agent away once its turn ends.
     public func askAfterTurn(_ request: DaemonAPI.AfterTurnRequest) throws -> String {
         guard let agentID = appTokens[request.token], var agent = agents[agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent,
@@ -29,33 +30,46 @@ extension DaemonCore {
                 throw JSONRPCError(code: JSONRPCError.invalidParams, message: """
                     Nothing was recorded: you move once this turn ends, and a run that \
                     moves is not archived. Call move_worktree with neither argument to \
-                    stay, or park instead.
+                    stay, or call request_archive instead.
                     """)
             }
         }
         // An ending this turn has already given, which the ask must go with.
         if let report = agent.report, report != reportBeforeTurn[agentID], !after.goes(with: report.outcome) {
             let wait = report.outcome == .blocked
-                ? " You are waiting to be resumed, and a parked conversation is never woken." : ""
+                ? " You are waiting to be resumed, and a conversation asking to be archived is not." : ""
             throw JSONRPCError(code: JSONRPCError.invalidParams,
                                message: "Nothing was recorded: this turn ended \(report.outcome.rawValue), "
                                    + "and \(after.rawValue) only goes with "
-                                   + (after == .park ? "done, nothing_to_do or partly_done." : "done or nothing_to_do.")
+                                   + (after == .requestArchive ? "done, nothing_to_do or partly_done." : "done or nothing_to_do.")
                                    + wait)
         }
         if let wait = agent.eventWait, wait.isOpen {
             throw JSONRPCError(code: JSONRPCError.invalidParams, message: """
-                Nothing was recorded: you are waiting for \(wait.label), and a parked \
-                conversation is never woken. Call cancel_wait first.
+                Nothing was recorded: you are waiting for \(wait.label), and a conversation \
+                asking to be archived is not waiting to be woken. Call cancel_wait first.
                 """)
         }
         agent.afterTurn = after
         changed(agent)
         var note = Self.afterTurnNote(after)
-        if after == .park, agent.pendingMove != nil {
-            note += " You move first, and stay parked there rather than being started again."
+        if after == .requestArchive, agent.pendingMove != nil {
+            note += " You move first, and stay there asking rather than being started again."
+        } else if after == .requestArchive, let say = archivesWithoutAskingNote(agentID, agent) {
+            note = say
         }
         return note + " Anything the person sends before then drops it."
+    }
+
+    /// What an agent asking to be archived is told when nobody needs to agree (#584,
+    /// decision 2): its workflow lets its run archive itself, or the agent that
+    /// started it may archive it. Nil when the person is asked.
+    private func archivesWithoutAskingNote(_ agentID: UUID, _ agent: Agent) -> String? {
+        let may = whenDone(forRunOf: agentID)?.allowsArchiveAsk == true
+            || (agent.startedByAgent != nil && agentsMayArchive(in: agent.projectFolder))
+        guard may else { return nil }
+        return "Once this turn ends, this conversation will be archived if it ended done or with nothing to do, "
+            + "as nobody needs to agree; otherwise the person will be asked."
     }
 
     /// `set_session_labels`: the agent's own labels, changed now.

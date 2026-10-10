@@ -154,7 +154,7 @@ extension DaemonCore {
     }
 
     /// Stopped, as imported, with nothing left on it that would start a runtime by
-    /// itself: no wait to be woken from, no move to make, no park or follow-up to run.
+    /// itself: no wait to be woken from, no move to make, no request to archive or follow-up to run.
     /// Written directly rather than through `move`, because a stop through the funnel
     /// fires the triggers, and a workflow run for a copy is the copy acting.
     private func markImported(_ agent: Agent) async {
@@ -164,7 +164,7 @@ extension DaemonCore {
         updated.endedReason = .imported
         updated.eventWait = nil
         updated.pendingMove = nil
-        updated.parking = nil
+        updated.archiveRequest = nil
         updated.afterTurn = nil
         updated.allowanceWait = nil
         guard !alreadySaid || updated != agent else { return }

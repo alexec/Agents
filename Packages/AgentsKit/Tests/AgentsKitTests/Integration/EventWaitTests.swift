@@ -167,7 +167,7 @@ struct EventWaitTests {
         let core = try await makeCore(locations, clock: Clock())
         let (_, token) = try await agent(core, in: work, "Waiter")
         let refused = await refusal { _ = try await wait(core, token, ["person.away"], where: ["why": "asleep"]) }
-        #expect(refused?.message == "why on person.away is one of locked, idle; \"asleep\" is not one of them.")
+        #expect(refused?.message == "person.away: why is one of locked, idle, not asleep.")
     }
 
     /// Only a filter narrows a wait (#574); anything else is refused, and nothing waits.
@@ -178,11 +178,11 @@ struct EventWaitTests {
         for (name, key) in [("agent.finished", "agent"), ("agent.finished", "labels"), ("agent.*", "outcome")] {
             let refused = await refusal { _ = try await wait(core, token, [name], where: [key: "x"]) }
             #expect(refused?.code == DaemonAPI.Failure.eventRefused)
-            #expect(refused?.message == "\(name) can't be narrowed, by \"\(key)\" or anything else. "
+            #expect(refused?.message == "\(name) takes no arguments; \"\(key)\" is not one of its arguments. "
                     + "To wait for particular agents, use wait_for_event with agents.")
         }
         let custom = await refusal { _ = try await wait(core, token, ["custom.ping"], where: ["by": "x"]) }
-        #expect(custom?.message == "custom.ping can't be narrowed, by \"by\" or anything else.")
+        #expect(custom?.message == "custom.ping takes no arguments; \"by\" is not one of its arguments.")
         #expect(!(await isHeld(core, a)))
     }
 
@@ -344,13 +344,17 @@ struct EventWaitTests {
         #expect(!quiet.contains("server"), "\(quiet)")
     }
 
-    /// The disk events' old names still wait (#372).
-    @Test func anOldDiskNameWaitsOnTheNewOne() async throws {
+    /// An old name is refused with the one to use (#575): the disk events' before #372,
+    /// and the hyphenated trigger names.
+    @Test func anOldNameIsRefusedWithTheNewOne() async throws {
         let (locations, work, _) = try temporary()
         let core = try await makeCore(locations, clock: Clock(), hold: .milliseconds(100))
         let (a, token) = try await agent(core, in: work, "Old")
-        _ = try await wait(core, token, ["mac.disk_low"])
-        #expect(await core.agents[a]?.eventWait?.patterns == [EventPattern("machine.disk_low")])
+        for (old, now) in [("mac.disk_low", "machine.disk_low"), ("agent-finished", "agent.finished")] {
+            let refused = await refusal { _ = try await wait(core, token, [old]) }
+            #expect(refused?.message.contains("Did you mean \(now)?") == true, "\(old): \(refused?.message ?? "waited")")
+        }
+        #expect(await core.agents[a]?.eventWait == nil)
     }
 
     @Test func itIsNeverWokenByNewsOfItself() async throws {
@@ -371,7 +375,7 @@ struct EventWaitTests {
         #expect(unknown?.code == DaemonAPI.Failure.eventRefused)
         #expect(unknown?.message.contains("Did you mean workflow.completed?") == true)
         let filter = await refusal { _ = try await wait(core, token, ["branch.moved"], where: ["number": "x"]) }
-        #expect(filter?.message == "branch.moved can be narrowed only by branch, not by \"number\".")
+        #expect(filter?.message == "branch.moved takes branch; \"number\" is not one of its arguments.")
         for minutes in [0, 1441] {
             let deadline = await refusal { _ = try await wait(core, token, ["mac.wake"], until: minutes) }
             #expect(deadline?.message == EventWords.badDeadline())
@@ -431,7 +435,8 @@ struct EventWaitTests {
         #expect(!recent.contains("custom.theirs"))
         #expect(recent.contains("Head: "))
         let list = try await calling(core, token) { t in try await core.waitForEvent(.init(token: t, action: "list")) }
-        #expect(list == EventCatalogue.describe())
+        // No MCP server here, so the list is the app's events alone (#579).
+        #expect(list == EventList.text())
     }
 
     // MARK: US1: ending a wait without a wake (FR-013)

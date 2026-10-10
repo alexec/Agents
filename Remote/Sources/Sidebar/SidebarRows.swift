@@ -38,8 +38,7 @@ struct SidebarSessionRow: View {
                            outcome: agent.report?.outcome,
                            isWaiting: agent.isWaiting,
                            endedReason: agent.endedReason,
-                           outcomeUnknown: agent.endingIsUnaccountedFor,
-                           isParked: agent.parking?.isParked == true)
+                           outcomeUnknown: agent.endingIsUnaccountedFor)
             }
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
@@ -127,14 +126,17 @@ struct SidebarSessionRow: View {
 /// when it finished unread, an empty ring once read. Any other state keeps its
 /// `StatusIcon`.
 private struct SessionMark: View {
-    private enum Kind { case needsYou, working, unread, read }
+    private enum Kind { case needsYou, working, unread, read, asksToArchive }
     private let kind: Kind
 
     init?(agent: Agent, group: AgentGroup) {
         switch group {
         case .needsAttention, .blocked: kind = .needsYou
         case .running: kind = .working
+        // Asking to be archived (#584), as the window's mark says it.
+        case .finished where agent.asksToArchive: kind = .asksToArchive
         case .finished: kind = agent.showsUnread ? .unread : .read
+        case .stopped where agent.asksToArchive: kind = .asksToArchive
         default: return nil
         }
     }
@@ -150,6 +152,8 @@ private struct SessionMark: View {
                 Image(systemName: "circle.inset.filled").foregroundStyle(Paper.accent)
             case .read:
                 Image(systemName: "circle").foregroundStyle(Paper.accent)
+            case .asksToArchive:
+                Image(systemName: ArchiveRequestWords.symbol).foregroundStyle(Paper.accent)
             }
         }
         // Decorative: a mark filling the rows' 20-point well, as `WorkflowMark` (FR-015).
@@ -165,6 +169,7 @@ private struct SessionMark: View {
         case .working: "Working"
         case .unread: "Unread"
         case .read: "Done"
+        case .asksToArchive: ArchiveRequestWords.mark
         }
     }
 }

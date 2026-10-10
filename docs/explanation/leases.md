@@ -107,5 +107,5 @@ same project share one line, because they share one Mac.
 - [Settings and the Resources page](../reference/settings.md), for where the Resources
   page lives and what it shows.
 - [Tools the app gives agents](../reference/agent-tools.md), for the lease tools.
-- [Stop, park and archive agents](../how-to/archive-park-stop.md), when you want an
+- [Stop and archive agents](../how-to/archive-and-stop.md), when you want an
   agent out of the line without ending its lease first.

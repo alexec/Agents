@@ -43,16 +43,9 @@ extension DaemonCore {
         // happened — which for a restart is `recover`'s order, most recently active
         // first. Taken out of the array before any of it is replayed, so an event that
         // somehow defers again lands on an empty queue instead of a growing one.
-        let waiting = deferredLifecycleEvents
-        deferredLifecycleEvents.removeAll()
-        for held in waiting {
-            workflowsRespond(to: held.event, agentID: held.agentID, depth: held.depth, causingEvent: held.cause,
-                             endingRun: held.endingRun)
-        }
-        // And the events whose new-style triggers could not be matched yet (042).
         let events = deferredEventsForWorkflows
         deferredEventsForWorkflows.removeAll()
-        for event in events { fireWorkflows(for: event) }
+        for held in events { fireWorkflows(for: held.event, endingRun: held.endingRun) }
     }
 
     /// Take a project's workflows on: read them once, and watch for more.
@@ -85,6 +78,7 @@ extension DaemonCore {
             broadcast(DaemonAPI.Notification.workflowChanged,
                       summary(for: workflow, records: records, ceilings: ceilings))
         }
+        markWorkflowChanges(in: standardized)
     }
 
 
@@ -350,11 +344,19 @@ extension DaemonCore {
 
     /// Re-read one project's workflow folder and tell the windows what moved.
     public func rescanWorkflows(in folder: URL) {
+        rescanWorkflows(in: folder, witness: nil)
+    }
+
+    /// `witness` is an agent whose turn just ended, named as having changed a workflow
+    /// now waiting if no one was named yet (#569).
+    func rescanWorkflows(in folder: URL, witness: Agent?) {
         let standardized = Project.standardize(folder)
         workflowRescans.removeValue(forKey: standardized)
         let before = workflows[standardized] ?? [:]
         loadWorkflows(in: standardized)
         let after = workflows[standardized] ?? [:]
+        // Who changed one now waiting, and the question every client asks (#569).
+        defer { markWorkflowChanges(in: standardized, witness: witness) }
 
         // The list a window sees is the workflows this computer may run (#317). One
         // pinned to another host leaves this list, which is a removal, even while the
@@ -1136,11 +1138,11 @@ extension DaemonCore {
         }
         let name = agent.title ?? "an untitled agent"
         let what: String
-        switch run.trigger {
-        case .agentFinished: what = "has just finished its work"
-        case .agentAskedPermission: what = "is waiting for permission"
-        case .agentAskedForm: what = "is waiting on a form"
-        case .agentStopped: what = "stopped without finishing"
+        switch event?.name {
+        case "agent.finished": what = "has just finished its work"
+        case "agent.asked_permission": what = "is waiting for permission"
+        case "agent.asked_form": what = "is waiting on a form"
+        case "agent.stopped", "agent.failed": what = "stopped without finishing"
         default: what = "triggered this"
         }
         return """
@@ -1151,19 +1153,19 @@ extension DaemonCore {
     }
 
     /// What the run is told about putting its session away (#433), when its workflow
-    /// says more than park: the one thing about `when-done:` it could not know.
+    /// says more than keep: the one thing about `when-done:` it could not know.
     static func whenDoneNote(_ workflow: Workflow) -> String {
         guard workflow.mode != .triggering else { return "" }
-        switch workflow.whenDone ?? .park {
-        case .park: return ""
+        switch workflow.whenDone ?? .keep {
+        case .keep: return ""
         case .archiveAllowed:
             return """
 
 
                 (This workflow lets its run archive itself. If you finish done or with nothing \
                 to do, and there is nothing the person needs to look at, call \
-                \(AppTool.archiveAgent) with no id before you end. Otherwise leave it out, \
-                or park with \(AppTool.parkAgent) and no id.)
+                \(AppTool.requestArchive) with no id before you end: no one is asked, and the \
+                run is archived once the turn ends. Otherwise leave it out.)
                 """
         case .archive:
             return """
@@ -1309,47 +1311,6 @@ extension DaemonCore {
         return workflow.mode != .triggering && agents[starter]?.startedByWorkflow == workflow.workflowID
     }
 
-    /// Called from the one funnel every agent state change goes through.
-    func workflowsRespond(to event: WorkflowAgentEvent, agentID: UUID, depth: Int? = nil,
-                          causingEvent: EventPosition? = nil, endingRun: String? = nil) {
-        guard let agent = agents[agentID] else { return }
-        // Before anything is read off `workflows`, because at this point that
-        // dictionary is empty and the guard below would swallow the event without
-        // leaving a trace. See `deferredLifecycleEvents` for why the whole of this
-        // problem exists.
-        guard workflowsAreStarted else {
-            deferredLifecycleEvents.append(
-                (event: event, agentID: agentID,
-                 depth: depth ?? workflowChainDepth(causedBy: agentID), cause: causingEvent,
-                 endingRun: endingRun ?? runInFlight(for: agentID)?.key))
-            return
-        }
-        let folder = agent.projectFolder
-        guard let byID = workflows[folder], !byID.isEmpty else { return }
-        let depth = depth ?? workflowChainDepth(causedBy: agentID)
-
-        let trigger: WorkflowTrigger
-        switch event {
-        case .finished: trigger = .agentFinished
-        case .askedPermission: trigger = .agentAskedPermission
-        case .askedForm: trigger = .agentAskedForm
-        case .stopped: trigger = .agentStopped
-        }
-
-        for workflow in byID.values where workflow.runs(on: MachineID.current)
-            && workflow.responds(to: event)
-            && !workflow.isArchived
-            && !isOwnAgent(agentID, of: workflow, endingRun: endingRun) {
-            // Detached, because this is called from inside the actor by `move`, and
-            // firing awaits things that can call back into it. The shape `beginTurn`
-            // already uses for a turn.
-            Task { [weak self] in
-                await self?.fire(workflow, on: trigger,
-                                 triggeringAgentID: agentID, depth: depth, causingEvent: causingEvent)
-            }
-        }
-    }
-
     /// A run is over. Release the workflow, and let anything chained off it go.
     func workflowRunFinished(agentID: UUID) {
         guard let (key, run) = runInFlight(for: agentID) else { return }
@@ -1364,7 +1325,8 @@ extension DaemonCore {
         }
 
         let folder = Project.standardize(run.folder)
-        // On the log (042), a step deeper than the run, as the old trigger fires.
+        // On the log (042), a step deeper than the run, so a chain of workflows meets the
+        // depth limit.
         raise(EventDraft(name: "workflow.completed", at: now(), scope: .project(folder: folder),
                          sentence: "Workflow \(workflow(run.workflowID, in: run.folder)?.name ?? run.workflowID) finished.",
                          details: ["workflow": run.workflowID]
@@ -1374,15 +1336,6 @@ extension DaemonCore {
                             .merging(run.agentID.flatMap { agents[$0]?.report }
                                 .map { ["outcome": $0.outcome.rawValue] } ?? [:]) { $1 },
                          chainDepth: run.depth + 1))
-        guard let byID = workflows[folder] else { return }
-        for other in byID.values where other.runs(on: MachineID.current)
-            && other.respondsToCompletion(of: run.workflowID)
-            && !other.isArchived {
-            Task { [weak self] in
-                await self?.fire(other, on: .workflowCompleted(id: run.workflowID),
-                                 depth: run.depth + 1)
-            }
-        }
     }
 
     // MARK: Cooldowns (#103)
@@ -1687,14 +1640,14 @@ extension DaemonCore {
                     edited = try writeHosts(hosts, into: edited)
                 }
             }
-            // `park` takes the line out, as a file that never said (#433). Anything that
+            // `keep` takes the line out, as a file that never said (#433). Anything that
             // is not one of the three is refused, never read as the nearest.
             if let text = request.whenDone {
                 let trimmed = text.trimmingCharacters(in: .whitespaces)
-                guard let chosen = trimmed.isEmpty ? .park : WorkflowWhenDone(rawValue: trimmed) else {
+                guard let chosen = trimmed.isEmpty ? .keep : WorkflowWhenDone(rawValue: trimmed) else {
                     throw JSONRPCError(code: JSONRPCError.invalidParams, message: WorkflowWhenDone.unknown)
                 }
-                if chosen != (existing.whenDone ?? .park) {
+                if chosen != (existing.whenDone ?? .keep) {
                     edited = try FrontMatterEdit.set(WorkflowWhenDone.key, to: chosen.fileText, in: edited)
                 }
             }
@@ -1849,13 +1802,13 @@ extension DaemonCore {
     /// What this agent's run may do with its session, while a workflow that started or
     /// keeps the agent is running it. `nil` for anything else: a session a person
     /// started, a run that is over, and an agent a triggering workflow borrowed, which
-    /// is somebody else's and stays park-only.
+    /// is somebody else's and stays the person's to archive.
     func whenDone(forRunOf agentID: UUID) -> WorkflowWhenDone? {
         guard let agent = agents[agentID], let (_, run) = runInFlight(for: agentID),
               run.agentID == agentID, agent.startedByWorkflow == run.workflowID,
               let workflow = workflow(run.workflowID, in: run.folder),
               workflow.mode != .triggering, workflow.problem == nil else { return nil }
-        return workflow.whenDone ?? .park
+        return workflow.whenDone ?? .keep
     }
 
     /// Whether the turn ending now is a run's, done as its workflow lets the daemon put
@@ -1868,8 +1821,10 @@ extension DaemonCore {
         guard let report = agent.report, report != reportBeforeTurn[agentID],
               AfterTurn.archive.goes(with: report.outcome) else { return false }
         switch whenDone {
-        case .park: return false
-        case .archiveAllowed: return asked == .archive
+        case .keep: return false
+        // Either ask (#584): where the run may archive itself, a request needs nobody's
+        // OK — unless it moves, when it stays there asking.
+        case .archiveAllowed: return asked == .archive || (asked == .requestArchive && agent.pendingMove == nil)
         case .archive: return true
         }
     }

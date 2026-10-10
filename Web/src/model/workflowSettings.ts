@@ -113,12 +113,12 @@ export function refusals(settings: WorkflowSettings, remembered: readonly Config
 
 /** WorkflowWhenDone (#433): what a run may do with its session when it is done. */
 export type WhenDone = WorkflowWhenDone;
-export const whenDoneChoices: WhenDone[] = ["park", "archive-allowed", "archive"];
+export const whenDoneChoices: WhenDone[] = ["keep", "archive-allowed", "archive"];
 
 /** WorkflowWhenDone.words: the menu's words for each. */
 export function whenDoneWords(w: WhenDone): string {
   switch (w) {
-    case "park": return "Keep each run";
+    case "keep": return "Keep each run";
     case "archive-allowed": return "Let a run archive itself";
     case "archive": return "Archive each finished run";
   }
@@ -127,7 +127,7 @@ export function whenDoneWords(w: WhenDone): string {
 /** WorkflowWhenDone.sentence: what it means, under the menu. */
 export function whenDoneSentence(w: WhenDone): string {
   switch (w) {
-    case "park": return "Every run stays in the list when it is done. A run may park itself.";
+    case "keep": return "Every run stays in the list when it is done. A run may ask you to archive it.";
     case "archive-allowed": return "A run that finishes done or with nothing to do may archive itself when there is nothing to look at. Otherwise it stays.";
     case "archive": return "A run that finishes done or with nothing to do is archived. One that needs you, is stuck or is blocked stays.";
   }

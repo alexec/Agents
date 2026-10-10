@@ -22,29 +22,49 @@ The same names work in three places:
 A name is a subject, a dot, and what happened: `branch.moved`. A subject followed by `.*`,
 such as `agent.*`, matches every event of that subject.
 
-Each event shows details, listed in the tables below: on the Events page, in a woken
-agent's message and in a workflow agent's prompt. Only a few of them are **filters**, which
-a wait or a trigger can narrow the event by:
+Each event is described the way an MCP server describes its own (`events/list`): a name, a
+description, an `inputSchema` and a `payloadSchema`, both JSON Schema. The tables below
+give them as two columns:
 
-- `branch` on `branch.moved`, for example `branch: main` for one branch;
-- `why` on `person.away` and `person.back`: `locked` or `idle`;
-- an MCP server's event's keys in a workflow's `on:`, which the server checks (see
-  [Events from MCP servers](#events-from-mcp-servers)).
+- **Details** are the `payloadSchema`: what the event carries, shown on the Events page, in
+  a woken agent's message and in a workflow agent's prompt. Every detail is text; one with
+  fixed values, such as `outcome`, `reason`, `by`, `how` or `level`, lists them as an
+  `enum`. An event about an agent also carries `agent_title`, its title, beside `agent`, its
+  id, and a woken agent is told both under those names.
+- **Filter by** is the `inputSchema`: what a wait's `where` or the keys under a trigger can
+  narrow the event by. Only a few events take any:
+  - `branch` on `branch.moved`, for example `branch: main` for one branch;
+  - `why` on `person.away` and `person.back`: `locked` or `idle`;
+  - an MCP server's event's own, which the server checks (see
+    [Events from MCP servers](#events-from-mcp-servers)).
 
 Nothing else narrows an event: not `agent`, `labels`, `outcome` or any other detail of an
 agent event, nor a drop box arrival's, a lease's, the disk's, a cost's or a server's, nor
-a custom event's own.
+a custom event's own. A custom event's `inputSchema` is empty and its `payloadSchema` open.
 
 - **A list means any of them.** `branch: [main, develop]` matches either. A list of one is
   the same as the value on its own.
-- **Any other key is an error**, naming the filters the event takes: *branch.moved can be
-  narrowed only by branch, not by "to".* For an agent event it says how to wait for
-  particular agents instead: *agent.finished can't be narrowed, by "outcome" or anything
-  else. To wait for particular agents, use wait_for_event with agents.* A workflow file
-  with one is unreadable, and says so, rather than firing for every event of its kind.
-- **A wrong value is an error too**: *why on person.away is one of locked, idle; "asleep"
-  is not one of them.* `branch` takes any value.
+- **Filters are checked against the `inputSchema`** by the same checker as an MCP server's
+  event's, so the sentences read alike. Any other key is an error naming what the event
+  takes: *branch.moved takes branch; "to" is not one of its arguments.* For an agent event
+  it says how to wait for particular agents instead: *agent.finished takes no arguments;
+  "outcome" is not one of its arguments. To wait for particular agents, use wait_for_event
+  with agents.* A workflow file with one is unreadable, and says so, rather than firing for
+  every event of its kind.
+- **A wrong value is an error too**: *person.away: why is one of locked, idle, not asleep.*
+  `branch` takes any value.
 - **A wait already waiting** when this changed keeps matching as it was written.
+
+### The one list
+
+`wait_for_event` with action `list` gives every event an agent can wait on, in one list: the
+app's, then each of the project's MCP servers' that it offers by poll. Each is one line of
+JSON with its `name`, `source` (`app`, or the server's name in `mcp.json`), `description`,
+`inputSchema` and `payloadSchema`. A server that could not be asked is named on a line of
+its own. The workflow tool's description carries the app's part of the same list.
+
+Serving the app's own events over `events/poll` from the app's MCP endpoint, so any MCP
+client could subscribe to them, would be possible in this shape; it is not done.
 
 An agent can wait for its own project's events and for this Mac's. It cannot wait for
 another project's events.
@@ -63,23 +83,23 @@ agents, use `wait_for_event` with `agents`. Each shows:
 These describe the agent as it was when the event happened. A label added later doesn't change
 an event already on the log.
 
-| Event | Filters | Details shown | What it means |
+| Event | Filter by | Details | What it means |
 | --- | --- | --- | --- |
 | `agent.started` | — | agent | An agent started working. |
-| `agent.finished` | — | agent, outcome, afterwards | An agent ended a turn having done its work. `afterwards` is `park` when the agent is parked once the turn is over (it asked to be, or you parked it while it worked), else `stay`. `outcome` is `done`, `nothing_to_do`, `needs_answer`, `partly_done`, `stuck` or `blocked`. |
+| `agent.finished` | — | agent, outcome, afterwards | An agent ended a turn having done its work. `afterwards` is `archive_requested` when the turn ends asking to be archived, `archived` when the session is archived as the turn ends, else `stay`. `outcome` is `done`, `nothing_to_do`, `needs_answer`, `partly_done`, `stuck` or `blocked`. |
 | `agent.asked_permission` | — | agent | An agent is asking for permission. |
 | `agent.asked_form` | — | agent | An agent raised a form to fill in. |
 | `agent.blocked` | — | agent, waiting_on | An agent ended its turn waiting on something. When `waiting_on` names agents or a time to check again, the agent resumes by itself; otherwise it needs you to carry it on. See [Statuses and groups](statuses.md). |
 | `agent.stopped` | — | agent, by | An agent was stopped before finishing. `by` is `you`, `cost_limit` or `unknown`. |
 | `agent.failed` | — | agent, reason | An agent ended in an error. `reason` is `allowance_spent`, `rate_limited`, `process_died`, `sign_in_refused`, `runtime_error`, `sandbox_failed`, `max_tokens`, `max_turn_requests`, `refusal`, `daemon_gone`, `stopped_by_agent` or `unrecognised`. |
-| `agent.parked` | — | agent, outcome | An agent was parked: put down to come back to. `outcome` is its last report's, when it made one. |
+| `agent.archive_requested` | — | agent, outcome | An agent's turn ended asking for its session to be archived, and it waits for you to agree. `outcome` is its last report's, when it made one. |
 | `agent.messaged` | — | agent, from, from_title | An agent was sent a message by another agent with `message_agent`. `agent` is the one it was sent to; `from` is the sender's id and `from_title` its title. |
 | `agent.archived` | — | agent, by, outcome | An agent was archived. `by` is `you`, or `agent` when the agent that started it archived it with `archive_agent`. `outcome` is its last report's, when it made one. |
-| `agent.deleted` | — | agent, because | An archived agent was deleted with its conversation. `because` is `age` or `person`. A trigger on `agent.retired`, its name before #398, still answers. |
+| `agent.deleted` | — | agent, because | An archived agent was deleted with its conversation. `because` is `age` or `person`. |
 
 ## Projects
 
-| Event | Filters | Details shown | What it means |
+| Event | Filter by | Details | What it means |
 | --- | --- | --- | --- |
 | `project.idle` | — | agents, finished, blocked, waiting_on_you, stopped, failed, since, ids | Every agent in this project has stopped working. Raised once, a minute after the last agent stops, when none has started since. `agents` is how many worked since the project was last quiet, and `ids` their ids, comma-separated. `finished`, `blocked`, `waiting_on_you`, `stopped` and `failed` count how each of those stands now. `since` is when the first of them started. |
 
@@ -91,7 +111,7 @@ counting again from the next agent that works.
 
 ## Workflows
 
-| Event | Filters | Details shown | What it means |
+| Event | Filter by | Details | What it means |
 | --- | --- | --- | --- |
 | `workflow.ran` | — | workflow, agent | A workflow started an agent. |
 | `workflow.completed` | — | workflow, agent, outcome | A workflow's run finished. `outcome` is its agent's report's, when it made one. |
@@ -99,7 +119,7 @@ counting again from the next agent that works.
 
 ## Branches
 
-| Event | Filters | Details shown | What it means |
+| Event | Filter by | Details | What it means |
 | --- | --- | --- | --- |
 | `branch.moved` | branch | branch, from, to | A branch moved: the default branch, or one an agent works on. |
 
@@ -108,7 +128,7 @@ counting again from the next agent that works.
 Each project has a drop box, the folder `.agents/dropbox/` in it. See
 [Hand files to a workflow](../how-to/hand-files-to-a-workflow.md).
 
-| Event | Filters | Details shown | What it means |
+| Event | Filter by | Details | What it means |
 | --- | --- | --- | --- |
 | `dropbox.file_added` | — | path, name, folder, extension, size | A file arrived in this project's drop box, or a folder in it. `path` is the file's full path on the project's host. `name` is its name. `folder` is where it is inside `.agents/dropbox/`, such as `review` or `review/2026`, and empty at the top. `extension` is in lower case without the dot, and empty when there is none. `size` is in bytes. Raised once, when the file has stopped changing. A file replaced under the same name, or changed where it lies, is raised again. Files there when the app starts, and names starting with a dot, are not. |
 
@@ -120,10 +140,9 @@ These belong to the machine the host runs on, not to a project. Any agent can wa
 server has nothing that hears them. On a server, a `wait_for_event` naming only these is
 refused, one naming them with others says so in its answer, and `manage_workflows` says so
 when it writes or lists a workflow that triggers on them. The disk events fire on both, so
-they are `machine.`; their names before, `mac.disk_low` and `mac.disk_ok`, still work in a
-workflow file and a wait, and are read as the new ones.
+they are `machine.`.
 
-| Event | Filters | Details shown | What it means |
+| Event | Filter by | Details | What it means |
 | --- | --- | --- | --- |
 | `lease.granted` | — | resource, agent | An agent was given a lease. See [Leases on shared resources](../explanation/leases.md). |
 | `lease.released` | — | resource, how | A lease was given back, ended or ran out. `how` is `released`, `ended` or `expired`. |
@@ -229,18 +248,6 @@ Each workflow page shows a line for each server its event triggers hear, on the 
 iPhone and iPad and the web page: when it was last asked and when the last event came, or
 why not (**Can't reach ci**, the server no longer offers the event, refused it, or doesn't
 take the filters).
-
-## Older trigger names
-
-Workflows written before events keep working. Each older name answers to these events:
-
-| Older trigger | Events |
-| --- | --- |
-| `agent-finished` | `agent.finished` |
-| `agent-asked-permission` | `agent.asked_permission` |
-| `agent-asked-form` | `agent.asked_form` |
-| `agent-stopped` | `agent.stopped`, `agent.failed` |
-| `workflow-completed` | `workflow.completed` |
 
 ## The Events page
 

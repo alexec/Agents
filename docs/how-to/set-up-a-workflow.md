@@ -35,7 +35,7 @@ an agent finishes.
    ---
    name: Review finished work
    on:
-     - agent-finished
+     - agent.finished
    agent: new
    permission-mode: plan
    ---
@@ -45,10 +45,10 @@ an agent finishes.
    was itself only reviewing, say so and finish.
    ```
 
-   - `on` is what makes it run. Besides `agent-finished` there are `agent-stopped`,
-     `agent-asked-permission`, `agent-asked-form`, `workflow-completed`, a `schedule`
-     (on the hour or half hour, with optional hours and days), and any name on
-     [Events](../reference/events.md).
+   - `on` is what makes it run. Besides `agent.finished` there are `agent.stopped`,
+     `agent.failed`, `agent.asked_permission`, `agent.asked_form`, `workflow.completed`,
+     a `schedule` (on the hour or half hour, with optional hours and days), and any other
+     name on [Events](../reference/events.md).
    - Only a few events can be narrowed: `branch.moved` by `branch`, and `person.away` and
      `person.back` by `why`. To run when `main` moves:
 

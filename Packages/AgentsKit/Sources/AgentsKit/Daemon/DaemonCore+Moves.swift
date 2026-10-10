@@ -46,16 +46,16 @@ extension DaemonCore {
         if agent.afterTurn == .archive {
             throw JSONRPCError(code: JSONRPCError.invalidParams, message: """
                 Nothing was moved: you asked to be archived once this turn ends, and a run \
-                that moves is not archived. Park instead, or do not move.
+                that moves is not archived. Call request_archive with no id instead, or do not move.
                 """)
         }
         var answer = try await askMove(agentID, PendingMove(target: target, removeLeft: request.removeLeft,
                                                             discardChanges: request.discardChanges,
                                                             askedBy: .agent, askedAt: now()))
-        if answer.when == .afterTurn, agents[agentID]?.afterTurn == .park {
+        if answer.when == .afterTurn, agents[agentID]?.afterTurn == .requestArchive {
             answer.message = answer.message.replacingOccurrences(
                 of: "you will be started again there to carry on.",
-                with: "you stay parked there, as you asked, rather than being started again.")
+                with: "you stay there, asking the person to archive you, rather than being started again.")
         }
         return answer
     }

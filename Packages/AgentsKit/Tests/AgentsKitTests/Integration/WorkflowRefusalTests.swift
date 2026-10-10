@@ -403,7 +403,7 @@ struct WorkflowRefusalTests {
     @Test func anUnreadableFileRefusesAndSaysWhy() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
-        try write("---\non: agent-finished\n---\n\n   \n", as: "broken", in: work)
+        try write("---\non: agent.finished\n---\n\n   \n", as: "broken", in: work)
 
         let core = try await core(locations)
         await core.rescanWorkflows(in: work)
@@ -434,7 +434,7 @@ struct WorkflowRefusalTests {
     @Test func triggeringModeRunByHandHasNoAgentToResume() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
-        try write("---\non: agent-finished\nagent: triggering\n---\n\nGo.", as: "follow", in: work)
+        try write("---\non: agent.finished\nagent: triggering\n---\n\nGo.", as: "follow", in: work)
 
         let core = try await core(locations)
         await core.rescanWorkflows(in: work)
@@ -448,7 +448,7 @@ struct WorkflowRefusalTests {
         // Substituting would send words meant for one conversation into another.
         let (locations, root) = try temporary()
         let work = try project(root)
-        try write("---\non: agent-stopped\nagent: triggering\n---\n\nGo.", as: "follow", in: work)
+        try write("---\non: [agent.stopped, agent.failed]\nagent: triggering\n---\n\nGo.", as: "follow", in: work)
 
         let core = try await core(locations)
         await core.rescanWorkflows(in: work)
@@ -478,12 +478,12 @@ struct WorkflowRefusalTests {
 
     @Test func aWorkflowThatFiresOnItsOwnOutputComesToRestOnItsOwn() async throws {
         // The trap every first workflow falls into: an agent started by a workflow
-        // finishing is exactly what `agent-finished` watches for. Since #102 a workflow
+        // finishing is exactly what `agent.finished` watches for. Since #102 a workflow
         // is never fired by news of its own agents, so it runs once for the person's
         // agent and then rests — no loop, and no chain-depth refusal on the way.
         let (locations, root) = try temporary()
         let work = try project(root)
-        try write("---\non: agent-finished\n---\n\nGo again.", as: "loop", in: work)
+        try write("---\non: agent.finished\n---\n\nGo again.", as: "loop", in: work)
 
         let core = try await core(locations)
         await core.rescanWorkflows(in: work)
@@ -561,7 +561,7 @@ struct WorkflowRefusalTests {
         try write(onSchedule, as: "fine", in: work)
         try write("---\nagent: new\n---\n\n  \n", as: "broken", in: work)
         try write("---\non: deploys-finished\n---\n\nGo.", as: "future", in: work)
-        try write("---\non: agent-finished\nagent: triggering\n---\n\nGo.", as: "follow", in: work)
+        try write("---\non: agent.finished\nagent: triggering\n---\n\nGo.", as: "follow", in: work)
 
         let core = try await core(locations)
         await core.rescanWorkflows(in: work)
@@ -643,6 +643,6 @@ extension DaemonCore {
     func fireForTesting(workflowID: String, in folder: URL,
                         triggeringAgentID: UUID?) async -> WorkflowRefusal? {
         guard let workflow = workflow(workflowID, in: folder) else { return nil }
-        return await fire(workflow, on: .agentStopped, triggeringAgentID: triggeringAgentID)
+        return await fire(workflow, on: .event(EventPattern("agent.stopped")), triggeringAgentID: triggeringAgentID)
     }
 }

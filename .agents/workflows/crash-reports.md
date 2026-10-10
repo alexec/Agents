@@ -41,14 +41,16 @@ issues are the handoff: you fix nothing.
 
 ## 1. Set up
 
-```sh
-git worktree add .agents/worktrees/reviews-crashes agents/reviews-crashes 2>/dev/null \
-  || git worktree add -b agents/reviews-crashes .agents/worktrees/reviews-crashes main
-cd .agents/worktrees/reviews-crashes && git merge --no-edit main
-mkdir -p .agents/reviews/crashes
-```
+Move into the review worktree through the app, so it shows where you work (#615):
+- `.agents/worktrees/reviews-crashes` is there: move_worktree with its absolute path.
+- Only the branch `agents/reviews-crashes` is there: `git worktree add .agents/worktrees/reviews-crashes
+  agents/reviews-crashes`, then move_worktree with its absolute path.
+- Neither: move_worktree with worktree `reviews-crashes`.
 
-(If the worktree is already there, `cd` into it and merge `main`.) Read the newest note in
+End your turn; you are started again in it. There, `git merge --no-edit main` and
+`mkdir -p .agents/reviews/crashes`.
+
+Read the newest note in
 `.agents/reviews/crashes/` (`YYYY-MM-DD.md`): its `read-through:` is where the last run
 left off, and what it says it left undone is yours to finish first.
 
@@ -156,4 +158,4 @@ rm -rf "$OUT"
 ## 6. End
 
 End with one line per signature as in the note, plus the Remote line. If anything was
-left, ask Alex about it with your question tool. Otherwise call `park_agent` with no id.
+left, ask Alex about it with your question tool. Otherwise call `request_archive` with no id.

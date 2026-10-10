@@ -3,14 +3,14 @@ import Testing
 @testable import AgentsKit
 @testable import AgentsKitCore
 
-/// An agent asking, on the call that ends its turn, to be parked once that turn is
-/// over — driven through the real daemon. An ask to be archived from a session no
+/// An agent asking, with request_archive, for the person to archive it once that turn
+/// is over (#584) — driven through the real daemon. An ask to be archived from a session no
 /// workflow is running is refused whole (#433 covers the runs that may).
 ///
 /// What these are for is the shape of the promise: the ask takes effect only once the
 /// turn has ended as asked, is refused whole when it contradicts the outcome, and is
 /// dropped when the person moves the work on first.
-@Suite("Parked or archived at the end of a turn", .timeLimit(.minutes(1)))
+@Suite("Asking to be archived at the end of a turn", .timeLimit(.minutes(1)))
 struct AfterTurnTests {
     private func temporary() throws -> (StoreLocations, URL) {
         let root = URL(fileURLWithPath: NSTemporaryDirectory())
@@ -62,77 +62,76 @@ struct AfterTurnTests {
                                         afterwards: afterwards))
     }
 
-    // MARK: Park
+    // MARK: Request to archive
 
-    @Test func parkIsParkedWhenTheTurnEndsWithNoNeedAndNothingUnread() async throws {
+    @Test func aRequestMarksTheSessionWhenTheTurnEnds() async throws {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
         let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
-        let reply = try await finish(core, launcher, "partly_done", afterwards: "park")
-        #expect(reply.contains("will be parked"))
-        #expect(await core.agent(id)?.parking == nil, "nothing happens until the turn is over")
-        #expect(await core.agent(id)?.afterTurn == .park)
+        let reply = try await finish(core, launcher, "partly_done", afterwards: "request_archive")
+        #expect(reply.contains("will be asked to archive"))
+        #expect(await core.agent(id)?.archiveRequest == nil, "nothing happens until the turn is over")
+        #expect(await core.agent(id)?.afterTurn == .requestArchive)
 
         try await settle(core, id)
         let agent = try #require(await core.agent(id))
         #expect(agent.state == .finished, "the turn ran to its end")
-        #expect(agent.parking?.isParked == true)
-        #expect(agent.group(wantsEyes: false) == .parked)
+        #expect(agent.asksToArchive)
+        // Partly done still says so under Needs you; the mark is beside it (#584).
+        #expect(agent.group(wantsEyes: false) == .needsAttention)
         #expect(agent.afterTurn == nil)
-        #expect(agent.isUnread == false)
-        #expect(await !core.needs().contains { $0.agentID == id })
     }
 
-    /// The person's prompt drops a park ask the moment it is sent.
+    /// The person's prompt drops the ask the moment it is sent.
     @Test func thePersonsPromptDropsTheAsk() async throws {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
         let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
-        try await finish(core, launcher, "done", afterwards: "park")
+        try await finish(core, launcher, "done", afterwards: "request_archive")
         _ = await core.handle(method: DaemonAPI.Method.agentsPrompt,
                               params: try JSONValue.encoding(DaemonAPI.PromptRequest(agentID: id, text: "and then")))
         #expect(await core.agent(id)?.afterTurn == nil)
 
         try await settle(core, id)
-        #expect(await core.agent(id)?.group(wantsEyes: false) != .parked)
+        #expect(await core.agent(id)?.asksToArchive == false)
     }
 
-    @Test func aStopDropsTheParkAsk() async throws {
+    @Test func aStopDropsTheAsk() async throws {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
         let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
-        try await finish(core, launcher, "done", afterwards: "park")
+        try await finish(core, launcher, "done", afterwards: "request_archive")
         try await core.stop(id)
         try await settle(core, id)
 
         let agent = try #require(await core.agent(id))
         #expect(agent.state == .stopped)
         #expect(agent.afterTurn == nil)
-        #expect(agent.parking == nil)
+        #expect(agent.archiveRequest == nil)
     }
 
     // MARK: A later account
 
-    /// Since #481 the ask is park_agent's to make, so a later finish_turn without one
-    /// keeps it — while its ending still goes with a park.
+    /// Since #481 the ask is request_archive's to make, so a later finish_turn without
+    /// one keeps it — while its ending still goes with it.
     @Test func aLaterCallWithoutAfterwardsKeepsTheAsk() async throws {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
         let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
-        try await finish(core, launcher, "done", afterwards: "park")
+        try await finish(core, launcher, "done", afterwards: "request_archive")
         try await finish(core, launcher, "done", afterwards: nil)
-        #expect(await core.agent(id)?.afterTurn == .park)
+        #expect(await core.agent(id)?.afterTurn == .requestArchive)
 
         try await settle(core, id)
-        #expect(await core.agent(id)?.parking?.isParked == true)
+        #expect(await core.agent(id)?.asksToArchive == true)
     }
 
     /// And an ending that does not go with it drops it, telling the agent.
@@ -142,68 +141,68 @@ struct AfterTurnTests {
         let core = try core(launcher, locations: locations)
         let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
-        _ = try await core.askAfterTurn(.init(token: await mintedToken(launcher), afterwards: "park"))
+        _ = try await core.askAfterTurn(.init(token: await mintedToken(launcher), afterwards: "request_archive"))
         let reply = try await finish(core, launcher, "stuck", afterwards: nil)
-        #expect(reply.contains("Your ask to be parked is dropped"))
+        #expect(reply.contains("Your ask to be archived is dropped"))
         #expect(await core.agent(id)?.afterTurn == nil)
         try await settle(core, id)
-        #expect(await core.agent(id)?.parking == nil)
+        #expect(await core.agent(id)?.archiveRequest == nil)
     }
 
-    // MARK: park_agent with no id (#481)
+    // MARK: request_archive with no id (#481)
 
     /// Asked mid-turn and never followed by finish_turn: the turn's worked-out ending
-    /// goes with a park, and it is parked when the turn ends.
-    @Test func parkAgentOnItselfParksWhenTheTurnEnds() async throws {
+    /// goes with the request, and the session asks when the turn ends.
+    @Test func requestArchiveOnItselfAsksWhenTheTurnEnds() async throws {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
         let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
-        let reply = try await core.askAfterTurn(.init(token: await mintedToken(launcher), afterwards: "park"))
-        #expect(reply.contains("will be parked"))
-        #expect(await core.agent(id)?.parking == nil, "nothing happens until the turn is over")
+        let reply = try await core.askAfterTurn(.init(token: await mintedToken(launcher), afterwards: "request_archive"))
+        #expect(reply.contains("will be asked to archive"))
+        #expect(await core.agent(id)?.archiveRequest == nil, "nothing happens until the turn is over")
 
         try await settle(core, id)
         let agent = try #require(await core.agent(id))
         #expect(agent.state == .finished)
-        #expect(agent.parking?.isParked == true)
+        #expect(agent.asksToArchive)
     }
 
     /// Its own id is the same ask as none.
-    @Test func parkAgentWithItsOwnIdIsTheSameAsk() async throws {
+    @Test func requestArchiveWithItsOwnIdIsTheSameAsk() async throws {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
         let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
-        let reply = try await core.parkHelper(.init(token: await mintedToken(launcher), agentID: id.uuidString))
-        #expect(reply.contains("will be parked"))
-        #expect(await core.agent(id)?.afterTurn == .park)
+        let reply = try await core.requestArchiveHelper(.init(token: await mintedToken(launcher), agentID: id.uuidString))
+        #expect(reply.contains("will be asked to archive"))
+        #expect(await core.agent(id)?.afterTurn == .requestArchive)
         try await settle(core, id)
     }
 
-    /// A wait this turn and a park do not go together: the wait first refuses the park;
-    /// the park first is dropped by the wait, which says so.
-    @Test func aWaitAndAParkDoNotGoTogether() async throws {
+    /// A wait this turn and a request do not go together: the wait first refuses the
+    /// request; the request first is dropped by the wait, which says so.
+    @Test func aWaitAndARequestDoNotGoTogether() async throws {
         let (locations, work) = try temporary()
         let launcher = midTurn()
         let core = try core(launcher, locations: locations)
         let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
         let token = await mintedToken(launcher)
 
-        _ = try await core.askAfterTurn(.init(token: token, afterwards: "park"))
+        _ = try await core.askAfterTurn(.init(token: token, afterwards: "request_archive"))
         let waiting = try await core.waitOn(.init(token: token, untilMinutes: 5, message: "CI is running."))
-        #expect(waiting.contains("Your ask to be parked is dropped"))
+        #expect(waiting.contains("Your ask to be archived is dropped"))
         #expect(await core.agent(id)?.afterTurn == nil)
         #expect(await core.agent(id)?.report?.outcome == .blocked)
 
         let error = await #expect(throws: JSONRPCError.self) {
-            _ = try await core.askAfterTurn(.init(token: token, afterwards: "park"))
+            _ = try await core.askAfterTurn(.init(token: token, afterwards: "request_archive"))
         }
         #expect(error?.message.contains("this turn ended blocked") == true)
         try await settle(core, id)
-        #expect(await core.agent(id)?.parking == nil)
+        #expect(await core.agent(id)?.archiveRequest == nil)
     }
 
     /// Archiving itself is a workflow's run's, and only where its workflow allows.
@@ -228,19 +227,19 @@ struct AfterTurnTests {
         let core = try core(launcher, locations: locations)
         let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
-        try await finish(core, launcher, "done", afterwards: "park")
+        try await finish(core, launcher, "done", afterwards: "request_archive")
         _ = try await core.reportOutcome(.init(token: await mintedToken(launcher),
                                                outcome: "stuck", message: "The merge failed."))
         try await settle(core, id)
         #expect(await core.agent(id)?.state == .finished)
         #expect(await core.agent(id)?.afterTurn == nil)
-        #expect(await core.agent(id)?.parking == nil)
+        #expect(await core.agent(id)?.archiveRequest == nil)
     }
 
     // MARK: Refused whole
 
-    @Test(arguments: [("park", "needs_answer"), ("park", "stuck"),
-                      ("park", "blocked"), ("later", "done"),
+    @Test(arguments: [("request_archive", "needs_answer"), ("request_archive", "stuck"),
+                      ("request_archive", "blocked"), ("later", "done"),
                       // Only a workflow's run may archive itself, when its workflow allows (#433).
                       ("archive", "done")])
     func aPairingThatContradictsTheOutcomeRecordsNothing(_ afterwards: String, _ outcome: String) async throws {

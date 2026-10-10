@@ -18,6 +18,16 @@ struct BriefingTests {
         }
     }
 
+    /// What the person declared goes inside the lease line, so leasing is said once (#599).
+    @Test func theDeclaredResourcesAreInTheLeaseLine() {
+        let declared = [DeclaredResource(name: ResourceName("build")!, description: "Before builds.", holders: 2)]
+        let text = Briefing.text(for: ToolPolicyCatalog.claude, declared: declared)
+        #expect(text.contains(LeaseWords.briefing(declared: declared)))
+        #expect(text.components(separatedBy: "with lease_resource").count == 2)
+        #expect(Briefing.lines(for: ToolPolicyCatalog.claude, declared: declared).count
+                == Briefing.lines(for: ToolPolicyCatalog.claude).count)
+    }
+
     @Test func everyLineIsInTheBlockThatIsSent() {
         for policy in ToolPolicyCatalog.builtIn {
             for line in Briefing.lines(for: policy) {
@@ -62,16 +72,16 @@ struct BriefingTests {
     /// "I" and "you" anywhere else (#335).
     @Test func theNamingSentenceNamesTheRuntimeAndThePerson() {
         let line = Briefing.naming(Self.alex)
-        #expect(line.hasPrefix("You are Claude and I am Alex:"))
-        #expect(line.contains("in a question to me (a form card, a turn ending on my answer, or a question in a reply)"))
+        #expect(line.hasPrefix("You are Claude; I am Alex."))
+        #expect(line.contains("In a question to me (a form card, a turn ending on my answer, a question in a reply)"))
         #expect(!line.contains("messages to me"))
-        #expect(line.contains("anywhere else plain \"I\" and \"you\" are fine"))
-        #expect(line.contains("never write a bare \"I\" or \"you\""))
+        #expect(line.contains("Elsewhere, plain \"I\" and \"you\" are fine."))
+        #expect(line.contains("never a bare \"I\" or \"you\""))
         #expect(line.contains("\"Claude (this agent) will…\""))
         #expect(line.contains("\"Alex, do you want…?\""))
-        #expect(line.contains("name any other agent by its title"))
-        // One sentence, said once.
-        #expect(line.split(separator: ". ").count == 1)
+        #expect(line.contains("Name other agents by their title"))
+        // One paragraph, said once.
+        #expect(!line.contains("\n"))
         for policy in ToolPolicyCatalog.builtIn {
             let lines = Briefing.lines(for: policy, naming: Self.alex)
             #expect(lines.first == line)
@@ -90,9 +100,9 @@ struct BriefingTests {
     /// A helper names the agent that started it by title, as the person sees it.
     @Test func aHelperIsToldWhoStartedIt() {
         let helper = Briefing.naming(.init(runtime: "Claude", person: "Alex", startedBy: "Project lead"))
-        #expect(helper.hasPrefix("You are Claude, started by \u{201C}Project lead\u{201D}, and I am Alex:"))
+        #expect(helper.hasPrefix("You are Claude, started by \u{201C}Project lead\u{201D}; I am Alex."))
         let untitled = Briefing.naming(.init(runtime: "Claude", person: "Alex", startedBy: ""))
-        #expect(untitled.hasPrefix("You are Claude, started by another agent, and I am Alex:"))
+        #expect(untitled.hasPrefix("You are Claude, started by another agent; I am Alex."))
     }
 
     /// The person's name: the one set, else the account's first name, else something
@@ -106,7 +116,7 @@ struct BriefingTests {
         #expect(PersonSettings().resolved(accountName: "Alex Collins") == PersonSettings(name: "Alex"))
         // And what the daemon says with nothing set is this account's first name.
         let said = Briefing.naming(.init(runtime: "Claude", person: PersonSettings().effectiveName()))
-        #expect(said.contains("I am \(PersonSettings.firstName(of: NSFullUserName()) ?? "the person"):"))
+        #expect(said.contains("I am \(PersonSettings.firstName(of: NSFullUserName()) ?? "the person")."))
     }
 
     /// Without a naming, nothing is said: a caller that does not know says nothing.
@@ -124,9 +134,10 @@ struct BriefingTests {
             let line = Briefing.escalation(named: tool)
             #expect(!line.contains("mcp__"))
             #expect(line.lowercased().contains("ask me"))
+            #expect(line.contains("rather than guessing"))
             // The reason, which is the load-bearing half: an agent that believes nobody
             // is there is the agent that guesses.
-            #expect(line.contains("phone"))
+            #expect(line.contains("waits for me"))
         }
     }
 
@@ -163,8 +174,8 @@ struct BriefingTests {
     @Test func andNamesAskFormWhereThereIsNoRuntimeChannel() {
         for policy in [ToolPolicyCatalog.grok, ToolPolicyCatalog.copilot, ToolPolicyCatalog.gemini] {
             #expect(policy.escalationTool == nil, "\(policy.runtimeID)")
-            #expect(Briefing.text(for: policy).contains("Yours is called `\(AppTool.askForm)`"))
-            #expect(!Briefing.text(for: policy).contains("If you do not have it"))
+            #expect(Briefing.text(for: policy).contains("ask me with `\(AppTool.askForm)` rather"))
+            #expect(!Briefing.text(for: policy).contains("if you lack it"))
         }
         // Kept all the same: taking it out of the allowlist would buy nothing today and
         // cost us the day Grok gives it a way out.
@@ -228,14 +239,21 @@ struct BriefingTests {
     ///
     /// Raised with who is who (#121), to 3,150 and 2,950 and ten lines: one sentence,
     /// told to every agent, about 300 characters with a long name and a helper's starter.
+    ///
+    /// Lowered in #599, to 2,200 and 2,000: every line cut to its rule, the reasons
+    /// dropped but the one that earns its place (a question in a reply goes unread),
+    /// and leasing said once with what the person declared joined to it. Raised in the
+    /// same change, to 2,700 and 2,450, for what landed meanwhile: what not to ask
+    /// about (#601) and moving into worktrees (#615). Measured then at 2,621 for the
+    /// longest (Copilot, with a long name and a helper's starter).
     @Test func itStaysShortEnoughToBeRead() {
         let naming = Briefing.Naming(runtime: "Antigravity", person: "Alexandra", pronouns: "they/them",
                                      startedBy: "#121 agent names and questions")
         for policy in ToolPolicyCatalog.builtIn {
             let text = Briefing.text(for: policy, naming: naming)
-            #expect(text.count < 3_150, "\(policy.runtimeID): \(text.count)")
+            #expect(text.count < 2_700, "\(policy.runtimeID): \(text.count)")
             #expect(Briefing.lines(for: policy, naming: naming).count <= 10, "\(policy.runtimeID)")
-            #expect(Briefing.text(for: policy, managesAgents: false, naming: naming).count < 2_950,
+            #expect(Briefing.text(for: policy, managesAgents: false, naming: naming).count < 2_450,
                     "\(policy.runtimeID), for an agent another agent started")
         }
     }
@@ -365,7 +383,7 @@ struct BriefingTests {
             #expect(text.contains(Briefing.helpers), "\(policy.runtimeID)")
             #expect(text.contains(AppTool.startAgent))
         }
-        #expect(Briefing.helpers.contains("the limits the person set"))
+        #expect(Briefing.helpers.contains("within my limits"))
         for number in ["three", "five", "3", "5"] {
             #expect(!Briefing.helpers.contains(number), "\(number)")
         }
@@ -377,6 +395,26 @@ struct BriefingTests {
             #expect(!text.contains(Briefing.helpers), "\(policy.runtimeID)")
             #expect(!text.contains(AppTool.startAgent))
             #expect(text.contains(Briefing.leases), "and is told everything else")
+        }
+    }
+
+    // MARK: Worktrees through the app (#615)
+
+    /// Agents that only had the tool description made worktrees with git, and the app
+    /// never knew they had moved.
+    @Test func anAgentThatCanMoveIsToldToMoveThroughTheApp() {
+        for policy in ToolPolicyCatalog.builtIn {
+            #expect(Briefing.lines(for: policy).contains(Briefing.worktrees), "\(policy.runtimeID)")
+            #expect(Briefing.text(for: policy, managesAgents: false).contains(Briefing.worktrees))
+        }
+        #expect(Briefing.worktrees.contains(AppTool.moveWorktree))
+        #expect(Briefing.worktrees.contains("git worktree add"))
+    }
+
+    @Test func anAgentThatCannotMoveIsNotToldAboutMoveWorktree() {
+        for policy in ToolPolicyCatalog.builtIn {
+            #expect(!Briefing.text(for: policy, movesItself: false).contains(AppTool.moveWorktree),
+                    "\(policy.runtimeID)")
         }
     }
 

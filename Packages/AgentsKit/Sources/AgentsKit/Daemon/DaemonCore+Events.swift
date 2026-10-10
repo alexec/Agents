@@ -73,27 +73,33 @@ extension DaemonCore {
                      endingRun: endingRun).position
     }
 
+    /// `agent.finished`'s `afterwards`, once `move` has settled the turn's ending (#584).
+    func afterwards(_ agentID: UUID, _ agent: Agent) -> String {
+        if archiveWhenDone[agentID] != nil { return "archived" }
+        return agent.archiveRequest?.isRequested == true ? "archive_requested" : "stay"
+    }
+
     /// `agent.finished`, `agent.stopped` or `agent.failed`. Stopped is somebody or
     /// something choosing to stop it; failed is everything that ended it that nobody
-    /// chose. The old `agent-stopped` trigger answers to both (FR-022).
+    /// chose.
     @discardableResult
     ///
-    /// `parks` is whether the agent is parked once this ending is through, by its own
-    /// ask or the person's park while the turn ran (073 FR-003), which `move` has
-    /// decided by now. Read as "parked afterwards" rather than "parked by this ending":
-    /// a finish held back for the outcome question is raised on the second ending, by
-    /// when the park the first one made has already happened.
+    /// `afterwards` is what becomes of the session once this ending is through (073
+    /// FR-003, #584): `archive_requested`, `archived` or `stay`, which `move` has
+    /// decided by now. Read as "afterwards" rather than "by this ending": a finish held
+    /// back for the outcome question is raised on the second ending, by when the
+    /// request the first one made has already happened.
     /// The details are codes (073 FR-007, FR-008); the sentence keeps today's words.
     func raiseAgentEnding(_ agentID: UUID, next: AgentState, reason: EndedReason?, depth: Int,
-                          parks: Bool = false) -> EventPosition? {
+                          afterwards: String = "stay", endingRun: String? = nil) -> EventPosition? {
         guard let agent = agents[agentID] else { return nil }
         if next == .finished {
             let outcome = agent.report?.outcome
-            var details = ["afterwards": parks ? "park" : "stay"]
+            var details = ["afterwards": afterwards]
             if let outcome { details["outcome"] = outcome.rawValue }
             return raiseAgentEvent("agent.finished", agentID,
                                    sentence: outcome.map { "finished: \($0.heading.lowercased())." } ?? "finished.",
-                                   details: details, depth: depth)
+                                   details: details, depth: depth, endingRun: endingRun)
         }
         let words = reason?.summary?.lowercased() ?? "stopped"
         if Self.isChosenStop(reason) {
@@ -102,10 +108,12 @@ extension DaemonCore {
             case .costLimit: "cost_limit"
             default: "unknown"
             }
-            return raiseAgentEvent("agent.stopped", agentID, sentence: "was stopped.", details: ["by": by], depth: depth)
+            return raiseAgentEvent("agent.stopped", agentID, sentence: "was stopped.", details: ["by": by], depth: depth,
+                                   endingRun: endingRun)
         }
         return raiseAgentEvent("agent.failed", agentID, sentence: "ended in an error: \(words).",
-                               details: ["reason": reason?.code ?? EndedReason.unrecognised.code], depth: depth)
+                               details: ["reason": reason?.code ?? EndedReason.unrecognised.code], depth: depth,
+                               endingRun: endingRun)
     }
 
     static func isChosenStop(_ reason: EndedReason?) -> Bool {
@@ -117,19 +125,16 @@ extension DaemonCore {
 
     // MARK: Workflows
 
-    /// Fire every workflow with a new-style trigger this event matches (042 FR-021).
-    ///
-    /// Today's six trigger names keep firing from where they always have — the
-    /// lifecycle funnel, the clock, the run that finished — and are not
-    /// matched here, so nothing fires twice (research R7, as built). A project event
+    /// Fire every workflow with a trigger this event matches (042 FR-021). A schedule
+    /// fires from the clock, not here. A project event
     /// reaches that project's workflows; a Mac event reaches every project's. A workflow
     /// is never fired by news of itself, which with the chain-depth limit is what stops
     /// `workflow.refused` feeding on its own refusals — nor by news of its own agents
-    /// (#102), or every agent-finished workflow would run again on its own finish until
+    /// (#102), or every workflow on agent.finished would run again on its own finish until
     /// the limit refused it.
     func fireWorkflows(for event: Event, endingRun: String? = nil) {
         guard workflowsAreStarted else {
-            deferredEventsForWorkflows.append(event)
+            deferredEventsForWorkflows.append((event, endingRun))
             return
         }
         let folders: [URL]
@@ -148,7 +153,7 @@ extension DaemonCore {
                       !(event.subject == .agent && triggeringAgent.map {
                           isOwnAgent($0, of: workflow, endingRun: endingRun) } == true),
                       let trigger = workflow.triggers.first(where: { $0.matches(event) }) else { continue }
-                // Detached, as `workflowsRespond` does: `raise` is called from inside
+                // Detached: `raise` is called from inside
                 // the actor, and firing awaits things that call back into it.
                 Task { [weak self] in
                     await self?.fire(workflow, on: trigger, triggeringAgentID: triggeringAgent,

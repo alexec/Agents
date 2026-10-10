@@ -71,8 +71,7 @@ struct AgentRow: View {
                        isUnaccountedFor: agent.endingIsUnaccountedFor,
                        ending: agent.endedReason?.summary,
                        endedReason: agent.endedReason,
-                       isUnread: agent.isUnread,
-                       isParked: agent.parking?.isParked == true)
+                       isUnread: agent.isUnread)
                 .frame(width: isCompact ? 16 : nil)
                 .padding(.top, 1)
             }
@@ -130,7 +129,7 @@ struct AgentRow: View {
                 // thing depending on state is a row nobody can read at a glance. The
                 // state is the icon's; what it is doing is the title, which the agent
                 // keeps current; this is what it said.
-                // Stop, park or archive on its way, from whichever control sent it (#87).
+                // Stop or archive on its way, from whichever control sent it (#87).
                 // In the report's place, at the report line's height. Nothing is held for
                 // the line when there is none (#144): the row is fixed to its height below,
                 // so the list measures it again when a line arrives.
@@ -180,9 +179,9 @@ struct AgentRow: View {
                         }
                     }
 
-                    // What it holds or waits for (036), so an idle agent still holding the
-                    // simulator can be seen from the list.
-                    if let leases = model.work.leaseStatus(of: agent.id) {
+                    // What it holds (036), so an idle agent still holding the simulator can be
+                    // seen from the list. What it waits for is the wait line's.
+                    if let leases = model.work.leaseStatus(of: agent.id)?.holdingOnly {
                         LeaseMark(status: leases)
                     }
 
@@ -196,37 +195,33 @@ struct AgentRow: View {
                             .accessibilityLabel(running)
                     }
 
-                    // Waiting on events (042), on the same kind of line.
-                    if agent.eventWait?.isOpen == true, let wait = model.work.waitStatus(of: agent) {
-                        Text(wait.mark)
+                    // What it waits for (#582): agents (039), events (042) and resources (036)
+                    // on one line, the first and how many more, so the row says what it is
+                    // waiting for without opening it (039 SC-005) and stays one line tall.
+                    // Each in full is the line's help, and the chat's; Carry on is the menu's.
+                    if let wait = model.work.waitMark(of: agent) {
+                        Text(wait.line)
                             .appText(.fine)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
+                            .help(wait.detail)
                     }
-
-                    // Blocked (039): what it waits on, one line an agent, and when it will
-                    // look again — so the row says what it is waiting for without opening
-                    // it (SC-005). Carry on is here because the person often knows the block
-                    // has gone before the app does.
-                    if model.isBlocked(agent) {
-                        ForEach(model.blockLines(agent), id: \.self) { line in
-                            Text(line)
+                    // An agent asked for it to be archived (#584): the mark, and the one
+                    // click that agrees. In the sidebar the leading mark says it instead.
+                    if let line = ArchiveRequestWords.line(agent) {
+                        HStack(spacing: 6) {
+                            Label(line, systemImage: ArchiveRequestWords.symbol)
                                 .appText(.fine)
                                 .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                        Button(AgentsModel.carryOnLabel) { Task { await model.carryOn(agent.id) } }
+                            Button(ArchiveRequestWords.archive) {
+                                Task { await model.archive(agent.id, andLeave: true) }
+                            }
                             .buttonStyle(.paper)
                             .controlSize(.small)
-                            .padding(.top, 3)
-                            .help(AgentsModel.carryOnHelp(for: agent))
-                    }
-                    // Parked, and since when; or that it will park when this turn ends
-                    // (040). How it ended stays the icon's to say.
-                    if let line = ParkWords.line(agent.parking) {
-                        Text(line)
-                            .appText(.fine)
-                            .foregroundStyle(.tertiary)
+                            .help(ArchiveRequestWords.archiveHelp)
+                            .disabled(isActing)
+                        }
+                        .padding(.top, 3)
                     }
                 }
             }
@@ -266,13 +261,6 @@ struct AgentRow: View {
                 PinSessionButton(agent: agent)
                 // Branching leaves the original alone and carries the history so far.
                 Button("Branch") { Task { await model.fork(agent.id) } }
-                if let action = agent.parkAction {
-                    Button(ParkWords.label(action), systemImage: ParkWords.symbol(action)) {
-                        Task { await model.perform(action, on: agent.id) }
-                    }
-                    .help(ParkWords.help(action))
-                    .disabled(isActing)
-                }
                 Button("Archive") { Task { await model.archive(agent.id, andLeave: true) } }
                     .disabled(isActing)
             }
@@ -313,14 +301,17 @@ struct AgentRow: View {
 /// orange hand when it needs the person, a spinner while it works, two rings when it
 /// finished unread, an empty ring once read. Any other state keeps its `StatusIcon`.
 private struct SessionMark: View {
-    private enum Kind { case needsYou, working, unread, read }
+    private enum Kind { case needsYou, working, unread, read, asksToArchive }
     private let kind: Kind
 
     init?(agent: Agent, group: AgentGroup) {
         switch group {
         case .needsAttention, .blocked: kind = .needsYou
         case .running: kind = .working
+        // Asking to be archived (#584) is what the person has left to do with it.
+        case .finished where agent.asksToArchive: kind = .asksToArchive
         case .finished: kind = agent.showsUnread ? .unread : .read
+        case .stopped where agent.asksToArchive: kind = .asksToArchive
         default: return nil
         }
     }
@@ -336,6 +327,8 @@ private struct SessionMark: View {
                 Image(systemName: "circle.inset.filled").foregroundStyle(Paper.accent)
             case .read:
                 Image(systemName: "circle").foregroundStyle(Paper.accent)
+            case .asksToArchive:
+                Image(systemName: ArchiveRequestWords.symbol).foregroundStyle(Paper.accent)
             }
         }
         .frame(width: 16, height: 16)
@@ -349,6 +342,7 @@ private struct SessionMark: View {
         case .working: "Working"
         case .unread: "Unread"
         case .read: "Done"
+        case .asksToArchive: ArchiveRequestWords.mark
         }
     }
 }
@@ -368,9 +362,6 @@ struct StatusIcon: View {
     var endedReason: EndedReason?
     /// Said in the tooltip only; the row's dot is the mark, and the shape ignores it (#70).
     var isUnread = false
-    /// Parked (040): the shape still says how it ended, but it is not orange, because
-    /// the person has seen it and chosen later.
-    var isParked = false
     /// Waiting for an allowance to come back (052, US4): it will carry on by itself, so
     /// it does not want a person, whatever its stopped shape says.
     var isWaitingForAllowance = false
@@ -388,7 +379,7 @@ struct StatusIcon: View {
                 Image(systemName: symbol)
                     // Decorative: a glyph filling an 18-point well, not text (FR-015).
                     .font(.system(size: 15))
-                    .foregroundStyle((StatusShape.isTinted(shape, isParked: isParked, isWaitingForAllowance: isWaitingForAllowance)
+                    .foregroundStyle((StatusShape.isTinted(shape, isWaitingForAllowance: isWaitingForAllowance)
                                       ? StateTint.attention : .none)
                         .style(or: .secondary))
             } else {

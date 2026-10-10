@@ -30,3 +30,5 @@ Nothing here needs doing; it is for understanding.
   what agents cost, how either would plug in, and what the app could do instead.
 - [What agents are sent each turn](token-cost-of-tools.md): what the app's own tools add to
   every request, what is cached, and what was changed to cut it.
+- [Direction](direction.md): what the project is working towards now, what it is not,
+  and how the work is checked against it every few days.

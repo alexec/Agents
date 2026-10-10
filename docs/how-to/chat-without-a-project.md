@@ -32,7 +32,7 @@ so a file one chat saves there is there for the next.
 2. Type what you want and send.
 
 The chat is listed under **chat** in the sidebar, like any project's sessions, and can be
-parked, archived, labelled and searched the same way.
+archived, labelled and searched the same way.
 
 **Keep a file for a later chat**
 

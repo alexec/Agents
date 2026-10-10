@@ -44,7 +44,7 @@ struct AppServiceTests {
         let result = try await client.call("tools/list", .object([:]))
         let tools = result["tools"]?.arrayValue ?? []
         // No tool ends a turn: the app works out how each one ended.
-        // The four agent tools (028 + park) sit after the workflow tool, for an agent
+        // The five agent tools (028 + request_archive) sit after the workflow tool, for an agent
         // that may use them — which is the default. The three lease tools (036) follow
         // them, for every agent, then the three event tools (042). Labels and moving
         // (053) have tools of their own since #481. The two session tools (065) and message_agent (#560) sit after the agent tools, for every
@@ -53,7 +53,7 @@ struct AppServiceTests {
             == [AppService.showFileToolName,
                 AppService.workflowToolName, AppService.askFormToolName,
                 AppService.startAgentToolName, AppService.stopAgentToolName,
-                AppService.parkAgentToolName, AppService.archiveAgentToolName,
+                AppService.requestArchiveToolName, AppService.archiveAgentToolName,
                 AppService.listMyAgentsToolName,
                 AppService.setSessionLabelsToolName, AppService.moveWorktreeToolName,
                 AppService.listSessionsToolName, AppService.readSessionToolName,
@@ -295,7 +295,7 @@ struct AppServiceTests {
                 ])
             }
         }
-        #expect(AppService.parkAgentTool["inputSchema"]?["required"] == nil, "no id is yourself")
+        #expect(AppService.requestArchiveTool["inputSchema"]?["required"] == nil, "no id is yourself")
         await service.close()
     }
 
@@ -329,7 +329,7 @@ struct AppServiceTests {
 
     @Test func noToolNameEndsWithAnother() {
         let names = [AppTool.showFile, AppTool.manageWorkflows, AppTool.askForm,
-                     AppTool.startAgent, AppTool.stopAgent, AppTool.parkAgent, AppTool.archiveAgent,
+                     AppTool.startAgent, AppTool.stopAgent, AppTool.requestArchive, AppTool.archiveAgent,
                      AppTool.listMyAgents,
                      AppTool.waitForEvent, AppTool.cancelWait, AppTool.publishEvent,
                      AppTool.listResources]
@@ -344,7 +344,7 @@ struct AppServiceTests {
     /// (042 FR-024).
     @Test func theWorkflowToolListsTheSameEventsTheWaitToolDoes() {
         let description = AppService.workflowTool["description"]?.stringValue ?? ""
-        #expect(description.hasSuffix(EventCatalogue.describe()))
+        #expect(description.hasSuffix(EventList.text()))
     }
 
     // MARK: 073: where takes a list, and drops nothing

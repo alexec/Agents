@@ -60,7 +60,7 @@ something particular done.
   agent writes it, and type on it yourself.
 - [Look at an HTML page an agent wrote](look-at-an-html-page.md): a report or wireframe as a
   page, with its stylesheet and pictures, and what it is not allowed to do.
-- [Stop, park and archive agents](archive-park-stop.md): what each does, and what each
+- [Stop and archive agents](archive-and-stop.md): what each does, and what each
   keeps.
 - [Sign a runtime in](sign-a-runtime-in.md): sign Claude Code, Codex, Copilot, Cursor, Grok
   or Antigravity in or out from the app, and give Gemini its key.

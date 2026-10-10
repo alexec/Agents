@@ -42,15 +42,13 @@ public struct EventPattern: Hashable, Sendable {
     // MARK: Reading one
 
     /// A pattern checked against the catalogue, or the sentence saying what is wrong
-    /// with it. An event's old name is read as its new one (#372). Only a filter may
-    /// narrow it (#574): `branch` on `branch.moved`, `why` on `person.away` and
-    /// `person.back`; any other key, a custom event's own details included, is refused
-    /// naming the ones it takes, and a value a filter cannot have names the ones it can.
-    /// A server's event is the exception: its keys are the server's to check (#383).
+    /// with it. Only a filter may narrow it (#574): `branch` on `branch.moved`, `why` on
+    /// `person.away` and `person.back`. The filters are checked against the kind's
+    /// `inputSchema` by `JSONSchemaSubset`, as a server's event's arguments are (#579), so
+    /// a refusal reads the same for both. A server's event is not checked here: its keys
+    /// are the server's (#383, #577). An old name is unknown like any other (#575).
     public static func parse(_ given: String, filters: [String: DetailFilter] = [:]) -> Result<EventPattern, EventPatternProblem> {
-        // An old name is read as today's (#372), so a file written before a rename
-        // keeps firing.
-        let name = EventCatalogue.currentName(given.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+        let name = given.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let filters = Dictionary(filters.map { key, filter in
             (key.trimmingCharacters(in: .whitespaces),
              DetailFilter(anyOf: filter.values.map { $0.trimmingCharacters(in: .whitespaces) }) ?? filter)
@@ -72,16 +70,25 @@ public struct EventPattern: Hashable, Sendable {
                 return .failure(.unknown(name))
             }
         }
-        let allowed = EventCatalogue.filters(for: name)
-        for key in filters.keys.sorted() {
-            guard let detail = allowed.first(where: { $0.key == key }) else {
-                return .failure(.badFilter(name: name, key: key, valid: allowed.map(\.key)))
-            }
-            if let valid = detail.values, let given = filters[key]?.values.first(where: { !valid.contains($0) }) {
-                return .failure(.badValue(name: name, key: key, valid: valid, given: given))
-            }
+        if let problem = Self.problem(filters, against: EventCatalogue.inputSchema(for: name), name: name) {
+            return .failure(.badArguments(name: name, message: problem))
         }
         return .success(EventPattern(name, filters: filters))
+    }
+
+    /// What is wrong with filters against a schema, as `JSONSchemaSubset` says it. A
+    /// list is checked a value at a time, so `why: [locked, asleep]` names `asleep`.
+    static func problem(_ filters: [String: DetailFilter], against schema: JSONValue, name: String) -> String? {
+        let first = filters.mapValues { JSONValue.string($0.values[0]) }
+        if let problem = JSONSchemaSubset.check(.object(first), against: schema, name: name) { return problem }
+        for (key, filter) in filters.sorted(by: { $0.key < $1.key }) {
+            for value in filter.values.dropFirst() {
+                if let problem = JSONSchemaSubset.check([key: .string(value)], against: schema, name: name) {
+                    return problem
+                }
+            }
+        }
+        return nil
     }
 
     // MARK: From an event
@@ -91,8 +98,8 @@ public struct EventPattern: Hashable, Sendable {
     /// Copy as trigger starts from, so what it copies reads back.
     public static func matching(_ event: Event) -> EventPattern {
         var filters: [String: DetailFilter] = [:]
-        for detail in EventCatalogue.filters(for: event.name) {
-            if let value = event.details[detail.key] { filters[detail.key] = DetailFilter(value) }
+        for key in EventCatalogue.filterKeys(for: event.name) {
+            if let value = event.details[key] { filters[key] = DetailFilter(value) }
         }
         return EventPattern(event.name, filters: filters)
     }
@@ -163,7 +170,7 @@ extension EventPattern: Codable {
         for (key, values) in try c.decodeIfPresent([String: [String]].self, forKey: .anyOf) ?? [:] {
             if let filter = DetailFilter(anyOf: values) { filters[key] = filter }
         }
-        self = EventPattern(EventCatalogue.currentName(name), filters: filters)
+        self = EventPattern(name, filters: filters)
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -179,18 +186,12 @@ extension EventPattern: Codable {
 public enum EventPatternProblem: Error, Hashable, Sendable {
     case unknown(String)
     case badCustomName(String)
-    case badFilter(name: String, key: String, valid: [String])
-    /// A value a detail with fixed values cannot have (073 FR-019). For a list, the
-    /// first wrong one.
-    case badValue(name: String, key: String, valid: [String], given: String)
+    /// Filters its `inputSchema` does not take: a key it cannot be narrowed by, or a
+    /// value a filter cannot have (073 FR-019), in `JSONSchemaSubset`'s words (#579).
+    case badArguments(name: String, message: String)
 
     public var isBadFilter: Bool {
-        if case .badFilter = self { return true }
-        return false
-    }
-
-    public var isBadValue: Bool {
-        if case .badValue = self { return true }
+        if case .badArguments = self { return true }
         return false
     }
 
@@ -204,23 +205,25 @@ public enum EventPatternProblem: Error, Hashable, Sendable {
         case .badCustomName(let name):
             return "\"\(name)\" is not a custom event name: after custom. it is lowercase letters, digits "
                 + "and _, up to 40 characters."
-        case .badFilter(let name, let key, let valid):
-            guard !valid.isEmpty else {
-                let agents = EventSubject(name: name) == .agent
-                    ? " To wait for particular agents, use wait_for_event with agents." : ""
-                return "\(name) can't be narrowed, by \"\(key)\" or anything else.\(agents)"
-            }
-            return "\(name) can be narrowed only by \(valid.joined(separator: ", ")), not by \"\(key)\"."
-        case .badValue(let name, let key, let valid, let given):
-            return "\(key) on \(name) is one of \(valid.joined(separator: ", ")); \"\(given)\" is not one of them."
+        case .badArguments(let name, let message):
+            let agents = EventSubject(name: name) == .agent
+                ? " To wait for particular agents, use wait_for_event with agents." : ""
+            return message + agents
         }
     }
 
-    /// The catalogue name nearest to a mistyped one, if any is near enough to suggest.
+    /// The catalogue name nearest to a mistyped one, if any is near enough to suggest:
+    /// a few letters off (`agent-finished`), or, under another of the app's own nouns,
+    /// the one event with the same verb (`mac.disk_low` for `machine.disk_low`). A
+    /// server's noun is its own, so `ci.failed` is never `agent.failed`.
     public static func closest(to name: String) -> String? {
         let scored = EventCatalogue.all.map { ($0.name, distance(name, $0.name)) }
-        guard let best = scored.min(by: { $0.1 < $1.1 }), best.1 <= max(2, name.count / 4) else { return nil }
-        return best.0
+        if let best = scored.min(by: { $0.1 < $1.1 }), best.1 <= max(2, name.count / 4) { return best.0 }
+        guard let dot = name.firstIndex(of: "."), name.index(after: dot) < name.endIndex,
+              EventCatalogue.reservedNouns.contains(String(name[..<dot])) else { return nil }
+        let verb = name[dot...]
+        let same = EventCatalogue.all.filter { $0.name.hasSuffix(verb) }
+        return same.count == 1 ? same[0].name : nil
     }
 
     private static func distance(_ a: String, _ b: String) -> Int {

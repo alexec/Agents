@@ -1,18 +1,19 @@
 ---
 diataxis: how-to
 devices: [mac, iphone, ipad]
-description: Stop an agent mid-turn, park a chat to come back to later, or archive it when you are done.
+description: Stop an agent mid-turn, or archive a chat when you are done, including one that asks to be archived.
 ---
 
-# Stop, park and archive agents
+# Stop and archive agents
 
-Three ways to put an agent down, each keeping its whole conversation:
+Two ways to put an agent down, each keeping its whole conversation:
 
 - **Stop** ends what it is doing now. The chat stays where it is, and you can tell it what
   to do next.
-- **Park** puts a chat you have finished with *for now* in its own group, to come back to.
 - **Archive** puts away a chat you are done with. It folds out of sight under **Archived sessions**.
-  Any of them can be brought back.
+  It can be brought back.
+
+An agent that has finished can also ask you to archive it. You agree with one click.
 
 ## Before you start
 
@@ -31,20 +32,6 @@ Three ways to put an agent down, each keeping its whole conversation:
 3. To carry on, type a prompt and send it. The agent picks up with the whole conversation
    so far.
 
-**Park a chat**
-
-1. Open the conversation and click **Park**, between **Stop** and **Archive**. On iPhone
-   and iPad, tap the **Actions** menu (**…**) at the top and choose **Park**. On the
-   project's page you can also right-click the card and choose **Park**.
-
-   You go back to the project. The chat is under **Parked**, below **Stopped**, with when
-   you parked it. It does not ask for your attention while it is there, and it never
-   comes back by itself.
-2. If the agent is still working, it finishes the turn first. Its card says **Parks when
-   this turn ends**.
-3. To come back to it, open it and send a prompt; that unparks it. Or click **Unpark** to
-   put it back where it was without saying anything.
-
 **Archive a chat**
 
 1. Open the conversation and click **Archive** (on iPhone and iPad, **Archive** in the
@@ -61,16 +48,40 @@ Three ways to put an agent down, each keeping its whole conversation:
    On iPhone and iPad, open **Archived**, open the chat, and choose **Bring Back** from
    the **Actions** menu.
 
+**Archive a chat that asks to be archived**
+
+An agent that thinks its work is finished can ask to be archived. If its turn ends
+**Complete**, **Nothing to do** or **Partly done**, the chat carries an **Asks to archive**
+mark on its row, as the unread mark is. It stays in its group, usually **Done**; a
+partly done one stays under **Needs you**. Nothing is hidden until you archive it.
+
+1. Click **Archive** beside the mark on the Mac's row, or in the strip over the chat. On
+   iPhone, iPad and the web page, the strip over the chat has **Archive** too, and so do
+   the row's menu and its swipe.
+2. Or open **To Archive**, at the top of the sidebar. It gathers every chat that asks, in
+   every project and on every host, and is shown only when one does. **Archive All** in its
+   heading archives them all (on the Mac, it is also in the heading's right-click menu).
+3. To keep the chat instead, send it a prompt. That drops the request. So does a later turn
+   that ends wanting you: with a question, stuck, blocked or crashed. Bringing back an
+   archived chat does not bring the request back.
+
+A workflow's run whose workflow allows it to archive itself, and a helper in a project
+where agents may archive their helpers, are archived without asking you, if the turn ends
+**Complete** or **Nothing to do**. A partly done one still asks you. See
+[When a run is done](../reference/workflows.md#when-a-run-is-done) and
+**Agents may archive the helpers they started** in the
+[settings reference](../reference/settings.md).
+
 **What each keeps**
 
-| | Stop | Park | Archive |
-|---|---|---|---|
-| Conversation, cost, settings and labels | Kept | Kept | Kept |
-| Where it is listed | **Stopped** | **Parked** | **Archived sessions**, folded away |
-| Asks for your attention | No | Never | Never |
-| Worktree | Kept | Kept | Removed if everything in it is committed |
-| Afterwards | | | Deleted after 30 days, or now with **Delete…** |
-| Comes back by | Sending a prompt | Sending a prompt, or **Unpark** | **Bring Back** |
+| | Stop | Archive |
+|---|---|---|
+| Conversation, cost, settings and labels | Kept | Kept |
+| Where it is listed | **Stopped** | **Archived sessions**, folded away |
+| Asks for your attention | No | Never |
+| Worktree | Kept | Removed if everything in it is committed |
+| Afterwards | | Deleted after 30 days, or now with **Delete…** |
+| Comes back by | Sending a prompt | **Bring Back** |
 
 ## Deleting archived chats
 
@@ -87,7 +98,7 @@ it. An event or a chat that named it just says "another agent".
 - A chat whose worktree still has changes that are not committed or merged is kept until they
   are, and **Delete…** says why it cannot go yet. So is one a workflow run still belongs to.
   One you have open is kept from the 30 days, but **Delete…** still works on it.
-- To keep a chat, bring it back, or park it instead of archiving it.
+- To keep a chat, bring it back.
 - To change how long, or to keep archived chats until you delete them, see **Settings ▸
   General ▸ Archived agents** in the [settings reference](../reference/settings.md).
 

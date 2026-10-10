@@ -1,12 +1,16 @@
 // One session in the sidebar, as the Mac's AgentRow draws it (071 FR-018, #251): the status
 // mark (Coming back after a restart too), the title with who or what started it, the agent's own
 // last report, labels and the worktree, what it holds or waits for, what runs in the background,
-// what it waits on, and parking. Only Needs you is ever in colour.
+// what it waits on, and whether an agent asks for it to be archived. Only Needs you is ever in
+// colour. In the sidebar it is the mark, the title, the time and one grey line (#587): the rest is
+// the project page's and the chat's.
 import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
-import { eventWaitMark, leaseMark, startedByAgentLabel, worktreeHelp, type LeaseMark } from "../model/rowLines";
+import { leaseMark, startedByAgentLabel, waitMark, worktreeHelp, type LeaseMark, type WaitMark } from "../model/rowLines";
+import { blockWaitNames, openBlock } from "../model/block";
 import { backgroundMark } from "../model/background";
-import { parkedAt, projectFolder, showsUnread } from "../model/groups";
+import { projectFolder, showsUnread } from "../model/groups";
+import { archiveLine, archiveMark } from "../model/archiveWords";
 import { queuedLine, rowStatus, type StatusShape } from "../model/status";
 import { fromWireDate } from "../protocol/dates";
 import { Telling } from "./Telling";
@@ -27,7 +31,8 @@ export function StatusMark({ agent, comingBack = false }: { agent: Agent; coming
   );
 }
 
-const markWords: Record<SessionMark, string> = { needsYou: "Needs you", working: "Working", unread: "Unread", read: "Done" };
+const markWords: Record<SessionMark, string> = { needsYou: "Needs you", working: "Working", unread: "Unread", read: "Done",
+  asksToArchive: archiveMark };
 
 /**
  * A session's mark in the sidebar (#495, #499), the window's and the Remote's: an orange hand when
@@ -40,6 +45,7 @@ export function SidebarMark({ agent, comingBack = false }: { agent: Agent; comin
   return (
     <span class={`sidebar-mark ${mark}`} role="img" aria-label={markWords[mark]} title={markWords[mark]}>
       {mark === "needsYou" && <span class="glyph" aria-hidden="true">✋&#xFE0E;</span>}
+      {mark === "asksToArchive" && <span class="glyph" aria-hidden="true">🗃&#xFE0E;</span>}
     </span>
   );
 }
@@ -58,22 +64,14 @@ export function ago(date: Date, now = new Date()): string {
   return relative.format(Math.round(seconds), "second");
 }
 
-/** ParkWords.line: "Parked 3 days ago", or "Parks when this turn ends". */
-export function parkLine(agent: Agent): string | null {
-  if (!agent.parking) return null;
-  if ("whenTurnEnds" in agent.parking) return "Parks when this turn ends";
-  const at = fromWireDate(parkedAt(agent)!);
-  if (Date.now() - at.getTime() < 60_000) return "Parked just now";
-  return "Parked " + ago(at);
-}
-
 /** What a row says that its host's other state decides: who started it, its leases, its waits. */
 export interface RowExtras {
   comingBack: boolean;
   startedByWorkflow: string | null;
   startedByAgent: string | null;
   leases: LeaseMark | null;
-  eventWait: string | null;
+  /** What it waits for, on one line (#582): its block, its wait on events, the resources it is in line for. */
+  wait: WaitMark | null;
   /** A queued helper's place in its project's queue (#362), "Queued, 2nd". */
   queued: string | null;
 }
@@ -82,6 +80,7 @@ export interface RowExtras {
 export function rowExtras(store: Store, host: string, agent: Agent): RowExtras {
   const title = (id: string) => store.agent(host, id)?.title;
   const workflowID = agent.startedByWorkflow;
+  const leases = leaseMark(agent.id, store.leases.value[host], title);
   return {
     comingBack: store.isComingBack(host, agent.id),
     // Its id when the file has since gone, so the mark never goes with it, as the window's.
@@ -89,27 +88,31 @@ export function rowExtras(store: Store, host: string, agent: Agent): RowExtras {
       : store.projectWorkflows(host, projectFolder(agent))
         .find((w) => w.workflow.workflowID === workflowID)?.workflow.name ?? workflowID,
     startedByAgent: startedByAgentLabel(agent, title),
-    leases: leaseMark(agent.id, store.leases.value[host], title),
-    eventWait: eventWaitMark(agent, title),
+    leases,
+    wait: waitMark(agent, openBlock(agent)
+      ? { names: blockWaitNames(agent, store.agents.value[host] ?? []), lines: store.waitsOf(host, agent) }
+      : { names: [], lines: [] }, leases, title),
     queued: agent.state === "queued" ? queuedLine(agent, store.projectAgents(host, projectFolder(agent))) : null,
   };
 }
 
-export function SessionRow({ agent, chosen, onPick, going, waits = [], extras, inSidebar = false, place }: {
+export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = false, place }: {
   agent: Agent; chosen: boolean; onPick: () => void;
-  /** In the sidebar (#495): the state is the row's mark, unread among them, rather than a dot. */
+  /**
+   * In the sidebar (#495): the state is the row's mark, unread among them, rather than a dot, and
+   * the row is its title, time and one grey line (#587).
+   */
   inSidebar?: boolean;
   /** Which project it is in, after the title: under a smart group, which gathers every project's. */
   place?: string | undefined;
   /** What the window's row says from beyond the agent's record (#251). */
   extras?: RowExtras | undefined;
-  /** A blocked agent's wait lines (039, #157): blockLines over its host's agents. */
-  waits?: string[];
-  /** Stop, park or archive on its way (#87): what it is doing, and to whom. */
+  /** Stop or archive on its way (#87): what it is doing, and to whom. */
   going?: { doing: string; recipient: string } | undefined;
 }) {
   const running = backgroundMark(agent.background ?? []);
-  const park = parkLine(agent);
+  // The mark alone: the row is a button, so Archive is the menu's, the strip's and To Archive's (#584).
+  const asks = archiveLine(agent);
   const activity = fromWireDate(agent.lastActivityAt);
   const labels = agent.labels ?? [];
   return (
@@ -118,8 +121,10 @@ export function SessionRow({ agent, chosen, onPick, going, waits = [], extras, i
         : <StatusMark agent={agent} comingBack={extras?.comingBack ?? false} />}
       <span class="body">
         {/* Unread is a mark, as in Mail (#70): a dot (two rings in the sidebar) and a heavier title, gone once opened. */}
-        <span class={`title${showsUnread(agent) ? " unread" : ""}`} aria-description={showsUnread(agent) ? "unread" : undefined}>
-          {showsUnread(agent) && !inSidebar && <span class="unread-dot" aria-hidden="true" />}{agent.title ?? "Untitled"}
+        <span class={`title${showsUnread(agent) ? " unread" : ""}${place ? " placed" : ""}`} aria-description={showsUnread(agent) ? "unread" : undefined}>
+          {showsUnread(agent) && !inSidebar && <span class="unread-dot" aria-hidden="true" />}
+          {/* The title gives way before its project's name, which is whole (#587). */}
+          {place ? <span class="name">{agent.title ?? "Untitled"}</span> : agent.title ?? "Untitled"}
           {place && <span class="place"> {place}</span>}
           {/* Started by a workflow or another agent, not typed for by the person (028). */}
           {extras?.startedByWorkflow && (
@@ -133,26 +138,29 @@ export function SessionRow({ agent, chosen, onPick, going, waits = [], extras, i
         {/* In the report's place, as the window's row has it (#87). */}
         {going ? <span class="subtitle"><Telling recipient={going.recipient} doing={going.doing} /></span>
           : extras?.queued ? <span class="subtitle queued">{extras.queued}</span>
-          : agent.report && <span class="subtitle report">{agent.report.message}</span>}
+          : agent.report && !(inSidebar && folderIsMissing(agent)) && <span class="subtitle report">{agent.report.message}</span>}
         {/* Its folder gone (#119), as a project's row says it. */}
         {folderIsMissing(agent) && <span class="subtitle missing-folder" title={folderPath(agent)}>⚠ {missingFolderLabel}</span>}
-        {(agent.worktree || labels.length > 0) && (
-          <span class="chips">
-            {agent.worktree && <span class={`chip worktree${folderIsMissing(agent) ? " gone" : ""}`} title={worktreeHelp(agent.worktree, folderIsMissing(agent))}>⑂ {agent.worktree.name}</span>}
-            {labels.map((label) => <span key={label.value} class="chip label">{label.value}</span>)}
-          </span>
-        )}
-        {/* What it holds or waits for (036), so an idle agent still holding the screen can be seen. */}
-        {extras?.leases && (
-          <span class="subtitle lease-mark" role="note" aria-label={extras.leases.full} title={extras.leases.full}>
-            {extras.leases.mark}{extras.leases.more > 0 && <span class="quiet"> · and {extras.leases.more} more</span>}
-          </span>
-        )}
-        {running && <span class="subtitle">{running}</span>}
-        {/* Waiting on events (042), then on agents, one line an agent (039, #152). */}
-        {extras?.eventWait && <span class="subtitle wait-line">{extras.eventWait}</span>}
-        {waits.map((line) => <span key={line} class="subtitle wait-line">{line}</span>)}
-        {park && <span class="subtitle quiet">{park}</span>}
+        {/* In the sidebar, that one line is all (#587): what it holds, waits on, runs or is
+            labelled with is the chat's to say. */}
+        {!inSidebar && <>
+          {(agent.worktree || labels.length > 0) && (
+            <span class="chips">
+              {agent.worktree && <span class={`chip worktree${folderIsMissing(agent) ? " gone" : ""}`} title={worktreeHelp(agent.worktree, folderIsMissing(agent))}>⑂ {agent.worktree.name}</span>}
+              {labels.map((label) => <span key={label.value} class="chip label">{label.value}</span>)}
+            </span>
+          )}
+          {/* What it holds (036), so an idle agent still holding the screen can be seen. What it waits for is the wait line's. */}
+          {extras?.leases?.holds && (
+            <span class="subtitle lease-mark" role="note" aria-label={extras.leases.holds.full} title={extras.leases.holds.full}>
+              {extras.leases.holds.mark}{extras.leases.holds.more > 0 && <span class="quiet"> · and {extras.leases.holds.more} more</span>}
+            </span>
+          )}
+          {running && <span class="subtitle">{running}</span>}
+          {/* What it waits for (#582): agents, events and resources on one line; each in full is its title, and the chat's. */}
+          {extras?.wait && <span class="subtitle wait-line" title={extras.wait.detail}>{extras.wait.line}</span>}
+          {asks && <span class="subtitle quiet archive-mark">{asks}</span>}
+        </>}
       </span>
       <time class="when" dateTime={activity.toISOString()} title={activity.toLocaleString()}>{shortAgo(activity)}</time>
     </button>

@@ -443,30 +443,30 @@ struct MoveTests {
 
     // MARK: Moving with the other turn-end tools (#481)
 
-    /// Parked and moved in one turn: it moves, and stays parked there rather than being
-    /// started again. On the old `finish_turn`, which refused the pair, as on the new tools.
+    /// Asked to be archived and moved in one turn: it moves, and stays there asking
+    /// rather than being started again. On the old `finish_turn`, which refused the pair, as on the new tools.
     @Test(arguments: [false, true])
-    func aParkAndAMoveTogetherMoveAndStayParked(_ onFinishTurn: Bool) async throws {
+    func aRequestAndAMoveTogetherMoveAndStayAsking(_ onFinishTurn: Bool) async throws {
         let repo = try await repository()
         let (launcher, gate) = gatedLauncher()
         let core = try await makeCore(repo, launcher)
         let (id, token) = try await busyAgent(core, repo, gate, launcher)
 
         if onFinishTurn {
-            let answer = try await finish(core, token, "done", afterwards: "park",
-                                          move: .init(target: .newWorktree(name: "parked-there")))
-            #expect(answer.contains("will be parked"))
+            let answer = try await finish(core, token, "done", afterwards: "request_archive",
+                                          move: .init(target: .newWorktree(name: "asking-there")))
+            #expect(answer.contains("will be asked to archive"))
         } else {
-            let moving = try await core.moveSelf(.init(token: token, target: .newWorktree(name: "parked-there")))
+            let moving = try await core.moveSelf(.init(token: token, target: .newWorktree(name: "asking-there")))
             #expect(moving.when == .afterTurn)
-            let parking = try await core.askAfterTurn(.init(token: token, afterwards: "park"))
-            #expect(parking.contains("stay parked there"))
+            let asking = try await core.askAfterTurn(.init(token: token, afterwards: "request_archive"))
+            #expect(asking.contains("stay there asking"))
         }
 
         gate.open()
-        let moved = repo.top.appending(path: ".agents/worktrees/parked-there").path
+        let moved = repo.top.appending(path: ".agents/worktrees/asking-there").path
         await eventually("moved when the turn ended") { await core.agent(id)?.cwd.path == moved }
-        await eventually("parked") { await core.agent(id)?.parking?.isParked == true }
+        await eventually("asking") { await core.agent(id)?.asksToArchive == true }
         try await Task.sleep(for: .milliseconds(200))
         #expect(try await !appPrompts(core, id).contains(DaemonCore.carryOn), "not started again")
     }

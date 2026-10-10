@@ -1,18 +1,19 @@
 // What the Things-style sidebar (#495, #499) gathers and in what order, as the window's and the
 // Remote's `SidebarSmartRow` and `SidebarProjectFold` (AgentsKitCore/Sidebar) work it out: the
-// smart groups at the top across every project (Pinned, Needs You, Working, Unread), and each
-// project's sessions as one list, newest started first, the state the row's mark.
+// smart groups at the top across every project (Pinned, Needs You, Working, Unread, To Archive), and
+// each project's sessions as one list, newest started first, the state the row's mark. Each session
+// is listed once, in its first group (#587).
 import type { Agent, WorkflowSummary } from "../protocol/generated";
-import { byStart, folderKey, groupOf, showsUnread } from "./groups";
+import { asksToArchive, byStart, folderKey, groupOf, showsUnread } from "./groups";
 import { queryMatches, type LabelQuery } from "./labels";
 
-export type SmartRow = "pinned" | "needsYou" | "working" | "unread";
+export type SmartRow = "pinned" | "needsYou" | "working" | "unread" | "toArchive";
 
-/** In the sidebar's order: Pinned first, then by what they want. */
-export const smartRows: readonly SmartRow[] = ["pinned", "needsYou", "working", "unread"];
+/** In the sidebar's order: Pinned first, then by what they want, then what asks to be archived (#584). */
+export const smartRows: readonly SmartRow[] = ["pinned", "needsYou", "working", "unread", "toArchive"];
 
 export const smartTitles: Record<SmartRow, string> = {
-  pinned: "Pinned", needsYou: "Needs You", working: "Working", unread: "Unread",
+  pinned: "Pinned", needsYou: "Needs You", working: "Working", unread: "Unread", toArchive: "To Archive",
 };
 
 /** Pinned and Needs You start open, so the first thing the page says is who is waiting; the others start folded. */
@@ -20,24 +21,37 @@ export function smartStartsOpen(row: SmartRow): boolean {
   return row === "pinned" || row === "needsYou";
 }
 
-/** Whether a live session belongs under Needs You, Working or Unread (never Pinned: that is by pin). */
-export function inSmartRow(row: Exclude<SmartRow, "pinned">, agent: Agent): boolean {
-  const group = groupOf(agent);
-  switch (row) {
-    case "needsYou": return group === "needsAttention" || group === "blocked";
-    case "working": return group === "running";
-    case "unread": return group !== "archived" && showsUnread(agent);
+/**
+ * Where a live session is listed (#587), as `SidebarSmartRow.home`: once, in the first of the smart
+ * groups it belongs to (Pinned, Needs You, Working, To Archive (#584), Unread), or, in none of them,
+ * under its project (null). To Archive comes before Unread though it is drawn after it, so Archive
+ * All reaches every session that asks.
+ */
+export function home(agent: Agent, isPinned: boolean): SmartRow | null {
+  if (isPinned) return "pinned";
+  switch (groupOf(agent)) {
+    case "needsAttention": case "blocked": return "needsYou";
+    case "running": return "working";
+    case "archived": return null;
+    default: return asksToArchive(agent) ? "toArchive" : showsUnread(agent) ? "unread" : null;
   }
 }
 
+/** Whether a live session, not pinned, is listed under Needs You, Working, Unread or To Archive. */
+export function inSmartRow(row: Exclude<SmartRow, "pinned">, agent: Agent): boolean {
+  return home(agent, false) === row;
+}
+
 /** The mark a session's row carries in the sidebar (#495): what it wants, or null for its own status mark. */
-export type SessionMark = "needsYou" | "working" | "unread" | "read";
+export type SessionMark = "needsYou" | "working" | "unread" | "read" | "asksToArchive";
 
 export function sessionMark(agent: Agent): SessionMark | null {
   switch (groupOf(agent)) {
     case "needsAttention": case "blocked": return "needsYou";
     case "running": return "working";
-    case "finished": return showsUnread(agent) ? "unread" : "read";
+    // Asking to be archived (#584) is what the person has left to do with it, as the window's mark says.
+    case "finished": return asksToArchive(agent) ? "asksToArchive" : showsUnread(agent) ? "unread" : "read";
+    case "stopped": return asksToArchive(agent) ? "asksToArchive" : null;
     default: return null;
   }
 }
@@ -54,17 +68,28 @@ export function pinnedWorkflows(held: readonly WorkflowSummary[], pins: readonly
 }
 
 /**
- * A project's live sessions as one list (#495), the pinned left out: newest started first, not
- * by last activity, so a working session does not climb past the pointer with every line (#357).
+ * A project's live sessions as one list (#495), those a smart group lists left out, as each is
+ * listed once (#587): newest started first, not by last activity, so a working session does not
+ * climb past the pointer with every line (#357).
  */
 export function projectSessions(live: readonly Agent[], pins: readonly string[], query?: LabelQuery): Agent[] {
   const pinned = new Set(pins);
-  return live.filter((a) => !pinned.has(a.id) && (!query || queryMatches(query, a))).sort(byStart);
+  return live.filter((a) => home(a, pinned.has(a.id)) === null && (!query || queryMatches(query, a))).sort(byStart);
 }
 
-/** What a smart group (not Pinned) gathers from the projects' live sessions: newest started first. */
-export function smartAgents(row: Exclude<SmartRow, "pinned">, live: readonly Agent[], query?: LabelQuery): Agent[] {
-  return live.filter((a) => inSmartRow(row, a) && (!query || queryMatches(query, a))).sort(byStart);
+/** How many sessions a project's own group lists, folded or not (#587), as `SidebarProjectFold.ownCount`. */
+export function ownCount(live: readonly Agent[], pins: readonly string[]): number {
+  return projectSessions(live, pins).length;
+}
+
+/**
+ * What a smart group (not Pinned) gathers from the projects' live sessions, the pinned left out
+ * as they are listed in Pinned (#587): newest started first.
+ */
+export function smartAgents(row: Exclude<SmartRow, "pinned">, live: readonly Agent[], query?: LabelQuery,
+  pins: readonly string[] = []): Agent[] {
+  const pinned = new Set(pins);
+  return live.filter((a) => !pinned.has(a.id) && inSmartRow(row, a) && (!query || queryMatches(query, a))).sort(byStart);
 }
 
 /**

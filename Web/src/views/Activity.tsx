@@ -1,7 +1,7 @@
 // Activity at the top of the sidebar (#151), as the window's (#145): Events, Resources, Runtimes,
-// MCP Servers (#589) and Spending, each a row that says what it has at a glance and opens its page
-// in the chat's place. What each page lets you change is the Mac's, but for marking a runtime
-// available and stopping a wait (#541).
+// MCP Servers (#589) and Spending, each a row whose tooltip says what it has at a glance (#587)
+// and that opens its page in the chat's place. What each page lets you change is the Mac's, but
+// for marking a runtime available and stopping a wait (#541).
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
@@ -159,34 +159,28 @@ export function ActivityRows({ store, chosen, onPick }: {
   const mac = costs["mac"];
   const left = headroom(mac);
   // The page's name in the projects' type, after its icon in the accent, as the window's rows
-  // have it (#155, #495).
-  const row = (page: ActivityPage, title: string, help: string, detail: preact.ComponentChildren) => (
-    <button class={`row activity-row${chosen === page ? " chosen" : ""}`} aria-current={chosen === page} title={help}
-      onClick={() => onPick(page)}>
-      <span class="activity-icon" aria-hidden="true">{activityIcons[page]}</span>
+  // have it (#155, #495). Nothing at its end, which is only a session's (#587): what it would say
+  // at a glance is its tooltip's, and the icon turns red when the page has something wrong to say.
+  const row = (page: ActivityPage, title: string, help: string, figures: string | null, warns = false) => (
+    <button class={`row activity-row${chosen === page ? " chosen" : ""}`} aria-current={chosen === page}
+      title={figures ? `${figures}. ${help}` : help} aria-description={figures ?? undefined} onClick={() => onPick(page)}>
+      <span class={`activity-icon${warns ? " warns" : ""}`} aria-hidden="true">{activityIcons[page]}</span>
       <span class="title">{title}</span>
-      <span class="detail">{detail}</span>
     </button>
   );
+  const spent = [today && `${today} today`, left].filter(Boolean).join(", ");
   return (
     <>
-      {row("events", "Events", "What happened, what came of it, and who is waiting", last && `Last ${clock(last)}`)}
+      {row("events", "Events", "What happened, what came of it, and who is waiting", last && `Last at ${clock(last)}`)}
       {row("resources", "Resources", "Who holds the simulators, browsers and screen, and who is waiting",
-        held + waiting > 0 && `${held} held · ${waiting} waiting`)}
+        held + waiting > 0 ? `${held} held, ${waiting} waiting` : null)}
       {row("runtimes", "Runtimes", "What each runtime can be started on right now",
-        tally && (
-          <span aria-label={tally.working === 0 ? `None of ${tally.total} working` : `${tally.working} of ${tally.total} working`}>
-            {tally.working === 0 && <><span class="dot failure" aria-hidden="true" />{" "}</>}{tally.working}/{tally.total}
-          </span>
-        ))}
+        tally ? (tally.working === 0 ? `None of ${tally.total} working` : `${tally.working} of ${tally.total} working`) : null,
+        tally?.working === 0)}
       {row("mcp", "MCP Servers", "The MCP servers each host runs once for every agent, and why each last stopped",
-        hosted && <span>{hosted.stopped && <><span class="dot failure" aria-hidden="true" />{" "}</>}{hosted.words}</span>)}
-      {row("spending", "Cost", "What all of the work has cost, and what it cost today",
-        (today || left) && (
-          <span class={`spending${closeToFull(mac) && chosen !== "spending" ? " close" : ""}`}>
-            {today && <span>{today}</span>}{left && <span>{left}</span>}
-          </span>
-        ))}
+        hosted?.words ?? null, hosted?.stopped ?? false)}
+      {row("spending", "Cost", "What all of the work has cost, and what it cost today", spent || null,
+        closeToFull(mac))}
     </>
   );
 }

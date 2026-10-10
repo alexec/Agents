@@ -59,7 +59,7 @@ struct WorkflowFileTests {
     @Test func theNameFallsBackToTheFileName() {
         let workflow = parse("""
             ---
-            on: agent-finished
+            on: agent.finished
             ---
 
             Say something.
@@ -71,22 +71,26 @@ struct WorkflowFileTests {
         let workflow = parse("""
             ---
             on:
-              - agent-finished
-              - agent-stopped
+              - agent.finished
+              - agent.stopped
             agent: triggering
             ---
 
             Look at what happened.
             """)
         #expect(workflow.problem == nil)
-        #expect(workflow.triggers == [.agentFinished, .agentStopped])
+        #expect(workflow.triggers == [.event(EventPattern("agent.finished")), .event(EventPattern("agent.stopped"))])
         #expect(workflow.mode == .triggering)
     }
 
-    @Test func workflowCompletedTakesAnOptionalName() {
-        let anyOne = parse("---\non: workflow-completed\n---\n\nGo.")
-        #expect(anyOne.triggers == [.workflowCompleted(id: nil)])
-        let namedOne = parse("""
+    /// The names from before events (#575) are unknown names like any other: listed,
+    /// inert, with the event to use instead on the page.
+    @Test func anOldTriggerNameIsInertWithTheEventToUse() {
+        let workflow = parse("---\non: agent-finished\n---\n\nGo.")
+        #expect(workflow.triggers == [.unrecognised(name: "agent-finished", keys: [:])])
+        #expect(workflow.problem == .triggerNotSupported("agent-finished"))
+        #expect(workflow.problem?.message.hasSuffix("Did you mean agent.finished?") == true)
+        let chained = parse("""
             ---
             on:
               - workflow-completed:
@@ -95,7 +99,10 @@ struct WorkflowFileTests {
 
             Go.
             """)
-        #expect(namedOne.triggers == [.workflowCompleted(id: "morning-build-check")])
+        #expect(chained.supportedTriggers.isEmpty)
+        #expect(chained.triggers.first?.summary.hasSuffix("Did you mean workflow.completed?") == true)
+        let renamed = parse("---\non: mac.disk_low\n---\n\nGo.")
+        #expect(renamed.problem?.message.hasSuffix("Did you mean machine.disk_low?") == true)
     }
 
     @Test func commentsAndBlankLinesAreNotContent() {
@@ -104,13 +111,13 @@ struct WorkflowFileTests {
             # what this is for
             on:
 
-              - agent-finished   # every time
+              - agent.finished   # every time
             ---
 
             Go.
             """)
         #expect(workflow.problem == nil)
-        #expect(workflow.triggers == [.agentFinished])
+        #expect(workflow.triggers == [.event(EventPattern("agent.finished"))])
     }
 
     // MARK: Files from the future
@@ -133,7 +140,7 @@ struct WorkflowFileTests {
     }
 
     @Test func anUnknownModeIsInertRatherThanBroken() {
-        let workflow = parse("---\non: agent-finished\nagent: swarm\n---\n\nGo.")
+        let workflow = parse("---\non: agent.finished\nagent: swarm\n---\n\nGo.")
         #expect(workflow.problem == .unsupportedMode("swarm"))
         #expect(!workflow.canFire)
     }
@@ -143,20 +150,20 @@ struct WorkflowFileTests {
             ---
             on:
               - deploys-finished
-              - agent-finished
+              - agent.finished
             ---
 
             Go.
             """)
         #expect(workflow.problem == nil)
         #expect(workflow.canFire)
-        #expect(workflow.supportedTriggers == [.agentFinished])
+        #expect(workflow.supportedTriggers == [.event(EventPattern("agent.finished"))])
     }
 
     @Test func unknownTopLevelKeysAreKeptRatherThanDropped() {
         let workflow = parse("""
             ---
-            on: agent-finished
+            on: agent.finished
             retries: 3
             ---
 
@@ -169,16 +176,16 @@ struct WorkflowFileTests {
     // MARK: Which computers run it (#317)
 
     @Test func absentOrEmptyHostsRunOnEveryMachine() {
-        let absent = parse("---\non: agent-finished\n---\n\nGo.")
+        let absent = parse("---\non: agent.finished\n---\n\nGo.")
         #expect(absent.hosts == nil)
         #expect(absent.runs(on: "anywhere"))
 
-        let empty = parse("---\non: agent-finished\nhosts: []\n---\n\nGo.")
+        let empty = parse("---\non: agent.finished\nhosts: []\n---\n\nGo.")
         #expect(empty.problem == nil)
         #expect(empty.hosts == nil)
         #expect(empty.runs(on: "anywhere"))
 
-        let blank = parse("---\non: agent-finished\nhosts:\n---\n\nGo.")
+        let blank = parse("---\non: agent.finished\nhosts:\n---\n\nGo.")
         #expect(blank.problem == nil)
         #expect(blank.hosts == nil)
     }
@@ -186,7 +193,7 @@ struct WorkflowFileTests {
     @Test func aListAndASingleIdNameTheSameComputers() {
         let listed = parse("""
             ---
-            on: agent-finished
+            on: agent.finished
             hosts:
               - this-mac
               - this-mac
@@ -201,7 +208,7 @@ struct WorkflowFileTests {
         #expect(listed.runs(on: "this-mac"))
         #expect(!listed.runs(on: "a-third"))
 
-        let one = parse("---\non: agent-finished\nhosts: this-mac\n---\n\nGo.")
+        let one = parse("---\non: agent.finished\nhosts: this-mac\n---\n\nGo.")
         #expect(one.problem == nil)
         #expect(one.hosts == ["this-mac"])
         #expect(one.runs(on: "this-mac"))
@@ -211,7 +218,7 @@ struct WorkflowFileTests {
     @Test func aClaimBesideHostsStaysAKeyThisVersionDoesNotKnow() {
         let workflow = parse("""
             ---
-            on: agent-finished
+            on: agent.finished
             claim: one
             hosts:
               - this-mac
@@ -228,7 +235,7 @@ struct WorkflowFileTests {
     @Test func hostsThatAreNotIdsAreUnreadableAndStillShowEverywhere() {
         let mapped = parse("""
             ---
-            on: agent-finished
+            on: agent.finished
             hosts:
               name: this-mac
             ---
@@ -242,7 +249,7 @@ struct WorkflowFileTests {
 
         let nested = parse("""
             ---
-            on: agent-finished
+            on: agent.finished
             hosts:
               - name: this-mac
             ---
@@ -255,7 +262,7 @@ struct WorkflowFileTests {
     @Test func aBrokenFilePinnedElsewhereStaysOffThisList() {
         let workflow = parse("""
             ---
-            on: agent-finished
+            on: agent.finished
             enabled: sometimes
             hosts:
               - other-box
@@ -274,7 +281,7 @@ struct WorkflowFileTests {
     @Test func aSettingThatIsNotASingleValueIsUnreadable() {
         let listed = parse("""
             ---
-            on: agent-finished
+            on: agent.finished
             permission-mode:
               - plan
               - default
@@ -286,7 +293,7 @@ struct WorkflowFileTests {
 
         let blocked = parse("""
             ---
-            on: agent-finished
+            on: agent.finished
             model:
               name: opus
             ---
@@ -299,7 +306,7 @@ struct WorkflowFileTests {
     @Test func aRuntimeThisVersionHasNeverHeardOfIsNotAParseError() {
         let workflow = parse("""
             ---
-            on: agent-finished
+            on: agent.finished
             runtime: nonesuch
             ---
 
@@ -321,7 +328,7 @@ struct WorkflowFileTests {
     }
 
     @Test func anUnclosedMetadataBlockIsUnreadable() {
-        let workflow = parse("---\non: agent-finished\n\nGo.")
+        let workflow = parse("---\non: agent.finished\n\nGo.")
         #expect(workflow.problem == .unreadable("The metadata block is never closed"))
     }
 
@@ -345,15 +352,15 @@ struct WorkflowFileTests {
     }
 
     @Test func manualBesideATriggerIsJustTheTrigger() {
-        let workflow = parse("---\non: [manual, agent-finished]\n---\n\nGo.")
+        let workflow = parse("---\non: [manual, agent.finished]\n---\n\nGo.")
         #expect(workflow.problem == nil)
-        #expect(workflow.triggers == [.agentFinished])
+        #expect(workflow.triggers == [.event(EventPattern("agent.finished"))])
         #expect(!workflow.runsOnlyByHand)
     }
 
     @Test func anEmptyBodyIsUnreadable() {
         // A workflow with nothing to say is a scheduled no-op.
-        let workflow = parse("---\non: agent-finished\n---\n\n   \n")
+        let workflow = parse("---\non: agent.finished\n---\n\n   \n")
         #expect(workflow.problem == .unreadable("There is no prompt under the metadata"))
     }
 
@@ -432,7 +439,7 @@ struct WorkflowFileTests {
         // the top of a document when you do.
         let workflow = parse("""
             ---
-            on: agent-finished
+            on: agent.finished
             ---
 
             First paragraph.
