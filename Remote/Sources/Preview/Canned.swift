@@ -268,11 +268,8 @@ enum Canned {
 
     /// And the other kind of blocked, on an agent of its own.
     ///
-    /// On its own rather than behind the permission, which is where it started: the
-    /// phone will not draw two blocking cards at once — `formForSelection` hides the
-    /// form while a permission is live — so sharing an agent left the form unreachable
-    /// without answering the permission first, and a screen nobody can open is a screen
-    /// nobody can settle.
+    /// On its own rather than beside the permission, so each preview shows one card
+    /// as the phone first draws it; the two share the screen when both wait (#243).
     ///
     /// Two properties, not one, because that is what this app's own question tool
     /// actually sends: the choices, and an optional free-text "Other" beside them. A
