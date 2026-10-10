@@ -21,6 +21,12 @@ struct SidebarSessionRow: View {
     /// Mac's `AgentRow`.
     private var agent: Agent { model.work.agent(given.id) ?? given }
 
+    private var startedByWorkflowName: String? {
+        guard let id = agent.startedByWorkflow else { return nil }
+        return model.work.workflows(in: agent.projectFolder)
+            .first { $0.workflow.workflowID == id }?.workflow.name ?? id
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             // What it wants, as the window's sidebar says it (#495): the state is the
@@ -48,6 +54,13 @@ struct SidebarSessionRow: View {
                             .lineLimit(1)
                             .layoutPriority(-1)
                     }
+                    // Started by a workflow (the Mac row's mark), then by another agent.
+                    if let workflowName = startedByWorkflowName {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .appText(.fine)
+                            .foregroundStyle(.tertiary)
+                            .accessibilityLabel("started by the workflow \(workflowName)")
+                    }
                     if model.startedByAgentLabel(agent) != nil {
                         Image(systemName: AgentsModel.startedByAgentSymbol)
                             .appText(.fine)
@@ -56,7 +69,12 @@ struct SidebarSessionRow: View {
                 }
                 // The agent's own account of its last turn, one line, as on the Mac.
                 if let acting = model.acting(agent.id) {
-                    Telling(host: "your Mac", doing: acting.doing)
+                    Telling(host: model.answerRecipient(agent.id), doing: acting.doing)
+                } else if let queued = model.queuedLine(agent) {
+                    // Its place in its project's queue (#362), as the Mac's row says it.
+                    Text(queued)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
                 } else if agent.missingFolder != nil, agent.state != .archived {
                     Text(MissingFolderWords.label)
                         .appText(.fine)
