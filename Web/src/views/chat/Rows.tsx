@@ -14,7 +14,7 @@ import { backgroundEntryLine } from "../../model/background";
 import { outcomeNeedsAPerson } from "../../model/groups";
 import { outcomeHeadings, queuedLabel, startingLabel } from "../../model/status";
 import {
-  callLine, compactionLine, drawnInTurn, fields, isSummaryOnly, isThought, kindOf, turnLine, turnParts, type ChatTurn, type Item,
+  callLine, compactionLine, copiedText, drawnInTurn, fields, isSummaryOnly, isThought, kindOf, turnLine, turnParts, type ChatTurn, type Item,
 } from "../../model/turns";
 import { fileLinkPath, Markdown } from "../../render/markdown";
 import { AppView } from "./AppView";
@@ -275,6 +275,27 @@ export function fromLine(title: string | undefined): string {
   return `From \u201C${title ?? "another agent"}\u201D`;
 }
 
+/**
+ * Copy Message (#519): the whole message, as written, onto the clipboard. Shown while the pointer
+ * is on the message or the button has focus; the Mac and the phone have it on the message's menu.
+ */
+function CopyMessage({ entry }: { entry: TranscriptEntry }) {
+  const copied = useSignal(false);
+  const text = copiedText(entry);
+  if (!text) return null;
+  const copy = () => {
+    void navigator.clipboard?.writeText(text).then(() => {
+      copied.value = true;
+      setTimeout(() => { copied.value = false; }, 1500);
+    }, () => {});
+  };
+  return (
+    <button class="steps-control copy-message" onClick={copy} title="Copy this message, as written">
+      {copied.value ? "Copied" : "Copy"}
+    </button>
+  );
+}
+
 /** One entry, drawn as its kind is (EntryRow). Marked so Exchanged can bring it into view. */
 export function EntryRow({ entry }: { entry: TranscriptEntry }) {
   return <div class="entry-mark" data-entry={entry.id}>{entryBody(entry)}</div>;
@@ -285,17 +306,17 @@ function entryBody(entry: TranscriptEntry) {
     case "userMessage": {
       const message = fields(entry, "userMessage")!;
       if (message.from === "app") {
-        return <div class="note"><p class="faint">Agents asked</p><div class="quiet"><Blocks blocks={message.blocks} text={message._0} /></div></div>;
+        return <div class="note copyable"><p class="faint">Agents asked</p><div class="quiet"><Blocks blocks={message.blocks} text={message._0} /></div><CopyMessage entry={entry} /></div>;
       }
       if (message.from === "agent") {
         // Another agent's message (#560): the person's bubble, named as the sender's.
-        return <div class="from-agent"><p class="faint">{fromLine(entry.sender?.title)}</p><div class="bubble"><Blocks blocks={message.blocks} text={message._0} /></div></div>;
+        return <div class="from-agent"><p class="faint">{fromLine(entry.sender?.title)}</p><div class="bubble copyable"><Blocks blocks={message.blocks} text={message._0} /><CopyMessage entry={entry} /></div></div>;
       }
-      return <div class="bubble"><Blocks blocks={message.blocks} text={message._0} /></div>;
+      return <div class="bubble copyable"><Blocks blocks={message.blocks} text={message._0} /><CopyMessage entry={entry} /></div>;
     }
     case "agentMessage": {
       const message = fields(entry, "agentMessage")!;
-      return <div class="reply"><Blocks blocks={message.blocks} text={message.text} /></div>;
+      return <div class="reply copyable"><Blocks blocks={message.blocks} text={message.text} /><CopyMessage entry={entry} /></div>;
     }
     case "agentThought":
       return <p class="thought quiet">{fields(entry, "agentThought")!.text}</p>;

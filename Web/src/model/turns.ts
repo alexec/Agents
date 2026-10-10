@@ -20,6 +20,21 @@ export function fields<N extends KindName>(entry: TranscriptEntry, name: N):
   return (entry.kind as Record<string, unknown>)[name] as never;
 }
 
+/**
+ * What Copy puts on the clipboard for a message (#519), as `TranscriptEntry.copiedText`: all of
+ * what it says, as written, Markdown and all. Undefined for anything else, and for an empty one.
+ */
+export function copiedText(entry: TranscriptEntry): string | undefined {
+  const message = fields(entry, "userMessage");
+  const reply = fields(entry, "agentMessage");
+  const text = message ? message._0 : reply?.text;
+  if (text === undefined) return undefined;
+  const blocks = (message ?? reply)!.blocks ?? [];
+  const copied = text || blocks.map((block) => block.type === "text" ? block.text
+    : block.type === "resource" ? block.resource.text ?? "" : "").join("");
+  return copied || undefined;
+}
+
 const finishTurn = "finish_turn";
 const retiredEndOfTurn = ["suggest_next_prompts", "report_outcome"];
 

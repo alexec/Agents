@@ -3232,14 +3232,14 @@ final class AppModel {
     /// the turn is longer than a host gives in one answer (#200).
     /// Nil when they did not come, which the chat says and asks again for, rather than
     /// a turn with no steps for as long as the chat is open (#400).
-    func turnEntries(_ agentID: UUID, _ range: Range<Int>) async -> [TranscriptEntry]? {
+    func turnEntries(_ agentID: UUID, _ range: Range<Int>) async -> TranscriptPage? {
         do {
             return try await client(forAgent: agentID).call(
                 DaemonAPI.Method.agentsTranscript,
                 DaemonAPI.TranscriptRequest(agentID: agentID, before: range.upperBound,
                                             limit: min(range.count, DaemonAPI.TranscriptRequest.limitCeiling),
                                             from: range.lowerBound),
-                returning: TranscriptPage.self).entries
+                returning: TranscriptPage.self)
         } catch {
             Self.chatLog.notice("steps of \(agentID) did not load: \(self.describe(error), privacy: .public)")
             return nil

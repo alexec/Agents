@@ -37,3 +37,14 @@ for (const { name, input, expected } of cases("turns/lines.json")) {
     assert.deepEqual({ turnLine: turns.turnLine(input.call), line: turns.callLine(input.call) }, expected);
   });
 }
+
+test("copy takes the whole message as written (#519)", () => {
+  const agent = (text, blocks) => ({ id: "a", at: "", kind: { agentMessage: { messageID: "m", text, blocks } } });
+  assert.equal(turns.copiedText(agent("## Done\n\n- one\n- `two`")), "## Done\n\n- one\n- `two`");
+  assert.equal(turns.copiedText({ id: "u", at: "", kind: { userMessage: { _0: "Fix it", blocks: [] } } }), "Fix it");
+  // Blocks alone give the text in them.
+  assert.equal(turns.copiedText(agent("", [{ type: "text", text: "a" }, { type: "text", text: "b" }])), "ab");
+  // Nothing to copy is nothing offered.
+  assert.equal(turns.copiedText(agent("")), undefined);
+  assert.equal(turns.copiedText({ id: "n", at: "", kind: { runtimeNote: { _0: "note" } } }), undefined);
+});
