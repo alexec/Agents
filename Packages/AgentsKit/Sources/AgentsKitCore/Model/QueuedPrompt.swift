@@ -21,15 +21,23 @@ public struct QueuedPrompt: Codable, Hashable, Sendable, Identifiable {
     /// the app owes the agent about this prompt, such as the wait it just cancelled
     /// (042 FR-013). The person's bubble stays their own words.
     public var preface: String?
+    /// The agent that sent it, when `from` is `.agent` (#560).
+    public var sender: MessageSender?
+    /// How many messages between agents led here with no prompt from the person (#560):
+    /// 1 for an agent's message sent in a turn the person started. The loop guard.
+    public var hops: Int?
 
     public init(id: UUID = UUID(), text: String, attachments: [Attachment] = [],
-                queuedAt: Date = Date(), from: PromptOrigin = .person, preface: String? = nil) {
+                queuedAt: Date = Date(), from: PromptOrigin = .person, preface: String? = nil,
+                sender: MessageSender? = nil, hops: Int? = nil) {
         self.id = id
         self.text = text
         self.attachments = attachments
         self.queuedAt = queuedAt
         self.from = from
         self.preface = preface
+        self.sender = sender
+        self.hops = hops
     }
 
     /// What goes to the runtime when its turn comes: the words, then what was

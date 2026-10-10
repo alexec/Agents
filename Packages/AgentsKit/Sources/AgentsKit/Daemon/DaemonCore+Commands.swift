@@ -739,7 +739,7 @@ extension DaemonCore {
             // moment a turn ended under the words. They were said either way.
             await record(.userMessage(queued.text, blocks: queued.blocks.count > 1 ? queued.blocks : [],
                                       from: queued.from),
-                         for: request.agentID)
+                         for: request.agentID, sender: queued.sender)
         case .promptRequired:
             await putBack(queued, on: request.agentID)
             try await sendNextQueued(to: request.agentID)
@@ -878,7 +878,7 @@ extension DaemonCore {
         changed(agent)
         await beginTurn(agentID: agentID, text: next.text, blocks: next.blocks,
                         from: next.from, session: session, unlessStoppedSince: stopsBefore,
-                        requeue: next, preface: next.preface)
+                        requeue: next, preface: next.preface, sender: next.sender, hops: next.hops)
     }
 
     /// Whatever is waiting, now that a turn has ended of its own accord.
@@ -1293,7 +1293,8 @@ extension DaemonCore {
     func beginTurn(agentID: UUID, text: String, blocks: [ContentBlock]? = nil,
                    from: PromptOrigin = .person, session: ACPSession,
                    unlessStoppedSince stopsBefore: Int? = nil, requeue: QueuedPrompt? = nil,
-                   preface: String? = nil, recorded: Bool = true) async {
+                   preface: String? = nil, recorded: Bool = true, sender: MessageSender? = nil,
+                   hops: Int? = nil) async {
         // A runtime with a turn is work, not warm (#183), whoever handed it over.
         warm.removeValue(forKey: agentID)
         let blocks = blocks ?? [.text(text)]
@@ -1306,9 +1307,16 @@ extension DaemonCore {
         if from == .person, recorded { clearSuggestions(for: agentID) }
         // The text is kept beside the blocks so the record reads the way it always has.
         // A prompt sent again after a rate limit (052) is already on the record.
+        // The loop guard's count (#560): the person starts it again, another agent's
+        // message carries it on, and the app's own words leave it where it was.
+        switch from {
+        case .person: messageHops[agentID] = nil
+        case .agent: messageHops[agentID] = hops ?? messageHops[agentID] ?? 1
+        case .app: break
+        }
         if recorded {
             await record(.userMessage(text, blocks: blocks.count > 1 ? blocks : [], from: from),
-                         for: agentID)
+                         for: agentID, sender: sender)
             rateLimitAttempts[agentID] = nil
             if from == .person { retriedErrorAttempts[agentID] = nil }
         }
@@ -1318,7 +1326,8 @@ extension DaemonCore {
         // not, so nothing of theirs cleared the last turn's report. It stays where the
         // person sees it until this turn gives its own; what is noted here is that it
         // is not this turn's, so a silent ending is accounted for afresh (#479).
-        if from == .app, var agent = agents[agentID] {
+        // Another agent's message (#560) starts a turn the person did not, as the app's does.
+        if from != .person, var agent = agents[agentID] {
             reportBeforeTurn[agentID] = agent.report
             if agent.outcomeAsked {
                 agent.outcomeAsked = false
@@ -1330,10 +1339,10 @@ extension DaemonCore {
         // Stopped or archived while that was written. The move below would otherwise
         // take an archived agent straight back out of the archive — the app's own
         // question to a silent agent did, and started it in a worktree the archive had
-        // just removed. The app's words go; a person's go back on the queue, as a stop
-        // promises.
+        // just removed. The app's words go; a person's, or another agent's (#560), go back
+        // on the queue, as a stop promises.
         if let stopsBefore, stops[agentID, default: 0] != stopsBefore {
-            if from == .person, let requeue, var agent = agents[agentID] {
+            if from != .app, let requeue, var agent = agents[agentID] {
                 agent.queuedPrompts.insert(requeue, at: 0)
                 changed(agent)
             }

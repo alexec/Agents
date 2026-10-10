@@ -25,7 +25,7 @@ import { ContextMeter, CostLimitBanner, SandboxCapsule } from "./PromptStatus";
 import { SessionMenu } from "./SessionMenu";
 import { drawable } from "../model/options";
 import { projectFolder } from "../model/groups";
-import { CallActionsContext, detailSummaries, detailTitles, TurnView, type CallActions, type TurnDetail } from "./chat/Rows";
+import { CallActionsContext, detailSummaries, detailTitles, fromLine, TurnView, type CallActions, type TurnDetail } from "./chat/Rows";
 import { nameOf, pathOf, setPane } from "./files/paneState";
 import { FileSearch, isOpenFileKey } from "./files/FileSearch";
 import { focusedEntry } from "../model/focus";
@@ -601,7 +601,9 @@ function Queued({ store, host, agent, disabled }: { store: Store; host: string; 
         // The person's bubble, dashed and dimmed, with what can be done to it underneath (#95).
         return (
         <div key={queued.id} class="queued">
-          <div class="queued-bubble" role="group" aria-label={`Queued: ${queued.text}`}>
+          {queued.from === "agent" && <p class="faint">{fromLine(queued.sender?.title)}</p>}
+          <div class="queued-bubble" role="group"
+            aria-label={queued.from === "agent" ? `Queued, ${fromLine(queued.sender?.title)}: ${queued.text}` : `Queued: ${queued.text}`}>
             <p>{queued.text}</p>
             {queued.attachments.length > 0 && <p class="small">📎 {queued.attachments.map((a) => a.displayName).join(", ")}</p>}
           </div>

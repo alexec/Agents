@@ -47,7 +47,7 @@ struct AppServiceTests {
         // The four agent tools (028 + park) sit after the workflow tool, for an agent
         // that may use them — which is the default. The three lease tools (036) follow
         // them, for every agent, then the three event tools (042). Labels and moving
-        // (053) have tools of their own since #481. The two session tools (065) sit after the agent tools, for every
+        // (053) have tools of their own since #481. The two session tools (065) and message_agent (#560) sit after the agent tools, for every
         // agent. The pin tools (#159, #180) come last, for every agent.
         #expect(tools.compactMap { $0["name"]?.stringValue }
             == [AppService.showFileToolName,
@@ -57,6 +57,7 @@ struct AppServiceTests {
                 AppService.listMyAgentsToolName,
                 AppService.setSessionLabelsToolName, AppService.moveWorktreeToolName,
                 AppService.listSessionsToolName, AppService.readSessionToolName,
+                AppService.messageAgentToolName,
                 AppService.leaseResourceToolName, AppService.releaseResourceToolName,
                 AppService.listResourcesToolName,
                 AppService.waitForEventToolName, AppService.cancelWaitToolName,

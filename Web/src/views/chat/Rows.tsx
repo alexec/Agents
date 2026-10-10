@@ -261,6 +261,11 @@ function SandboxFailureCard({ record }: { record: SandboxFailureRecord }) {
   );
 }
 
+/** Who another agent's message is from (#560), as the queued bubble says it too. */
+export function fromLine(title: string | undefined): string {
+  return `From \u201C${title ?? "another agent"}\u201D`;
+}
+
 /** One entry, drawn as its kind is (EntryRow). Marked so Exchanged can bring it into view. */
 export function EntryRow({ entry }: { entry: TranscriptEntry }) {
   return <div class="entry-mark" data-entry={entry.id}>{entryBody(entry)}</div>;
@@ -272,6 +277,10 @@ function entryBody(entry: TranscriptEntry) {
       const message = fields(entry, "userMessage")!;
       if (message.from === "app") {
         return <div class="note"><p class="faint">Agents asked</p><div class="quiet"><Blocks blocks={message.blocks} text={message._0} /></div></div>;
+      }
+      if (message.from === "agent") {
+        // Another agent's message (#560): the person's bubble, named as the sender's.
+        return <div class="from-agent"><p class="faint">{fromLine(entry.sender?.title)}</p><div class="bubble"><Blocks blocks={message.blocks} text={message._0} /></div></div>;
       }
       return <div class="bubble"><Blocks blocks={message.blocks} text={message._0} /></div>;
     }

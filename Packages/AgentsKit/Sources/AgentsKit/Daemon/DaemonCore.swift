@@ -589,6 +589,11 @@ public actor DaemonCore {
     /// Tries so far at carrying each agent on past a turn that ended on a retried error
     /// (#513). Cleared by a turn that ends any other way, and by the person's next prompt.
     var retriedErrorAttempts: [UUID: Int] = [:]
+    /// How many messages between agents led to each agent's current turn with no prompt
+    /// from the person (#560): the loop guard's count. In memory; a restart forgets it.
+    var messageHops: [UUID: Int] = [:]
+    /// When each agent sent its messages in the last hour (#560), for the rate cap.
+    var messagesSent: [UUID: [Date]] = [:]
     /// How those are tried. A test shortens the waits; nothing else changes it.
     var retriedErrorPolicy = RetriedErrorPolicy.standard
     /// The last cost figure each agent's runtime quoted, per currency.
@@ -1117,8 +1122,9 @@ public actor DaemonCore {
 
     /// Append to the record first, then tell the windows. That order is the whole
     /// reason a daemon killed mid-turn still leaves something true behind.
-    func record(_ kind: TranscriptEntry.Kind, for agentID: UUID, subagentID: String? = nil) async {
-        let entry = TranscriptEntry(kind: kind, subagentID: subagentID)
+    func record(_ kind: TranscriptEntry.Kind, for agentID: UUID, subagentID: String? = nil,
+                sender: MessageSender? = nil) async {
+        let entry = TranscriptEntry(kind: kind, subagentID: subagentID, sender: sender)
         if case .userMessage(_, _, .person) = kind { clearWaitingSandbox(agentID: agentID) }
         var bytes: Int?
         do {

@@ -430,7 +430,8 @@ export function omittingThoughts(items: readonly Item[]): Item[] {
 export function isPersonsAsk(item: Item): boolean {
   if (item.kind !== "entry") return false;
   const message = fields(item.entry, "userMessage");
-  return message !== undefined && (message.from ?? "person") === "person";
+  // Another agent's message starts a turn as the person's prompt does (#560); the app's question does not.
+  return message !== undefined && (message.from ?? "person") !== "app";
 }
 
 function isAgentMessage(item: Item): boolean {

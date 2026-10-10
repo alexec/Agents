@@ -9,6 +9,20 @@ public enum PromptOrigin: String, Codable, Hashable, Sendable {
     case person
     /// The app asking on its own behalf. Today: the one question after a silent ending.
     case app
+    /// Another agent in the project, with `message_agent` (#560). Who is on the entry's
+    /// `sender`: drawn as theirs, never as the person's.
+    case agent
+}
+
+/// The agent a message came from (#560): its id, and its title as it was when it sent.
+public struct MessageSender: Codable, Hashable, Sendable {
+    public var agentID: UUID
+    public var title: String
+
+    public init(agentID: UUID, title: String) {
+        self.agentID = agentID
+        self.title = title
+    }
 }
 
 /// One line of an agent's life, appended and never rewritten.
@@ -26,12 +40,17 @@ public struct TranscriptEntry: Codable, Hashable, Sendable, Identifiable {
     /// these out, and the subagent's own page shows only these. Absent on everything
     /// written before, which is the agent's.
     public var subagentID: String?
+    /// The agent that sent this prompt, on a `userMessage` from `.agent` (#560). Absent on
+    /// everything else.
+    public var sender: MessageSender?
 
-    public init(id: UUID = UUID(), at: Date = Date(), kind: Kind, subagentID: String? = nil) {
+    public init(id: UUID = UUID(), at: Date = Date(), kind: Kind, subagentID: String? = nil,
+                sender: MessageSender? = nil) {
         self.id = id
         self.at = at
         self.kind = kind
         self.subagentID = subagentID
+        self.sender = sender
     }
 
     public enum Kind: Codable, Hashable, Sendable {

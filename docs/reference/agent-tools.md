@@ -34,6 +34,7 @@ There's no tool for ending a turn. The app works out how each one ended: **Compl
 | `set_session_labels` | Adds or removes labels the agent owns on its own session, at once. It cannot remove or claim one of yours. | The runtime decides. |
 | `list_sessions` | Lists the sessions in this project, most recent first, its own included: each one's id, title, runtime, status, worktree and branch, the resources it holds, and what it last said. Nothing from another project. | No. The app answers. |
 | `read_session` | Reads one session in this project, by its id or exact title: what you asked, what the agent said, the tools it ran and the files they touched, what it said of how the work went, and its plan as it last stood. A long one keeps the first request and the latest turns and says how many were left out. Reading it changes nothing. A title used twice, a deleted session, or one not in this project is refused in words. Used when you ask an agent to continue another session's work. | No. The app answers. |
+| `message_agent` | Sends words to another session in this project, by its id or exact title. It reads them as a prompt marked as the sender's, and its chat shows them as "From" that agent on the Mac, the Remote and the web. A session that is working reads it after its turn; one that is done or parked is woken by it, within the project's running limit for agents started by agents; one you started, or one waiting on your answer, is not woken: the message waits in its chat for you. It never answers a question or permission card. Limits: 4,000 characters, 30 messages an hour per sender, and at most 3 messages between agents in a row with no prompt from you; your next prompt starts the count again. Raises `agent.messaged`. | No. The app answers. |
 | `lease_resource` | Takes a turn with something only one agent should use at a time: a simulator, a browser, the screen, or anything it names. Waits up to 45 seconds if someone else holds it, then keeps the agent's place in line. A lease lasts 30 minutes unless the agent asks for up to 240 (or the declared resource's own lengths), and calling it again extends it. A declared resource may allow more than one holder at once. | The runtime decides. |
 | `release_resource` | Gives back a lease, or leaves the line for one. | The runtime decides. |
 | `list_resources` | Lists what can be leased on this Mac, and who holds or is waiting for what. Resources declared in Settings ▸ Resources come first, with their descriptions, even when free; the agent is told to lease one whenever its description applies. | The runtime decides. |
@@ -65,7 +66,7 @@ helper's not-archived place stays taken until it is archived. A lead should arch
 helper once its work is merged or abandoned, rather than remove the helper's worktree under
 it; archiving removes a worktree the app made for it once everything in it is committed. Both limits are yours alone to
 change: the tools only read them. They are kept in the project's `.agents/project.json`;
-a value written there by hand is held to the maximums. `list_sessions` and `read_session` are
+a value written there by hand is held to the maximums. `list_sessions`, `read_session` and `message_agent` are
 given to every agent, including one another agent started.
 
 ## See also
