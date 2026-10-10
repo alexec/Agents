@@ -1094,14 +1094,12 @@ final class RemoteModel {
     /// The question the open conversation is blocked on, if it still is.
     var questionsForSelection: [PermissionRequest] { work.permissions(for: selection) }
 
-    /// The form it is blocked on instead, if it is one of those.
+    /// The form it is blocked on, if it is one of those.
     ///
-    /// The two never share the screen, and the permission wins where both somehow
-    /// exist: it is the one the runtime is most likely to be sitting on, and two
-    /// blocking cards at once on a phone is a card nobody can read.
-    var formForSelection: ElicitationRequest? {
-        questionsForSelection.isEmpty ? work.elicitation(for: selection) : nil
-    }
+    /// Shown beside any permission rather than behind it, as on the Mac and the page
+    /// (#243, #539): each waits on its own, and a form hidden until a permission is
+    /// answered is a form that cannot be answered first.
+    var formForSelection: ElicitationRequest? { work.elicitation(for: selection) }
 
     /// A file being read, by path, or nothing.
     ///
