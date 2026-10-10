@@ -141,12 +141,12 @@ The deltas are tracked by 29 issues:
 | Moving a session to another place (053) | Worktree capsule: `A/Chat/PromptBar.swift:1185-1261` | None | Names the place, can't move: `W/views/Chat.tsx:249-264` | **by design** (moving is the window's) |
 | Model and effort | One `ModelPill`: `S/Chat/ModelPill.swift` | One `ModelPill` | One combined disclosure: `W/views/PromptMenus.tsx` | **same** |
 | The order of a menu's choices (#436) | Models: Auto or Default first, then by family (Claude, GPT, Gemini, Grok, the rest by name), newest and most capable first; modes, effort and permissions as the runtime sent them. Sorted once as an option is read: `K/Model/ChoiceOrder.swift` | The same, from the shared model | The same: the daemon sends them in order | **same** (#436) |
-| No-controls note | `OptionsNote`: `S/Chat/PromptPieces.swift` | The same | `W/views/PromptMenus.tsx` | **same** |
+| No-controls note | `OptionsNote`: `S/Chat/PromptPieces.swift` | The same | `W/views/PromptMenus.tsx`, the runtime named (#542) | **same** (#542) |
 | Sandbox capsule | `S/Chat/SandboxCapsule.swift`, `A/Chat/PromptBar.swift:854-878` | `R/Chat/PromptBar.swift:498-505` | `W/views/PromptStatus.tsx` | **same** |
 | Lease and event-wait capsules | `S/Chat/LeaseRow.swift`, `S/Chat/WaitCapsule.swift` | The same, the wait without ✕ (`WaitCapsule.swift:9-10`) | `W/views/Chat.tsx:472-488` | **same** |
 | Cost / day-limit banner | `S/Chat/PromptPieces.swift:104` | The same | `W/views/PromptStatus.tsx` | **same** |
-| Placeholder | `PromptWords.placeholder`: `S/Chat/PromptPieces.swift:14-24` | The same | `promptPlaceholder`: `W/model/promptWords.ts`, offered suggestion as placeholder: `W/views/Prompt.tsx` | **same** (#276) |
-| Send / Queue / Stop button | `A/Chat/PromptBar.swift:478-524` | `R/Chat/PromptBar.swift:228-272` | `W/views/Prompt.tsx` | **same** (#276) |
+| Placeholder | `PromptWords.placeholder`: `S/Chat/PromptPieces.swift:14-24` | The same | `promptPlaceholder`: `W/model/promptWords.ts`, offered suggestion as placeholder: `W/views/Prompt.tsx`; a queued helper's words and Queue (#542) | **same** (#276, #542) |
+| Send / Queue / Stop button | `A/Chat/PromptBar.swift:478-524` | `R/Chat/PromptBar.swift:228-272` | `W/views/Prompt.tsx`, Stop spinning while it stops and held while something else goes (#542) | **same** (#276, #542) |
 | Return and Shift-Return send, Option-Return a new line (#377) | `PromptReturn` (AgentsKitCore): `A/Chat/PromptBar.swift:401` | `PromptReturn` from a hardware keyboard; the on-screen keyboard's Return is a new line: `R/Chat/PromptBar.swift:172` | `returnAction`: `W/views/Prompt.tsx` | **same** |
 | Sending in flight (#87) | Spinner, *telling* after 400 ms: `A/Chat/PromptBar.swift:120-138` | The host's name: `R/Chat/PromptBar.swift:94` | `W/views/Prompt.tsx:119-121` | **same** (#239) |
 | Queued prompts as bubbles, Send now, × (#95) | `S/Chat/TranscriptRows.swift:377-463` | Shared | `W/views/Chat.tsx:277-306` | **same** |

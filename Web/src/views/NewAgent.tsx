@@ -326,7 +326,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
           {saying}
           {(!saying || form.value.state === "ready") && (
             <PromptMenus options={form.value.options} value={(o) => form.value.chosen[o.id]}
-              onChange={(o, v) => setChosen(o.id, v)} disabled={down}
+              onChange={(o, v) => setChosen(o.id, v)} disabled={down} runtime={chosenRuntime ? runtimeName : undefined}
               besideMode={chosenRuntime && (
                 <SandboxPill runtimeID={chosenRuntime} name={runtimeName} override={sandbox.value} runtimeDefault={runtimeDefault}
                   codexMode={typeof codexMode === "string" ? codexMode : undefined} disabled={down}
