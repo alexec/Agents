@@ -1,7 +1,8 @@
 // One session in the sidebar, as the Mac's AgentRow draws it (071 FR-018, #251): the status
 // mark (Coming back after a restart too), the title with who or what started it, the agent's own
 // last report, labels and the worktree, what it holds or waits for, what runs in the background,
-// what it waits on, and parking. Only Needs you is ever in colour.
+// what it waits on, and parking. Only Needs you is ever in colour. In the sidebar it is the mark,
+// the title, the time and one grey line (#587): the rest is the project page's and the chat's.
 import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { leaseMark, startedByAgentLabel, waitMark, worktreeHelp, type LeaseMark, type WaitMark } from "../model/rowLines";
@@ -102,7 +103,10 @@ export function rowExtras(store: Store, host: string, agent: Agent): RowExtras {
 
 export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = false, place }: {
   agent: Agent; chosen: boolean; onPick: () => void;
-  /** In the sidebar (#495): the state is the row's mark, unread among them, rather than a dot. */
+  /**
+   * In the sidebar (#495): the state is the row's mark, unread among them, rather than a dot, and
+   * the row is its title, time and one grey line (#587).
+   */
   inSidebar?: boolean;
   /** Which project it is in, after the title: under a smart group, which gathers every project's. */
   place?: string | undefined;
@@ -121,8 +125,10 @@ export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = f
         : <StatusMark agent={agent} comingBack={extras?.comingBack ?? false} />}
       <span class="body">
         {/* Unread is a mark, as in Mail (#70): a dot (two rings in the sidebar) and a heavier title, gone once opened. */}
-        <span class={`title${showsUnread(agent) ? " unread" : ""}`} aria-description={showsUnread(agent) ? "unread" : undefined}>
-          {showsUnread(agent) && !inSidebar && <span class="unread-dot" aria-hidden="true" />}{agent.title ?? "Untitled"}
+        <span class={`title${showsUnread(agent) ? " unread" : ""}${place ? " placed" : ""}`} aria-description={showsUnread(agent) ? "unread" : undefined}>
+          {showsUnread(agent) && !inSidebar && <span class="unread-dot" aria-hidden="true" />}
+          {/* The title gives way before its project's name, which is whole (#587). */}
+          {place ? <span class="name">{agent.title ?? "Untitled"}</span> : agent.title ?? "Untitled"}
           {place && <span class="place"> {place}</span>}
           {/* Started by a workflow or another agent, not typed for by the person (028). */}
           {extras?.startedByWorkflow && (
@@ -136,25 +142,29 @@ export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = f
         {/* In the report's place, as the window's row has it (#87). */}
         {going ? <span class="subtitle"><Telling recipient={going.recipient} doing={going.doing} /></span>
           : extras?.queued ? <span class="subtitle queued">{extras.queued}</span>
-          : agent.report && <span class="subtitle report">{agent.report.message}</span>}
+          : agent.report && !(inSidebar && folderIsMissing(agent)) && <span class="subtitle report">{agent.report.message}</span>}
         {/* Its folder gone (#119), as a project's row says it. */}
         {folderIsMissing(agent) && <span class="subtitle missing-folder" title={folderPath(agent)}>⚠ {missingFolderLabel}</span>}
-        {(agent.worktree || labels.length > 0) && (
-          <span class="chips">
-            {agent.worktree && <span class={`chip worktree${folderIsMissing(agent) ? " gone" : ""}`} title={worktreeHelp(agent.worktree, folderIsMissing(agent))}>⑂ {agent.worktree.name}</span>}
-            {labels.map((label) => <span key={label.value} class="chip label">{label.value}</span>)}
-          </span>
-        )}
-        {/* What it holds (036), so an idle agent still holding the screen can be seen. What it waits for is the wait line's. */}
-        {extras?.leases?.holds && (
-          <span class="subtitle lease-mark" role="note" aria-label={extras.leases.holds.full} title={extras.leases.holds.full}>
-            {extras.leases.holds.mark}{extras.leases.holds.more > 0 && <span class="quiet"> · and {extras.leases.holds.more} more</span>}
-          </span>
-        )}
-        {running && <span class="subtitle">{running}</span>}
-        {/* What it waits for (#582): agents, events and resources on one line; each in full is its title, and the chat's. */}
-        {extras?.wait && <span class="subtitle wait-line" title={extras.wait.detail}>{extras.wait.line}</span>}
-        {park && <span class="subtitle quiet">{park}</span>}
+        {/* In the sidebar, that one line is all (#587): what it holds, waits on, runs or is
+            labelled with is the chat's to say. */}
+        {!inSidebar && <>
+          {(agent.worktree || labels.length > 0) && (
+            <span class="chips">
+              {agent.worktree && <span class={`chip worktree${folderIsMissing(agent) ? " gone" : ""}`} title={worktreeHelp(agent.worktree, folderIsMissing(agent))}>⑂ {agent.worktree.name}</span>}
+              {labels.map((label) => <span key={label.value} class="chip label">{label.value}</span>)}
+            </span>
+          )}
+          {/* What it holds (036), so an idle agent still holding the screen can be seen. What it waits for is the wait line's. */}
+          {extras?.leases?.holds && (
+            <span class="subtitle lease-mark" role="note" aria-label={extras.leases.holds.full} title={extras.leases.holds.full}>
+              {extras.leases.holds.mark}{extras.leases.holds.more > 0 && <span class="quiet"> · and {extras.leases.holds.more} more</span>}
+            </span>
+          )}
+          {running && <span class="subtitle">{running}</span>}
+          {/* What it waits for (#582): agents, events and resources on one line; each in full is its title, and the chat's. */}
+          {extras?.wait && <span class="subtitle wait-line" title={extras.wait.detail}>{extras.wait.line}</span>}
+          {park && <span class="subtitle quiet">{park}</span>}
+        </>}
       </span>
       <time class="when" dateTime={activity.toISOString()} title={activity.toLocaleString()}>{shortAgo(activity)}</time>
     </button>

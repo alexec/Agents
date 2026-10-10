@@ -63,11 +63,12 @@ export function PinnedPageRows({ store, host, folder, chosen, down }: {
           onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu(pin)); }}>
           <div class={`row pin${chosen === pin.path ? " chosen" : ""}${pin.missing ? " missing" : ""}${dragged.value === pin.path ? " dragging" : ""}`}>
             <button class="pick" aria-current={chosen === pin.path}
-              title={pin.missing && pin.missingReason ? `${pin.path}: ${pin.missingReason}` : pin.path}
+              title={pin.missing ? `Missing: ${pin.path}${pin.missingReason ? `: ${pin.missingReason}` : ""}` : pin.path}
+              aria-description={pin.missing ? "missing" : undefined}
               onClick={() => go({ host, project: folder, page: pin.path })}>
               <span class="pin-mark" aria-hidden="true">{pinMark(pin)}</span>
+              {/* Nothing at its end, which is only a session's (#587): missing is the grey title and the tooltip. */}
               <span class="title">{pin.title}</span>
-              {pin.missing && <span class="faint small">Missing</span>}
             </button>
           </div>
         </div>

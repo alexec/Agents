@@ -1,5 +1,6 @@
-// One workflow under a project's sessions (071 US5; ProjectWorkRows.swift): its status mark, its
-// name and Off, as the window's and the Remote's rows (#547); what it is is its page's to say (#495).
+// One workflow under a project's sessions (071 US5; ProjectWorkRows.swift): its status mark and its
+// name, as the window's and the Remote's rows (#547); nothing at its end, which is only a session's
+// (#587), so Off is its mark and its tooltip. What it is is its page's to say (#495).
 // Chosen, it opens its page in the chat's place, as the window's list does (#98). Its actions are in
 // its right-click / menu-key menu, as a session row's are (#151): Run Now, Approve or Deny on This
 // Host while it waits for its OK, Pin (#432) and, under Pinned, Move Up and Down, Turn Off or On
@@ -22,13 +23,13 @@ export function WorkflowRow({ store, host, summary, disabled, chosen, onPick, pi
   return (
     <div class={`row workflow${chosen ? " chosen" : ""}`} onContextMenu={(e) => openContextMenu(e, menu())}
       onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }}>
-      <button class="pick" aria-current={chosen} onClick={onPick} title={`Open ${summary.workflow.name}`}>
+      <button class="pick" aria-current={chosen} onClick={onPick}
+        title={!isOn(summary) && !summary.isArchived ? `Turned off. Open ${summary.workflow.name}` : `Open ${summary.workflow.name}`}>
         <span class={`workflow-mark${status.tinted ? " tinted" : ""}`} role="img" aria-label={status.words} title={status.words}>{status.mark}</span>
         {/* Heavier only while it waits for an OK (#520), as a session's title is while unread. */}
-        <span class={`title${summary.awaitingApproval && !summary.isArchived ? " needs-ok" : ""}`}>
-          {summary.workflow.name}
-          {/* Marked where it stands, rather than moved (#100): off is not put away. */}
-          {!isOn(summary) && !summary.isArchived && <span class="faint"> · Off</span>}
+        <span class={`title${summary.awaitingApproval && !summary.isArchived ? " needs-ok" : ""}${place ? " placed" : ""}`}>
+          {/* The name gives way before its project's, which is whole (#587). */}
+          {place ? <span class="name">{summary.workflow.name}</span> : summary.workflow.name}
           {place && <span class="place"> {place}</span>}
         </span>
       </button>
