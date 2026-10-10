@@ -17,7 +17,7 @@ import { actDoing, type Store } from "../model/store";
 import { byStart, folderKey, projectFolder, showsUnread } from "../model/groups";
 import { folds } from "../model/folds";
 import { parseQuery, queryMatches, type LabelQuery } from "../model/labels";
-import { newSessionProject, pinnedSessions, pinnedWorkflows, projectSessions, rememberedProject, rememberProject,
+import { newSessionProject, ownCount, pinnedSessions, pinnedWorkflows, projectSessions, rememberedProject, rememberProject,
   smartAgents, smartRows, smartTitles, withKept, type SmartRow } from "../model/sidebar";
 import { namedRelative, workflowSummary } from "../model/workflows";
 import { fromWireDate } from "../protocol/dates";
@@ -228,7 +228,8 @@ function inOpenSmartRow(store: Store, host: string, agent: Agent): boolean {
   if (folds.isSmartOpen("pinned") && store.sessionPinsIn(host, projectFolder(agent)).includes(agent.id)) return true;
   const kept = keptInUnread.peek();
   if (folds.isSmartOpen("unread") && kept?.host === host && kept.id === agent.id) return true;
-  return (["needsYou", "working", "unread"] as const).some((row) => folds.isSmartOpen(row) && smartAgents(row, [agent]).length > 0);
+  const pins = store.sessionPinsIn(host, projectFolder(agent));
+  return (["needsYou", "working", "unread"] as const).some((row) => folds.isSmartOpen(row) && smartAgents(row, [agent], undefined, pins).length > 0);
 }
 
 /** A search narrows workflows by name and what they are; one asking for a label leaves them out. */
@@ -314,8 +315,10 @@ function SmartFold({ row, store, projects, query, linkDown }: {
     const found = new Map<Agent, Placed>();
     for (const placed of projects) {
       const live = liveSessions(store, placed.host.id, placed.project.project.folder);
-      count += smartAgents(row, live).length;
-      if (open || parsed) for (const agent of smartAgents(row, live, parsed)) found.set(agent, placed);
+      // The pinned are in Pinned alone: each session is listed once (#587).
+      const pins = store.sessionPinsIn(placed.host.id, placed.project.project.folder);
+      count += smartAgents(row, live, undefined, pins).length;
+      if (open || parsed) for (const agent of smartAgents(row, live, parsed, pins)) found.set(agent, placed);
     }
     // Unread keeps the session opened from it in its place, read now; none while searching.
     const kept = row === "unread" && !parsed ? keptInUnread.value : null;
@@ -391,8 +394,11 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   // The matcher is made once per fold, not per row.
   const parsed = searching ? parseQuery(query) : undefined;
   const live = view.headings.flatMap((h) => h.agents);
-  // The pinned are in Pinned at the top (#495), out of the project's list.
-  const sessions = !unfolded ? [] : projectSessions(live, store.sessionPinsIn(host.id, folder), parsed);
+  // Those a group at the top lists are there alone (#495, #587), out of the project's list.
+  const pins = store.sessionPinsIn(host.id, folder);
+  const sessions = !unfolded ? [] : projectSessions(live, pins, parsed);
+  // The heading's grey count, as every group's heading has one (#587), folded or not.
+  const own = ownCount(live, pins);
   const archived = !unfolded || !parsed ? [] : view.archived.filter((a) => queryMatches(parsed, a));
   const allWorkflows = (unfolded ? store.projectWorkflows(host.id, folder) : [])
     .filter(workflowMatches(store, host.id, parsed))
@@ -406,7 +412,6 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
 
   const here = r.host === host.id && r.project !== undefined && folderKey(r.project) === folderKey(folder);
   const archiveCount = (project.counts.archived ?? 0) + archivedWorkflows.length;
-  const subtitle = !project.exists ? "Folder is missing" : view.subtitle;
   const fold = (open: boolean) => folds.set(host.id, folder, open);
   const projectPinned = project.project.pinned === true;
   const projectMenu: MenuItem[] = [
@@ -446,10 +451,11 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
           onContextMenu={(e) => openContextMenu(e, projectMenu)}
           onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, projectMenu); }}>
           <span class="title">{project.isChat === true && <span class="project-chat" aria-label="chat project">💬 </span>}{label}{projectPinned && <span class="project-pin" aria-label="pinned"> 📌</span>}</span>
-          {/* Folded, the row says what is under it, Needs you first; unfolded, the rows under it say that. */}
-          {(!unfolded || !project.exists) && subtitle && <span class="subtitle">{subtitle}</span>}
+          {/* A heading, as the groups' at the top (#587): who needs you is in Needs You, so no
+              line under it and no dot; only a missing folder is said. */}
+          {!project.exists && <span class="subtitle">Folder is missing</span>}
         </button>
-        {view.needsYou && !unfolded && <span class="dot" aria-label="Needs you" />}
+        {own > 0 && <span class="count" aria-label={`${own} sessions`}>{own}</span>}
       </div>
       {unfolded && (
         <div class="fold-body">
@@ -469,11 +475,11 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
             // The archive, one row opening a page (#495): never a fold inside the group.
             <div class="nav-item">
               <div class={`row page-row${here && r.archive ? " chosen" : ""}`}>
+                {/* Nothing at its end, which is only a session's (#587): the count is its tooltip's. */}
                 <button class="pick" aria-current={here && !!r.archive} aria-label={`Archived, ${archiveCount}`}
-                  onClick={() => go({ host: host.id, project: folder, archive: true })}>
+                  title={`${archiveCount} archived`} onClick={() => go({ host: host.id, project: folder, archive: true })}>
                   <span class="pin-mark" aria-hidden="true">▣</span>
                   <span class="title">Archived</span>
-                  <span class="count">{archiveCount}</span>
                 </button>
               </div>
             </div>
@@ -543,6 +549,7 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
   return (
     <div class={`nav-item${drop.targeted ? " drop-target" : ""}`} onContextMenu={(e) => openContextMenu(e, menu())}
       onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }} {...drop.props}>
+      {/* No wait lines: in the sidebar a session's row is its title and one line (#587). */}
       <SessionRow agent={agent} chosen={chosen} onPick={() => go({ host, project: folder, session: agent.id })} going={going}
         extras={rowExtras(store, host, agent)}
         inSidebar place={place} />

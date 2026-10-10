@@ -206,15 +206,15 @@ for (const scene of scenes) {
       say(`workflow row menu: ${menu ? JSON.stringify(await visible(".workflows [role=menu] [role=menuitem]")) : "none"}`);
       if (menu) {
         await shot("workflow-menu");
-        // Off and on again, through the host: the row is marked in place each way.
+        // Off and on again, through the host: the row's mark says so in place each way (#587).
         const row = () => visible(".workflows .row.workflow");
         await page.press("Turn Off");
-        await page.waitFor(`[...document.querySelectorAll(".workflows .row")].some((r) => r.textContent.includes("Write a greeting · Off"))`);
+        await page.waitFor(`[...document.querySelectorAll(".workflows .row")].some((r) => r.textContent.includes("Write a greeting") && r.querySelector(".workflow-mark")?.getAttribute("aria-label") === "Turned off")`);
         say(`turned off: ${JSON.stringify((await row()).filter((r) => r.includes("Write a greeting")))}`);
         await page.eval(`[...document.querySelectorAll(".workflows .row")].find((r) => r.textContent.includes("Write a greeting")).querySelector("[aria-label^='More']").click()`);
         await sleep(200);
         await page.press("Turn On");
-        await page.waitFor(`![...document.querySelectorAll(".workflows .row")].some((r) => r.textContent.includes("Write a greeting · Off"))`);
+        await page.waitFor(`![...document.querySelectorAll(".workflows .row")].some((r) => r.textContent.includes("Write a greeting") && r.querySelector(".workflow-mark")?.getAttribute("aria-label") === "Turned off")`);
         say(`turned on: ${JSON.stringify((await row()).filter((r) => r.includes("Write a greeting")))}`);
       }
     } else if (scene === "filters") {

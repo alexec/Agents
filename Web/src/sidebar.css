@@ -29,18 +29,14 @@
 .with-sidebar .sidebar .row { box-sizing: border-box; }
 .with-sidebar .sidebar-head-label { font-size: 11px; font-weight: 600; opacity: 0.5; margin: 12px 8px 4px; }
 
-/* Activity: an icon in the accent, the page's name in the rows' type (#155, #495), and what it says
-   at a glance on the right. */
-.with-sidebar .activity-row { grid-template-columns: 16px minmax(0, 1fr) auto; column-gap: 8px; align-items: baseline; padding: 4px 8px; }
+/* Activity: an icon in the accent, the page's name in the rows' type (#155, #495), and nothing at
+   its end, which is only a session's (#587): the icon turns red when the page warns. */
+.with-sidebar .activity-row { grid-template-columns: 16px minmax(0, 1fr); column-gap: 8px; align-items: baseline; padding: 4px 8px; }
 .with-sidebar .activity-row .activity-icon { color: var(--accent); text-align: center; }
+.with-sidebar .activity-row .activity-icon.warns { color: var(--tint-failure); }
 .with-sidebar .activity-row .title { font-weight: 500; }
-.with-sidebar .activity-row .detail { font-size: 11.5px; opacity: 0.6; font-variant-numeric: tabular-nums; text-align: right; }
-.with-sidebar .activity-row .detail .dot.failure { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
-  background: var(--tint-failure); position: static; }
-.with-sidebar .activity-row .spending { display: inline-flex; flex-direction: column; align-items: flex-end; }
-.with-sidebar .activity-row .spending.close { color: var(--tint-failure); opacity: 1; }
 
-/* A project's row: the disclosure, the name and its counts, the Needs you dot. */
+/* A project's row: the disclosure, the name, and a grey count of its own sessions (#587). */
 .with-sidebar .row.project { grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; padding: 0 8px 0 0;
   column-gap: 2px; }
 .with-sidebar .row.project .disclosure { border: none; background: none; padding: 0; width: 16px; font-size: 12px;
@@ -52,7 +48,7 @@
 .with-sidebar .row.project .project-chat { font-size: 11px; opacity: 0.6; filter: grayscale(1); }
 .with-sidebar .row.project .project-pin { font-size: 10px; opacity: 0.55; filter: grayscale(1); }
 .with-sidebar .row.project .subtitle { font-size: 11.5px; }
-.with-sidebar .row.project .dot { grid-column: 3; grid-row: 1; }
+.with-sidebar .row.project .count { grid-column: 3; grid-row: 1; font-size: 11px; font-weight: 500; }
 .with-sidebar .project-fold.greyed .row, .with-sidebar .project-fold.greyed .subhead { opacity: 0.55; }
 
 /* A project's rows sit at the sidebar's edge under its heading, as a group's do (#495). */
@@ -67,6 +63,10 @@
 
 /* Which project a row is in, after its title, under a group at the top (#495). */
 .with-sidebar .sidebar .place { font-size: 11px; font-weight: 400; opacity: 0.45; }
+/* The title gives way first, the project's name whole (#587): cut to "p" it said nothing. */
+.with-sidebar .sidebar .title.placed { display: flex; align-items: baseline; min-width: 0; }
+.with-sidebar .sidebar .title.placed .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.with-sidebar .sidebar .title.placed :is(.place, .started-by) { flex: none; white-space: pre; }
 
 /* A session's mark in the sidebar (#495): an orange hand, a spinner, two rings unread, an empty
    ring once read; every icon in the accent but the hand. */
@@ -85,7 +85,6 @@
   border: none; background: none; padding: 5px 8px; text-align: left; font: inherit; color: inherit; min-width: 0; }
 .row.page-row .pin-mark { color: var(--accent); text-align: center; }
 .row.page-row .title { font-weight: 400; }
-.row.page-row .count { font-size: 11.5px; opacity: 0.55; font-variant-numeric: tabular-nums; }
 
 /* A project's archive, in the chat's place (#499). */
 .with-sidebar .archive-page .column-head .quiet { font-size: 12px; }

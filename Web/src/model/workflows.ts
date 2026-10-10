@@ -250,7 +250,9 @@ export function workflowStatus(s: WorkflowSummary): { mark: string; words: strin
   const tinted = workflowNeedsAPerson(s);
   if (s.isArchived) return { mark: "▣", words: "Archived", tinted };
   if (waitsItsTurn(s)) return { mark: "✋", words: "Over the limit", tinted };
-  if (s.awaitingApproval) return { mark: "✋", words: "Waiting for your OK", tinted };
+  // A shield, not a hand (#587): the hand is a session's Needs You mark, and a workflow waiting
+  // for an OK beside it read as one more session asking.
+  if (s.awaitingApproval) return { mark: "🛡\uFE0E", words: "Waiting for your OK", tinted };
   if (s.deniedHere) return { mark: "⊘", words: "Denied on this host", tinted };
   if (!isOn(s)) return { mark: "⏸\uFE0E", words: "Turned off", tinted };
   if (s.overLimit) return { mark: "!", words: "Over the limit", tinted };
