@@ -17,17 +17,17 @@ day.
 
 ## Goals
 
-1. **It holds up.** Nothing crashes, hangs or loses work, and cost stays flat as hosts,
-   clients, projects and sessions grow. Bound what is held or returned before reaching
-   for concurrency.
-2. **Three clients, one product.** The Mac window, the Remote and the web page do the
-   same thing the same way, or the parity table says why not.
-3. **What merges has been used.** A UI change counts as done once someone has run it,
-   on a scratch app or by Alex, not when its pull request lands.
-4. **A newcomer gets going.** A fresh clone builds, pairs a phone and runs a first agent
-   by following the docs, with nothing missing.
-5. **Agents land work on their own.** Issue → lane → pull request → CI → merge runs with
-   nobody watching, and asks Alex only what is his to decide.
+- **It holds up.** Nothing crashes, hangs or loses work, and cost stays flat as hosts,
+  clients, projects and sessions grow. Bound what is held or returned before reaching
+  for concurrency.
+- **Three clients, one product.** The Mac window, the Remote and the web page do the
+  same thing the same way, or the parity table says why not.
+- **What merges has been used.** A UI change counts as done once someone has run it,
+  on a scratch app or by Alex, not when its pull request lands.
+- **A newcomer gets going.** A fresh clone builds, pairs a phone and runs a first agent
+  by following the docs, with nothing missing.
+- **Agents land work on their own.** Issue → lane → pull request → CI → merge runs with
+  nobody watching, and asks Alex only what is Alex's to decide.
 
 ## Not now
 
