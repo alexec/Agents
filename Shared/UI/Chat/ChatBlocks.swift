@@ -56,21 +56,15 @@ struct BlocksView: View {
                 .foregroundStyle(.secondary)
 
         case .resourceLink(let uri, let name, _, _, _):
-            #if os(macOS)
+            // On the Mac it opens on the agent's host; on a phone, in Files (#548). Each
+            // app says what opening a file means, in its openURL.
             Button {
                 if let url = URL(string: uri) { openURL(url) }
             } label: {
                 Label(name, systemImage: "doc")
                     .appText(.reading)
             }
-            .buttonStyle(.link)
-            #else
-            // A file on the Mac. The phone names it and cannot open it.
-            let _ = uri
-            Label(name, systemImage: "doc")
-                .appText(.reading)
-                .foregroundStyle(.secondary)
-            #endif
+            .linkStyle()
 
         case .resource(let uri, let text, _, _, _):
             VStack(alignment: .leading, spacing: 4) {
