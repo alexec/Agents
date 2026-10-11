@@ -232,8 +232,6 @@ public struct EventState: Codable, Hashable, Sendable {
     public var nextPosition: EventPosition = 1
     /// Project folder path → branch → commit, as last seen.
     public var branchTips: [String: [String: String]] = [:]
-    /// Agent id → when it published, over the last hour.
-    public var publishes: [String: [Date]] = [:]
     /// Day ("2026-09-25") → the limits already said to be reached that day.
     public var costCrossings: [String: [String]] = [:]
     /// Volume mount → how it stood at the last look (#195), so a crossing is raised

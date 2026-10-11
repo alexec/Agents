@@ -28,8 +28,7 @@ struct EventDetailView: View {
                 }
                 Text(event.sentence).appText(.reading)
                 detailGrid
-                if let meaning = EventCatalogue.kind(named: event.name)?.meaning
-                    ?? (EventCatalogue.isCustom(event.name) ? EventCatalogue.customMeaning : nil) {
+                if let meaning = EventCatalogue.kind(named: event.name)?.meaning {
                     Text(meaning).appText(.supporting).foregroundStyle(.secondary)
                 }
                 VStack(alignment: .leading, spacing: 6) {

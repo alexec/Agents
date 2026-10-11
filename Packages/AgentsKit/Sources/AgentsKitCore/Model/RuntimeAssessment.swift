@@ -14,10 +14,14 @@ public enum RuntimeAssessment {
     public static let label = "assess-runtime"
     /// On the helper the assessing agent starts.
     public static let helperLabel = "assess-runtime-helper"
-    /// Published and waited for (step `events`).
-    public static let pingEvent = "custom.assess_ping"
-    /// Waited for and never published, so the wait times out (step `wait`).
-    public static let neverEvent = "custom.assess_never"
+    /// Raised by the agent's own second lease and waited for (step `events`). Agents do
+    /// not raise events (#639), so the step waits on one the app raises for it.
+    public static let pingEvent = "lease.granted"
+    /// The second lease's name, by the lease's short id: `assess-<id>-ping`.
+    public static func pingLease(_ shortID: String) -> String { "assess-\(shortID)-ping" }
+    /// Waited for, narrowed to a branch nothing moves, so the wait times out (step `wait`).
+    public static let neverEvent = "branch.moved"
+    public static let neverBranch = "assess-never"
     /// The long deadline of the wait step `events` cancels, so it is not the one step
     /// `wait` lets time out.
     public static let longWaitMinutes = 1440
@@ -38,7 +42,7 @@ public enum RuntimeAssessment {
         Step(id: "workflows", area: "Workflows",
              passesWhen: "manage_workflows listed them, wrote a throwaway that was left waiting for the person's OK, listed it, and removed it, leaving nothing behind"),
         Step(id: "events", area: "Events",
-             passesWhen: "custom.assess_ping is on the log from this agent, and its wait came back with it; a wait with no until_minutes was refused; cancel_wait then cleared a second wait"),
+             passesWhen: "a second lease raised lease.granted for this agent, and the wait on it came back with it; a wait with no until_minutes was refused; cancel_wait then cleared a second wait"),
         Step(id: "ask_form", area: "Questions",
              passesWhen: "ask_form with a choice and a text field was answered, and the text came back to the agent unchanged and into the report"),
         Step(id: "own_ask", area: "Questions",
@@ -64,13 +68,14 @@ public enum RuntimeAssessment {
     /// The workflow the agent writes and removes (step `workflows`), by the lease's short id.
     public static func throwawayWorkflowID(_ shortID: String) -> String { "assess-\(shortID)" }
 
-    /// Its whole file: it never runs, because nothing publishes the event it waits for,
-    /// and it starts off and waiting for the person's OK besides.
+    /// Its whole file: it never runs, because nothing moves the branch it waits for, and
+    /// it starts off and waiting for the person's OK besides.
     public static let throwawayWorkflow = """
         ---
         name: Assessment throwaway
         on:
-          - \(neverEvent)
+          - \(neverEvent):
+              branch: \(neverBranch)
         agent: new
         ---
         Reply with the word OK.
@@ -170,6 +175,8 @@ public enum RuntimeAssessment {
                 + "call it rather than deciding from a list that it is missing, and if the call is refused, put its words in the report."
         } ?? "Your runtime has no question tool the app can carry. Ask nothing here; write `not offered` for this step."
         let lease = "assess-\(agentShortID)"
+        let pingLease = pingLease(agentShortID)
+        let never = "`wait_for_event` on `\(neverEvent)` where `{\"branch\": \"\(neverBranch)\"}`"
         let workflow = throwawayWorkflowID(agentShortID)
         let version = runtimeVersion.map { "`\($0)`" } ?? "not given by its adapter"
         let fileContent = throwawayWorkflow.split(separator: "\n", omittingEmptySubsequences: false)
@@ -204,11 +211,11 @@ public enum RuntimeAssessment {
             then `list` again, and note what it says about `\(workflow)`; then action `remove`, \
             workflow `\(workflow)`. Change no other workflow.
             4. `events`: `wait_for_event` with action `recent` and limit 1, and note the position \
-            it gives; `publish_event` `\(pingEvent)` with the message "ping"; then \
-            `wait_for_event` on `\(pingEvent)` from that position. It comes back at once. Then \
-            `wait_for_event` on `\(neverEvent)` with no `until_minutes`, which is refused: note \
-            what it says. Then `wait_for_event` on `\(neverEvent)` with `until_minutes` \
-            \(longWaitMinutes); when it says you are still waiting, call `cancel_wait`.
+            it gives; `lease_resource` named `\(pingLease)` for 5 minutes; then `wait_for_event` \
+            on `\(pingEvent)` from that position. It comes back at once, with that lease. Then \
+            `release_resource` `\(pingLease)`. Then \(never) with no `until_minutes`, which is \
+            refused: note what it says. Then \(never) with `until_minutes` \(longWaitMinutes); \
+            when it says you are still waiting, call `cancel_wait`.
             5. `ask_form`: `ask_form` titled "\(runtimeName) assessment" with two questions: id \
             `pick`, prompt "Pick one", options `a` (Alpha) and `b` (Beta); and id `words`, prompt \
             "Type any short phrase", with no options. Write both answers into the report exactly \
@@ -224,7 +231,7 @@ public enum RuntimeAssessment {
             **Turn 2**, once the helper has finished
 
             8. `helpers`: `request_archive` the helper. If that leaves it asking rather than archived, `archive_agent` it.
-            9. `wait`: `wait_for_event` on `\(neverEvent)` with `until_minutes` 1. When it says \
+            9. `wait`: \(never) with `until_minutes` 1. When it says \
             you are still waiting, end your turn. You are started again when it times out. (If \
             the call itself comes back timed out, go straight on to step 10 in this turn.)
 

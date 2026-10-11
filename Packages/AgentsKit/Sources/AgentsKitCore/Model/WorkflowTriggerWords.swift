@@ -24,9 +24,7 @@ extension WorkflowTrigger {
         // A server's events are the project's: its servers are found by its folder.
         case .serverEvent: return .project
         case .event(let pattern):
-            if EventCatalogue.isCustom(pattern.name) { return .project }
             if let subject = pattern.wholeSubject {
-                if subject == .custom { return .project }
                 let scopes = Set(EventCatalogue.kinds(in: subject).map(\.scope))
                 return scopes.count == 1 ? scopes.first : .either
             }
@@ -45,9 +43,6 @@ extension WorkflowTrigger {
         case .serverEvent:
             return "A server's events are about no agent, so this never runs it"
         case .event(let pattern):
-            if EventCatalogue.isCustom(pattern.name) || pattern.wholeSubject == .custom {
-                return "Resumes the agent that published it"
-            }
             let kinds = pattern.wholeSubject.map(EventCatalogue.kinds(in:))
                 ?? EventCatalogue.kind(named: pattern.name).map { [$0] } ?? []
             let carrying = kinds.filter { $0.details.contains("agent") }

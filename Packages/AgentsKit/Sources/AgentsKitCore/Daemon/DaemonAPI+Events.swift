@@ -8,8 +8,6 @@ public extension DaemonAPI.Method {
     static let eventsWait = "events/wait"
     /// `cancel_wait`, relayed.
     static let eventsCancel = "events/cancel"
-    /// `publish_event`, relayed.
-    static let eventsPublish = "events/publish"
     /// A page of the log and who is waiting, for the Mac's page and the phone's list.
     static let eventsList = "events/list"
     /// The person cancelling an agent's wait, from the Mac, the phone or the web page.
@@ -28,9 +26,9 @@ public extension DaemonAPI.Notification {
 }
 
 public extension DaemonAPI.Failure {
-    /// An event name, filter, scope or publish the app will not take: unknown, outside
-    /// the caller's project, outside `custom.`, or over the publish limit. The message
-    /// says which, and what would do (042 R16).
+    /// An event name, filter or scope the app will not take: unknown, outside the
+    /// caller's project, or a `custom.` one (#639). The message says which, and what
+    /// would do (042 R16).
     static let eventRefused = -32050
     /// Cancelling a wait when there is none.
     static let noWait = -32051
@@ -64,20 +62,6 @@ public extension DaemonAPI {
     struct EventTokenRequest: Codable, Sendable, Hashable {
         public var token: String
         public init(token: String) { self.token = token }
-    }
-
-    struct EventPublishRequest: Codable, Sendable, Hashable {
-        public var token: String
-        public var name: String
-        public var message: String?
-        public var details: [String: String]?
-
-        public init(token: String, name: String, message: String? = nil, details: [String: String]? = nil) {
-            self.token = token
-            self.name = name
-            self.message = message
-            self.details = details
-        }
     }
 
     struct EventsListRequest: Codable, Sendable, Hashable {

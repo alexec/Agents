@@ -58,7 +58,7 @@ same way. See [The control plane](control-plane.md).
 | Control uplink | `Daemon/ControlUplink`, `HostDialer` | The host's one connection out to the control plane. Each client's channel on it becomes a connection to the daemon server. |
 | Daemon server | `Daemon/DaemonServer` | JSON-RPC, over `daemon.sock` and over the uplink's channels. Every connection gets every notification, so clients agree. |
 | Daemon core | `Daemon/DaemonCore`, `AgentTable` | The actor that owns every agent: sessions, turns, queues, statuses and attention. Every request lands here, and every change is announced from here. |
-| Workflows and events | `Daemon/DaemonCore+Workflows`, `+Events`, `+EventWaits`, `Workflows/` | Schedules, triggers, cooldowns and queues. `wait_for_event`, `publish_event` and the event log. |
+| Workflows and events | `Daemon/DaemonCore+Workflows`, `+Events`, `+EventWaits`, `Workflows/` | Schedules, triggers, cooldowns and queues. `wait_for_event` and the event log. |
 | Leases and wakefulness | `Daemon/DaemonCore+Leases`, `ResourceCatalog`, `Power/` | A line per declared resource. Keeps the Mac awake while a turn runs. |
 | MCP clients | `MCP/` | The daemon's own connections to MCP servers: `events/poll` for workflow triggers, server views and OAuth sign-ins. |
 | Projects, files and git | `Projects/`, `Files/` | `.agents/` config and plugins, worktrees, changes, clones, folder watching, and file reads and writes for clients. |

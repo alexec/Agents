@@ -7,7 +7,7 @@ import Foundation
 /// `matches`, which is what makes "the same names, the same details" true rather than
 /// hoped for.
 public struct EventPattern: Hashable, Sendable {
-    /// A catalogue name, `subject.*`, or `custom.<name>`.
+    /// A catalogue name, `subject.*`, or a server's event.
     public var name: String
     /// Detail keys and the values they may have: one, or any of a list (073). Compared
     /// as strings, so a number written as 41 matches the detail "41".
@@ -46,7 +46,8 @@ public struct EventPattern: Hashable, Sendable {
     /// `person.away` and `person.back`. The filters are checked against the kind's
     /// `inputSchema` by `JSONSchemaSubset`, as a server's event's arguments are (#579), so
     /// a refusal reads the same for both. A server's event is not checked here: its keys
-    /// are the server's (#383, #577). An old name is unknown like any other (#575).
+    /// are the server's (#383, #577). An old name is unknown like any other (#575); a
+    /// `custom.` one is refused saying agents no longer raise events (#639).
     public static func parse(_ given: String, filters: [String: DetailFilter] = [:]) -> Result<EventPattern, EventPatternProblem> {
         let name = given.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let filters = Dictionary(filters.map { key, filter in
@@ -54,6 +55,7 @@ public struct EventPattern: Hashable, Sendable {
              DetailFilter(anyOf: filter.values.map { $0.trimmingCharacters(in: .whitespaces) }) ?? filter)
         }, uniquingKeysWith: { $1 })
 
+        if EventCatalogue.isRetiredCustom(name) { return .failure(.retiredCustom(name)) }
         if name.hasSuffix(".*") {
             guard EventSubject(rawValue: String(name.dropLast(2))) != nil else {
                 // A server's noun (#383): its details are the server's, so none is checked.
@@ -62,13 +64,10 @@ public struct EventPattern: Hashable, Sendable {
                 }
                 return .failure(.unknown(name))
             }
-        } else if !EventCatalogue.isCustom(name) {
-            if name.hasPrefix("custom.") { return .failure(.badCustomName(name)) }
-            guard EventCatalogue.kind(named: name) != nil else {
-                // A server's event (#383): its details are open, as its trigger's keys are.
-                if EventCatalogue.isServerEventName(name) { return .success(EventPattern(name, filters: filters)) }
-                return .failure(.unknown(name))
-            }
+        } else if EventCatalogue.kind(named: name) == nil {
+            // A server's event (#383): its details are open, as its trigger's keys are.
+            if EventCatalogue.isServerEventName(name) { return .success(EventPattern(name, filters: filters)) }
+            return .failure(.unknown(name))
         }
         if let problem = Self.problem(filters, against: EventCatalogue.inputSchema(for: name), name: name) {
             return .failure(.badArguments(name: name, message: problem))
@@ -130,8 +129,6 @@ public struct EventPattern: Hashable, Sendable {
         let meaning: String
         if let subject = wholeSubject {
             meaning = "Anything about \(subject.rawValue)s"
-        } else if EventCatalogue.isCustom(name) {
-            meaning = "An agent here publishes \(name)"
         } else {
             meaning = EventCatalogue.kind(named: name).map { String($0.meaning.dropLast()) } ?? name
         }
@@ -185,7 +182,8 @@ extension EventPattern: Codable {
 /// What was wrong with a pattern, in the sentence the agent (or the workflow page) reads.
 public enum EventPatternProblem: Error, Hashable, Sendable {
     case unknown(String)
-    case badCustomName(String)
+    /// A `custom.` name, which agents announced events with until #639.
+    case retiredCustom(String)
     /// Filters its `inputSchema` does not take: a key it cannot be narrowed by, or a
     /// value a filter cannot have (073 FR-019), in `JSONSchemaSubset`'s words (#579).
     case badArguments(name: String, message: String)
@@ -195,16 +193,22 @@ public enum EventPatternProblem: Error, Hashable, Sendable {
         return false
     }
 
+    public var isRetiredCustom: Bool {
+        if case .retiredCustom = self { return true }
+        return false
+    }
+
     public var message: String {
         switch self {
         case .unknown(let name):
             let guess = Self.closest(to: name).map { " Did you mean \($0)?" } ?? ""
             let names = EventCatalogue.all.map(\.name).joined(separator: ", ")
-            return "\"\(name)\" is not an event.\(guess) Events you can wait on: \(names), custom.<name>, "
+            return "\"\(name)\" is not an event.\(guess) Events you can wait on: \(names), "
                 + "or a subject with .* such as agent.*."
-        case .badCustomName(let name):
-            return "\"\(name)\" is not a custom event name: after custom. it is lowercase letters, digits "
-                + "and _, up to 40 characters."
+        case .retiredCustom(let name):
+            return "\"\(name)\" is never raised: agents no longer publish events, so there are no custom.* "
+                + "events to wait or trigger on. Use one the app raises, such as agent.finished or "
+                + "branch.moved; to wait for particular agents, use wait_for_event with agents."
         case .badArguments(let name, let message):
             let agents = EventSubject(name: name) == .agent
                 ? " To wait for particular agents, use wait_for_event with agents." : ""

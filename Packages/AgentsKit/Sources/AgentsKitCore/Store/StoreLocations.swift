@@ -223,7 +223,7 @@ public struct StoreLocations: Sendable {
     /// record (051). A cache, rebuilt when it is missing or unreadable.
     public var archiveIndex: URL { root.appendingPathComponent("archive.json") }
     /// The little the event sources remember between runs (042): the next position,
-    /// branch tips, publish counts, cost crossings.
+    /// branch tips, cost crossings.
     public var eventState: URL { root.appendingPathComponent("events-state.json") }
     /// What each of the last few local days cost, per currency. One file, so a daemon
     /// restarted part-way through a day comes back having counted the money rather

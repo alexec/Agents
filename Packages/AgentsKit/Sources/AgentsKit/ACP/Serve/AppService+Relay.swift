@@ -102,11 +102,6 @@ extension AppService {
             case .cancel:
                 return await send(DaemonAPI.Method.eventsCancel, DaemonAPI.EventTokenRequest(token: token),
                                   fallback: "Stopped waiting.")
-            case .publish(let name, let message, let details):
-                return await send(DaemonAPI.Method.eventsPublish,
-                                  DaemonAPI.EventPublishRequest(token: token, name: name, message: message,
-                                                                details: details),
-                                  fallback: "Published.")
             }
         } sessions: { call in
             // Only ever the caller's own project: the daemon takes it from the token (065).

@@ -55,7 +55,7 @@ struct TurnEndToolsServiceTests {
         let forever = try await call(tools, "wait_for_event", ["agents": ["A"]])
         #expect("\(forever)".contains("until_minutes is required"))
         // A wait on events is still an event wait, never a block.
-        #expect(AppService.selfCall(named: "wait_for_event", ["events": ["custom.x"], "until_minutes": 5],
+        #expect(AppService.selfCall(named: "wait_for_event", ["events": ["mac.wake"], "until_minutes": 5],
                                     movesItself: true) == nil)
     }
 

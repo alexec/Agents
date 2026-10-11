@@ -76,22 +76,17 @@ Stopping or archiving the agent also ends its wait.
   Mac's, not another project's.
 - **Time limits** run from 1 minute to 24 hours.
 
-## Have agents tell each other
+## Have one agent wait for another
 
-An agent can announce something with its `publish_event` tool, and other agents in the
-project can wait for it. For example, tell one agent:
-
-```text
-When the build is green, publish custom.build_green.
-```
-
-and another:
+Agents do not announce events of their own. To have one agent go on when another is done,
+tell it to wait for that agent:
 
 ```text
-Wait for custom.build_green, then deploy the docs.
+Wait for the agent titled "Build" to finish, then deploy the docs.
 ```
 
-The publishing agent is told who it woke. A workflow can start on the same event: see
+It calls `wait_for_event` with `agents`, and is started again with how the other agent
+ended. A workflow can start when an agent finishes too, on `agent.finished`: see
 [Workflow triggers and actions](../reference/workflows.md).
 
 ## See also

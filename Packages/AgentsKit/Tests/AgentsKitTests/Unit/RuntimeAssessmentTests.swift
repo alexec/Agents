@@ -23,10 +23,9 @@ struct RuntimeAssessmentTests {
         TranscriptEntry(at: t(at), kind: kind)
     }
 
-    func event(_ position: Int64, _ name: String, _ details: [String: String],
-               publisher: UUID? = nil) -> Event {
+    func event(_ position: Int64, _ name: String, _ details: [String: String]) -> Event {
         Event(position: position, name: name, at: t(Double(position)), scope: .project(URL(filePath: "/tmp/work")),
-              sentence: name, details: details, publisher: publisher.map { EventPublisher(agentID: $0, title: "me") })
+              sentence: name, details: details)
     }
 
     var reportText: String {
@@ -49,15 +48,16 @@ struct RuntimeAssessmentTests {
             call(5.2, DaemonAPI.Method.agentsManageWorkflows, ["action": s("list")]),
             call(5.3, DaemonAPI.Method.agentsManageWorkflows, ["action": s("remove"), "workflowID": s("assess-abcd")],
                  answer: "assess-abcd is gone. It will not run again."),
-            call(9, DaemonAPI.Method.eventsPublish, ["name": s(RuntimeAssessment.pingEvent)]),
+            call(9, DaemonAPI.Method.leasesLease, ["name": s(RuntimeAssessment.pingLease("abcd"))]),
             call(10, DaemonAPI.Method.eventsWait, ["events": .array([s(RuntimeAssessment.pingEvent)]), "from": .int(4)],
-                 answer: "custom.assess_ping happened at 10:00"),
+                 answer: "lease.granted happened at 10:00"),
+            call(10.01, DaemonAPI.Method.leasesRelease, ["name": s(RuntimeAssessment.pingLease("abcd"))]),
             call(10.05, DaemonAPI.Method.eventsWait, ["events": .array([s(RuntimeAssessment.neverEvent)])], ok: false,
                  answer: "until_minutes is required: say how long to wait, from 1 minute to 24 hours (1440)."),
             call(10.1, DaemonAPI.Method.eventsWait, ["events": .array([s(RuntimeAssessment.neverEvent)]),
                                                     "untilMinutes": .int(RuntimeAssessment.longWaitMinutes)],
-                 answer: "Still waiting for custom.assess_never, since 10:00."),
-            call(10.2, DaemonAPI.Method.eventsCancel, [:], answer: "Stopped waiting for custom.assess_never."),
+                 answer: "Still waiting for branch.moved, since 10:00."),
+            call(10.2, DaemonAPI.Method.eventsCancel, [:], answer: "Stopped waiting for branch.moved."),
             call(11, DaemonAPI.Method.agentsAskForm, ["questions": .array([
                 .object(["id": s("pick"), "prompt": s("Pick one"),
                          "options": .array([.object(["id": s("a")]), .object(["id": s("b")])])]),
@@ -72,7 +72,7 @@ struct RuntimeAssessmentTests {
             call(40, DaemonAPI.Method.agentsRequestArchiveHelper, ["agentID": s(helper.uuidString)]),
             call(41, DaemonAPI.Method.agentsArchiveHelper, ["agentID": s(helper.uuidString)]),
             call(42, DaemonAPI.Method.eventsWait, ["events": .array([s(RuntimeAssessment.neverEvent)]), "untilMinutes": .int(1)],
-                 answer: "Still waiting for custom.assess_never."),
+                 answer: "Still waiting for branch.moved."),
             call(90, DaemonAPI.Method.agentsFinishTurn, ["outcome": s("blocked"), "message": s("waiting for the timeout"), "prompts": .array([])]),
             call(110, DaemonAPI.Method.agentsFinishTurn, ["outcome": s("blocked"), "message": s("checking again"),
                                                          "checkAgainInMinutes": .int(1), "prompts": .array([])]),
@@ -106,7 +106,7 @@ struct RuntimeAssessmentTests {
             entry(35, .stateChanged(.running, reason: nil)),
             entry(90, .workReported(WorkReport(outcome: .blocked, message: "waiting", at: t(90)))),
             entry(91, .stateChanged(.finished, reason: .endTurn)),
-            entry(103, .userMessage("Your wait for custom.assess_never timed out at 10:01 with no match.", from: .app)),
+            entry(103, .userMessage("Your wait for branch.moved timed out at 10:01 with no match.", from: .app)),
             entry(103, .stateChanged(.running, reason: nil)),
             entry(110, .workReported(WorkReport(outcome: .blocked, message: "checking", at: t(110)))),
             entry(111, .stateChanged(.finished, reason: .endTurn)),
@@ -129,7 +129,8 @@ struct RuntimeAssessmentTests {
         let events = [
             event(2, "lease.granted", ["agent": me.uuidString, "resource": "assess-abcd"]),
             event(4, "lease.released", ["how": "released", "resource": "assess-abcd"]),
-            event(9, RuntimeAssessment.pingEvent, [:], publisher: me),
+            event(9, "lease.granted", ["agent": me.uuidString, "resource": "assess-abcd-ping"]),
+            event(10, "lease.released", ["how": "released", "resource": "assess-abcd-ping"]),
             event(40, "agent.archive_requested", ["agent": helper.uuidString]),
         ]
         var helperAgent = Agent(id: helper, runtimeID: "claude", cwd: URL(filePath: "/tmp/work"), state: .archived)
@@ -292,9 +293,16 @@ struct RuntimeAssessmentTests {
         #expect(verdicts(record)["wait"] == .failed)
     }
 
-    @Test func thePublishedEventMustBeOnTheLog() {
+    /// Agents raise no events (#639): the step waits on the grant of its own second lease,
+    /// which must be on the log, and to this agent.
+    @Test func theSecondLeasesGrantMustBeOnTheLog() {
         var record = goodRecord()
-        record.events.removeAll { $0.name == RuntimeAssessment.pingEvent }
+        record.events.removeAll { $0.details["resource"] == "assess-abcd-ping" }
+        #expect(verdicts(record)["events"] == .failed)
+        #expect(verdicts(record)["leases"] == .passed)
+        record = goodRecord()
+        let i = record.events.firstIndex { $0.details["resource"] == "assess-abcd-ping" }!
+        record.events[i].details["agent"] = UUID().uuidString
         #expect(verdicts(record)["events"] == .failed)
     }
 
@@ -481,7 +489,8 @@ struct RuntimeAssessmentTests {
         for word in [RuntimeAssessment.pingEvent, RuntimeAssessment.neverEvent, RuntimeAssessment.helperLabel,
                      "AskUserQuestion", "assess-abcd1234", "until_minutes", report, scopeFile,
                      "cancel_wait", "leave_worktree", "move_worktree", "request_archive", "read_session", "claude-agent-acp 0.81.2", "this Mac (test)",
-                     "on:\n      - custom.assess_never"] {
+                     RuntimeAssessment.pingLease("abcd1234"), RuntimeAssessment.neverBranch,
+                     "on:\n      - branch.moved:\n          branch: assess-never"] {
             #expect(brief.contains(word), "\(word)")
         }
         let none = RuntimeAssessment.brief(runtimeID: "grok", runtimeName: "Grok", model: nil, reportPath: report,

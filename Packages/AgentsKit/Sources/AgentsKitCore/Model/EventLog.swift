@@ -139,7 +139,7 @@ public struct EventLog: Codable, Hashable, Sendable {
 
     static func isRepeat(_ draft: EventDraft, of last: Event, now: Date) -> Bool {
         last.name == draft.name && last.scope == draft.scope && last.details == draft.details
-            && last.publisher == draft.publisher && last.message == draft.message
+            && last.publisher == nil && last.message == draft.message
             && now.timeIntervalSince(last.latest) < repeatWindow
     }
 

@@ -201,10 +201,17 @@ private struct Scorer {
 
     func events() -> (Verdict, String) {
         let ping = RuntimeAssessment.pingEvent
-        let published = calls(DaemonAPI.Method.eventsPublish).filter { $0.arguments?["name"]?.stringValue == ping }
-        guard ok(published) else { return (.failed, said(published, "publish_event \(ping)")) }
-        guard record.events.contains(where: { $0.name == ping && $0.publisher?.agentID == record.agentID }) else {
-            return (.failed, "\(ping) is not on the log from this agent")
+        // The second lease: named by the start when it is known, else by its ending.
+        func isPingLease(_ name: String?) -> Bool {
+            guard let name = name?.trimmingCharacters(in: .whitespaces).lowercased() else { return false }
+            return record.start.map { name == RuntimeAssessment.pingLease($0.shortID).lowercased() } ?? name.hasSuffix("-ping")
+        }
+        let leased = calls(DaemonAPI.Method.leasesLease).filter { isPingLease($0.arguments?["name"]?.stringValue) }
+        guard ok(leased) else { return (.failed, said(leased, "lease_resource for the ping")) }
+        guard record.events.contains(where: {
+            $0.name == ping && $0.details["agent"] == record.agentID.uuidString && isPingLease($0.details["resource"])
+        }) else {
+            return (.failed, "no \(ping) to this agent for its second lease on the log")
         }
         let waited = calls(DaemonAPI.Method.eventsWait).filter {
             $0.ok && ($0.arguments?["events"]?.arrayValue ?? []).contains { $0.stringValue == ping }
@@ -219,13 +226,13 @@ private struct Scorer {
         }
         // A wait that could last for ever is refused (#572).
         let unbounded = onNever.filter { $0.arguments?["untilMinutes"]?.intValue == nil }
-        guard !unbounded.isEmpty else { return (.failed, "published \(ping) and heard it, but never waited with no until_minutes") }
+        guard !unbounded.isEmpty else { return (.failed, "heard \(ping), but never waited with no until_minutes") }
         guard unbounded.allSatisfy({ !$0.ok }) else { return (.failed, "a wait for \(never) with no until_minutes was kept, not refused") }
         let second = onNever.filter { $0.ok && $0.arguments?["untilMinutes"]?.intValue == RuntimeAssessment.longWaitMinutes }
-        guard let open = second.first else { return (.failed, "published \(ping) and heard it, but never made a second wait to cancel") }
+        guard let open = second.first else { return (.failed, "heard \(ping), but never made a second wait to cancel") }
         let cancelled = calls(DaemonAPI.Method.eventsCancel).filter { $0.at >= open.at }
         guard ok(cancelled) else { return (.failed, said(cancelled, "cancel_wait")) }
-        return (.passed, "published \(ping); the wait came back with it\(seconds); a wait with no until_minutes was refused; `cancel_wait` cleared the second")
+        return (.passed, "a second lease raised \(ping); the wait came back with it\(seconds); a wait with no until_minutes was refused; `cancel_wait` cleared the second")
     }
 
     /// The form's questions, from the call's arguments.

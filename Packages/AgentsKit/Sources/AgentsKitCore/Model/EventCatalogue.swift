@@ -16,7 +16,6 @@ public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
     case person
     case cost
     case server
-    case custom
 
     public init?(name: String) {
         guard let dot = name.firstIndex(of: ".") else { return nil }
@@ -31,7 +30,6 @@ public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
         case .branch: return "⎇"
         case .dropbox: return "⇣"
         case .mac, .machine, .person, .lease, .cost, .server: return "⌘"
-        case .custom: return "✦"
         }
     }
 
@@ -43,12 +41,11 @@ public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
         case .branch: return .branches
         case .dropbox: return .dropbox
         case .mac, .machine, .person, .lease, .cost, .server: return .mac
-        case .custom: return .custom
         }
     }
 }
 
-/// The page's six filter capsules (042 FR-028, wireframes §1). Several subjects about
+/// The page's five filter capsules (042 FR-028, wireframes §1). Several subjects about
 /// the machine and the person share one, because to the person they are all "This Mac".
 public enum EventGroup: String, Codable, Hashable, Sendable, CaseIterable {
     case agents
@@ -56,7 +53,6 @@ public enum EventGroup: String, Codable, Hashable, Sendable, CaseIterable {
     case branches
     case dropbox
     case mac
-    case custom
 
     public var title: String {
         switch self {
@@ -65,7 +61,6 @@ public enum EventGroup: String, Codable, Hashable, Sendable, CaseIterable {
         case .branches: return "Branches"
         case .dropbox: return "Drop box"
         case .mac: return "This Mac"
-        case .custom: return "Custom"
         }
     }
 
@@ -138,8 +133,8 @@ public struct EventKind: Hashable, Sendable {
 ///
 /// The wait tool's list, the workflow tool's description, the workflow file parser and
 /// the events page all read this, so an agent can wait on exactly what a workflow can
-/// trigger on, described in the same words. `custom.<name>` is a family rather than an
-/// entry: anything under it is an agent's to name.
+/// trigger on, described in the same words. There is no `custom.` family: agents do not
+/// raise events (#639).
 public enum EventCatalogue {
     public static let all: [EventKind] = [
         EventKind("agent.started", .project, about(), "An agent in this project started working."),
@@ -232,8 +227,7 @@ public enum EventCatalogue {
     }
 
     /// What a pattern on `name` may be narrowed by, as JSON Schema (#579): the kind's
-    /// own, or for `subject.*` those of every kind in the subject (073 FR-021). A custom
-    /// event takes none: its details are its publisher's.
+    /// own, or for `subject.*` those of every kind in the subject (073 FR-021).
     public static func inputSchema(for name: String) -> JSONValue {
         if let kind = kind(named: name) { return kind.inputSchema }
         guard name.hasSuffix(".*"), let subject = EventSubject(rawValue: String(name.dropLast(2))) else {
@@ -247,34 +241,35 @@ public enum EventCatalogue {
         inputSchema(for: name)["properties"]?.objectValue?.keys.sorted() ?? []
     }
 
-    public static let customMeaning = "An agent in this project published this."
-
     private static let byName: [String: EventKind] = Dictionary(uniqueKeysWithValues: all.map { ($0.name, $0) })
 
     public static func kind(named name: String) -> EventKind? { byName[name] }
 
     /// Whether only a Mac raises what a pattern names: a Mac-only kind, or a subject
-    /// whose every kind is (#372). A custom event or a name the catalogue does not know
-    /// is not.
+    /// whose every kind is (#372). A name the catalogue does not know is not.
     public static func isMacOnly(_ name: String) -> Bool {
         if name.hasSuffix(".*") {
-            guard let subject = EventSubject(rawValue: String(name.dropLast(2))), subject != .custom else { return false }
+            guard let subject = EventSubject(rawValue: String(name.dropLast(2))) else { return false }
             let kinds = kinds(in: subject)
             return !kinds.isEmpty && kinds.allSatisfy(\.isMacOnly)
         }
         return kind(named: name)?.isMacOnly ?? false
     }
 
-    /// `custom.` and a name of lowercase letters, digits and `_`, up to 40 characters.
-    public static func isCustom(_ name: String) -> Bool {
-        name.range(of: #"^custom\.[a-z0-9_]{1,40}$"#, options: .regularExpression) != nil
+    /// Whether a name is under `custom.`, which agents announced events with until #639.
+    /// Nothing raises one now, so a wait or a trigger naming one is refused, saying why.
+    public static func isRetiredCustom(_ name: String) -> Bool {
+        name == retiredCustomNoun || name.hasPrefix(retiredCustomNoun + ".")
     }
+
+    static let retiredCustomNoun = "custom"
 
     // MARK: Events from MCP servers (#383)
 
-    /// The nouns only the app raises events about: every subject, `custom` included. A
-    /// server's event with one of these is refused, so it can never pass for the app's.
-    public static let reservedNouns: Set<String> = Set(EventSubject.allCases.map(\.rawValue))
+    /// The nouns only the app raises events about: every subject, and `custom`, which an
+    /// agent's events had (#639). A server's event with one of these is refused, so it can
+    /// never pass for the app's.
+    public static let reservedNouns: Set<String> = Set(EventSubject.allCases.map(\.rawValue) + [retiredCustomNoun])
 
     /// Whether a name has the one shape every event has, whoever raises it: `noun.verbed`.
     public static func isEventName(_ name: String) -> Bool {
@@ -294,17 +289,8 @@ public enum EventCatalogue {
         all.filter { $0.subject == subject }
     }
 
-    /// The custom family as `events/list` would describe it: nothing to narrow it by,
-    /// and whatever its publisher put in it.
-    public static var customDefinition: EventDefinition {
-        EventDefinition(name: "custom.<name>",
-                        description: customMeaning + " <name> is lowercase letters, digits and _, up to 40 characters.",
-                        delivery: [], inputSchema: schema([], closed: true), payloadSchema: ["type": "object"])
-    }
-
-    /// Every one of the app's events as `events/list` would describe it (#579), the
-    /// custom family last.
-    public static var definitions: [EventDefinition] { all.map(\.definition) + [customDefinition] }
+    /// Every one of the app's events as `events/list` would describe it (#579).
+    public static var definitions: [EventDefinition] { all.map(\.definition) }
 }
 
 /// The one list of events an agent reads (#579): the app's, then each server's, every

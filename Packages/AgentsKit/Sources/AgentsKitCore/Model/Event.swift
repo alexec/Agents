@@ -21,7 +21,8 @@ public enum EventScope: Codable, Hashable, Sendable {
     }
 }
 
-/// The agent that published a `custom.*` event, as it was called when it did.
+/// The agent that published a `custom.*` event, as it was called when it did. Agents no
+/// longer publish (#639); kept so an event on the log from before still reads.
 public struct EventPublisher: Codable, Hashable, Sendable {
     public var agentID: UUID
     public var title: String
@@ -85,6 +86,7 @@ public struct Event: Codable, Hashable, Sendable, Identifiable {
     /// The kind's details. An agent is named by id under `agent`, with `agent_title`
     /// beside it for reading.
     public var details: [String: String]
+    /// Only on a `custom.` event from before #639.
     public var publisher: EventPublisher?
     public var message: String?
     /// How deep in a workflow chain anything fired from this event would be (008 FR-021).
@@ -113,7 +115,7 @@ public struct Event: Codable, Hashable, Sendable, Identifiable {
 
     public init(_ draft: EventDraft, position: EventPosition) {
         self.init(position: position, name: draft.name, at: draft.at, scope: draft.scope,
-                  sentence: draft.sentence, details: draft.details, publisher: draft.publisher,
+                  sentence: draft.sentence, details: draft.details,
                   message: draft.message, chainDepth: draft.chainDepth)
     }
 
@@ -130,19 +132,16 @@ public struct EventDraft: Codable, Hashable, Sendable {
     public var scope: EventScope
     public var sentence: String
     public var details: [String: String]
-    public var publisher: EventPublisher?
     public var message: String?
     public var chainDepth: Int
 
     public init(name: String, at: Date = Date(), scope: EventScope, sentence: String,
-                details: [String: String] = [:], publisher: EventPublisher? = nil,
-                message: String? = nil, chainDepth: Int = 0) {
+                details: [String: String] = [:], message: String? = nil, chainDepth: Int = 0) {
         self.name = name
         self.at = at
         self.scope = scope
         self.sentence = sentence
         self.details = details
-        self.publisher = publisher
         self.message = message
         self.chainDepth = chainDepth
     }
@@ -161,7 +160,7 @@ public struct EventDraft: Codable, Hashable, Sendable {
     /// Why this draft cannot be recorded, in the words an agent reads. `nil` when it can.
     public var problem: String? {
         guard Self.isWellFormed(name) else {
-            return "\"\(name)\" is not an event name: it is lowercase words joined by a dot, like custom.build_green."
+            return "\"\(name)\" is not an event name: it is lowercase words joined by a dot, like branch.moved."
         }
         if details.count > Self.maximumDetails {
             return "An event carries at most \(Self.maximumDetails) details; this one has \(details.count)."

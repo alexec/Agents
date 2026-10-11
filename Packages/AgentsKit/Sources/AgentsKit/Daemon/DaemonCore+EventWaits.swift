@@ -323,43 +323,6 @@ extension DaemonCore {
         eventWaitDeadlinesPassed()
     }
 
-    // MARK: publish_event (US4)
-
-    public static let publishesPerHour = 30
-
-    public func publishEvent(_ request: DaemonAPI.EventPublishRequest) throws -> String {
-        let caller = try eventCaller(request.token)
-        loadEventsIfNeeded()
-        let name = request.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard name.hasPrefix("custom.") else { throw eventRefusal(EventWords.publishOutsideCustom(name)) }
-        guard EventCatalogue.isCustom(name) else {
-            throw eventRefusal(EventPatternProblem.badCustomName(name).message)
-        }
-        let at = now()
-        let key = caller.id.uuidString
-        let recent = (eventState.publishes[key] ?? []).filter { at.timeIntervalSince($0) < 3600 }
-        if recent.count >= Self.publishesPerHour, let oldest = recent.min() {
-            throw eventRefusal(EventWords.publishLimit(Self.publishesPerHour, until: oldest.addingTimeInterval(3600)))
-        }
-        let message = request.message?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let draft = EventDraft(name: name, at: at, scope: .project(folder: caller.projectFolder),
-                               sentence: "\(LeaseWords.agentName(caller.title)) published \(name).",
-                               details: request.details ?? [:],
-                               publisher: EventPublisher(agentID: caller.id, title: caller.title ?? "Untitled"),
-                               message: message?.isEmpty == true ? nil : message,
-                               chainDepth: workflowChainDepth(causedBy: caller.id))
-        if let problem = draft.problem { throw eventRefusal(problem) }
-        // Every agent's past their hour go with this one's, so the map holds only the
-        // publishers of the last hour (#218).
-        eventState.publishes = eventState.publishes.compactMapValues { dates in
-            let kept = dates.filter { at.timeIntervalSince($0) < 3600 }
-            return kept.isEmpty ? nil : kept
-        }
-        eventState.publishes[key] = recent + [at]
-        saveEventState()
-        return EventWords.published(raise(draft))
-    }
-
     // MARK: Inside
 
     private func eventCaller(_ token: String) throws -> Agent {

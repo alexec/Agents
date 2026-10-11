@@ -497,7 +497,7 @@ extension DaemonCore {
     }
 
     /// Cursor and Grok (061): only the tools that end or annotate a turn, never the ones
-    /// that start agents, change workflows, take leases or publish.
+    /// that start agents, change workflows or take leases.
     func autoAllowedTurnTool(_ request: PermissionRequest) -> PermissionOption? {
         let call = request.toolCall
         guard call.isFinishingTurn || call.isOwnSessionCall || call.isShowingFile else { return nil }

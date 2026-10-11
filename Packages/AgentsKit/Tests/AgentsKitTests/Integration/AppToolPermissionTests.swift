@@ -16,6 +16,15 @@ struct AppToolPermissionTests {
         }
     }
 
+    /// `publish_event` is gone (#639): not offered, but a conversation that called it
+    /// still draws the call as the app's own.
+    @Test func aRetiredPublishEventStillReadsAsTheApps() {
+        #expect(!AppTool.all.contains(AppTool.retiredPublishEvent))
+        #expect(!AppService.tools(managesAgents: true).contains { $0["name"]?.stringValue == AppTool.retiredPublishEvent })
+        #expect(AppTool.isServedByTheApp("mcp__agents__publish_event"))
+        #expect(AppTool.isServedByTheApp("agents_publish_event"))
+    }
+
     /// A bare name says nothing about whose it is: Antigravity has a `list_resources` of
     /// its own. Nor does another server's tool of the same name.
     @Test func aBareNameOrAnotherServersToolIsStillThePersonsToAnswer() {

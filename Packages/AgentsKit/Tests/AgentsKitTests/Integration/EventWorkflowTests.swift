@@ -88,21 +88,21 @@ struct EventWorkflowTests {
         #expect(prompt?.contains("Its details are level: critical; volume: Macintosh HD.") == true)
     }
 
-    @Test func aCustomEventResumesItsPublisherInTriggeringMode() async throws {
+    /// Agents no longer publish (#639): a workflow still waiting on a custom event says
+    /// it cannot run, and one raised anyway fires nothing.
+    @Test func aCustomEventWorkflowCannotRun() async throws {
         let (locations, work) = try temporary()
         try write("  - custom.release_ready", mode: "triggering", as: "release", in: work)
         let core = try await core(locations)
         await core.rescanWorkflows(in: work)
-        let publisher = try await core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: work, prompt: "Build"))
-        try await eventually("publisher settled") { await core.agent(publisher)?.state == .finished }
+        let workflow = try #require(await core.workflows[work]?["release"])
+        guard case .unreadable(let detail)? = workflow.problem else { Issue.record("not refused"); return }
+        #expect(detail.contains("agents no longer publish events"))
 
         let event = await core.raise(EventDraft(name: "custom.release_ready", scope: .project(folder: work),
-                                                sentence: "published",
-                                                publisher: EventPublisher(agentID: publisher, title: "Build")))
-        try await eventually("fired in the publisher") {
-            await core.eventLog.event(at: event.position)?.consequences
-                == [.fired(workflowID: "release", folder: work, agentID: publisher)]
-        }
+                                                sentence: "published"))
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(await core.eventLog.event(at: event.position)?.consequences.isEmpty == true)
     }
 
     @Test func triggeringOnAnEventWithNoAgentIsRefusedAndTheEventSaysWhy() async throws {

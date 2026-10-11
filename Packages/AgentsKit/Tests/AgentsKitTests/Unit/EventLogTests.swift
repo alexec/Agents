@@ -72,7 +72,7 @@ struct EventLogTests {
     @Test func pruningKeepsAtMostTenThousandDroppingTheOldest() {
         var log = EventLog()
         for i in 0...EventLog.maximumEvents {
-            add(&log, draft("custom.n", nil, ["i": "\(i)"]), at: Double(i))
+            add(&log, draft("dropbox.file_added", nil, ["i": "\(i)"]), at: Double(i))
         }
         #expect(log.events.count == EventLog.maximumEvents + 1)
         log.prune(now: t0.addingTimeInterval(Double(EventLog.maximumEvents)))
@@ -82,7 +82,7 @@ struct EventLogTests {
 
     @Test func aPageIsNewestFirstAndPagesBack() {
         var log = EventLog()
-        for i in 0..<5 { add(&log, draft("custom.n", nil, ["i": "\(i)"]), at: Double(i)) }
+        for i in 0..<5 { add(&log, draft("dropbox.file_added", nil, ["i": "\(i)"]), at: Double(i)) }
         let first = log.query(limit: 2)
         #expect(first.events.map(\.position) == [5, 4])
         #expect(first.hasMore)
@@ -107,10 +107,10 @@ struct EventLogTests {
 
     @Test func waitingFromAPositionSeesOnlyWhatCameAfterItInItsScopes() throws {
         var log = EventLog()
-        add(&log, draft("custom.ping"))
-        add(&log, draft("custom.ping", q), at: 61)
-        add(&log, draft("custom.ping", nil, ["n": "2"]), at: 62)
-        let ping = try EventPattern.parse("custom.ping").get()
+        add(&log, draft("dropbox.file_added"))
+        add(&log, draft("dropbox.file_added", q), at: 61)
+        add(&log, draft("dropbox.file_added", nil, ["n": "2"]), at: 62)
+        let ping = try EventPattern.parse("dropbox.file_added").get()
         #expect(log.matches(after: 0, [ping], scopes: [.mac, p]).map(\.position) == [1, 3])
         #expect(log.matches(after: 1, [ping], scopes: [.mac, p]).map(\.position) == [3])
         #expect(log.matches(after: 3, [ping], scopes: [.mac, p]).isEmpty)
@@ -128,7 +128,7 @@ struct EventLogTests {
     @Test func aLogSurvivesCoding() throws {
         var log = EventLog()
         add(&log, draft("mac.wake", .mac))
-        add(&log, draft("custom.ping", nil, ["k": "v"]), at: 1)
+        add(&log, draft("dropbox.file_added", nil, ["k": "v"]), at: 1)
         log.addConsequence(.refused(workflowID: "w", folder: URL(fileURLWithPath: "/tmp/p"),
                                     reason: .noTriggeringAgent), to: 2)
         let data = try JSONEncoder().encode(log)
@@ -136,7 +136,7 @@ struct EventLogTests {
     }
 
     @Test func draftsOverTheLimitsSayWhy() {
-        var d = draft("custom.x")
+        var d = draft("dropbox.file_added")
         #expect(d.problem == nil)
         d.message = String(repeating: "m", count: 501)
         #expect(d.problem?.contains("500") == true)

@@ -39,8 +39,7 @@ give them as two columns:
     [Events from MCP servers](#events-from-mcp-servers)).
 
 Nothing else narrows an event: not `agent`, `labels`, `outcome` or any other detail of an
-agent event, nor a drop box arrival's, a lease's, the disk's, a cost's or a server's, nor
-a custom event's own. A custom event's `inputSchema` is empty and its `payloadSchema` open.
+agent event, nor a drop box arrival's, a lease's, the disk's, a cost's or a server's.
 
 - **A list means any of them.** `branch: [main, develop]` matches either. A list of one is
   the same as the value on its own.
@@ -158,19 +157,13 @@ they are `machine.`.
 | `server.offline` | — | server | A server's connection dropped. Raised once, while the Agents window is open. |
 | `server.online` | — | server | A server that was offline is back. Raised once, while the Agents window is open. |
 
-## Custom events
+## No custom events
 
-An agent can publish an event of its own with its `publish_event` tool, to tell other
-agents and workflows in the same project that something happened.
-
-- The name is `custom.` followed by up to 40 lowercase letters, digits and `_`, such as
-  `custom.build_green` or `custom.release_ready`.
-- It carries `publisher` and `message`, a short note of up to 500 characters for whoever
-  wakes on it, plus up to 10 details of the publisher's own. These are shown, not filters.
-- Each agent can publish at most 30 an hour.
-- Only `custom.` events can be published. The others are raised by the app.
-
-The publishing agent is told who was woken and which workflows ran.
+Agents do not raise events of their own. The `publish_event` tool and the `custom.` events it
+raised were removed (#639). A wait on a `custom.` name is refused, saying why, and a workflow
+whose `on:` names one does not run: its page says what is wrong. To wait for another agent,
+use `wait_for_event` with `agents`. A `custom.` event already on the log still shows, with the
+agent that published it.
 
 ## Events from MCP servers
 
@@ -255,8 +248,7 @@ On the Mac, **Events** is a row at the foot of the sidebar, above **Resources** 
 **Spending**. It shows every event, newest first, grouped by day.
 
 - **Filters**: a menu for all projects, this Mac or one project, and a capsule for each
-  subject: **Agents**, **Workflows**, **Branches**, **Drop box**, **This Mac** and
-  **Custom**.
+  subject: **Agents**, **Workflows**, **Branches**, **Drop box** and **This Mac**.
 - **Each row** shows the time, what happened, and the event's name. Under it, what it led
   to: **Woke** an agent, **Fired** a workflow, **Refused by** a workflow with the reason,
   or **Could not wake** an agent with the reason. A repeat shows a count, such as ×4.

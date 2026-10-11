@@ -84,7 +84,7 @@ const eventMeanings: Record<string, string> = {
   "server.online": "A server came back",
 };
 
-// EventCatalogue.reservedNouns: the app's own subjects, which no server's event may use.
+// EventCatalogue.reservedNouns: the app's own subjects, and `custom` (#639), which no server's event may use.
 const reservedNouns = new Set(["agent", "project", "workflow", "branch", "lease", "mac", "machine", "person", "cost", "server", "custom"]);
 
 /** EventCatalogue.isServerEventName: `noun.verbed`, about none of the app's own subjects. */
@@ -137,8 +137,7 @@ export function triggerSummary(trigger: WorkflowTriggerStored): string {
   if (isEvent(trigger)) {
     const filters = eventFilters(trigger).map(([k, values]) => filterWords(k, values)).join(", ");
     const subject = name.endsWith(".*") ? name.slice(0, -2) : null;
-    const meaning = name.startsWith("custom.") ? `An agent here publishes ${name}`
-      : subject ? `Anything about ${subject}s` : eventMeanings[name] ?? name;
+    const meaning = subject ? `Anything about ${subject}s` : eventMeanings[name] ?? name;
     return filters ? `${meaning} (${filters})` : meaning;
   }
   return `Waits for "${name}", which this version does not know about yet${guess(name)}`;
@@ -335,10 +334,6 @@ const catalogue: Record<string, { scope: "mac" | "project" | "either"; details: 
   "server.online": { scope: "mac", details: ["server"] },
 };
 
-function isCustom(name: string): boolean {
-  return /^custom\.[a-z0-9_]{1,40}$/.test(name);
-}
-
 /** `subject.*`'s subject, or null for a single name (EventPattern.wholeSubject). */
 function wholeSubject(name: string): string | null {
   return name.endsWith(".*") ? name.slice(0, -2) : null;
@@ -393,10 +388,8 @@ export function listensIn(trigger: WorkflowTriggerStored): "mac" | "project" | "
   // A server's events are the project's: its servers are found by its folder.
   if (serverEvent(trigger)) return "project";
   const name = trigger.unrecognised.name;
-  if (isCustom(name)) return "project";
   const subject = wholeSubject(name);
   if (subject) {
-    if (subject === "custom") return "project";
     const scopes = new Set(kindsIn(subject).map(([, k]) => k.scope));
     return scopes.size === 1 ? [...scopes][0]! : "either";
   }
@@ -421,7 +414,6 @@ export function resumedAgent(trigger: WorkflowTriggerStored): string {
   if (serverEvent(trigger)) return "A server's events are about no agent, so this never runs it";
   const name = trigger.unrecognised.name;
   const subject = wholeSubject(name);
-  if (isCustom(name) || subject === "custom") return "Resumes the agent that published it";
   const kinds = subject ? kindsIn(subject).map(([, k]) => k) : catalogue[name] ? [catalogue[name]!] : [];
   const carrying = kinds.filter((k) => k.details.includes("agent"));
   if (!carrying.length) return "These events are about no agent, so this never runs it";
@@ -435,7 +427,7 @@ export function triggerGlyph(trigger: WorkflowTriggerStored): string {
   if (!("unrecognised" in trigger)) return "●";
   if (!isEvent(trigger)) return "?";
   const subject = trigger.unrecognised.name.split(".")[0];
-  return subject === "agent" || subject === "project" ? "●" : subject === "workflow" ? "⟳" : subject === "branch" ? "⎇" : subject === "custom" ? "✦" : "⌘";
+  return subject === "agent" || subject === "project" ? "●" : subject === "workflow" ? "⟳" : subject === "branch" ? "⎇" : "⌘";
 }
 
 const named = new Intl.RelativeTimeFormat("en", { numeric: "auto" });

@@ -7,7 +7,7 @@ public enum AgentMessageLimits {
     /// that a message is not a way to hand another agent a file.
     public static let characters = 4_000
 
-    /// How many messages one agent may send in an hour, as `publish_event` (042).
+    /// How many messages one agent may send in an hour.
     public static let perHour = 30
 
     /// How many messages between agents may follow one another with no prompt from the

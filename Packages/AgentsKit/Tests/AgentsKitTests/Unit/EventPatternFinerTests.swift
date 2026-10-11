@@ -88,8 +88,7 @@ struct EventPatternFinerTests {
                 == "workflow.completed takes no arguments; \"workflow\" is not one of its arguments.")
         for (name, key) in [("project.idle", "agents"), ("dropbox.file_added", "extension"),
                             ("lease.released", "how"), ("machine.disk_low", "level"), ("cost.allowance_out", "runtime"),
-                            ("server.offline", "server"), ("custom.ship", "labels"), ("custom.*", "message"),
-                            ("workflow.*", "workflow")] {
+                            ("server.offline", "server"), ("workflow.*", "workflow")] {
             #expect(EventPattern.parse(name, filters: [key: "x"]).failure?.isBadFilter == true, "\(name) \(key)")
         }
     }
@@ -158,7 +157,6 @@ struct EventPatternFinerTests {
                 == "on:\n  - person.back:\n      why: idle")
         let finished = about("agent.finished", labels: "bug", ["outcome": "done", "afterwards": "archive_requested"])
         #expect(EventPattern.matching(finished).asTrigger == "on:\n  - agent.finished")
-        #expect(EventPattern.matching(event("custom.ship", ["labels": "bug"])).asTrigger == "on:\n  - custom.ship")
         let dropped = event("dropbox.file_added", ["path": "a.txt", "extension": "txt"])
         #expect(EventPattern.matching(dropped).asTrigger == "on:\n  - dropbox.file_added")
         // What it copies reads back.

@@ -65,7 +65,6 @@ struct AppServiceTests {
                 AppService.leaseResourceToolName, AppService.releaseResourceToolName,
                 AppService.listResourcesToolName,
                 AppService.waitForEventToolName, AppService.cancelWaitToolName,
-                AppService.publishEventToolName,
                 AppService.pinPageToolName, AppService.unpinPageToolName, AppService.movePinToolName,
                 AppService.pinSessionToolName])
 
@@ -374,7 +373,7 @@ struct AppServiceTests {
         let names = [AppTool.showFile, AppTool.manageWorkflows, AppTool.askForm,
                      AppTool.startAgent, AppTool.stopAgent, AppTool.requestArchive, AppTool.archiveAgent,
                      AppTool.listMyAgents,
-                     AppTool.waitForEvent, AppTool.cancelWait, AppTool.publishEvent,
+                     AppTool.waitForEvent, AppTool.cancelWait,
                      AppTool.listResources]
         for name in names {
             for other in names + [AppTool.leaseResource] where other != name {

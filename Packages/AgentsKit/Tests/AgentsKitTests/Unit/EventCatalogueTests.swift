@@ -33,7 +33,6 @@ struct EventCatalogueTests {
         #expect(EventCatalogue.isMacOnly("mac.*"))
         #expect(!EventCatalogue.isMacOnly("machine.*"))
         #expect(!EventCatalogue.isMacOnly("machine.disk_low"))
-        #expect(!EventCatalogue.isMacOnly("custom.mac_wake"))
         #expect(EventList.text().contains(#""name":"mac.wake","source":"app","description":"This Mac woke up. Only a Mac raises it"#))
     }
 
@@ -60,10 +59,10 @@ struct EventCatalogueTests {
         }
     }
 
-    @Test func theDescriptionNamesEveryKindAndTheCustomFamily() {
+    @Test func theDescriptionNamesEveryKindAndNoCustomFamily() {
         let text = EventList.text()
         for kind in EventCatalogue.all { #expect(text.contains(kind.name)) }
-        #expect(text.contains("custom.<name>"))
+        #expect(!text.contains("custom."))
         #expect(text.contains("agent.*"))
     }
 
@@ -150,11 +149,10 @@ struct EventCatalogueTests {
         let entries = text.split(separator: "\n").filter { $0.hasPrefix("{") }.map { line in
             try? JSONDecoder().decode(JSONValue.self, from: Data(line.utf8))
         }
-        #expect(entries.count == EventCatalogue.all.count + 2)
-        let app = entries.prefix(EventCatalogue.all.count + 1)
+        #expect(entries.count == EventCatalogue.all.count + 1)
+        let app = entries.prefix(EventCatalogue.all.count)
         #expect(app.allSatisfy { $0?["source"] == "app" })
-        #expect(app.compactMap { $0?["name"]?.stringValue } == EventCatalogue.all.map(\.name) + ["custom.<name>"])
-        #expect(app.last??["payloadSchema"] == ["type": "object"])
+        #expect(app.compactMap { $0?["name"]?.stringValue } == EventCatalogue.all.map(\.name))
         let last = try #require(entries.last ?? nil)
         #expect(last["source"] == "github")
         #expect(last["name"] == "pr.merged")
@@ -163,13 +161,17 @@ struct EventCatalogueTests {
         #expect(text.contains("Not listed: Can't reach ci"))
     }
 
-    @Test func customNamesAreLowercaseAndShort() {
-        #expect(EventCatalogue.isCustom("custom.build_green"))
-        #expect(EventCatalogue.isCustom("custom.v2"))
-        #expect(!EventCatalogue.isCustom("custom."))
-        #expect(!EventCatalogue.isCustom("custom.Build"))
-        #expect(!EventCatalogue.isCustom("custom." + String(repeating: "a", count: 41)))
-        #expect(!EventCatalogue.isCustom("mac.wake"))
+    /// Agents no longer publish (#639): every `custom.` name, and the subject, is the
+    /// retired family, and none of it can pass for a server's event either.
+    @Test func customNamesAreRetired() {
+        for name in ["custom.build_green", "custom.v2", "custom.*", "custom.Build"] {
+            #expect(EventCatalogue.isRetiredCustom(name), "\(name)")
+            #expect(!EventCatalogue.isServerEventName(name), "\(name)")
+        }
+        #expect(!EventCatalogue.isRetiredCustom("mac.wake"))
+        #expect(!EventCatalogue.isRetiredCustom("customer.signed_up"))
+        #expect(EventCatalogue.isServerEventName("customer.signed_up"))
+        #expect(EventSubject(name: "custom.build_green") == nil)
     }
 
     @Test func everySubjectHasAGroupAndTheGroupsCoverThemAll() {

@@ -16,7 +16,7 @@ import Foundation
 public enum WorkflowTrigger: Hashable, Sendable {
     /// On a clock.
     case schedule(WorkflowSchedule)
-    /// Any event in the catalogue, a whole subject, or `custom.<name>`, narrowed by
+    /// Any event in the catalogue, a whole subject, or a server's event, narrowed by
     /// details (042 FR-021): the same pattern a wait uses, so the two cannot drift.
     case event(EventPattern)
     /// An MCP server's event (#383), named as the server names it (`checks.failed`),

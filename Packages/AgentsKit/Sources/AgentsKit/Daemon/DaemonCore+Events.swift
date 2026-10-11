@@ -142,8 +142,8 @@ extension DaemonCore {
         case .mac: folders = Array(workflows.keys)
         case .project(let folder): folders = [folder]
         }
-        // The agent the event is about, or the one that published it (FR-023).
-        let triggeringAgent = event.details["agent"].flatMap(UUID.init(uuidString:)) ?? event.publisher?.agentID
+        // The agent the event is about (FR-023).
+        let triggeringAgent = event.details["agent"].flatMap(UUID.init(uuidString:))
         for folder in folders {
             for workflow in (workflows[folder] ?? [:]).values.sorted(by: { $0.workflowID < $1.workflowID }) {
                 guard workflow.runs(on: MachineID.current),
@@ -251,16 +251,11 @@ extension DaemonCore {
         if let error = eventStore.saveState(saved) { lost(error, keeping: "where the events have got to") }
     }
 
-    /// Drop what the sources remember of what has gone (#218): publishes past their
-    /// hour, and the branch tips of folders that are no longer projects.
+    /// Drop what the sources remember of what has gone (#218): the branch tips of
+    /// folders that are no longer projects.
     func pruneEventState() {
         loadEventsIfNeeded()
-        let at = now()
         let projects = Set(projectFolders().map { Project.standardize($0).path })
-        eventState.publishes = eventState.publishes.compactMapValues { dates in
-            let recent = dates.filter { at.timeIntervalSince($0) < 3600 }
-            return recent.isEmpty ? nil : recent
-        }
         eventState.branchTips = eventState.branchTips.filter { projects.contains($0.key) }
         saveEventState()
     }
