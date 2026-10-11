@@ -123,10 +123,10 @@ struct SidebarSessionRow: View {
 
 /// A session's mark in the sidebar (#495, #498), the window's: what it wants, in four
 /// shapes — an orange hand when it needs the person, a spinner while it works, two rings
-/// when it finished unread, an empty ring once read; an hourglass while it waits and a
-/// pause mark once stopped (#630). Archived keeps its `StatusIcon`.
+/// when it finished unread, an empty ring once read; a numbered list while queued, an
+/// hourglass while it waits and a pause mark once stopped (#630). Archived keeps its `StatusIcon`.
 private struct SessionMark: View {
-    private enum Kind { case needsYou, working, waiting, paused, unread, read, asksToArchive }
+    private enum Kind { case needsYou, working, queued, waiting, paused, unread, read, asksToArchive }
     private let kind: Kind
 
     init?(agent: Agent, group: AgentGroup) {
@@ -138,6 +138,8 @@ private struct SessionMark: View {
         case .finished: kind = agent.showsUnread ? .unread : .read
         case .stopped where agent.asksToArchive: kind = .asksToArchive
         // In the accent as the rest, not the grey `StatusIcon` (#630).
+        // A queued helper waits for a free place, not on anything it asked for (#630).
+        case .waiting where agent.state == .queued: kind = .queued
         case .waiting: kind = .waiting
         case .stopped: kind = .paused
         default: return nil
@@ -151,6 +153,8 @@ private struct SessionMark: View {
                 Image(systemName: "hand.raised.fill").tinted(.attention)
             case .working:
                 SyncedSpinner(diameter: 14)
+            case .queued:
+                Image(systemName: "list.number").foregroundStyle(Paper.accent)
             case .waiting:
                 Image(systemName: "hourglass").foregroundStyle(Paper.accent)
             case .paused:
@@ -174,6 +178,7 @@ private struct SessionMark: View {
         switch kind {
         case .needsYou: "Needs you"
         case .working: "Working"
+        case .queued: "Queued"
         case .waiting: "Waiting"
         case .paused: "Paused"
         case .unread: "Unread"

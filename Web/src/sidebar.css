@@ -73,8 +73,9 @@
 .with-sidebar .sidebar .title.placed .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .with-sidebar .sidebar .title.placed :is(.place, .started-by) { flex: none; white-space: pre; }
 
-/* A session's mark in the sidebar (#495): an orange hand, a spinner, an hourglass, a pause mark
-   (#630), two rings unread, an empty ring once read; every icon in the accent but the hand. */
+/* A session's mark in the sidebar (#495): an orange hand, a spinner, a list when queued, an
+   hourglass, a pause mark (#630), two rings unread, an empty ring once read; every icon in the
+   accent but the hand. */
 .sidebar-mark { width: 16px; height: 16px; margin-top: 1px; box-sizing: border-box; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center; color: var(--accent); }
 .sidebar-mark.needsYou { color: var(--tint-attention); font-size: 13px; border-radius: 0; }
@@ -82,7 +83,7 @@
 .sidebar-mark.unread { border: 1.5px solid currentColor; }
 .sidebar-mark.unread::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .sidebar-mark.read { border: 1.5px solid currentColor; opacity: 0.7; }
-.sidebar-mark.waiting, .sidebar-mark.paused { font-size: 12px; border-radius: 0; }
+.sidebar-mark.queued, .sidebar-mark.waiting, .sidebar-mark.paused { font-size: 12px; border-radius: 0; }
 /* Asks to archive (#584): the window's archive box, in the accent. */
 .sidebar-mark.asksToArchive { font-size: 12px; border-radius: 0; }
 @media (prefers-reduced-motion: reduce) { .sidebar-mark.working { animation-duration: 3s; } }
