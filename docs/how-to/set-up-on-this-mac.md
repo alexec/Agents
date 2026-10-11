@@ -27,6 +27,12 @@ this Mac, with **Agents Host**.
 2. Under **Set one up on this Mac**, click **Get Agents Host…**. Download and install
    Agents Host, then open it. It lives in the menu bar; its window opens the
    first time.
+
+   The release has a `.dmg` and a `.zip` of the same app. Neither needs admin rights.
+   Drag the app into `~/Applications`, the Applications folder in your home folder,
+   which you can always write to. `/Applications` asks for an admin's password. If
+   your Mac won't open a disk image, a company policy for example, download the
+   `.zip` instead, double-click it, and move the app it makes into `~/Applications`.
 3. Agents Host asks **Where should this Mac's agents report?** Under **Run the control
    plane here**, click **Run It Here**.
 
