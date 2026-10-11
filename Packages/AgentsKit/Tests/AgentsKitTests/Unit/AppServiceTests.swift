@@ -13,10 +13,12 @@ struct AppServiceTests {
     /// A service on one end of a pipe and a plain JSON-RPC client on the other, which
     /// is what a runtime is here.
     private func pair(showFile: @escaping AppService.FileSink = { _ in .refused("not expected") },
-                      askForm: @escaping AppService.AskFormSink = { _, _ in .refused("not expected") })
+                      askForm: @escaping AppService.AskFormSink = { _, _ in .refused("not expected") },
+                      suggestNextPrompt: @escaping AppService.SuggestedPromptSink = { _ in .refused("not expected") })
         async -> (client: JSONRPCConnection, service: AppService) {
         let (mine, theirs) = PairedTransport.pair()
-        let service = AppService(transport: theirs, showFile: showFile, askForm: askForm)
+        let service = AppService(transport: theirs, showFile: showFile, askForm: askForm,
+                                 suggestNextPrompt: suggestNextPrompt)
         let client = JSONRPCConnection(transport: mine)
         await client.start()
         return (client, service)
@@ -44,7 +46,8 @@ struct AppServiceTests {
         let result = try await client.call("tools/list", .object([:]))
         let tools = result["tools"]?.arrayValue ?? []
         // No tool ends a turn: the app works out how each one ended.
-        // The five agent tools (028 + request_archive) sit after the workflow tool, for an agent
+        // The next-prompt tool follows the ask tool. The five agent tools (028 + request_archive)
+        // sit after the workflow tool, for an agent
         // that may use them — which is the default. The three lease tools (036) follow
         // them, for every agent, then the three event tools (042). Labels and moving
         // (053) have tools of their own since #481. The two session tools (065) and message_agent (#560) sit after the agent tools, for every
@@ -52,6 +55,7 @@ struct AppServiceTests {
         #expect(tools.compactMap { $0["name"]?.stringValue }
             == [AppService.showFileToolName,
                 AppService.workflowToolName, AppService.askFormToolName,
+                AppService.suggestNextPromptToolName,
                 AppService.startAgentToolName, AppService.stopAgentToolName,
                 AppService.requestArchiveToolName, AppService.archiveAgentToolName,
                 AppService.listMyAgentsToolName,
@@ -87,7 +91,46 @@ struct AppServiceTests {
         // agent makes first.
         #expect(workflows?["required"]?.arrayValue?.compactMap { $0.stringValue } == ["action"])
 
+        let nextPrompt = tools[3]
+        #expect(nextPrompt["inputSchema"]?["required"]?.arrayValue?.compactMap { $0.stringValue }
+            == ["label", "prompt"])
+        #expect(nextPrompt["description"]?.stringValue?.contains("at most once") == true)
+
         await service.close()
+    }
+
+    @Test func aNextPromptReachesTheSinkAndCanBeReplaced() async throws {
+        let box = SuggestedPromptBox()
+        let (client, service) = await pair(suggestNextPrompt: { suggestion in
+            await box.record(suggestion)
+            return .shown("Suggested.")
+        })
+        for (label, prompt) in [("Run the tests", "Run the tests and fix failures"),
+                                ("Review changes", "Review the diff for bugs")] {
+            let result = try await client.call("tools/call", [
+                "name": .string(AppService.suggestNextPromptToolName),
+                "arguments": ["label": .string(label), "prompt": .string(prompt)],
+            ])
+            #expect(result["isError"]?.boolValue == false)
+        }
+        #expect(await box.suggestions.map(\.label) == ["Run the tests", "Review changes"])
+        #expect(await box.suggestions.last?.prompt == "Review the diff for bugs")
+        await service.close()
+    }
+
+    @Test func aNextPromptNeedsBothNonEmptyFields() async throws {
+        let (client, service) = await pair()
+        let result = try await client.call("tools/call", [
+            "name": .string(AppService.suggestNextPromptToolName),
+            "arguments": ["label": " ", "prompt": "Run the tests"],
+        ])
+        #expect(result["isError"]?.boolValue == true)
+        await service.close()
+    }
+
+    private actor SuggestedPromptBox {
+        private(set) var suggestions: [SuggestedPrompt] = []
+        func record(_ suggestion: SuggestedPrompt) { suggestions.append(suggestion) }
     }
 
     @Test func aWorkflowCallWithNoUsableActionIsToldRatherThanGuessedAt() async throws {

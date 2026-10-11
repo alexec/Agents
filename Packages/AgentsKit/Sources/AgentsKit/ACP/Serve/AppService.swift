@@ -34,6 +34,9 @@ public actor AppService {
     /// Ask the person and wait: the form card every runtime can reach.
     public static let askFormToolName = AppTool.askForm
 
+    /// Offer the person one optional next prompt.
+    public static let suggestNextPromptToolName = AppTool.suggestNextPrompt
+
     /// And five that act on other agents (028), offered only to an agent the person or
     /// a workflow started: start one in this project, and stop, ask to archive, archive (#120) or
     /// list the ones this agent started.
@@ -72,6 +75,9 @@ public actor AppService {
 
     /// Where an `ask_form` goes. May take as long as the person takes to answer.
     public typealias AskFormSink = @Sendable (String?, [DaemonAPI.AskFormRequest.Question]) async -> Outcome
+
+    /// Where an optional next prompt goes.
+    public typealias SuggestedPromptSink = @Sendable (SuggestedPrompt) async -> Outcome
 
     /// Where a workflow question goes. Unlike the other two this can take a while:
     /// a write waits on somebody answering.
@@ -148,6 +154,7 @@ public actor AppService {
     private let connection: JSONRPCConnection?
     private let fileSink: FileSink
     private let askFormSink: AskFormSink
+    private let suggestedPromptSink: SuggestedPromptSink
     private let workflowSink: WorkflowSink
     private let agentsSink: AgentsSink
     private let leasesSink: LeasesSink
@@ -172,6 +179,9 @@ public actor AppService {
                 showFile: @escaping FileSink = { _ in .refused("This app cannot show a file.") },
                 askForm: @escaping AskFormSink = { _, _ in
                     .refused("This app cannot ask the person.")
+                },
+                suggestNextPrompt: @escaping SuggestedPromptSink = { _ in
+                    .refused("This app cannot suggest a next prompt.")
                 },
                 workflows: @escaping WorkflowSink = { _, _, _ in
                     .refused("This app cannot manage workflows.")
@@ -201,6 +211,7 @@ public actor AppService {
         let box = self.box
         self.fileSink = showFile
         self.askFormSink = askForm
+        self.suggestedPromptSink = suggestNextPrompt
         self.workflowSink = workflows
         self.agentsSink = agents
         self.leasesSink = leases
@@ -311,6 +322,17 @@ public actor AppService {
                 case .success(let call):
                     return .success(Self.reply(await askFormSink(call.title, call.questions)))
                 }
+            }
+
+            if name.hasSuffix(Self.suggestNextPromptToolName) {
+                guard let arguments,
+                      let suggestion = SuggestedPrompt(wire: arguments),
+                      arguments["label"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false,
+                      arguments["prompt"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
+                    return .success(Self.reply("Nothing was suggested: send a non-empty `label` and `prompt`.",
+                                               isError: true))
+                }
+                return .success(Self.reply(await suggestedPromptSink(suggestion)))
             }
 
             if name.hasSuffix(Self.workflowToolName) {
@@ -635,7 +657,7 @@ public actor AppService {
         // The agent's own session: labels, and moving, which is not offered on a runtime
         // that would forget the conversation on the way (053, #481).
         let selfTools = [Self.setSessionLabelsTool] + (movesItself ? [Self.moveWorktreeTool] : [])
-        return [Self.showFileTool, Self.workflowTool, Self.askFormTool]
+        return [Self.showFileTool, Self.workflowTool, Self.askFormTool, Self.suggestNextPromptTool]
             + agentTools + selfTools + sessionTools + leaseTools
             + eventTools + pinTools
     }
@@ -894,6 +916,21 @@ public actor AppService {
                 ],
             ],
             "required": .array(["questions"]),
+        ],
+    ]
+
+    /// Add or replace the single suggested prompt shown above the prompt bar.
+    static let suggestNextPromptTool: JSONValue = [
+        "name": .string(suggestNextPromptToolName),
+        "title": "Suggest the next prompt",
+        "description": "Near the end of your turn, optionally offer one useful next prompt. Call at most once; a later call replaces it. Use a 2–5 word label and the full prompt text.",
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "label": ["type": "string", "description": "A 2–5 word chip label."],
+                "prompt": ["type": "string", "description": "The prompt sent when the person taps the chip."],
+            ],
+            "required": .array(["label", "prompt"]),
         ],
     ]
 

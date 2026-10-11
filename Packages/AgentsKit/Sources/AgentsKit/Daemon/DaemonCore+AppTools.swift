@@ -81,6 +81,12 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent,
                                message: "That conversation is not open any more, so the suggestions were not shown.")
         }
+        let waiting = pendingPermissions.values.contains { $0.agentID == agentID }
+            || elicitations.values.contains { $0.agentID == agentID }
+        guard !waiting else {
+            throw JSONRPCError(code: JSONRPCError.invalidParams,
+                               message: "Nothing was suggested: you have a question waiting to be answered.")
+        }
         let prompts = Array(request.prompts.prefix(SuggestedPrompt.limit))
         guard !prompts.isEmpty else {
             throw JSONRPCError(code: JSONRPCError.invalidParams, message: "No suggestions were sent.")
