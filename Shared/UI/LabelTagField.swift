@@ -47,10 +47,10 @@ struct LabelTagField: View {
     }
 
     private var field: some View {
-        TextField(labels.isEmpty ? "Add labels" : "", text: $text, selection: $selection)
+        TextField(labels.isEmpty ? "Add labels" : placeholderAfterLabels, text: $text, selection: $selection)
             .textFieldStyle(.plain)
             .focused($focused)
-            .frame(width: 120)
+            .frame(width: fieldWidth)
             .padding(.vertical, 3)
             .suggesting(matchingSuggestions)
             .onChange(of: text) {
@@ -128,6 +128,24 @@ struct LabelTagField: View {
     private func chipFill(_ label: SessionLabel, isChosen: Bool) -> Color {
         if isChosen { return Paper.accent.opacity(0.35) }
         return label.owner == .person ? Paper.accent.opacity(0.16) : Color.clear
+    }
+
+    /// On a phone the empty field beside labels is only room to tap, so it does not wrap
+    /// the row onto a line of its own; it widens while it is typed in (#670).
+    private var fieldWidth: CGFloat {
+        #if os(iOS)
+        labels.isEmpty || focused ? 120 : 44
+        #else
+        120
+        #endif
+    }
+
+    private var placeholderAfterLabels: String {
+        #if os(iOS)
+        "Add"
+        #else
+        ""
+        #endif
     }
 
     private var cursorAtStart: Bool {
