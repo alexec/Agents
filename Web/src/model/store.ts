@@ -1839,6 +1839,13 @@ export class Store extends Work {
     if (changed) this.placeWorkflow(changed, host);
   }
 
+  /** Delete its workflow file and let workflow/removed update every open view (#605). */
+  async deleteWorkflow(host: string, summary: WorkflowSummary): Promise<boolean> {
+    const deleted = await this.act("workflows/delete",
+      { folder: summary.workflow.folder, workflowID: summary.workflow.workflowID }, host);
+    return deleted !== null;
+  }
+
   private settingsInFlight = new Map<string, Promise<unknown>>();
 
   /**

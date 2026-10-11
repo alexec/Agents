@@ -181,6 +181,7 @@ struct SidebarWorkflowRow: View {
     @Environment(RemoteModel.self) private var model
     let summary: WorkflowSummary
     let project: ProjectKey
+    @State private var confirmsDelete = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -250,6 +251,15 @@ struct SidebarWorkflowRow: View {
                 }
                 Button("Archive", systemImage: "archivebox") { Task { await model.setWorkflowArchived(summary, true) } }
             }
+            Divider()
+            Button("Delete…", systemImage: "trash", role: .destructive) { confirmsDelete = true }
+        }
+        .confirmationDialog("Delete \"\(summary.workflow.name)\"? Its file is removed from disk.",
+                            isPresented: $confirmsDelete, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) { Task { await model.deleteWorkflow(summary) } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The file can be restored from the project's git history.")
         }
     }
 

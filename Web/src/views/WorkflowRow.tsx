@@ -56,11 +56,11 @@ export function RunNow({ store, host, summary, disabled, wide }: {
 
 /** What a workflow row's menu offers, in the window's order (ProjectWorkRows.swift `WorkflowListRow`). */
 export type WorkflowAction = "open" | "bringBack" | "approve" | "deny" | "runNow" | "pin" | "unpin" | "moveUp" | "moveDown"
-  | "turnOff" | "turnOn" | "archive";
+  | "turnOff" | "turnOn" | "archive" | "delete";
 
 export function workflowActions(summary: WorkflowSummary, pinned: boolean, pinnedAt?: string[]): WorkflowAction[] {
   const actions: WorkflowAction[] = ["open"];
-  if (summary.isArchived) return [...actions, "bringBack"];
+  if (summary.isArchived) return [...actions, "bringBack", "delete"];
   if (isUnapproved(summary)) {
     if (canBeApproved(summary)) actions.push("approve");
     // Not on this host, without archiving it everywhere (#391).
@@ -71,14 +71,14 @@ export function workflowActions(summary: WorkflowSummary, pinned: boolean, pinne
   actions.push(pinned ? "unpin" : "pin");
   // The window orders the pinned by drag; the page has no drag, so its menu moves them.
   if (pinned && pinnedAt) actions.push("moveUp", "moveDown");
-  actions.push(isOn(summary) ? "turnOff" : "turnOn", "archive");
+  actions.push(isOn(summary) ? "turnOff" : "turnOn", "archive", "delete");
   return actions;
 }
 
 const words: Record<WorkflowAction, string> = {
   open: "Open", bringBack: "Bring Back", approve: "Approve", deny: "Deny on This Host", runNow: "Run Now",
   pin: "Pin", unpin: "Unpin", moveUp: "Move Up", moveDown: "Move Down", turnOff: "Turn Off", turnOn: "Turn On",
-  archive: "Archive",
+  archive: "Archive", delete: "Delete…",
 };
 
 const helps: Partial<Record<WorkflowAction, string>> = {
@@ -112,6 +112,11 @@ function workflowMenu(store: Store, host: string, summary: WorkflowSummary, disa
     turnOff: () => void store.setWorkflowEnabled(host, summary, false),
     turnOn: () => void store.setWorkflowEnabled(host, summary, true),
     archive: () => void store.setWorkflowArchived(host, summary, true),
+    delete: () => {
+      if (confirm(`Delete “${summary.workflow.name}”? Its file is removed from disk.\n\nThe file can be restored from the project's git history.`)) {
+        void store.deleteWorkflow(host, summary);
+      }
+    },
   };
   const off: Partial<Record<WorkflowAction, boolean>> = {
     approve: !summary.deniedHere && summary.overLimit !== undefined,

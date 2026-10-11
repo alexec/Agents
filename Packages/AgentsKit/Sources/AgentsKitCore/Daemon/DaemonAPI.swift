@@ -219,6 +219,8 @@ public enum DaemonAPI {
         /// Put one away, or bring it back. The user's one way of overruling a workflow
         /// an agent wrote, which is why it is here and not only in the file system.
         public static let workflowsArchive = "workflows/archive"
+        /// Delete a workflow's file at the person's request. Never exposed to agent tools.
+        public static let workflowsDelete = "workflows/delete"
         /// Turn one on or off, keeping its place on the list (#100).
         public static let workflowsEnable = "workflows/enable"
         /// Approve a workflow file as the person was shown it (security review).

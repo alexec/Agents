@@ -133,6 +133,7 @@ struct WorkflowListRow: View {
     @Environment(AppModel.self) private var model
     let summary: WorkflowSummary
     let project: ProjectKey
+    @State private var confirmsDelete = false
 
     var body: some View {
         // Heavier only while it waits for an OK (#520), as a session's title is while unread.
@@ -195,6 +196,15 @@ struct WorkflowListRow: View {
                 }
                 Button("Archive") { Task { await model.setWorkflowArchived(summary, true) } }
             }
+            Divider()
+            Button("Delete…", role: .destructive) { confirmsDelete = true }
+        }
+        .confirmationDialog("Delete \"\(summary.workflow.name)\"? Its file is removed from disk.",
+                            isPresented: $confirmsDelete, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) { Task { await model.deleteWorkflow(summary, on: project.host) } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The file can be restored from the project's git history.")
         }
     }
 }
