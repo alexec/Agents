@@ -24,6 +24,6 @@ struct LeaseToolNameTests {
 
     @Test func otherToolsAreNotLeaseCalls() {
         #expect(AppService.leaseCall(named: "mcp__agents__finish_turn", arguments) == nil)
-        #expect(AppService.leaseCall(named: "mcp__agents__start_agent", arguments) == nil)
+        #expect(AppService.leaseCall(named: "mcp__agents__start_session", arguments) == nil)
     }
 }

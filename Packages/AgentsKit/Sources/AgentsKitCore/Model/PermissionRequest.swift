@@ -167,8 +167,7 @@ public struct ToolCall: Codable, Hashable, Sendable {
     public var isOwnSessionCall: Bool {
         let called = name ?? title
         if called.hasSuffix(AppTool.setSessionLabels) || called.hasSuffix(AppTool.moveWorktree) { return true }
-        if called.hasSuffix(AppTool.requestArchive) || called.hasSuffix(AppTool.retiredParkAgent)
-            || called.hasSuffix(AppTool.archiveAgent) {
+        if called.hasSuffix(AppTool.archiveSession) || AppTool.retiredOwnArchive.contains(where: called.hasSuffix) {
             return rawInput?["id"]?.stringValue?.isEmpty ?? true
         }
         if called.hasSuffix(AppTool.waitForEvent) {

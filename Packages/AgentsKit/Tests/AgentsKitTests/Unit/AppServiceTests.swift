@@ -46,22 +46,21 @@ struct AppServiceTests {
         let result = try await client.call("tools/list", .object([:]))
         let tools = result["tools"]?.arrayValue ?? []
         // No tool ends a turn: the app works out how each one ended.
-        // The next-prompt tool follows the ask tool. The five agent tools (028 + request_archive)
-        // sit after the workflow tool, for an agent
-        // that may use them — which is the default. The three lease tools (036) follow
-        // them, for every agent, then the three event tools (042). Labels and moving
-        // (053) have tools of their own since #481. The two session tools (065) and message_agent (#560) sit after the agent tools, for every
-        // agent. The pin tools (#159, #180) come last, for every agent.
+        // The next-prompt tool follows the ask tool. Starting, stopping and archiving sessions (028, #584, #638) sit after the workflow
+        // tool; starting and stopping only for an agent that may use them — which is the
+        // default. Labels and moving (053) have tools of their own since #481. Listing,
+        // reading and messaging sessions (065, #560) sit after them, then the three lease
+        // tools (036) and the three event tools (042), for every agent. The pin tools
+        // (#159, #180) come last, for every agent.
         #expect(tools.compactMap { $0["name"]?.stringValue }
             == [AppService.showFileToolName,
                 AppService.workflowToolName, AppService.askFormToolName,
                 AppService.suggestNextPromptToolName,
-                AppService.startAgentToolName, AppService.stopAgentToolName,
-                AppService.requestArchiveToolName, AppService.archiveAgentToolName,
-                AppService.listMyAgentsToolName,
+                AppService.startSessionToolName, AppService.stopSessionToolName,
+                AppService.archiveSessionToolName,
                 AppService.setSessionLabelsToolName, AppService.moveWorktreeToolName,
                 AppService.listSessionsToolName, AppService.readSessionToolName,
-                AppService.messageAgentToolName,
+                AppService.messageSessionToolName,
                 AppService.leaseResourceToolName, AppService.releaseResourceToolName,
                 AppService.listResourcesToolName,
                 AppService.waitForEventToolName, AppService.cancelWaitToolName,
@@ -323,6 +322,24 @@ struct AppServiceTests {
         await service.close()
     }
 
+    /// The agent tools' names from before #638 are not listed or answered, but a call to
+    /// one in an older conversation is still the app's own.
+    @Test func theRetiredAgentToolNamesAreNeitherListedNorAnswered() async throws {
+        let (client, service) = await pair()
+        let listed = try await client.call("tools/list", .object([:]))["tools"]?.arrayValue?
+            .compactMap { $0["name"]?.stringValue } ?? []
+        for name in AppTool.retiredAgentTools {
+            #expect(!listed.contains(name))
+            #expect(AppTool.isServedByTheApp("mcp__agents__\(name)"), "\(name)")
+            for called in [name, "mcp__agents__\(name)"] {
+                await #expect(throws: JSONRPCError.self) {
+                    _ = try await client.call("tools/call", ["name": .string(called), "arguments": ["id": "abc"]])
+                }
+            }
+        }
+        await service.close()
+    }
+
     /// Gone altogether: no tool ends a turn. Not listed, and a call to it, prefixed or
     /// not, is no tool of ours.
     @Test func finishTurnIsNeitherListedNorAnswered() async throws {
@@ -337,7 +354,7 @@ struct AppServiceTests {
                 ])
             }
         }
-        #expect(AppService.requestArchiveTool["inputSchema"]?["required"] == nil, "no id is yourself")
+        #expect(AppService.archiveSessionTool["inputSchema"]?["required"] == nil, "no id is yourself")
         await service.close()
     }
 
@@ -371,8 +388,8 @@ struct AppServiceTests {
 
     @Test func noToolNameEndsWithAnother() {
         let names = [AppTool.showFile, AppTool.manageWorkflows, AppTool.askForm,
-                     AppTool.startAgent, AppTool.stopAgent, AppTool.requestArchive, AppTool.archiveAgent,
-                     AppTool.listMyAgents,
+                     AppTool.startSession, AppTool.stopSession, AppTool.archiveSession,
+                     AppTool.listSessions, AppTool.readSession, AppTool.messageSession,
                      AppTool.waitForEvent, AppTool.cancelWait,
                      AppTool.listResources]
         for name in names {

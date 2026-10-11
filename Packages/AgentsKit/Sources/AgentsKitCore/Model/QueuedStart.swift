@@ -1,6 +1,6 @@
 import Foundation
 
-/// What `start_agent` asked for, kept on a queued helper's record until a place frees
+/// What `start_session` asked for, kept on a queued helper's record until a place frees
 /// (#362).
 ///
 /// The words as the starter wrote them, not a settled start: settling a mode or a model

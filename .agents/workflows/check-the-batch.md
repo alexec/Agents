@@ -30,7 +30,7 @@ issue, even with uncommitted changes in it. Nothing else.
 - **Never fix what you find.** Do not merge, push, update a branch, re-run CI, enable
   auto-merge, close or comment on PRs or issues, stop or archive agents, or start
   new ones. The one thing you may tell an agent to do is step 5's message, with
-  `message_agent`. What is stuck or ready goes in your report, for Alex.
+  `message_session`. What is stuck or ready goes in your report, for Alex.
 - **Only a folder `list_sessions` names** as a session's `Worktree:` is ever removed. A
   worktree no session names (a review's, a merge's, the person's own) is left alone.
 - **Never a worktree any session is busy in.** Every session naming it must be `Done`,
@@ -185,7 +185,7 @@ Message every one of the sessions from step 1 that is not `Archived`, has a pull
 (a `P#<n>` label, or an open or merged PR on its branch from steps 2 and 3), and does not
 already carry the `merged` label. Skip any that is `Needs you`, `Blocked` or `Paused` (that waits on Alex),
 and any this run's step 2 found **nothing to land** with no PR. Send each, with
-`message_agent` to its id, this message as it stands:
+`message_session` to its id, this message as it stands:
 
 > From the "Check the batch" workflow: check your PR now (`gh pr view <n> --json
 > state,mergeStateStatus,statusCheckRollup`). Then label this session with
@@ -219,4 +219,4 @@ End with, in this order:
 Then end with a line counting what is left, like "2 PRs can be merged, 1 is stuck on a
 failing test; 3 worktrees removed; 4 agents asked to label." If anything is stuck, can be
 merged but waits on Alex, or in the batch is flagged or not landed, ask Alex what to do
-with your question tool. Otherwise call `request_archive` (no id).
+with your question tool. Otherwise call `archive_session` (no id).

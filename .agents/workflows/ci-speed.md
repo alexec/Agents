@@ -24,7 +24,7 @@ brings them back under, on a pull request of its own.
   Do any edits in a worktree of your own (step 3).
 - One optimisation pull request per night at most. If an earlier one from this workflow
   (branch `agents/ci-speed-*`) is still open, do not open another: say so and call
-  `request_archive` (no id).
+  `archive_session` (no id).
 - A macOS job may be skipped by its `if:` when the diff gives it nothing to run (#594);
   that is not weakening it. Keep it starting whenever the selection fails.
 - Never weaken the checks to make them fast: no skipping or deleting tests, no dropping
@@ -60,7 +60,7 @@ brings them back under, on a pull request of its own.
 
 If the median time to green of the completed PR runs is **15 minutes or less**, and no run
 in the last 10 went over 20, say so with the median, and call
-`request_archive` (no id). Otherwise go on.
+`archive_session` (no id). Otherwise go on.
 
 ## 2. Find the cause
 
@@ -124,4 +124,4 @@ of them is now the cause, say so and propose rather than change.
    keeps the commits.
 2. End with the table's medians (before, and the PR's own run after), the cause, the
    PR link and whether it is set to merge. If it is left for Alex or a bigger fix needs a
-   decision, ask Alex with your question tool; otherwise call `request_archive` (no id).
+   decision, ask Alex with your question tool; otherwise call `archive_session` (no id).

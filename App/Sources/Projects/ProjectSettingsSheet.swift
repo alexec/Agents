@@ -243,7 +243,7 @@ private struct ProjectGeneralPane: View {
                         VStack(alignment: .leading, spacing: 6) {
                             helperLimit(\.queued, in: summary, default: HelperLimit.defaultQueued,
                                         upTo: HelperLimit.maximumQueued)
-                            Text("How many agents that other agents started may be running at once, how "
+                            Text("How many sessions that other sessions started may be running at once, how "
                                  + "many may be kept until you archive them, and how many more may wait to "
                                  + "start, oldest first, when a place frees. Agents can't change these.")
                                 .appText(.fine)
@@ -260,8 +260,8 @@ private struct ProjectGeneralPane: View {
                     row("Helpers archived") {
                         VStack(alignment: .leading, spacing: 6) {
                             mayArchive(in: summary)
-                            Text("An agent may archive only agents it started, once they've stopped working, "
-                                 + "and never itself or your own sessions. You can bring any of them back.")
+                            Text("A session may archive only sessions it started, once their turn has ended, "
+                                 + "and never your own sessions. Off, it asks you instead. You can bring any of them back.")
                                 .appText(.fine)
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -347,11 +347,11 @@ private struct ProjectGeneralPane: View {
         .disabled(model.hosts.isOffline(summary.host))
     }
 
-    /// Whether agents may archive the helpers they started (#120), beside the limits
+    /// Whether sessions may archive the sessions they started (#120, #638), beside the limits
     /// those places count against. Back to nil when it is the default again.
     private func mayArchive(in summary: DaemonAPI.ProjectSummary) -> some View {
         let kept = summary.project.helperLimits ?? HelperLimits()
-        return Toggle("Agents may archive the helpers they started", isOn: Binding(get: { kept.mayArchive }, set: { on in
+        return Toggle("Sessions may archive the sessions they started", isOn: Binding(get: { kept.mayArchive }, set: { on in
             var limits = kept
             limits.agentsMayArchive = on == HelperLimit.defaultAgentsMayArchive ? nil : on
             Task { await model.setHelperLimits(limits, for: summary.key) }

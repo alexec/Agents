@@ -3,7 +3,7 @@ import Testing
 @testable import AgentsKit
 @testable import AgentsKitCore
 
-/// `message_agent` on a daemon (#560): any agent in a project tells any session there
+/// `message_session` on a daemon (#560): any agent in a project tells any session there
 /// something, which reads as a prompt marked as the sender's, within the limits that keep
 /// that from running away.
 @Suite("Messaging another agent", .timeLimit(.minutes(1)))
@@ -231,23 +231,24 @@ struct MessageAgentTests {
     // MARK: The tool
 
     @Test func theToolIsTheAppsAndOfferedToEveryAgent() {
-        #expect(AppTool.all.contains(AppTool.messageAgent))
+        #expect(AppTool.all.contains(AppTool.messageSession))
         #expect(AppTool.isServedByTheApp("mcp__agents__message_agent"))
+        #expect(AppTool.isServedByTheApp("mcp__agents__message_session"))
         #expect(ConnectionRole.agentMethods.contains(DaemonAPI.Method.agentsMessageAgent))
         for managesAgents in [true, false] {
             let names = AppService.tools(managesAgents: managesAgents).compactMap { $0["name"]?.stringValue }
-            #expect(names.contains(AppTool.messageAgent))
+            #expect(names.contains(AppTool.messageSession))
         }
     }
 
     @Test func aMessageWithoutWordsOrATargetIsRefusedBeforeItReachesTheDaemon() {
-        guard case .failure? = AppService.sessionCall(named: "mcp__agents__message_agent", ["to": " ", "message": "Hi"]),
-              case .failure? = AppService.sessionCall(named: "mcp__agents__message_agent", ["to": "A", "message": " "])
+        guard case .failure? = AppService.sessionCall(named: "mcp__agents__message_session", ["to": " ", "message": "Hi"]),
+              case .failure? = AppService.sessionCall(named: "mcp__agents__message_session", ["to": "A", "message": " "])
         else {
             Issue.record("an empty message was not refused"); return
         }
         guard case .success(.message(let to, let text))? = AppService.sessionCall(
-            named: "agents_message_agent", ["to": " Reviewer ", "message": " Label yourself. "]) else {
+            named: "agents_message_session", ["to": " Reviewer ", "message": " Label yourself. "]) else {
             Issue.record("a message was not read"); return
         }
         #expect(to == "Reviewer")

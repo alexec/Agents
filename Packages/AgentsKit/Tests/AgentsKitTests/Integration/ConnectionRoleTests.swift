@@ -158,7 +158,7 @@ struct ConnectionRoleTests {
 
         for method in [DaemonAPI.Method.agentsFinishTurn, DaemonAPI.Method.agentsStartHelper,
                        DaemonAPI.Method.agentsStopHelper, DaemonAPI.Method.agentsRequestArchiveHelper,
-                       DaemonAPI.Method.agentsArchiveHelper, DaemonAPI.Method.agentsListHelpers,
+                       DaemonAPI.Method.agentsListHelpers,
                        DaemonAPI.Method.leasesLease, DaemonAPI.Method.eventsWait] {
             #expect(errorCode(await ask(fd, method)) == nil, "\(method)")
         }
@@ -405,9 +405,10 @@ struct ConnectionRoleTests {
     }
 
     @Test func aHelperMayCallEveryToolItRelaysAndOnlyThose() {
-        // 28 tools (three more since #481, message_agent since #560), a tool with a
-        // view (#187), and the two a stranger has.
-        #expect(ConnectionRole.agentMethods.count == 31)
+        // 26 tools (three more since #481, message_session since #560, publish_event gone
+        // with #639, archive_agent folded into archive_session by #638), a tool with a view
+        // (#187), and the two a stranger has.
+        #expect(ConnectionRole.agentMethods.count == 29)
         #expect(ConnectionRole.agent.allows(DaemonAPI.Method.agentsAskForm))
         #expect(ConnectionRole.stranger.allows(DaemonAPI.Method.daemonStatus))
         #expect(!ConnectionRole.agent.allows(DaemonAPI.Method.filesBrowse))

@@ -31,7 +31,7 @@ clean-up, no asking to archive, archiving or stopping agents, no merging, no bui
   `Done`, `Archived`, `Retired`, `Needs you`, `Blocked` or `Paused`). Do not
   count yourself.
 - Free slots = the running limit minus that count. If it is 0 or less, say "No free slots:
-  N of N running." and call `request_archive` (no id).
+  N of N running." and call `archive_session` (no id).
 
 ## 2. Issues nobody is working on
 
@@ -52,21 +52,21 @@ While there are more than 5, start no enhancements: after the bugs, take the una
 `docs/explanation/direction.md`.
 
 If there is nothing to start, say "No unassigned issues to start." and call
-`request_archive` (no id).
+`archive_session` (no id).
 
 ## 3. Start one agent per free slot
 
 For each of the first (free slots) issues, in order:
 
 1. Assign it first, so no other run picks it up: `gh issue edit <n> --add-assignee alexec`.
-2. start_agent with a new worktree named `fix-github-issue-<n>` (for a bug) or
+2. start_session with a new worktree named `fix-github-issue-<n>` (for a bug) or
    `work-github-issue-<n>` (otherwise), titled `#<n>: <issue title>`, and this prompt:
 
    > Work on GitHub issue #<n> (`gh issue view <n>`). Follow AGENTS.md: verify only what
    > you touch, building through scripts/build-cache.sh with the "build" lease, and say
    > in each UI commit what the other two clients do. Commit, push, open a pull request
    > that says "Fixes #<n>", and turn on auto-merge (squash) at once. Then call
-   > move_worktree with leave_worktree: remove, and request_archive with no id.
+   > move_worktree with leave_worktree: remove, and archive_session with no id.
 
    For a walk lane, name the worktree `walk-github-issue-<n>`, title it
    `Walk #<n>: <issue title>`, and use this prompt instead:
@@ -78,13 +78,13 @@ For each of the first (free slots) issues, in order:
    > locked, leave everything as it is and end your turn. If it works, comment on the issue what you
    > ran and saw, and remove the `needs-walk` label. If not, file a bug for each problem,
    > linked to #<n>, then remove the label. Then call move_worktree with leave_worktree:
-   > remove, and request_archive with no id.
+   > remove, and archive_session with no id.
 
-3. If start_agent refuses because the limit is reached, unassign that issue
+3. If start_session refuses because the limit is reached, unassign that issue
    (`gh issue edit <n> --remove-assignee alexec`) and stop starting more.
 
 ## 4. Report
 
 One line per agent started: `#<n> <title>: started`, and one per issue that could not be
 started, with why, then a line like "Started 2 agents on #427 and #432; 4 of 4 slots
-now in use." Then call `request_archive` (no id).
+now in use." Then call `archive_session` (no id).

@@ -39,42 +39,41 @@ public enum AppTool {
     /// Offer one optional prompt for the person to send next.
     public static let suggestNextPrompt = "suggest_next_prompt"
 
-    // Five that act on other agents (028): start one in this project, and stop, ask to
-    // archive (#584), archive (#120) or list the ones this agent started. An agent never archives itself
-    // or the person's sessions. Never offered to an agent another agent started.
+    // The session tools (#638): one family for every session, a helper an agent
+    // started included. Starting and stopping are never offered to a session another
+    // session started; the rest are offered to every agent.
 
-    /// Start an agent in the caller's own project.
-    public static let startAgent = "start_agent"
+    /// Start a session in the caller's own project (028).
+    public static let startSession = "start_session"
 
-    /// Stop an agent the caller started.
-    public static let stopAgent = "stop_agent"
+    /// Stop a session the caller started.
+    public static let stopSession = "stop_session"
 
-    /// Ask for the caller, or an agent it started, to be archived (#584). Archives at
-    /// once where the caller may already archive it; otherwise waits for the person.
-    public static let requestArchive = "request_archive"
+    /// Archive the caller, or a session it started (#584, #638). Archives at once where
+    /// the caller may already archive it; otherwise waits for the person.
+    public static let archiveSession = "archive_session"
 
-    /// What `requestArchive` was called until #584. No longer offered or answered;
-    /// kept so a conversation that called it still draws as the app's own call.
-    public static let retiredParkAgent = "park_agent"
-
-    /// Archive an agent the caller started, once it has stopped working (#120).
-    public static let archiveAgent = "archive_agent"
-
-    /// The agents the caller started that are still here, and the places in use.
-    public static let listMyAgents = "list_my_agents"
-
-    // Two for reading another session in the same project (065). Offered to every
-    // agent, including one another agent started: reading is not managing anyone.
-
-    /// The sessions in the caller's project, newest first.
+    /// The sessions in the caller's project, newest first (065); with `started_by: me`,
+    /// the ones it started, and the places in use (028).
     public static let listSessions = "list_sessions"
 
     /// One session's history, by id or exact title.
     public static let readSession = "read_session"
 
     /// Say something to another session in the project (#560), which it reads as a
-    /// prompt marked as this agent's. Offered to every agent, as reading is.
-    public static let messageAgent = "message_agent"
+    /// prompt marked as this agent's.
+    public static let messageSession = "message_session"
+
+    /// What the session tools were called before #638 (and `park_agent` before #584).
+    /// No longer offered or answered; kept so a conversation that called them still
+    /// draws as the app's own calls.
+    public static let retiredAgentTools = [
+        "start_agent", "stop_agent", "request_archive", "archive_agent", "list_my_agents",
+        "message_agent", "park_agent",
+    ]
+
+    /// The retired names that, with no id, asked about the caller's own session.
+    static let retiredOwnArchive = ["request_archive", "archive_agent", "park_agent"]
 
     // Three more for taking turns with the Mac's shared things (036). Offered to every
     // agent, including one another agent started: waiting for the simulator is not
@@ -123,10 +122,10 @@ public enum AppTool {
 
     /// Every tool the app's MCP server serves.
     public static let all: [String] = [
-        finishTurn, showFile, manageWorkflows, askForm, suggestNextPrompt, startAgent, stopAgent, requestArchive,
-        listMyAgents, leaseResource, releaseResource, listResources, waitForEvent,
-        cancelWait, listSessions, readSession, archiveAgent,
-        pinPage, unpinPage, movePin, pinSession, setSessionLabels, moveWorktree, messageAgent,
+        finishTurn, showFile, manageWorkflows, askForm, suggestNextPrompt, startSession, stopSession, archiveSession,
+        leaseResource, releaseResource, listResources, waitForEvent,
+        cancelWait, listSessions, readSession,
+        pinPage, unpinPage, movePin, pinSession, setSessionLabels, moveWorktree, messageSession,
     ]
 
     /// How runtimes put the server's name in front of a tool's, as measured: Claude's
@@ -139,7 +138,7 @@ public enum AppTool {
     public static func isServedByTheApp(_ called: String) -> Bool {
         serverPrefixes.contains { prefix in
             called.hasPrefix(prefix)
-                && (all + [retiredParkAgent, retiredPublishEvent]).contains(String(called.dropFirst(prefix.count)))
+                && (all + retiredAgentTools + [retiredPublishEvent]).contains(String(called.dropFirst(prefix.count)))
         }
     }
 }

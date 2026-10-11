@@ -34,9 +34,8 @@ struct AgentToolsServiceTests {
         return (result["tools"]?.arrayValue ?? []).compactMap { $0["name"]?.stringValue }
     }
 
-    private let agentTools = [AppService.startAgentToolName, AppService.stopAgentToolName,
-                              AppService.requestArchiveToolName, AppService.archiveAgentToolName,
-                              AppService.listMyAgentsToolName]
+    private let agentTools = [AppService.startSessionToolName, AppService.stopSessionToolName,
+                              AppService.archiveSessionToolName]
 
     @Test func anAgentThePersonStartedIsOfferedThem() async throws {
         let (client, service) = await pair()
@@ -45,12 +44,12 @@ struct AgentToolsServiceTests {
         await service.close()
     }
 
-    /// All but request_archive, which with no id asks for the caller itself (#481).
+    /// All but archive_session, which with no id asks for the caller itself (#481).
     @Test func anAgentAnotherAgentStartedIsNotOfferedThem() async throws {
         let (client, service) = await pair(managesAgents: false)
         let listed = try await names(client)
-        for tool in agentTools where tool != AppService.requestArchiveToolName { #expect(!listed.contains(tool), "\(tool)") }
-        #expect(listed.contains(AppService.requestArchiveToolName))
+        for tool in agentTools where tool != AppService.archiveSessionToolName { #expect(!listed.contains(tool), "\(tool)") }
+        #expect(listed.contains(AppService.archiveSessionToolName))
         #expect(listed.contains(AppService.showFileToolName), "and keeps the rest")
         await service.close()
     }
@@ -59,12 +58,12 @@ struct AgentToolsServiceTests {
         let calls = Calls()
         let (client, service) = await pair(managesAgents: false, calls: calls)
         let result = try await client.call("tools/call", [
-            "name": .string("mcp__agents__" + AppService.startAgentToolName),
+            "name": .string("mcp__agents__" + AppService.startSessionToolName),
             "arguments": ["prompt": "Go"],
         ])
         #expect(result["isError"]?.boolValue == true)
         #expect(result["content"]?.arrayValue?.first?["text"]?.stringValue?
-            .contains("an agent that another agent started cannot") == true)
+            .contains("a session that another session started cannot") == true)
         #expect(await calls.seen.isEmpty)
         await service.close()
     }
@@ -73,7 +72,7 @@ struct AgentToolsServiceTests {
         let calls = Calls()
         let (client, service) = await pair(calls: calls)
         let result = try await client.call("tools/call", [
-            "name": .string("mcp__agents__" + AppService.startAgentToolName),
+            "name": .string("mcp__agents__" + AppService.startSessionToolName),
             "arguments": ["prompt": "  Count the files  ", "runtime": "claude",
                           "model": "opus", "permission_mode": "plan"],
         ])
@@ -83,20 +82,36 @@ struct AgentToolsServiceTests {
         await service.close()
     }
 
-    @Test func stopRequestArchiveAndListReachTheDaemon() async throws {
+    @Test func stopArchiveAndListReachTheDaemon() async throws {
         let calls = Calls()
         let (client, service) = await pair(calls: calls)
         _ = try await client.call("tools/call", [
-            "name": .string(AppService.stopAgentToolName), "arguments": ["id": "abc"],
+            "name": .string(AppService.stopSessionToolName), "arguments": ["id": "abc"],
         ])
         _ = try await client.call("tools/call", [
-            "name": .string(AppService.requestArchiveToolName), "arguments": ["id": "abc"],
+            "name": .string(AppService.archiveSessionToolName), "arguments": ["id": "abc"],
         ])
         _ = try await client.call("tools/call", [
-            "name": .string(AppService.archiveAgentToolName), "arguments": ["id": "abc"],
+            "name": .string(AppService.listSessionsToolName), "arguments": ["started_by": "me"],
         ])
-        _ = try await client.call("tools/call", ["name": .string(AppService.listMyAgentsToolName)])
-        #expect(await calls.seen == [.stop(agentID: "abc"), .requestArchive(agentID: "abc"), .archive(agentID: "abc"), .list])
+        #expect(await calls.seen == [.stop(agentID: "abc"), .requestArchive(agentID: "abc"), .list])
+        await service.close()
+    }
+
+    /// list_sessions is every agent's, but only one that may start sessions lists the
+    /// ones it started (#638); anything but `me` is refused.
+    @Test func listingTheSessionsItStartedNeedsTheTools() async throws {
+        let calls = Calls()
+        let (client, service) = await pair(managesAgents: false, calls: calls)
+        let mine = try await client.call("tools/call", [
+            "name": .string(AppService.listSessionsToolName), "arguments": ["started_by": "me"],
+        ])
+        #expect(mine["isError"]?.boolValue == true)
+        let other = try await client.call("tools/call", [
+            "name": .string(AppService.listSessionsToolName), "arguments": ["started_by": "them"],
+        ])
+        #expect(other["isError"]?.boolValue == true)
+        #expect(await calls.seen.isEmpty)
         await service.close()
     }
 
@@ -104,7 +119,7 @@ struct AgentToolsServiceTests {
         let calls = Calls()
         let (client, service) = await pair(calls: calls)
         let result = try await client.call("tools/call", [
-            "name": .string(AppService.startAgentToolName), "arguments": ["prompt": "  "],
+            "name": .string(AppService.startSessionToolName), "arguments": ["prompt": "  "],
         ])
         #expect(result["isError"]?.boolValue == true)
         #expect(result["content"]?.arrayValue?.first?["text"]?.stringValue?
@@ -117,7 +132,7 @@ struct AgentToolsServiceTests {
         let calls = Calls()
         let (client, service) = await pair(calls: calls)
         let result = try await client.call("tools/call", [
-            "name": .string(AppService.stopAgentToolName), "arguments": .object([:]),
+            "name": .string(AppService.stopSessionToolName), "arguments": .object([:]),
         ])
         #expect(result["isError"]?.boolValue == true)
         #expect(await calls.seen.isEmpty)
@@ -125,7 +140,7 @@ struct AgentToolsServiceTests {
     }
 
     @Test func theStartDescriptionCarriesTheLimits() {
-        let description = AppService.startAgentTool["description"]?.stringValue ?? ""
+        let description = AppService.startSessionTool["description"]?.stringValue ?? ""
         #expect(description.contains("this project"))
         #expect(description.contains("two limits"))
         #expect(description.contains("only the person sets"))
@@ -134,8 +149,8 @@ struct AgentToolsServiceTests {
 
     /// No helper tool says how many: the project's limits are in each result (#64).
     @Test func noHelperToolHardCodesANumber() {
-        for tool in [AppService.startAgentTool, AppService.stopAgentTool, AppService.requestArchiveTool,
-                     AppService.archiveAgentTool, AppService.listMyAgentsTool] {
+        for tool in [AppService.startSessionTool, AppService.stopSessionTool, AppService.archiveSessionTool,
+                     AppService.listSessionsTool] {
             let description = tool["description"]?.stringValue ?? ""
             for number in ["three", "five", " 3 ", " 5 "] {
                 #expect(!description.contains(number), "\(tool["name"]?.stringValue ?? "?") says \(number)")

@@ -158,7 +158,7 @@ extension DaemonCore {
             + "until it is archived. This project now has \(helperPlaces(in: target.projectFolder))."
     }
 
-    /// `request_archive` with an id (#584): ask for an agent the caller started to be
+    /// `archive_session` with an id (#584, #638): ask for an agent the caller started to be
     /// archived. Where the caller may archive it — the project lets agents archive the
     /// helpers they started — it is archived now, or once its turn ends; otherwise it
     /// carries the Asks to archive mark until the person archives it. Either way its
@@ -208,42 +208,9 @@ extension DaemonCore {
         return "Archived when it asked, as the agent that started it may archive it."
     }
 
-    /// Archive an agent the caller started (#120), as the person's Archive does: its
-    /// not-archived place is freed, its transcript says who archived it, and
-    /// `agent.archived` says `by` another agent. The person can bring it back.
-    ///
-    /// Only one that has stopped working: archiving a working helper would stop it
-    /// too, and a stop is a choice the agent should make out loud with `stop_agent`.
-    public func archiveHelper(_ request: DaemonAPI.HelperRequest) async throws -> String {
-        // Itself first, whoever it is, so even a helper hears how it is put away.
-        if let callerID = appTokens[request.token],
-           UUID(uuidString: request.agentID.trimmingCharacters(in: .whitespacesAndNewlines)) == callerID {
-            // A workflow's run its workflow lets archive itself, once its turn ends (#481).
-            return try askAfterTurn(DaemonAPI.AfterTurnRequest(token: request.token,
-                                                               afterwards: AfterTurn.archive.rawValue))
-        }
-        let (caller, target) = try helperTarget(request, doing: "archive")
-        let title = target.title ?? "Untitled"
-        guard agentsMayArchive(in: target.projectFolder) else {
-            throw JSONRPCError(code: DaemonAPI.Failure.notYours,
-                               message: "Nothing changed: in this project only the person archives; they can "
-                                   + "let agents archive the helpers they started in Project Settings. "
-                                   + "Ask the person to archive \u{201C}\(title)\u{201D} with \(AppTool.requestArchive) instead.")
-        }
-        guard !HelperLimit.isRunning(target, comingBack: comingBack) else {
-            throw JSONRPCError(code: DaemonAPI.Failure.notYours,
-                               message: "Nothing changed: \u{201C}\(title)\u{201D} is still working. "
-                                   + "Wait for it to finish, or stop it with \(AppTool.stopAgent) if its work "
-                                   + "is no longer wanted, then archive it.")
-        }
-        try await archive(target.id, by: .agent(caller.id))
-        return "Archived \u{201C}\(title)\u{201D}, freeing its place; the person can bring it back. "
-            + "This project now has \(helperPlaces(in: target.projectFolder))."
-    }
-
     /// What an agent hears when it tries to archive itself (#120, Alex's words).
-    static let cannotArchiveItself = "Nothing changed: you can't archive yourself. Call request_archive with no id "
-        + "to ask the person to archive you when your turn ends; the person or the agent that started you can archive you."
+    static let cannotArchiveItself = "Nothing changed: you can't archive yourself. Call \(AppTool.archiveSession) with no id "
+        + "to ask the person to archive you when your turn ends; the person or the session that started you can archive you."
 
     // MARK: Listing
 
@@ -257,7 +224,7 @@ extension DaemonCore {
         // Which runtimes it may name, last (#117): live, as a tool's description is not.
         let runtimes = runtimeChoices(in: folder)
         guard !mine.isEmpty else {
-            return "You have not started any agents that are still here. \(places)\n\(runtimes)"
+            return "You have not started any sessions that are still here. \(places)\n\(runtimes)"
         }
         let lines = mine.map { agent in
             "- \(agent.id.uuidString): \u{201C}\(agent.title ?? "Untitled")\u{201D} — \(helperStatus(agent))\(SessionLookup.labels(of: agent))"
@@ -326,17 +293,17 @@ extension DaemonCore {
         let kept = HelperLimit.helpers(in: folder, agents: agents.inProject(folder))
         if kept.count + reserved >= limits.notArchived {
             full.append("this project already has \(kept.count + reserved) of \(limits.notArchived) "
-                + "agents started by agents not yet archived\(quoted(kept))\(starting). "
+                + "sessions started by sessions not yet archived\(quoted(kept))\(starting). "
                 + (agentsMayArchive(in: folder)
-                    ? "Archive one of yours with \(AppTool.archiveAgent) once its work is merged or abandoned, "
+                    ? "Archive one of yours with \(AppTool.archiveSession) once its work is merged or abandoned, "
                         + "or ask the person to archive one, to free that place."
                     : "Only the person can archive one to free that place."))
         }
         let running = HelperLimit.runningHelpers(in: folder, agents: agents.inProject(folder), comingBack: comingBack)
         if running.count + reserved >= limits.running {
             full.append("this project already has \(running.count + reserved) of \(limits.running) "
-                + "agents started by agents running\(quoted(running))\(starting). "
-                + "Ask to archive or stop one of yours with \(AppTool.requestArchive) or \(AppTool.stopAgent) when its part is done, "
+                + "sessions started by sessions running\(quoted(running))\(starting). "
+                + "Archive or stop one of yours with \(AppTool.archiveSession) or \(AppTool.stopSession) when its part is done, "
                 + "or wait for one to finish.")
         }
         guard !full.isEmpty else { return nil }
@@ -355,8 +322,8 @@ extension DaemonCore {
         // holds if a runtime offered them anyway.
         guard caller.startedByAgent == nil else {
             throw JSONRPCError(code: DaemonAPI.Failure.notYours,
-                               message: "\(lead): an agent that another agent started cannot start, "
-                                   + "stop, archive or list agents of its own.")
+                               message: "\(lead): a session that another session started cannot start, "
+                                   + "stop, archive or list sessions of its own.")
         }
         return caller
     }
@@ -376,8 +343,7 @@ extension DaemonCore {
         guard target.id != caller.id else {
             throw JSONRPCError(code: DaemonAPI.Failure.notYours,
                                message: verb == "request"
-                                   ? "Nothing changed: to ask to be archived yourself, call request_archive with no id."
-                                   : verb == "archive" ? Self.cannotArchiveItself
+                                   ? "Nothing changed: to ask to be archived yourself, call \(AppTool.archiveSession) with no id."
                                    : "Nothing changed: an agent cannot \(verb) itself.")
         }
         guard target.startedByAgent == caller.id else {
@@ -385,7 +351,7 @@ extension DaemonCore {
                 : target.startedByWorkflow != nil ? "a workflow started that one"
                 : "that is one of the person's own sessions"
             throw JSONRPCError(code: DaemonAPI.Failure.notYours,
-                               message: "Nothing changed: \(whose). You can only stop or archive agents you started.")
+                               message: "Nothing changed: \(whose). You can only stop or archive sessions you started.")
         }
         guard target.state != .archived else {
             throw JSONRPCError(code: DaemonAPI.Failure.notYours,

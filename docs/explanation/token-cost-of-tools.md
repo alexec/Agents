@@ -48,7 +48,7 @@ JSON. A token is taken as about four bytes.
 | The briefing, sent once with the first prompt (Claude) | 2,083 | 520 tokens |
 
 Measured on 2026-10-10. `manage_workflows` is the largest at 20,211 bytes, then
-`start_agent` at 3,398; every other tool is under 2,800. `suggest_next_prompt` adds
+`start_agent` (now `start_session`) at 3,398; every other tool is under 2,800. `suggest_next_prompt` adds
 476 bytes (~119 tokens). `finish_turn` was 8,509 until it was split (below).
 
 What a runtime does with the list differs:
@@ -89,7 +89,7 @@ of a turn: the outcome, the title, the next prompt, labels, parking, waiting on 
 time, and moves. Its description explained which arguments could not go together, and
 agents still got that wrong. It now says only how the turn went. Waiting is on
 `wait_for_event` (`agents`, `wake_on`, `until_minutes`), parking itself on `park_agent`
-with no id (asking to be archived on `request_archive` since #584), moves on `move_worktree`, and labels on `set_session_labels`. The next prompt
+with no id (asking to be archived on `request_archive` since #584, `archive_session` since #638), moves on `move_worktree`, and labels on `set_session_labels`. The next prompt
 was dropped. Old calls still work: `finish_turn` reads every argument it took before.
 
 | Measured by `ToolCostTests` | Before | After |

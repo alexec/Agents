@@ -113,11 +113,11 @@ Only **critical** and **high** findings are fixed; medium and low stay recorded.
 
 - At most **1 helper per run**: its proof is twelve runs of a measurement, and builds
   take turns on the one "build" lease. Take the most severe finding. Call
-  `list_my_agents` first and start it only if a running place is free (the project's
+  `list_sessions` with `started_by: me` first and start it only if a running place is free (the project's
   helper limits are 3 running and 5 not archived unless Alex changed them). Every
   other critical or high finding is recorded as "needs a decision: no helper place this
   run" and is picked up next run.
-- Start it with `start_agent`: runtime Claude, permission mode no looser than yours, a
+- Start it with `start_session`: runtime Claude, permission mode no looser than yours, a
   **new worktree** off `main` on the branch `agents/review-fix-<finding id>`, and this
   prompt, filled in:
 
@@ -144,7 +144,7 @@ Only **critical** and **high** findings are fixed; medium and low stay recorded.
   > If you must ask Alex something, use your question tool and name yourself: "The
   > performance-fix agent for <id> recommends… Alex, which…?", never a bare "I" or
   > "you".
-  > If you start helpers of your own, archive each with archive_agent when its work is
+  > If you start helpers of your own, archive each with archive_session when its work is
   > done, and never delete its worktree.
   > End with a last message naming the branch, the commits, the twelve numbers and what
   > you proved, or why you could not.
@@ -163,7 +163,7 @@ When the helper is done (or if none was started):
    <branch> (<commits>, <median before → after>)`, `needs a decision: <the choice>`,
    `won't fix: <why>`, or `recorded` (medium and low). Commit on
    `agents/reviews-performance`.
-3. Archive the helper you started with `archive_agent`. Never delete its worktree or
+3. Archive the helper you started with `archive_session`. Never delete its worktree or
    branch yourself: the work is there for Alex. (Archiving lets the app tidy away a
    worktree it made once everything in it is committed; the unmerged branch stays.)
 4. End with one line per finding:

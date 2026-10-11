@@ -286,12 +286,12 @@ private struct Scorer {
     func helpers() -> (Verdict, String) {
         let started = calls(DaemonAPI.Method.agentsStartHelper)
         guard let call = started.first(where: { $0.ok && $0.agentID != nil }), let id = call.agentID else {
-            return (.failed, said(started, "start_agent"))
+            return (.failed, said(started, "start_session"))
         }
         guard let helper = record.helpers.first(where: { $0.id == id }) else {
             return (.failed, "the helper \(id.uuidString.prefix(8)) is not marked as this agent's")
         }
-        guard ok(calls(DaemonAPI.Method.agentsListHelpers)) else { return (.failed, said(calls(DaemonAPI.Method.agentsListHelpers), "list_my_agents")) }
+        guard ok(calls(DaemonAPI.Method.agentsListHelpers)) else { return (.failed, said(calls(DaemonAPI.Method.agentsListHelpers), "list_sessions with started_by me")) }
         // Resumed when it finished, or told at the block that it already had (a quick
         // runtime's helper can end before its starter's turn does).
         let resumed = appPrompts.contains { $0.at > call.at && $0.text.contains("The block you reported has cleared") }
@@ -300,9 +300,9 @@ private struct Scorer {
         }
         let requested = calls(DaemonAPI.Method.agentsRequestArchiveHelper)
             .filter { $0.arguments?["agentID"]?.stringValue?.uppercased() == id.uuidString }
-        guard ok(requested) else { return (.failed, said(requested, "request_archive")) }
-        // Archived by the request where the project lets agents archive their helpers
-        // (#584), or by archive_agent after it asked: either way, by an agent.
+        guard ok(requested) else { return (.failed, said(requested, "archive_session")) }
+        // Archived by archive_session where the project lets agents archive the sessions
+        // they started (#584, #638): by an agent.
         guard helper.archivedAt != nil, helper.archivedReason == .byAgent else {
             return (.failed, "the helper is not archived by an agent")
         }

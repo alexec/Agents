@@ -46,7 +46,7 @@ extension DaemonCore {
         if agent.afterTurn == .archive {
             throw JSONRPCError(code: JSONRPCError.invalidParams, message: """
                 Nothing was moved: you asked to be archived once this turn ends, and a run \
-                that moves is not archived. Call request_archive with no id instead, or do not move.
+                that moves is not archived. Call archive_session with no id instead, or do not move.
                 """)
         }
         var answer = try await askMove(agentID, PendingMove(target: target, removeLeft: request.removeLeft,
