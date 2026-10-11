@@ -10,7 +10,8 @@ import Glibc
 /// why it is not behind `Network`: a server project's client runs in the Linux `agentsd`.
 ///
 /// Started with the same scrubbing a runtime launch gets, never the daemon's full
-/// environment (security review S5), plus the server's own env; stderr is discarded.
+/// environment (security review S5), with the shell's PATH (#623), plus the server's own
+/// env; stderr is discarded.
 /// Nothing it is given — command, arguments, environment, bodies — is ever logged: a
 /// server's environment is where its secrets are (FR-023).
 final class MCPStdioProcess: @unchecked Sendable {
@@ -41,7 +42,7 @@ final class MCPStdioProcess: @unchecked Sendable {
         self.log = log
         process.executableURL = URL(filePath: "/usr/bin/env")
         process.arguments = [command] + args
-        process.environment = RuntimeEnvironment.forRuntimes().merging(env) { $1 }
+        process.environment = RuntimeEnvironment.forMCPServers(env)
         process.currentDirectoryURL = RuntimeProcess.folderURL(cwd)
         process.standardInput = input
         process.standardOutput = output

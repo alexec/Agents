@@ -23,4 +23,20 @@ struct RuntimeEnvironmentTests {
         #expect(!given.keys.contains { $0.hasPrefix("CLAUDE") })
         #expect(given["HOME"] == ProcessInfo.processInfo.environment["HOME"])
     }
+
+    /// A daemon launched by launchd has no `/opt/homebrew/bin`, so a server whose command
+    /// is `node` exited 127 (#623). It gets the shell's PATH, scrubbed, with its own env last.
+    @Test func anMCPServerGetsTheShellsPathAndItsOwnEnv() {
+        let shell = ["HOME": "/Users/a", "PATH": "/opt/homebrew/bin:/usr/bin", "CLAUDECODE": "1",
+                     "TOKEN": "daemon"]
+        let given = RuntimeEnvironment.forMCPServers(["TOKEN": "server"], onto: shell)
+        #expect(given == ["HOME": "/Users/a", "PATH": "/opt/homebrew/bin:/usr/bin", "TOKEN": "server"])
+        #expect(RuntimeEnvironment.forMCPServers(["PATH": "/mine"], onto: shell)["PATH"] == "/mine")
+    }
+
+    @Test func theDefaultIsTheLoginShellsPath() {
+        let given = RuntimeEnvironment.forMCPServers([:])
+        #expect(given["PATH"] == LoginShellPath.directories().joined(separator: ":"))
+        #expect(!given.keys.contains { $0.hasPrefix("CLAUDE") })
+    }
 }

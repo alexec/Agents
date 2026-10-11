@@ -22,4 +22,13 @@ public enum RuntimeEnvironment {
             !parentSessionPrefixes.contains { key.hasPrefix($0) }
         }
     }
+
+    /// What an MCP server the app runs is started with (#623): the shell's PATH, as a
+    /// runtime gets, because a server's `command` is a tool such as `node` or `gh` that a
+    /// daemon launched by launchd cannot find on its own PATH. Scrubbed as a runtime's
+    /// is, then the server's own env over all of it, PATH included.
+    public static func forMCPServers(_ env: [String: String],
+                                     onto base: [String: String] = LoginShellPath.environment()) -> [String: String] {
+        forRuntimes(base).merging(env) { $1 }
+    }
 }
