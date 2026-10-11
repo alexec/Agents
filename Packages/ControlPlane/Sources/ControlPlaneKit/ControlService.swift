@@ -293,6 +293,7 @@ public final class ControlService: @unchecked Sendable {
         // hosts/detect (#429): the servers in the ssh config that answer, installed the same way.
         let detect = HostDetect(installer: install) { [methods] in await methods.allHosts.map(\.name) }
         hooks.detect = { try JSONValue.encoding(await detect.run()) }
+        hooks.sshHosts = { destination in try JSONValue.encoding(await detect.sshHosts(destination)) }
         hooks.tunnel = { host in await tunnels?.state(for: host) }
         // Notices (T097): a need goes to the relay host, wherever it is held.
         hooks.need = { [weak self] _, params in await self?.heard(params) }

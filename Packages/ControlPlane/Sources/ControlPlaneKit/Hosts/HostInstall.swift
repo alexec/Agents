@@ -10,14 +10,17 @@ import Foundation
 ///   With none, ssh logs in as `ssh user@host` would for the person running the control
 ///   plane: their agent, `~/.ssh/config` and default identity (#413). Only a control plane
 ///   on the person's own Mac has those; one elsewhere needs the key.
-/// - The server's host key is shown first (`needsTrust`) and trusted only when the
-///   fingerprint comes back; it goes into the same folder, not the person's known_hosts.
+/// - The server's host key is checked against the person's known_hosts first (#610): one
+///   already there is used as ssh would use it, and a changed one is refused. One not there
+///   is shown (`needsTrust`) and trusted only when the fingerprint comes back; it goes into
+///   the same folder, not the person's known_hosts.
 /// - No master connection and no forward are kept (FR-018a). The host starts with a host
 ///   code and enrols over its own connection out, like one added by command.
-/// - Except for a server the person's ssh reaches through a bastion (`ProxyJump` or
-///   `ProxyCommand`), which can rarely dial back (#435): its code's address is its own
-///   loopback, and `HostTunnels` holds a reverse tunnel there for as long as it is a host.
-///   A server on the same network dials the control plane's address, with no tunnel.
+/// - Except for a server that asks for a tunnel (#610), which by default is one the
+///   person's ssh reaches through a bastion (`ProxyJump` or `ProxyCommand`) and can rarely
+///   dial back (#435): its code's address is its own loopback, and `HostTunnels` holds a
+///   reverse tunnel there for as long as it is a host. A server on the same network dials
+///   the control plane's address, with no tunnel.
 public struct HostInstall: Sendable {
     public struct Request: Codable, Sendable {
         /// `user@host`, `user@host:port`, or a name from the ssh config.
@@ -27,12 +30,17 @@ public struct HostInstall: Sendable {
         public var key: String?
         /// The fingerprint the person was shown and trusts, on the second call.
         public var trust: String?
+        /// Whether the server dials back through an ssh tunnel (#610). Nil: when ssh reaches
+        /// it through a bastion.
+        public var tunnel: Bool?
 
-        public init(destination: String, name: String? = nil, key: String? = nil, trust: String? = nil) {
+        public init(destination: String, name: String? = nil, key: String? = nil, trust: String? = nil,
+                    tunnel: Bool? = nil) {
             self.destination = destination
             self.name = name
             self.key = key
             self.trust = trust
+            self.tunnel = tunnel
         }
     }
 
@@ -42,12 +50,16 @@ public struct HostInstall: Sendable {
     /// nil where this copy holds none (several copies, whose ssh is no person's).
     let tunnels: (holder: HostTunnels, port: Int)?
     let progress: @Sendable (String, String) async -> Void
+    /// `-F` and a config file, for tests; nothing, for the person's own.
+    let configFile: [String]
 
     public init(codes: ControlCodes, servers: URL?, tunnels: (holder: HostTunnels, port: Int)? = nil,
+                configFile: [String] = HostInstall.configFile,
                 progress: @escaping @Sendable (String, String) async -> Void = { _, _ in }) {
         self.codes = codes
         self.servers = servers
         self.tunnels = tunnels
+        self.configFile = configFile
         self.progress = progress
     }
 
@@ -58,10 +70,16 @@ public struct HostInstall: Sendable {
         return try await run(request)
     }
 
+    /// The host key, in order (#610):
+    /// 1. Without a fingerprint to trust, ssh logs in against the person's own known_hosts
+    ///    with `StrictHostKeyChecking=yes`. A key there is the one they trust, so there is
+    ///    nothing to show; a changed one is refused, as ssh refuses it.
+    /// 2. No key there: it is fetched and its fingerprint returned (`needsTrust`).
+    /// 3. With that fingerprint back, the key is fetched again into the install's own
+    ///    known_hosts, checked against it, and the install goes on with that file.
+    ///
     /// `personsKnownHosts`: a server found in the ssh config (#429), which ssh has just
-    /// logged into with the person's own known_hosts and `StrictHostKeyChecking=yes`.
-    /// Its key is the one the person already trusts, so there is nothing to show, and
-    /// the install checks it against the same file.
+    /// logged into that way; it never asks.
     func run(_ request: Request, personsKnownHosts: Bool = false) async throws -> JSONValue {
         guard !request.destination.trimmingCharacters(in: .whitespaces).isEmpty else {
             throw JSONRPCError(code: JSONRPCError.invalidParams, message: "Say which server.")
@@ -91,23 +109,38 @@ public struct HostInstall: Sendable {
 
         var ssh = SSHCommand(executable: Self.sshExecutable, name: destination, controlPath: nil,
                              environment: Self.environment(keepAgent: !keyGiven))
-        ssh.options = Self.options(keyFile: keyFile, knownHosts: personsKnownHosts ? nil : knownHosts)
-        if personsKnownHosts { ssh.options += await Self.personsKnownHosts(ssh) }
-
-        // The host key: shown once, trusted when its fingerprint comes back.
         await progress(name, "connect")
-        if !personsKnownHosts {
+        let trusting = request.trust.flatMap { $0.isEmpty || personsKnownHosts ? nil : $0 }
+        let facts: ServerFacts
+        if let trusting {
+            // The key shown on the first call: fetched again, and used only if it is that one.
+            ssh.options = configFile
             let fetched = try await Self.words(keyGiven: keyGiven) { try await HostKeyCheck.fetch(ssh) }
             defer { HostKeyCheck.discard(fetched) }
-            guard let trust = request.trust, trust == fetched.fingerprint else {
+            guard trusting == fetched.fingerprint else {
                 return ["needsTrust": .string(fetched.fingerprint), "name": .string(name)]
             }
             try FileManager.default.copyItem(at: fetched.file, to: knownHosts)
+            ssh.options = configFile + Self.options(keyFile: keyFile, knownHosts: knownHosts)
+            await progress(name, "checkSystem")
+            facts = try await Self.words(keyGiven: keyGiven) { try await ServerInstaller(ssh: ssh).probe() }
+        } else {
+            ssh.options = configFile + Self.options(keyFile: keyFile, knownHosts: nil)
+            ssh.options += await Self.personsKnownHosts(ssh)
+            await progress(name, "checkSystem")
+            do {
+                facts = try await ServerInstaller(ssh: ssh).probe()
+            } catch HostProblem.hostKeyUnknown where !personsKnownHosts {
+                var fetching = ssh
+                fetching.options = configFile
+                let fetched = try await Self.words(keyGiven: keyGiven) { try await HostKeyCheck.fetch(fetching) }
+                HostKeyCheck.discard(fetched)
+                return ["needsTrust": .string(fetched.fingerprint), "name": .string(name)]
+            } catch let problem as HostProblem {
+                throw JSONRPCError(code: DaemonAPI.Failure.notAllowed, message: Self.say(problem, keyGiven: keyGiven))
+            }
         }
-
         let installer = ServerInstaller(ssh: ssh)
-        await progress(name, "checkSystem")
-        let facts = try await Self.words(keyGiven: keyGiven) { try await installer.probe() }
         guard let arch = facts.architecture.binarySuffix,
               let binary = ServerFiles.binary(for: arch, in: servers) else {
             throw JSONRPCError(code: DaemonAPI.Failure.notAllowed,
@@ -117,15 +150,22 @@ public struct HostInstall: Sendable {
         try await Self.words(keyGiven: keyGiven) { try await installer.install(binary: binary.file, sha256: binary.sha256, firstInstall: true) }
         try await Self.words(keyGiven: keyGiven) { try await installer.swapCurrent(to: binary.sha256, version: binary.version, installedBy: "control plane") }
         // A host code, left in the host's root and read once: never on its command line,
-        // where `ps` would show it. Behind a bastion, it names the server's end of the
-        // tunnel, which is held from now so the host's first dial finds it (#435).
+        // where `ps` would show it. Through a tunnel, it names the server's end of the
+        // tunnel, which is held from now so the host's first dial finds it (#435, #610).
         let code: String
         var tunnelled = false
-        if let tunnels, await Self.throughBastion(ssh) {
+        let wantsTunnel: Bool
+        if let asked = request.tunnel { wantsTunnel = asked } else { wantsTunnel = await Self.throughBastion(ssh) }
+        if wantsTunnel, tunnels == nil {
+            throw JSONRPCError(code: DaemonAPI.Failure.notAllowed,
+                               message: "This control plane can’t hold an ssh tunnel: only one on your Mac can. Add the server without one.")
+        }
+        if wantsTunnel, let tunnels {
             let issued = try await codes.issue(.host, url: "https://127.0.0.1:\(tunnels.port)")
             let record = HostTunnels.Record(id: UUID().uuidString.lowercased(), destination: destination, name: name,
                                             port: tunnels.port, code: issued.id, host: nil,
-                                            knownHosts: (try? String(contentsOf: knownHosts, encoding: .utf8)) ?? "",
+                                            // Empty: the person's own known_hosts had the key.
+                                            knownHosts: trusting == nil ? "" : (try? String(contentsOf: knownHosts, encoding: .utf8)) ?? "",
                                             made: Date())
             try await tunnels.holder.add(record)
             code = issued.shown.text
@@ -157,6 +197,12 @@ public struct HostInstall: Sendable {
         if host.hasPrefix("ssh://") { host = String(host.dropFirst(6)) }
         if let colon = host.firstIndex(of: ":") { host = String(host[..<colon]) }
         return host
+    }
+
+    /// `-F` and the file `AGENTS_SSH_CONFIG` names, for tests; otherwise ssh reads the
+    /// person's own `~/.ssh/config`.
+    public static var configFile: [String] {
+        ProcessInfo.processInfo.environment["AGENTS_SSH_CONFIG"].map { ["-F", $0] } ?? []
     }
 
     static var sshExecutable: URL {
@@ -220,7 +266,9 @@ public struct HostInstall: Sendable {
         case .loginRefused: "The server refused that key."
         case .keyLocked: "That key has a passphrase. Give a key without one for the install, or run the command instead."
         case .hostKeyChanged:
-            "ssh could not check the server’s host key: it is not in your known_hosts, or it has changed. Add it to ~/.ssh/known_hosts (ssh-keyscan prints it) and try again."
+            "The server’s host key has changed since your known_hosts last saw it, so nothing was installed. If the server was rebuilt, remove its old key (ssh-keygen -R) and try again."
+        case .hostKeyUnknown:
+            "The server’s host key isn’t in your known_hosts. Add it over ssh to see the key and trust it."
         case .timedOut: "It did not answer: the connection timed out or was refused."
         case .installFailed(let words) where words.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty:
             "ssh failed without saying why."

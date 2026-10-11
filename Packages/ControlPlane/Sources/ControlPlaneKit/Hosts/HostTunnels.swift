@@ -1,8 +1,12 @@
 import AgentsKit
 import AgentsKitCore
 import Foundation
+#if canImport(Network)
+import Network
+#endif
 
-/// Reverse tunnels for servers behind a bastion (#435).
+/// Reverse tunnels for servers behind a bastion (#435), or for any server the person
+/// asked for one (#610).
 ///
 /// A host joins by dialling the control plane. A server this machine reaches only through
 /// a `ProxyJump` or `ProxyCommand` can rarely dial back: nothing resolves or routes to this
@@ -12,11 +16,15 @@ import Foundation
 /// by its pin, so the name does not matter.
 ///
 /// - The session is the person's own ssh, with their config, agent and keys, and a known
-///   hosts file holding only the key trusted at the install. No key is kept (#413): a key
-///   given for the install was for the install.
+///   hosts file holding only the key trusted at the install, or the person's own known_hosts
+///   when the key was already there. No key is kept (#413): a key given for the install was
+///   for the install.
+/// - Only our forward rides it (#610): the config's `LocalForward`, `RemoteForward` and
+///   `DynamicForward` are cleared, and a forward the server will not open ends the session
+///   with ssh's reason.
 /// - Held for as long as the server is a host: a session that drops is started again,
-///   sooner the longer it had lasted. A record whose host was removed goes, and so does one
-///   whose host never joined.
+///   sooner the longer it had lasted, and at once when this Mac wakes or its network
+///   changes. A record whose host was removed goes, and so does one whose host never joined.
 /// - Only a single copy holds tunnels (Agents Host's): the ssh is this machine's.
 public actor HostTunnels {
     public struct Record: Codable, Sendable, Equatable {
@@ -29,7 +37,8 @@ public actor HostTunnels {
         /// The host code's id: its spend says which host this carries.
         public var code: String
         public var host: HostID?
-        /// The server's host key, as trusted at the install, in known_hosts form.
+        /// The server's host key, as trusted at the install, in known_hosts form; empty when
+        /// the person's own known_hosts had it (#610), which is then what the tunnel checks.
         public var knownHosts: String
         public var made: Date
     }
@@ -42,6 +51,8 @@ public actor HostTunnels {
     private let store: any ControlStore
     private let executable: URL
     private let environment: [String: String]
+    /// `-F` and a config file, for tests; nothing, for the person's own.
+    private let configFile: [String]
     private let hosts: @Sendable () async -> [HostRecord]
     private let changed: @Sendable (DaemonAPI.HostTunnelChanged) async -> Void
     private let log: @Sendable (String) -> Void
@@ -50,34 +61,86 @@ public actor HostTunnels {
     private var held: [String: Task<Void, Never>] = [:]
     private var states: [String: DaemonAPI.HostTunnel] = [:]
     private var ticker: Task<Void, Never>?
+    #if canImport(Network)
+    private var network: NWPathMonitor?
+    private var lastPath: String?
+    #endif
 
     public init(store: any ControlStore, executable: URL, environment: [String: String],
                 hosts: @escaping @Sendable () async -> [HostRecord],
                 changed: @escaping @Sendable (DaemonAPI.HostTunnelChanged) async -> Void,
-                log: @escaping @Sendable (String) -> Void = { _ in }) {
+                log: @escaping @Sendable (String) -> Void = { _ in },
+                configFile: [String] = HostInstall.configFile) {
         self.store = store
         self.executable = executable
         self.environment = environment
+        self.configFile = configFile
         self.hosts = hosts
         self.changed = changed
         self.log = log
-        folder = FileManager.default.temporaryDirectory.appendingPathComponent("agents-tunnels-\(getpid())", isDirectory: true)
+        // Short: a control socket's path must fit in 104 bytes, with ssh's own suffix.
+        folder = URL(fileURLWithPath: "/tmp/agents-tunnels-\(getuid())-\(getpid())", isDirectory: true)
     }
 
     /// Takes up the records and keeps them true every `every`.
+    /// A tick that took far longer on the clock that counts sleep than on the one that
+    /// does not is this Mac waking: every session is started again then, not when
+    /// `ServerAlive` gives up on a connection that died while it slept.
     public func start(every: Duration = .seconds(15)) {
         guard ticker == nil else { return }
         ticker = Task { [weak self] in
             while !Task.isCancelled {
                 await self?.reconcile()
+                let (awake, wall) = (SuspendingClock.now, ContinuousClock.now)
                 try? await Task.sleep(for: every)
+                if (ContinuousClock.now - wall) - (SuspendingClock.now - awake) > .seconds(5) {
+                    await self?.restart(because: "this Mac woke")
+                }
             }
         }
+        watchNetwork()
     }
+
+    /// Every session started again now, the waits between tries forgotten.
+    func restart(because why: String) {
+        guard !held.isEmpty else { return }
+        log("tunnels: \(why); starting every session again")
+        for task in held.values { task.cancel() }
+        held = [:]
+        for record in records.values { hold(record) }
+    }
+
+    /// A new network (another Wi-Fi, a VPN, the cable) leaves every session on the old
+    /// one: each is started again when the interfaces change, or the network comes back.
+    private func watchNetwork() {
+        #if canImport(Network)
+        guard network == nil else { return }
+        let monitor = NWPathMonitor()
+        monitor.pathUpdateHandler = { [weak self] path in
+            let shape = path.status == .satisfied
+                ? path.availableInterfaces.map { "\($0.name)" }.joined(separator: ",") : "none"
+            Task { await self?.networkIs(shape) }
+        }
+        monitor.start(queue: DispatchQueue(label: "agents.tunnels.network"))
+        network = monitor
+        #endif
+    }
+
+    #if canImport(Network)
+    private func networkIs(_ shape: String) {
+        defer { lastPath = shape }
+        guard let lastPath, lastPath != shape, shape != "none" else { return }
+        restart(because: "the network changed")
+    }
+    #endif
 
     public func stop() {
         ticker?.cancel()
         ticker = nil
+        #if canImport(Network)
+        network?.cancel()
+        network = nil
+        #endif
         for task in held.values { task.cancel() }
         held = [:]
         try? FileManager.default.removeItem(at: folder)
@@ -149,7 +212,8 @@ public actor HostTunnels {
 
     private func hold(_ record: Record) {
         guard held[record.id] == nil else { return }
-        let ssh = SSHCommand(executable: executable, name: record.destination, controlPath: nil, environment: environment)
+        var ssh = SSHCommand(executable: executable, name: record.destination, controlPath: nil, environment: environment)
+        ssh.options = configFile
         let folder = self.folder
         held[record.id] = Task { [weak self] in
             var wait: TimeInterval = 2
@@ -174,30 +238,49 @@ public actor HostTunnels {
         await changed(.init(name: record.name, host: record.host, tunnel: state))
     }
 
-    /// One `ssh -N -R`, until it ends or the task is cancelled: why it ended, if ssh said.
+    /// One tunnel session, until it ends or the task is cancelled: why it ended, if ssh said.
+    ///
+    /// A master of its own with no forwards, then our one forward asked of it (#610): the
+    /// master's `ClearAllForwardings` would drop a `-R` on its own command line. A forward
+    /// the server refuses ends the session with ssh's words for it.
     static func session(_ record: Record, ssh base: SSHCommand, folder: URL,
                         up: @escaping @Sendable () async -> Void) async -> String? {
-        let knownHosts = folder.appendingPathComponent("\(record.id).known_hosts")
+        var ssh = base
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true,
                                                     attributes: [.posixPermissions: 0o700])
-            try Data(record.knownHosts.utf8).write(to: knownHosts, options: .atomic)
         } catch {
-            return "its known hosts file could not be written: \(error.localizedDescription)"
+            return "its folder could not be made: \(error.localizedDescription)"
         }
-        var ssh = base
-        ssh.options = ["-o", "UserKnownHostsFile=\(knownHosts.path)", "-o", "GlobalKnownHostsFile=/dev/null",
-                       "-o", "StrictHostKeyChecking=yes"]
+        if record.knownHosts.isEmpty {
+            ssh.options += await HostInstall.personsKnownHosts(ssh) + ["-o", "StrictHostKeyChecking=yes"]
+        } else {
+            let knownHosts = folder.appendingPathComponent("\(record.id).known_hosts")
+            do {
+                try Data(record.knownHosts.utf8).write(to: knownHosts, options: .atomic)
+            } catch {
+                return "its known hosts file could not be written: \(error.localizedDescription)"
+            }
+            ssh.options += ["-o", "UserKnownHostsFile=\(knownHosts.path)", "-o", "GlobalKnownHostsFile=/dev/null",
+                            "-o", "StrictHostKeyChecking=yes"]
+        }
+        let control = folder.appendingPathComponent("\(record.id.prefix(8)).ctl")
+        try? FileManager.default.removeItem(at: control)
+        defer { try? FileManager.default.removeItem(at: control) }
+
         let process = Process()
         process.executableURL = ssh.executable
-        process.arguments = ssh.reverseTunnelArguments(remotePort: record.port, localPort: record.port)
+        process.arguments = ssh.tunnelMasterArguments(control: control)
         process.environment = ssh.environment
         process.standardInput = FileHandle.nullDevice
         process.standardOutput = FileHandle.nullDevice
         let errors = Pipe()
         process.standardError = errors
-        let heard = SessionLines(up: up)
-        return await withTaskCancellationHandler {
+        let heard = SessionLines()
+        let forwarding = Task { () -> String? in
+            await forward(record, ssh: ssh, control: control, master: process, up: up)
+        }
+        let ended = await withTaskCancellationHandler {
             await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
                 // ssh can exit before its last words are read: the session ends when it has
                 // exited and its standard error is closed, or a moment after it exits if a
@@ -230,7 +313,56 @@ public actor HostTunnels {
             }
         } onCancel: {
             if process.isRunning { process.terminate() }
+            forwarding.cancel()
         }
+        forwarding.cancel()
+        return await forwarding.value ?? ended
+    }
+
+    /// How long a master has to come up: ssh's own `ConnectTimeout` does not cover a
+    /// `ProxyCommand` or a chain of jumps.
+    static let connecting: Duration = .seconds(60)
+
+    /// Once the master answers, ask it for the tunnel's forward. Why the session must end,
+    /// or nil when the forward is open or the master ended by itself.
+    private static func forward(_ record: Record, ssh: SSHCommand, control: URL, master: Process,
+                                up: @Sendable () async -> Void) async -> String? {
+        let clock = ContinuousClock()
+        let deadline = clock.now + connecting
+        // Not yet launched has no pid; launched and not running has ended.
+        let ended = { master.processIdentifier != 0 && !master.isRunning }
+        while true {
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled, !ended() else { return nil }
+            if master.processIdentifier != 0,
+               let check = try? await ssh.run(ssh.tunnelControlArguments(control: control, "check")), check.status == 0 { break }
+            if ended() { return nil }
+            if clock.now > deadline {
+                master.terminate()
+                return "ssh did not connect within \(connecting.components.seconds) seconds"
+            }
+        }
+        let asked = try? await ssh.run(ssh.tunnelForwardArguments(control: control, remotePort: record.port,
+                                                                  localPort: record.port))
+        if asked?.status == 0 {
+            await up()
+            return nil
+        }
+        // A master that ended meanwhile has its own reason.
+        if ended() { return nil }
+        master.terminate()
+        return forwardFailure(asked?.stderr ?? "")
+    }
+
+    /// ssh's reason for a forward its master would not open: `mux_client_forward:
+    /// forwarding request failed: remote port forwarding failed for listen port 8791`.
+    static func forwardFailure(_ stderr: String) -> String {
+        let lines = stderr.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }
+        if let line = lines.first(where: { $0.contains("forwarding request failed: ") }),
+           let range = line.range(of: "forwarding request failed: ") {
+            return String(line[range.upperBound...])
+        }
+        return lines.compactMap(SessionLines.said).last ?? "the server would not open the tunnel's forward"
     }
 
     /// The end of one session: once ssh has exited and its standard error is closed, or
@@ -256,15 +388,12 @@ public actor HostTunnels {
         }
     }
 
-    /// What ssh says on standard error, a line at a time: `remote forward success` is the
-    /// tunnel open; the last line that is not `-v`'s own chatter is why it ended.
+    /// What ssh says on standard error, a line at a time: the last line that is not
+    /// debug chatter is why it ended.
     final class SessionLines: @unchecked Sendable {
         private let lock = NSLock()
         private var partial = Data()
         private var last: String?
-        private let up: @Sendable () async -> Void
-
-        init(up: @escaping @Sendable () async -> Void) { self.up = up }
 
         var problem: String? { lock.withLock { last } }
 
@@ -280,10 +409,7 @@ public actor HostTunnels {
             }
             for raw in lines {
                 let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-                if line.contains("remote forward success") {
-                    let up = self.up
-                    Task { await up() }
-                } else if let said = Self.said(line) {
+                if let said = Self.said(line) {
                     lock.withLock { last = said }
                 }
             }

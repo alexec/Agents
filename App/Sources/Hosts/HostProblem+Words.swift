@@ -14,6 +14,8 @@ extension HostProblem {
             "Your key needs its passphrase. Run ssh-add in Terminal, then try again."
         case .hostKeyChanged:
             "\(label)’s host key has changed since you last connected. Agents won’t connect until you check it."
+        case .hostKeyUnknown:
+            "\(label)’s host key isn’t in your known_hosts. Add the server again to see its key and trust it."
         case .unsupportedSystem(let system, let architecture):
             "\(label) is \(system == "Darwin" ? "macOS" : system) on \(architecture). Agents servers need Linux on x86-64 or ARM64."
         case .noStreamLocalForwarding:

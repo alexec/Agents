@@ -58,24 +58,16 @@ struct HostInstallTests {
         #expect(request.key == nil)
     }
 
-    /// Against a real server this Mac's own ssh reaches (the devbox), with no key at all:
-    /// the host key is shown, and once trusted, ssh logs in and reads the system. Only when
-    /// `AGENTS_INSTALL_LIVE` names the destination, e.g. `agents@127.0.0.1:2222`.
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["AGENTS_INSTALL_LIVE"] != nil))
-    func withoutAKeyTheMacsOwnSSHLogsIn() async throws {
-        let destination = try #require(ProcessInfo.processInfo.environment["AGENTS_INSTALL_LIVE"])
-        let codes = ControlCodes.forCommandLine(store: MemoryStore(), privateKey: ControlAgreement.generate().privateKey,
-                                                url: "https://127.0.0.1:1", pin: nil, name: "live")
-        // No servers folder: the install stops once ssh has logged in and read the system.
-        let install = HostInstall(codes: codes, servers: FileManager.default.temporaryDirectory.appendingPathComponent("no-servers-\(UUID())"))
-        let asked = try await install.run(["destination": .string(destination)])
-        let fingerprint = try #require(asked["needsTrust"]?.stringValue)
-        await #expect {
-            _ = try await install.run(["destination": .string(destination), "trust": .string(fingerprint)])
-        } throws: { error in
-            let message = (error as? JSONRPCError)?.message ?? "\(error)"
-            print("LIVE \(message)")
-            return message.contains("which this control plane has no host for")
-        }
+    /// #610: whether to tunnel is the sheet's to say; left out, a bastion decides.
+    @Test func aRequestMaySayWhetherToTunnel() throws {
+        let asked = try JSONDecoder().decode(HostInstall.Request.self, from: Data(#"{"destination":"ws","tunnel":true}"#.utf8))
+        #expect(asked.tunnel == true)
+        let left = try JSONDecoder().decode(HostInstall.Request.self, from: Data(#"{"destination":"ws"}"#.utf8))
+        #expect(left.tunnel == nil)
+    }
+
+    @Test func anUnknownKeyIsNotAChangedOne() {
+        #expect(HostInstall.say(.hostKeyUnknown, keyGiven: false).contains("isn’t in your known_hosts"))
+        #expect(HostInstall.say(.hostKeyChanged, keyGiven: false).contains("has changed"))
     }
 }

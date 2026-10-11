@@ -18,6 +18,8 @@ public actor ControlMethods: ControlHandling {
         public var install: @Sendable (JSONValue?) async throws -> JSONValue
         /// `hosts/detect` (#429): the servers in the ssh config that answer, installed.
         public var detect: @Sendable () async throws -> JSONValue = { throw ControlMethods.notHere }
+        /// `hosts/sshHosts` (#610): the ssh config's hosts, or one destination, resolved.
+        public var sshHosts: @Sendable (String?) async throws -> JSONValue = { _ in throw ControlMethods.notHere }
         public var update: @Sendable (HostID) async throws -> Void
         public var checkAgain: @Sendable (HostID) async throws -> Void
         /// A need a host raised, for the control plane to choose a device and seal (R6).
@@ -215,8 +217,8 @@ public actor ControlMethods: ControlHandling {
         DaemonAPI.Method.ping, DaemonAPI.Method.controlStatus, DaemonAPI.Method.hostsList,
         DaemonAPI.Method.hostsStartEnroll, DaemonAPI.Method.hostsInstall, DaemonAPI.Method.hostsCheckAgain,
         DaemonAPI.Method.hostsUpdate, DaemonAPI.Method.hostsRemove, DaemonAPI.Method.hostsSetRelay,
-        DaemonAPI.Method.hostsLendSignIn, DaemonAPI.Method.hostsDetect, DaemonAPI.Method.controlSetProjectDetection,
-        DaemonAPI.Method.clientsList, DaemonAPI.Method.clientsStartPairing, DaemonAPI.Method.clientsStopPairing,
+        DaemonAPI.Method.hostsLendSignIn, DaemonAPI.Method.hostsDetect, DaemonAPI.Method.hostsSSHHosts,
+        DaemonAPI.Method.controlSetProjectDetection, DaemonAPI.Method.clientsList, DaemonAPI.Method.clientsStartPairing, DaemonAPI.Method.clientsStopPairing,
         DaemonAPI.Method.clientsSetGrant, DaemonAPI.Method.clientsForget, DaemonAPI.Method.clientsConnections,
         DaemonAPI.Method.clientsForgetSelf,
         DaemonAPI.Method.devicesList, DaemonAPI.Method.devicesStartPairing, DaemonAPI.Method.devicesStopPairing,
@@ -323,6 +325,9 @@ public actor ControlMethods: ControlHandling {
             return try await hooks.install(params)
         case DaemonAPI.Method.hostsDetect:
             return try await hooks.detect()
+        case DaemonAPI.Method.hostsSSHHosts:
+            let destination = params?["destination"]?.stringValue?.trimmingCharacters(in: .whitespaces)
+            return try await hooks.sshHosts(destination?.isEmpty == false ? destination : nil)
         case DaemonAPI.Method.controlSetProjectDetection:
             var request = try Self.require(params, as: ProjectDetection.self)
             request.paths = request.paths.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
