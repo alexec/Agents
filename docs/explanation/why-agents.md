@@ -59,9 +59,9 @@ simulator is free.
 
 It reproduces the failure, fixes it and commits. Then it
 [waits for `main` to move](../how-to/wait-for-something.md) so it can rebase. Its turn
-ends again, and nothing polls. When `main` moves, it is woken and told so. It publishes
-`custom.release_ready`, and a release agent that was waiting for that event wakes up and
-starts on the release notes.
+ends again, and nothing polls. When `main` moves, it is woken and told so. It rebases and
+finishes, and a release agent that was waiting for it wakes up and starts on the release
+notes.
 
 You were not asked for anything. The list shows each step as it happens.
 
@@ -72,7 +72,7 @@ Each part can be used on its own:
   shows who holds what, and you can end a lease.
   See [Leases on shared resources](leases.md).
 - **Events and waiting.** An agent can wait for another agent finishing, a branch
-  moving, the Mac waking, you coming back, or an event another agent publishes. The Mac keeps a log of events, and the phone and iPad can read it.
+  moving, the Mac waking, or you coming back. The Mac keeps a log of events, and the phone and iPad can read it.
   See [Events](../reference/events.md).
 - **Workflows.** A workflow starts an agent on a schedule, such as every weekday at nine,
   or on an event, such as an agent finishing or a branch moving. It is a file beside your

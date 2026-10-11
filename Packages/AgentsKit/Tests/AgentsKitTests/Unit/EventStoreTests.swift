@@ -28,7 +28,7 @@ struct EventStoreTests {
         let store = EventStore(locations: locations)
         let agent = UUID()
         store.append(.event(event(1)))
-        store.append(.event(event(2, "custom.ping")))
+        store.append(.event(event(2, "dropbox.file_added")))
         store.append(.consequence(.woke(agentID: agent, title: "Waiter"), position: 2))
         store.append(.repeatOf(1, at: t0.addingTimeInterval(30), count: 3))
 
@@ -37,6 +37,26 @@ struct EventStoreTests {
         #expect(back.event(at: 1)?.count == 3)
         #expect(back.event(at: 1)?.lastAt == t0.addingTimeInterval(30))
         #expect(back.event(at: 2)?.consequences == [.woke(agentID: agent, title: "Waiter")])
+    }
+
+    /// Agents no longer publish (#639), but a `custom.` event already on the log still
+    /// reads back with who published it, and a state file that counted publishes loads.
+    @Test func aCustomEventFromBeforeStillReads() throws {
+        let locations = temporary()
+        let publisher = EventPublisher(agentID: UUID(), title: "Nightly build")
+        EventStore(locations: locations).append(.event(Event(
+            position: 1, name: "custom.build_green", at: t0, scope: .mac, sentence: "Published.",
+            publisher: publisher, message: "All green")))
+        let back = EventStore(locations: locations).load().event(at: 1)
+        #expect(back?.publisher == publisher)
+        #expect(back?.message == "All green")
+        #expect(back?.subject == nil)
+
+        try FileManager.default.createDirectory(at: locations.eventState.deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
+        try Data(#"{"nextPosition":7,"branchTips":{},"publishes":{"x":[0]},"costCrossings":{}}"#.utf8)
+            .write(to: locations.eventState)
+        #expect(EventStore(locations: locations).loadState().nextPosition == 7)
     }
 
     @Test func aTornLastLineIsDropped() throws {
@@ -110,7 +130,6 @@ struct EventStoreTests {
         var state = EventState()
         state.nextPosition = 42
         state.branchTips = ["/tmp/p": ["main": "abc"]]
-        state.publishes = [UUID().uuidString: [t0]]
         EventStore(locations: locations).saveState(state)
         #expect(EventStore(locations: locations).loadState() == state)
     }

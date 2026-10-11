@@ -1593,7 +1593,7 @@ public actor DaemonCore {
             let reviewsClientSide = runtimeID.map(ClientPermissionSettings.supports) == true
             // Our own tool, answered by us. Nobody is asked whether the app may show
             // the app's own suggestions. Cursor, Grok and OpenCode keep only the turn-ending
-            // ones automatic (061): workflows, agents, leases and publishing still ask.
+            // ones automatic (061): workflows, agents and leases still ask.
             if let option = reviewsClientSide
                 ? autoAllowedTurnTool(request)
                 : autoAllowed(request) {

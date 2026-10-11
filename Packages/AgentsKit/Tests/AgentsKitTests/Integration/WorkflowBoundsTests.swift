@@ -203,14 +203,14 @@ struct WorkflowBoundsTests {
         var last: EventPosition = 0
         for index in 0..<100 {
             clock.advance(seconds: 1)
-            last = await core.raise(EventDraft(name: "custom.tick", at: clock.now, scope: .mac,
+            last = await core.raise(EventDraft(name: "machine.disk_ok", at: clock.now, scope: .mac,
                                                sentence: "Tick \(index).", details: ["n": "\(index)"])).position
         }
         #expect(await core.eventStore.stateWrites == 2)
 
         let again = try await self.core(locations, clock: clock)
         clock.advance(seconds: 1)
-        let next = await again.raise(EventDraft(name: "custom.tick", at: clock.now, scope: .mac,
+        let next = await again.raise(EventDraft(name: "machine.disk_ok", at: clock.now, scope: .mac,
                                                 sentence: "After.", details: [:])).position
         #expect(next > last)
     }
@@ -225,7 +225,7 @@ struct WorkflowBoundsTests {
         var last: EventPosition = 0
         for index in 0..<10 {
             clock.advance(seconds: 1)
-            last = await core.raise(EventDraft(name: "custom.tick", at: clock.now, scope: .mac,
+            last = await core.raise(EventDraft(name: "machine.disk_ok", at: clock.now, scope: .mac,
                                                sentence: "Tick \(index).", details: [:])).position
         }
         await core.raiseCostLimit("daily", agent: nil)
@@ -245,7 +245,7 @@ struct WorkflowBoundsTests {
         let limit = EventLog.maximumEvents + DaemonCore.eventCapMargin
         for _ in 0...(limit + 1) {
             clock.advance(seconds: 1)
-            await core.raise(EventDraft(name: "custom.same", at: clock.now, scope: .mac, sentence: "Same.", details: [:]))
+            await core.raise(EventDraft(name: "mac.wake", at: clock.now, scope: .mac, sentence: "Same.", details: [:]))
         }
         let lines = try String(contentsOf: locations.events, encoding: .utf8).split(separator: "\n").count
         #expect(lines < 100, "\(lines) lines for one event")
@@ -261,7 +261,7 @@ struct WorkflowBoundsTests {
         let core = try await core(locations, clock: clock)
         await core.loadEventsIfNeeded()
         for index in 0...(EventLog.maximumEvents + DaemonCore.eventCapMargin) {
-            await core.raise(EventDraft(name: "custom.n", at: clock.now, scope: .mac,
+            await core.raise(EventDraft(name: "machine.disk_ok", at: clock.now, scope: .mac,
                                         sentence: "N.", details: ["n": "\(index)"]))
         }
         #expect(await core.eventLog.events.count == EventLog.maximumEvents)
@@ -287,24 +287,17 @@ struct WorkflowBoundsTests {
         #expect(await core.watchedBranches(in: work, tips: [:]) == ["main", "agents/live"])
     }
 
-    /// Publishes past their hour and the tips of folders that are no longer projects go.
+    /// The tips of folders that are no longer projects go.
     @Test func eventStateForgetsWhatHasGone() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
-        let clock = Clock()
         let store = try AgentStore(locations: locations)
-        let agent = Agent(runtimeID: "claude", cwd: work, title: "Publisher", state: .finished, endedReason: .endTurn)
-        try await store.save(agent)
-        let core = DaemonCore(store: store, locations: locations, discovery: .findsEverything,
-                              launcher: FakeLauncher(), now: { clock.now })
+        try await store.save(Agent(runtimeID: "claude", cwd: work, title: "Here", state: .finished, endedReason: .endTurn))
+        let core = DaemonCore(store: store, locations: locations, discovery: .findsEverything, launcher: FakeLauncher())
         await core.loadFromDisk()
-        await core.bindAppToken("token", to: agent.id)
-        _ = try await core.publishEvent(.init(token: "token", name: "custom.done", message: nil, details: nil))
         await core.setBranchTips(["/no/longer/a/project": ["main": "abc"], work.path: ["main": "def"]])
-        clock.advance(seconds: 3601)
         await core.pruneEventState()
         let state = EventStore(locations: locations).loadState()
-        #expect(state.publishes.isEmpty)
         #expect(Array(state.branchTips.keys) == [work.path])
     }
 }

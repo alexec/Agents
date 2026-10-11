@@ -51,7 +51,6 @@ public actor AppService {
     public static let leaseResourceToolName = AppTool.leaseResource
     public static let waitForEventToolName = AppTool.waitForEvent
     public static let cancelWaitToolName = AppTool.cancelWait
-    public static let publishEventToolName = AppTool.publishEvent
     public static let releaseResourceToolName = AppTool.releaseResource
     public static let listResourcesToolName = AppTool.listResources
     public static let setSessionLabelsToolName = AppTool.setSessionLabels
@@ -109,12 +108,11 @@ public actor AppService {
     /// Where those go. A lease call may take up to the wait limit to come back.
     public typealias LeasesSink = @Sendable (LeaseCall) async -> Outcome
 
-    /// One of the three event calls (042), as the agent made it.
+    /// One of the two event calls (042), as the agent made it.
     public enum EventCall: Sendable, Equatable {
         case wait(action: String?, events: [String]?, where: [String: DetailFilter]?, from: Int64?,
                   untilMinutes: Int?, limit: Int?)
         case cancel
-        case publish(name: String, message: String?, details: [String: String]?)
     }
 
     /// Where those go. A wait may take up to the hold limit to come back.
@@ -193,7 +191,7 @@ public actor AppService {
                     .refused("This app cannot lease resources.")
                 },
                 events: @escaping EventsSink = { _ in
-                    .refused("This app cannot wait on or publish events.")
+                    .refused("This app cannot wait on events.")
                 },
                 sessions: @escaping SessionsSink = { _ in
                     .refused("This app cannot read other sessions.")
@@ -571,19 +569,9 @@ public actor AppService {
         return nil
     }
 
-    /// Which of the three event calls a tool name is, with its arguments read (042).
+    /// Which of the two event calls a tool name is, with its arguments read (042).
     static func eventCall(named name: String,
                           _ arguments: JSONValue?) -> Result<EventCall, AgentCallProblem>? {
-        func strings(_ value: JSONValue?) -> [String: String]? {
-            guard let object = value?.objectValue else { return nil }
-            var out: [String: String] = [:]
-            for (key, value) in object {
-                if let text = value.stringValue { out[key] = text }
-                else if let number = value.intValue { out[key] = String(number) }
-                else if let flag = value.boolValue { out[key] = String(flag) }
-            }
-            return out
-        }
         /// Each key's value, one or a list (073 FR-016). The first key holding
         /// anything else, which used to be dropped without a word.
         func readFilters(_ value: JSONValue?) -> Result<[String: DetailFilter]?, AgentCallProblem> {
@@ -621,14 +609,6 @@ public actor AppService {
         if name.hasSuffix(cancelWaitToolName) {
             return .success(.cancel)
         }
-        if name.hasSuffix(publishEventToolName) {
-            let event = arguments?["name"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            guard !event.isEmpty else {
-                return .failure("Nothing was published: say what happened in `name`, e.g. custom.build_green.")
-            }
-            return .success(.publish(name: event, message: arguments?["message"]?.stringValue,
-                                     details: strings(arguments?["details"])))
-        }
         return nil
     }
 
@@ -646,8 +626,8 @@ public actor AppService {
         // The three lease tools after those, for every agent: waiting for the
         // simulator is not managing anyone (036).
         let leaseTools = [Self.leaseResourceTool, Self.releaseResourceTool, Self.listResourcesTool]
-        // The three event tools, for every agent (042).
-        let eventTools = [Self.waitForEventTool, Self.cancelWaitTool, Self.publishEventTool]
+        // The two event tools, for every agent (042).
+        let eventTools = [Self.waitForEventTool, Self.cancelWaitTool]
         // The two for reading another session in this project, and the one for telling it
         // something, for every agent (065, #560).
         let sessionTools = [Self.listSessionsTool, Self.readSessionTool, Self.messageAgentTool]
@@ -1338,7 +1318,7 @@ public actor AppService {
         "title": "Wait for something to happen",
         "description": """
             Wait until something happens: an event in this project or on this Mac, such as \
-            agent.finished, workflow.completed, mac.wake or custom.build_green. Your \
+            agent.finished, workflow.completed, mac.wake or branch.moved. Your \
             turn can end while you wait, and it costs nothing: when the event happens you \
             are started again with it. The call itself waits up to 45 seconds; if nothing \
             has happened by then it says you are still waiting and keeps your place. Use \
@@ -1424,34 +1404,6 @@ public actor AppService {
         "title": "Stop waiting",
         "description": "Stop waiting. Nothing will start you again for the wait you had.",
         "inputSchema": ["type": "object", "properties": [:]],
-    ]
-
-    static let publishEventTool: JSONValue = [
-        "name": .string(publishEventToolName),
-        "title": "Say that something happened",
-        "description": """
-            Tell other agents and workflows in this project that something happened. The \
-            name must start with custom., e.g. custom.build_green. Agents waiting on it are \
-            started, and workflows that trigger on it run. At most 30 an hour.
-            """,
-        "inputSchema": [
-            "type": "object",
-            "properties": [
-                "name": [
-                    "type": "string",
-                    "description": "custom. and lowercase letters, digits and _, up to 40 characters.",
-                ],
-                "message": [
-                    "type": "string",
-                    "description": "A short message for whoever wakes on it, up to 500 characters.",
-                ],
-                "details": [
-                    "type": "object",
-                    "description": "Up to 10 string details, which waits and workflows can narrow by.",
-                ],
-            ],
-            "required": .array(["name"]),
-        ],
     ]
 
     // MARK: Leases (036). Words from contracts/lease-tools.md.

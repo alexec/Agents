@@ -13,7 +13,6 @@ struct WorkflowTriggerWordsTests {
         #expect(WorkflowTrigger.event(EventPattern("branch.moved")).listensIn == .project)
         #expect(WorkflowTrigger.event(EventPattern("mac.wake")).listensIn == .mac)
         #expect(WorkflowTrigger.event(EventPattern("cost.limit_reached")).listensIn == .either)
-        #expect(WorkflowTrigger.event(EventPattern("custom.build_green")).listensIn == .project)
         // A whole subject that mixes the two is either.
         #expect(WorkflowTrigger.event(EventPattern("cost.*")).listensIn == .either)
         #expect(WorkflowTrigger.event(EventPattern("agent.*")).listensIn == .project)
@@ -28,8 +27,6 @@ struct WorkflowTriggerWordsTests {
     }
 
     @Test func aTriggeringRunSaysWhichAgentItResumesOrThatThereIsNone() {
-        #expect(WorkflowTrigger.event(EventPattern("custom.ready")).resumedAgent
-                == "Resumes the agent that published it")
         #expect(WorkflowTrigger.event(EventPattern("mac.wake")).resumedAgent.contains("never runs"))
         #expect(WorkflowTrigger.schedule(WorkflowSchedule()).resumedAgent.contains("never runs"))
         #expect(WorkflowTrigger.event(EventPattern("agent.started")).resumedAgent == "Resumes the agent it is about")
@@ -51,7 +48,7 @@ struct WorkflowTriggerWordsTests {
             on:
               - schedule:
                   at: [":30"]
-              - custom.build_green
+              - agent.finished
             options:
               - fast
             ---

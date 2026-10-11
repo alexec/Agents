@@ -332,8 +332,8 @@ public enum WorkflowFile {
                 }
                 return .serverEvent(trigger)
             }
-            // An event (042): a catalogue name, a subject with .*, or custom.<name>,
-            // narrowed by details written under it. A name the catalogue knows with a
+            // An event (042): a catalogue name or a subject with .*, narrowed by
+            // details written under it. A name the catalogue knows with a
             // detail it does not carry is a mistake worth saying; a dotted name it does
             // not know is from a later version, and is kept whole like any other.
             if name.contains(".") {
@@ -358,8 +358,9 @@ public enum WorkflowFile {
                 case .success(let pattern):
                     return .event(pattern)
                 // A key it cannot be narrowed by (#574) leaves the trigger unreadable,
-                // saying so, rather than firing for everything.
-                case .failure(let problem) where problem.isBadFilter:
+                // saying so, rather than firing for everything; so does a custom. event,
+                // which nothing raises any more (#639).
+                case .failure(let problem) where problem.isBadFilter || problem.isRetiredCustom:
                     throw YAMLNode.Failure(problem.message)
                 case .failure:
                     break

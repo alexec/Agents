@@ -56,7 +56,6 @@ public enum ConnectionRole: String, Sendable, Hashable {
         DaemonAPI.Method.leasesList,
         DaemonAPI.Method.eventsWait,
         DaemonAPI.Method.eventsCancel,
-        DaemonAPI.Method.eventsPublish,
         DaemonAPI.Method.pinsPinPage,
         DaemonAPI.Method.pinsUnpinPage,
         DaemonAPI.Method.pinsMovePin,

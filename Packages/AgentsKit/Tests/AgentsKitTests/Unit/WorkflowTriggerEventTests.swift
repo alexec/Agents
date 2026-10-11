@@ -29,14 +29,12 @@ struct WorkflowTriggerEventTests {
     @Test func dottedNamesAreEvents() {
         let workflow = triggers("""
               - mac.wake
-              - custom.build_green
               - branch.*
               - branch.moved:
                   branch: main
             """)
         #expect(workflow.problem == nil)
-        #expect(workflow.triggers == [.event(EventPattern("mac.wake")), .event(EventPattern("custom.build_green")),
-                                      .event(EventPattern("branch.*")),
+        #expect(workflow.triggers == [.event(EventPattern("mac.wake")), .event(EventPattern("branch.*")),
                                       .event(EventPattern("branch.moved", filters: ["branch": "main"]))])
     }
 
@@ -47,6 +45,17 @@ struct WorkflowTriggerEventTests {
             """)
         guard case .unreadable(let detail)? = workflow.problem else { Issue.record("not refused"); return }
         #expect(detail.contains("workflow.completed takes no arguments; \"branch\" is not one of its arguments."))
+    }
+
+    /// Agents no longer publish (#639): a file that still names a custom event cannot run,
+    /// and its page says why.
+    @Test func aCustomEventIsAFileErrorSayingWhy() {
+        for line in ["  - custom.build_green", "  - custom.*", "  - custom.ready:\n      branch: main"] {
+            let workflow = triggers(line)
+            guard case .unreadable(let detail)? = workflow.problem else { Issue.record("not refused: \(line)"); continue }
+            #expect(detail.contains("agents no longer publish events"), "\(detail)")
+            #expect(!workflow.canFire)
+        }
     }
 
     @Test func aNameAboutTheAppsOwnSubjectThisVersionDoesNotKnowStaysInert() {
@@ -89,8 +98,6 @@ struct WorkflowTriggerEventTests {
 
     @Test func anEventTriggerSaysWhatItWaitsFor() {
         #expect(WorkflowTrigger.event(EventPattern("mac.wake")).summary == "When this Mac woke up")
-        #expect(WorkflowTrigger.event(EventPattern("custom.release_ready")).summary
-                == "When an agent here publishes custom.release_ready")
     }
 
     // MARK: 073

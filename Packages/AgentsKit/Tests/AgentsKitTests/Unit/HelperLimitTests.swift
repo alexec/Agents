@@ -65,7 +65,7 @@ struct HelperLimitTests {
         #expect(HelperLimit.isRunning(blocked))
 
         var onEvents = helper(.finished)
-        onEvents.eventWait = EventWait(patterns: [EventPattern("custom.ping")], from: 0, since: Date())
+        onEvents.eventWait = EventWait(patterns: [EventPattern("dropbox.file_added")], from: 0, since: Date())
         #expect(HelperLimit.isRunning(onEvents))
 
         var onAllowance = helper(.stopped)

@@ -3,12 +3,12 @@ import Testing
 @testable import AgentsKit
 @testable import AgentsKitCore
 
-/// Agents waiting for something to happen, through the daemon (042 US1, US4).
+/// Agents waiting for something to happen, through the daemon (042 US1).
 ///
 /// What the log and the pattern alone cannot show: that a held call is answered when
 /// its event comes, that an agent whose call has returned is started again with the
 /// news once, that every way of ending a wait ends it without a wake, that a restart
-/// keeps it, and that publishing wakes and is limited. Replies are checked for their
+/// keeps it, and that a custom event is refused (#639). Replies are checked for their
 /// words, because the agent reads them.
 @Suite("Event waits", .timeLimit(.minutes(1)))
 struct EventWaitTests {
@@ -133,14 +133,14 @@ struct EventWaitTests {
         let core = try await makeCore(locations, clock: Clock())
         let (a, token) = try await agent(core, in: work, "Waiter")
 
-        let call = Task { try await wait(core, token, ["custom.ping"]) }
+        let call = Task { try await wait(core, token, ["dropbox.file_added"]) }
         try await eventually("held") { await isHeld(core, a) }
-        await core.raise(draft("custom.ping", in: work))
+        await core.raise(draft("dropbox.file_added", in: work))
         let answer = try await call.value
-        #expect(answer.hasPrefix("custom.ping happened at "))
+        #expect(answer.hasPrefix("dropbox.file_added happened at "))
         #expect(answer.hasSuffix("You can carry on."))
         #expect(!(await isWaiting(core, a)))
-        let event = await core.eventLog.events.last { $0.name == "custom.ping" }
+        let event = await core.eventLog.events.last { $0.name == "dropbox.file_added" }
         #expect(event?.consequences == [.woke(agentID: a, title: "Waiter")])
     }
 
@@ -181,8 +181,8 @@ struct EventWaitTests {
             #expect(refused?.message == "\(name) takes no arguments; \"\(key)\" is not one of its arguments. "
                     + "To wait for particular agents, use wait_for_event with agents.")
         }
-        let custom = await refusal { _ = try await wait(core, token, ["custom.ping"], where: ["by": "x"]) }
-        #expect(custom?.message == "custom.ping takes no arguments; \"by\" is not one of its arguments.")
+        let dropbox = await refusal { _ = try await wait(core, token, ["dropbox.file_added"], where: ["by": "x"]) }
+        #expect(dropbox?.message == "dropbox.file_added takes no arguments; \"by\" is not one of its arguments.")
         #expect(!(await isHeld(core, a)))
     }
 
@@ -227,8 +227,8 @@ struct EventWaitTests {
         let core = try await makeCore(locations, clock: Clock(), hold: .milliseconds(150))
         let (a, token) = try await agent(core, in: work, "Waiter")
 
-        let answer = try await wait(core, token, ["custom.ping"])
-        #expect(answer.hasPrefix("Still waiting for custom.ping, since "))
+        let answer = try await wait(core, token, ["dropbox.file_added"])
+        #expect(answer.hasPrefix("Still waiting for dropbox.file_added, since "))
         #expect(answer.contains("you can end your turn"))
         #expect(await isWaiting(core, a))
         #expect(await core.eventLog.events.contains { $0.name == "agent.blocked" && $0.details["agent"] == a.uuidString })
@@ -237,7 +237,7 @@ struct EventWaitTests {
             await core.agents[a]?.group(wantsEyes: false) == .waiting
         }
 
-        await core.raise(draft("custom.ping", in: work))
+        await core.raise(draft("dropbox.file_added", in: work))
         try await eventually("started with the event") {
             try await appPrompts(core, a).contains { $0.hasPrefix("The event you were waiting for happened.") }
         }
@@ -249,11 +249,11 @@ struct EventWaitTests {
         let (locations, work, _) = try temporary()
         let core = try await makeCore(locations, clock: clock, hold: .milliseconds(100))
         let (a, token) = try await agent(core, in: work, "Patient")
-        _ = try await wait(core, token, ["custom.never"], until: 1)
+        _ = try await wait(core, token, ["server.online"], until: 1)
         clock.advance(minutes: 2)
         await core.eventWaitDeadlinesPassed()
         try await eventually("told it timed out") {
-            try await appPrompts(core, a).contains { $0.hasPrefix("Your wait for custom.never timed out at ") }
+            try await appPrompts(core, a).contains { $0.hasPrefix("Your wait for server.online timed out at ") }
         }
     }
 
@@ -262,11 +262,11 @@ struct EventWaitTests {
         let core = try await makeCore(locations, clock: Clock())
         let (_, token) = try await agent(core, in: work, "Checker")
         let head = await core.eventLog.head
-        await core.raise(draft("custom.build_green", in: work))
-        let answer = try await wait(core, token, ["custom.build_green"], from: head)
-        #expect(answer.hasPrefix("custom.build_green happened at "))
+        await core.raise(draft("workflow.ran", in: work))
+        let answer = try await wait(core, token, ["workflow.ran"], from: head)
+        #expect(answer.hasPrefix("workflow.ran happened at "))
         // From now, the same event is in the past and does not count.
-        let later = Task { try await wait(core, token, ["custom.build_green"]) }
+        let later = Task { try await wait(core, token, ["workflow.ran"]) }
         try await Task.sleep(for: .milliseconds(100))
         #expect(!later.isCancelled)
         later.cancel()
@@ -276,8 +276,8 @@ struct EventWaitTests {
         let (locations, work, _) = try temporary()
         let core = try await makeCore(locations, clock: Clock(), hold: .milliseconds(100))
         let (a, token) = try await agent(core, in: work, "Waiter")
-        _ = try await wait(core, token, ["custom.*"])
-        await core.raiseEach([draft("custom.one", in: work), draft("custom.two", in: work), draft("custom.three", in: work)])
+        _ = try await wait(core, token, ["dropbox.*"])
+        await core.raiseEach(["one", "two", "three"].map { draft("dropbox.file_added", in: work, ["name": $0]) })
         try await eventually("woken once") {
             try await appPrompts(core, a).contains { $0.contains("2 more matches arrived before you resumed") }
         }
@@ -289,19 +289,19 @@ struct EventWaitTests {
         let (locations, work, _) = try temporary()
         let core = try await makeCore(locations, clock: Clock(), hold: .milliseconds(100))
         let (a, token) = try await agent(core, in: work, "Fickle")
-        _ = try await wait(core, token, ["custom.a"])
-        let second = try await wait(core, token, ["custom.b"])
-        #expect(second.hasPrefix("Replaced your earlier wait on custom.a. Still waiting for custom.b"))
-        #expect(await core.agents[a]?.eventWait?.patterns == [EventPattern("custom.b")])
+        _ = try await wait(core, token, ["workflow.ran"])
+        let second = try await wait(core, token, ["workflow.completed"])
+        #expect(second.hasPrefix("Replaced your earlier wait on workflow.ran. Still waiting for workflow.completed"))
+        #expect(await core.agents[a]?.eventWait?.patterns == [EventPattern("workflow.completed")])
     }
 
     @Test func anotherProjectsEventsNeverMatchButTheMacsDo() async throws {
         let (locations, work, other) = try temporary()
         let core = try await makeCore(locations, clock: Clock())
         let (a, token) = try await agent(core, in: work, "Here")
-        let call = Task { try await wait(core, token, ["custom.ping", "mac.wake"]) }
+        let call = Task { try await wait(core, token, ["dropbox.file_added", "mac.wake"]) }
         try await eventually("held") { await isHeld(core, a) }
-        await core.raise(draft("custom.ping", in: other))
+        await core.raise(draft("dropbox.file_added", in: other))
         try await Task.sleep(for: .milliseconds(50))
         #expect(await isHeld(core, a), "another project's ping is not ours")
         await core.raise(draft("mac.wake", in: nil))
@@ -320,11 +320,11 @@ struct EventWaitTests {
         #expect(refused?.message == EventWords.neverHere(["mac.wake", "person.*"]) + " Nothing is waiting.")
         #expect(await !isWaiting(core, a))
 
-        let call = Task { try await wait(core, token, ["custom.ping", "mac.wake"]) }
+        let call = Task { try await wait(core, token, ["dropbox.file_added", "mac.wake"]) }
         try await eventually("held") { await isHeld(core, a) }
-        await core.raise(draft("custom.ping", in: work))
+        await core.raise(draft("dropbox.file_added", in: work))
         let answer = try await call.value
-        #expect(answer.hasPrefix(EventWords.neverHere(["mac.wake"]) + " custom.ping happened at "), "\(answer)")
+        #expect(answer.hasPrefix(EventWords.neverHere(["mac.wake"]) + " dropbox.file_added happened at "), "\(answer)")
     }
 
     /// A server's event no server here offers is refused (#577); a mistyped app event,
@@ -333,14 +333,14 @@ struct EventWaitTests {
         let (locations, work, _) = try temporary()
         let core = try await makeCore(locations, clock: Clock(), hold: .milliseconds(100))
         let (a, token) = try await agent(core, in: work, "Hopeful")
-        let refused = await refusal { _ = try await wait(core, token, ["ci.failed", "custom.ping"]) }
+        let refused = await refusal { _ = try await wait(core, token, ["ci.failed", "dropbox.file_added"]) }
         #expect(refused?.code == DaemonAPI.Failure.eventRefused)
         #expect(refused?.message == EventWords.notOffered("ci.failed", offers: [:]) + " Nothing is waiting.")
         #expect(await !isWaiting(core, a))
         let typo = await refusal { _ = try await wait(core, token, ["agnet.finished"]) }
         #expect(typo?.message.contains("Did you mean agent.finished?") == true, "\(typo?.message ?? "")")
 
-        let quiet = try await wait(core, token, ["custom.ping", "agent.*"])
+        let quiet = try await wait(core, token, ["dropbox.file_added", "agent.*"])
         #expect(!quiet.contains("server"), "\(quiet)")
     }
 
@@ -390,9 +390,9 @@ struct EventWaitTests {
         let (locations, work, _) = try temporary()
         let core = try await makeCore(locations, clock: Clock(), hold: .milliseconds(100))
         let (a, token) = try await agent(core, in: work, "Forever")
-        _ = try await wait(core, token, ["custom.ping"])
+        _ = try await wait(core, token, ["dropbox.file_added"])
         let earlier = await core.agents[a]?.eventWait
-        let refused = await refusal { _ = try await wait(core, token, ["custom.never"], until: nil) }
+        let refused = await refusal { _ = try await wait(core, token, ["server.online"], until: nil) }
         #expect(refused?.code == DaemonAPI.Failure.eventRefused)
         #expect(refused?.message == EventWords.deadlineRequired())
         #expect(refused?.message.contains("until_minutes is required") == true)
@@ -406,7 +406,7 @@ struct EventWaitTests {
         let (locations, work, _) = try temporary()
         let core = try await makeCore(locations, clock: clock, hold: .milliseconds(100))
         let (a, token) = try await agent(core, in: work, "Old build")
-        _ = try await wait(core, token, ["custom.never"])
+        _ = try await wait(core, token, ["server.online"])
         var saved = try #require(await core.agents[a])
         saved.eventWait?.deadline = nil
         await core.changed(saved)
@@ -420,7 +420,7 @@ struct EventWaitTests {
         clock.advance(minutes: 1441)
         await again.eventWaitDeadlinesPassed()
         try await eventually("told it timed out") {
-            try await appPrompts(again, a).contains { $0.hasPrefix("Your wait for custom.never timed out at ") }
+            try await appPrompts(again, a).contains { $0.hasPrefix("Your wait for server.online timed out at ") }
         }
     }
 
@@ -428,11 +428,11 @@ struct EventWaitTests {
         let (locations, work, other) = try temporary()
         let core = try await makeCore(locations, clock: Clock())
         let (_, token) = try await agent(core, in: work, "Reader")
-        await core.raise(draft("custom.mine", in: work))
-        await core.raise(draft("custom.theirs", in: other))
+        await core.raise(draft("workflow.ran", in: work))
+        await core.raise(draft("workflow.completed", in: other))
         let recent = try await calling(core, token) { t in try await core.waitForEvent(.init(token: t, action: "recent")) }
-        #expect(recent.contains("custom.mine"))
-        #expect(!recent.contains("custom.theirs"))
+        #expect(recent.contains("workflow.ran"))
+        #expect(!recent.contains("workflow.completed"))
         #expect(recent.contains("Head: "))
         let list = try await calling(core, token) { t in try await core.waitForEvent(.init(token: t, action: "list")) }
         // No MCP server here, so the list is the app's events alone (#579).
@@ -445,10 +445,10 @@ struct EventWaitTests {
         let (locations, work, _) = try temporary()
         let core = try await makeCore(locations, clock: Clock(), hold: .milliseconds(100))
         let (a, token) = try await agent(core, in: work, "Quitter")
-        _ = try await wait(core, token, ["custom.ping"])
+        _ = try await wait(core, token, ["dropbox.file_added"])
         let reply = try await calling(core, token) { t in try await core.cancelWait(.init(token: t)) }
-        #expect(reply == "Stopped waiting for custom.ping.")
-        await core.raise(draft("custom.ping", in: work))
+        #expect(reply == "Stopped waiting for dropbox.file_added.")
+        await core.raise(draft("dropbox.file_added", in: work))
         try await Task.sleep(for: .milliseconds(150))
         #expect(try await wakes(core, a).isEmpty)
         let none = await refusal { _ = try await calling(core, token) { t in try await core.cancelWait(.init(token: t)) } }
@@ -460,7 +460,7 @@ struct EventWaitTests {
         let (locations, work, _) = try temporary()
         let core = try await makeCore(locations, clock: Clock(), hold: .milliseconds(100))
         let (a, token) = try await agent(core, in: work, "Watched")
-        _ = try await wait(core, token, ["custom.ping"])
+        _ = try await wait(core, token, ["dropbox.file_added"])
         #expect(await core.waitingAgents().map(\.agentID) == [a])
         let left = try await core.cancelWaitByPerson(.init(agentID: a))
         #expect(left.isEmpty)
@@ -471,7 +471,7 @@ struct EventWaitTests {
         let (locations, work, _) = try temporary()
         let core = try await makeCore(locations, clock: Clock(), hold: .milliseconds(100))
         let (a, token) = try await agent(core, in: work, "Interrupted")
-        _ = try await wait(core, token, ["custom.ping"])
+        _ = try await wait(core, token, ["dropbox.file_added"])
         try await eventually("turn over") { await core.agents[a]?.state == .finished }
         try await core.prompt(DaemonAPI.PromptRequest(agentID: a, text: "Do this instead."))
         #expect(!(await isWaiting(core, a)))
@@ -486,7 +486,7 @@ struct EventWaitTests {
             if case .userMessage(let text, _, _) = $0.kind { return text } else { return nil }
         }
         #expect(!said.contains { $0.contains("(Your wait for") }, "the preface is for the runtime, not the record")
-        await core.raise(draft("custom.ping", in: work))
+        await core.raise(draft("dropbox.file_added", in: work))
         try await Task.sleep(for: .milliseconds(150))
         #expect(try await wakes(core, a).isEmpty)
     }
@@ -496,13 +496,13 @@ struct EventWaitTests {
         let core = try await makeCore(locations, clock: Clock(), hold: .milliseconds(100))
         let (a, first) = try await agent(core, in: work, "Stopped")
         let (b, second) = try await agent(core, in: work, "Archived")
-        _ = try await wait(core, first, ["custom.ping"])
-        _ = try await wait(core, second, ["custom.ping"])
+        _ = try await wait(core, first, ["dropbox.file_added"])
+        _ = try await wait(core, second, ["dropbox.file_added"])
         try await core.stop(a)
         try await core.archive(b)
         #expect(!(await isWaiting(core, a)))
         #expect(!(await isWaiting(core, b)))
-        await core.raise(draft("custom.ping", in: work))
+        await core.raise(draft("dropbox.file_added", in: work))
         try await Task.sleep(for: .milliseconds(150))
         #expect(try await wakes(core, a).isEmpty)
         #expect(try await wakes(core, b).isEmpty)
@@ -531,56 +531,18 @@ struct EventWaitTests {
                 "nothing is invented for the time it was down")
     }
 
-    // MARK: US4: publishing
+    // MARK: No custom events (#639)
 
-    @Test func aPublishWakesAWaiterAndSaysSo() async throws {
+    @Test func aWaitOnACustomEventIsRefusedSayingWhy() async throws {
         let (locations, work, _) = try temporary()
         let core = try await makeCore(locations, clock: Clock())
-        let (a, waiterToken) = try await agent(core, in: work, "Merge when green")
-        let (b, publisherToken) = try await agent(core, in: work, "Nightly build")
-        let call = Task { try await wait(core, waiterToken, ["custom.build_green"]) }
-        try await eventually("held") { await isHeld(core, a) }
-        let reply = try await calling(core, publisherToken) { t in
-            try await core.publishEvent(.init(token: t, name: "custom.build_green", message: "All green",
-                                             details: ["branch": "main"]))
+        let (a, token) = try await agent(core, in: work, "Old habits")
+        for name in ["custom.build_green", "custom.*"] {
+            let refused = await refusal { _ = try await wait(core, token, [name]) }
+            #expect(refused?.code == DaemonAPI.Failure.eventRefused)
+            #expect(refused?.message.contains("agents no longer publish events") == true, "\(refused?.message ?? "")")
         }
-        #expect(reply.hasPrefix("Published custom.build_green (position "))
-        #expect(reply.contains("Woke \u{201C}Merge when green\u{201D}."))
-        let answer = try await call.value
-        #expect(answer.contains("Message: All green"))
-        let event = await core.eventLog.events.last { $0.name == "custom.build_green" }
-        #expect(event?.publisher == EventPublisher(agentID: b, title: "Nightly build"))
-        #expect(event?.details == ["branch": "main"])
-    }
-
-    @Test func onlyCustomNamesArePublished() async throws {
-        let (locations, work, _) = try temporary()
-        let core = try await makeCore(locations, clock: Clock())
-        let (_, token) = try await agent(core, in: work, "Impostor")
-        let refused = await refusal {
-            _ = try await calling(core, token) { t in try await core.publishEvent(.init(token: t, name: "mac.wake")) }
-        }
-        #expect(refused?.code == DaemonAPI.Failure.eventRefused)
-        #expect(refused?.message == EventWords.publishOutsideCustom("mac.wake"))
-        let long = await refusal {
-            _ = try await calling(core, token) { t in
-                try await core.publishEvent(.init(token: t, name: "custom.x", message: String(repeating: "m", count: 501)))
-            }
-        }
-        #expect(long?.message.contains("500") == true)
-    }
-
-    @Test func theThirtyFirstPublishInAnHourIsRefused() async throws {
-        let (locations, work, _) = try temporary()
-        let core = try await makeCore(locations, clock: Clock())
-        let (_, token) = try await agent(core, in: work, "Chatty")
-        for i in 0..<DaemonCore.publishesPerHour {
-            _ = try await calling(core, token) { t in try await core.publishEvent(.init(token: t, name: "custom.n\(i)")) }
-        }
-        let refused = await refusal {
-            _ = try await calling(core, token) { t in try await core.publishEvent(.init(token: t, name: "custom.more")) }
-        }
-        #expect(refused?.message.hasPrefix("You've published 30 events in the last hour") == true)
+        #expect(await !isWaiting(core, a))
     }
 }
 

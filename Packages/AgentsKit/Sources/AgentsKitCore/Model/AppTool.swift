@@ -100,8 +100,9 @@ public enum AppTool {
     /// Stop waiting.
     public static let cancelWait = "cancel_wait"
 
-    /// Say that something happened, as a `custom.` event.
-    public static let publishEvent = "publish_event"
+    /// What agents announced `custom.` events with until #639. No longer offered or
+    /// answered; kept so a conversation that called it still draws as the app's own call.
+    public static let retiredPublishEvent = "publish_event"
 
     /// Pin a Markdown or HTML page under the project (#159).
     public static let pinPage = "pin_page"
@@ -124,7 +125,7 @@ public enum AppTool {
     public static let all: [String] = [
         finishTurn, showFile, manageWorkflows, askForm, suggestNextPrompt, startAgent, stopAgent, requestArchive,
         listMyAgents, leaseResource, releaseResource, listResources, waitForEvent,
-        cancelWait, publishEvent, listSessions, readSession, archiveAgent,
+        cancelWait, listSessions, readSession, archiveAgent,
         pinPage, unpinPage, movePin, pinSession, setSessionLabels, moveWorktree, messageAgent,
     ]
 
@@ -138,7 +139,7 @@ public enum AppTool {
     public static func isServedByTheApp(_ called: String) -> Bool {
         serverPrefixes.contains { prefix in
             called.hasPrefix(prefix)
-                && (all + [retiredParkAgent]).contains(String(called.dropFirst(prefix.count)))
+                && (all + [retiredParkAgent, retiredPublishEvent]).contains(String(called.dropFirst(prefix.count)))
         }
     }
 }

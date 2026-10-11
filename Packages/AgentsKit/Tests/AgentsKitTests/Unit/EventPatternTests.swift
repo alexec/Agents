@@ -32,19 +32,23 @@ struct EventPatternTests {
         #expect(!main.matches(event("workflow.ran", ["branch": "main"])))
     }
 
-    @Test func aCustomNameMatchesOnlyItself() throws {
-        let green = try pattern("custom.build_green")
-        #expect(green.matches(event("custom.build_green")))
-        #expect(!green.matches(event("custom.build_red")))
-        // A custom event's details are shown, not matched on (#574).
-        #expect(EventPattern.parse("custom.build_green", filters: ["branch": "main"]).failure?.isBadFilter == true)
+    /// Agents no longer publish (#639): a custom name, or the whole family, is refused
+    /// saying why, filters or none.
+    @Test func aCustomNameIsRefusedSayingWhy() {
+        for name in ["custom.build_green", "custom.*", "Custom.Build Green"] {
+            let problem = EventPattern.parse(name).failure
+            #expect(problem?.isRetiredCustom == true, "\(name)")
+            #expect(problem?.message.contains("agents no longer publish events") == true)
+        }
+        #expect(EventPattern.parse("custom.build_green", filters: ["branch": "main"]).failure
+                == .retiredCustom("custom.build_green"))
     }
 
     @Test func anUnknownNameIsRefusedWithASuggestionAndTheList() {
         let message = EventPattern.parse("workflow.complete").failure?.message ?? ""
         #expect(message.contains("Did you mean workflow.completed?"))
         #expect(message.contains("mac.wake"))
-        #expect(message.contains("custom.<name>"))
+        #expect(!message.contains("custom."))
     }
 
     @Test func anUnknownSubjectIsRefused() {
@@ -73,10 +77,6 @@ struct EventPatternTests {
         #expect(EventPattern.parse("branch.*", filters: ["branch": "main"]).failure == nil)
     }
 
-    @Test func aBadCustomNameIsRefused() {
-        #expect(EventPattern.parse("custom.Build Green").failure == .badCustomName("custom.build green"))
-    }
-
     @Test func namesAreTrimmedAndLowercased() throws {
         #expect(try pattern("  Mac.Wake ").name == "mac.wake")
     }
@@ -85,8 +85,6 @@ struct EventPatternTests {
         let moved = event("branch.moved", ["branch": "feature x", "from": "a1", "to": "b2", "extra": "x"])
         #expect(EventPattern.matching(moved).asTrigger == "on:\n  - branch.moved:\n      branch: \"feature x\"")
         #expect(EventPattern.matching(event("mac.wake")).asTrigger == "on:\n  - mac.wake")
-        let custom = event("custom.build_green", ["branch": "main"])
-        #expect(EventPattern.matching(custom).asTrigger == "on:\n  - custom.build_green")
     }
 
     @Test func theLabelWritesEachFilterAfterTheName() throws {

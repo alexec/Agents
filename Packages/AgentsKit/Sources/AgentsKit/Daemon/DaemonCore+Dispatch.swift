@@ -726,10 +726,6 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.EventTokenRequest.self)
                 return .success(["note": .string(try cancelWait(request))])
 
-            case DaemonAPI.Method.eventsPublish:
-                let request = try require(params, as: DaemonAPI.EventPublishRequest.self)
-                return .success(["note": .string(try publishEvent(request))])
-
             case DaemonAPI.Method.pinsPinPage:
                 let request = try require(params, as: DaemonAPI.PinToolRequest.self)
                 return .success(["note": .string(try pinPage(request))])

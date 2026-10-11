@@ -18,10 +18,8 @@ for (const { name, input, expected } of cases("workflows/summaries.json")) {
 }
 
 test("an event trigger uses the catalogue meaning and includes its filters", () => {
-  const trigger = { unrecognised: { name: "custom.build_green", keys: { branch: "main", attempt: 2 } } };
-  assert.equal(w.triggerSummary(trigger), "An agent here publishes custom.build_green (attempt 2, branch main)");
-  assert.equal(w.triggerSummary({ unrecognised: { name: "custom.build_green", keys: {} } }),
-    "An agent here publishes custom.build_green");
+  const trigger = { unrecognised: { name: "branch.moved", keys: { branch: "main" } } };
+  assert.equal(w.triggerSummary(trigger), "A branch moved: the default branch, or one an agent works on (branch main)");
   assert.equal(w.triggerSummary({ unrecognised: { name: "agent.finished", keys: {} } }),
     "An agent in this project ended a turn having done its work");
   assert.equal(w.canFire({ triggers: [trigger], mode: "new", settings: { options: {}, labels: [] } }), true);
@@ -58,7 +56,6 @@ test("each trigger listens where its events are", () => {
   assert.equal(w.listensIn(event("machine.disk_low", { level: "critical" })), "mac");
   assert.equal(w.listensIn(event("machine.disk_ok")), "mac");
   assert.equal(w.listensIn(event("cost.limit_reached")), "either");
-  assert.equal(w.listensIn(event("custom.build_green")), "project");
   assert.equal(w.listensIn(event("cost.*")), "either");
   assert.equal(w.listensIn(event("agent.*")), "project");
   assert.equal(w.listensIn(schedule), null);
@@ -73,7 +70,6 @@ test("filters are the file's own", () => {
 });
 
 test("a triggering run says which agent it resumes, or that there is none", () => {
-  assert.equal(w.resumedAgent(event("custom.ready")), "Resumes the agent that published it");
   assert.match(w.resumedAgent(event("mac.wake")), /never runs/);
   assert.match(w.resumedAgent(schedule), /never runs/);
   assert.equal(w.resumedAgent(event("agent.started")), "Resumes the agent it is about");

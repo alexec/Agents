@@ -14,10 +14,10 @@ struct EventWaitModelTests {
     }
 
     @Test func itMatchesOnlyAfterItsPosition() {
-        let wait = EventWait(patterns: [EventPattern("custom.ping")], from: 5, since: t0)
-        #expect(!wait.matches(event("custom.ping", position: 5)))
-        #expect(wait.matches(event("custom.ping", position: 6)))
-        #expect(!wait.matches(event("custom.pong", position: 6)))
+        let wait = EventWait(patterns: [EventPattern("dropbox.file_added")], from: 5, since: t0)
+        #expect(!wait.matches(event("dropbox.file_added", position: 5)))
+        #expect(wait.matches(event("dropbox.file_added", position: 6)))
+        #expect(!wait.matches(event("workflow.ran", position: 6)))
     }
 
     @Test func anyOfItsPatternsWillDo() {

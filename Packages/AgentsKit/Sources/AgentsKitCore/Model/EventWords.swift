@@ -150,49 +150,14 @@ public enum EventWords {
         }
     }
 
-    // MARK: publish_event
-
-    public static func published(_ event: Event) -> String {
-        var woke: [String] = [], fired: [String] = [], queued: [String] = [], refused: [String] = []
-        for consequence in event.consequences {
-            switch consequence {
-            case .woke(_, let title): woke.append(LeaseWords.agentName(title))
-            case .fired(let workflowID, _, _): fired.append(workflowID)
-            case .refused(let workflowID, _, .queued): queued.append(workflowID)
-            case .refused(let workflowID, _, let reason): refused.append("\(workflowID) (\(reason.message))")
-            case .couldNotWake(_, let title, _): woke.append("\(LeaseWords.agentName(title)) could not be woken")
-            }
-        }
-        var parts = ["Published \(event.name) (position \(event.position))."]
-        if woke.isEmpty && fired.isEmpty && queued.isEmpty && refused.isEmpty {
-            parts.append("Nobody was waiting on it and no workflow triggers on it.")
-        }
-        if !woke.isEmpty { parts.append("Woke \(woke.joined(separator: ", ")).") }
-        if !fired.isEmpty { parts.append("Fired workflow \(fired.joined(separator: ", ")).") }
-        if !queued.isEmpty {
-            parts.append("Queued for workflow \(queued.joined(separator: ", ")), which runs it when its current run ends.")
-        }
-        if !refused.isEmpty { parts.append("Refused by \(refused.joined(separator: ", ")).") }
-        return parts.joined(separator: " ")
-    }
-
-    public static func publishOutsideCustom(_ name: String) -> String {
-        "Only custom.* events can be published; \(name) is raised by the app."
-    }
-
-    public static func publishLimit(_ limit: Int, until: Date) -> String {
-        "You've published \(limit) events in the last hour, which is the limit. Try again after \(clock(until))."
-    }
-
     // MARK: The briefing
 
     /// The paragraph every agent is briefed with (042): wait rather than poll, the turn
-    /// may end while waiting, publish to tell others, and where the names are.
+    /// may end while waiting.
     public static let briefing = """
         Wait for something to happen (checks passing, an agent finishing, this Mac waking) \
         with wait_for_event, not repeated checks. If told you are still waiting, you may \
-        end your turn; you will be started again when it happens. Announce events with \
-        publish_event under a `custom.` name.
+        end your turn; you will be started again when it happens.
         """
 
     // MARK: The person's side

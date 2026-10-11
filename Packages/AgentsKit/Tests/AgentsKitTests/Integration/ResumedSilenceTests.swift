@@ -151,7 +151,7 @@ struct ResumedSilenceTests {
         await core.useForEvents(holdLimit: .milliseconds(100))
         let (id, token) = try await agent(core, in: work, "Patient")
         if let bound = callers[token] { await core.bindAppToken(token, to: bound) }
-        _ = try await core.waitForEvent(.init(token: token, events: ["custom.never"], where: nil,
+        _ = try await core.waitForEvent(.init(token: token, events: ["server.online"], where: nil,
                                               from: nil, untilMinutes: 1))
         try await finish(core, token, "partly_done", "Half of it; waiting on the rest.")
         gate.open()
@@ -162,7 +162,7 @@ struct ResumedSilenceTests {
         await eventually("the woken turn ended under an account of its own") {
             await core.agent(id)?.report?.outcome == .done
         }
-        #expect(try await appPrompts(core, id).contains { $0.hasPrefix("Your wait for custom.never timed out at ") })
+        #expect(try await appPrompts(core, id).contains { $0.hasPrefix("Your wait for server.online timed out at ") })
         await settled(core, id, "the woken turn ended")
         try await quiet()
         #expect(try await asks(core, id) == 0)

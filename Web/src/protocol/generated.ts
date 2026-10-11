@@ -740,7 +740,7 @@ export interface Event {
   consequences: Consequence[];
 }
 
-export type EventGroup = "agents" | "workflows" | "branches" | "dropbox" | "mac" | "custom";
+export type EventGroup = "agents" | "workflows" | "branches" | "dropbox" | "mac";
 
 /**
  * EventPattern (Model/EventPattern.swift), as its encode(to:) writes it (073): `filters` holds
