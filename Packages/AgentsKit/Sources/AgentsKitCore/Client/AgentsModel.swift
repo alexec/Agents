@@ -337,6 +337,7 @@ public final class AgentsModel {
     public enum Update: Sendable {
         case agentChanged(Agent)
         case projectChanged(DaemonAPI.ProjectSummary)
+        case projectRemoved(DaemonAPI.ProjectRemovedNotification)
         case entry(DaemonAPI.EntryNotification)
         case permission(DaemonAPI.PermissionNotification)
         case elicitation(DaemonAPI.ElicitationNotification)
@@ -386,6 +387,8 @@ public final class AgentsModel {
         switch method {
         case DaemonAPI.Notification.agentChanged: return decode(Agent.self, Update.agentChanged)
         case DaemonAPI.Notification.projectChanged: return decode(DaemonAPI.ProjectSummary.self, Update.projectChanged)
+        case DaemonAPI.Notification.projectRemoved:
+            return decode(DaemonAPI.ProjectRemovedNotification.self, Update.projectRemoved)
         case DaemonAPI.Notification.agentEntry: return decode(DaemonAPI.EntryNotification.self, Update.entry)
         case DaemonAPI.Notification.agentPermission: return decode(DaemonAPI.PermissionNotification.self, Update.permission)
         case DaemonAPI.Notification.agentElicitation: return decode(DaemonAPI.ElicitationNotification.self, Update.elicitation)
@@ -451,6 +454,9 @@ public final class AgentsModel {
         case .projectChanged(var summary):
             summary.host = host
             return .projectChanged(summary)
+        case .projectRemoved(var removed):
+            removed.host = host
+            return .projectRemoved(removed)
         default:
             return update
         }
@@ -469,6 +475,10 @@ public final class AgentsModel {
 
         case .projectChanged(let summary):
             upsert(summary)
+
+        case .projectRemoved(let removed):
+            // Deleted (#677). Its sessions went before it, each by `agent/removed`.
+            removeProject(ProjectKey(host: removed.host, folder: removed.folder))
 
         case .entry(let notification):
             guard notification.agentID == watching else { return }
@@ -816,6 +826,10 @@ public final class AgentsModel {
             projects.append(summary)
         }
         projects.sort(by: SidebarOrder.byAdded)
+    }
+
+    public func removeProject(_ key: ProjectKey) {
+        projects.removeAll { $0.key == key }
     }
 
     public func replaceAgents(_ listed: [Agent]) {

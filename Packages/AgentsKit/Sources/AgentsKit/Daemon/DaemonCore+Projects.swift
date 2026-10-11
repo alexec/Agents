@@ -562,4 +562,60 @@ extension DaemonCore {
         reconsider()
         return summary
     }
+
+    /// `projects/delete` (#677): what comes after archiving a project, as deleting comes
+    /// after archiving a session (#398). Every session in it goes through the one delete
+    /// path, then the record is forgotten and the windows told. The folder on disk is
+    /// left exactly as it is: deleting a project is forgetting it, not removing files.
+    ///
+    /// All or nothing: refused, naming them, while any session is running or held by its
+    /// worktree or a workflow run, before anything is deleted.
+    public func deleteProject(_ folder: URL) async throws {
+        let standardized = Project.standardize(folder)
+        guard projectSummary(for: standardized) != nil else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchProject,
+                               message: "\(standardized.path) is not a project.")
+        }
+        guard projectRecords()[standardized]?.isArchived == true else {
+            throw JSONRPCError(code: DaemonAPI.Failure.deleteRefused, message: DeletionWords.projectNotArchived)
+        }
+        let inProject = agents.agents(in: standardized)
+        let live = inProject.filter { $0.state.holdsRuntime }
+        if !live.isEmpty {
+            throw JSONRPCError(code: DaemonAPI.Failure.projectHasLiveAgents,
+                               message: "Stop these first: \(live.map { $0.title ?? "an agent" }.joined(separator: ", ")).")
+        }
+        loadRetentionIfNeeded()
+        let candidates = inProject.map {
+            RetentionPlan.Candidate(id: $0.id, archivedAt: $0.archivedAt ?? now(),
+                                    lastActivityAt: $0.lastActivityAt, sizeOnDisk: 0)
+        }
+        // Open in a window does not hold it, as for one session: the person asking is
+        // usually the one looking.
+        let holds = await holds(for: candidates).filter { $0.value != .openInWindow }
+        if !holds.isEmpty {
+            let held = inProject.compactMap { agent in
+                holds[agent.id].map { (name: agent.title ?? "An untitled session", hold: $0) }
+            }
+            throw JSONRPCError(code: DaemonAPI.Failure.deleteRefused, message: DeletionWords.projectRefusal(held))
+        }
+
+        for agent in inProject {
+            // A session left as it was when its project was archived is archived first,
+            // so it goes the way every deleted session goes.
+            if agents[agent.id]?.state != .archived { try await archive(agent.id) }
+            try await delete(agent.id, because: .person)
+        }
+        var records = projectRecords()
+        records[standardized] = nil
+        try saveProjectRecords(records)
+        lastProjectSent[standardized] = nil
+        folderExistence[standardized] = nil
+        projectConfigCache[standardized] = nil
+        diskSpaceConfigCache[standardized] = nil
+        DaemonLog.shared.write("deleted the project \(standardized.path); its folder is left as it was")
+        broadcast(DaemonAPI.Notification.projectRemoved, DaemonAPI.ProjectRemovedNotification(folder: standardized))
+        broadcast(DaemonAPI.Notification.retentionChanged, retentionState())
+        reconsider()
+    }
 }

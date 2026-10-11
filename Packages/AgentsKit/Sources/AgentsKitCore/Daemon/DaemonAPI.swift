@@ -185,6 +185,10 @@ public enum DaemonAPI {
         public static let projectsAdd = "projects/add"
         public static let projectsArchive = "projects/archive"
         public static let projectsUnarchive = "projects/unarchive"
+        /// Delete an archived project (#677): every session in it through the one delete
+        /// path, then its record. The folder on disk is left as it is. Refused, naming
+        /// them, while any of its sessions is held.
+        public static let projectsDelete = "projects/delete"
         /// Why this host has a chat project or not (#229), for a New Chat that found no
         /// summary marked `isChat` in the list.
         public static let projectsChatState = "projects/chatState"
@@ -506,6 +510,10 @@ public enum DaemonAPI {
         /// `AgentRemovedNotification`. An older window ignores it and drops the agent at
         /// its next `agents/list`.
         public static let agentRemoved = "agent/removed"
+        /// A project was deleted and is not in any list any more (#677). A
+        /// `ProjectRemovedNotification`. An older window ignores it and drops the project
+        /// at its next `projects/list`.
+        public static let projectRemoved = "project/removed"
 
         /// A lease was granted, extended, released, ended or expired, or a line moved:
         /// the whole `LeaseSnapshot`, which clients replace rather than merge (036).
@@ -3590,5 +3598,15 @@ public extension DaemonAPI {
     struct AgentRemovedNotification: Codable, Sendable {
         public var agentID: UUID
         public init(agentID: UUID) { self.agentID = agentID }
+    }
+
+    struct ProjectRemovedNotification: Codable, Sendable {
+        public var folder: URL
+        /// Which machine it was on, stamped by the window that heard it and never sent,
+        /// as on `ProjectSummary`. Not in `CodingKeys`.
+        public var host: HostID = .mac
+        public init(folder: URL) { self.folder = folder }
+
+        enum CodingKeys: String, CodingKey { case folder }
     }
 }

@@ -129,7 +129,10 @@ struct ProjectListView: View {
                 Section(isExpanded: $showsArchived) {
                     // None while folded, as under a folded project (#356).
                     ForEach(showsArchived ? model.archivedProjects : [], id: \.key) { summary in
-                        ArchivedProjectRow(summary: summary) { await model.unarchiveProject(summary.key) }
+                        ArchivedProjectRow(summary: summary,
+                                           label: SidebarOrder.label(summary) { model.hosts.label($0) },
+                                           bringBack: { await model.unarchiveProject(summary.key) },
+                                           delete: { await model.deleteProject(summary.key) })
                             .appText(.supporting)
                     }
                 } header: {

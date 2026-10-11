@@ -1911,6 +1911,22 @@ final class AppModel {
         }
     }
 
+    /// Delete an archived project (#677), once confirmed. It leaves the list by
+    /// `project/removed`, and here at once; a refusal is answered, in the host's words,
+    /// for the row to show.
+    func deleteProject(_ key: ProjectKey) async -> String? {
+        do {
+            _ = try await client(for: key.host).call(DaemonAPI.Method.projectsDelete,
+                                                     DaemonAPI.ProjectRequest(folder: key.folder),
+                                                     returning: DaemonAPI.Empty.self)
+            work.removeProject(key)
+            settleProjectSelection()
+            return nil
+        } catch {
+            return describe(error)
+        }
+    }
+
     /// The person's helper limits for a project (#64). Through the window only: the
     /// daemon refuses the method to agents and phones.
     func setHelperLimits(_ limits: HelperLimits, for key: ProjectKey) async {

@@ -1594,6 +1594,9 @@ final class RemoteModel {
                         || note.method == DaemonAPI.Notification.eventsChanged { continue }
                     guard let update = AgentsModel.read(note.method, note.params, showing: shown.id) else { continue }
                     await self?.work.apply(update, from: id)
+                    if case .projectRemoved(let removed) = update {
+                        await self?.forgetArchivedProject(ProjectKey(host: id, folder: removed.folder))
+                    }
                 }
                 // Its connection ended: its cards are stale until the watch reaches it again.
                 await MainActor.run { [weak self] in
@@ -1667,6 +1670,7 @@ final class RemoteModel {
         // Anything the shared model does not claim is the Mac's own — shells,
         // terminals — and a remote has no business with it.
         if let update { self.work.apply(update) }
+        if case .projectRemoved(let removed)? = update { forgetArchivedProject(ProjectKey(folder: removed.folder)) }
         // Nothing below waits on the network: one slow answer would hold every
         // notification after it (#175). What needs asking is asked beside the loop.
         if let updated, previousLabels != updated.labels,
@@ -2391,6 +2395,32 @@ final class RemoteModel {
             sidebarItem = .project(brought.key)
         } catch {
             problem = sentence(for: error)
+        }
+    }
+
+    /// A project deleted, here or by another client (#677): out of the listed archived ones too.
+    func forgetArchivedProject(_ key: ProjectKey) {
+        archivedProjects.removeAll { $0.key == key }
+    }
+
+    /// Delete an archived project (#677), once confirmed, through its own host. It
+    /// leaves the list here at once and everywhere by `project/removed`; a refusal is
+    /// answered for the row to show.
+    func deleteProject(_ summary: DaemonAPI.ProjectSummary) async -> String? {
+        let host = summary.host
+        let target = host == .mac ? client : otherHosts[host]
+        guard let target, host == .mac || reachableHosts.contains(host) else {
+            return "That project’s host is not answering, so it could not be deleted."
+        }
+        do {
+            _ = try await target.call(DaemonAPI.Method.projectsDelete,
+                                      DaemonAPI.ProjectRequest(folder: summary.folder),
+                                      returning: DaemonAPI.Empty.self)
+            work.removeProject(summary.key)
+            forgetArchivedProject(summary.key)
+            return nil
+        } catch {
+            return sentence(for: error)
         }
     }
 

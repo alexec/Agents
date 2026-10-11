@@ -46,6 +46,24 @@ public enum DeletionWords {
 
     public static let notArchived = "Only an archived session can be deleted. Archive it first."
 
+    // MARK: Delete a project (#677)
+
+    /// The confirmation's title: "Delete the project “api”?".
+    public static func confirmProjectTitle(_ name: String) -> String {
+        "Delete the project \u{201C}\(name)\u{201D}?"
+    }
+
+    public static let confirmProjectMessage =
+        "Every session in it is deleted with its conversation, and the project leaves the list. The folder on disk is not touched. This cannot be undone."
+
+    public static let projectNotArchived = "Only an archived project can be deleted. Archive it first."
+
+    /// Why Delete is refused for a project: the sessions that hold it, each named.
+    public static func projectRefusal(_ held: [(name: String, hold: Hold)]) -> String {
+        let lines = held.map { "\($0.name): \(refusal($0.hold).prefix(1).lowercased())\(refusal($0.hold).dropFirst())" }
+        return "Nothing was deleted. " + lines.joined(separator: " ")
+    }
+
     /// What names an agent that has been deleted: a pin, a starter, an event.
     public static let deletedSession = "a deleted session"
 

@@ -255,6 +255,70 @@ struct ProjectsTests {
         #expect(back.exists == false)
     }
 
+    // MARK: Deleting (#677)
+
+    @Test func deletingAnArchivedProjectDeletesItsSessionsAndLeavesTheFolder() async throws {
+        let (locations, root) = try temporary()
+        let work = try folder(root, "api")
+        let other = try folder(root, "web")
+        let done = agent(in: work, title: "Done")
+        let stopped = agent(in: work, title: "Stopped", state: .stopped)
+        let elsewhere = agent(in: other, title: "Elsewhere")
+        let core = try await core(locations, seeded: [done, stopped, elsewhere])
+        _ = try await core.archiveProject(work)
+
+        let answer = await core.handle(method: DaemonAPI.Method.projectsDelete,
+                                       params: try JSONValue.encoding(DaemonAPI.ProjectRequest(folder: work)))
+        guard case .success = answer else { Issue.record("delete was refused: \(answer)"); return }
+
+        #expect(await core.agent(done.id) == nil)
+        #expect(await core.agent(stopped.id) == nil)
+        #expect(await core.agent(elsewhere.id) != nil, "another project's sessions are not touched")
+        #expect(await core.allProjects().map(\.folder) == [other])
+        #expect(FileManager.default.fileExists(atPath: work.path), "the folder on disk is left as it was")
+
+        // And it stays forgotten across a restart.
+        let restarted = try await self.core(locations)
+        #expect(await restarted.allProjects().map(\.folder) == [other])
+    }
+
+    @Test func deletingAProjectThatIsNotArchivedIsRefused() async throws {
+        let (locations, root) = try temporary()
+        let work = try folder(root, "api")
+        let done = agent(in: work, title: "Done")
+        let core = try await core(locations, seeded: [done])
+
+        do {
+            try await core.deleteProject(work)
+            Issue.record("a live project was deleted")
+        } catch let error as JSONRPCError {
+            #expect(error.code == DaemonAPI.Failure.deleteRefused)
+            #expect(error.message == DeletionWords.projectNotArchived)
+        }
+        #expect(await core.agent(done.id) != nil)
+    }
+
+    @Test func deletingAProjectWithAHeldSessionDeletesNothingAndNamesIt() async throws {
+        let (locations, root) = try temporary()
+        let work = try folder(root, "api")
+        let free = agent(in: work, title: "Free")
+        let held = agent(in: work, title: "Nightly run")
+        let core = try await core(locations, seeded: [free, held])
+        _ = try await core.archiveProject(work)
+        await core.putRun(WorkflowRun(workflowID: "nightly", folder: work,
+                                      trigger: .event(EventPattern("agent.finished")), agentID: held.id))
+
+        do {
+            try await core.deleteProject(work)
+            Issue.record("a held project was deleted")
+        } catch let error as JSONRPCError {
+            #expect(error.code == DaemonAPI.Failure.deleteRefused)
+            #expect(error.message.contains("Nightly run"))
+        }
+        #expect(await core.agent(free.id) != nil, "all or nothing")
+        #expect(await core.allProjects().count == 1)
+    }
+
     @Test func aTrailingSlashDoesNotMakeASecondProject() async throws {
         let (locations, root) = try temporary()
         let work = try folder(root, "api")

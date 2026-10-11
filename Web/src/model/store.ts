@@ -3,7 +3,7 @@
 // (research R7). Nothing here decides anything; the hosts do.
 import { batch, computed, signal, type ReadonlySignal, type Signal } from "@preact/signals";
 import type {
-  Agent, AgentRemovedNotification, ResumingNotification, ControlHost, ElicitationNotification, ElicitationRequest, EntryNotification,
+  Agent, AgentRemovedNotification, ProjectRemovedNotification, ResumingNotification, ControlHost, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, DiskState, StoreNotes,
@@ -356,6 +356,9 @@ export class Work {
       case "agent/changed":
         this.upsertAgent(params as Agent, host);
         return true;
+      case "project/removed":
+        this.removeProject((params as ProjectRemovedNotification).folder, host);
+        return true;
       case "project/changed":
         this.upsertProject(params as ProjectSummary, host);
         return true;
@@ -480,6 +483,12 @@ export class Work {
       default:
         return false;
     }
+  }
+
+  /** Deleted (#677): out of the list. Its sessions went before it, each by `agent/removed`. */
+  removeProject(folder: string, host: string): void {
+    const list = (this.projects.value[host] ?? []).filter((p) => folderKey(p.project.folder) !== folderKey(folder));
+    this.projects.value = { ...this.projects.value, [host]: list };
   }
 
   upsertProject(summary: ProjectSummary, host: string): void {
@@ -1393,6 +1402,16 @@ export class Store extends Work {
     const summary = await this.act("projects/unarchive", { folder: folder as never }, host);
     if (summary) this.upsertProject(summary, host);
     return summary;
+  }
+
+  /**
+   * An archived project deleted (#677), once confirmed, as the window's Delete… does. A refusal
+   * names the sessions that hold it, in `problem`.
+   */
+  async deleteProject(host: string, folder: string): Promise<boolean> {
+    if (await this.act("projects/delete", { folder: folder as never }, host) === null) return false;
+    this.removeProject(folder, host);
+    return true;
   }
 
   /**

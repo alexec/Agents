@@ -517,28 +517,45 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
 });
 
 /**
- * An archived project, with when it was put away, and Bring Back, as the window's
- * ArchivedProjectRow (#343). Brought back, it is a project again and its new-session form opens.
+ * An archived project, with when it was put away, Bring Back and Delete…, as the window's
+ * ArchivedProjectRow (#343, #677). Brought back, it is a project again and its new-session form
+ * opens. Named as the live rows are, `host:Project` on a server (#677).
  */
 function ArchivedProjectRow({ store, host, project, down }: {
   store: Store; host: ControlHost; project: ProjectSummary; down: boolean;
 }) {
   const folder = project.project.folder;
   const archivedAt = project.project.archivedAt;
+  const label = projectLabel(host, project);
   const bringBack = async () => {
     if (await store.unarchiveProject(host.id, folder)) go({ host: host.id, project: folder, compose: true });
   };
-  const menu: MenuItem[] = [{ label: "Bring Back", disabled: down, run: () => void bringBack() }];
+  const remove = () => {
+    if (confirm(`${deleteProjectTitle(label)}\n\n${deleteProjectMessage}`)) void store.deleteProject(host.id, folder);
+  };
+  const menu: MenuItem[] = [
+    { label: "Bring Back", disabled: down, run: () => void bringBack() },
+    { label: "Delete…", disabled: down, run: remove },
+  ];
   return (
     <div class="row archived-project" title={folderPath(folder)}
       onContextMenu={(e) => openContextMenu(e, menu)}>
-      <span class="title">{project.name}</span>
+      <span class="title">{label}</span>
       <button class="link" disabled={down} onClick={() => void bringBack()}
         onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu); }}>Bring Back</button>
       {archivedAt !== undefined && <span class="subtitle">Archived {namedRelative(fromWireDate(archivedAt))}</span>}
     </div>
   );
 }
+
+/** DeletionWords.confirmProjectTitle: "Delete the project “api”?". */
+export function deleteProjectTitle(label: string): string {
+  return `Delete the project \u201C${label}\u201D?`;
+}
+
+/** DeletionWords.confirmProjectMessage. */
+export const deleteProjectMessage =
+  "Every session in it is deleted with its conversation, and the project leaves the list. The folder on disk is not touched. This cannot be undone.";
 
 /**
  * One session's row in the sidebar, drawn again only when the agent, whether it is chosen, or its
