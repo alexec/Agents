@@ -60,6 +60,27 @@ struct HostedMCPServersTests {
         await hosted.stopAll()
     }
 
+    @Test func hostedServersUseTheDiscoveredRuntimePath() async throws {
+        let fileManager = FileManager.default
+        let tools = temp.appending(path: "hosted-mcp-path-\(UUID().uuidString)")
+        try fileManager.createDirectory(at: tools, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: tools) }
+
+        let python = try #require(LoginShellPath.directories()
+            .map { URL(filePath: $0).appending(path: "python3") }
+            .first { fileManager.isExecutableFile(atPath: $0.path) })
+        try fileManager.createSymbolicLink(at: tools.appending(path: "python3"), withDestinationURL: python)
+
+        let hosted = HostedMCPServers(logFolder: nil, log: { _ in },
+                                      runtimeEnvironment: { ["PATH": tools.path] })
+        let endpoint = endpoint(hosted)
+        let path = try await hosted.use(echo, key: key, project: nil, cwd: temp, user: "a")
+        let (status, initialized, _) = await call(endpoint, path, token: "a", "initialize")
+        #expect(status == 200)
+        #expect(initialized?["result"]?["serverInfo"]?["name"]?.stringValue == "echo")
+        await hosted.stopAll()
+    }
+
     @Test func aTokenThatDoesNotUseTheServerIsNotServed() async throws {
         let hosted = HostedMCPServers(logFolder: nil, log: { _ in })
         let endpoint = endpoint(hosted)
