@@ -217,4 +217,48 @@ struct WorkflowApprovalTests {
         #expect(try await summary(second, "deploy", in: work).awaitingApproval?.isNew == true)
         #expect(try await summary(second, "tests", in: work).awaitingApproval == nil)
     }
+
+    // MARK: What runs is what was approved
+
+    /// The copy held from the last read is what runs, so it is that copy which must be
+    /// the approved one: a file changed, read, and put back before the next read must
+    /// not run the change because the file on disk is the approved one again.
+    @Test func aHeldCopyThatWasNotApprovedDoesNotRun() async throws {
+        let (core, work, _) = try await started()
+        let url = WorkflowFile.url(for: "tests", in: work)
+        let approved = try Data(contentsOf: url)
+        try write("Push to production.", as: "tests", in: work)
+        await core.rescanWorkflows(in: work)
+        let held = try #require(await core.workflows[work]?["tests"])
+        #expect(held.prompt.contains("Push to production."))
+        try approved.write(to: url)
+
+        let refusal = await core.fire(held, on: .schedule(WorkflowSchedule()), byHand: true)
+        #expect(refusal == .awaitingApproval)
+        #expect(await core.allAgents().isEmpty, "the held copy was never approved")
+    }
+
+    /// A workflow file that is a link reads through to a file the project's watch may
+    /// never see, so it is refused, as is one with a second hard link.
+    @Test func aWorkflowFileThatIsALinkIsRefused() async throws {
+        let (core, work, _) = try await started()
+        let url = WorkflowFile.url(for: "tests", in: work)
+        let outside = work.deletingLastPathComponent().appendingPathComponent("outside.md")
+        try FileManager.default.moveItem(at: url, to: outside)
+        try FileManager.default.createSymbolicLink(at: url, withDestinationURL: outside)
+
+        let linked = try await summary(core, "tests", in: work)
+        #expect(linked.workflow.problem?.needsAPerson == true)
+        #expect(await core.workflowDigest(linked.workflow) == nil)
+        _ = try await core.runWorkflow(.init(folder: work, workflowID: "tests"))
+        #expect(await core.allAgents().isEmpty, "a symbolic link ran nothing")
+
+        try FileManager.default.removeItem(at: url)
+        try FileManager.default.linkItem(at: outside, to: url)
+        let hardLinked = try await summary(core, "tests", in: work)
+        #expect(hardLinked.workflow.problem?.needsAPerson == true)
+        #expect(await core.workflowDigest(hardLinked.workflow) == nil)
+        _ = try await core.runWorkflow(.init(folder: work, workflowID: "tests"))
+        #expect(await core.allAgents().isEmpty, "a hard link ran nothing")
+    }
 }
