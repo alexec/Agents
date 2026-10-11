@@ -1,6 +1,8 @@
 #!/bin/zsh
 # Build Agents Host for a GitHub release (#669): signed with Developer ID, notarized and
-# stapled, in a .dmg, beside the Linux agentsd as tarballs and a SHA256SUMS.
+# stapled, in a .dmg and a .zip, beside the Linux agentsd as tarballs and a SHA256SUMS. The zip
+# is for Macs that may not mount a disk image (#675: CyberArk, no hdiutil): unzip, then move the
+# app to ~/Applications, which needs no admin rights.
 #
 #   scripts/release-host.sh 0.2.0 [build]        everything, into build/release/
 #   scripts/release-host.sh --dry-run 0.2.0      ad-hoc signed, not notarized: proves the
@@ -101,12 +103,15 @@ if (( ! dry )); then
         --issuer $ASC_ISSUER_ID --wait --timeout 30m
     xcrun stapler staple $dmg
     spctl --assess --type open --context context:primary-signature --verbose $dmg
+    # Notarizing the image notarized the app inside it: staple its ticket for the zip too.
+    xcrun stapler staple "$app"
 fi
+ditto -c -k --keepParent "$app" $out/Agents-Host-$version.zip
 
 for arch in x86_64 aarch64; do
     tar -czf $out/agentsd-linux-$arch-$version.tar.gz -C $servers agentsd-linux-$arch \
         agentsd-linux-$arch.sha256 VERSION
 done
-(cd $out && shasum -a 256 *.dmg *.tar.gz > SHA256SUMS)
+(cd $out && shasum -a 256 *.dmg *.zip *.tar.gz > SHA256SUMS)
 print "\n$out:"
-(cd $out && ls -lh *.dmg *.tar.gz SHA256SUMS)
+(cd $out && ls -lh *.dmg *.zip *.tar.gz SHA256SUMS)

@@ -12,6 +12,8 @@ publishes a release. The tag starts the `release` workflow, which:
 
 - builds Agents Host with agentsd, agents-control and agents-relay inside;
 - signs it with Developer ID, notarizes and staples it, as `Agents-Host-<version>.dmg`;
+- staples the same app and zips it as `Agents-Host-<version>.zip`, for Macs that may not
+  mount a disk image;
 - builds the static Linux agentsd as `agentsd-linux-<arch>-<version>.tar.gz`;
 - creates the release with these files and a `SHA256SUMS`.
 

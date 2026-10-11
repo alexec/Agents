@@ -4,6 +4,7 @@
 #
 # The release carries:
 #   Agents-Host-<version>.dmg              signed with Developer ID, notarized, stapled
+#   Agents-Host-<version>.zip              the same app, stapled, for Macs that can't mount a .dmg
 #   agentsd-linux-<arch>-<version>.tar.gz  the static Linux agentsd, for a Linux host
 #   SHA256SUMS
 #
@@ -148,8 +149,8 @@ jobs:
         run: |
           cd build/release
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" *.dmg *.tar.gz SHA256SUMS --clobber
+            gh release upload "$TAG" *.dmg *.zip *.tar.gz SHA256SUMS --clobber
           else
-            gh release create "$TAG" *.dmg *.tar.gz SHA256SUMS --title "Agents Host ${TAG#v}" \
+            gh release create "$TAG" *.dmg *.zip *.tar.gz SHA256SUMS --title "Agents Host ${TAG#v}" \
               --generate-notes --verify-tag
           fi
