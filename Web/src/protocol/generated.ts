@@ -525,6 +525,7 @@ export interface ControlStatus {
   web?: WebRemoteStatus;
   thisMacHost?: HostJoinStatus;
   projectDetection?: ProjectDetection;
+  unjoinedTunnels?: HostTunnelChanged[];
 }
 
 export interface Cost {
@@ -914,6 +915,12 @@ export interface HostJoinStatus {
 export interface HostTunnel {
   up: boolean;
   problem?: string;
+}
+
+export interface HostTunnelChanged {
+  name: string;
+  host?: HostID;
+  tunnel: HostTunnel;
 }
 
 export interface HostedMCPSnapshot {
@@ -2284,7 +2291,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ContinueInProjectRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
   ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "tunnel"] },
-  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "thisMacHost", "projectDetection"] },
+  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "thisMacHost", "projectDetection", "unjoinedTunnels"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily"] },
   CostState: { required: ["limits", "today", "day"], optional: ["note"] },
@@ -2334,6 +2341,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive"] },
   HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
   HostTunnel: { required: ["up"], optional: ["problem"] },
+  HostTunnelChanged: { required: ["name", "tunnel"], optional: ["host"] },
   HostedMCPSnapshot: { required: ["servers", "at"], optional: [] },
   HostedMCPStatus: { required: ["name", "state", "restarts", "users"], optional: ["project", "since", "retryAt", "lastError"] },
   LabelVocabularyRequest: { required: ["folder"], optional: [] },

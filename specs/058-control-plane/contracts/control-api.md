@@ -20,7 +20,7 @@ Sent with no `h`. Grant column: which client grant may call it. Params and resul
 | Method | Grant | Params → Result |
 |---|---|---|
 | `daemon/ping` | any, and pairing | → `{}` (so today's clients' liveness check works) |
-| `control/status` | any | → `{name, version, url, copy, homeHost, machineID, relayKey?}`. `relayKey` is the relaying host's public key, which a device keeps so it can come through the relay when the address can't be reached (T077) |
+| `control/status` | any | → `{name, version, url, copy, homeHost, machineID, relayKey?}`. `relayKey` is the relaying host's public key, which a device keeps so it can come through the relay when the address can't be reached (T077). `unjoinedTunnels`: the servers installed over an ssh tunnel that have not joined yet, each `{name, tunnel: {up, problem?}}`, which Settings ▸ Hosts lists until they join or their record goes (#660) |
 | `hosts/list` | any | → `[{id, name, platform, version, state, machineID, relay}]` (no `reach`: every host dials out) |
 | `hosts/startEnroll` | operator | → `{code, command}`: the host code, and the one-line install command for a server (FR-018) |
 | `hosts/install` | operator | `{name, destination, key, trust?}` → `{host}` or `{needsTrust: fingerprint}`. `key`, optional, is a private key for this install only; it is held in memory until the call ends and never stored (FR-018a). Without it, the control plane's ssh logs in as `ssh user@host` would for the person running it: agent, `~/.ssh/config`, default identity (#413). The host key is confirmed either way Progress comes as `control/installProgress`. The copy that takes the call does the install |

@@ -132,6 +132,8 @@ struct HostTunnelsTests {
         let record = Self.record(host: nil)
         try await tunnels.add(record)
         #expect(await tunnels.state(for: host) == nil)
+        // Not joined yet: listed by name, so the window can say how it stands (#660).
+        #expect(await tunnels.unjoined().map(\.name) == ["ws"])
 
         // The host's join spends the code: the tunnel is that host's from then on.
         _ = try await store.put(ControlCodes.key(record.code), Data("{}".utf8), when: .absent)
@@ -139,6 +141,7 @@ struct HostTunnelsTests {
                                 try ControlRecords.encoder.encode(ControlCodes.Spent(publicKey: Data([1]), host: host)), when: .absent)
         await tunnels.reconcile()
         #expect(await tunnels.state(for: host) != nil)
+        #expect(await tunnels.unjoined().isEmpty)
 
         // Removed: the tunnel and its record go.
         await known.set([])
