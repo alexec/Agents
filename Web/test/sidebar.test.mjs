@@ -59,7 +59,9 @@ test("smart groups gather by what a session wants, newest started first (#495)",
   assert.deepEqual(smartAgents("unread", live).map((a) => a.id), ["unread"]);
   assert.deepEqual(smartAgents("working", live, { label: null, text: "old" }).map((a) => a.id), ["old-work"], "a search narrows it");
   assert.deepEqual(live.map(sessionMark), ["needsYou", "working", "working", "unread", "read"]);
-  assert.equal(sessionMark(agent("paused", 1, { state: "stopped", endedReason: "cancelled" })), null, "its own status mark");
+  assert.equal(sessionMark(agent("paused", 1, { state: "stopped", endedReason: "cancelled" })), "paused", "in the accent (#630)");
+  assert.equal(sessionMark(agent("queued", 1, { state: "queued" })), "waiting", "in the accent (#630)");
+  assert.equal(sessionMark(agent("gone", 1, { state: "archived" })), null, "its own status mark");
 });
 
 test("To Archive gathers what an agent asked to have archived, each listed once (#584, #587)", async () => {
