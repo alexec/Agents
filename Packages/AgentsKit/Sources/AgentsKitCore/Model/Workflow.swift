@@ -83,6 +83,16 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
     /// What a run may do with its session when it is done, from the file's
     /// `when-done:` (#433). `nil` is a file that does not say, which is `keep`.
     public var whenDone: WorkflowWhenDone?
+    /// SHA-256 of the bytes this was read from, or nil when it was not read from a file.
+    /// What runs is this copy, so it is this digest that must be the approved one, not
+    /// the digest of whatever the file holds when it fires (security review). The
+    /// daemon's own, and never sent: a client asks for the file's digest instead.
+    public var digest: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case workflowID, folder, name, triggers, mode, prompt, problem, unknownFields, settings,
+             cooldown, enabled, archived, hosts, whenDone
+    }
 
     /// Whether it is put away.
     public var isArchived: Bool { archived == true }

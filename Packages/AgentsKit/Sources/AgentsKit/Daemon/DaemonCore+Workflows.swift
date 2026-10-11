@@ -815,6 +815,16 @@ extension DaemonCore {
             record(.refused(refusal, at: now, repeats: 1), for: workflow, causingEvent: causingEvent, depth: depth)
             return refusal
         }
+        // What runs is the copy held from the last read, so that copy must be the one
+        // approved, whatever the file holds now (security review). One that is not is
+        // behind the file, or was changed and put back; read it again.
+        if !workflow.isArchived, !disabled, records.approvalsBegan != nil,
+           workflow.digest != state?.approvedDigest {
+            scheduleWorkflowRescan(in: workflow.folder)
+            let refusal = WorkflowRefusal.awaitingApproval
+            record(.refused(refusal, at: now, repeats: 1), for: workflow, causingEvent: causingEvent, depth: depth)
+            return refusal
+        }
 
         if let refusal = workflow.refusalIfBlocked(
             isRunning: workflowRuns[key] != nil,
