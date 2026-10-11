@@ -90,7 +90,7 @@ public enum AfterTurn: String, Codable, Hashable, Sendable {
     /// no workflow started it.
     public static let archiveNotAllowed = """
         Nothing was recorded: only a workflow's run can archive itself, and only when \
-        its workflow says when-done: archive-allowed or archive. Call request_archive \
+        its workflow says when-done: archive-allowed or archive. Call archive_session \
         with no id instead.
         """
 }

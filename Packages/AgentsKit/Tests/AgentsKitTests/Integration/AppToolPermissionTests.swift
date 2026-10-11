@@ -30,7 +30,7 @@ struct AppToolPermissionTests {
     @Test func aBareNameOrAnotherServersToolIsStillThePersonsToAnswer() {
         #expect(!AppTool.isServedByTheApp(AppTool.listResources))
         #expect(!AppTool.isServedByTheApp("github_\(AppTool.listResources)"))
-        #expect(!AppTool.isServedByTheApp("mcp__github__\(AppTool.startAgent)"))
+        #expect(!AppTool.isServedByTheApp("mcp__github__\(AppTool.startSession)"))
         #expect(!AppTool.isServedByTheApp("agents_rm_rf"))
         #expect(!ToolCall(title: AppTool.leaseResource).isAutoAllowable)
         #expect(!ToolCall(title: "run_command", name: "run_command").isAutoAllowable)

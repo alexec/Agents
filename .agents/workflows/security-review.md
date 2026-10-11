@@ -119,11 +119,11 @@ In the review worktree:
 
 Only **critical** and **high** findings are fixed; medium and low stay recorded.
 
-- At most **2 helpers per run**. Call `list_my_agents` first and start no more than
+- At most **2 helpers per run**. Call `list_sessions` with `started_by: me` first and start no more than
   the free running places allow (the project's helper limits are 3 running and 5 not
   archived unless Alex changed them). A finding without a helper is recorded as
   "needs a decision: no helper place this run" and is picked up next run.
-- Start each with `start_agent`: runtime Claude, permission mode no looser than yours,
+- Start each with `start_session`: runtime Claude, permission mode no looser than yours,
   a **new worktree** off `main` on the branch `agents/review-fix-<finding id>`, and this
   prompt, filled in:
 
@@ -146,7 +146,7 @@ Only **critical** and **high** findings are fixed; medium and low stay recorded.
   > "screen" when you need both.
   > If you must ask Alex something, use your question tool and name yourself: "The
   > security-fix agent for <id> recommends… Alex, which…?", never a bare "I" or "you".
-  > If you start helpers of your own, archive each with archive_agent when its work is
+  > If you start helpers of your own, archive each with archive_session when its work is
   > done, and never delete its worktree.
   > End with a last message naming the branch, the commits and what you proved, or why you
   > could not.
@@ -163,7 +163,7 @@ When the helpers are done (or if none were started):
 2. Update each finding's status in `findings.md` and in the run file: `fixed on
    <branch> (<commits>)`, `needs a decision: <the choice>`, `won't fix: <why>`, or
    `recorded` (medium and low). Commit on `agents/reviews-security`.
-3. Archive each helper you started with `archive_agent`. Never delete its worktree or
+3. Archive each helper you started with `archive_session`. Never delete its worktree or
    branch yourself: the work is there for Alex. (Archiving lets the app tidy away a
    worktree it made once everything in it is committed; the unmerged branch stays.)
 4. End with one line per finding:

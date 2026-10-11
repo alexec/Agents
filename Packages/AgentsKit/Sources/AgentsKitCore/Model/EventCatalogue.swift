@@ -153,7 +153,7 @@ public enum EventCatalogue {
         EventKind("agent.archive_requested", .project, about(outcome),
                   "An agent in this project asked to be archived, and waits for the person's OK."),
         EventKind("agent.messaged", .project, about(EventDetail("from"), EventDetail("from_title")),
-                  "An agent in this project was sent a message by another, with message_agent."),
+                  "An agent in this project was sent a message by another, with message_session."),
         EventKind("agent.archived", .project, about(EventDetail("by", values: ["agent", "you"]), outcome),
                   "An agent in this project was archived."),
         EventKind("agent.deleted", .project, about(EventDetail("because", values: ["age", "person"])),

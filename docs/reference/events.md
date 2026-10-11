@@ -92,8 +92,8 @@ an event already on the log.
 | `agent.stopped` | — | agent, by | An agent was stopped before finishing. `by` is `you`, `cost_limit` or `unknown`. |
 | `agent.failed` | — | agent, reason | An agent ended in an error. `reason` is `allowance_spent`, `rate_limited`, `process_died`, `sign_in_refused`, `runtime_error`, `sandbox_failed`, `max_tokens`, `max_turn_requests`, `refusal`, `daemon_gone`, `stopped_by_agent` or `unrecognised`. |
 | `agent.archive_requested` | — | agent, outcome | An agent's turn ended asking for its session to be archived, and it waits for you to agree. `outcome` is its last report's, when it made one. |
-| `agent.messaged` | — | agent, from, from_title | An agent was sent a message by another agent with `message_agent`. `agent` is the one it was sent to; `from` is the sender's id and `from_title` its title. |
-| `agent.archived` | — | agent, by, outcome | An agent was archived. `by` is `you`, or `agent` when the agent that started it archived it with `archive_agent`. `outcome` is its last report's, when it made one. |
+| `agent.messaged` | — | agent, from, from_title | An agent was sent a message by another agent with `message_session`. `agent` is the one it was sent to; `from` is the sender's id and `from_title` its title. |
+| `agent.archived` | — | agent, by, outcome | An agent was archived. `by` is `you`, or `agent` when the agent that started it archived it with `archive_session`. `outcome` is its last report's, when it made one. |
 | `agent.deleted` | — | agent, because | An archived agent was deleted with its conversation. `because` is `age` or `person`. |
 
 ## Projects

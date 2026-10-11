@@ -381,7 +381,7 @@ struct BriefingTests {
         for policy in ToolPolicyCatalog.builtIn {
             let text = Briefing.text(for: policy)
             #expect(text.contains(Briefing.helpers), "\(policy.runtimeID)")
-            #expect(text.contains(AppTool.startAgent))
+            #expect(text.contains(AppTool.startSession))
         }
         #expect(Briefing.helpers.contains("within my limits"))
         for number in ["three", "five", "3", "5"] {
@@ -393,7 +393,7 @@ struct BriefingTests {
         for policy in ToolPolicyCatalog.builtIn {
             let text = Briefing.text(for: policy, managesAgents: false)
             #expect(!text.contains(Briefing.helpers), "\(policy.runtimeID)")
-            #expect(!text.contains(AppTool.startAgent))
+            #expect(!text.contains(AppTool.startSession))
             #expect(text.contains(Briefing.leases), "and is told everything else")
         }
     }

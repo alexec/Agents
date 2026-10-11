@@ -48,7 +48,7 @@ public enum RuntimeAssessment {
         Step(id: "own_ask", area: "Questions",
              passesWhen: "a question asked with the runtime's own tool reached the app and was answered (not offered where the runtime has none)"),
         Step(id: "helpers", area: "Helpers",
-             passesWhen: "start_agent made a helper marked as this agent's; the agent was resumed when it finished; request_archive archived it for this agent"),
+             passesWhen: "start_session made a helper marked as this agent's; the agent was resumed when it finished; archive_session archived it for this agent"),
         Step(id: "wait", area: "Events",
              passesWhen: "wait_for_event with until_minutes timed out, and the agent was started again to be told"),
         Step(id: "ending", area: "Ending a turn",
@@ -221,8 +221,8 @@ public enum RuntimeAssessment {
             "Type any short phrase", with no options. Write both answers into the report exactly \
             as they came back.
             6. `own_ask`: \(ownAsk)
-            7. `helpers`: `start_agent` a helper on runtime `\(runtimeID)` with \(modelWords), the \
-            label `\(helperLabel)`, and the prompt "Reply with the word OK." Then call `list_my_agents`. Then call \
+            7. `helpers`: `start_session` a helper on runtime `\(runtimeID)` with \(modelWords), the \
+            label `\(helperLabel)`, and the prompt "Reply with the word OK." Then call `list_sessions` with `started_by` `me`. Then call \
             `wait_for_event` with `agents` the helper's id and a message saying you are \
             waiting on the helper: that ends this turn, and you are started again when the \
             helper finishes. (If that call is refused because the helper has already \
@@ -230,7 +230,7 @@ public enum RuntimeAssessment {
 
             **Turn 2**, once the helper has finished
 
-            8. `helpers`: `request_archive` the helper. If that leaves it asking rather than archived, `archive_agent` it.
+            8. `helpers`: `archive_session` with the helper's id.
             9. `wait`: \(never) with `until_minutes` 1. When it says \
             you are still waiting, end your turn. You are started again when it times out. (If \
             the call itself comes back timed out, go straight on to step 10 in this turn.)
@@ -264,7 +264,7 @@ public enum RuntimeAssessment {
 
             16. `report`: finish the report: every row filled in, and a section "What to fix" \
             naming each failure with its likely fix — the app, the adapter, the runtime's \
-            version, or a setting. If every step passed by your own account, call `request_archive` \
+            version, or a setting. If every step passed by your own account, call `archive_session` \
             with no id and end your turn saying how many passed; otherwise end it naming the \
             failures and what to fix, with a last line asking Alex which to take up. The app then scores the record and adds its own table \
             to this conversation.

@@ -89,7 +89,7 @@ public enum HelperLimit {
     }
 
     /// Where a queued agent stands in its project's queue, counting from 1; nil when it
-    /// is not queued. What a row says ("Queued, 2nd") and what `list_my_agents` says.
+    /// is not queued. What a row says ("Queued, 2nd") and what `list_sessions` with `started_by: me` says.
     public static func queuePosition(of agent: Agent, among agents: some Sequence<Agent>) -> Int? {
         guard agent.state == .queued else { return nil }
         return queue(in: agent.projectFolder, agents: agents).firstIndex { $0.id == agent.id }.map { $0 + 1 }
@@ -127,7 +127,8 @@ public struct HelperLimits: Codable, Hashable, Sendable {
     public var notArchived: Int?
     /// How many may wait in the queue (#362). Nil is `HelperLimit.defaultQueued`.
     public var queued: Int?
-    /// Whether `archive_agent` is answered in this project (#120). Nil is the default,
+    /// Whether `archive_session` archives a session the caller started at once in this
+    /// project, rather than asking the person (#120, #638). Nil is the default,
     /// `HelperLimit.defaultAgentsMayArchive`.
     public var agentsMayArchive: Bool?
 

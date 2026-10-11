@@ -3,7 +3,7 @@ import Foundation
 /// Which runtimes a new agent may start on, here, and why not the others (#117).
 ///
 /// One answer for every place that starts an agent without a person choosing from a
-/// menu: an agent's `start_agent`, and a workflow's `runtime:`. It is the answer the
+/// menu: an agent's `start_session`, and a workflow's `runtime:`. It is the answer the
 /// Runtimes page and the pool already give (`unusable`, the allowance states), asked of
 /// this host, because a helper starts in its caller's project and so on its caller's
 /// host. Said before anything starts: a runtime that is not installed, not signed in or
@@ -65,7 +65,7 @@ extension DaemonCore {
 
     /// Every runtime, available or not, for an agent about to choose one: the ids it
     /// may name, each with the model it starts on where this folder has used it, and
-    /// the rest with why not. What `list_my_agents` ends with.
+    /// the rest with why not. What `list_sessions` with `started_by: me` ends with.
     func runtimeChoices(in folder: URL) -> String {
         var available: [String] = []
         var not: [String] = []

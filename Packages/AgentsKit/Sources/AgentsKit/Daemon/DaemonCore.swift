@@ -1197,7 +1197,7 @@ public actor DaemonCore {
         // flag goes.
         agent.isUnread = next == .finished && !isWatched(agentID)
         // A request to archive (#584), asked while the turn was in flight — by the agent
-        // itself with request_archive and no id, or by the agent that started it — is
+        // itself with archive_session and no id, or by the agent that started it — is
         // settled the moment that turn ends, by whatever means, and before anything is
         // told. Not when a restarting daemon is about to pick it back up: that turn has
         // not ended. The triggers below read `next`, never the mark, so a workflow sees

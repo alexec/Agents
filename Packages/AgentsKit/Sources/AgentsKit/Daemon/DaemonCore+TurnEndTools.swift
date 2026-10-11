@@ -13,7 +13,7 @@ import Foundation
 ///   archive; a wait does not go with a request either, since one asking to be archived
 ///   is not waiting to be woken.
 extension DaemonCore {
-    /// `request_archive` or `archive_agent` with no id: put this agent away once its turn ends.
+    /// `archive_session` with no id: put this agent away once its turn ends.
     public func askAfterTurn(_ request: DaemonAPI.AfterTurnRequest) throws -> String {
         guard let agentID = appTokens[request.token], var agent = agents[agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent,
@@ -30,7 +30,7 @@ extension DaemonCore {
                 throw JSONRPCError(code: JSONRPCError.invalidParams, message: """
                     Nothing was recorded: you move once this turn ends, and a run that \
                     moves is not archived. Call move_worktree with neither argument to \
-                    stay, or call request_archive instead.
+                    stay, or call archive_session instead.
                     """)
             }
         }

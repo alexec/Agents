@@ -79,8 +79,8 @@ public enum Briefing {
     /// they are known before the first call rather than learned from a refusal. Without
     /// their numbers, which are the project's and can change mid-conversation (#64).
     public static let helpers = """
-        For work that can run alongside yours, use \(AppTool.startAgent) within my \
-        limits on how many may run and be kept. Stop helpers when they are done, \
+        For work that can run alongside yours, use \(AppTool.startSession) within my \
+        limits on how many may run and be kept. Stop the sessions you started when they are done, \
         and archive them once their work is merged or abandoned. Do not start one for \
         work you could simply do yourself.
         """

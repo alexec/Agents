@@ -245,21 +245,19 @@ public enum DaemonAPI {
         public static let workflowsClearMCPMissed = "workflows/mcpTrigger/clearMissed"
         /// What the MCP helper relays when an agent calls the workflow tool.
         public static let agentsManageWorkflows = "agents/manageWorkflows"
-        /// What the MCP helper relays when an agent calls `start_agent`,
-        /// `stop_agent`, `request_archive` or `list_my_agents` (028). The
+        /// What the MCP helper relays when an agent calls `start_session`,
+        /// `stop_session`, `archive_session` or `list_sessions` with `started_by: me` (028, #638). The
         /// caller is the token, and the token alone decides the project and what it
         /// may touch.
         public static let agentsStartHelper = "agents/startHelper"
         public static let agentsStopHelper = "agents/stopHelper"
-        /// `request_archive` with an id (#584; `park_agent` before it).
+        /// `archive_session` with an id (#584, #638; `park_agent`, then `request_archive`, before it).
         public static let agentsRequestArchiveHelper = "agents/requestArchiveHelper"
-        /// `archive_agent` (#120).
-        public static let agentsArchiveHelper = "agents/archiveHelper"
         public static let agentsListHelpers = "agents/listHelpers"
         /// `list_sessions` and `read_session` (065): the caller's project, read only.
         public static let agentsListSessions = "agents/listSessions"
         public static let agentsReadSession = "agents/readSession"
-        /// `message_agent` (#560): words for another session in the caller's project.
+        /// `message_session` (#560): words for another session in the caller's project.
         public static let agentsMessageAgent = "agents/messageAgent"
         /// What the MCP helper relays for `lease_resource`, `release_resource` and
         /// `list_resources` (036). The caller is the token. `leases/lease` may stay open
@@ -304,7 +302,7 @@ public enum DaemonAPI {
         /// helper when an agent calls `finish_turn`. The two above stay for the older
         /// names the helper still relays.
         public static let agentsFinishTurn = "agents/finishTurn"
-        /// `request_archive` or `archive_agent` with no id (#481, #584): the agent asking
+        /// `archive_session` with no id (#481, #584, #638): the agent asking
         /// to be put away once its own turn ends.
         public static let agentsAfterTurn = "agents/afterTurn"
         /// `set_session_labels` (#481): the agent's own labels on its own session.
@@ -2445,7 +2443,7 @@ public enum DaemonAPI {
 
     // MARK: Agents started by agents (028)
 
-    /// What an agent passes to `start_agent`. There is no folder: the new agent
+    /// What an agent passes to `start_session`. There is no folder: the new session
     /// always starts in the caller's own project, which the token decides.
     public struct StartHelperRequest: Codable, Sendable {
         public var token: String
@@ -2482,7 +2480,7 @@ public enum DaemonAPI {
         }
     }
 
-    /// What an agent passes to `stop_agent` or `request_archive`. The id
+    /// What an agent passes to `stop_session` or `archive_session`. The id
     /// is a string so one that is not a UUID is refused in words rather than failing
     /// to decode.
     public struct HelperRequest: Codable, Sendable {
@@ -2495,8 +2493,8 @@ public enum DaemonAPI {
         }
     }
 
-    /// `request_archive` or `archive_agent` on itself (#481): `request_archive` or
-    /// `archive`, checked at the daemon.
+    /// `archive_session` on itself (#481, #638): `request_archive` or `archive`, checked
+    /// at the daemon.
     public struct AfterTurnRequest: Codable, Sendable {
         public var token: String
         public var afterwards: String
@@ -2541,7 +2539,7 @@ public enum DaemonAPI {
         }
     }
 
-    /// What an agent passes to `list_my_agents`: nothing but who it is.
+    /// What an agent passes to `list_sessions` with `started_by: me`: nothing but who it is.
     public struct ListHelpersRequest: Codable, Sendable {
         public var token: String
 
@@ -2583,7 +2581,7 @@ public enum DaemonAPI {
         }
     }
 
-    /// `message_agent` (#560): `to` is a session id or exact title in the caller's project.
+    /// `message_session` (#560): `to` is a session id or exact title in the caller's project.
     public struct MessageAgentRequest: Codable, Sendable {
         public var token: String
         public var to: String

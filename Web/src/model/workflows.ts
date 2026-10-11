@@ -61,7 +61,7 @@ const eventMeanings: Record<string, string> = {
   "agent.stopped": "An agent in this project was stopped before finishing",
   "agent.failed": "An agent in this project ended in an error",
   "agent.archive_requested": "An agent in this project asked to be archived, and waits for the person's OK",
-  "agent.messaged": "An agent in this project was sent a message by another, with message_agent",
+  "agent.messaged": "An agent in this project was sent a message by another, with message_session",
   "agent.archived": "An agent in this project was archived",
   "agent.deleted": "An archived agent was deleted with its conversation",
   "project.idle": "Every agent in this project has stopped working",

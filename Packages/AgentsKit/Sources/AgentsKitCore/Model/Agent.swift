@@ -151,7 +151,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// The workflow run that caused this agent, if one did. Read to work out how deep a
     /// chain is when this agent's own events fire something further.
     public var startedByRun: UUID?
-    /// The agent whose `start_agent` call made this one, if one did (028). Set once,
+    /// The agent whose `start_session` call made this one, if one did (028). Set once,
     /// never changed. It is what lets that agent stop and archive this one, what keeps
     /// the tools from this one, and what counts it against its project's three.
     public var startedByAgent: UUID?

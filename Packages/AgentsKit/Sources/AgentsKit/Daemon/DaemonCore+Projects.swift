@@ -308,7 +308,7 @@ extension DaemonCore {
     /// neither the `_meta` nor the index until they do.
     /// `managesAgents` is false for an agent another agent started. Grok's rules name
     /// only the tools that session's server will offer, so a helper is not told how to
-    /// call `start_agent`.
+    /// call `start_session`.
     func sessionMeta(runtimeID: String, cwd: URL, managesAgents: Bool = true,
                      sandbox: SandboxChoice = .runtime) -> JSONValue? {
         Self.merging(scopingMeta(runtimeID: runtimeID, cwd: cwd, managesAgents: managesAgents),

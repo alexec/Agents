@@ -70,7 +70,6 @@ struct RuntimeAssessmentTests {
                                                         "title": s("Assess Claude"),
                                                         "prompts": .array([.object(["label": s("x"), "prompt": s("y")])])]),
             call(40, DaemonAPI.Method.agentsRequestArchiveHelper, ["agentID": s(helper.uuidString)]),
-            call(41, DaemonAPI.Method.agentsArchiveHelper, ["agentID": s(helper.uuidString)]),
             call(42, DaemonAPI.Method.eventsWait, ["events": .array([s(RuntimeAssessment.neverEvent)]), "untilMinutes": .int(1)],
                  answer: "Still waiting for branch.moved."),
             call(90, DaemonAPI.Method.agentsFinishTurn, ["outcome": s("blocked"), "message": s("waiting for the timeout"), "prompts": .array([])]),
@@ -488,7 +487,7 @@ struct RuntimeAssessmentTests {
         for step in RuntimeAssessment.steps { #expect(brief.contains("`\(step.id)`"), "\(step.id)") }
         for word in [RuntimeAssessment.pingEvent, RuntimeAssessment.neverEvent, RuntimeAssessment.helperLabel,
                      "AskUserQuestion", "assess-abcd1234", "until_minutes", report, scopeFile,
-                     "cancel_wait", "leave_worktree", "move_worktree", "request_archive", "read_session", "claude-agent-acp 0.81.2", "this Mac (test)",
+                     "cancel_wait", "leave_worktree", "move_worktree", "archive_session", "read_session", "claude-agent-acp 0.81.2", "this Mac (test)",
                      RuntimeAssessment.pingLease("abcd1234"), RuntimeAssessment.neverBranch,
                      "on:\n      - branch.moved:\n          branch: assess-never"] {
             #expect(brief.contains(word), "\(word)")

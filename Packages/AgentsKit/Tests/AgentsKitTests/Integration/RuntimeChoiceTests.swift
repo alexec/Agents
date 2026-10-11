@@ -48,7 +48,7 @@ struct RuntimeChoiceTests {
         do { try await body(); return nil } catch let error as JSONRPCError { return error } catch { return nil }
     }
 
-    // MARK: start_agent
+    // MARK: start_session
 
     @Test func anAvailableRuntimeStartsTheHelperOnIt() async throws {
         let (locations, work) = try temporary()

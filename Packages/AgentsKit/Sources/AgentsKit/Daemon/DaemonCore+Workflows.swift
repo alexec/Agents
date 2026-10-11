@@ -1164,7 +1164,7 @@ extension DaemonCore {
 
                 (This workflow lets its run archive itself. If you finish done or with nothing \
                 to do, and there is nothing the person needs to look at, call \
-                \(AppTool.requestArchive) with no id before you end: no one is asked, and the \
+                \(AppTool.archiveSession) with no id before you end: no one is asked, and the \
                 run is archived once the turn ends. Otherwise leave it out.)
                 """
         case .archive:

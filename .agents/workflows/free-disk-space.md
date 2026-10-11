@@ -128,4 +128,4 @@ du -sk "$P"/.agents/worktrees/* 2>/dev/null | sort -rn | head -5
 
 End with one line per worktree touched (`freed <GB> from <name>` or `removed <name>,
 branch <branch> kept`), then the free space before and after, then what was kept and why
-(busy, holding, not named by a session, not clean). Then call `request_archive` with no id.
+(busy, holding, not named by a session, not clean). Then call `archive_session` with no id.

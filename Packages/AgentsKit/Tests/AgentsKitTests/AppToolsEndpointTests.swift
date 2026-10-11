@@ -66,7 +66,7 @@ struct AppToolsEndpointTests {
         #expect(list.headers["Content-Type"] == "application/json")
         let names = try toolNames(list)
         #expect(names.contains(AppService.showFileToolName))
-        #expect(names.contains("start_agent"))
+        #expect(names.contains("start_session"))
         #expect(endpoint.openSessions("tok") == 1)
     }
 
@@ -76,7 +76,7 @@ struct AppToolsEndpointTests {
         let session = try await opened(endpoint)
         let names = try toolNames(await post(endpoint, body("tools/list", id: 2), session: session))
         #expect(names.contains(AppService.showFileToolName))
-        #expect(!names.contains("start_agent"))
+        #expect(!names.contains("start_session"))
     }
 
     @Test func aToolCallGoesToTheDaemonWithTheToken() async throws {

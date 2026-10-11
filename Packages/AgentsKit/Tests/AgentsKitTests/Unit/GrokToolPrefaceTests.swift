@@ -25,9 +25,8 @@ struct GrokToolPrefaceTests {
     @Test func aHelperIsNotToldHowToStartAnAgent() {
         let rules = GrokToolPreface.rules(managesAgents: false)
         #expect(rules.contains(GrokToolPreface.catalogName(AppTool.showFile)))
-        #expect(!rules.contains(GrokToolPreface.catalogName(AppTool.startAgent)))
-        #expect(!rules.contains(GrokToolPreface.catalogName(AppTool.stopAgent)))
-        #expect(!rules.contains(GrokToolPreface.catalogName(AppTool.listMyAgents)))
+        #expect(!rules.contains(GrokToolPreface.catalogName(AppTool.startSession)))
+        #expect(!rules.contains(GrokToolPreface.catalogName(AppTool.stopSession)))
         #expect(rules.contains(GrokToolPreface.catalogName(AppTool.leaseResource)))
         // Grok's own question tool never reaches us, so this is its only way to ask.
         #expect(rules.contains(GrokToolPreface.catalogName(AppTool.askForm)))

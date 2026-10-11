@@ -89,7 +89,7 @@ struct ModelFailureTests {
         failing.promptError = JSONRPCError(code: -32603, message: "Upstream request failed: Endpoint is unavailable")
         var working = FakeACPAgent.Script()
         working.configOptions = models
-        // Long enough to call start_agent while the turn is still running.
+        // Long enough to call start_session while the turn is still running.
         working.turnDelay = .seconds(3)
         let core = try await makeCore(locations, FakeLauncher(script: working, then: [failing]))
 
@@ -102,7 +102,7 @@ struct ModelFailureTests {
         await core.runtimeFailed(runtimeID: "opencode")
         #expect(await core.whyUnavailable("opencode") != nil)
 
-        // A turn on the default model, still running, calls start_agent for OpenCode.
+        // A turn on the default model, still running, calls start_session for OpenCode.
         let lead = try await core.start(.init(runtimeID: "opencode", cwd: work, prompt: "Lead",
                                               startOptions: StartOptions(values: ["model": .string("opencode/big-pickle")])))
         await eventually("the lead is working") { await core.agent(lead)?.state.hasTurnInFlight == true }
@@ -112,7 +112,7 @@ struct ModelFailureTests {
                                        params: try JSONValue.encoding(DaemonAPI.StartHelperRequest(
                                            token: token, prompt: "Count the files", runtime: "opencode")))
 
-        guard case .success = answer else { Issue.record("start_agent was refused: \(answer)"); return }
+        guard case .success = answer else { Issue.record("start_session was refused: \(answer)"); return }
         #expect(await core.agent(lead)?.state.hasTurnInFlight == true)
         #expect(await state(core)?.isOut == false)
         #expect(await core.eventLog.events.contains {

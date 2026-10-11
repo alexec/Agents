@@ -10,9 +10,10 @@ import Foundation
 /// session is made, and all four runtimes take them. So the app offers the agent
 /// tools of its own: one that ends a turn — what one passes to `finish_turn` becomes
 /// the line under the agent's name and the row of chips above the prompt — and two
-/// that act mid-turn, `show_file` and `manage_workflows`. Five more act on other
-/// agents — `start_agent`, `stop_agent`, `request_archive` (#584), `archive_agent` (#120) and
-/// `list_my_agents` (028) — and are offered only to an agent the person or a workflow started.
+/// that act mid-turn, `show_file` and `manage_workflows`. The session tools (#638) act on
+/// sessions: `start_session` and `stop_session` (028) are offered only to an agent the person
+/// or a workflow started; `archive_session` (#584), `list_sessions`, `read_session` (065) and
+/// `message_session` (#560) to every agent.
 ///
 /// This speaks MCP itself rather than pulling in an SDK: it is four methods of
 /// JSON-RPC, which the daemon's loopback endpoint hands it one request at a time
@@ -37,17 +38,15 @@ public actor AppService {
     /// Offer the person one optional next prompt.
     public static let suggestNextPromptToolName = AppTool.suggestNextPrompt
 
-    /// And five that act on other agents (028), offered only to an agent the person or
-    /// a workflow started: start one in this project, and stop, ask to archive, archive (#120) or
-    /// list the ones this agent started.
-    public static let startAgentToolName = AppTool.startAgent
-    public static let stopAgentToolName = AppTool.stopAgent
-    public static let requestArchiveToolName = AppTool.requestArchive
-    public static let archiveAgentToolName = AppTool.archiveAgent
-    public static let listMyAgentsToolName = AppTool.listMyAgents
+    /// And the session tools (#638): start a session in this project and stop one this
+    /// agent started (028), offered only to an agent the person or a workflow started;
+    /// archive itself or one it started, list, read and message, offered to every agent.
+    public static let startSessionToolName = AppTool.startSession
+    public static let stopSessionToolName = AppTool.stopSession
+    public static let archiveSessionToolName = AppTool.archiveSession
     public static let listSessionsToolName = AppTool.listSessions
     public static let readSessionToolName = AppTool.readSession
-    public static let messageAgentToolName = AppTool.messageAgent
+    public static let messageSessionToolName = AppTool.messageSession
     public static let leaseResourceToolName = AppTool.leaseResource
     public static let waitForEventToolName = AppTool.waitForEvent
     public static let cancelWaitToolName = AppTool.cancelWait
@@ -83,7 +82,7 @@ public actor AppService {
     public typealias WorkflowSink =
         @Sendable (DaemonAPI.ManageWorkflowsRequest.Action, String?, String?) async -> Outcome
 
-    /// One of the calls that act on other agents (028), as the agent made it.
+    /// One of the calls that act on sessions this agent started (028), as the agent made it.
     /// Nothing is decided here beyond whether the words are there at all: the daemon
     /// is what knows whose agent is whose.
     public enum AgentCall: Sendable, Equatable {
@@ -91,7 +90,7 @@ public actor AppService {
                    worktree: String? = nil, labels: [String] = [])
         case stop(agentID: String)
         case requestArchive(agentID: String)
-        case archive(agentID: String)
+        /// `list_sessions` with `started_by: me`.
         case list
     }
 
@@ -125,7 +124,7 @@ public actor AppService {
     }
 
     /// What an agent asks of its own session (#481), each once on the tool that does it:
-    /// to be put away once the turn ends (`request_archive` or `archive_agent` with no id), its
+    /// to be put away once the turn ends (`archive_session` with no id), its
     /// labels, a move (none takes one back), or a wait on agents or a time.
     public enum SelfCall: Sendable, Equatable {
         case afterTurn(AfterTurn)
@@ -142,7 +141,7 @@ public actor AppService {
     public enum SessionCall: Sendable, Equatable {
         case list(limit: Int? = nil, after: String? = nil)
         case read(session: String)
-        /// `message_agent` (#560): the daemon decides whether it goes now, waits, or not at all.
+        /// `message_session` (#560): the daemon decides whether it goes now, waits, or not at all.
         case message(to: String, text: String)
     }
 
@@ -377,8 +376,8 @@ public actor AppService {
             if let call = Self.agentCall(named: name, arguments) {
                 guard managesAgents else {
                     return .success(Self.reply("""
-                        Nothing was done: an agent that another agent started cannot \
-                        start, stop, archive or list agents of its own.
+                        Nothing was done: a session that another session started cannot \
+                        start, stop, archive or list sessions of its own.
                         """, isError: true))
                 }
                 switch call {
@@ -396,7 +395,7 @@ public actor AppService {
     }
 
     /// Which of the calls on the agent's own session a tool is (#481), with its arguments
-    /// read. `nil` when it is none of them — `request_archive` with an id is a helper's, and a
+    /// read. `nil` when it is none of them — `archive_session` with an id is a helper's, and a
     /// `wait_for_event` on events is an event wait.
     static func selfCall(named name: String, _ arguments: JSONValue?,
                          movesItself: Bool) -> Result<SelfCall, AgentCallProblem>? {
@@ -412,8 +411,7 @@ public actor AppService {
             }
             return .success(list.compactMap(\.stringValue))
         }
-        if name.hasSuffix(requestArchiveToolName), !given("id") { return .success(.afterTurn(.requestArchive)) }
-        if name.hasSuffix(archiveAgentToolName), !given("id") { return .success(.afterTurn(.archive)) }
+        if name.hasSuffix(archiveSessionToolName), !given("id") { return .success(.afterTurn(.requestArchive)) }
         if name.hasSuffix(setSessionLabelsToolName) {
             let add: [String], remove: [String]
             switch strings("add") {
@@ -486,9 +484,9 @@ public actor AppService {
             let value = arguments?[key]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
             return value?.isEmpty == false ? value : nil
         }
-        if name.hasSuffix(startAgentToolName) {
+        if name.hasSuffix(startSessionToolName) {
             guard let prompt = text("prompt") else {
-                return .failure("Nothing was started: say what the agent is to do, in `prompt`.")
+                return .failure("Nothing was started: say what the session is to do, in `prompt`.")
             }
             guard arguments?["labels"] == nil || arguments?["labels"]?.arrayValue != nil,
                   (arguments?["labels"]?.arrayValue ?? []).allSatisfy({ $0.stringValue != nil }) else {
@@ -499,16 +497,14 @@ public actor AppService {
                                    worktree: text("worktree"),
                                    labels: arguments?["labels"]?.arrayValue?.compactMap(\.stringValue) ?? []))
         }
-        if name.hasSuffix(stopAgentToolName) || name.hasSuffix(requestArchiveToolName)
-            || name.hasSuffix(archiveAgentToolName) {
+        if name.hasSuffix(stopSessionToolName) || name.hasSuffix(archiveSessionToolName) {
             guard let id = text("id") else {
-                return .failure("Nothing changed: `id` has to be the id start_agent or list_my_agents gave.")
+                return .failure("Nothing changed: `id` has to be the id start_session or list_sessions gave.")
             }
-            if name.hasSuffix(stopAgentToolName) { return .success(.stop(agentID: id)) }
-            if name.hasSuffix(archiveAgentToolName) { return .success(.archive(agentID: id)) }
+            if name.hasSuffix(stopSessionToolName) { return .success(.stop(agentID: id)) }
             return .success(.requestArchive(agentID: id))
         }
-        if name.hasSuffix(listMyAgentsToolName) {
+        if name.hasSuffix(listSessionsToolName), text("started_by") == "me" {
             return .success(.list)
         }
         return nil
@@ -519,6 +515,12 @@ public actor AppService {
     static func sessionCall(named name: String,
                             _ arguments: JSONValue?) -> Result<SessionCall, AgentCallProblem>? {
         if name.hasSuffix(listSessionsToolName) {
+            let startedBy = arguments?["started_by"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            // The sessions this agent started are an agent call (#638).
+            if startedBy == "me" { return nil }
+            guard startedBy.isEmpty else {
+                return .failure("Nothing was listed: `started_by` can only be me, or left out for every session.")
+            }
             let after = arguments?["after"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
             return .success(.list(limit: arguments?["limit"]?.intValue,
                                   after: after?.isEmpty == false ? after : nil))
@@ -528,7 +530,7 @@ public actor AppService {
             guard !value.isEmpty else { return .failure(AgentCallProblem(stringLiteral: SessionLookup.noValue)) }
             return .success(.read(session: value))
         }
-        if name.hasSuffix(messageAgentToolName) {
+        if name.hasSuffix(messageSessionToolName) {
             let to = arguments?["to"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             guard !to.isEmpty else {
                 return .failure("Nothing was sent: say which session, by id or exact title, in `to`.")
@@ -616,13 +618,12 @@ public actor AppService {
     static func tools(managesAgents: Bool, movesItself: Bool = true) -> [JSONValue] {
         // `finish_turn` is gone (#479, #481, then removed): the app works out how a turn
         // ended, and an agent that needs the person asks them.
-        // The agent tools after the workflow tool, and only for an agent that
-        // may use them (028).
-        // `request_archive` for every agent, since with no id it asks for the caller (#481, #584).
+        // Starting and stopping sessions after the workflow tool, and only for an agent
+        // that may use them (028). `archive_session` for every agent, since with no id it
+        // asks for the caller (#481, #584, #638).
         let agentTools = managesAgents
-            ? [Self.startAgentTool, Self.stopAgentTool, Self.requestArchiveTool, Self.archiveAgentTool,
-               Self.listMyAgentsTool]
-            : [Self.requestArchiveTool]
+            ? [Self.startSessionTool, Self.stopSessionTool, Self.archiveSessionTool]
+            : [Self.archiveSessionTool]
         // The three lease tools after those, for every agent: waiting for the
         // simulator is not managing anyone (036).
         let leaseTools = [Self.leaseResourceTool, Self.releaseResourceTool, Self.listResourcesTool]
@@ -630,7 +631,7 @@ public actor AppService {
         let eventTools = [Self.waitForEventTool, Self.cancelWaitTool]
         // The two for reading another session in this project, and the one for telling it
         // something, for every agent (065, #560).
-        let sessionTools = [Self.listSessionsTool, Self.readSessionTool, Self.messageAgentTool]
+        let sessionTools = [Self.listSessionsTool, Self.readSessionTool, Self.messageSessionTool]
         // The three for the project's pinned pages and the one for pinning its own
         // session, for every agent (#159, #180).
         let pinTools = [Self.pinPageTool, Self.unpinPageTool, Self.movePinTool, Self.pinSessionTool]
@@ -1044,59 +1045,60 @@ public actor AppService {
         ],
     ]
 
-    /// Start an agent in this project (028).
+    /// Start a session in this project (028).
     ///
     /// The description carries the limits because the agent needs them before it
     /// calls, not in a refusal after: this project only, two limits across the project
     /// that the person sets, and only the person frees a not-archived place. No number
     /// is written here: the limits are the project's own, and a result says them. And the restraint,
-    /// as the workflow tool carries its own — an agent told it can start agents will
-    /// start agents.
-    static let startAgentTool: JSONValue = [
-        "name": .string(startAgentToolName),
-        "title": "Start an agent in this project",
+    /// as the workflow tool carries its own — an agent told it can start sessions will
+    /// start sessions.
+    static let startSessionTool: JSONValue = [
+        "name": .string(startSessionToolName),
+        "title": "Start a session in this project",
         "description": """
-            Start another agent in this project, with a prompt of its own, to do a part \
+            Start another session in this project, with a prompt of its own, to do a part \
             of the work that can run alongside the rest. It starts in this project's \
             folder — there is no way to start one anywhere else — and appears in the \
-            person's list of agents, marked as started by you. The person can open it, \
+            person's list of sessions, marked as started by you. The person can open it, \
             talk to it, stop it or archive it at any time.
 
-            This project has two limits on agents started by agents, counting every agent \
-            here, which only the person sets (in Project Settings): how many may be \
+            This project has two limits on sessions started by sessions, counting every \
+            one here, which only the person sets (in Project Settings): how many may be \
             running — working, waiting on a question, or waiting to carry on by \
             itself — and how many may exist not yet archived, where stopped, finished \
             and asking-to-be-archived ones still count. A start that would break either is queued \
             instead, saying which: nothing runs yet, and it starts by itself, oldest \
             first, once a running place and a not-archived place are both free, behind \
             the working and waiting ones. So you can queue work up front rather than \
-            wait and try again; wait for a queued agent with wait_for_event as for any \
+            wait and try again; wait for a queued session with wait_for_event as for any \
             other. A third limit says how many may be queued; past it a start is \
-            refused. Use list_my_agents to see yours and how many places of each \
-            are in use. Stop one with stop_agent, or call request_archive on it, when its \
-            part is done: that frees its running place, and it keeps its other place \
-            until it is archived. Once its work is merged or abandoned, archive it with \
-            archive_agent to free that place too (where the person allows it); archive \
-            a finished helper rather than removing its worktree under it.
+            refused. Use list_sessions with started_by me to see yours and how many places \
+            of each are in use. Stop one with stop_session when its part is no longer \
+            wanted: that frees its running place, and it keeps its other place until it \
+            is archived. Once its work is merged or abandoned, call archive_session on it \
+            to free that place too (at once where the person allows it, otherwise by \
+            asking them); archive a finished session rather than removing its worktree \
+            under it.
 
             Start one only when part of the work can genuinely run alongside the rest. \
-            Do not start one for work you could simply do yourself. The agent you \
-            start cannot start agents of its own.
+            Do not start one for work you could simply do yourself. The session you \
+            start cannot start sessions of its own.
 
-            Returns the new agent's id, which stop_agent, request_archive and archive_agent take.
+            Returns the new session's id, which stop_session and archive_session take.
             """,
         "inputSchema": [
             "type": "object",
             "properties": [
                 "prompt": [
                     "type": "string",
-                    "description": "What the new agent is to do. Sent to it as its first message.",
+                    "description": "What the new session is to do. Sent to it as its first message.",
                 ],
                 "runtime": [
                     "type": "string",
                     "description": """
                         Optional. The runtime to run it on, by id, as a workflow's \
-                        `runtime:`; leave out for the default. list_my_agents ends with \
+                        `runtime:`; leave out for the default. list_sessions with started_by me ends with \
                         the ones available here and each one's model. One that is not \
                         available (not installed, not signed in, out of the pool) is \
                         refused before anything starts, naming the ones that are.
@@ -1121,7 +1123,7 @@ public actor AppService {
                 "worktree": [
                     "type": "string",
                     "description": """
-                        Optional. Where the new agent works. Leave out to work in the \
+                        Optional. Where the new session works. Leave out to work in the \
                         project folder. "new" makes a fresh git worktree, on its own \
                         branch, named from the prompt — for parallel work that should \
                         not touch the same files. Or the name of a worktree of this \
@@ -1131,104 +1133,70 @@ public actor AppService {
                         """,
                 ],
                 "labels": ["type": "array", "items": ["type": "string"],
-                           "description": "Labels for the helper, owned by that helper."],
+                           "description": "Labels for the new session, owned by that session."],
             ],
             "required": .array(["prompt"]),
         ],
     ]
 
-    /// The id schema stop and archive share.
-    private static let agentIDSchema: JSONValue = [
+    /// The id stop takes.
+    private static let sessionIDSchema: JSONValue = [
         "type": "object",
         "properties": [
             "id": [
                 "type": "string",
-                "description": "The id start_agent or list_my_agents gave.",
+                "description": "The id start_session or list_sessions gave.",
             ],
         ],
         "required": .array(["id"]),
     ]
 
-    static let stopAgentTool: JSONValue = [
-        "name": .string(stopAgentToolName),
-        "title": "Stop an agent you started",
+    static let stopSessionTool: JSONValue = [
+        "name": .string(stopSessionToolName),
+        "title": "Stop a session you started",
         "description": """
-            Stop an agent you started with start_agent, as the person's own Stop would. \
+            Stop a session you started with start_session, as the person's own Stop would. \
             It stays in the list with its conversation. Stopping frees its running \
             place; it keeps its not-archived place until it is archived. Stopping a \
-            queued one takes it off the queue, and it never starts. Only agents you started can be stopped this way; not yourself, \
-            and not anyone else's.
+            queued one takes it off the queue, and it never starts. Only sessions you \
+            started can be stopped this way; not yourself, and not anyone else's.
             """,
-        "inputSchema": agentIDSchema,
+        "inputSchema": sessionIDSchema,
     ]
 
-    /// The id request_archive and archive take, which may be left out to mean the caller (#481).
-    private static let ownOrHelperIDSchema: JSONValue = [
+    /// The id archive takes, which may be left out to mean the caller (#481).
+    private static let ownOrStartedIDSchema: JSONValue = [
         "type": "object",
         "properties": [
             "id": [
                 "type": "string",
-                "description": "The id start_agent or list_my_agents gave. Leave out for yourself.",
+                "description": "The id start_session or list_sessions gave. Leave out for yourself.",
             ],
         ],
     ]
 
-    static let requestArchiveTool: JSONValue = [
-        "name": .string(requestArchiveToolName),
-        "title": "Ask to archive yourself or an agent you started",
+    static let archiveSessionTool: JSONValue = [
+        "name": .string(archiveSessionToolName),
+        "title": "Archive this session or one you started",
         "description": """
-            With no id: ask for this conversation to be archived once this turn ends, \
+            With no id: ask for this session to be archived once this turn ends, \
             when you have finished and cleaned up. Only if the turn ends done, \
             nothing_to_do or partly_done; anything the person sends first drops it. The \
             person sees the ask on your row and archives it, or leaves it. Where nobody \
-            needs to agree — your workflow lets its run archive itself, or the agent \
+            needs to agree — your workflow lets its run archive itself, or the session \
             that started you may archive you — you are archived instead, if the turn \
             ends done or nothing_to_do. Goes with move_worktree: you move, and stay \
             there asking.
 
-            With an id: the same for an agent you started with start_agent. Where this \
-            project lets you archive your agents it is archived now, or once its turn \
+            With an id: the same for a session you started with start_session, once its \
+            work is merged or abandoned. Where this project lets you archive the sessions \
+            you started (a Project Settings switch) it is archived now, or once its turn \
             ends; otherwise it asks the person. Either way its running place is freed \
-            once it is done; it keeps its not-archived place until it is archived.
+            once it is done; it keeps its not-archived place until it is archived. Archive \
+            a finished session rather than removing its worktree under it. Never the \
+            person's own sessions or another session's.
             """,
-        "inputSchema": ownOrHelperIDSchema,
-    ]
-
-    static let archiveAgentTool: JSONValue = [
-        "name": .string(archiveAgentToolName),
-        "title": "Archive an agent you started",
-        "description": """
-            Archive an agent you started with start_agent, as the person's own Archive \
-            would, once its work is merged or abandoned. It leaves the list for Archived, \
-            frees its not-archived place, and its conversation says you archived it. The \
-            person can bring it back. Archive a finished helper rather than removing its \
-            worktree under it.
-
-            Refused while it is still working: wait for it to finish, or stop it with \
-            stop_agent first if its work is no longer wanted. Only agents you started can \
-            be archived, never the person's own sessions or another agent's. The person \
-            can turn this off for a project in Project Settings.
-
-            With no id, only a workflow's run whose workflow allows it archives itself, \
-            once its turn ends done or nothing_to_do with nothing for the person to see.
-            """,
-        "inputSchema": ownOrHelperIDSchema,
-    ]
-
-
-    static let listMyAgentsTool: JSONValue = [
-        "name": .string(listMyAgentsToolName),
-        "title": "List the agents you started",
-        "description": """
-            The agents you started with start_agent that have not been archived: each \
-            one's id, what it is doing, what it last said, and its labels with owners. Also \
-            how many of this project's running and not-archived places are in use, out \
-            of the limits the person set, and which of yours are queued and where. And which runtimes start_agent can start one \
-            on here, as of now, with the model each starts on where known, and why the \
-            others cannot. Archive the finished ones whose work is merged or abandoned \
-            with archive_agent, so their places are free for the next.
-            """,
-        "inputSchema": ["type": "object", "properties": .object([:])],
+        "inputSchema": ownOrStartedIDSchema,
     ]
 
     // MARK: Sessions (065). Words from contracts/session-tools.md.
@@ -1243,6 +1211,15 @@ public actor AppService {
             and what it last said. The page ends by saying how many more there are and \
             what to pass as `after` for the next. Use it to find a session \
             the person asks you to continue, then read it with read_session.
+
+            With started_by me: only the sessions you started with start_session that \
+            have not been archived, each one's id, what it is doing, what it last said, \
+            and its labels with owners; first, how many of this project's running and \
+            not-archived places are in use out of the limits the person set, and which \
+            of yours are queued and where; last, which runtimes start_session can start \
+            one on here, as of now, with the model each starts on where known, and why \
+            the others cannot. Archive the finished ones whose work is merged or \
+            abandoned with archive_session, so their places are free for the next.
             """,
         "inputSchema": [
             "type": "object",
@@ -1254,6 +1231,11 @@ public actor AppService {
                 "after": [
                     "type": "string",
                     "description": "The id of the last session the previous page listed, for the next page.",
+                ],
+                "started_by": [
+                    "type": "string",
+                    "enum": ["me"],
+                    "description": "me: only the sessions you started, with the limits and runtimes.",
                 ],
             ],
         ],
@@ -1281,8 +1263,8 @@ public actor AppService {
         ],
     ]
 
-    static let messageAgentTool: JSONValue = [
-        "name": .string(messageAgentToolName),
+    static let messageSessionTool: JSONValue = [
+        "name": .string(messageSessionToolName),
         "title": "Tell another session something",
         "description": .string("""
             Say something to another session in this project, which it reads as a prompt \
@@ -1293,7 +1275,7 @@ public actor AppService {
             It never answers a question that session is waiting on. A reply comes back the \
             same way, as a message to you. Limits: \(AgentMessageLimits.characters) characters, \
             \(AgentMessageLimits.perHour) an hour, and at most \(AgentMessageLimits.hops) messages \
-            between agents in a row with no prompt from the person.
+            between sessions in a row with no prompt from the person.
             """),
         "inputSchema": [
             "type": "object",

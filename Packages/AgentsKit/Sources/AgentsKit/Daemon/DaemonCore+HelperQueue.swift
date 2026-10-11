@@ -3,7 +3,7 @@ import AgentsKitCore
 
 /// Helpers queued past a project's limits, and started when a place frees (#362).
 ///
-/// A `start_agent` that would break the running or not-archived limit is written down
+/// A `start_session` that would break the running or not-archived limit is written down
 /// as a `queued` agent: its words, runtime and worktree kept on the record, nothing
 /// spawned, nothing spent. Queued agents go behind working and waiting ones — a place
 /// is free only when `HelperLimit.isRunning` says fewer than the limit hold one, and a
@@ -35,7 +35,7 @@ extension DaemonCore {
             throw JSONRPCError(
                 code: DaemonAPI.Failure.notYours,
                 message: "Nothing was started: \(behind) queue is full too: \(waiting) of \(limit) "
-                    + "agents queued\(names). Stop one of yours that is queued with \(AppTool.stopAgent) "
+                    + "sessions queued\(names). Stop one of yours that is queued with \(AppTool.stopSession) "
                     + "if it is no longer wanted, or wait for the queue to move. "
                     + "The person sets these limits in Project Settings.")
         }
@@ -91,8 +91,8 @@ extension DaemonCore {
             + "in this project's queue: "
         note += full.map { "\($0.prefix(1).uppercased() + $0.dropFirst()) " } ?? "Others are queued ahead of it. "
         note += "It starts by itself, oldest first, once a running place and a not-archived place are both "
-            + "free. Wait for it with \(AppTool.waitForEvent) as for any agent, or take it off the queue with "
-            + "\(AppTool.stopAgent). This project now has \(helperPlaces(in: folder))."
+            + "free. Wait for it with \(AppTool.waitForEvent) as for any session, or take it off the queue with "
+            + "\(AppTool.stopSession). This project now has \(helperPlaces(in: folder))."
         checkQueueSoon(in: folder)
         return (note, agent.id)
     }

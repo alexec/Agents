@@ -1,6 +1,6 @@
 import Foundation
 
-/// The brakes on `message_agent` (#560). Any agent may message any session in its
+/// The brakes on `message_session` (#560). Any agent may message any session in its
 /// project; these are what stop that running away.
 public enum AgentMessageLimits {
     /// The most a message may say, in characters. Long enough for a brief, short enough

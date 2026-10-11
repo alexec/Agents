@@ -273,7 +273,7 @@ extension DaemonCore {
     /// and say what became of it.
     ///
     /// `afterwards`, when the call carries one, replaces the ask. A call without one keeps
-    /// an ask `request_archive` made (#481) — unless this ending does not go with it: an ask
+    /// an ask `archive_session` made (#481) — unless this ending does not go with it: an ask
     /// left under a later `stuck` would put away work that needs somebody, so it is
     /// dropped, and the agent told.
     private func land(_ report: WorkReport, prompts: [SuggestedPrompt]?,

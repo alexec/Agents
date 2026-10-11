@@ -220,8 +220,8 @@ struct ClientPermissionTests {
         script.permission = .object([
             "toolCall": .object([
                 "toolCallId": .string("c1"),
-                "title": .string("agents_start_agent"),
-                "name": .string("agents_start_agent"),
+                "title": .string("agents_start_session"),
+                "name": .string("agents_start_session"),
                 "kind": .string("other"),
                 "status": .string("pending"),
             ]),

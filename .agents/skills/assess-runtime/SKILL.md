@@ -32,7 +32,7 @@ Unattended, `.agents/skills/assess-runtime/scripts/assess.py` does both and answ
 person would (the form, the runtime's own question, permission cards) — see below.
 
 Runtimes out of the pool (not installed, not signed in, or marked out on the Runtimes page)
-are not assessed: `start_agent` would refuse them too. Say which were skipped and why.
+are not assessed: `start_session` would refuse them too. Say which were skipped and why.
 
 ## The steps
 
@@ -47,9 +47,9 @@ as written, even when it expects a failure, and records what the tool answered.
 | `events` | 1 | `wait_for_event recent`, `lease_resource assess-<id>-ping`, `wait_for_event lease.granted` from that position, `release_resource`; then `wait_for_event branch.moved` where branch `assess-never` with no time limit, which is refused, then again with `until_minutes 1440` and `cancel_wait` | the second lease's `lease.granted` to this agent is on the log; the wait came back with it (agents raise no events of their own, #639); the wait with no `until_minutes` was refused (#572); `cancel_wait` answered after the second wait |
 | `ask_form` | 1 | `ask_form` with a choice (`pick`) and a text field (`words`) | answered; the typed text came back in the tool's answer unchanged, and is in the report |
 | `own_ask` | 1 | one question with the runtime's own tool (Claude `AskUserQuestion`, Codex `request_user_input`, Cursor `AskQuestion`, Antigravity `ask_question`) | an elicitation reached the app beyond `ask_form`'s; **not offered** where `ToolPolicy.escalationTool` is nil (Grok, Copilot, Gemini, OpenCode) and none came |
-| `helpers` | 1–2 | `start_agent` a helper on the same runtime, `list_my_agents`, `wait_for_event agents` it, which ends the turn (refused if it has already finished, which counts); then `request_archive` it (and `archive_agent` it if that left it asking) | helper marked as this agent's; the "block … has cleared" prompt resumed it; `request_archive` succeeded; helper archived by an agent |
+| `helpers` | 1–2 | `start_session` a helper on the same runtime, `list_sessions started_by me`, `wait_for_event agents` it, which ends the turn (refused if it has already finished, which counts); then `archive_session` it by its id | helper marked as this agent's; the "block … has cleared" prompt resumed it; `archive_session` succeeded; helper archived by an agent |
 | `wait` | 2–3 | `wait_for_event branch.moved` where branch `assess-never`, `until_minutes 1`, then ends its turn | the "timed out" prompt started it again |
-| `ending` | 1–6 | `wait_for_event` on the helper, `wait_for_event until_minutes 1` with no events, then `request_archive` with no id | both waits recorded as blocks (#481; `finish_turn blocked` with `waiting_on` or `check_again_in_minutes`, from a conversation briefed before the tool was removed, counts the same). The daemon works out how every turn ended (#479) |
+| `ending` | 1–6 | `wait_for_event` on the helper, `wait_for_event until_minutes 1` with no events, then `archive_session` with no id | both waits recorded as blocks (#481; `finish_turn blocked` with `waiting_on` or `check_again_in_minutes`, from a conversation briefed before the tool was removed, counts the same). The daemon works out how every turn ended (#479) |
 | `worktree` | 4–5 | `move_worktree worktree assess-<id>` and ends its turn, then, in it, `move_worktree leave_worktree remove` and ends its turn (a `move` on `finish_turn`, as before #481, counts the same) | the app's notes say it moved into the worktree, then back, and removed it; it is in no worktree at the end. **Not offered** outside a git repository, or where the runtime cannot move |
 | `sessions` | 5 | `list_sessions`, then `read_session` on its own id | the list names this session; the read gives back its id and title |
 | `scope` | 5 | write a line, with its own file tool, to `<root>/assessments/scope-<id>.txt` (outside every project) | a permission card asked about it, or the runtime refused it; never written without asking |

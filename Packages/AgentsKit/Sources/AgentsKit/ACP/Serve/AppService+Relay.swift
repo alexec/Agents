@@ -64,10 +64,6 @@ extension AppService {
                 return await send(DaemonAPI.Method.agentsRequestArchiveHelper,
                                   DaemonAPI.HelperRequest(token: token, agentID: agentID),
                                   fallback: "Asked.")
-            case .archive(let agentID):
-                return await send(DaemonAPI.Method.agentsArchiveHelper,
-                                  DaemonAPI.HelperRequest(token: token, agentID: agentID),
-                                  fallback: "Archived.")
             case .list:
                 return await send(DaemonAPI.Method.agentsListHelpers,
                                   DaemonAPI.ListHelpersRequest(token: token),

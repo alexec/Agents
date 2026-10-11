@@ -21,7 +21,7 @@ struct SessionLabelToolTests {
         let client = JSONRPCConnection(transport: mine)
         await client.start()
         _ = try await client.call("tools/call", [
-            "name": .string(AppService.startAgentToolName),
+            "name": .string(AppService.startSessionToolName),
             "arguments": ["prompt": "Review", "labels": ["Ready"]],
         ])
         #expect(await calls.helper == .start(prompt: "Review", runtime: nil,
