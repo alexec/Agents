@@ -73,6 +73,10 @@ push, and use `comment_on_pr` to say what you changed.
 - The `ci` server's `checks.failed` and `pr.merged` both take `repo` (required), `branch`
   (only that PR branch) and `pr` (only that pull request, by number). Given together,
   each must hold: `{repo: alexec/Agents, pr: 551}` hears only PR 551's failures and merge.
+- Its issue events, `issue.opened`, `issue.labelled`, `issue.commented` and `issue.closed`,
+  take `repo` (required) and `label`; all but `issue.opened` also take `issue`, by number.
+  On `issue.labelled`, `label` is the label added: `{repo: alexec/Agents, label: bug}` hears
+  each issue as it is marked a bug.
 - A filter the server's event doesn't take, or a value of the wrong type, shows on the
   workflow's page as an error, naming the filters it does take.
 - This project's copy of the workflow arrives with `enabled: false`. Turn it on with its

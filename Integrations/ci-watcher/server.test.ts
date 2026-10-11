@@ -97,9 +97,10 @@ test("a notification is answered with nothing", async () => {
   assert.deepEqual(await ok("ping"), {});
 });
 
-test("events/list gives both events, poll only, with their schemas", async () => {
+test("events/list gives every event, poll only, with their schemas", async () => {
   const { events } = await ok("events/list");
-  assert.deepEqual(events.map((e: any) => e.name).sort(), ["checks.failed", "pr.merged"]);
+  assert.deepEqual(events.map((e: any) => e.name).sort(),
+    ["checks.failed", "issue.closed", "issue.commented", "issue.labelled", "issue.opened", "pr.merged"]);
   for (const e of events) {
     assert.deepEqual(e.delivery, ["poll"]);
     assert.ok(e.description);
@@ -108,7 +109,12 @@ test("events/list gives both events, poll only, with their schemas", async () =>
     assert.equal(e.inputSchema.properties.repo.type, "string");
     assert.equal(e.payloadSchema.type, "object");
   }
-  for (const e of events) {
+  for (const e of events.filter((e: any) => e.name.startsWith("issue."))) {
+    assert.equal(e.inputSchema.properties.label.type, "string");
+    assert.equal(e.inputSchema.properties.issue?.type, e.name === "issue.opened" ? undefined : "integer");
+    assert.equal(e.payloadSchema.properties.issue.type, "object");
+  }
+  for (const e of events.filter((e: any) => !e.name.startsWith("issue."))) {
     assert.equal(e.inputSchema.properties.branch.type, "string");
     assert.equal(e.inputSchema.properties.pr.type, "integer");
     assert.ok(e.inputSchema.properties.pr.description);
@@ -223,6 +229,66 @@ test("pr and branch narrow pr.merged", async () => {
   assert.deepEqual(none.events, []);
 });
 
+const issueAt = (d: any, number: number) => repoData(d).issues.find((i: any) => i.number === number);
+function newIssue(number: number, labels: string[], createdAt: string) {
+  return { number, title: `Issue ${number}`, author: "someone", labels, url: `https://github.com/${REPO}/issues/${number}`,
+    state: "open", createdAt, updatedAt: createdAt, comments: [], events: [] };
+}
+
+test("issue.opened, narrowed by label", async () => {
+  const [first, firstBug] = await Promise.all([{ repo: REPO }, { repo: REPO, label: "bug" }].map((a) => poll("issue.opened", a, null)));
+  edit((d) => repoData(d).issues.push(newIssue(420, ["bug"], now(5)), newIssue(421, [], now(5))));
+  const raised = await poll("issue.opened", { repo: REPO }, first.cursor);
+  assert.deepEqual(raised.events.map((e: any) => e.eventId), [`issue.opened:${REPO}:420`, `issue.opened:${REPO}:421`]);
+  assert.deepEqual(raised.events[0].data.issue, { number: 420, title: "Issue 420", author: "someone", labels: ["bug"],
+    url: `https://github.com/${REPO}/issues/420` });
+  assert.ok(Date.parse(raised.events[0].data.openedAt));
+  const bugs = await poll("issue.opened", { repo: REPO, label: "bug" }, firstBug.cursor);
+  assert.deepEqual(bugs.events.map((e: any) => e.data.issue.number), [420]);
+  const quiet = await poll("issue.opened", { repo: REPO }, raised.cursor);
+  assert.deepEqual(quiet.events, []);
+});
+
+test("issue.labelled matches the label added, issue.closed gives its reason", async () => {
+  const [labelled, closed, other] = await Promise.all([
+    poll("issue.labelled", { repo: REPO, label: "expedite" }, null),
+    poll("issue.closed", { repo: REPO, issue: 411 }, null),
+    poll("issue.closed", { repo: REPO, issue: 410 }, null),
+  ]);
+  edit((d) => {
+    const i = issueAt(d, 411);
+    i.labels.push("expedite");
+    i.events.push({ id: 8100, event: "labeled", label: "expedite", actor: "alexec", createdAt: now(5) },
+      { id: 8101, event: "labeled", label: "enhancement", actor: "alexec", createdAt: now(5) },
+      { id: 8102, event: "closed", reason: "not_planned", actor: "alexec", createdAt: now(6) });
+    i.state = "closed";
+  });
+  const raisedLabel = await poll("issue.labelled", { repo: REPO, label: "expedite" }, labelled.cursor);
+  assert.deepEqual(raisedLabel.events.map((e: any) => e.eventId), [`issue.labelled:${REPO}:8100`]);
+  assert.equal(raisedLabel.events[0].data.label, "expedite");
+  assert.equal(raisedLabel.events[0].data.by, "alexec");
+  const raisedClosed = await poll("issue.closed", { repo: REPO, issue: 411 }, closed.cursor);
+  assert.deepEqual(raisedClosed.events.map((e: any) => e.eventId), [`issue.closed:${REPO}:8102`]);
+  assert.equal(raisedClosed.events[0].data.reason, "not_planned");
+  assert.deepEqual((await poll("issue.closed", { repo: REPO, issue: 410 }, other.cursor)).events, []);
+});
+
+test("issue.commented gives the comment, its body cut to 4000 characters", async () => {
+  const first = await poll("issue.commented", { repo: REPO, label: "bug" }, null);
+  edit((d) => {
+    issueAt(d, 410).comments.push({ id: 7100, author: "someone", url: `https://github.com/${REPO}/issues/410#issuecomment-7100`,
+      body: "x".repeat(5000), createdAt: now(5) });
+    issueAt(d, 411).comments.push({ id: 7101, author: "someone", url: "u", body: "not a bug", createdAt: now(5) });
+  });
+  const raised = await poll("issue.commented", { repo: REPO, label: "bug" }, first.cursor);
+  assert.deepEqual(raised.events.map((e: any) => e.eventId), [`issue.commented:${REPO}:7100`]);
+  const { comment, issue } = raised.events[0].data;
+  assert.equal(issue.number, 410);
+  assert.equal(comment.author, "someone");
+  assert.equal(comment.body.length, 4001);
+  assert.ok(comment.body.endsWith("…"));
+});
+
 test("ties at one updated_at aren't lost", async () => {
   const args = { repo: REPO, branch: "agents/ties" };
   const first = await poll("checks.failed", args, null);
@@ -275,7 +341,9 @@ test("bad arguments are -32602, an unknown event -32011", async () => {
 test("tools/list annotations and visibility", async () => {
   const { tools } = await ok("tools/list");
   const byName = Object.fromEntries(tools.map((t: any) => [t.name, t]));
-  assert.deepEqual(Object.keys(byName).sort(), ["comment_on_pr", "failed_log", "list_prs", "rerun_failed"]);
+  assert.deepEqual(Object.keys(byName).sort(), ["comment_on_pr", "failed_log", "list_issues", "list_prs", "rerun_failed"]);
+  assert.equal(byName.list_issues.annotations.readOnlyHint, true);
+  assert.deepEqual(byName.list_issues._meta.ui.visibility, ["model", "app"]);
   assert.equal(byName.list_prs.annotations.readOnlyHint, true);
   assert.deepEqual(byName.list_prs._meta.ui.visibility, ["model", "app"]);
   assert.equal(byName.failed_log.annotations.readOnlyHint, true);
@@ -320,6 +388,19 @@ test("each tool's result shape", async () => {
   assert.match(comment.structuredContent.url, /pull\/402#issuecomment-/);
   assert.equal(read().comments.at(-1).body, "Fixed the test.");
 
+  const issues = await ok("tools/call", { name: "list_issues", arguments: { repo: REPO } });
+  assert.notEqual(issues.isError, true);
+  const open = issues.structuredContent.issues;
+  assert.ok(!open.some((i: any) => i.number === 409), "a closed issue is not open");
+  assert.deepEqual(open.find((i: any) => i.number === 410), {
+    number: 410, title: "The sidebar flickers on wake", author: "alexec", labels: ["bug"],
+    url: `https://github.com/${REPO}/issues/410`, comments: open.find((i: any) => i.number === 410).comments,
+    updatedAt: "2026-10-01T11:00:00Z",
+  });
+  assert.ok(open.find((i: any) => i.number === 410).comments >= 1);
+  const bugs = await ok("tools/call", { name: "list_issues", arguments: { repo: REPO, label: "bug" } });
+  assert.ok(bugs.structuredContent.issues.every((i: any) => i.labels.includes("bug")));
+
   const bad = await ok("tools/call", { name: "failed_log", arguments: { repo: REPO } });
   assert.equal(bad.isError, true);
   const unknown = await rpc("tools/call", { name: "nope", arguments: {} });
@@ -345,32 +426,39 @@ test("gh not signed in, and a rate limit", async () => {
   }
 });
 
-test("list_prs feeds the board, which resources/read serves", async () => {
-  const { tools } = await ok("tools/list");
-  const list = tools.find((t: any) => t.name === "list_prs");
-  assert.equal(list._meta.ui.resourceUri, "ui://ci/board");
-  assert.equal(list._meta["ui/resourceUri"], "ui://ci/board");
-  for (const t of tools.filter((t: any) => t.name !== "list_prs")) assert.equal(t._meta.ui.resourceUri, undefined);
+for (const [tool, uri, file, words] of [
+  ["list_prs", "ui://ci/board", "board.html", ["rerun_failed", "list_prs"]],
+  ["list_issues", "ui://ci/issues", "issues.html", ["list_issues"]],
+] as const) {
+  test(`${tool} feeds ${uri}, which resources/read serves`, async () => {
+    const { tools } = await ok("tools/list");
+    const fed = tools.find((t: any) => t.name === tool);
+    assert.equal(fed._meta.ui.resourceUri, uri);
+    assert.equal(fed._meta["ui/resourceUri"], uri);
+    for (const t of tools.filter((t: any) => !["list_prs", "list_issues"].includes(t.name))) assert.equal(t._meta.ui.resourceUri, undefined);
 
-  const { resources } = await ok("resources/list");
-  assert.equal(resources.length, 1);
-  assert.equal(resources[0].uri, "ui://ci/board");
-  assert.equal(resources[0].mimeType, "text/html;profile=mcp-app");
+    const { resources } = await ok("resources/list");
+    assert.deepEqual(resources.map((r: any) => r.uri), ["ui://ci/board", "ui://ci/issues"]);
+    const listed = resources.find((r: any) => r.uri === uri);
+    assert.equal(listed.mimeType, "text/html;profile=mcp-app");
+    assert.equal(listed.file, undefined);
 
-  const { contents } = await ok("resources/read", { uri: "ui://ci/board" });
-  assert.equal(contents.length, 1);
-  const [page] = contents;
-  assert.equal(page.uri, "ui://ci/board");
-  assert.equal(page.mimeType, "text/html;profile=mcp-app");
-  assert.deepEqual(page._meta.ui.csp, {});
-  assert.equal(page.text, readFileSync(join(here, "board.html"), "utf8"));
-  for (const word of ["ui/initialize", "ui/notifications/initialized", "ui/notifications/tool-result",
-    "rerun_failed", "list_prs", "ui/open-link"]) assert.ok(page.text.includes(word), word);
-  assert.doesNotMatch(page.text, /fetch\(|XMLHttpRequest|WebSocket|<script src|<link /, "the board has no network");
+    const { contents } = await ok("resources/read", { uri });
+    assert.equal(contents.length, 1);
+    const [page] = contents;
+    assert.equal(page.uri, uri);
+    assert.equal(page.mimeType, "text/html;profile=mcp-app");
+    assert.deepEqual(page._meta.ui.csp, {});
+    assert.equal(page.text, readFileSync(join(here, file), "utf8"));
+    for (const word of ["ui/initialize", "ui/notifications/initialized", "ui/notifications/tool-result", "ui/open-link", ...words]) {
+      assert.ok(page.text.includes(word), word);
+    }
+    assert.doesNotMatch(page.text, /fetch\(|XMLHttpRequest|WebSocket|<script src|<link /, "the view has no network");
 
-  const missing = await rpc("resources/read", { uri: "ui://ci/nope" });
-  assert.equal(missing.error.code, -32002);
-});
+    const missing = await rpc("resources/read", { uri: "ui://ci/nope" });
+    assert.equal(missing.error.code, -32002);
+  });
+}
 
 test("a line that is not JSON is a parse error, and the server goes on", async () => {
   const answered = new Promise<any>((resolve) => waiting.set(null as any, resolve));

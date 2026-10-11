@@ -19,6 +19,16 @@ export interface FailedRunData {
 }
 export interface MergedPR { pr: PR; mergedAt: string; mergeSha: string }
 
+export interface Issue { number: number; title: string; author: string; labels: string[]; url: string }
+export interface ListedIssue extends Issue { comments: number; updatedAt: string }
+/** One thing that happened to an issue (never a pull request), oldest first or in any order. */
+export type IssueActivity =
+  | { kind: "opened"; id: string; at: string; issue: Issue }
+  | { kind: "labelled"; id: string; at: string; issue: Issue; label: string; by: string }
+  | { kind: "commented"; id: string; at: string; issue: Issue; comment: { author: string; url: string; body: string } }
+  | { kind: "closed"; id: string; at: string; issue: Issue; reason: "completed" | "not_planned"; by: string };
+export type IssueKind = IssueActivity["kind"];
+
 export interface GitHub {
   /** Failed `pull_request` runs updated at or after `since`, oldest first or in any order. */
   failedRuns(repo: string, branch: string | undefined, since: string): Promise<{ runs: RunRef[]; truncated: boolean }>;
@@ -27,6 +37,10 @@ export interface GitHub {
   /** PRs merged at or after `since`. */
   mergedPRs(repo: string, since: string): Promise<{ prs: MergedPR[]; truncated: boolean }>;
   listPRs(repo: string): Promise<BoardPR[]>;
+  /** What happened to the repo's issues at or after `since`, of one kind. */
+  issueActivity(repo: string, kind: IssueKind, since: string): Promise<{ items: IssueActivity[]; truncated: boolean }>;
+  /** Open issues, newest updated first, at most 100; with `label`, only those with it. */
+  listIssues(repo: string, label?: string): Promise<ListedIssue[]>;
   failedLog(repo: string, runId: number, job?: string): Promise<string>;
   rerunFailed(repo: string, runId: number): Promise<{ rerun: true; url: string }>;
   commentOnPR(repo: string, number: number, body: string): Promise<{ url: string }>;
@@ -57,6 +71,13 @@ const plain = (text: string) =>
     .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, "");
 const at = (time: string) => Date.parse(time);
 const runURL = (repo: string, runId: number) => `https://github.com/${repo}/actions/runs/${runId}`;
+/** A comment's body as an event gives it: at most this many characters. */
+export const COMMENT_CHARS = 4000;
+const clip = (text: string | null | undefined) => {
+  const body = String(text ?? "");
+  return body.length > COMMENT_CHARS ? body.slice(0, COMMENT_CHARS) + "…" : body;
+};
+const reasonOf = (r: string | null | undefined): "completed" | "not_planned" => (r === "not_planned" ? "not_planned" : "completed");
 const isFailed = (conclusion: string | null | undefined) =>
   ["failure", "timed_out", "startup_failure"].includes((conclusion ?? "").toLowerCase());
 
@@ -176,6 +197,25 @@ export function realGitHub(): GitHub {
     return { number: p.number, title: p.title, branch: p.head.ref, url: p.html_url };
   }
 
+  const issueOf = (i: any): Issue => ({
+    number: i.number, title: i.title, author: i.user?.login ?? "", url: i.html_url,
+    labels: (i.labels ?? []).map((l: any) => (typeof l === "string" ? l : l.name)),
+  });
+
+  /** Pages of `path` (newest first), until an item older than `since` by `time`. */
+  async function newest(path: string, since: string, time: (item: any) => string) {
+    const items: any[] = [];
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      const list = await json(`${path}${path.includes("?") ? "&" : "?"}per_page=${PER_PAGE}&page=${page}`);
+      for (const item of list as any[]) {
+        if (at(time(item)) < at(since)) return { items, truncated: false };
+        items.push(item);
+      }
+      if (list.length < PER_PAGE) return { items, truncated: false };
+    }
+    return { items, truncated: true };
+  }
+
   async function failedJobs(repo: string, runId: number) {
     const { jobs } = await json(`repos/${repo}/actions/runs/${runId}/jobs?filter=latest&per_page=100`);
     return (jobs as any[]).filter((j) => isFailed(j.conclusion));
@@ -244,6 +284,54 @@ export function realGitHub(): GitHub {
       }));
     },
 
+    async issueActivity(repo, kind, since) {
+      if (kind === "opened") {
+        const { items, truncated } = await newest(`repos/${repo}/issues?state=all&sort=created&direction=desc`,
+          since, (i) => i.created_at);
+        return { truncated, items: items.filter((i) => !i.pull_request)
+          .map((i) => ({ kind, id: String(i.number), at: i.created_at, issue: issueOf(i) })) };
+      }
+      if (kind === "commented") {
+        // `since` lists comments updated since; an edited old one is dropped by its created_at.
+        const { items, truncated } = await newest(
+          `repos/${repo}/issues/comments?sort=created&direction=desc&since=${encodeURIComponent(since)}`,
+          since, (c) => c.created_at);
+        const out: IssueActivity[] = [];
+        const issues = new Map<string, any>();
+        for (const c of items) {
+          // A comment doesn't say whether its issue is a pull request; the issue does (and is cached).
+          const path = String(c.issue_url).replace("https://api.github.com/", "");
+          if (!issues.has(path)) issues.set(path, await json(path));
+          const i = issues.get(path);
+          if (i.pull_request) continue;
+          out.push({ kind, id: String(c.id), at: c.created_at, issue: issueOf(i),
+            comment: { author: c.user?.login ?? "", url: c.html_url, body: clip(c.body) } });
+        }
+        return { items: out, truncated };
+      }
+      const { items, truncated } = await newest(`repos/${repo}/issues/events`, since, (e) => e.created_at);
+      const wanted = kind === "labelled" ? "labeled" : "closed";
+      return { truncated, items: items.filter((e) => e.event === wanted && e.issue && !e.issue.pull_request).map((e): IssueActivity =>
+        kind === "labelled"
+          ? { kind, id: String(e.id), at: e.created_at, issue: issueOf(e.issue), label: e.label?.name ?? "", by: e.actor?.login ?? "" }
+          : { kind: "closed", id: String(e.id), at: e.created_at, issue: issueOf(e.issue),
+            reason: reasonOf(e.state_reason ?? e.issue.state_reason), by: e.actor?.login ?? "" }) };
+    },
+
+    async listIssues(repo, label) {
+      // The issues listing has pull requests in it too; ask for more than 100 so 100 issues are likely.
+      const query = `state=open&sort=updated&direction=desc&per_page=${PER_PAGE}` + (label ? `&labels=${encodeURIComponent(label)}` : "");
+      const out: ListedIssue[] = [];
+      for (let page = 1; page <= 3 && out.length < PER_PAGE; page++) {
+        const list = await json(`repos/${repo}/issues?${query}&page=${page}`);
+        for (const i of list as any[]) {
+          if (!i.pull_request && out.length < PER_PAGE) out.push({ ...issueOf(i), comments: i.comments ?? 0, updatedAt: i.updated_at });
+        }
+        if (list.length < PER_PAGE) break;
+      }
+      return out;
+    },
+
     async failedLog(repo, runId, job) {
       const jobs = (await failedJobs(repo, runId)).filter((j) => !job || j.name === job);
       const logs = [];
@@ -278,6 +366,7 @@ export function fakeGitHub(file: string): GitHub {
   };
   const repoOf = (data: any, repo: string) => data.repos?.[repo] ?? { prs: [], runs: [] };
   const toPR = (p: any): PR => ({ number: p.number, title: p.title, branch: p.branch, url: p.url });
+  const toIssue = (i: any): Issue => ({ number: i.number, title: i.title, author: i.author, labels: i.labels ?? [], url: i.url });
   const findRun = (data: any, repo: string, runId: number) => {
     const found = repoOf(data, repo).runs.find((r: any) => r.id === runId);
     if (!found) throw new GhError("notFound", `no run ${runId} in ${repo}`);
@@ -320,6 +409,33 @@ export function fakeGitHub(file: string): GitHub {
         if (p.checks === "failing" && p.failedRunId !== undefined) out.failedRunId = p.failedRunId;
         return out;
       });
+    },
+
+    async issueActivity(repo, kind, since) {
+      const items: IssueActivity[] = [];
+      for (const i of (repoOf(await load(), repo).issues ?? []) as any[]) {
+        const issue = toIssue(i);
+        if (kind === "opened") items.push({ kind, id: String(i.number), at: i.createdAt, issue });
+        if (kind === "commented") {
+          for (const c of i.comments ?? []) {
+            items.push({ kind, id: String(c.id), at: c.createdAt, issue, comment: { author: c.author, url: c.url, body: clip(c.body) } });
+          }
+        }
+        for (const e of i.events ?? []) {
+          if (kind === "labelled" && e.event === "labeled") items.push({ kind, id: String(e.id), at: e.createdAt, issue, label: e.label, by: e.actor });
+          if (kind === "closed" && e.event === "closed") {
+            items.push({ kind, id: String(e.id), at: e.createdAt, issue, reason: reasonOf(e.reason), by: e.actor });
+          }
+        }
+      }
+      return { items: items.filter((a) => at(a.at) >= at(since)), truncated: false };
+    },
+
+    async listIssues(repo, label) {
+      return ((repoOf(await load(), repo).issues ?? []) as any[])
+        .filter((i) => i.state === "open" && (!label || (i.labels ?? []).includes(label)))
+        .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
+        .map((i) => ({ ...toIssue(i), comments: (i.comments ?? []).length, updatedAt: i.updatedAt }));
     },
 
     async failedLog(repo, runId, job) {

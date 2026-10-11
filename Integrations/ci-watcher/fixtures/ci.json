@@ -66,6 +66,74 @@
             }
           ]
         }
+      ],
+      "issues": [
+        {
+          "number": 410,
+          "title": "The sidebar flickers on wake",
+          "author": "alexec",
+          "labels": [
+            "bug"
+          ],
+          "url": "https://github.com/alexec/Agents/issues/410",
+          "state": "open",
+          "createdAt": "2026-10-01T07:00:00Z",
+          "updatedAt": "2026-10-01T11:00:00Z",
+          "comments": [
+            {
+              "id": 7001,
+              "author": "alexec",
+              "url": "https://github.com/alexec/Agents/issues/410#issuecomment-7001",
+              "body": "Seen again after a restart.",
+              "createdAt": "2026-10-01T11:00:00Z"
+            }
+          ],
+          "events": [
+            {
+              "id": 8001,
+              "event": "labeled",
+              "label": "bug",
+              "actor": "alexec",
+              "createdAt": "2026-10-01T07:00:01Z"
+            }
+          ]
+        },
+        {
+          "number": 411,
+          "title": "Wait on new issues",
+          "author": "alexec",
+          "labels": [
+            "enhancement"
+          ],
+          "url": "https://github.com/alexec/Agents/issues/411",
+          "state": "open",
+          "createdAt": "2026-10-01T08:00:00Z",
+          "updatedAt": "2026-10-01T09:00:00Z",
+          "comments": [],
+          "events": []
+        },
+        {
+          "number": 409,
+          "title": "Old crash on quit",
+          "author": "alexec",
+          "labels": [
+            "bug"
+          ],
+          "url": "https://github.com/alexec/Agents/issues/409",
+          "state": "closed",
+          "createdAt": "2026-09-30T08:00:00Z",
+          "updatedAt": "2026-09-30T09:00:00Z",
+          "comments": [],
+          "events": [
+            {
+              "id": 8000,
+              "event": "closed",
+              "reason": "completed",
+              "actor": "alexec",
+              "createdAt": "2026-09-30T09:00:00Z"
+            }
+          ]
+        }
       ]
     }
   },
