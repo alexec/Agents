@@ -148,6 +148,29 @@ struct HostTunnelsTests {
         await tunnels.stop()
     }
 
+    @Test func theSameServerAddedAgainLetsItsOldTunnelGo() async throws {
+        let folder = try Self.folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let sleeper = try Self.fakeSSH(in: folder, named: "sleep", forward: "exit 0", master: "exec sleep 30")
+        let store = MemoryStore()
+        let tunnels = HostTunnels(store: store, executable: sleeper, environment: [:], hosts: { [] }, changed: { _ in })
+        let first = Self.record(host: nil)
+        try await tunnels.add(first)
+        var second = Self.record(host: nil)
+        second.destination = "AGENTS@ws"
+        try await tunnels.add(second)
+        #expect(try await store.list(prefix: HostTunnels.prefix).map(\.key) == [HostTunnels.key(second.id)])
+        await tunnels.stop()
+    }
+
+    /// A server through a tunnel dials this listener at its loopback (#435, #610).
+    @Test func aCopyThatHoldsTunnelsAnswersAtItsLoopbackToo() {
+        let settings = ControlSettings(name: "home", machineID: "m")
+        #expect(ControlService.origins("https://mac.local:8791", settings) == ["https://mac.local:8791"])
+        #expect(ControlService.origins("https://mac.local:8791", settings, tunnelled: 8791)
+            == ["https://mac.local:8791", "https://127.0.0.1:8791"])
+    }
+
     @Test func aServerThatNeverJoinedIsLetGo() async throws {
         let folder = try Self.folder()
         defer { try? FileManager.default.removeItem(at: folder) }

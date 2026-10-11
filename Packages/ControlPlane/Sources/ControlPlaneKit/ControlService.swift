@@ -485,11 +485,14 @@ public final class ControlService: @unchecked Sendable {
     // MARK: A socket
 
     /// Every origin a member may have dialled: this copy's own, and each endpoint
-    /// announced (R16), in that order and once each.
-    static func origins(_ own: String, _ settings: ControlSettings) -> [String] {
+    /// announced (R16), in that order and once each. A copy that holds ssh tunnels also
+    /// answers at its loopback (`tunnelled`): a server through one dials
+    /// `https://127.0.0.1:<port>` on its own end, which is this listener (#435, #610).
+    static func origins(_ own: String, _ settings: ControlSettings, tunnelled: Int? = nil) -> [String] {
         var seen: [String] = [own]
-        for endpoint in settings.currentEndpoints {
-            if let url = URL(string: endpoint.url), let origin = ControlAuth.origin(url), !seen.contains(origin) {
+        let tunnel = tunnelled.map { ["https://127.0.0.1:\($0)"] } ?? []
+        for url in settings.currentEndpoints.map(\.url) + tunnel {
+            if let url = URL(string: url), let origin = ControlAuth.origin(url), !seen.contains(origin) {
                 seen.append(origin)
             }
         }
@@ -527,7 +530,8 @@ public final class ControlService: @unchecked Sendable {
             switch arrival {
             case .tls:
                 let peerCopy = auth.id.hasPrefix("x:") && !auth.id.hasPrefix("x:" + Handover.prefix)
-                bound = peerCopy ? [peerOrigin ?? origin] : Self.origins(origin, settings)
+                bound = peerCopy ? [peerOrigin ?? origin]
+                    : Self.origins(origin, settings, tunnelled: tunnels == nil ? nil : configuration.port)
             case .loopback(let web):
                 guard auth.id.hasPrefix("c:") || auth.id.hasPrefix("p:") else { throw ControlAuth.Refusal(.unknown) }
                 bound = [web]

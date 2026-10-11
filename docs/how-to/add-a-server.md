@@ -24,9 +24,10 @@ it and no port needs opening. See [Projects, hosts and worktrees](../explanation
   `.local` name.
 - `curl` on the server, and its CA certificates if the control plane has a publicly
   trusted certificate.
-- For installing over ssh instead of running a command yourself: the server's ssh
-  destination, and a private key that logs in there. The control plane makes the ssh
-  connection, so it must be able to reach the server.
+- For installing over ssh instead of running a command yourself: a server you can
+  `ssh` to from Terminal on this Mac, by a name in `~/.ssh/config` or as `user@host[:port]`.
+  The control plane makes the ssh connection with your config, agent and keys, so it must
+  be able to reach the server. A control plane on another machine needs a private key.
 - Runtimes on the server, installed and signed in there as the user your agents run as.
   See [Runtimes](../reference/runtimes.md).
 
@@ -49,18 +50,27 @@ it and no port needs opening. See [Projects, hosts and worktrees](../explanation
    The sheet says **devbox joined.** Click **Done**. The server is listed under **Hosts**,
    and has a heading of its own in the projects list.
 
-### Or install it over ssh
+### Or add it over ssh
 
 1. In **Settings ▸ Control plane ▸ Hosts**, click **Add a Server…**, then choose
-   **Install over ssh**.
-2. Fill in **Server**, the ssh destination, such as `agents@devbox.example.com`, and a
-   **Name** for it.
-3. Beside **Key**, click **Choose…** and pick the private key that logs in there.
-4. Click **Install**.
-5. The first time, the sheet says **This server is new to the control plane. Its key is:**
-   and a fingerprint. Check it matches the server: on the server,
+   **Over ssh**.
+2. In **Server**, type the server. The box offers the hosts in your `~/.ssh/config`, each with
+   the `user@host` ssh resolves it to; choose one, or type any `user@host`,
+   `user@host:port` or `ssh://user@host:port`. Under the box, the sheet says what ssh makes of
+   it, such as **Ssh reaches it as agents@10.0.0.4:2222.**
+3. Give it a **Name**, or leave the one guessed from the server.
+4. Leave **Key** empty to log in as `ssh` does from Terminal, or click **Choose…** to use one
+   key for this install only.
+5. Click **Install**.
+
+   If the server's key is already in your `known_hosts`, the install goes straight on. If it
+   isn't, the sheet says **This server's key isn't in your known_hosts. Its key is:** and a
+   fingerprint. Check it matches the server: on the server,
    `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` prints it. Click **Trust and
-   Install**.
+   Install**. The key is trusted for this install and the server's tunnel; your
+   `known_hosts` is not changed. If the key has **changed** since your `known_hosts` saw it,
+   nothing is installed: remove the old key with `ssh-keygen -R` if the server was rebuilt,
+   and try again.
 
    The sheet ticks through **Checking the system…** and **Installing Agents…**, then says
    **devbox joined.**
@@ -68,22 +78,29 @@ it and no port needs opening. See [Projects, hosts and worktrees](../explanation
 The key is read once, for this install. The control plane keeps neither the key nor the ssh
 connection, and afterwards the server connects out by itself like any other.
 
-#### A server behind a bastion
+#### A server that can't reach this Mac: use an ssh tunnel
 
 A server your `~/.ssh/config` reaches through a `ProxyJump` or `ProxyCommand`, such as a
-cloud workspace behind a bastion, usually cannot dial back to this Mac. Install it over ssh
-the same way. The sheet then says the server **is reached through a bastion, so it connects
-through a tunnel the control plane holds over ssh**.
+cloud workspace behind a bastion, usually cannot dial back to this Mac. For such a server,
+**Use an ssh tunnel** is on by default. Turn it on for any other server that can't reach this
+Mac, or off for one behind a bastion that can. Once you set it, the sheet leaves it as you set
+it. Only a control plane on this Mac can hold a tunnel.
 
-The control plane keeps an ssh session open to the server, logging in as `ssh` does for you
-from Terminal. That session forwards port 8791 on the server's loopback back to the control
-plane. The server's host dials `https://127.0.0.1:8791`, and the certificate is still
-checked by its pin. The key, if you chose one, is still read only for the install.
+With a tunnel, the control plane keeps an ssh session open to the server, logging in as `ssh`
+does for you from Terminal. That session forwards port 8791 on the server's loopback back to
+the control plane, and nothing else: any `LocalForward`, `RemoteForward` or `DynamicForward` in
+your config is not opened on it. The server's host dials `https://127.0.0.1:8791`, and the
+certificate is still checked by its pin. The key, if you chose one, is still read only for the
+install.
 
-If the session drops, for example while this Mac sleeps, the server goes offline. Under
-**Hosts** its line says **ssh tunnel down** and why. The control plane starts the session
-again by itself. When you remove the server, the tunnel closes. A server on the same network
-is set up as before, with no tunnel.
+If the server won't open that port (something else has it, or its sshd has
+`AllowTcpForwarding no`), or the session drops, the server goes offline. Under **Hosts** its
+line says **ssh tunnel down** and ssh's reason. The control plane starts the session again by
+itself, waiting longer each time it fails, and at once when this Mac wakes or its network
+changes. When you remove the server, the tunnel closes.
+
+What the control plane passes to ssh, and how each common `~/.ssh/config` option fares, is in
+[the ssh contract](https://github.com/alexec/Agents/blob/main/specs/037-cloud-agents/contracts/ssh.md#options-from-the-persons-config-610).
 
 ### Put a project on it
 

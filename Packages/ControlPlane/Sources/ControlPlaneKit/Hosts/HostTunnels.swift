@@ -146,8 +146,17 @@ public actor HostTunnels {
         try? FileManager.default.removeItem(at: folder)
     }
 
-    /// A tunnel for a server just installed, held at once so its first dial finds it.
+    /// A tunnel for a server just installed, held at once so its first dial finds it. One
+    /// held before for the same destination goes: the install replaced the host it carried,
+    /// and its forward would take the port this one needs.
     public func add(_ record: Record) async throws {
+        for old in records.values where old.destination.lowercased() == record.destination.lowercased() {
+            log("tunnel to \(old.name): \(record.name) was installed on that server; letting go")
+            try? await store.delete(Self.key(old.id))
+            records[old.id] = nil
+            held.removeValue(forKey: old.id)?.cancel()
+            states[old.id] = nil
+        }
         _ = try await store.put(Self.key(record.id), try ControlRecords.encoder.encode(record), when: .absent)
         records[record.id] = record
         hold(record)
