@@ -19,7 +19,7 @@ import { archiveAllHelp, archiveAllLabel } from "../model/archiveWords";
 import { folds } from "../model/folds";
 import { parseQuery, queryMatches, type LabelQuery } from "../model/labels";
 import { newSessionProject, ownCount, pinnedSessions, pinnedWorkflows, projectSessions, rememberedProject, rememberProject,
-  smartAgents, smartRows, smartTitles, withKept, type SmartRow } from "../model/sidebar";
+  smartAgents, smartRows, smartTitles, withKept, type ProjectKey, type SmartRow } from "../model/sidebar";
 import { namedRelative, workflowSummary } from "../model/workflows";
 import { fromWireDate } from "../protocol/dates";
 import type { Agent, ControlHost, ProjectSummary, WorkflowSummary } from "../protocol/generated";
@@ -131,7 +131,7 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
         <input class="search" type="search" placeholder="Search" aria-label="Search sessions and workflows"
           value={search.value} onInput={(e) => (search.value = (e.currentTarget as HTMLInputElement).value)} />
         {/* New project, which the window has in its File menu (#115): the page has no menu bar. */}
-        <NewProjectMenu store={store} />
+        <NewProjectMenu store={store} newSession={newSessionStart(store, projects, linkDown)} />
       </header>
       <div class="scroll" onKeyDown={(e) => moveWithKeys(e)}>
         {projects.length > 0 && <NewSessionTopRow store={store} projects={projects} linkDown={linkDown} />}
@@ -242,6 +242,21 @@ function workflowMatches(store: Store, host: string, query: LabelQuery | undefin
     || [w.workflow.name, workflowSummary(w.workflow, runtimeName)].some((t) => t.toLowerCase().includes(text)));
 }
 
+/** New Session in the + menu (#628): its start, or undefined while there is nowhere to start one. */
+function newSessionStart(store: Store, projects: Placed[], linkDown: boolean): (() => void) | undefined {
+  const target = newSessionTarget(projects);
+  if (linkDown || !target || !store.hostIsOnline(target.host)) return undefined;
+  return () => go({ host: target.host, project: target.folder, compose: true });
+}
+
+/** The project New Session starts in, at the top of the sidebar and in the + menu (#628). */
+function newSessionTarget(projects: Placed[]): ProjectKey | undefined {
+  const r = route.value;
+  const live = projects.map(({ host, project }) => ({ host: host.id, folder: project.project.folder }));
+  const open = r.host && r.project ? { host: r.host, folder: r.project } : undefined;
+  return newSessionProject(live, rememberedProject(storage), open);
+}
+
 /**
  * The first row of the sidebar (#495): a new session, in the project the last one was started in,
  * as the window's and the Remote's. Lit while that form is open. A project's menu starts one in
@@ -249,9 +264,7 @@ function workflowMatches(store: Store, host: string, query: LabelQuery | undefin
  */
 function NewSessionTopRow({ store, projects, linkDown }: { store: Store; projects: Placed[]; linkDown: boolean }) {
   const r = route.value;
-  const live = projects.map(({ host, project }) => ({ host: host.id, folder: project.project.folder }));
-  const open = r.host && r.project ? { host: r.host, folder: r.project } : undefined;
-  const target = newSessionProject(live, rememberedProject(storage), open);
+  const target = newSessionTarget(projects);
   const chosen = !!r.compose && !!target && r.host === target.host && r.project !== undefined
     && folderKey(r.project) === folderKey(target.folder);
   return (

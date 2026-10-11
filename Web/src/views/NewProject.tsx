@@ -85,7 +85,7 @@ export function NewProjectItems({ store, onChoose }: { store: Store; onChoose?: 
 }
 
 /** The + at the head of the projects column: the window's toolbar button over its sidebar. */
-export function NewProjectMenu({ store }: { store: Store }) {
+export function NewProjectMenu({ store, newSession }: { store: Store; newSession?: (() => void) | undefined }) {
   const open = useSignal(false);
   const anchor = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -98,10 +98,12 @@ export function NewProjectMenu({ store }: { store: Store }) {
   }, [open.value]);
   return (
     <span class="menu-anchor new-project" ref={anchor}>
-      <button class="icon" aria-label="New project" title="New Chat, or Add Project… or Clone Project from Git URL… as a project"
+      <button class="icon" aria-label="New project" title="New Session, New Chat, or Add Project… or Clone Project from Git URL… as a project"
         aria-haspopup="menu" aria-expanded={open.value} onClick={() => (open.value = !open.value)}>+</button>
       {open.value && (
         <div class="popover right" role="menu" aria-label="New project">
+          {/* As the sidebar's top row starts one, in the project last started in (#628). */}
+          <button role="menuitem" disabled={!newSession} onClick={() => { open.value = false; newSession?.(); }}>New Session</button>
           <NewProjectItems store={store} onChoose={() => (open.value = false)} />
         </div>
       )}
