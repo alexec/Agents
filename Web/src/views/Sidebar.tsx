@@ -486,7 +486,9 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
           {/* The project's pinned pages first (#159), not while searching: the search is for sessions. */}
           {!searching && <PinnedPageRows store={store} host={host.id} folder={folder} down={down} chosen={here ? r.page : undefined} />}
           {sessions.map(row)}
-          {/* Its workflows after the sessions (#495): rows, not a page. */}
+          {/* Its workflows after the sessions (#495): rows, not a page, a plain line between the
+              two kinds when there are both (#631). */}
+          {sessions.length > 0 && workflows.length > 0 && <hr class="kinds" aria-hidden="true" />}
           {workflows.map(workflowRow)}
           {searching ? <>
             {/* What matched in the archive, in the group while searching, so a match is one click away. */}
