@@ -261,6 +261,8 @@ struct ControlHostsPage: View {
                             Button("Check again") { Task { await control.checkAgain(host.id) } }.buttonStyle(.paper)
                             Button("Remove…") { removing = host }.buttonStyle(.paper)
                         }
+                        // The buttons keep their one line; the line beside them wraps.
+                        .fixedSize()
                     }
                 }
             }

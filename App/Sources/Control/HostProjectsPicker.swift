@@ -99,7 +99,11 @@ struct HostProjectsPicker: View {
     }
 
     private var addTitle: String {
-        ticked.count == 1 ? "Add 1 Project" : "Add \(ticked.count) Projects"
+        switch ticked.count {
+        case 0: "Add Projects"
+        case 1: "Add 1 Project"
+        default: "Add \(ticked.count) Projects"
+        }
     }
 
     private func look() async {
