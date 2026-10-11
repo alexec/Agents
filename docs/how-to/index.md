@@ -26,6 +26,8 @@ something particular done.
   agents, devices and servers to a control plane, once.
 - [Release Agents Host](release-agents-host.md): publish the Developer ID download on
   GitHub by tagging main, and set up its signing secrets once.
+- [Fix Agents Host when it won't start](fix-agents-host-not-starting.md): see why a login
+  item isn't running, Repair it, and send diagnostics with a report.
 
 ### Projects
 

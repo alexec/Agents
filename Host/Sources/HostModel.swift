@@ -2,6 +2,7 @@ import AgentsKit
 import AgentsKitCore
 import AppKit
 import Observation
+import UniformTypeIdentifiers
 
 /// What frame L shows and does (058, US2): this Mac's host, the single copy of the control
 /// plane when it runs here, where it keeps its store, and the code to pair a window or phone.
@@ -31,6 +32,18 @@ final class HostModel {
     private(set) var busy: String?
     /// What went wrong last, in words.
     var problem: String?
+
+    // MARK: Why it isn't running (#678)
+
+    /// What launchd and macOS said of each job at the last full look.
+    private(set) var controlJob: LaunchJobState?
+    private(set) var daemonJob: LaunchJobState?
+    private(set) var controlLogin: LoginItemStatus?
+    private(set) var daemonLogin: LoginItemStatus?
+    /// Other copies of Agents Host on this Mac, which share these login items.
+    private(set) var otherCopies: [URL] = []
+    /// What the last Repair came to, in words.
+    private(set) var repaired: String?
 
     // MARK: The store, being edited
 
@@ -131,9 +144,16 @@ final class HostModel {
     func refresh() async {
         looking.lookedFully(at: Date())
         let services = self.services
-        let control = await services.running(.control)
+        let controlState = await services.state(.control)
+        let daemonState = await services.state(.daemon)
+        controlJob = controlState
+        daemonJob = daemonState
+        controlLogin = services.loginStatus(.control)
+        daemonLogin = services.loginStatus(.daemon)
+        if !paths.scratch { otherCopies = HostDiagnostics.otherCopies() }
+        let control = controlState.running ? controlState.pid : nil
         controlRunning = control != nil
-        let daemon = await services.running(.daemon)
+        let daemon = daemonState.running ? daemonState.pid : nil
         daemonRunning = daemon != nil
         daemonPID = daemon
         hostJoin = daemon.flatMap { HostJoinFile.read(paths.hostLocations.controlJoinStatus, pid: $0) }
@@ -233,6 +253,117 @@ final class HostModel {
         guard sysctl(&name, 4, &info, &size, nil, 0) == 0, size > 0 else { return nil }
         let start = info.kp_proc.p_un.__p_starttime
         return Date(timeIntervalSince1970: TimeInterval(start.tv_sec) + TimeInterval(start.tv_usec) / 1_000_000)
+    }
+
+    // MARK: Why it isn't running (#678)
+
+    /// A job the role wants that isn't running, and launchd or macOS says why.
+    var controlFailure: HostJobFailure? {
+        guard settings.role == .runHere, !controlRunning, let controlJob, let controlLogin else { return nil }
+        return HostJobFailure.diagnose(controlJob, login: controlLogin)
+    }
+
+    var daemonFailure: HostJobFailure? {
+        guard settings.role != .none, !daemonRunning, let daemonJob, let daemonLogin else { return nil }
+        return HostJobFailure.diagnose(daemonJob, login: daemonLogin)
+    }
+
+    /// The reason, as long as it holds: on every full look, not only after a button.
+    var failureReason: String? {
+        let reasons = [controlFailure?.reason("The control plane"), daemonFailure?.reason("This Mac’s host")].compactMap { $0 }
+        guard !reasons.isEmpty else { return nil }
+        var said = reasons.joined(separator: " ")
+        if !otherCopies.isEmpty {
+            let places = otherCopies.map { $0.deletingLastPathComponent().path }.joined(separator: ", ")
+            said += " Agents Host is also in \(places): keep one copy, so its login items are this one’s."
+        }
+        return said
+    }
+
+    /// Repair is offered: something it can fix is in the way.
+    var canRepair: Bool {
+        [controlFailure, daemonFailure].contains { $0?.repairable == true }
+    }
+
+    /// **Repair**: both login items unregistered, registered again from this copy, and
+    /// started afresh; then, running here, this Mac's host is given a fresh code if it never
+    /// joined. Distinct from Restart (a kickstart) and Try Again (a join). Not a way past a
+    /// Mac's management software: when that blocks it, the reason stays and so do the logs.
+    func repair() async {
+        guard busy == nil, settings.role != .none else { return }
+        problem = nil
+        repaired = nil
+        busy = "Repairing…"
+        defer { busy = nil }
+        let jobs: [LocalServices.Job] = settings.role == .runHere && settings.movedTo == nil ? [.control, .daemon] : [.daemon]
+        for job in jobs { await services.unregister(job) }
+        for job in jobs {
+            for _ in 0..<20 where await services.state(job).loaded { try? await Task.sleep(for: .milliseconds(250)) }
+        }
+        for job in jobs {
+            guard await start(job) else { await refresh(); return }
+        }
+        for job in jobs { _ = await services.restart(job) }
+        // Long enough for launchd to spawn both, or to fail to.
+        for _ in 0..<12 {
+            try? await Task.sleep(for: .milliseconds(500))
+            await refresh()
+            if failureReason == nil, (jobs.contains(.control) ? controlRunning : true), daemonRunning { break }
+        }
+        if jobs.contains(.control), controlRunning, daemonRunning, !services.hostJoined, let code = await makeOwnHostCode() {
+            lastHostCode = ControlCode(text: code)
+            try? services.leaveCode(code)
+            if let daemonPID { kill(daemonPID, SIGUSR1) }
+            try? await Task.sleep(for: .seconds(2))
+            await refresh()
+        }
+        if let failureReason {
+            problem = "Repair didn’t fix it. \(failureReason) Copy Diagnostics and send them with what you see."
+        } else if daemonRunning, !jobs.contains(.control) || controlRunning {
+            repaired = jobs.contains(.control)
+                ? "Repaired: the control plane is running at \(controlURL), and this Mac’s host is running."
+                : "Repaired: this Mac’s host is running."
+        }
+    }
+
+    // MARK: Diagnostics (#678)
+
+    /// **Copy Diagnostics**: the redacted report on the pasteboard.
+    func copyDiagnostics() async {
+        busy = "Gathering diagnostics…"
+        defer { busy = nil }
+        let text = await HostDiagnostics(paths: paths).report()
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        repaired = "Diagnostics copied. Paste them into a bug report."
+    }
+
+    /// **Save Diagnostics…**: the same report, to a file the person picks.
+    func saveDiagnostics() async {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = HostDiagnostics.suggestedName
+        panel.directoryURL = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first
+        panel.allowedContentTypes = [.plainText]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        busy = "Gathering diagnostics…"
+        defer { busy = nil }
+        let text = await HostDiagnostics(paths: paths).report()
+        do {
+            try Data(text.utf8).write(to: url, options: .atomic)
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } catch {
+            problem = "The diagnostics could not be saved: \(error.localizedDescription)"
+        }
+    }
+
+    /// **Show Logs**: both logs, selected in Finder.
+    func showLogs() {
+        let logs = [paths.controlLog, paths.hostLocations.log].filter { FileManager.default.fileExists(atPath: $0.path) }
+        guard !logs.isEmpty else {
+            problem = "There are no logs yet. They’ll be at \(paths.controlLog.path) and \(paths.hostLocations.log.path)."
+            return
+        }
+        NSWorkspace.shared.activateFileViewerSelecting(logs)
     }
 
     // MARK: Run it here
