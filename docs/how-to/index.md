@@ -24,6 +24,8 @@ something particular done.
   behind a load balancer, so it stays up when your Mac sleeps.
 - [Move an existing set-up across](move-an-existing-set-up.md): bring the earlier app's
   agents, devices and servers to a control plane, once.
+- [Release Agents Host](release-agents-host.md): publish the Developer ID download on
+  GitHub by tagging main, and set up its signing secrets once.
 
 ### Projects
 

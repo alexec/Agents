@@ -20,18 +20,27 @@ root=${0:A:h:h}
 check=0
 [[ ${1:-} == --check ]] && check=1
 
-swift_version=$(xcrun swift --version 2>&1 | sed -nE 's/.*Swift version ([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/p' | head -1)
-[[ $swift_version == *.*.* ]] || swift_version="$swift_version.0"
-toolchain=~/Library/Developer/Toolchains/swift-$swift_version-RELEASE.xctoolchain
-swift=$toolchain/usr/bin/swift
-if [[ ! -x $swift ]]; then
-    print -u2 "No swift.org $swift_version toolchain at $toolchain. See specs/037-cloud-agents/quickstart.md."
-    exit 1
+# SWIFT names the swift.org toolchain's swift outright: the release workflow builds on Linux
+# (#669), where there is no xcrun and the toolchain is the one on PATH.
+if [[ -n ${SWIFT:-} ]]; then
+    swift=$SWIFT
+else
+    swift_version=$(xcrun swift --version 2>&1 | sed -nE 's/.*Swift version ([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/p' | head -1)
+    [[ $swift_version == *.*.* ]] || swift_version="$swift_version.0"
+    toolchain=~/Library/Developer/Toolchains/swift-$swift_version-RELEASE.xctoolchain
+    swift=$toolchain/usr/bin/swift
+    if [[ ! -x $swift ]]; then
+        print -u2 "No swift.org $swift_version toolchain at $toolchain. See specs/037-cloud-agents/quickstart.md."
+        exit 1
+    fi
 fi
 
-marketing=$(sed -nE 's/^ *MARKETING_VERSION: "?([^"]+)"?/\1/p' $root/project.yml | head -1)
-build=$(sed -nE 's/^ *CURRENT_PROJECT_VERSION: "?([^"]+)"?/\1/p' $root/project.yml | head -1)
+# A release names its own version (#669); otherwise project.yml's.
+marketing=${AGENTS_MARKETING_VERSION:-$(sed -nE 's/^ *MARKETING_VERSION: "?([^"]+)"?/\1/p' $root/project.yml | head -1)}
+build=${AGENTS_BUILD:-$(sed -nE 's/^ *CURRENT_PROJECT_VERSION: "?([^"]+)"?/\1/p' $root/project.yml | head -1)}
 out=$root/App/Resources/servers
+
+sha256() { if (( $+commands[shasum] )); then shasum -a 256 $1; else sha256sum $1; fi | cut -d' ' -f1 }
 
 for arch in x86_64 aarch64; do
     print "building agentsd for $arch-linux…"
@@ -40,12 +49,12 @@ for arch in x86_64 aarch64; do
         -Xswiftc -gnone -Xlinker -s
     bin=$($swift build --package-path $root/Daemon -c release --swift-sdk $arch-swift-linux-musl --show-bin-path)/agentsd
     file $bin | grep -q "statically linked" || { print -u2 "$bin is not static"; exit 1; }
-    size=$(stat -f %z $bin)
+    size=$(wc -c < $bin)
     print "  $bin ($((size / 1048576)) MB)"
     if (( ! check )); then
         mkdir -p $out
         cp $bin $out/agentsd-linux-$arch
-        shasum -a 256 $out/agentsd-linux-$arch | cut -d' ' -f1 > $out/agentsd-linux-$arch.sha256
+        sha256 $out/agentsd-linux-$arch > $out/agentsd-linux-$arch.sha256
     fi
 done
 

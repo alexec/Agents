@@ -366,6 +366,8 @@ targets:
       - path: Host/Relay/Sources
       - path: Host/Relay/agents-relay.entitlements
         buildPhase: none
+      - path: Host/Relay/agents-relay-DeveloperID.entitlements
+        buildPhase: none
     dependencies:
       - package: AgentsKit
     info:
@@ -389,6 +391,16 @@ targets:
         SDKROOT: macosx
         SUPPORTED_PLATFORMS: macosx
         SKIP_INSTALL: YES
+      # The GitHub release (#669): Release signs it with Developer ID, outside the App Store.
+      configs:
+        Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: Developer ID Application
+          OTHER_CODE_SIGN_FLAGS: --timestamp
+          # CloudKit outside the App Store needs a Developer ID profile, and the production
+          # container.
+          PROVISIONING_PROFILE_SPECIFIER: Agents Relay Developer ID
+          CODE_SIGN_ENTITLEMENTS: Host/Relay/agents-relay-DeveloperID.entitlements
 
   # Agents Host (058, US2, T054): the download of its own that runs this Mac's host and,
   # when chosen, the control plane's single copy, as launch agents. Not sandboxed and not
@@ -474,6 +486,12 @@ targets:
         # The web remote's build reads Web/ and writes Web/dist, which a sandboxed script
         # phase may not.
         ENABLE_USER_SCRIPT_SANDBOXING: NO
+      # The GitHub release (#669): Release signs it with Developer ID, outside the App Store.
+      configs:
+        Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: Developer ID Application
+          OTHER_CODE_SIGN_FLAGS: --timestamp
 
   # The control plane's program (058), built here for Agents Host's bundle; Linux builds it
   # with `swift build` in Packages/ControlPlane.
@@ -497,6 +515,12 @@ targets:
         SUPPORTED_PLATFORMS: macosx
         SKIP_INSTALL: YES
         ENABLE_HARDENED_RUNTIME: YES
+      # The GitHub release (#669): Release signs it with Developer ID, outside the App Store.
+      configs:
+        Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: Developer ID Application
+          OTHER_CODE_SIGN_FLAGS: --timestamp
 
   agentsd:
     type: tool
@@ -513,6 +537,12 @@ targets:
         SUPPORTED_PLATFORMS: macosx
         SKIP_INSTALL: YES
         ENABLE_HARDENED_RUNTIME: YES
+      # The GitHub release (#669): Release signs it with Developer ID, outside the App Store.
+      configs:
+        Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: Developer ID Application
+          OTHER_CODE_SIGN_FLAGS: --timestamp
 
 schemes:
   AgentsHost:
