@@ -12,15 +12,13 @@ where a chat would be, live as the file changes, as a page an agent shows you do
 
 ## Pin one
 
-- **Ask an agent.** For example: "Pin docs/roadmap.md to the project as Roadmap." Agents
-  pin with the `pin_page` tool, and are told to pin what lasts rather than what they are
-  writing this turn.
-- **On the Mac or the web page**, open the file in the files pane beside a conversation and
-  click the pin in the pane's bar. Click it again to unpin.
+On the Mac or the web page, open the file in the files pane beside a conversation and
+click the pin in the pane's bar. Click it again to unpin. Pinning is yours: agents have no
+tool to pin, unpin or move a pin. Pins an agent made before those tools went stay, with
+its name, until you unpin them.
 
 Only Markdown (`.md`) and HTML (`.html`) files in the project can be pinned. A project holds
-at most 10 pins; at 10, **Pin to Project** is greyed and an agent's `pin_page` is refused,
-saying so, until one is unpinned.
+at most 10 pins; at 10, **Pin to Project** is greyed until one is unpinned.
 
 ## Read one
 
@@ -38,7 +36,7 @@ stylesheets and pictures, with scripts and the network off (see
 - **Drag** a pin among the pins in the sidebar, on the Mac and the web page. On the
   iPhone and iPad, long-press a pin for **Move Up** and **Move Down**.
 - **Unpin** is in a pin's context menu (long press on the phone) and at the top of its
-  page. You can unpin any pin. An agent can unpin only the pins it pinned.
+  page. You can unpin any pin.
 
 ## When a pinned file moves or goes
 
@@ -46,17 +44,15 @@ The pin stays, its row says **Missing**, and its page says the file isn't in the
 folder, with **Unpin**. If the file comes back (a pull, a branch landing, an undo), the pin
 works again by itself. Pins don't follow a rename: pin the new path and unpin the old.
 
-A pin opens the **project folder's** copy of the file. One an agent pins from its worktree
-shows as missing until its branch lands in the project folder.
+A pin opens the **project folder's** copy of the file, never a worktree's.
 
 ## Where pins are kept
 
 In the project, in `.agents/pins.json`, in the order shown. The
-app writes it, only through its tools and your clicks, only in the project folder, never in
+app writes it, only from your clicks, only in the project folder, never in
 a worktree, and never commits it: it shows in the project's changes and goes in with
 whatever is committed next, so pins travel with the project.
 
 ## See also
 
-- [Tools the app gives agents](../reference/agent-tools.md), for `pin_page`, `unpin_page`
-  and `move_pin`
+- [Tools the app gives agents](../reference/agent-tools.md)

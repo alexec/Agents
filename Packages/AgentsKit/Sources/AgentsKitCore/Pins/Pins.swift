@@ -320,22 +320,6 @@ public enum PinRules {
         let name = view.uri.split(separator: "/").last.map(String.init) ?? view.uri
         return name.replacingOccurrences(of: "-", with: " ").capitalized(with: nil)
     }
-
-    /// The order after moving `path`: before or after another, or first or last.
-    public static func moving(_ paths: [String], _ path: String, before: String? = nil, after: String? = nil,
-                              first: Bool = false) -> [String] {
-        var rest = paths.filter { $0 != path }
-        if let before, let index = rest.firstIndex(of: before) {
-            rest.insert(path, at: index)
-        } else if let after, let index = rest.firstIndex(of: after) {
-            rest.insert(path, at: index + 1)
-        } else if first {
-            rest.insert(path, at: 0)
-        } else {
-            rest.append(path)
-        }
-        return rest
-    }
 }
 
 /// One pin as a screen draws it.

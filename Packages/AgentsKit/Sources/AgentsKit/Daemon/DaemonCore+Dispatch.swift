@@ -726,18 +726,6 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.EventTokenRequest.self)
                 return .success(["note": .string(try cancelWait(request))])
 
-            case DaemonAPI.Method.pinsPinPage:
-                let request = try require(params, as: DaemonAPI.PinToolRequest.self)
-                return .success(["note": .string(try pinPage(request))])
-
-            case DaemonAPI.Method.pinsUnpinPage:
-                let request = try require(params, as: DaemonAPI.PinToolRequest.self)
-                return .success(["note": .string(try unpinPage(request))])
-
-            case DaemonAPI.Method.pinsMovePin:
-                let request = try require(params, as: DaemonAPI.PinToolRequest.self)
-                return .success(["note": .string(try movePin(request))])
-
             case DaemonAPI.Method.pinsList:
                 return .success(try JSONValue.encoding(pinsList()))
 
@@ -754,10 +742,6 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.PinArrangeRequest.self)
                 try arrangePins(request)
                 return .success([:])
-
-            case DaemonAPI.Method.pinsPinSessionTool:
-                let request = try require(params, as: DaemonAPI.PinToolRequest.self)
-                return .success(["note": .string(try pinSessionTool(request))])
 
             case DaemonAPI.Method.pinsPinSession:
                 let request = try require(params, as: DaemonAPI.PinSessionRequest.self)

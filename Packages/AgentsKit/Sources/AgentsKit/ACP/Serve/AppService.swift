@@ -158,7 +158,6 @@ public actor AppService {
     private let eventsSink: EventsSink
     private let sessionsSink: SessionsSink
     private let selfSink: SelfSink
-    private let pinsSink: PinsSink
     private let viewToolSink: ViewToolSink
     /// Whether the test view and its tools are offered (#187).
     private let offersTestView: Bool
@@ -198,9 +197,6 @@ public actor AppService {
                 itself: @escaping SelfSink = { _ in
                     .refused("This app cannot change this session.")
                 },
-                pins: @escaping PinsSink = { _ in
-                    .refused("This app cannot pin pages.")
-                },
                 viewTool: @escaping ViewToolSink = { _, _ in
                     .failure("This app draws no views.")
                 },
@@ -215,7 +211,6 @@ public actor AppService {
         self.eventsSink = events
         self.sessionsSink = sessions
         self.selfSink = itself
-        self.pinsSink = pins
         self.viewToolSink = viewTool
         self.offersTestView = offersTestView
         self.managesAgents = managesAgents
@@ -356,13 +351,6 @@ public actor AppService {
                 switch call {
                 case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
                 case .success(let call): return .success(Self.reply(await leasesSink(call)))
-                }
-            }
-
-            if let call = Self.pinCall(named: name, arguments) {
-                switch call {
-                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
-                case .success(let call): return .success(Self.reply(await pinsSink(call)))
                 }
             }
 
@@ -632,15 +620,12 @@ public actor AppService {
         // The two for reading another session in this project, and the one for telling it
         // something, for every agent (065, #560).
         let sessionTools = [Self.listSessionsTool, Self.readSessionTool, Self.messageSessionTool]
-        // The three for the project's pinned pages and the one for pinning its own
-        // session, for every agent (#159, #180).
-        let pinTools = [Self.pinPageTool, Self.unpinPageTool, Self.movePinTool, Self.pinSessionTool]
         // The agent's own session: labels, and moving, which is not offered on a runtime
         // that would forget the conversation on the way (053, #481).
         let selfTools = [Self.setSessionLabelsTool] + (movesItself ? [Self.moveWorktreeTool] : [])
         return [Self.showFileTool, Self.workflowTool, Self.askFormTool, Self.suggestNextPromptTool]
             + agentTools + selfTools + sessionTools + leaseTools
-            + eventTools + pinTools
+            + eventTools
     }
 
     /// The questions an `ask_form` call carried, or why it cannot be asked.

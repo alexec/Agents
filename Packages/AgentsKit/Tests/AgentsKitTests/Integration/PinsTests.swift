@@ -3,50 +3,36 @@ import Testing
 @testable import AgentsKit
 @testable import AgentsKitCore
 
-/// Pinned pages (#159), through the daemon: agents pinning with `pin_page`, the person's
-/// Pin, Unpin and drag, the one file in the project folder, the limit, and the pages read
-/// for a screen. Agents are written to disk before the daemon reads it, so no runtime is
-/// involved.
+/// Pinned pages (#159), through the daemon: the person's Pin, Unpin and drag, the one file
+/// in the project folder, the limit, the pages read for a screen, and the pins agents made
+/// before their tools went (#640). Agents are written to disk before the daemon reads it,
+/// so no runtime is involved.
 @Suite("Pinned pages", .timeLimit(.minutes(1)))
 struct PinsTests {
     private struct Setup {
         var core: DaemonCore
         var project: URL
-        var tree: URL
-        var tokens: [String: String]
         var ids: [String: UUID]
     }
 
-    private func setUp(_ agents: [(name: String, worktree: Bool, workflow: String?)]) async throws -> Setup {
+    private func setUp(_ names: [String]) async throws -> Setup {
         let root = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("AgentsPins-\(UUID().uuidString)", isDirectory: true)
         let project = Project.standardize(root.appendingPathComponent("work", isDirectory: true))
-        let tree = project.appendingPathComponent(".agents/worktrees/lane", isDirectory: true)
-        try FileManager.default.createDirectory(at: tree, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
         let locations = StoreLocations(root: root.appendingPathComponent("root", isDirectory: true))
         try locations.createDirectories()
         let store = try AgentStore(locations: locations)
         var ids: [String: UUID] = [:]
-        for agent in agents {
-            var record = Agent(runtimeID: "claude", cwd: agent.worktree ? tree : project, title: agent.name,
-                               state: .finished, endedReason: .endTurn, startedByWorkflow: agent.workflow)
-            if agent.worktree {
-                record.worktree = AgentWorktree(name: "lane", root: tree, branch: "agents/lane", project: project,
-                                                base: "main", madeByApp: true)
-            }
+        for name in names {
+            let record = Agent(runtimeID: "claude", cwd: project, title: name, state: .finished, endedReason: .endTurn)
             try await store.save(record)
-            ids[agent.name] = record.id
+            ids[name] = record.id
         }
         let core = DaemonCore(store: store, locations: locations, discovery: .findsEverything, launcher: FakeLauncher())
         await core.loadFromDisk()
         _ = try await core.addProject(project)
-        var tokens: [String: String] = [:]
-        for (name, id) in ids {
-            let token = UUID().uuidString
-            await core.bindAppToken(token, to: id)
-            tokens[name] = token
-        }
-        return Setup(core: core, project: project, tree: tree, tokens: tokens, ids: ids)
+        return Setup(core: core, project: project, ids: ids)
     }
 
     private func write(_ folder: URL, _ path: String, _ text: String = "# Page\n") throws {
@@ -55,16 +41,27 @@ struct PinsTests {
         try Data(text.utf8).write(to: url)
     }
 
-    private func unpin(_ s: Setup, _ who: String, _ arguments: JSONValue) async throws -> String {
-        try await s.core.unpinPage(DaemonAPI.PinToolRequest(token: s.tokens[who]!, arguments: arguments))
+    @discardableResult
+    private func pin(_ s: Setup, _ path: String, title: String? = nil) async throws -> [PinView] {
+        try await s.core.pinByPerson(DaemonAPI.PinRequest(folder: s.project, path: path, title: title))
     }
 
-    private func move(_ s: Setup, _ who: String, _ arguments: JSONValue) async throws -> String {
-        try await s.core.movePin(DaemonAPI.PinToolRequest(token: s.tokens[who]!, arguments: arguments))
+    private func unpin(_ s: Setup, _ path: String) async throws {
+        try await s.core.unpinByPerson(DaemonAPI.PinPathRequest(folder: s.project, path: path))
     }
 
-    private func pin(_ s: Setup, _ who: String, _ arguments: JSONValue) async throws -> String {
-        try await s.core.pinPage(DaemonAPI.PinToolRequest(token: s.tokens[who]!, arguments: arguments))
+    private func arrange(_ s: Setup, _ paths: [String]) async throws {
+        try await s.core.arrangePins(DaemonAPI.PinArrangeRequest(folder: s.project, paths: paths))
+    }
+
+    private func pinSession(_ s: Setup, _ id: UUID) async throws {
+        try await s.core.pinSessionByPerson(DaemonAPI.PinSessionRequest(folder: s.project, agentID: id))
+    }
+
+    /// A pins file written as it is on disk, as an older build left it.
+    private func writePinsFile(_ s: Setup, _ file: PinsFile) throws {
+        try FileManager.default.createDirectory(at: s.project.appending(path: ".agents"), withIntermediateDirectories: true)
+        try file.fileData().write(to: s.project.appending(path: PinsFile.path))
     }
 
     private func refusal(_ body: () async throws -> Any) async -> String? {
@@ -75,20 +72,39 @@ struct PinsTests {
         try PinsFile.read(Data(contentsOf: s.project.appending(path: PinsFile.path))).file
     }
 
-    @Test func anAgentPinsAPageIntoTheProjectFile() async throws {
-        let s = try await setUp([("Lead", false, nil)])
+    @Test func thePersonPinsAPageIntoTheProjectFile() async throws {
+        let s = try await setUp([])
         try write(s.project, "docs/roadmap.md")
-        let answer = try await pin(s, "Lead", ["path": "docs/roadmap.md", "title": "Roadmap"])
-        #expect(answer.contains("Pinned docs/roadmap.md"))
-        #expect(answer.contains("1. Roadmap — docs/roadmap.md [markdown], pinned by you"))
+        let views = try await pin(s, "docs/roadmap.md", title: "Roadmap")
+        try #require(views.map(\.title) == ["Roadmap"])
+        #expect(views[0].kind == .markdown && views[0].pinnedBy.kind == .person)
         let file = try pinsFile(s)
-        #expect(file.pins == [PinEntry(path: "docs/roadmap.md", title: "Roadmap", pinnedBy: .agent(s.ids["Lead"]!))])
+        #expect(file.pins == [PinEntry(path: "docs/roadmap.md", title: "Roadmap", pinnedBy: .thePerson)])
         let text = try String(contentsOf: s.project.appending(path: PinsFile.path), encoding: .utf8)
         #expect(text.contains("\"pinned_by\""))
-        let views = await s.core.pinViews(s.project)
-        try #require(views.map(\.title) == ["Roadmap"])
-        #expect(views[0].pinnedBy.name == "Lead")
         #expect(await s.core.pinsList().map(\.folder) == [s.project])
+    }
+
+    /// Agents pinned with their own tools until #640. What they pinned stays, under their
+    /// names, and the person unpins it as any other.
+    @Test func pinsAgentsMadeBeforeStayUnderTheirNames() async throws {
+        let s = try await setUp(["Lead"])
+        let lead = try #require(s.ids["Lead"])
+        try write(s.project, "a.md")
+        try write(s.project, "report.html", "<p>r</p>")
+        try writePinsFile(s, PinsFile(pins: [PinEntry(path: "a.md", pinnedBy: .agent(lead)),
+                                             PinEntry(path: "report.html", pinnedBy: .workflow("nightly"))],
+                                      sessions: [SessionPinEntry(session: lead, pinnedBy: .agent(lead))]))
+        let views = await s.core.pinViews(s.project)
+        #expect(views.map(\.pinnedBy.kind) == [.agent, .workflow])
+        #expect(views.map(\.pinnedBy.name) == ["Lead", "nightly"])
+        #expect(await s.core.pinsList().first?.sessions == [lead])
+
+        try await unpin(s, "a.md")
+        try await unpin(s, "report.html")
+        try await s.core.unpinSessionByPerson(DaemonAPI.PinSessionRequest(folder: s.project, agentID: lead))
+        // The last one gone takes the file with it.
+        #expect(!FileManager.default.fileExists(atPath: s.project.appending(path: PinsFile.path).path))
     }
 
     @Test func titlesDefaultToTheFileOrItsFolder() {
@@ -102,105 +118,76 @@ struct PinsTests {
     }
 
     @Test func onlyMarkdownAndHTMLInTheProjectArePinned() async throws {
-        let s = try await setUp([("Lead", false, nil)])
+        let s = try await setUp([])
         try write(s.project, "notes.txt")
-        let txt = await refusal { try await pin(s, "Lead", ["path": "notes.txt"]) }
+        let txt = await refusal { try await pin(s, "notes.txt") }
         #expect(txt?.contains("only a Markdown (.md) or HTML (.html) page") == true)
-        let gone = await refusal { try await pin(s, "Lead", ["path": "nowhere.md"]) }
+        let gone = await refusal { try await pin(s, "nowhere.md") }
         #expect(gone?.contains("there is no file at nowhere.md") == true)
-        let outside = await refusal { try await pin(s, "Lead", ["path": "/etc/hosts.md"]) }
+        let outside = await refusal { try await pin(s, "/etc/hosts.md") }
         #expect(outside?.contains("is not in this project") == true)
+        let stranger = await refusal {
+            try await s.core.pinByPerson(DaemonAPI.PinRequest(folder: URL(filePath: "/etc"), path: "hosts.md"))
+        }
+        #expect(stranger?.contains("no project at") == true)
         #expect(!FileManager.default.fileExists(atPath: s.project.appending(path: PinsFile.path).path))
     }
 
     @Test func theLimitIsTenAndSaysSo() async throws {
-        let s = try await setUp([("Lead", false, nil)])
+        let s = try await setUp([])
         for index in 1...PinLimits.perProject {
             try write(s.project, "p\(index).md")
-            _ = try await pin(s, "Lead", ["path": .string("p\(index).md")])
+            try await pin(s, "p\(index).md")
         }
         try write(s.project, "eleven.md")
-        let message = await refusal { try await pin(s, "Lead", ["path": "eleven.md"]) }
+        let message = await refusal { try await pin(s, "eleven.md") }
         #expect(message == "Nothing was pinned: this project already has 10 pins, pages and views together, "
-            + "the most it can have. Unpin one first, or ask the person which to unpin.")
-        let person = await refusal {
-            try await s.core.pinByPerson(DaemonAPI.PinRequest(folder: s.project, path: "eleven.md"))
-        }
-        #expect(person?.contains("already has 10 pins") == true)
+            + "the most it can have. Unpin one first.")
         // Pinning one already pinned is a retitle, not a new pin.
-        let again = try await pin(s, "Lead", ["path": "p3.md", "title": "Three"])
-        #expect(again.contains("its title is now"))
+        let again = try await pin(s, "p3.md", title: "Three")
+        #expect(again.map(\.title).dropFirst(2).first == "Three")
         #expect(try pinsFile(s).pins.count == 10)
     }
 
-    @Test func anAgentUnpinsOnlyItsOwnAndThePersonUnpinsAny() async throws {
-        let s = try await setUp([("Lead", false, nil), ("Helper", false, nil)])
+    @Test func thePersonUnpinsAnyPinByItsPath() async throws {
+        let s = try await setUp([])
         try write(s.project, "a.md")
         try write(s.project, "b.html", "<p>b</p>")
-        _ = try await pin(s, "Lead", ["path": "a.md"])
-        _ = try await s.core.pinByPerson(DaemonAPI.PinRequest(folder: s.project, path: s.project.appending(path: "b.html").path))
-        let theirs = await refusal { try await unpin(s, "Helper", ["path": "a.md"]) }
-        #expect(theirs?.contains("a.md was pinned by the agent “Lead”") == true)
-        let persons = await refusal { try await unpin(s, "Lead", ["path": "b.html"]) }
-        #expect(persons?.contains("pinned by the person") == true)
-        let done = try await unpin(s, "Lead", ["path": "a.md"])
-        #expect(done.hasPrefix("Unpinned a.md."))
-        try await s.core.unpinByPerson(DaemonAPI.PinPathRequest(folder: s.project, path: "b.html"))
-        // The last one gone takes the file with it.
+        try await pin(s, "a.md")
+        try await pin(s, s.project.appending(path: "b.html").path)
+        #expect(try pinsFile(s).pins.map(\.path) == ["a.md", "b.html"])
+        let never = await refusal { try await unpin(s, "c.md") }
+        #expect(never == "Nothing was unpinned: c.md is not pinned in this project.")
+        try await unpin(s, s.project.appending(path: "a.md").path)
+        try await unpin(s, "b.html")
         #expect(!FileManager.default.fileExists(atPath: s.project.appending(path: PinsFile.path).path))
     }
 
-    @Test func pinsMoveByToolAndByDrop() async throws {
-        let s = try await setUp([("Lead", false, nil), ("Helper", false, nil)])
+    @Test func pinsMoveByDrop() async throws {
+        let s = try await setUp([])
         for name in ["a", "b", "c"] {
             try write(s.project, "\(name).md")
-            _ = try await pin(s, "Lead", ["path": .string("\(name).md")])
+            try await pin(s, "\(name).md")
         }
-        _ = try await move(s, "Helper", ["path": "c.md", "position": "first"])
-        #expect(try pinsFile(s).pins.map(\.path) == ["c.md", "a.md", "b.md"])
-        _ = try await move(s, "Helper", ["path": "c.md", "after": "b.md"])
-        #expect(try pinsFile(s).pins.map(\.path) == ["a.md", "b.md", "c.md"])
-        let bad = await refusal { try await move(s, "Helper", ["path": "a.md", "before": "a.md"]) }
-        #expect(bad == "Nothing was moved: a page can't go next to itself.")
-        let two = await refusal { try await move(s, "Helper", ["path": "a.md", "position": "last", "after": "b.md"]) }
-        #expect(two?.contains("give one of") == true)
         // A drop names the whole order; anything it leaves out keeps its place after.
-        try await s.core.arrangePins(DaemonAPI.PinArrangeRequest(folder: s.project, paths: ["b.md", "gone.md", "a.md"]))
+        try await arrange(s, ["b.md", "gone.md", "a.md"])
         #expect(try pinsFile(s).pins.map(\.path) == ["b.md", "a.md", "c.md"])
-    }
-
-    @Test func aWorktreeAgentPinsTheProjectPathAndItShowsMissingUntilItLands() async throws {
-        let s = try await setUp([("Lane", true, nil)])
-        try write(s.tree, "docs/review.md")
-        let answer = try await pin(s, "Lane", ["path": .string(s.tree.appending(path: "docs/review.md").path)])
-        #expect(answer.contains("only in your worktree so far"))
-        #expect(try pinsFile(s).pins.map(\.path) == ["docs/review.md"])
-        #expect(await s.core.pinViews(s.project).first?.missing == true)
-        try write(s.project, "docs/review.md")
-        #expect(await s.core.pinViews(s.project).first?.missing == false)
+        try await arrange(s, ["c.md"])
+        #expect(try pinsFile(s).pins.map(\.path) == ["c.md", "b.md", "a.md"])
     }
 
     @Test func aDeletedFileStaysPinnedAndMissing() async throws {
-        let s = try await setUp([("Lead", false, nil)])
+        let s = try await setUp([])
         try write(s.project, "a.md")
-        _ = try await pin(s, "Lead", ["path": "a.md"])
+        try await pin(s, "a.md")
         try FileManager.default.removeItem(at: s.project.appending(path: "a.md"))
-        let views = await s.core.pinViews(s.project)
-        #expect(views.map(\.missing) == [true])
-        let read = await s.core.pinsWords(s.project, for: nil)
-        #expect(read.contains("missing from the project folder"))
-    }
-
-    @Test func aWorkflowsRunsShareItsPins() async throws {
-        let s = try await setUp([("Run 1", false, "nightly"), ("Run 2", false, "nightly")])
-        try write(s.project, "report.html", "<p>r</p>")
-        _ = try await pin(s, "Run 1", ["path": "report.html"])
-        #expect(try pinsFile(s).pins.first?.pinnedBy == .workflow("nightly"))
-        _ = try await unpin(s, "Run 2", ["path": "report.html"])
+        #expect(await s.core.pinViews(s.project).map(\.missing) == [true])
+        try write(s.project, "a.md")
+        #expect(await s.core.pinViews(s.project).map(\.missing) == [false])
     }
 
     @Test func pagesAreReadAndWrittenOnlyInsideTheProject() async throws {
-        let s = try await setUp([("Lead", false, nil)])
+        let s = try await setUp([])
         try write(s.project, "docs/a.md", "hello\n")
         let reading = try await s.core.readPage(DaemonAPI.PinReadRequest(folder: s.project, path: "docs/a.md"))
         guard case .text(let text, _, _, _) = reading else { Issue.record("not text"); return }
@@ -243,10 +230,10 @@ struct PinsTests {
     /// the daemon's root, and once it reads again pins change as before.
     @Test(arguments: ["conflict", "permissions"])
     func aPinsFileThatDoesNotReadIsNeverWrittenOver(_ how: String) async throws {
-        let s = try await setUp([("Lead", false, nil)])
+        let s = try await setUp([])
         try write(s.project, "docs/a.md")
         try write(s.project, "docs/b.md")
-        _ = try await pin(s, "Lead", ["path": "docs/a.md"])
+        try await pin(s, "docs/a.md")
         let url = s.project.appending(path: PinsFile.path)
         let good = try Data(contentsOf: url)
         let bytes: Data = switch how {
@@ -258,7 +245,7 @@ struct PinsTests {
         if how == "permissions" { try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: url.path) }
 
         #expect(await s.core.pinViews(s.project).isEmpty)
-        let refused = await refusal { try await pin(s, "Lead", ["path": "docs/b.md"]) }
+        let refused = await refusal { try await pin(s, "docs/b.md") }
         #expect(refused?.contains("could not be read") == true, "\(refused ?? "nil")")
         #expect(await refusal { try await s.core.arrangePins(DaemonAPI.PinArrangeRequest(folder: s.project, paths: [])) } != nil)
         try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: url.path)
@@ -272,7 +259,7 @@ struct PinsTests {
 
             // Fixed by hand: pins change again.
             try good.write(to: url)
-            _ = try await pin(s, "Lead", ["path": "docs/b.md"])
+            try await pin(s, "docs/b.md")
             #expect(try pinsFile(s).pins.map(\.path) == ["docs/a.md", "docs/b.md"])
         }
     }
@@ -280,7 +267,7 @@ struct PinsTests {
     /// A newer build's pins (a kind of page or a pinner this build does not know) read as
     /// far as they can; before a change drops them, the whole file is kept under the root.
     @Test func aNewerBuildsPinsAreKeptBeforeAChangeDropsThem() async throws {
-        let s = try await setUp([("Lead", false, nil)])
+        let s = try await setUp([])
         try write(s.project, "docs/a.md")
         try write(s.project, "docs/b.md")
         let url = s.project.appending(path: PinsFile.path)
@@ -288,38 +275,29 @@ struct PinsTests {
         let newer = Data(#"{"pins":[{"path":"docs/a.md","pinned_by":{"team":"x"}},{"path":"docs/c.pdf","pinned_by":{"person":true}}]}"#.utf8)
         try newer.write(to: url)
 
-        _ = try await pin(s, "Lead", ["path": "docs/b.md"])
+        try await pin(s, "docs/b.md")
         let kept = StoreCoding.asides(of: url, in: StoreCoding.asideFolder(for: url, under: await s.core.locations.root))
         #expect(kept.count == 1)
         #expect(try kept.first.map { try Data(contentsOf: $0) } == newer, "byte for byte")
-        _ = try await pin(s, "Lead", ["path": "docs/a.md", "title": "A"])
+        try await pin(s, "docs/a.md", title: "A")
         #expect(StoreCoding.asides(of: url, in: StoreCoding.asideFolder(for: url, under: await s.core.locations.root)).count == 1,
                 "kept once")
     }
 
     // MARK: Pinned sessions (#180)
 
-    private func pinSelf(_ s: Setup, _ who: String, _ arguments: JSONValue = [:]) async throws -> String {
-        try await s.core.pinSessionTool(DaemonAPI.PinToolRequest(token: s.tokens[who]!, arguments: arguments))
-    }
-
     @Test func sessionsArePinnedBesideThePagesInTheSameFile() async throws {
-        let s = try await setUp([("Lead", false, nil), ("Intake", false, nil), ("Helper", true, nil)])
+        let s = try await setUp(["Lead", "Intake", "Helper"])
         let (lead, intake, helper) = (try #require(s.ids["Lead"]), try #require(s.ids["Intake"]), try #require(s.ids["Helper"]))
         try write(s.project, "a.md")
-        _ = try await pin(s, "Lead", ["path": "a.md"])
+        try await pin(s, "a.md")
         let pagesOnly = try Data(contentsOf: s.project.appending(path: PinsFile.path))
         #expect(!String(decoding: pagesOnly, as: UTF8.self).contains("sessions"), "a file of pages is as it was")
 
-        let said = try await pinSelf(s, "Lead")
-        #expect(said.hasPrefix("Pinned this session at the top of its project"))
-        try await s.core.pinSessionByPerson(DaemonAPI.PinSessionRequest(folder: s.project, agentID: intake))
-        // An agent in a worktree pins into the project folder's file.
-        _ = try await pinSelf(s, "Helper", ["position": "first"])
-        #expect(try pinsFile(s).sessionPins.map(\.session) == [helper, lead, intake])
+        for id in [helper, lead, intake, lead] { try await pinSession(s, id) }
+        #expect(try pinsFile(s).sessionPins.map(\.session) == [helper, lead, intake], "each once")
         #expect(try pinsFile(s).pins.map(\.path) == ["a.md"], "the pages are untouched")
-        #expect(try pinsFile(s).sessionPins.first?.pinnedBy == .agent(helper))
-        #expect(!FileManager.default.fileExists(atPath: s.tree.appending(path: PinsFile.path).path), "never in a worktree")
+        #expect(try pinsFile(s).sessionPins.allSatisfy { $0.pinnedBy == .thePerson })
 
         let listed = await s.core.pinsList()
         #expect(listed.first?.sessions == [helper, lead, intake])
@@ -327,33 +305,23 @@ struct PinsTests {
         try await s.core.arrangeSessionPins(DaemonAPI.PinArrangeSessionsRequest(
             folder: s.project, agentIDs: [intake, UUID(), lead]))
         #expect(try pinsFile(s).sessionPins.map(\.session) == [intake, lead, helper])
-    }
 
-    @Test func anAgentUnpinsOnlyItsOwnSessionAndThePersonAny() async throws {
-        let s = try await setUp([("Lead", false, nil), ("Intake", false, nil)])
-        try await s.core.pinSessionByPerson(DaemonAPI.PinSessionRequest(folder: s.project, agentID: s.ids["Lead"]!))
-        let refused = await refusal { try await pinSelf(s, "Lead", ["pinned": false]) }
-        #expect(refused?.contains("pinned by the person") == true)
-        _ = try await pinSelf(s, "Intake")
-        #expect(try await pinSelf(s, "Intake").hasPrefix("This session was already pinned."))
-        #expect(try await pinSelf(s, "Intake", ["pinned": false]).hasPrefix("Unpinned this session."))
-        try await s.core.unpinSessionByPerson(DaemonAPI.PinSessionRequest(folder: s.project, agentID: s.ids["Lead"]!))
+        for id in [intake, lead, helper] {
+            try await s.core.unpinSessionByPerson(DaemonAPI.PinSessionRequest(folder: s.project, agentID: id))
+        }
+        try await unpin(s, "a.md")
         // Nothing pinned at all takes the file with it.
         #expect(!FileManager.default.fileExists(atPath: s.project.appending(path: PinsFile.path).path))
     }
 
     @Test func archivingUnpinsAndBringingBackDoesNotPinAgain() async throws {
-        let s = try await setUp([("Lead", false, nil), ("Intake", false, nil)])
+        let s = try await setUp(["Lead", "Intake"])
         let (lead, intake) = (try #require(s.ids["Lead"]), try #require(s.ids["Intake"]))
-        try write(s.project, "a.md")
-        _ = try await pin(s, "Lead", ["path": "a.md"])
-        _ = try await pinSelf(s, "Lead")
-        _ = try await pinSelf(s, "Intake")
+        try await pinSession(s, lead)
+        try await pinSession(s, intake)
         try await s.core.archive(lead)
         #expect(try pinsFile(s).sessionPins.map(\.session) == [intake])
-        let archived = await refusal {
-            try await s.core.pinSessionByPerson(DaemonAPI.PinSessionRequest(folder: s.project, agentID: lead))
-        }
+        let archived = await refusal { try await pinSession(s, lead) }
         #expect(archived == "Nothing was pinned: an archived session can't be pinned.")
         try await s.core.unarchive(lead)
         #expect(try pinsFile(s).sessionPins.map(\.session) == [intake])
@@ -361,14 +329,13 @@ struct PinsTests {
 
     @Test func aSessionFromElsewhereIsRefusedAndTheLimitIsTen() async throws {
         let names = (1...11).map { "Session \($0)" }  // index-ok: eleven
-        let s = try await setUp(names.map { ($0, false, nil) })
-        let elsewhere = await refusal {
-            try await s.core.pinSessionByPerson(DaemonAPI.PinSessionRequest(folder: s.project, agentID: UUID()))
-        }
+        let s = try await setUp(names)
+        let elsewhere = await refusal { try await pinSession(s, UUID()) }
         #expect(elsewhere == "Nothing was pinned: that session is not in this project.")
-        for name in names.prefix(10) { _ = try await pinSelf(s, name) }
-        let full = await refusal { try await pinSelf(s, names[10]) }
-        #expect(full?.contains("already has 10 pinned sessions") == true)
+        for name in names.prefix(10) { try await pinSession(s, s.ids[name]!) }
+        let full = await refusal { try await pinSession(s, s.ids[names[10]]!) }
+        #expect(full == "Nothing was pinned: this project already has 10 pinned sessions, the most it can have. "
+            + "Unpin one first.")
     }
 
     @Test func aSessionPinReadBackKeepsEachOnceAndUnderTheLimit() throws {
@@ -393,10 +360,10 @@ struct PinsTests {
     }
 
     @Test func workflowsArePinnedBesideTheSessionsInTheSameFile() async throws {
-        let s = try await setUp([("Lead", false, nil)])
+        let s = try await setUp(["Lead"])
         for id in ["release-notes", "triage", "tidy"] { try writeWorkflow(s, id) }
         await s.core.rescanWorkflows(in: s.project)
-        _ = try await pinSelf(s, "Lead")
+        try await pinSession(s, s.ids["Lead"]!)
         let sessionsOnly = try Data(contentsOf: s.project.appending(path: PinsFile.path))
         #expect(!String(decoding: sessionsOnly, as: UTF8.self).contains("workflows"), "a file without them is as it was")
 
@@ -447,18 +414,20 @@ struct PinsTests {
 
     // MARK: Views (#189)
 
-    private let testView: JSONValue = ["server": "agents", "uri": "ui://agents/test-view", "tool": "show_test_view",
-                                       "arguments": ["note": "pinned"]]
+    private let testView = ViewPin(server: "agents", uri: "ui://agents/test-view", tool: "show_test_view",
+                                   arguments: ["note": "pinned"])
 
-    @Test func anAgentPinsAViewWithItsFeedingCall() async throws {
-        let s = try await setUp([("Lead", false, nil)])
+    private func pinView(_ s: Setup, _ view: ViewPin, title: String? = nil) async throws {
+        _ = try await s.core.pinByPerson(DaemonAPI.PinRequest(folder: s.project, view: view, title: title))
+    }
+
+    @Test func thePersonPinsAViewWithItsFeedingCall() async throws {
+        let s = try await setUp([])
         await s.core.offerTestView(true)
-        let said = try await pin(s, "Lead", ["view": testView, "title": "Test view"])
-        #expect(said.contains("Pinned ui://agents/test-view"))
-        #expect(said.contains("view of the agents server, fed by show_test_view"))
+        try await pinView(s, testView, title: "Test view")
         let entry = try #require(try pinsFile(s).pins.first)
-        #expect(entry.view == ViewPin(server: "agents", uri: "ui://agents/test-view", tool: "show_test_view",
-                                      arguments: ["note": "pinned"]))
+        #expect(entry.view == testView)
+        #expect(entry.pinnedBy == .thePerson)
         // The file says `view`, never a `path`, for a view pin.
         let raw = try String(contentsOf: s.project.appending(path: PinsFile.path), encoding: .utf8)
         #expect(raw.contains("\"view\"") && !raw.contains("\"path\""))
@@ -466,66 +435,58 @@ struct PinsTests {
         #expect(shown.kind == .view && !shown.missing && shown.missingReason == nil)
         #expect(shown.path == "ui://agents/test-view" && shown.title == "Test view")
         // Pinned again: the new arguments, still one pin.
-        _ = try await pin(s, "Lead", ["view": ["server": "agents", "uri": "ui://agents/test-view",
-                                               "tool": "show_test_view", "arguments": ["note": "again"]]])
+        try await pinView(s, ViewPin(server: "agents", uri: "ui://agents/test-view", tool: "show_test_view",
+                                     arguments: ["note": "again"]))
         #expect(try pinsFile(s).pins.count == 1)
         #expect(try pinsFile(s).pins.first?.view?.arguments?["note"]?.stringValue == "again")
         // Moved and unpinned by its address.
         try write(s.project, "a.md")
-        _ = try await pin(s, "Lead", ["path": "a.md"])
-        _ = try await move(s, "Lead", ["path": "a.md", "before": "ui://agents/test-view"])
+        try await pin(s, "a.md")
+        try await arrange(s, ["a.md", "ui://agents/test-view"])
         #expect(try pinsFile(s).pins.map(\.path) == ["a.md", "ui://agents/test-view"])
-        let gone = try await unpin(s, "Lead", ["path": "ui://agents/test-view"])
-        #expect(gone.hasPrefix("Unpinned ui://agents/test-view."))
+        try await unpin(s, "ui://agents/test-view")
+        #expect(try pinsFile(s).pins.map(\.path) == ["a.md"])
     }
 
     @Test func onlyAReadOnlyToolOfASetUpServerFeedsAPin() async throws {
-        let s = try await setUp([("Lead", false, nil)])
+        let s = try await setUp([])
         await s.core.offerTestView(true)
-        func refused(_ view: JSONValue) async -> String? { await refusal { try await pin(s, "Lead", ["view": view]) } }
-        let counting = await refused(["server": "agents", "uri": "ui://agents/test-view", "tool": "test_view_count"])
+        func refused(_ view: ViewPin) async -> String? { await refusal { try await pinView(s, view) } }
+        let counting = await refused(ViewPin(server: "agents", uri: "ui://agents/test-view", tool: "test_view_count"))
         #expect(counting?.contains("test_view_count can't feed a pin") == true)
-        let gone = await refused(["server": "agents", "uri": "ui://agents/dashboard", "tool": "read_dashboard"])
+        let gone = await refused(ViewPin(server: "agents", uri: "ui://agents/dashboard", tool: "read_dashboard"))
         #expect(gone == "Nothing was pinned: the agents server has no view at ui://agents/dashboard.")
-        let other = await refused(["server": "github", "uri": "ui://github/issues", "tool": "list_issues"])
+        let other = await refused(ViewPin(server: "github", uri: "ui://github/issues", tool: "list_issues"))
         // Another server's view can be pinned (#191), once it is set up here.
         #expect(other?.contains("github is not set up here") == true)
-        let big = await refused(["server": "agents", "uri": "ui://agents/test-view", "tool": "show_test_view",
-                                 "arguments": ["note": .string(String(repeating: "x", count: 3000))]])
+        let big = await refused(ViewPin(server: "agents", uri: "ui://agents/test-view", tool: "show_test_view",
+                                        arguments: ["note": .string(String(repeating: "x", count: 3000))]))
         #expect(big?.contains("at most 2 KB") == true)
-        let person = await refusal {
-            try await s.core.pinByPerson(DaemonAPI.PinRequest(
-                folder: s.project, view: ViewPin(server: "agents", uri: "ui://agents/dashboard", tool: "read_dashboard")))
-        }
-        #expect(person?.contains("has no view at ui://agents/dashboard") == true)
         #expect(!FileManager.default.fileExists(atPath: s.project.appending(path: PinsFile.path).path))
     }
 
     @Test func theLimitCountsPagesAndViewsTogether() async throws {
-        let s = try await setUp([("Lead", false, nil)])
+        let s = try await setUp([])
         await s.core.offerTestView(true)
         for index in 0..<9 {
             try write(s.project, "p\(index).md")
-            _ = try await pin(s, "Lead", ["path": .string("p\(index).md")])
+            try await pin(s, "p\(index).md")
         }
-        _ = try await s.core.pinByPerson(DaemonAPI.PinRequest(
-            folder: s.project, view: ViewPin(server: "agents", uri: "ui://agents/test-view", tool: "show_test_view")))
+        try await pinView(s, ViewPin(server: "agents", uri: "ui://agents/test-view", tool: "show_test_view"))
         try write(s.project, "eleven.md")
-        let message = await refusal { try await pin(s, "Lead", ["path": "eleven.md"]) }
+        let message = await refusal { try await pin(s, "eleven.md") }
         #expect(message?.contains("already has 10 pins, pages and views together") == true)
         // The person unpins the view by its address.
-        try await s.core.unpinByPerson(DaemonAPI.PinPathRequest(folder: s.project, path: "ui://agents/test-view"))
+        try await unpin(s, "ui://agents/test-view")
         #expect(try pinsFile(s).pins.count == 9)
     }
 
     @Test func aViewThisHostCannotDrawShowsAsMissingWithWhy() async throws {
-        let s = try await setUp([("Lead", false, nil)])
-        let file = PinsFile(pins: [
+        let s = try await setUp([])
+        try writePinsFile(s, PinsFile(pins: [
             PinEntry(view: ViewPin(server: "github", uri: "ui://github/issues", tool: "list_issues"), pinnedBy: .thePerson),
             PinEntry(view: ViewPin(server: "agents", uri: "ui://agents/test-view", tool: "show_test_view"), pinnedBy: .thePerson),
-        ])
-        try FileManager.default.createDirectory(at: s.project.appending(path: ".agents"), withIntermediateDirectories: true)
-        try file.fileData().write(to: s.project.appending(path: PinsFile.path))
+        ]))
         // The test view is not offered on this host.
         let shown = await s.core.pinViews(s.project)
         #expect(shown.map(\.missingReason) == [PinMissing.serverNotSetUp, PinMissing.noSuchView])
@@ -533,19 +494,17 @@ struct PinsTests {
         #expect(shown.first?.title == "Issues")
         await s.core.offerTestView(true)
         #expect(await s.core.pinViews(s.project).map(\.missing) == [true, false])
-        let words = await s.core.pinsWords(s.project, for: nil)
-        #expect(words.contains("missing: server not set up here"))
     }
 
     @Test func anEntryThisBuildCannotReadIsKeptAndCounted() async throws {
-        let s = try await setUp([("Lead", false, nil)])
+        let s = try await setUp([])
         try write(s.project, "a.md")
         let raw = #"{"pins":[{"path":"a.md","pinned_by":{"person":true}},{"widget":{"kind":"later"},"pinned_by":{"person":true}}]}"#
         try FileManager.default.createDirectory(at: s.project.appending(path: ".agents"), withIntermediateDirectories: true)
         try Data(raw.utf8).write(to: s.project.appending(path: PinsFile.path))
         #expect(await s.core.pinViews(s.project).map(\.path) == ["a.md"])
         try write(s.project, "b.md")
-        _ = try await pin(s, "Lead", ["path": "b.md"])
+        try await pin(s, "b.md")
         let file = try pinsFile(s)
         #expect(file.pins.map(\.path) == ["a.md", "b.md"])
         #expect(file.unread.count == 1 && file.pinCount == 3)

@@ -25,6 +25,16 @@ struct AppToolPermissionTests {
         #expect(AppTool.isServedByTheApp("agents_publish_event"))
     }
 
+    /// The pin tools went in #640: no longer offered, but a conversation that called them
+    /// still draws them as the app's own calls.
+    @Test func theRetiredPinToolsAreStillTheAppsInAnOldConversation() {
+        for tool in AppTool.retiredPins {
+            #expect(!AppTool.all.contains(tool))
+            #expect(AppTool.isServedByTheApp("mcp__agents__\(tool)"), "Claude's spelling of \(tool)")
+            #expect(ToolCall(title: "agents_\(tool)").isAutoAllowable, "\(tool)")
+        }
+    }
+
     /// A bare name says nothing about whose it is: Antigravity has a `list_resources` of
     /// its own. Nor does another server's tool of the same name.
     @Test func aBareNameOrAnotherServersToolIsStillThePersonsToAnswer() {
