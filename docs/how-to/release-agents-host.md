@@ -26,9 +26,11 @@ You set this up once, as the Apple Developer account's Account Holder.
    App Store too. In the developer site's Profiles, make a **Developer ID** profile for the
    App ID `com.alexecollins.agents.bridge`, with the certificate from step 1. Name it exactly
    **Agents Relay Developer ID** and download it.
-3. **The `release` environment.** In the repository's Settings ▸ Environments, create
-   `release`. Under **Deployment branches and tags**, allow only tags matching `v*`.
-   Then add these secrets:
+3. **The `release` environment.** In Keychain Access, under My Certificates, export
+   **Developer ID Application: …** as a `.p12`. Then run
+   `scripts/release-secrets.sh path/to/DeveloperID.p12` and delete the `.p12`. The script
+   creates `release`, allows only tags matching `v*` to deploy to it, and sets these
+   secrets (or set them yourself in Settings ▸ Environments):
 
    | Secret | Value |
    |---|---|
