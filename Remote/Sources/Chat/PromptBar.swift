@@ -630,8 +630,11 @@ private struct PromptHead: View {
                     .paperRaised(in: .capsule)
                     .accessibilityLabel("Worktree: \(place)")
             }
+            // The labels take the width the place leaves, not half of it: a Spacer beside
+            // them was as flexible as their wrapping row, so the two split it and the
+            // chips wrapped beside empty space (#670).
             RemoteSessionLabels(agent: agent, compact: false)
-            Spacer(minLength: 0)
+                .frame(maxWidth: .infinity, alignment: .leading)
             Text(PromptWords.runtimeName(agent.runtimeID))
                 .lineLimit(1)
                 .padding(.horizontal, 10)
