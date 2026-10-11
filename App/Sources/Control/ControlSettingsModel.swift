@@ -132,8 +132,8 @@ final class ControlSettingsModel {
     private(set) var tunnels: [String: DaemonAPI.HostTunnel] = [:]
 
     enum InstallOutcome: Equatable {
-        /// `tunnel`: the server is reached through a bastion, so it dials the control plane
-        /// through a reverse tunnel the control plane holds over ssh (#435).
+        /// `tunnel`: the server dials the control plane through a reverse tunnel the
+        /// control plane holds over ssh (#435, #610).
         case added(name: String, tunnel: Bool)
         /// The server's key is new to this Mac: the person looks at it and says so.
         case needsTrust(fingerprint: String)
@@ -142,10 +142,13 @@ final class ControlSettingsModel {
 
     /// Add a server over ssh (frame M2): the control plane installs the host once with the
     /// key given here, which goes in this one call and is kept nowhere (058, T072). With no
-    /// key, the control plane's ssh logs in as `ssh user@host` would (#413).
-    func install(destination: String, name: String? = nil, key: String? = nil, trust: String? = nil) async -> InstallOutcome {
+    /// key, the control plane's ssh logs in as `ssh user@host` would (#413). `tunnel`: whether
+    /// it dials back through an ssh tunnel; nil leaves it to whether it is behind a bastion.
+    func install(destination: String, name: String? = nil, key: String? = nil, trust: String? = nil,
+                 tunnel: Bool? = nil) async -> InstallOutcome {
         installStep = nil
         var params: [String: JSONValue] = ["destination": .string(destination)]
+        if let tunnel { params["tunnel"] = .bool(tunnel) }
         if let key { params["key"] = .string(key) }
         if let name, !name.isEmpty { params["name"] = .string(name) }
         if let trust { params["trust"] = .string(trust) }
@@ -162,21 +165,14 @@ final class ControlSettingsModel {
         }
     }
 
-    /// The servers in the ssh config that answer, installed (#429): what happened to
-    /// each, or nil with `problem` saying why it could not look.
-    func detectServers() async -> [DaemonAPI.DetectedServer]? {
-        installStep = nil
-        do {
-            let found = try await client.call(DaemonAPI.Method.hostsDetect, returning: [DaemonAPI.DetectedServer].self)
-            problem = nil
-            await refresh()
-            return found
-        } catch let error as JSONRPCError {
-            problem = HostProblem.controlRefusal(error)
-        } catch {
-            problem = "The control plane can’t be reached."
-        }
-        return nil
+    /// The hosts in the control plane's ssh config, or just `destination` as typed, as
+    /// `ssh -G` resolves each (#610): what Add a Server's server box offers. Empty when the
+    /// control plane cannot say.
+    func sshHosts(_ destination: String? = nil) async -> [DaemonAPI.SSHHost] {
+        var params: [String: JSONValue] = [:]
+        if let destination { params["destination"] = .string(destination) }
+        return (try? await client.call(DaemonAPI.Method.hostsSSHHosts, JSONValue.object(params),
+                                       returning: [DaemonAPI.SSHHost].self)) ?? []
     }
 
     /// Where a host added from now on has its projects found (#429).
