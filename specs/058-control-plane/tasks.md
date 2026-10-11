@@ -467,7 +467,7 @@ again.
   - the `AGENTS_STORE` switch, so the store configuration is the only one;
   - the Remote's old TLS-PSK path.
 
-- [ ] T107 Before the first App Store submission, and after T106 frees `com.alexecollins.agents`: decide whether the Mac window and the iPhone and iPad app become one app with Universal Purchase (one bundle ID, one listing and purchase). If so, move both to that ID, re-issue the app group, iCloud container, push and keychain entitlements and the App Store profiles, and remove the two unsubmitted records made for T093. Alex agreed the approach on 2026-09-29.
+- [x] T107 (#659, 2026-10-11, walks/us8-store.md: one app on the Remote's ID `com.alexecollins.agents.remote` rather than `com.alexecollins.agents`, so the existing iOS record carries it, listed as "Loops: Agent Workflows"; the Mac record's removal is Alex's) Before the first App Store submission, and after T106 frees `com.alexecollins.agents`: decide whether the Mac window and the iPhone and iPad app become one app with Universal Purchase (one bundle ID, one listing and purchase). If so, move both to that ID, re-issue the app group, iCloud container, push and keychain entitlements and the App Store profiles, and remove the two unsubmitted records made for T093. Alex agreed the approach on 2026-09-29.
 ---
 
 ## Phase 14: Moving the control plane between machines (#61, research R16)

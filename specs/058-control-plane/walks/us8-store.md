@@ -131,3 +131,27 @@ then `docker compose -f compose.yaml -f compose.local.yaml up -d --build`.
 - **The Remote on a phone, pasting the code.** Built for the generic simulator; the phone look
   is Alex's.
 - **Caddy with a public certificate** needs a public name pointing at the machine.
+
+## One Universal app, listed as Loops (T107, #659, 2026-10-11)
+
+Alex decided: the store listing is **Loops: Agent Workflows** (bare "Loop" and "Loops" are
+taken); only the listing is renamed, and the apps keep saying "Agents"; the Mac window and
+the Remote are one app (Universal Purchase); builds go as far as TestFlight.
+
+- **One record, no new one.** The iOS record (Apple ID 6817621595) already had the UNIVERSAL
+  bundle ID `com.alexecollins.agents.remote`, so the Mac window's **Release** config moved to
+  that ID. Debug and Live keep `.store`, so the running window keeps its container and
+  pairing. The record's en-GB name is now "Loops: Agent Workflows". App Store Connect took it
+  through the API (`appInfoLocalizations` PATCH).
+- **Profiles.** New: *Agents Universal Mac App Store* (MAC_APP_STORE on the Remote's ID), and
+  *Agents Remote Widget App Store*. The widget (068) came after the first upload, had no
+  Release signing, and failed the archive with "Embedded binary is not signed with the same
+  certificate as the parent app".
+- **Archives** as 0.1.0 (2) (`CURRENT_PROJECT_VERSION=2` on the command line; build 1 is
+  taken on iOS). Both pass `check-store-archive.sh`.
+- **altool.** The `.ipa` validated as it was. The `.pkg` needs `--apple-id 6817621595` until
+  the record has a macOS platform ("Unable to find Apple ID … on platform 'macOS App'"). With
+  it: VERIFY SUCCEEDED. Both uploaded.
+- **Left over:** the *Agents for Mac* record (6817621702, `com.alexecollins.agents.store`,
+  one unsubmitted build). Only App Store Connect's web page can remove a record, and that
+  can't be undone, so it waits for Alex.
