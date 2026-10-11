@@ -197,6 +197,11 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.ProjectRequest.self)
                 return .success(try JSONValue.encoding(try await unarchiveProject(request.folder)))
 
+            case DaemonAPI.Method.projectsDelete:
+                let request = try require(params, as: DaemonAPI.ProjectRequest.self)
+                try await deleteProject(request.folder)
+                return .success([:])
+
             case DaemonAPI.Method.projectsChatState:
                 return .success(try JSONValue.encoding(chatProjectState()))
 

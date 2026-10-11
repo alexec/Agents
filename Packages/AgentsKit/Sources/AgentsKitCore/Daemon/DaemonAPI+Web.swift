@@ -168,6 +168,8 @@ public extension DaemonAPI {
                 Row(Method.projectsClones, params: Empty.self, result: [CloneSummary].self, kind: .hostRequest),
                 // Bring Back in the Archived projects fold (#343), as the window's sidebar has it.
                 Row(Method.projectsUnarchive, params: ProjectRequest.self, result: ProjectSummary.self, kind: .hostRequest),
+                // Delete… on an archived project (#677).
+                Row(Method.projectsDelete, params: ProjectRequest.self, result: Empty.self, kind: .hostRequest),
                 // Pin and Unpin on a project's row, as the window's sidebar has them.
                 Row(Method.projectsSetPinned, params: SetPinnedRequest.self, result: ProjectSummary.self, kind: .hostRequest),
                 // A change to the project's own files made outside the app (#531): read, Keep, Undo.
@@ -201,6 +203,8 @@ public extension DaemonAPI {
                 Row(Notification.agentElicitation, params: ElicitationNotification.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.projectChanged, params: ProjectSummary.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.projectRemoved, params: ProjectRemovedNotification.self, result: Empty.self,
+                    kind: .hostNotification),
                 Row(Notification.cloneChanged, params: CloneNotification.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.draftOptions, params: DraftOptionsNotification.self, result: Empty.self,
                     kind: .hostNotification),

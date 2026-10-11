@@ -562,4 +562,52 @@ extension DaemonCore {
         reconsider()
         return summary
     }
+
+    /// Delete an archived project (#677): every session in it, each by the one path every
+    /// delete takes (#398), and then its record, so it leaves every list. Its folder and
+    /// everything in it are left exactly where they are; adding the folder again makes it
+    /// a project again, with nothing in it.
+    ///
+    /// Only an archived one, as only an archived session can be deleted. Refused before
+    /// anything is deleted when any session in it is still held, naming them, so a
+    /// refusal never leaves half a project behind.
+    public func deleteProject(_ folder: URL) async throws {
+        let standardized = Project.standardize(folder)
+        guard let record = projectRecords()[standardized], record.isArchived else {
+            throw JSONRPCError(code: DaemonAPI.Failure.deleteRefused, message: DeletionWords.projectNotArchived)
+        }
+        loadRetentionIfNeeded()
+        let inProject = agents.agents(in: standardized)
+        if let live = inProject.first(where: { $0.state.holdsRuntime || $0.state == .queued }) {
+            throw JSONRPCError(code: DaemonAPI.Failure.deleteRefused,
+                               message: DeletionWords.projectRefusal([live.title], because: DeletionWords.projectLive))
+        }
+        let candidates = inProject.map {
+            RetentionPlan.Candidate(id: $0.id, archivedAt: $0.archivedAt ?? now(),
+                                    lastActivityAt: $0.lastActivityAt, sizeOnDisk: 0)
+        }
+        // Read, not held: the person deleting a project is not reading its sessions, and
+        // archiving one below marks it as just read.
+        let held = await holds(for: candidates).filter { $0.value != .openInWindow }
+        if let hold = held.values.first {
+            let titles = inProject.filter { held[$0.id] != nil }.map(\.title)
+            throw JSONRPCError(code: DaemonAPI.Failure.deleteRefused,
+                               message: DeletionWords.projectRefusal(titles, because: DeletionWords.refusal(hold)))
+        }
+
+        DaemonLog.shared.write("deleting project \(standardized.path) with \(inProject.count) sessions")
+        for agent in inProject {
+            if agents[agent.id]?.state != .archived { try await archive(agent.id) }
+            try await delete(agent.id, because: .person)
+        }
+        var records = projectRecords()
+        records.removeValue(forKey: standardized)
+        try saveProjectRecords(records)
+        forgetWorkflows(in: standardized)
+        lastProjectSent.removeValue(forKey: standardized)
+        folderExistence.removeValue(forKey: standardized)
+        broadcast(DaemonAPI.Notification.projectRemoved, DaemonAPI.ProjectRemovedNotification(folder: standardized))
+        broadcast(DaemonAPI.Notification.retentionChanged, retentionState())
+        reconsider()
+    }
 }

@@ -27,6 +27,9 @@ struct ProjectListView: View {
     @State private var searched = ""
     /// Bumped to make the list again when its outline has drifted from the model (#237).
     @State private var outlineRebuilds = 0
+    /// The archived project Delete… is asking about, and why one could not go (#677).
+    @State private var deletingProject: DaemonAPI.ProjectSummary?
+    @State private var cannotDeleteProject: String?
     /// Projects whose every match is on show, past the first few (#176).
     @State private var showingAllMatches: Set<ProjectKey> = []
     @FocusState private var searchFocused: Bool
@@ -129,7 +132,9 @@ struct ProjectListView: View {
                 Section(isExpanded: $showsArchived) {
                     // None while folded, as under a folded project (#356).
                     ForEach(showsArchived ? model.archivedProjects : [], id: \.key) { summary in
-                        ArchivedProjectRow(summary: summary) { await model.unarchiveProject(summary.key) }
+                        ArchivedProjectRow(summary: summary, label: label(summary),
+                                           bringBack: { await model.unarchiveProject(summary.key) },
+                                           delete: { deletingProject = summary })
                             .appText(.supporting)
                     }
                 } header: {
@@ -169,6 +174,27 @@ struct ProjectListView: View {
             await model.searchSessions(words)
         }
         .searchFocused($searchFocused)
+        .confirmationDialog(DeletionWords.projectConfirmTitle(deletingProject.map(label) ?? ""),
+                            isPresented: Binding(get: { deletingProject != nil },
+                                                 set: { if !$0 { deletingProject = nil } }),
+                            presenting: deletingProject) { summary in
+            Button("Delete", role: .destructive) {
+                Task {
+                    if case .failure(let refusal) = await model.deleteProject(summary.key) {
+                        cannotDeleteProject = refusal.message
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text(DeletionWords.projectConfirmMessage)
+        }
+        .alert("This project cannot be deleted yet",
+               isPresented: Binding(get: { cannotDeleteProject != nil }, set: { if !$0 { cannotDeleteProject = nil } })) {
+            Button("OK") {}
+        } message: {
+            Text(cannotDeleteProject ?? "")
+        }
         // What this Mac and its hosts are doing, pinned at the foot: status lines rather
         // than somewhere to go, so not rows of the list. Each is absent when there is
         // nothing to say, which is most of the time (024 FR-015).
@@ -317,6 +343,11 @@ struct ProjectListView: View {
                 }
             }
         }
+    }
+
+    /// An archived project's name as its live row had it: `server:Project` on a server (#677).
+    private func label(_ summary: DaemonAPI.ProjectSummary) -> String {
+        SidebarOrder.label(summary) { model.hosts.label($0) }
     }
 }
 

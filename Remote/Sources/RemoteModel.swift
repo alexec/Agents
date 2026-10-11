@@ -1594,6 +1594,7 @@ final class RemoteModel {
                         || note.method == DaemonAPI.Notification.eventsChanged { continue }
                     guard let update = AgentsModel.read(note.method, note.params, showing: shown.id) else { continue }
                     await self?.work.apply(update, from: id)
+                    if case .projectRemoved = update { await self?.forgetArchived(AgentsModel.stamp(update, host: id)) }
                 }
                 // Its connection ended: its cards are stale until the watch reaches it again.
                 await MainActor.run { [weak self] in
@@ -1666,7 +1667,10 @@ final class RemoteModel {
         if case .agentRemoved(let removed)? = update { removedProject = self.work.agent(removed.agentID)?.projectFolder }
         // Anything the shared model does not claim is the Mac's own — shells,
         // terminals — and a remote has no business with it.
-        if let update { self.work.apply(update) }
+        if let update {
+            self.work.apply(update)
+            forgetArchived(update)
+        }
         // Nothing below waits on the network: one slow answer would hold every
         // notification after it (#175). What needs asking is asked beside the loop.
         if let updated, previousLabels != updated.labels,
@@ -2358,6 +2362,37 @@ final class RemoteModel {
             archived += theirs.filter(\.project.isArchived).map { var summary = $0; summary.host = host; return summary }
         }
         archivedProjects = archived
+    }
+
+    /// A deleted project (#677) out of the archived ones listed, as the shared model
+    /// takes it out of its own.
+    func forgetArchived(_ update: AgentsModel.Update) {
+        if case .projectRemoved(let key) = update { archivedProjects.removeAll { $0.key == key } }
+    }
+
+    /// The archived project a Delete… is asking about, until it is answered (#677).
+    var askingToDeleteProject: DaemonAPI.ProjectSummary?
+
+    /// Delete an archived project (#677), once asked, through its own host: every
+    /// session in it and its record; its folder stays. A refusal says which sessions
+    /// hold it.
+    func deleteProject(_ summary: DaemonAPI.ProjectSummary) async {
+        let host = summary.host
+        let target = host == .mac ? client : otherHosts[host]
+        guard let target, !isStale(on: host), host == .mac || reachableHosts.contains(host) else {
+            problem = "\(hostLabel(host)) is not answering, so that could not be sent."
+            return
+        }
+        do {
+            _ = try await target.call(DaemonAPI.Method.projectsDelete, DaemonAPI.ProjectRequest(folder: summary.folder),
+                                      returning: DaemonAPI.Empty.self)
+            work.removeProject(summary.key)
+            archivedProjects.removeAll { $0.key == summary.key }
+        } catch let error as JSONRPCError {
+            problem = error.message
+        } catch {
+            problem = sentence(for: error)
+        }
     }
 
     /// A project pinned to the top of the sidebar, or not, through its own host.
