@@ -1,0 +1,155 @@
+# Publishes Agents Host on GitHub when a version tag is pushed (#669): `git tag v0.2.0 &&
+# git push origin v0.2.0` makes the release the store window's "Set one up on this Mac"
+# opens (AgentsHostDownloadURL, releases/latest).
+#
+# The release carries:
+#   Agents-Host-<version>.dmg              signed with Developer ID, notarized, stapled
+#   agentsd-linux-<arch>-<version>.tar.gz  the static Linux agentsd, for a Linux host
+#   SHA256SUMS
+#
+# The signing material is in the `release` environment's secrets, which only a tag on main
+# can reach (its deployment rule). How to make each is in docs/how-to/release-agents-host.md:
+#   DEVELOPER_ID_P12, DEVELOPER_ID_P12_PASSWORD   the Developer ID Application identity
+#   RELAY_PROFILE                                 the "Agents Relay Developer ID" profile
+#   ASC_KEY_P8, ASC_KEY_ID, ASC_ISSUER_ID         the App Store Connect key, for notarytool
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: An existing v* tag to release again
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  # The static Linux agentsd, with the swift.org toolchain and its Static Linux SDK. They
+  # must match Xcode's Swift (scripts/build-linux-agentsd.sh); move all three together.
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    container: swift:6.4.0-noble
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Tools and the Static Linux SDK
+        run: |
+          apt-get update -qq && apt-get install -y -qq zsh file >/dev/null
+          swift sdk install \
+            https://download.swift.org/swift-6.4.0-release/static-sdk/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz \
+            --checksum 47d2fd89eebfdf9eb4d536b6710414297f755c17926cdebc4742c08982b40a9e
+
+      - name: Build agentsd for Linux
+        env:
+          SWIFT: swift
+          AGENTS_BUILD: ${{ github.run_number }}
+        run: |
+          export AGENTS_MARKETING_VERSION="${TAG#v}"
+          zsh scripts/build-linux-agentsd.sh
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: servers
+          path: App/Resources/servers
+          retention-days: 3
+
+  mac:
+    needs: linux
+    runs-on: xcode-27
+    timeout-minutes: 75
+    environment: release
+    permissions:
+      contents: write
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: The tag is on main
+        run: |
+          git fetch --quiet origin main
+          git merge-base --is-ancestor HEAD origin/main || {
+            echo "::error::$TAG is not on main"; exit 1; }
+
+      - uses: actions/download-artifact@v6
+        with:
+          name: servers
+          path: App/Resources/servers
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: Web/.node-version
+
+      - name: Tools
+        run: |
+          brew install xcodegen &
+          xcodegen_pid=$!
+          xcodebuild -downloadComponent MetalToolchain
+          wait "$xcodegen_pid"
+
+      # A keychain of the run's own, gone with the runner, and the relay's profile where
+      # Xcode looks for it.
+      - name: Signing
+        env:
+          DEVELOPER_ID_P12: ${{ secrets.DEVELOPER_ID_P12 }}
+          DEVELOPER_ID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+          RELAY_PROFILE: ${{ secrets.RELAY_PROFILE }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          keychain="$RUNNER_TEMP/release.keychain-db"
+          password="$(uuidgen)"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          echo "$DEVELOPER_ID_P12" | base64 --decode > "$RUNNER_TEMP/devid.p12"
+          security import "$RUNNER_TEMP/devid.p12" -k "$keychain" -P "$DEVELOPER_ID_P12_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/productsign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/devid.p12"
+          profiles="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+          mkdir -p "$profiles"
+          echo "$RELAY_PROFILE" | base64 --decode > "$profiles/agents-relay-developer-id.provisionprofile"
+          echo "$ASC_KEY_P8" > "$RUNNER_TEMP/asc.p8"
+          security find-identity -v -p codesigning | grep "Developer ID Application"
+
+      - name: Build, sign and notarize Agents Host
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          export ASC_KEY_PATH="$RUNNER_TEMP/asc.p8"
+          scripts/release-host.sh "${TAG#v}" "${{ github.run_number }}"
+
+      - name: Logs
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: release-logs
+          path: build/release/*.log
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd build/release
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" *.dmg *.tar.gz SHA256SUMS --clobber
+          else
+            gh release create "$TAG" *.dmg *.tar.gz SHA256SUMS --title "Agents Host ${TAG#v}" \
+              --generate-notes --verify-tag
+          fi
