@@ -587,8 +587,14 @@ struct PromptBar: View {
             editor.unmarkText()
             shown = editor.string
         }
+        // Back to this field itself (#650). Asked of SwiftUI alone, focus could land
+        // on the next field along instead, the labels.
+        let field = editor.delegate as? NSView
         window.makeFirstResponder(nil)
-        DispatchQueue.main.async { focused = true }
+        DispatchQueue.main.async {
+            if let field, field.window === window { window.makeFirstResponder(field) }
+            focused = true
+        }
         return shown
     }
 
@@ -979,6 +985,9 @@ struct PromptBar: View {
                       suggestions: model.draftCwd.map { model.labelSuggestions(in: $0, on: model.selectedProjectHost) } ?? [],
                       add: { draftLabels += $0 },
                       remove: { value in draftLabels.removeAll { SessionLabelPolicy.key($0) == SessionLabelPolicy.key(value) } })
+            // Held with the words while they start, so the caret the prompt field gives
+            // up does not fall into it (#650).
+            .disabled(model.isStarting)
             .task(id: model.draftCwd.map { ProjectKey(host: model.selectedProjectHost, folder: $0) }) {
                 if let folder = model.draftCwd { await model.loadLabelVocabulary(in: folder, on: model.selectedProjectHost) }
             }
@@ -1020,6 +1029,9 @@ struct PromptBar: View {
         Task {
             if starting {
                 // Kept in the field if it did not start, with the reason over it.
+                // The field was held while it started, and gave up the caret; it
+                // takes it back, started or not, once the page has settled (#650).
+                defer { DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focused = true } }
                 guard await model.startDraft(prompt: outgoing, attachments: going, labels: labels) else { return }
                 if text == outgoing { text = "" }
                 attachments = []
