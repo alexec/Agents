@@ -29,6 +29,8 @@ struct ControlAddServerSheet: View {
     @State private var shown: DaemonAPI.ControlCodeShown?
     @State private var before: Set<HostID> = []
     @State private var joined: String?
+    /// The host that joined, once it has: the sheet's last step picks its projects (#656).
+    @State private var joinedHost: HostID?
 
     // Over ssh
     @State private var destination = ""
@@ -49,14 +51,20 @@ struct ControlAddServerSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Add a Server").appText(.title).fontWeight(.semibold)
-            Picker("How", selection: $way) {
-                Text("Run a command").tag(Way.command)
-                Text("Over ssh").tag(Way.ssh)
-            }
-            .pickerStyle(.segmented).labelsHidden().fixedSize()
-            switch way {
-            case .command: commandPage
-            case .ssh: sshPage
+            if let joinedHost, let joined {
+                Label("\(joined) joined.", systemImage: "checkmark.circle.fill").appText(.reading).tinted(.vouched)
+                HostProjectsPicker(host: joinedHost, hostName: joined, paths: control.suggestedPaths,
+                                   leaveTitle: "Skip") { dismiss() }
+            } else {
+                Picker("How", selection: $way) {
+                    Text("Run a command").tag(Way.command)
+                    Text("Over ssh").tag(Way.ssh)
+                }
+                .pickerStyle(.segmented).labelsHidden().fixedSize()
+                switch way {
+                case .command: commandPage
+                case .ssh: sshPage
+                }
             }
         }
         .padding(28)
@@ -113,8 +121,8 @@ struct ControlAddServerSheet: View {
         }
     }
 
-    /// Makes the code once, then watches for a host that was not there before, and closes
-    /// when one joins.
+    /// Makes the code once, then watches for a host that was not there before, and goes on
+    /// to its projects when one joins (#656).
     private func watchForJoin() async {
         await control.refresh()
         before = Set(control.hosts.map(\.id))
@@ -125,8 +133,9 @@ struct ControlAddServerSheet: View {
             guard way == .command || outcome != nil else { continue }
             if let new = control.hosts.first(where: { !before.contains($0.id) && $0.state == "online" }) {
                 joined = new.name
+                // A moment to read "joined" on the page it happened on.
                 try? await Task.sleep(for: .seconds(1.5))
-                if way == .command { dismiss() }
+                joinedHost = new.id
             }
         }
     }

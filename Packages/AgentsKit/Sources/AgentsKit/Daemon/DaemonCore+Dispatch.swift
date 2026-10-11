@@ -185,6 +185,10 @@ extension DaemonCore {
             case DaemonAPI.Method.projectsClones:
                 return .success(try JSONValue.encoding(allClones()))
 
+            case DaemonAPI.Method.projectsFind:
+                let request = try require(params, as: DaemonAPI.ProjectsFindRequest.self)
+                return .success(try JSONValue.encoding(findProjects(request)))
+
             case DaemonAPI.Method.projectsArchive:
                 let request = try require(params, as: DaemonAPI.ProjectRequest.self)
                 return .success(try JSONValue.encoding(try await archiveProject(request.folder)))

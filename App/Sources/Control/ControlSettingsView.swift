@@ -240,18 +240,24 @@ struct ControlHostsPage: View {
     @State private var removing: DaemonAPI.ControlHost?
     @State private var addingByCode = false
     @State private var addingServer = false
+    @State private var choosing: DaemonAPI.ControlHost?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             ControlCard {
                 if let mac = control.thisMacHost {
-                    // This Mac's host has no buttons (the look gate's decision).
-                    ControlRow(dot: dot(mac), title: "This Mac", detail: thisMacLine(mac)) { EmptyView() }
+                    // This Mac's host has no buttons but this one (the look gate's
+                    // decision; #656 asked for projects to be chosen here too).
+                    ControlRow(dot: dot(mac), title: "This Mac", detail: thisMacLine(mac)) {
+                        chooseProjects(mac)
+                    }
                 }
                 ForEach(control.otherHosts) { host in
                     Divider()
                     ControlRow(dot: dot(host), title: host.name, detail: line(host)) {
                         HStack(spacing: 8) {
+                            // A relay runs no agents, so it has no projects.
+                            if host.relay == nil { chooseProjects(host) }
                             Button("Check again") { Task { await control.checkAgain(host.id) } }.buttonStyle(.paper)
                             Button("Remove…") { removing = host }.buttonStyle(.paper)
                         }
@@ -270,6 +276,10 @@ struct ControlHostsPage: View {
         }
         .sheet(isPresented: $addingByCode) { CodeSheet(control: control, purpose: .host).paperSheet() }
         .sheet(isPresented: $addingServer) { ControlAddServerSheet(control: control).paperSheet() }
+        .sheet(item: $choosing) { host in
+            ChooseProjectsSheet(host: host.id, hostName: host.id == control.thisMacHost?.id ? "This Mac" : host.name,
+                                paths: control.suggestedPaths).paperSheet()
+        }
         .confirmationDialog(removing.map { "Remove \($0.name)?" } ?? "",
                             isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
                             titleVisibility: .visible, presenting: removing) { host in
@@ -278,6 +288,13 @@ struct ControlHostsPage: View {
         } message: { _ in
             Text("It stops connecting, and every window and device stops seeing it. Its agents are left running where they are.")
         }
+    }
+
+    private func chooseProjects(_ host: DaemonAPI.ControlHost) -> some View {
+        Button("Choose Projects…") { choosing = host }
+            .buttonStyle(.paper)
+            .disabled(host.state != "online")
+            .help(host.state == "online" ? "Pick folders on it to add as projects." : "It has to be online to be asked.")
     }
 
     private func dot(_ host: DaemonAPI.ControlHost) -> ControlDot {
@@ -322,7 +339,7 @@ struct ControlHostsPage: View {
     }
 }
 
-/// Auto-detect (#429): where a host added from now on has its projects found, once.
+/// Auto-detect (#429, #656): where the projects picker looks on a host. It adds nothing.
 struct ProjectDetectionCard: View {
     let control: ControlSettingsModel
     /// The paths as typed, one a line; saved with Save.
@@ -334,7 +351,7 @@ struct ProjectDetectionCard: View {
         let detection = control.projectDetection
         ControlCard {
             VStack(alignment: .leading, spacing: 10) {
-                Toggle("Find projects on a host when it is added", isOn: Binding(
+                Toggle("Suggest projects on a host", isOn: Binding(
                     get: { detection.enabled },
                     set: { on in Task { await control.setProjectDetection(ProjectDetection(enabled: on, paths: detection.paths)) } }))
                 TextField("Paths", text: $text, axis: .vertical)
@@ -358,7 +375,7 @@ struct ProjectDetectionCard: View {
             }
             .padding(16)
         }
-        Text("Each folder directly inside these paths that is a git repository becomes a project, on a server added over ssh or by command, or this Mac. ~ is the host’s own home. It happens once, when the host is added: a project removed afterwards stays removed.")
+        Text("When a server joins, and from Choose Projects… on any host, each git repository directly inside these paths is listed, unticked. Only the ones you tick become projects, and you can add any other folder by its path. ~ is the host’s own home.")
             .appText(.supporting).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .onAppear(perform: load)

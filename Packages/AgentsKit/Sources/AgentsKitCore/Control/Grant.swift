@@ -182,9 +182,8 @@ public struct HostRecord: Codable, Hashable, Sendable, Identifiable {
     public var forgottenAt: Date?
     /// As `ClientRecord.knownEpoch`.
     public var knownEpoch: Int?
-    /// True from when it enrolled until it says it has added the projects it found
-    /// (#429): told `projects/detect` each time it connects until then. Nil for a host
-    /// that enrolled before, or while detection was off, so it is never told.
+    /// Set before #656 on a host that was to add the projects it found (#429). Never set
+    /// now; one left over is cleared when that host next says hello, and it is not told.
     public var detectProjects: Bool?
 
     public init(id: HostID, name: String, publicKey: Data? = nil, reach: HostReach = .dialOut,

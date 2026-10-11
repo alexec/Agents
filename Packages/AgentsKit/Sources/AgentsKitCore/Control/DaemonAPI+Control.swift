@@ -22,8 +22,8 @@ public extension DaemonAPI.Method {
     /// resolves each, with no network. `{destination}` resolves just that, as typed.
     /// `[SSHHost]`.
     static let hostsSSHHosts = "hosts/sshHosts"
-    /// `ProjectDetection` (#429): whether a host added from now on arrives with its
-    /// projects, and where they are looked for.
+    /// `ProjectDetection` (#429, #656): whether the window suggests projects on a host, and
+    /// where it looks for them. Nothing is added unless the person picks it.
     static let controlSetProjectDetection = "control/setProjectDetection"
     /// A host, on its channel 0 (T091): a tunnel to the host that lends it a sign-in.
     static let tunnelOpen = "tunnel/open"
@@ -48,10 +48,11 @@ public extension DaemonAPI.Method {
     static let hostHello = "host/hello"
     static let attentionNeed = "attention/need"
     static let controlPing = "control/ping"
-    /// To a host just added, on its channel 0 (#429), never answered: `ProjectDetection`,
-    /// the paths to add projects from, once.
+    /// To a host just added, on its channel 0 (#429), never answered: `ProjectDetection`.
+    /// Sent only by a control plane before #656; a host since says `projects/detected` with
+    /// nothing added.
     static let projectsDetect = "projects/detect"
-    /// A host, on its channel 0 (#429): it has added the projects it found. `{added}`.
+    /// A host, on its channel 0 (#429): its answer to `projects/detect`. `{added}`.
     static let projectsDetected = "projects/detected"
 
     // To a relay host, on its channel 0 (058, T096–T097): notifications, never answered.

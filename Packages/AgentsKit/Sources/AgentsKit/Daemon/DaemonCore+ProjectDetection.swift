@@ -1,19 +1,29 @@
 import AgentsKitCore
 import Foundation
 
-/// The projects a host arrives with (#429): asked once by the control plane, when the
-/// host is added, and never again, so a project the person removes stays removed.
+/// The projects a person may add on a host (#429, #656): suggested, never added by
+/// themselves. The window lists them, unticked, and adds the ones the person ticks.
 extension DaemonCore {
-    /// Adds every folder `found` names that is not a project already, and says how many.
-    public func detectProjects(_ detection: ProjectDetection) async -> Int {
-        guard detection.enabled else { return 0 }
+    /// Every repository found under `paths`, then each of `folders` as it stands, each once.
+    public func findProjects(_ request: DaemonAPI.ProjectsFindRequest,
+                             home: URL = FileManager.default.homeDirectoryForCurrentUser) -> [DaemonAPI.FoundFolder] {
         let known = Set(projectRecords().keys)
-        var added = 0
-        for folder in Self.found(detection.paths) where !known.contains(Project.standardize(folder)) {
-            if (try? await addProject(folder)) != nil { added += 1 }
+        var seen: Set<String> = []
+        var answer: [DaemonAPI.FoundFolder] = []
+        for folder in Self.found(request.paths, home: home) where seen.insert(folder.path(percentEncoded: false)).inserted {
+            answer.append(.init(folder: folder, exists: true, isRepository: true, isProject: known.contains(folder)))
         }
-        DaemonLog.shared.write("projects: found \(added) on this host under \(detection.paths.joined(separator: ", "))")
-        return added
+        for typed in request.folders {
+            let trimmed = typed.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty else { continue }
+            let folder = Project.standardize(Self.expand(trimmed, home: home))
+            let exists = Self.isDirectory(folder)
+            answer.append(.init(typed: trimmed, folder: folder, exists: exists,
+                                isRepository: exists && FileManager.default.fileExists(
+                                    atPath: folder.appending(path: ".git").path(percentEncoded: false)),
+                                isProject: known.contains(folder)))
+        }
+        return answer
     }
 
     /// The immediate folders of each path that have `.git` in them, a folder or a file

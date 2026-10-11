@@ -164,30 +164,21 @@ public actor ControlMethods: ControlHandling {
 
     /// A host that has enrolled, or this Mac's own host arriving on the local socket.
     ///
-    /// One the control plane has not had before is marked to have its projects found
-    /// (#429), when that is on; it is told what to look for once it has said hello.
+    /// Its projects are not found and added by themselves any more (#656): the window
+    /// lists what `projects/find` finds there under `detection`, and the person picks.
     public func enroll(_ host: HostRecord) async throws {
-        var host = host
-        if await records.host(host.id) == nil, host.relay != true, detection.enabled {
-            host.detectProjects = true
-        }
         try await records.save(host)
     }
 
-    /// Where a host added from now on has its projects found (#429).
+    /// Where the window looks for projects on a host (#429, #656).
     public var detection: ProjectDetection { settings.projectDetection ?? .standard }
 
-    /// Tells a host marked to find its projects where to look, or, with detection turned
-    /// off since it enrolled, lets the mark go.
+    /// A host marked before #656 to add the projects it found: the mark goes, and the host
+    /// is never told, so nothing is added that the person did not pick.
     private func detectProjectsIfDue(_ host: HostID) async {
         guard var record = await records.host(host), record.detectProjects == true else { return }
-        guard detection.enabled, !detection.paths.isEmpty else {
-            record.detectProjects = nil
-            try? await records.save(record)
-            return
-        }
-        guard let params = try? JSONValue.encoding(detection) else { return }
-        _ = await router?.tell(host, DaemonAPI.Method.projectsDetect, params)
+        record.detectProjects = nil
+        try? await records.save(record)
     }
 
     /// Where the control plane answers from now on, in order (R16): the list every member
