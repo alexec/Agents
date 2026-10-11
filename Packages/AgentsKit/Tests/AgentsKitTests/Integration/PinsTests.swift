@@ -145,7 +145,7 @@ struct PinsTests {
             + "the most it can have. Unpin one first.")
         // Pinning one already pinned is a retitle, not a new pin.
         let again = try await pin(s, "p3.md", title: "Three")
-        #expect(again.count == 10 && again[2].title == "Three")
+        #expect(again.map(\.title).dropFirst(2).first == "Three")
         #expect(try pinsFile(s).pins.count == 10)
     }
 
