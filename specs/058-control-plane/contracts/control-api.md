@@ -39,12 +39,15 @@ Sent with no `h`. Grant column: which client grant may call it. Params and resul
 | `presence/report` | any | as today; broadcast to peer copies, and folded for notices (R5, R10) |
 | `hosts/setRelay` | operator | `{host, relay: Bool}` → `{}`: switches a relay host (`agents-relay`) on or off. A host that runs agents cannot be made one: `invalidParams` (R10, T097) |
 
-**Projects found when a host is added (#429).** A host the control plane has not had before
-is marked `detectProjects` when it enrols, if `projectDetection.enabled`. After each `host/hello`
-from a marked host the control plane tells it, on channel 0, `projects/detect {enabled, paths}`; the
-host adds each immediate, non-hidden folder of each path (`~` its own home) that has `.git`, then
-says `projects/detected {added}`, and the mark goes. Nothing asks again, so a project removed
-afterwards stays removed. A host already enrolled is never marked.
+**Projects suggested on a host (#429, #656).** Nothing is added by itself. The window asks a
+host `projects/find {paths, folders}` (a host request, so through the control plane like any
+other): `paths` are `projectDetection.paths` (none with `enabled` off), and the host answers each
+immediate, non-hidden folder of each path (`~` its own home) that has `.git`, then each of
+`folders` as typed, as `[{typed?, folder, exists, isRepository, isProject}]`. The window lists
+them unticked, at the end of Add a Server and from a host row's **Choose Projects…**, and adds the
+ticked ones with `projects/add`. A control plane no longer marks a host `detectProjects`; a mark
+left from before goes at that host's next `host/hello` and the host is not told. A host since
+#656 answers a `projects/detect` from an older control plane with `projects/detected {added: 0}`.
 
 Legacy names `devices/list`, `devices/startPairing`, `devices/stopPairing`, `devices/announce`,
 `devices/forget` are accepted as aliases until the Remote and the window move to `clients/*`.

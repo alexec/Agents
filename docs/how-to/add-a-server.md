@@ -47,8 +47,9 @@ it and no port needs opening. See [Projects, hosts and worktrees](../explanation
    host runs as the user service `agents-host`; to keep it running after you log out, run
    the `loginctl enable-linger` line it prints.
 
-   The sheet says **devbox joined.** Click **Done**. The server is listed under **Hosts**,
-   and has a heading of its own in the projects list.
+   The sheet says **devbox joined.** and lists the git repositories it found on the server,
+   unticked (see [Choose its projects](#choose-its-projects)). The server is listed under
+   **Hosts**, and has a heading of its own in the projects list.
 
 ### Or add it over ssh
 
@@ -57,7 +58,7 @@ it and no port needs opening. See [Projects, hosts and worktrees](../explanation
 2. In **Server**, type the server. The box offers the hosts in your `~/.ssh/config`, each with
    the `user@host` ssh resolves it to; choose one, or type any `user@host`,
    `user@host:port` or `ssh://user@host:port`. Under the box, the sheet says what ssh makes of
-   it, such as **Ssh reaches it as agents@devbox.example.com:2222.**
+   it, such as **ssh reaches it as agents@devbox.example.com:2222.**
 3. Give it a **Name**, or leave the one guessed from the server.
 4. Leave **Key** empty to log in as `ssh` does from Terminal, or click **Choose…** to use one
    key for this install only.
@@ -101,6 +102,20 @@ changes. When you remove the server, the tunnel closes.
 
 What the control plane passes to ssh, and how each common `~/.ssh/config` option fares, is in
 [the ssh contract](https://github.com/alexec/Agents/blob/main/specs/037-cloud-agents/contracts/ssh.md#options-from-the-persons-config-610).
+
+### Choose its projects
+
+Nothing on the server becomes a project by itself (#656). Once it joins, Add a Server lists each
+git repository directly inside the paths under **Auto-detect** (`~`, `~/src` and the like, `~`
+being the server's home), each unticked, and the same list opens later from **Choose
+Projects…** on the server's row under **Hosts**, or on **This Mac**'s.
+
+1. Tick the repositories to add. One that is already a project is shown ticked and greyed.
+2. To add a folder that is not listed, type its path on the server, such as `~/work/app`, and
+   click **Add Folder**. It joins the list, ticked.
+3. Click **Add N Projects**, or **Skip** to add none.
+
+With **Suggest projects on a host** off, nothing is listed and only the folder box is there.
 
 ### Put a project on it
 

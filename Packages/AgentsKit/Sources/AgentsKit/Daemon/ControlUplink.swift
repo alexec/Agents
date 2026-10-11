@@ -31,8 +31,6 @@ public final class ControlUplink: @unchecked Sendable {
     /// request each was asked with.
     private var waitingTunnels: [String: CheckedContinuation<any LineTransport, any Error>] = [:]
     private var tunnelAsks: [Int: String] = [:]
-    /// Adds the projects found under the paths given and says how many (#429).
-    private var detectProjects: (@Sendable (ProjectDetection) async -> Int)?
     /// The fan-out queue of the uplink up now, by that uplink.
     private var fanQueue: (ObjectIdentifier, DispatchQueue)?
 
@@ -71,11 +69,6 @@ public final class ControlUplink: @unchecked Sendable {
     /// Where this host's relays listen, when it lends a sign-in (T091).
     public func setLendingPort(_ port: @escaping @Sendable (String) async -> UInt16?) {
         lock.withLock { lendingPort = port }
-    }
-
-    /// What finds this host's projects when the control plane says to (#429).
-    public func setProjectDetector(_ detect: @escaping @Sendable (ProjectDetection) async -> Int) {
-        lock.withLock { detectProjects = detect }
     }
 
     /// A tunnel to the host that lends this one `runtime`'s sign-in (T091): asked of the
@@ -225,15 +218,11 @@ public final class ControlUplink: @unchecked Sendable {
             let channel = lock.withLock { channels.removeValue(forKey: number) }
             channel?.end(tellingTheControlPlane: false)
         case .message(0, let message):
-            // Once, after this host is added (#429): find its projects, then say so, so
-            // the control plane never asks again.
-            if case .notification(DaemonAPI.Method.projectsDetect, let params)? = try? JSONRPCCodec.decode(line: message),
-               let detection = try? params?.decode(ProjectDetection.self),
-               let detect = lock.withLock({ detectProjects }) {
-                Task.detached { [weak self] in
-                    let added = await detect(detection)
-                    self?.tell(DaemonAPI.Method.projectsDetected, ["added": .int(added)])
-                }
+            // From a control plane before #656, which asked a new host to add the projects
+            // it found. Nothing is added by itself now: the person picks them in the window.
+            // Said done, so that control plane stops asking.
+            if case .notification(DaemonAPI.Method.projectsDetect, _)? = try? JSONRPCCodec.decode(line: message) {
+                tell(DaemonAPI.Method.projectsDetected, ["added": .int(0)])
                 return
             }
             // Replies to `host/hello` and `control/ping`, which nothing waits on; and to

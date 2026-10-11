@@ -177,6 +177,8 @@ final class ControlSettingsModel {
 
     /// Where a host added from now on has its projects found (#429).
     var projectDetection: ProjectDetection { status?.projectDetection ?? .standard }
+    /// Where the projects picker looks (#656): nowhere with auto-detect off.
+    var suggestedPaths: [String] { projectDetection.enabled ? projectDetection.paths : [] }
 
     func setProjectDetection(_ detection: ProjectDetection) async {
         await perform(DaemonAPI.Method.controlSetProjectDetection, detection)

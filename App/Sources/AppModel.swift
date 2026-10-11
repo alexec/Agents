@@ -1819,6 +1819,23 @@ final class AppModel {
         }
     }
 
+    /// The folders the person picked on a host (#656), added one by one without moving the
+    /// window's selection: those that could not be, each with why.
+    func addProjects(_ folders: [URL], on host: HostID) async -> [URL: String] {
+        var failed: [URL: String] = [:]
+        for folder in folders {
+            do {
+                var summary = try await client(for: host).call(DaemonAPI.Method.projectsAdd, DaemonAPI.ProjectRequest(folder: folder),
+                                                               returning: DaemonAPI.ProjectSummary.self)
+                summary.host = host
+                upsert(summary)
+            } catch {
+                failed[folder] = describe(error)
+            }
+        }
+        return failed
+    }
+
     /// Files dragged onto a project's row, or one of its sessions', or chosen in its Drop
     /// Box sheet, put into that project's drop box (#231): its main folder's, never a
     /// session's worktree, and inside `subfolder` when one is named. Sent to the project's
@@ -4284,7 +4301,7 @@ final class AppModel {
 
     /// What a person can read. The daemon's errors are already written for someone
     /// looking at a screen, so they are shown as they are.
-    private func describe(_ error: any Error) -> String {
+    func describe(_ error: any Error) -> String {
         if let error = error as? JSONRPCError {
             // A runtime that needs signing in says so, and says how. The command is
             // the runtime's own, which is better advice than any we could invent.

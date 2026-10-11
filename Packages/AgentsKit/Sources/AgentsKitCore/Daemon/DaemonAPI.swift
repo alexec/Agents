@@ -212,6 +212,10 @@ public enum DaemonAPI {
         public static let projectsClone = "projects/clone"
         /// The clones under way, for a window that connects in the middle of one.
         public static let projectsClones = "projects/clones"
+        /// The folders a person may add as projects on this host (#656): the git
+        /// repositories directly inside each of `paths`, and each of `folders` as typed.
+        /// Adds nothing; the window adds the ones the person ticks with `projects/add`.
+        public static let projectsFind = "projects/find"
 
         // Workflows: the prompts a project keeps that run themselves.
         public static let workflowsList = "workflows/list"
@@ -551,6 +555,39 @@ public enum DaemonAPI {
     public struct ProjectRequest: Codable, Sendable {
         public var folder: URL
         public init(folder: URL) { self.folder = folder }
+    }
+
+    /// `projects/find` (#656). `~` is the host's own home, in both.
+    public struct ProjectsFindRequest: Codable, Sendable {
+        /// Where to look: each folder directly inside one that has `.git` in it.
+        public var paths: [String]
+        /// Folders the person typed, each said back as it stands.
+        public var folders: [String]
+        public init(paths: [String] = [], folders: [String] = []) {
+            self.paths = paths
+            self.folders = folders
+        }
+    }
+
+    /// A folder `projects/find` found or was asked about, as it stands on that host.
+    public struct FoundFolder: Codable, Sendable, Hashable, Identifiable {
+        /// As typed, for one of `folders`; nil for one found under `paths`.
+        public var typed: String?
+        /// The whole path on the host, `~` expanded.
+        public var folder: URL
+        public var exists: Bool
+        /// Has `.git` in it, a folder or a worktree's file.
+        public var isRepository: Bool
+        /// A project on this host already.
+        public var isProject: Bool
+        public var id: String { folder.path(percentEncoded: false) }
+        public init(typed: String? = nil, folder: URL, exists: Bool, isRepository: Bool, isProject: Bool) {
+            self.typed = typed
+            self.folder = folder
+            self.exists = exists
+            self.isRepository = isRepository
+            self.isProject = isProject
+        }
     }
 
     /// A project's helper limits as the person set them (#64). A nil limit is its
