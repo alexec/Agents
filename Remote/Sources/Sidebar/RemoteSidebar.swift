@@ -309,7 +309,7 @@ private struct RemoteSmartFold: View {
 private struct SmartHeading: View {
     let row: SidebarSmartRow
     let count: Int
-    /// To Archive's Archive All (#584); nil on every other group.
+    /// Approve Archiving's Approve All (#584); nil on every other group.
     var archiveAll: (() -> Void)?
 
     var body: some View {

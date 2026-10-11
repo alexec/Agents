@@ -1164,7 +1164,7 @@ extension DaemonCore {
 
                 (This workflow lets its run archive itself. If you finish done or with nothing \
                 to do, and there is nothing the person needs to look at, call \
-                \(AppTool.archiveSession) with no id before you end: no one is asked, and the \
+                \(AppTool.archiveSession) with no id before you end: no one has to approve it, and the \
                 run is archived once the turn ends. Otherwise leave it out.)
                 """
         case .archive:
@@ -1846,7 +1846,7 @@ extension DaemonCore {
         switch whenDone {
         case .keep: return false
         // Either ask (#584): where the run may archive itself, a request needs nobody's
-        // OK — unless it moves, when it stays there asking.
+        // approval — unless it moves, when it stays there waiting for it.
         case .archiveAllowed: return asked == .archive || (asked == .requestArchive && agent.pendingMove == nil)
         case .archive: return true
         }

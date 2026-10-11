@@ -144,7 +144,7 @@ extension DaemonCore {
         if s.watchedActive { words.append("on screen") } else if s.watched { words.append("open") }
         if s.needsAnswer { words.append("needs an answer") }
         if s.unread { words.append("unread") }
-        if s.asksToArchive { words.append("asks to be archived") }
+        if s.asksToArchive { words.append("waits for archive approval") }
         if s.pendingWake { words.append("waiting to be woken") }
         if !s.personsConversation { words.append(agent.startedByWorkflow != nil ? "a workflow's" : "an agent's") }
         if let last = s.lastPersonPrompt { words.append("last prompt \(Int(now().timeIntervalSince(last)))s ago") }

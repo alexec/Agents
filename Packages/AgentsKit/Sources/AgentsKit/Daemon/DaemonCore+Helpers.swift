@@ -161,7 +161,7 @@ extension DaemonCore {
     /// `archive_session` with an id (#584, #638): ask for an agent the caller started to be
     /// archived. Where the caller may archive it — the project lets agents archive the
     /// helpers they started — it is archived now, or once its turn ends; otherwise it
-    /// carries the Asks to archive mark until the person archives it. Either way its
+    /// carries the Archiving needs approval mark until the person approves it. Either way its
     /// running place is free once its turn has ended.
     public func requestArchiveHelper(_ request: DaemonAPI.HelperRequest) async throws -> String {
         // Its own id is the same ask as none (#481).
@@ -179,27 +179,28 @@ extension DaemonCore {
                 + "This project now has \(helperPlaces(in: target.projectFolder))."
         }
         if target.archiveRequest?.isRequested == true {
-            return "\u{201C}\(title)\u{201D} already asks the person to archive it; nothing changed."
+            return "\u{201C}\(title)\u{201D} already waits for the person to approve archiving it; nothing changed."
         }
         if case .whenTurnEnds = target.archiveRequest {
-            return "\u{201C}\(title)\u{201D} is already set to ask when its turn ends; nothing changed."
+            return "\u{201C}\(title)\u{201D} is already set to wait for approval when its turn ends; nothing changed."
         }
         let inFlight = target.state.hasTurnInFlight
         try requestArchive(target.id)
         if inFlight {
             return mayArchive
                 ? "\u{201C}\(title)\u{201D} will be archived when its turn ends, if it ends done or with nothing to do; "
-                    + "otherwise it asks the person. Its running place frees then."
-                : "\u{201C}\(title)\u{201D} will ask the person to archive it when its turn ends, freeing its running place then."
+                    + "otherwise the person approves it. Its running place frees then."
+                : "\u{201C}\(title)\u{201D} will wait for the person to approve archiving it when its turn ends, "
+                    + "freeing its running place then."
         }
-        return "\u{201C}\(title)\u{201D} now asks the person to archive it, which frees its running place; "
+        return "\u{201C}\(title)\u{201D} now waits for the person to approve archiving it, which frees its running place; "
             + "it keeps its other place until it is archived. This project now has \(helperPlaces(in: target.projectFolder))."
     }
 
-    /// Where an agent's own request to be archived needs nobody's OK (#584, decision 2):
+    /// Where an agent's own archive_session needs nobody's approval (#584, decision 2):
     /// a helper, in a project that lets agents archive the helpers they started, whose
     /// turn ended done or with nothing to do, and that is not moving. The line it leaves
-    /// in its transcript, or nil when the person is asked instead.
+    /// in its transcript, or nil when the person approves it instead.
     func helperArchivesWithoutAsking(_ agentID: UUID, agent: Agent) -> String? {
         guard agent.startedByAgent != nil, agent.pendingMove == nil,
               agentsMayArchive(in: agent.projectFolder),
@@ -210,7 +211,7 @@ extension DaemonCore {
 
     /// What an agent hears when it tries to archive itself (#120, Alex's words).
     static let cannotArchiveItself = "Nothing changed: you can't archive yourself. Call \(AppTool.archiveSession) with no id "
-        + "to ask the person to archive you when your turn ends; the person or the session that started you can archive you."
+        + "to be archived when your turn ends, once the person approves it; the person or the session that started you can archive you."
 
     // MARK: Listing
 
@@ -234,8 +235,8 @@ extension DaemonCore {
 
     /// What one of an agent's own agents is doing, in a few words the agent can repeat.
     private func helperStatus(_ agent: Agent) -> String {
-        if agent.asksToArchive { return "asking the person to archive it" }
-        if case .whenTurnEnds = agent.archiveRequest { return "asking to be archived when the turn ends" }
+        if agent.asksToArchive { return "waiting for the person to approve archiving it" }
+        if case .whenTurnEnds = agent.archiveRequest { return "to wait for archive approval when the turn ends" }
         if resuming.contains(agent.id) || interrupted[agent.id] != nil { return "coming back" }
         if agent.state == .queued {
             let position = HelperLimit.queuePosition(of: agent, among: agents.inProject(agent.projectFolder))
@@ -296,7 +297,7 @@ extension DaemonCore {
                 + "sessions started by sessions not yet archived\(quoted(kept))\(starting). "
                 + (agentsMayArchive(in: folder)
                     ? "Archive one of yours with \(AppTool.archiveSession) once its work is merged or abandoned, "
-                        + "or ask the person to archive one, to free that place."
+                        + "or let the person approve archiving one, to free that place."
                     : "Only the person can archive one to free that place."))
         }
         let running = HelperLimit.runningHelpers(in: folder, agents: agents.inProject(folder), comingBack: comingBack)

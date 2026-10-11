@@ -149,7 +149,7 @@ extension DaemonCore {
         }
         // A move is the agent carrying on somewhere else, so it does not go with an
         // ending that waits for someone (053), or with being archived. With a request to archive it does since #481: the agent
-        // moves, and stays there asking.
+        // moves, and stays there waiting for approval.
         if request.move != nil {
             let waits = [WorkOutcome.needsAnswer, .blocked].contains(checked.report.outcome)
             guard !waits, afterwards != .archive else {
@@ -338,7 +338,8 @@ extension DaemonCore {
     /// because nothing happens yet, and the person can still move the work on.
     static func afterTurnNote(_ after: AfterTurn) -> String {
         switch after {
-        case .requestArchive: return "Once this turn ends, the person will be asked to archive this conversation."
+        case .requestArchive:
+            return "Once this turn ends, this conversation waits for the person to approve archiving it."
         case .archive: return "Once this turn ends, this conversation will be archived, as its workflow allows."
         }
     }

@@ -71,7 +71,7 @@ struct AfterTurnTests {
         let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         let reply = try await finish(core, launcher, "partly_done", afterwards: "request_archive")
-        #expect(reply.contains("will be asked to archive"))
+        #expect(reply.contains("waits for the person to approve archiving it"))
         #expect(await core.agent(id)?.archiveRequest == nil, "nothing happens until the turn is over")
         #expect(await core.agent(id)?.afterTurn == .requestArchive)
 
@@ -160,7 +160,7 @@ struct AfterTurnTests {
         let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         let reply = try await core.askAfterTurn(.init(token: await mintedToken(launcher), afterwards: "request_archive"))
-        #expect(reply.contains("will be asked to archive"))
+        #expect(reply.contains("waits for the person to approve archiving it"))
         #expect(await core.agent(id)?.archiveRequest == nil, "nothing happens until the turn is over")
 
         try await settle(core, id)
@@ -177,7 +177,7 @@ struct AfterTurnTests {
         let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
 
         let reply = try await core.requestArchiveHelper(.init(token: await mintedToken(launcher), agentID: id.uuidString))
-        #expect(reply.contains("will be asked to archive"))
+        #expect(reply.contains("waits for the person to approve archiving it"))
         #expect(await core.agent(id)?.afterTurn == .requestArchive)
         try await settle(core, id)
     }

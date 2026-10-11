@@ -2,7 +2,7 @@ import Foundation
 
 /// One of the rows at the top of the sidebar that gather sessions across every project
 /// and host (#495): Pinned, then by what they want — Needs You, Working, Unread, and the
-/// sessions an agent asked to have archived, To Archive (#584). Mail's
+/// sessions waiting for the person to approve archiving them, Approve Archiving (#584, #649). Mail's
 /// Favorites and smart mailboxes, Things' Inbox and Today.
 ///
 /// Read off each project's shelf (#165), so a folded smart row costs a sum of counts per
@@ -12,7 +12,8 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
     /// order and each project's pin order. Out of their projects' groups (Alex, #495).
     case pinned
     case needsYou, working, unread
-    /// Sessions an agent asked the person to archive (#584), with Archive All on it.
+    /// Sessions waiting for the person to approve archiving them (#584, #649), with
+    /// Approve All on it.
     case toArchive
 
     public var title: String {
@@ -21,7 +22,7 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
         case .needsYou: "Needs You"
         case .working: "Working"
         case .unread: "Unread"
-        case .toArchive: "To Archive"
+        case .toArchive: "Approve Archiving"
         }
     }
 
@@ -67,9 +68,9 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
     }
 
     /// Where a live session is listed (#587): once, in the first of the smart groups it
-    /// belongs to — Pinned, Needs You, Working, To Archive (#584), Unread — or, in none of
-    /// them, under its project. Nil for its project. To Archive comes before Unread though
-    /// it is drawn after it, so Archive All reaches every session that asks.
+    /// belongs to — Pinned, Needs You, Working, Approve Archiving (#584), Unread — or, in none of
+    /// them, under its project. Nil for its project. Approve Archiving comes before Unread though
+    /// it is drawn after it, so Approve All reaches every session that asks.
     public static func home(of agent: Agent, in group: AgentGroup, isPinned: Bool) -> SidebarSmartRow? {
         if isPinned { return .pinned }
         switch group {

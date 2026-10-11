@@ -455,12 +455,12 @@ struct MoveTests {
         if onFinishTurn {
             let answer = try await finish(core, token, "done", afterwards: "request_archive",
                                           move: .init(target: .newWorktree(name: "asking-there")))
-            #expect(answer.contains("will be asked to archive"))
+            #expect(answer.contains("waits for the person to approve archiving it"))
         } else {
             let moving = try await core.moveSelf(.init(token: token, target: .newWorktree(name: "asking-there")))
             #expect(moving.when == .afterTurn)
             let asking = try await core.askAfterTurn(.init(token: token, afterwards: "request_archive"))
-            #expect(asking.contains("stay there asking"))
+            #expect(asking.contains("stay there waiting for approval"))
         }
 
         gate.open()

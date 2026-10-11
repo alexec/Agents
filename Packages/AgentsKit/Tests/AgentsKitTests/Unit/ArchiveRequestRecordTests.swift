@@ -3,7 +3,7 @@ import Testing
 @testable import AgentsKit
 @testable import AgentsKitCore
 
-/// The Asks to archive mark on the record and on the wire, and what a record from the
+/// The Archiving needs approval mark on the record and on the wire, and what a record from the
 /// days of parking makes of it (#584).
 @Suite("The request to archive, on the record and on the wire")
 struct ArchiveRequestRecordTests {

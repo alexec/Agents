@@ -55,7 +55,7 @@ extension DaemonCore {
         if answer.when == .afterTurn, agents[agentID]?.afterTurn == .requestArchive {
             answer.message = answer.message.replacingOccurrences(
                 of: "you will be started again there to carry on.",
-                with: "you stay there, asking the person to archive you, rather than being started again.")
+                with: "you stay there, waiting for the person to approve archiving you, rather than being started again.")
         }
         return answer
     }

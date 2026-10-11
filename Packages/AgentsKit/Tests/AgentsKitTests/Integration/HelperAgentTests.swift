@@ -312,7 +312,7 @@ struct HelperAgentTests {
         #expect(error?.code == DaemonAPI.Failure.notYours)
         #expect(message.hasPrefix("Nothing was started: this project already has 5 of 5 sessions started by sessions not yet archived"))
         #expect(message.contains("Archive one of yours with archive_session once its work is merged or abandoned, "
-                                 + "or ask the person to archive one, to free that place."))
+                                 + "or let the person approve archiving one, to free that place."))
         #expect(message.contains(" And its queue is full too: 1 of 1 sessions queued — \u{201C}Zeta\u{201D}."))
         #expect(message.hasSuffix("The person sets these limits in Project Settings."))
         for name in ["Alpha", "Beta", "Gamma", "Delta", "Epsilon"] { #expect(message.contains(name), "names \(name)") }
@@ -832,7 +832,7 @@ struct HelperAgentTests {
         let asked = try #require(await core.agent(helper))
         #expect(asked.asksToArchive)
         #expect(asked.group(wantsEyes: false) == .finished)
-        #expect(note.contains("now asks the person to archive it, which frees its running place; it keeps its other place until it is archived."))
+        #expect(note.contains("now waits for the person to approve archiving it, which frees its running place; it keeps its other place until it is archived."))
         #expect(note.hasSuffix("This project now has 0 of 3 running, 1 of 5 not archived."))
     }
 
@@ -873,7 +873,7 @@ struct HelperAgentTests {
 
         let note = try await calling(core, token) { t in try await core.requestArchiveHelper(.init(token: t, agentID: helper.uuidString)) }
 
-        #expect(note.hasSuffix("will ask the person to archive it when its turn ends, freeing its running place then."))
+        #expect(note.hasSuffix("will wait for the person to approve archiving it when its turn ends, freeing its running place then."))
         gate.open()
         _ = await eventually("the helper finished and asks") { await core.agent(helper)?.asksToArchive == true }
         #expect(await core.agent(helper)?.group(wantsEyes: false) == .finished)
@@ -891,7 +891,7 @@ struct HelperAgentTests {
 
         let note = try await calling(core, token) { t in try await core.requestArchiveHelper(.init(token: t, agentID: helper.uuidString)) }
 
-        #expect(note.hasSuffix("already asks the person to archive it; nothing changed."))
+        #expect(note.hasSuffix("already waits for the person to approve archiving it; nothing changed."))
         #expect(await core.agent(helper)?.asksToArchive == true)
     }
 

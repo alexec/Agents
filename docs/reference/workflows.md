@@ -264,7 +264,7 @@ that starts a helper decides what becomes of it.
 
 | Value | What happens |
 |---|---|
-| `keep` | The default, **Keep each run**. Every run stays in the list when it is done. A run may ask you to archive it. |
+| `keep` | The default, **Keep each run**. Every run stays in the list when it is done. A run may archive itself once you approve it. |
 | `archive-allowed` | A run that finishes **Complete** or **Nothing to do** may archive itself, with `archive_session` and no id, when there is nothing for you to look at. It is told it may. Otherwise it stays. |
 | `archive` | A run that finishes **Complete** or **Nothing to do** is archived, whatever the agent asks. |
 
