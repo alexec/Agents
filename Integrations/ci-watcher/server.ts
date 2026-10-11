@@ -1,5 +1,5 @@
-// The CI watcher MCP server (#383): this repo's pull requests' CI as events, tools and a
-// view, over MCP's stdio transport. The Agents daemon hosts it (#488). The contract is
+// The CI watcher MCP server (#383): this repo's pull requests' CI and its issues (#682) as
+// events, tools and views, over MCP's stdio transport. The Agents daemon hosts it (#488). The contract is
 // specs/383-mcp-integrations/contracts/ci-watcher-server.md.
 //
 //   node server.ts                        gh as the signed-in person
@@ -9,7 +9,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { GhError, fakeGitHub, realGitHub, type GitHub, type RunRef } from "./github.ts";
+import { GhError, fakeGitHub, realGitHub, type GitHub, type IssueActivity, type IssueKind, type RunRef } from "./github.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const VERSION = "0.1.0";
@@ -113,7 +113,53 @@ const EVENTS = [
       properties: { pr: prSchema, mergedAt: { type: "string" }, mergeSha: { type: "string" } },
     },
   },
+  ...issueEvents(),
 ];
+
+function issueEvents() {
+  const issueSchema = {
+    type: "object",
+    properties: {
+      number: { type: "integer" }, title: { type: "string" }, author: { type: "string" },
+      labels: { type: "array", items: { type: "string" } }, url: { type: "string" },
+    },
+  };
+  const label = (what: string) => ({ type: "string", description: what });
+  const issue = { type: "integer", description: "Only this issue, by number." };
+  const kinds: { kind: IssueKind; title: string; description: string; label: string; payload: Record<string, any> }[] = [
+    { kind: "opened", title: "Issue opened", description: "An issue was opened. Pull requests are not issues here.",
+      label: "Only issues opened with this label.", payload: { openedAt: { type: "string" } } },
+    { kind: "labelled", title: "Issue labelled", description: "A label was added to an issue: one event per label added.",
+      label: "Only when this label is the one added.",
+      payload: { label: { type: "string" }, by: { type: "string" }, labelledAt: { type: "string" } } },
+    { kind: "commented", title: "Issue commented on",
+      description: "A comment was left on an issue (not a pull request). Its body is the first 4000 characters.",
+      label: "Only issues with this label.",
+      payload: {
+        comment: { type: "object", properties: { author: { type: "string" }, url: { type: "string" }, body: { type: "string" } } },
+        commentedAt: { type: "string" },
+      } },
+    { kind: "closed", title: "Issue closed", description: "An issue was closed, as completed or not planned.",
+      label: "Only issues with this label.",
+      payload: { reason: { type: "string", enum: ["completed", "not_planned"] }, by: { type: "string" }, closedAt: { type: "string" } } },
+  ];
+  return kinds.map((k) => ({
+    name: `issue.${k.kind}`, title: k.title, description: k.description, delivery: ["poll"],
+    inputSchema: schema(k.kind === "opened" ? { repo: repoProperty, label: label(k.label) }
+      : { repo: repoProperty, label: label(k.label), issue }, ["repo"]),
+    payloadSchema: { type: "object", properties: { issue: issueSchema, ...k.payload } },
+  }));
+}
+
+/** An issue activity as its event's details. */
+function issueData(a: IssueActivity) {
+  switch (a.kind) {
+    case "opened": return { issue: a.issue, openedAt: a.at };
+    case "labelled": return { issue: a.issue, label: a.label, by: a.by, labelledAt: a.at };
+    case "commented": return { issue: a.issue, comment: a.comment, commentedAt: a.at };
+    case "closed": return { issue: a.issue, reason: a.reason, by: a.by, closedAt: a.at };
+  }
+}
 
 interface Cursor { since: string; ids: string[] }
 const encodeCursor = (c: Cursor) => Buffer.from(JSON.stringify(c)).toString("base64url");
@@ -131,6 +177,14 @@ interface Candidate { eventId: string; time: string; data: () => Promise<unknown
 
 async function candidates(gh: GitHub, name: string, args: Record<string, any>, since: string) {
   const repo: string = args.repo;
+  if (name.startsWith("issue.")) {
+    const { items, truncated } = await gh.issueActivity(repo, name.slice("issue.".length) as IssueKind, since);
+    const list = items
+      .filter((a) => args.issue === undefined || a.issue.number === args.issue)
+      .filter((a) => args.label === undefined || (a.kind === "labelled" ? a.label === args.label : a.issue.labels.includes(args.label)))
+      .map((a): Candidate => ({ eventId: `${name}:${repo}:${a.id}`, time: new Date(a.at).toISOString(), data: async () => issueData(a) }));
+    return { list, truncated };
+  }
   if (name === "checks.failed") {
     const { runs, truncated } = await gh.failedRuns(repo, args.branch, since);
     // A run that names another PR is skipped before its details are fetched; one that names
@@ -218,6 +272,14 @@ const TOOLS = [
     _meta: { ui: { resourceUri: "ui://ci/board", visibility: ["model", "app"] }, "ui/resourceUri": "ui://ci/board" },
   },
   {
+    name: "list_issues",
+    title: "List issues",
+    description: "The repo's open issues (not pull requests), newest updated first, at most 100, each with its labels and comment count.",
+    inputSchema: schema({ repo: repoProperty, label: { type: "string", description: "Only issues with this label." } }, ["repo"]),
+    annotations: { readOnlyHint: true },
+    _meta: { ui: { resourceUri: "ui://ci/issues", visibility: ["model", "app"] }, "ui/resourceUri": "ui://ci/issues" },
+  },
+  {
     name: "failed_log",
     title: "Read a failed run's log",
     description: "The last 300 lines of each failed job's log in an Actions run, or of one job by name.",
@@ -256,6 +318,7 @@ async function callTool(gh: GitHub, params: any) {
       return { content: [{ type: "text", text: await gh.failedLog(a.repo, a.runId, a.job) }] };
     }
     const result = tool.name === "list_prs" ? { prs: await gh.listPRs(a.repo) }
+      : tool.name === "list_issues" ? { issues: await gh.listIssues(a.repo, a.label) }
       : tool.name === "rerun_failed" ? await gh.rerunFailed(a.repo, a.runId)
       : await gh.commentOnPR(a.repo, a.number, a.body);
     return { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result };
@@ -269,20 +332,22 @@ async function callTool(gh: GitHub, params: any) {
 
 // MARK: Resources
 
-const BOARD_URI = "ui://ci/board";
-const BOARD_MIME = "text/html;profile=mcp-app";
+const VIEW_MIME = "text/html;profile=mcp-app";
 // No network at all: an empty csp, so the host draws it under its strictest policy.
-const BOARD_META = { ui: { csp: {}, prefersBorder: true } };
-const board = {
-  uri: BOARD_URI, name: "board", title: "Pull requests",
-  description: "The repo's open pull requests and their checks, with Rerun on a failing one. Fed by list_prs.",
-  mimeType: BOARD_MIME, _meta: BOARD_META,
-};
+const VIEW_META = { ui: { csp: {}, prefersBorder: true } };
+const VIEWS = [
+  { uri: "ui://ci/board", file: "board.html", name: "board", title: "Pull requests",
+    description: "The repo's open pull requests and their checks, with Rerun on a failing one. Fed by list_prs." },
+  { uri: "ui://ci/issues", file: "issues.html", name: "issues", title: "Issues",
+    description: "The repo's open issues with their labels; a label narrows the list. Fed by list_issues." },
+];
+const resources = VIEWS.map(({ file, ...view }) => ({ ...view, mimeType: VIEW_MIME, _meta: VIEW_META }));
 
 async function readResource(params: any) {
-  if (params?.uri !== BOARD_URI) throw new RpcError(-32002, `no resource ${params?.uri}`);
-  const text = await readFile(join(here, "board.html"), "utf8");
-  return { contents: [{ uri: BOARD_URI, mimeType: BOARD_MIME, text, _meta: BOARD_META }] };
+  const view = VIEWS.find((v) => v.uri === params?.uri);
+  if (!view) throw new RpcError(-32002, `no resource ${params?.uri}`);
+  const text = await readFile(join(here, view.file), "utf8");
+  return { contents: [{ uri: view.uri, mimeType: VIEW_MIME, text, _meta: VIEW_META }] };
 }
 
 // MARK: Dispatch
@@ -296,13 +361,13 @@ async function handle(gh: GitHub, method: string, params: any): Promise<unknown>
         capabilities: { tools: {}, resources: {}, events: { listChanged: false },
           extensions: { "io.modelcontextprotocol/ui": {} } },
         serverInfo: { name: "ci-watcher", title: "CI watcher", version: VERSION },
-        instructions: "This repo's pull requests and their CI. Events: checks.failed, pr.merged. Tools read logs, rerun failed jobs and comment, as the signed-in gh user.",
+        instructions: "This repo's pull requests, their CI, and its issues. Events: checks.failed, pr.merged, issue.opened, issue.labelled, issue.commented, issue.closed. Tools list pull requests and issues, read logs, rerun failed jobs and comment, as the signed-in gh user.",
       };
     }
     case "ping": return {};
     case "tools/list": return { tools: TOOLS };
     case "tools/call": return callTool(gh, params);
-    case "resources/list": return { resources: [board] };
+    case "resources/list": return { resources };
     case "resources/templates/list": return { resourceTemplates: [] };
     case "resources/read": return readResource(params);
     case "events/list": return { events: EVENTS };
