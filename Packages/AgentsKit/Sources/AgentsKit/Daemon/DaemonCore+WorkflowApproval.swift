@@ -21,12 +21,13 @@ extension DaemonCore {
     /// modification date is still read and hashed afresh.
     func workflowDigest(_ workflow: Workflow) -> String? {
         let url = WorkflowFile.url(for: workflow.workflowID, in: workflow.folder)
-        guard let stamp = DigestStamp(url.path) else {
+        // A link is never approved, nor run (security review).
+        guard !WorkflowFile.isLinked(url), let stamp = DigestStamp(url.path) else {
             workflowDigests[url.path] = nil
             return nil
         }
         if let known = workflowDigests[url.path], known.stamp == stamp { return known.digest }
-        guard let data = try? Data(contentsOf: url) else { return nil }
+        guard let data = WorkflowFile.bytes(at: url) else { return nil }
         let digest = ContentDigest.sha256(data)
         workflowDigestReads += 1
         // Kept only when the file did not move under the read.
@@ -97,7 +98,7 @@ extension DaemonCore {
     /// can write them back (#569); nil when the file moved under the read.
     func approvedCopy(of workflow: Workflow, digest: String) -> Data? {
         let url = WorkflowFile.url(for: workflow.workflowID, in: workflow.folder)
-        guard let data = try? Data(contentsOf: url), ContentDigest.sha256(data) == digest else { return nil }
+        guard let data = WorkflowFile.bytes(at: url), ContentDigest.sha256(data) == digest else { return nil }
         return data
     }
 

@@ -24,11 +24,40 @@ public enum WorkflowFile {
     /// rather than leaving a gap where a row should be.
     public static func read(_ url: URL, in project: URL) -> Workflow {
         let workflowID = url.deletingPathExtension().lastPathComponent
-        guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+        if isLinked(url) {
+            return Workflow(workflowID: workflowID, folder: project,
+                            problem: .unreadable("This file is a link, and a workflow must be a file of its own"))
+        }
+        guard let data = bytes(at: url), let text = String(data: data, encoding: .utf8) else {
             return Workflow(workflowID: workflowID, folder: project,
                             problem: .unreadable("This file could not be read"))
         }
-        return parse(text, workflowID: workflowID, in: project)
+        var workflow = parse(text, workflowID: workflowID, in: project)
+        workflow.digest = ContentDigest.sha256(data)
+        return workflow
+    }
+
+    /// Whether the file is a symbolic link, or has a second hard link (security review).
+    /// Either reads through to a file somewhere the project's watch may never see, so
+    /// what was read and approved could change with nothing read again.
+    public static func isLinked(_ url: URL) -> Bool {
+        var info = stat()
+        guard lstat(url.path, &info) == 0 else { return false }
+        return (info.st_mode & S_IFMT) == S_IFLNK || info.st_nlink > 1
+    }
+
+    /// The file's bytes, or nil when it cannot be read or is not a plain file of its own:
+    /// opened without following a link, and the open file checked, so nothing swapped in
+    /// after `isLinked` is read either.
+    public static func bytes(at url: URL) -> Data? {
+        let descriptor = open(url.path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
+        guard descriptor >= 0 else { return nil }
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        var info = stat()
+        guard fstat(descriptor, &info) == 0, (info.st_mode & S_IFMT) == S_IFREG, info.st_nlink == 1 else {
+            return nil
+        }
+        return (try? handle.readToEnd()) ?? Data()
     }
 
     /// The whole of the format, as a function of text, so a test needs no file.
