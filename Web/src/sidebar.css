@@ -53,6 +53,8 @@
 
 /* A project's rows sit at the sidebar's edge under its heading, as a group's do (#495). */
 .with-sidebar .fold-body { margin-bottom: 6px; }
+/* A plain line between a project's sessions and its workflows, when it has both (#631). */
+.with-sidebar .fold-body hr.kinds { border: 0; border-top: 1px solid var(--paper-rule); margin: 4px 8px; }
 
 /* The groups at the top (#495): Pinned, Needs You, Working, Unread, headed and folding as Activity
    is, the count on the right, Needs You's in the attention tint. */

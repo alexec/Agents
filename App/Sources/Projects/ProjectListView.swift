@@ -361,7 +361,13 @@ private struct ProjectFold: View {
                 ForEach(FoldedRow.rows(fold.sessions, in: .sessions)) { row in
                     SessionSidebarRow(agent: row.item)
                 }
-                // Then its workflows, after the sessions (Alex, #495): rows, not a page.
+                // Then its workflows, after the sessions (Alex, #495): rows, not a page,
+                // a plain line between the two kinds when there are both (Alex, #631).
+                if !fold.sessions.isEmpty && !fold.workflows.isEmpty {
+                    Divider()
+                        .listRowInsets(.vertical, 2)
+                        .accessibilityHidden(true)
+                }
                 ForEach(FoldedRow.rows(fold.workflows, in: .workflows)) { row in
                     WorkflowListRow(summary: row.item, project: key)
                 }

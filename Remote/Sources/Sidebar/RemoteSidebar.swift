@@ -372,7 +372,13 @@ private struct RemoteProjectFold: View {
                 ForEach(fold.sessions) { agent in
                     SidebarSessionRow(agent: agent)
                 }
-                // Its workflows after the sessions (Alex, #495): rows, not a page.
+                // Its workflows after the sessions (Alex, #495): rows, not a page, a
+                // plain line between the two kinds when there are both (Alex, #631).
+                if !fold.sessions.isEmpty && !fold.workflows.isEmpty {
+                    Divider()
+                        .listRowInsets(.vertical, 2)
+                        .accessibilityHidden(true)
+                }
                 ForEach(fold.workflows) { summary in
                     SidebarWorkflowRow(summary: summary, project: key)
                 }
