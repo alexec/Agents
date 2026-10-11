@@ -164,6 +164,7 @@ struct ControlAddServerSheet: View {
                 GridRow {
                     Color.clear.frame(width: 1, height: 1)
                     Text(resolvedLine).appText(.supporting).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             GridRow {
@@ -260,15 +261,19 @@ struct ControlAddServerSheet: View {
     }
 
     /// What ssh makes of the server box: `user@host:port`, and whether through a bastion.
+    /// Said for a typed `user@host:port` too, where it only confirms what was typed: no
+    /// line would read as nothing having been checked (#610).
     private var resolvedLine: String? {
         guard let typed, typed.alias == destination.trimmingCharacters(in: .whitespaces) else { return nil }
-        var parts: [String] = []
-        if typed.resolved != typed.alias { parts.append("ssh reaches it as \(typed.resolved)") }
-        if typed.throughBastion { parts.append("through a bastion, so it can rarely reach this Mac") }
-        if typed.known { parts.append("already a host") }
-        guard !parts.isEmpty else { return nil }
-        let line = parts.joined(separator: ", ")
-        return line.prefix(1).uppercased() + line.dropFirst() + "."
+        return Self.resolvedLine(typed)
+    }
+
+    /// Starts with `ssh`, which stays lower case, as the command is written.
+    static func resolvedLine(_ host: DaemonAPI.SSHHost) -> String {
+        var parts = ["ssh reaches it as \(host.resolved)"]
+        if host.throughBastion { parts.append("through a bastion, so it can rarely reach this Mac") }
+        if host.known { parts.append("already a host") }
+        return parts.joined(separator: ", ") + "."
     }
 
     /// Once typing pauses, ask what ssh makes of it; until the person sets the tunnel,
