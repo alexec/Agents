@@ -39,7 +39,11 @@ struct HostWindow: View {
                     Label(problem, systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
                         .accessibilityLabel("Problem: \(problem)")
+                } else if let repaired = model.repaired, model.failureReason == nil {
+                    Label(repaired, systemImage: "checkmark.circle")
+                        .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
+                diagnostics
             }
             .padding(22)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -94,6 +98,28 @@ struct HostWindow: View {
                 }
             }
             .padding(16)
+            // Why a login item isn't running, as launchd and macOS say it, for as long as it
+            // holds (#678): never an endless Starting….
+            if let reason = model.failureReason {
+                Divider()
+                HStack(alignment: .top, spacing: 12) {
+                    Label(reason, systemImage: "exclamationmark.triangle")
+                        .font(.callout).foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityLabel("Why it isn’t running: \(reason)")
+                    Spacer()
+                    if model.canRepair {
+                        Button("Repair") { Task { await model.repair() } }
+                            .help("Registers both login items again from this copy of Agents Host and starts them.")
+                    } else {
+                        Button("Open Login Items") {
+                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension")!)
+                        }
+                    }
+                }
+                .disabled(model.busy != nil)
+                .padding(16)
+            }
             // The host's own word on its join, while it keeps failing (#113).
             if model.hostJoinFailed, let join = model.hostJoin {
                 Divider()
@@ -141,8 +167,25 @@ struct HostWindow: View {
         .accessibilityElement(children: .contain)
     }
 
-    /// Grey when the process is down, orange when it is up and has no membership (#303).
+    /// What to send with a bug report, and where the logs are (#678).
+    private var diagnostics: some View {
+        HStack(spacing: 14) {
+            Button("Copy Diagnostics") { Task { await model.copyDiagnostics() } }
+                .help("Copies a report with secrets left out: this copy, both login items, what listens, and the end of both logs.")
+            Button("Save Diagnostics…") { Task { await model.saveDiagnostics() } }
+            Button("Show Logs") { model.showLogs() }
+            Spacer()
+        }
+        .buttonStyle(.link)
+        .font(.callout)
+        .disabled(model.busy != nil)
+        .padding(.horizontal, 6)
+    }
+
+    /// Grey when the process is down, orange when it is up and has no membership (#303),
+    /// red when it can't start (#678).
     private var thisMacDot: Color {
+        if model.daemonFailure != nil { return .red }
         guard model.daemonRunning else { return Color.secondary.opacity(0.4) }
         if model.hostJoin?.member == false { return .orange }
         return .green
@@ -150,7 +193,8 @@ struct HostWindow: View {
 
     private var thisMacLine: String {
         guard model.daemonRunning else {
-            return model.settings.role == .none ? "Not running agents yet · Agents Host \(model.version)" : "Starting… · Agents Host \(model.version)"
+            if model.settings.role == .none { return "Not running agents yet · Agents Host \(model.version)" }
+            return model.daemonFailure != nil ? "Not running · Agents Host \(model.version)" : "Starting… · Agents Host \(model.version)"
         }
         if model.hostJoin?.member == false {
             return "Running, and not joined to the control plane · Agents Host \(model.version)"
@@ -252,10 +296,14 @@ struct HostWindow: View {
 
     private var running: some View {
         row {
-            Circle().fill(model.controlRunning ? Color.green : Color.orange).frame(width: 9, height: 9)
+            Circle().fill(model.controlRunning ? Color.green : model.controlFailure != nil ? Color.red : Color.orange)
+                .frame(width: 9, height: 9)
             VStack(alignment: .leading, spacing: 2) {
                 if model.controlRunning {
                     Text("Running at \(Text(model.controlURL).font(.system(.body, design: .monospaced)))")
+                } else if model.busy == nil, let job = model.controlJob {
+                    // What launchd says, not a bare "Not running" (#678).
+                    Text(job.loaded ? "Not running · \(job.state ?? "waiting")" : "Not running · not loaded")
                 } else {
                     Text(model.busy ?? "Not running")
                 }

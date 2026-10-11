@@ -13,6 +13,9 @@ enum MacHostNotice: Equatable {
     case notJoined(problem: String?)
     /// It enrolled, and its uplink is down. Try Again redials.
     case notAnswering
+    /// It is running and enrolled, and says why its uplink keeps failing (#678): the
+    /// control plane or the way to it, not the host process.
+    case uplinkFailing(problem: String)
     /// The host is up at the control plane, and this window is not reaching it (#445):
     /// the window's own connection, not the host. Try Again dials a fresh one.
     case windowLost
@@ -27,7 +30,10 @@ enum MacHostNotice: Equatable {
         let up: MacHostNotice? = windowMissed ? .windowLost : nil
         if let join {
             if !join.member { return .notJoined(problem: join.problem) }
-            if !join.connected { return .notAnswering }
+            if !join.connected {
+                if let problem = join.problem, !problem.isEmpty { return .uplinkFailing(problem: problem) }
+                return .notAnswering
+            }
             // The join says connected and the control plane's list says otherwise.
             if let macState, macState != "online" { return .notAnswering }
             return up
@@ -43,6 +49,7 @@ enum MacHostNotice: Equatable {
         case .notRunning: "This Mac’s host isn’t running"
         case .notJoined: "This Mac’s host hasn’t joined"
         case .notAnswering: "This Mac’s host isn’t answering"
+        case .uplinkFailing: "This Mac’s host can’t reach the control plane"
         case .windowLost: "This window lost its connection to this Mac’s host"
         }
     }
@@ -50,7 +57,7 @@ enum MacHostNotice: Equatable {
     var detail: String {
         switch self {
         case .notRunning:
-            "Open Agents Host. It starts this Mac’s host, and Try Again there joins it if it never enrolled."
+            "Open Agents Host. It says why, Repair there starts it again, and Copy Diagnostics there is what to send with a report."
         case .notJoined(let problem):
             if let problem, !problem.isEmpty {
                 "It’s running, and it has no membership. \(Self.sentence(problem)) Open Agents Host and press Try Again there."
@@ -59,6 +66,8 @@ enum MacHostNotice: Equatable {
             }
         case .notAnswering:
             "What’s listed is what it last said. The window is trying again by itself."
+        case .uplinkFailing(let problem):
+            "It’s running, and its link to the control plane keeps failing. \(Self.sentence(problem)) It’s trying again by itself; Agents Host’s Copy Diagnostics says more."
         case .windowLost:
             "The host and the control plane are both up. What’s listed is what the window last heard, and it’s reconnecting by itself."
         }
@@ -73,6 +82,8 @@ enum MacHostNotice: Equatable {
             "This Mac’s host hasn’t joined the control plane, so that didn’t happen. Open Agents Host and press Try Again there."
         case .notAnswering:
             "This Mac’s host isn’t answering, so that didn’t happen. The window is trying again by itself; Try Again tries now."
+        case .uplinkFailing:
+            "This Mac’s host can’t reach the control plane, so that didn’t happen. It’s trying again by itself; Try Again tries now."
         case .windowLost:
             "This window lost its connection to this Mac’s host, so that didn’t happen. It’s reconnecting by itself; Try Again tries now."
         }
@@ -87,6 +98,8 @@ enum MacHostNotice: Equatable {
             "This Mac’s host hasn’t joined the control plane\(Self.since(since)). Open Agents Host and press Try Again there. Nothing here can change until it has."
         case .notAnswering:
             OfflineWords.line(host: .mac, name: "This Mac", since: since)
+        case .uplinkFailing(let problem):
+            "This Mac’s host is running and can’t reach the control plane\(Self.since(since)). \(Self.sentence(problem)) It’s trying again by itself."
         case .windowLost:
             "This window lost its connection to this Mac’s host\(Self.since(since)). The host is up, and the window is reconnecting by itself."
         }

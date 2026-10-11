@@ -150,7 +150,7 @@ struct ControlOverviewPage: View {
                 } else if control.isOnThisMac, control.thisMacHost == nil, control.status?.thisMacHost == nil {
                     Divider()
                     ControlRow(dot: .attention, title: "This Mac’s host",
-                               detail: "It isn’t running, so it has not joined. Open Agents Host.") {
+                               detail: "It isn’t running, so it has not joined. Open Agents Host: it says why, and Repair there starts it again.") {
                         Text("Not running").appText(.reading).foregroundStyle(.secondary)
                     }
                 }

@@ -50,13 +50,31 @@ struct LocalServices {
 
     /// Whether launchd has it running, and as which process.
     func running(_ job: Job) async -> Int32? {
-        let text = await Self.launchctlOutput(["print", "gui/\(getuid())/\(label(job))"])
-        guard text.contains("state = running") else { return nil }
-        for line in text.split(separator: "\n") {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("pid = "), let pid = Int32(trimmed.dropFirst(6)) { return pid }
+        let state = await state(job)
+        return state.running ? state.pid : nil
+    }
+
+    /// What launchd says of it (#678): running, or why not.
+    func state(_ job: Job) async -> LaunchJobState {
+        let printed = await Self.run(["print", "gui/\(getuid())/\(label(job))"])
+        return LaunchJobState.parse(printed.text, exitStatus: printed.status)
+    }
+
+    /// `launchctl print` as it is, for the diagnostics.
+    func printed(_ job: Job) async -> String {
+        let printed = await Self.run(["print", "gui/\(getuid())/\(label(job))"])
+        return printed.status == 0 ? printed.text : printed.text + printed.errorText
+    }
+
+    /// Its login item, as `SMAppService` has it. A scratch set-up has none.
+    func loginStatus(_ job: Job) -> LoginItemStatus {
+        guard !paths.scratch else { return .scratch }
+        switch SMAppService.agent(plistName: plist(job)).status {
+        case .enabled: return .enabled
+        case .requiresApproval: return .requiresApproval
+        case .notFound: return .notFound
+        default: return .notRegistered
         }
-        return nil
     }
 
     /// Leave a one-time host code where `agentsd` reads it: on its next start, and on each
@@ -153,10 +171,6 @@ struct LocalServices {
     /// it, and stopped at a deadline (#92). See `ChildProcess`.
     private static func launchctl(_ arguments: [String]) async -> Int32 {
         await run(arguments).status
-    }
-
-    private static func launchctlOutput(_ arguments: [String]) async -> String {
-        await run(arguments).text
     }
 
     private static func run(_ arguments: [String]) async -> ChildProcess.Outcome {
