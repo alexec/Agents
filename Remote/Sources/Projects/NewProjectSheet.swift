@@ -11,14 +11,19 @@ enum NewProject: Identifiable, Hashable {
     var id: Self { self }
 }
 
-/// The + at the head of the sidebar: Add Project… and Clone Project from Git URL…, under
-/// each host's name when there is more than one. A host not answering can't take one.
+/// The + at the head of the sidebar: New Session, then Add Project… and Clone Project from
+/// Git URL…, under each host's name when there is more than one. A host not answering can't take one.
 struct NewProjectMenu: View {
     @Environment(RemoteModel.self) private var model
     @Binding var adding: NewProject?
 
     var body: some View {
         Menu {
+            // As the sidebar's top row starts one, in the project last started in (#628).
+            Button("New Session", systemImage: "square.and.pencil") {
+                if let project = model.newSessionProject { model.sidebarItem = .project(project) }
+            }
+            .disabled(model.isStale || model.newSessionProject == nil)
             let hosts = model.projectHosts
             ForEach(hosts) { host in
                 Section(hosts.count > 1 ? host.title : "") {
