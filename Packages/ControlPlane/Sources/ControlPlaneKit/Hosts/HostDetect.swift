@@ -136,6 +136,24 @@ public struct HostDetect: Sendable {
         return names.compactMap { results[$0] }
     }
 
+    /// `hosts/sshHosts` (#610): what Add a Server's server box suggests, from `ssh -G`
+    /// alone, with no network: every concrete `Host` in the config, or just `destination`,
+    /// as typed. Each says whether ssh reaches it through a bastion, so the sheet can turn a
+    /// tunnel on for it.
+    public func sshHosts(_ destination: String?) async -> [DaemonAPI.SSHHost] {
+        let names = destination.map { [$0] } ?? aliases()
+        let resolved = await Self.each(names, limit: Self.probes) { alias in
+            await resolve(alias) ?? SSHConfigHosts.Resolved(alias: alias, options: [:])
+        }
+        let bastions = destination == nil ? SSHConfigHosts.bastions(resolved) : []
+        let known = Set(await knownNames().map { $0.lowercased() })
+        return resolved.map { host in
+            .init(alias: host.alias, resolved: host.display, throughBastion: !host.jumpHosts.isEmpty,
+                  isBastion: SSHConfigHosts.isBastion(host, among: bastions),
+                  known: known.contains(host.alias.lowercased()) || known.contains(host.hostName.lowercased()))
+        }
+    }
+
     /// `work` on each item, at most `limit` at once, the results in the items' order.
     static func each<T: Sendable, R: Sendable>(_ items: [T], limit: Int,
                                                _ work: @escaping @Sendable (T) async -> R) async -> [R] {

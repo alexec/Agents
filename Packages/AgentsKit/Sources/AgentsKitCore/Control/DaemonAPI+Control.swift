@@ -18,6 +18,10 @@ public extension DaemonAPI.Method {
     /// `hosts/detect` (#429): every server in the control plane's `~/.ssh/config` that
     /// answers, added as `hosts/install` would with no key. `[DetectedServer]`.
     static let hostsDetect = "hosts/detect"
+    /// `hosts/sshHosts` (#610): the hosts in the control plane's ssh config, as `ssh -G`
+    /// resolves each, with no network. `{destination}` resolves just that, as typed.
+    /// `[SSHHost]`.
+    static let hostsSSHHosts = "hosts/sshHosts"
     /// `ProjectDetection` (#429): whether a host added from now on arrives with its
     /// projects, and where they are looked for.
     static let controlSetProjectDetection = "control/setProjectDetection"
@@ -209,6 +213,31 @@ public extension DaemonAPI {
             self.resolved = resolved
             self.outcome = outcome
             self.detail = detail
+        }
+    }
+
+    /// A server ssh knows by a name, for Add a Server's server box (#610).
+    struct SSHHost: Codable, Sendable, Hashable, Identifiable {
+        /// The `Host` name in the config, or the destination as typed.
+        public var alias: String
+        /// `user@hostname:port`, as `ssh -G` resolved it.
+        public var resolved: String
+        /// Reached through a `ProxyJump` or `ProxyCommand`: it rarely can dial back, so a
+        /// tunnel is the default.
+        public var throughBastion: Bool
+        /// Another host's way in, not a server to add.
+        public var isBastion: Bool
+        /// A host by that name is on the control plane already.
+        public var known: Bool
+
+        public var id: String { alias }
+
+        public init(alias: String, resolved: String, throughBastion: Bool, isBastion: Bool = false, known: Bool = false) {
+            self.alias = alias
+            self.resolved = resolved
+            self.throughBastion = throughBastion
+            self.isBastion = isBastion
+            self.known = known
         }
     }
 

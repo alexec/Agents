@@ -97,6 +97,33 @@ struct HostDetectTests {
         #expect(Set(probed.value) == ["devbox", "gpu", "down", "had"])
     }
 
+    /// #610: Add a Server's server box, from `ssh -G` alone: nothing is probed or installed.
+    @Test func theServerBoxIsOfferedTheConfigsHostsResolved() async {
+        let detect = HostDetect(
+            aliases: { ["devbox", "bastion", "gpu", "mine"] },
+            resolve: { alias in
+                switch alias {
+                case "gpu": SSHConfigHosts.Resolved(alias: alias, options: ["user": "me", "hostname": "10.1.0.9", "proxyjump": "bastion"])
+                case "devbox": SSHConfigHosts.Resolved(alias: alias, options: ["user": "agents", "hostname": "127.0.0.1", "port": "2222"])
+                case "agents@ws:2200": SSHConfigHosts.Resolved(alias: alias, options: ["user": "agents", "hostname": "ws", "port": "2200",
+                                                                                       "proxycommand": "ssh -W %h:%p jump"])
+                default: SSHConfigHosts.Resolved(alias: alias, options: ["hostname": alias + ".lan"])
+                }
+            },
+            probe: { _ in Issue.record("probed"); return .unreachable("") },
+            install: { _ in Issue.record("installed") },
+            knownNames: { ["mine.lan"] })
+        let all = await detect.sshHosts(nil)
+        #expect(all.map(\.alias) == ["devbox", "bastion", "gpu", "mine"])
+        #expect(all.map(\.resolved) == ["agents@127.0.0.1:2222", "bastion.lan", "me@10.1.0.9", "mine.lan"])
+        #expect(all.map(\.throughBastion) == [false, false, true, false])
+        #expect(all.map(\.isBastion) == [false, true, false, false])
+        #expect(all.map(\.known) == [false, false, false, true])
+        // Typed, not in the config: still resolved, so a ProxyCommand a wildcard gives it counts.
+        let typed = await detect.sshHosts("agents@ws:2200")
+        #expect(typed == [.init(alias: "agents@ws:2200", resolved: "agents@ws:2200", throughBastion: true)])
+    }
+
     @Test func aHungProbeEndsAtItsLimit() async {
         let clock = ContinuousClock()
         let start = clock.now

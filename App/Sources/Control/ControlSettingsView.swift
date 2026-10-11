@@ -262,7 +262,7 @@ struct ControlHostsPage: View {
                 Button("Add a Server…") { addingServer = true }.buttonStyle(.paper)
                 Button("Add by Code…") { addingByCode = true }.buttonStyle(.paper)
             }
-            Text("Add a Server gives you one command to run on it, or installs it over ssh with a key you give once. Either way the server connects out, so nothing has to reach it. Add by Code gives another Mac a code to join with. Removing a host stops it connecting. Its agents are left running where they are.")
+            Text("Add a Server gives you one command to run on it, or installs it over ssh as you log in from Terminal, through an ssh tunnel when it can’t reach this Mac. Either way the server connects out, so nothing has to reach it. Add by Code gives another Mac a code to join with. Removing a host stops it connecting. Its agents are left running where they are.")
                 .appText(.supporting).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             SharedSectionLabel("Auto-detect")

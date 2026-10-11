@@ -7,6 +7,11 @@ process, never from `agentsd`.
 Common options, called **B** below: `-o BatchMode=yes -o ConnectTimeout=10`.
 Over the master, called **M** below: `-S <root>/hosts/<id>.ctl` plus **B**.
 
+Since #610 every command that logs in also passes **Q**: `-o RemoteCommand=none -o RequestTTY=no
+-o ClearAllForwardings=yes`, so nothing in the person's config can break it. A command with no
+master of ours also passes **C**: `-o ControlMaster=no -o ControlPath=none`, so it is a
+connection of its own. See [Options from the person's config](#options-from-the-persons-config-610).
+
 ## 1. Resolve (no network)
 
 ```
@@ -101,6 +106,7 @@ in `Tests/AgentsKitTests/Hosts/Fixtures/stderr/`):
 | stderr contains | Problem |
 |---|---|
 | `Could not resolve hostname` | `unknownHost` |
+| `you have requested strict checking`, without `REMOTE HOST IDENTIFICATION HAS CHANGED` (#610) | `hostKeyUnknown` |
 | `REMOTE HOST IDENTIFICATION HAS CHANGED` | `hostKeyChanged` |
 | `Host key verification failed` (after step 3 trusted) | `hostKeyChanged` |
 | `Permission denied (publickey` and `ssh-add -l` lists no identities | `keyLocked` |
@@ -115,3 +121,87 @@ in `Tests/AgentsKitTests/Hosts/Fixtures/stderr/`):
 `ssh` is started with the app's environment minus `CLAUDE_*` and `AGENTS_*`, plus
 `SSH_AUTH_SOCK` as the app sees it. `SSH_ASKPASS` and `DISPLAY` are removed, so nothing can pop
 a prompt the app does not know about.
+
+## Adding a server over ssh (#610)
+
+Run by the control plane (`hosts/install`), not the window. Its `-F <file>` comes first when
+`AGENTS_SSH_CONFIG` names one (tests only).
+
+1. **The key, against the person's known_hosts.** Without a fingerprint to trust:
+   ```
+   ssh B [-i <key> -o IdentitiesOnly=yes -o IdentityAgent=none] -o StrictHostKeyChecking=yes
+         [-o "UserKnownHostsFile=~/.ssh/known_hosts ~/.ssh/known_hosts2"]   # only when ssh -G says /dev/null (#514)
+         Q C <name> '<probe>'
+   ```
+   It logs in → the key is one the person trusts, nothing is shown, the install goes on.
+   `hostKeyUnknown` → step 2. `hostKeyChanged` → refused, with words for it.
+2. **Not known: shown.** § 3's fetch into a temporary file, with **Q C**; the answer is
+   `{needsTrust: <SHA256 fingerprint>}`.
+3. **Trusted.** The second call carries `trust`. The key is fetched again and used only if its
+   fingerprint is that one. It goes into the install's own known_hosts, never the person's.
+4. **Tunnel.** `tunnel: true`, or, when the request leaves it out, `ssh -G` says `proxyjump` or
+   `proxycommand` (not `none`): the host code names `https://127.0.0.1:<port>`, and the
+   control plane holds the tunnel below. Only the control plane on the person's Mac can.
+
+`hosts/sshHosts` (#610): the config's concrete `Host` names (`SSHConfigHosts`, following
+`Include`), each resolved with `ssh -G` and no network. With `{destination}`, that alone,
+as typed. Each says `resolved` (`user@hostname[:port]`), `throughBastion`, `isBastion` (another
+entry's way in) and `known` (a host by that name already).
+
+### The tunnel
+
+```
+ssh B <-F> <known hosts> -o StrictHostKeyChecking=yes Q
+      -M -N -S /tmp/agents-tunnels-<uid>-<pid>/<id8>.ctl -o ControlPersist=no
+      -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes <name>
+ssh -S <ctl> -O check <name>                                       # every 0.5 s, up to 60 s
+ssh -S <ctl> -O forward -R 127.0.0.1:<port>:127.0.0.1:<port> <name>
+```
+
+`<known hosts>` is the key trusted at the install, in a file of the tunnel's own, or, when the
+person's known_hosts had it, theirs (with #514's override).
+
+`ClearAllForwardings=yes` drops every `LocalForward`, `RemoteForward` and `DynamicForward` the
+config names, and it drops a `-R` on the same command line too (OpenSSH clears forwards after
+reading the command line). So the master opens none, and the tunnel's one forward is asked of
+it with `-O forward`. When the server will not open it (the port is taken, `AllowTcpForwarding
+no`), `-O forward` exits non-zero with `forwarding request failed: <reason>`. The master is
+ended and the reason is the tunnel's problem: the host row says **ssh tunnel down: <reason>**.
+
+A session that ends is started again after 2 s, doubling to 60 s while it keeps failing, and
+back to 2 s once one has lasted a minute. Every session starts again at once when the Mac wakes
+(the clock that counts sleep ran well ahead of the one that does not) or the network's
+interfaces change. A server installed again over a tunnel replaces its older tunnel record.
+
+A host dialling through the tunnel binds its proof to `https://127.0.0.1:<port>`; a control
+plane that holds tunnels accepts that origin besides its own.
+
+## Options from the person's config (#610)
+
+Checked on 2026-10-10 with OpenSSH 10.3p1 on this Mac against the devbox (sshd on Debian),
+each with the arguments above (**B**, **Q**, **C**, `StrictHostKeyChecking=yes`), from a config
+written for the check: `specs/037-cloud-agents/walk/ssh-options.sh` runs them all again. Unit tests:
+`SSHCommandTests`, `HostTunnelsTests`, `HostInstallTests`; live: `SSHPathLiveTests`
+(`AGENTS_SSH_LIVE=1`) and `Walk610LiveTests`.
+
+| Option | What we do | Result |
+|---|---|---|
+| `HostName`, `User`, `Port` | the config's, through the alias | works |
+| `IdentityFile`, `IdentitiesOnly` | the config's; a key chosen in the sheet is `-i` with `IdentitiesOnly=yes` and `IdentityAgent=none` | works |
+| `IdentityAgent`, ssh-agent | the config's; `SSH_AUTH_SOCK` is kept (removed only when a key is chosen) | works with the agent alone. 1Password and Secretive are agents on a socket the same way; not tried with those apps |
+| `ProxyJump`, chains | the config's; a hop is its own ssh, which reads only the config, so our `-o`s do not reach it | works through one and two hops; a hop's own host key is checked as the config says |
+| `ProxyCommand` | the config's | works (`ssh -W %h:%p …`) |
+| `Include` | followed by ssh, and by `SSHConfigHosts` for the server box (globs, `~`, relative to `~/.ssh`) | works |
+| `Match` | ssh's own reading (`ssh -G`) | `Match host`, `Match exec` work |
+| `CertificateFile` | the config's, passed through | `ssh -G` reads it; not tried against an sshd with `TrustedUserCAKeys` |
+| `UserKnownHostsFile` | the config's; `/dev/null` alone is replaced by ssh's default files (#514); a key trusted in the sheet goes in a file of the install's own | works; `/dev/null` as given is refused under strict checking, ours logs in |
+| `StrictHostKeyChecking` | always `yes` on the command line, which wins over the config's `yes`, `accept-new` or `no` | an unknown key is refused and shown in the sheet, and nothing is written to known_hosts |
+| `HashKnownHosts` | read by `HostKeyCheck`; hashed lines match as ssh matches them | works against a hashed known_hosts |
+| `ControlMaster`, `ControlPath`, `ControlPersist` | `ControlMaster=no`, `ControlPath=none` on every command with no master of ours; the tunnel's master has its own `-S` and `ControlPersist=no` | works; with `ControlMaster auto` and `ControlPersist 600` in the config, no socket is made at their path |
+| `ServerAliveInterval`, `ConnectTimeout` | ours (`ConnectTimeout=10`, and 15 s × 3 on the tunnel) come first and win | works |
+| `LocalForward`, `RemoteForward`, `DynamicForward` | cleared on every connection (`ClearAllForwardings=yes`) | with a `RemoteForward` that cannot open and `ExitOnForwardFailure yes`, ours logs in and the tunnel opens; without our options ssh fails with `remote port forwarding failed` |
+| `SetEnv`, `SendEnv` | the config's; this app's `AGENTS_*` and `CLAUDE*` are not in ssh's environment | works |
+| `RequestTTY` | `no` | with `RequestTTY force`, what we read has no `\r` |
+| `RemoteCommand` | `none` | with one in the config, our command runs; without our options ssh refuses (`Cannot execute command-line and remote command`) |
+| `user@host:port`, `ssh://user@host:port`, aliases | `user@host:port` is handed to ssh as `ssh://…`; the rest as typed | works |
+

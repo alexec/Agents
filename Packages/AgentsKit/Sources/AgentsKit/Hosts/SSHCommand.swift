@@ -33,6 +33,20 @@ public struct SSHCommand: Sendable {
 
     static let batch = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10"]
 
+    /// What the person's config may say that would break a connection of ours (#610):
+    /// - `RemoteCommand` makes ssh refuse a command of ours ("Cannot execute command-line
+    ///   and remote command"), and `RequestTTY force` puts `\r\n` in what we read back.
+    /// - `LocalForward`, `RemoteForward` and `DynamicForward` would be opened by every
+    ///   connection, and one that cannot open is a failure of ours. `ClearAllForwardings`
+    ///   clears a forward given on the command line too, so a connection that needs one
+    ///   asks its own master for it (`tunnelForwardArguments`).
+    static let quiet = ["-o", "RemoteCommand=none", "-o", "RequestTTY=no", "-o", "ClearAllForwardings=yes"]
+
+    /// A connection of its own, never the person's `ControlMaster`: one of theirs would
+    /// carry ours past the host key check we ask for, and an `auto` one would be made by
+    /// us and left behind by `ControlPersist`.
+    static let ownConnection = ["-o", "ControlMaster=no", "-o", "ControlPath=none"]
+
     /// What ssh is handed as the destination. `user@host:port` is how people write it,
     /// and ssh does not read a port there; it does read `ssh://user@host:port`, so that
     /// form is written for it (037). An alias, or anything else, goes as typed.
@@ -51,13 +65,15 @@ public struct SSHCommand: Sendable {
     /// § 1: what the person's config says about this name, with no network.
     public var resolveArguments: [String] { ["-G", "--", destination] }
 
-    /// § 3: connect only far enough to learn the host key, offering no credentials.
+    /// § 3: connect only far enough to learn the host key, offering no credentials, into
+    /// `knownHosts` alone.
     public func keyFetchArguments(knownHosts: URL) -> [String] {
-        Self.batch + ["-o", "StrictHostKeyChecking=accept-new",
+        Self.batch + Self.quiet + Self.ownConnection + ["-o", "StrictHostKeyChecking=accept-new",
                       "-o", "UserKnownHostsFile=\(knownHosts.path(percentEncoded: false))",
                       "-o", "GlobalKnownHostsFile=/dev/null",
-                      "-o", "PreferredAuthentications=none",
-                      "--", destination, "true"]
+                      "-o", "PreferredAuthentications=none"]
+            // After ours: ssh keeps the first value it is given for each option.
+            + options + ["--", destination, "true"]
     }
 
     /// § 4: the long-lived connection everything else goes over.
@@ -85,15 +101,29 @@ public struct SSHCommand: Sendable {
         }
     }
 
-    /// A reverse tunnel and nothing else (#435): the server's `127.0.0.1:remote` reaches
-    /// this machine's `127.0.0.1:local`. A connection of its own, never a shared master, so
-    /// a `ControlPersist` in the person's config cannot end it; `-v` is how the holder
-    /// hears the forward is open (`remote forward success`).
-    public func reverseTunnelArguments(remotePort: Int, localPort: Int) -> [String] {
-        Self.batch + options + [
-            "-N", "-v", "-o", "ControlMaster=no", "-o", "ControlPath=none",
+    /// The connection a reverse tunnel rides (#435, #610): a master of its own on
+    /// `control`, never the person's, so neither their `ControlPersist` nor their
+    /// `ControlPath` can end or take it. It opens no forward: `ClearAllForwardings` drops
+    /// every one the config names, and would drop a `-R` given here too, so the tunnel's
+    /// one forward is asked for once this is up (`tunnelForwardArguments`).
+    public func tunnelMasterArguments(control: URL) -> [String] {
+        Self.batch + options + Self.quiet + [
+            "-M", "-N", "-S", control.path(percentEncoded: false), "-o", "ControlPersist=no",
             "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3", "-o", "ExitOnForwardFailure=yes",
-            "-R", "127.0.0.1:\(remotePort):127.0.0.1:\(localPort)", "--", destination]
+            "--", destination]
+    }
+
+    /// The tunnel's forward, asked of its master: the server's `127.0.0.1:remote` reaches
+    /// this machine's `127.0.0.1:local`. ssh exits non-zero with its reason when the server
+    /// will not open it (the port is taken, or `AllowTcpForwarding no`).
+    public func tunnelForwardArguments(control: URL, remotePort: Int, localPort: Int) -> [String] {
+        ["-S", control.path(percentEncoded: false), "-O", "forward",
+         "-R", "127.0.0.1:\(remotePort):127.0.0.1:\(localPort)", "--", destination]
+    }
+
+    /// `-O check` or `-O exit`, asked of a tunnel's master.
+    public func tunnelControlArguments(control: URL, _ operation: String) -> [String] {
+        ["-S", control.path(percentEncoded: false), "-O", operation, "--", destination]
     }
 
     /// `-O check` or `-O exit`, asked of the master.
@@ -102,8 +132,10 @@ public struct SSHCommand: Sendable {
     }
 
     /// §§ 5–8: a shell command on the server, over the master.
+    /// With no master of ours, a connection of its own (#610).
     public func runArguments(_ remote: String) -> [String] {
-        Self.batch + options + control + ["--", destination, remote]
+        Self.batch + options + Self.quiet + (controlPath == nil ? Self.ownConnection : control)
+            + ["--", destination, remote]
     }
 
     /// The window's environment, less anything that could open a prompt the window does
@@ -223,6 +255,10 @@ public struct SSHCommand: Sendable {
     public static func classify(status: Int32, stderr: String, agentHasKeys: Bool) -> HostProblem? {
         guard status != 0 else { return nil }
         if stderr.contains("Could not resolve hostname") { return .unknownHost }
+        // `StrictHostKeyChecking=yes` and no key for it in known_hosts: "No ED25519 host key
+        // is known for … and you have requested strict checking." A changed key says more.
+        if stderr.contains("you have requested strict checking"),
+           !stderr.contains("REMOTE HOST IDENTIFICATION HAS CHANGED") { return .hostKeyUnknown }
         if stderr.contains("REMOTE HOST IDENTIFICATION HAS CHANGED")
             || stderr.contains("Host key verification failed") { return .hostKeyChanged }
         if stderr.contains("Permission denied") { return agentHasKeys ? .loginRefused : .keyLocked }

@@ -46,7 +46,35 @@ struct SSHCommandTests {
     @Test func aCommandGoesOverTheMaster() {
         #expect(ssh.runArguments("uname -sm") == [
             "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
+            "-o", "RemoteCommand=none", "-o", "RequestTTY=no", "-o", "ClearAllForwardings=yes",
             "-S", "/r/hosts/ab12cd34.ctl", "--", "devbox", "uname -sm"])
+    }
+
+    /// #610: with no master of ours, a connection of its own: never the person's
+    /// ControlMaster, which would skip our host key check or be left behind by ControlPersist.
+    @Test func aCommandWithNoMasterIsAConnectionOfItsOwn() {
+        var install = SSHCommand(executable: URL(filePath: "/usr/bin/ssh"), name: "agents@ws:2222", controlPath: nil)
+        install.options = ["-o", "StrictHostKeyChecking=yes"]
+        #expect(install.runArguments("true") == [
+            "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "StrictHostKeyChecking=yes",
+            "-o", "RemoteCommand=none", "-o", "RequestTTY=no", "-o", "ClearAllForwardings=yes",
+            "-o", "ControlMaster=no", "-o", "ControlPath=none",
+            "--", "ssh://agents@ws:2222", "true"])
+    }
+
+    /// #610: what each typed form is handed to ssh as.
+    @Test(arguments: [
+        ("devbox", "devbox"),
+        ("agents@devbox.lan", "agents@devbox.lan"),
+        ("agents@devbox.lan:2222", "ssh://agents@devbox.lan:2222"),
+        ("devbox.lan:2222", "ssh://devbox.lan:2222"),
+        ("ssh://agents@devbox.lan:2222", "ssh://agents@devbox.lan:2222"),
+        ("ssh://devbox.lan", "ssh://devbox.lan"),
+        ("fe80::1", "fe80::1"),
+        ("agents@devbox.lan:http", "agents@devbox.lan:http"),
+    ])
+    func eachTypedFormIsADestinationSSHReads(_ typed: String, _ handed: String) {
+        #expect(SSHCommand(executable: URL(filePath: "/usr/bin/ssh"), name: typed, controlPath: nil).destination == handed)
     }
 
     @Test func checkAndExitAskTheMaster() {
@@ -57,9 +85,17 @@ struct SSHCommandTests {
     @Test func fetchingAKeyOffersNoCredentials() {
         let args = ssh.keyFetchArguments(knownHosts: URL(filePath: "/tmp/k"))
         #expect(args == ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
+                         "-o", "RemoteCommand=none", "-o", "RequestTTY=no", "-o", "ClearAllForwardings=yes",
+                         "-o", "ControlMaster=no", "-o", "ControlPath=none",
                          "-o", "StrictHostKeyChecking=accept-new", "-o", "UserKnownHostsFile=/tmp/k",
                          "-o", "GlobalKnownHostsFile=/dev/null", "-o", "PreferredAuthentications=none",
                          "--", "devbox", "true"])
+        // A config file given for the install goes after ours: ssh keeps the first value.
+        var configured = ssh
+        configured.options = ["-F", "/tmp/config", "-o", "UserKnownHostsFile=/elsewhere"]
+        let withConfig = configured.keyFetchArguments(knownHosts: URL(filePath: "/tmp/k"))
+        #expect(withConfig.firstIndex(of: "UserKnownHostsFile=/tmp/k")! < withConfig.firstIndex(of: "UserKnownHostsFile=/elsewhere")!)
+        #expect(withConfig.contains("-F"))
     }
 
     @Test func theEnvironmentKeepsTheAgentAndDropsWhatCouldPromptOrLeak() {
@@ -82,6 +118,7 @@ struct SSHCommandTests {
     @Test(arguments: [
         ("unknownHost", HostProblem.unknownHost),
         ("hostKeyChanged", .hostKeyChanged),
+        ("hostKeyUnknown", .hostKeyUnknown),
         ("timedOut", .timedOut("connect")),
         ("refused", .timedOut("connect")),
         ("noStreamLocalForwarding", .noStreamLocalForwarding),

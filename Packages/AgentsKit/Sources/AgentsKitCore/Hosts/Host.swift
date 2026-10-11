@@ -272,6 +272,9 @@ public enum HostProblem: Error, Hashable, Sendable {
     case loginRefused
     case keyLocked
     case hostKeyChanged
+    /// No key for the server in known_hosts, with strict checking asked for (#610): the
+    /// key is fetched and shown, and trusted only when the person says so.
+    case hostKeyUnknown
     case unsupportedSystem(system: String, architecture: String)
     case noStreamLocalForwarding
     case diskFull(freeBytes: Int64)

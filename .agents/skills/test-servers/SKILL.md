@@ -117,9 +117,13 @@ The devbox has no systemd, so the script starts the host detached; `devbox.sh st
 The window lists the box under its own heading. `devbox.sh logs` has the server's side (an
 `uplink:` line says it joined); `$ROOT/control/control.log` has the control plane's.
 
-Install over ssh instead (FR-018a), from the window's Add a Server ▸ Install over ssh, or over
-the control plane's socket: the first `hosts/install` answers `needsTrust` with the box's host
-key fingerprint, and the second, with the fingerprint, installs. Check afterwards that no ssh
+Install over ssh instead (FR-018a), from the window's Add a Server ▸ Over ssh, or over
+the control plane's socket: when the box's key is not in the known_hosts ssh reads, the first
+`hosts/install` answers `needsTrust` with its fingerprint, and the second, with the fingerprint,
+installs; a key already there goes straight on (#610). `Walk610LiveTests` drives the whole of
+#610 (known, unknown, behind a jump with a tunnel, a direct host with a tunnel, a dropped
+tunnel) against a scratch control plane started with `--control-env AGENTS_SSH_CONFIG=<config>`;
+`specs/037-cloud-agents/walk/ssh-options.sh` checks the common ssh options. Check afterwards that no ssh
 process is left on this Mac and that the key is in no file under `$ROOT/control`.
 
 A project and a turn. The prompt box can't be typed into over AX (setting its value does not
