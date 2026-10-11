@@ -169,7 +169,7 @@ no`), `-O forward` exits non-zero with `forwarding request failed: <reason>`. Th
 ended and the reason is the tunnel's problem: the host row says **ssh tunnel down: <reason>**.
 
 A session that ends is started again after 2 s, doubling to 60 s while it keeps failing, and
-back to 2 s once one has lasted a minute. Every session starts again at once when the Mac wakes
+back to 2 s once one has lasted a minute. A server that has not joined yet has no host row: `control/status`'s `unjoinedTunnels` carries its tunnel's state, and Settings ▸ Hosts shows it as **Not joined yet · ssh tunnel down: <reason>** (#660). Every session starts again at once when the Mac wakes
 (the clock that counts sleep ran well ahead of the one that does not) or the network's
 interfaces change. A server installed again over a tunnel replaces its older tunnel record.
 

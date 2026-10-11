@@ -168,6 +168,14 @@ public actor HostTunnels {
         return states[record.id] ?? .init(up: false)
     }
 
+    /// The servers whose tunnel is held but who have not joined yet, by name (#660): they
+    /// have no host row, so the window lists them with how the tunnel stands.
+    public func unjoined() -> [DaemonAPI.HostTunnelChanged] {
+        records.values.filter { $0.host == nil }.sorted { $0.made < $1.made }.map {
+            .init(name: $0.name, host: nil, tunnel: states[$0.id] ?? .init(up: false))
+        }
+    }
+
     /// Reads the records again, learns which host each carries, lets go of those nobody
     /// needs, and holds the rest.
     func reconcile() async {

@@ -104,6 +104,10 @@ public extension DaemonAPI {
         /// Where a host added from now on has its projects found (#429). Nil from a control
         /// plane older than that.
         public var projectDetection: ProjectDetection?
+        /// Servers installed over an ssh tunnel that have not joined yet (#660), each with how
+        /// its tunnel stands: they have no host row, so this is where ssh's reason shows.
+        /// Nil from a control plane older than that, or one that holds no tunnels.
+        public var unjoinedTunnels: [HostTunnelChanged]?
 
         public init(name: String, version: String, homeHost: HostID?, machineID: String,
                     startedAt: Date? = nil, port: Int? = nil, awayFromHome: Bool? = nil) {

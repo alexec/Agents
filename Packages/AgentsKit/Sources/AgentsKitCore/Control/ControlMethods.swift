@@ -35,6 +35,8 @@ public actor ControlMethods: ControlHandling {
         public var relayChanged: @Sendable (HostID) async -> Void = { _ in }
         /// How a server's reverse tunnel stands, for one behind a bastion (#435).
         public var tunnel: @Sendable (HostID) async -> DaemonAPI.HostTunnel? = { _ in nil }
+        /// The tunnels whose server has not joined yet (#660); nil where none are held.
+        public var unjoinedTunnels: @Sendable () async -> [DaemonAPI.HostTunnelChanged]? = { nil }
 
         public init(startPairing: @escaping @Sendable (Bool) async throws -> JSONValue = { _ in throw ControlMethods.notHere },
                     stopPairing: @escaping @Sendable () async -> Void = {},
@@ -260,6 +262,7 @@ public actor ControlMethods: ControlHandling {
             status.web = web
             status.thisMacHost = thisMacHost?()
             status.projectDetection = detection
+            status.unjoinedTunnels = await hooks.unjoinedTunnels()
             status.relayKey = await records.hosts.first { $0.relay == true }?.publicKey
             // A relay host is what takes devices out of the house (T096).
             if status.relayKey != nil { status.awayFromHome = true }

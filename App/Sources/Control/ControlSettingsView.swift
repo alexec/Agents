@@ -265,6 +265,13 @@ struct ControlHostsPage: View {
                         .fixedSize()
                     }
                 }
+                // Installed over a tunnel and not joined yet (#660): no host row yet, so
+                // this is where ssh's reason shows once Add a Server is closed.
+                ForEach(control.status?.unjoinedTunnels ?? [], id: \.name) { pending in
+                    Divider()
+                    ControlRow(dot: pending.tunnel.up ? .offline : .attention, title: pending.name,
+                               detail: unjoinedLine(pending.tunnel)) { EmptyView() }
+                }
             }
             HStack(spacing: 8) {
                 Button("Add a Server…") { addingServer = true }.buttonStyle(.paper)
@@ -315,6 +322,12 @@ struct ControlHostsPage: View {
         if working > 0 { parts.append("\(count(working, "agent")) working") }
         if host.state != "online" { parts.insert(host.state.capitalized, at: 0) }
         return parts.joined(separator: " · ")
+    }
+
+    private func unjoinedLine(_ tunnel: DaemonAPI.HostTunnel) -> String {
+        tunnel.up
+            ? "Not joined yet · connects through an ssh tunnel, which is up"
+            : "Not joined yet · ssh tunnel down\(tunnel.problem.map { ": \($0)" } ?? "") · tried again by itself"
     }
 
     private func line(_ host: DaemonAPI.ControlHost) -> String {

@@ -354,13 +354,14 @@ struct ControlAddServerSheet: View {
     }
 }
 
-/// What a server is called if nobody says: its host name from `user@host:port`.
+/// What a server is called if nobody says: its host name from `user@host:port`, and
+/// "Its host name" while the server box is empty (#660), not a made-up one.
 enum HostNameGuess {
     static func from(_ destination: String) -> String {
         var host = destination.trimmingCharacters(in: .whitespaces)
         if let at = host.lastIndex(of: "@") { host = String(host[host.index(after: at)...]) }
         if host.hasPrefix("ssh://") { host = String(host.dropFirst(6)) }
         if let colon = host.firstIndex(of: ":") { host = String(host[..<colon]) }
-        return host.isEmpty ? "devbox" : host
+        return host.isEmpty ? "Its host name" : host
     }
 }

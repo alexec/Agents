@@ -295,6 +295,7 @@ public final class ControlService: @unchecked Sendable {
         hooks.detect = { try JSONValue.encoding(await detect.run()) }
         hooks.sshHosts = { destination in try JSONValue.encoding(await detect.sshHosts(destination)) }
         hooks.tunnel = { host in await tunnels?.state(for: host) }
+        hooks.unjoinedTunnels = { await tunnels?.unjoined() }
         // Notices (T097): a need goes to the relay host, wherever it is held.
         hooks.need = { [weak self] _, params in await self?.heard(params) }
         hooks.relayChanged = { [weak self] _ in await self?.syncRelays() }
