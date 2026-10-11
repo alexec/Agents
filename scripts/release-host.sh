@@ -83,7 +83,7 @@ for helper in agentsd agents-control agents-relay.app; do
     [[ -e "$app/Contents/Helpers/$helper" ]] || { print -u2 "Agents Host has no Helpers/$helper"; exit 1 }
 done
 codesign --verify --deep --strict "$app"
-print "signed: $(codesign -dv "$app" 2>&1 | sed -n 's/^Authority=//p' | head -1)"
+print "signed: $(codesign -dvv "$app" 2>&1 | sed -n 's/^Authority=//p' | head -1)"
 
 dmg=$out/Agents-Host-$version.dmg
 stage=$out/dmg
