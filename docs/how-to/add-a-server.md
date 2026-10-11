@@ -57,7 +57,7 @@ it and no port needs opening. See [Projects, hosts and worktrees](../explanation
 2. In **Server**, type the server. The box offers the hosts in your `~/.ssh/config`, each with
    the `user@host` ssh resolves it to; choose one, or type any `user@host`,
    `user@host:port` or `ssh://user@host:port`. Under the box, the sheet says what ssh makes of
-   it, such as **Ssh reaches it as agents@10.0.0.4:2222.**
+   it, such as **Ssh reaches it as agents@devbox.example.com:2222.**
 3. Give it a **Name**, or leave the one guessed from the server.
 4. Leave **Key** empty to log in as `ssh` does from Terminal, or click **Choose…** to use one
    key for this install only.
