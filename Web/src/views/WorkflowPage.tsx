@@ -83,6 +83,11 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
   const locked = down || workflow.problem !== undefined;
   const change = (what: Parameters<Store["setWorkflowSettings"]>[2]) =>
     void store.setWorkflowSettings(host, summary, what).then((refusal) => { problem.value = refusal ? { workflowID, text: refusal } : null; });
+  const deleteWorkflow = async () => {
+    if (confirm(`Delete "${workflow.name}"? Its file is removed from disk.\n\nThe file can be restored from the project's git history.`)) {
+      if (await store.deleteWorkflow(host, summary)) go({ host, project: folder });
+    }
+  };
   return (
     <section class="chat workflow-page" aria-label="Workflow">
       <header class="column-head">{back}<h1>{workflow.name}</h1></header>
@@ -94,6 +99,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
           {summary.isArchived ? (
             <div class="controls">
               <button class="run-now prominent" disabled={down} onClick={() => void store.setWorkflowArchived(host, summary, false)}>Bring Back</button>
+              <button class="archive" disabled={down} title="Delete this workflow file from disk" onClick={() => void deleteWorkflow()}>Delete…</button>
             </div>
           ) : (
             <div class="controls">
@@ -127,6 +133,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
               })()}
               <button class="archive" disabled={down} title="Archive this workflow and go back to the project. Writes archived: true into its file"
                 onClick={async () => { await store.setWorkflowArchived(host, summary, true); go({ host, project: folder }); }}>Archive</button>
+              <button class="archive" disabled={down} title="Delete this workflow file from disk" onClick={() => void deleteWorkflow()}>Delete…</button>
             </div>
           )}
           {/* The switches write the workflow's file (#125), the window's words. */}

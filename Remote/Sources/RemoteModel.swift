@@ -2705,6 +2705,19 @@ final class RemoteModel {
         }
     }
 
+    /// Delete a workflow's file from its project (#605).
+    func deleteWorkflow(_ summary: WorkflowSummary) async -> Bool {
+        do {
+            let request = DaemonAPI.WorkflowRequest(folder: summary.workflow.folder,
+                                                    workflowID: summary.workflow.workflowID)
+            try await client(for: request).call(DaemonAPI.Method.workflowsDelete, request)
+            return true
+        } catch {
+            problem = sentence(for: error)
+            return false
+        }
+    }
+
     /// Let a waiting one run as its file now reads (#142): the digest is what the page
     /// was showing, so a file changed since is still waiting afterwards.
     func approveWorkflow(_ summary: WorkflowSummary) async {

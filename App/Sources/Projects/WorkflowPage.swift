@@ -42,6 +42,7 @@ struct WorkflowPage: View {
     /// opening another in this same view — lets those go (#285). A bigger page of the
     /// same workflow is not a leaving.
     @State private var runsHeld: RunsHeld?
+    @State private var confirmsDelete = false
 
     private static let runsAtFirst = 3
     private static let runsPerMore = 6
@@ -73,6 +74,19 @@ struct WorkflowPage: View {
                     actions(summary)
                 }
             }
+        }
+        .confirmationDialog("Delete \"\(summary?.workflow.name ?? "workflow")\"? Its file is removed from disk.",
+                            isPresented: $confirmsDelete, titleVisibility: .visible) {
+            if let summary {
+                Button("Delete", role: .destructive) {
+                    Task {
+                        if await model.deleteWorkflow(summary) { model.openWorkflow = nil }
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The file can be restored from the project's git history.")
         }
         // Only once it has actually gone, and not while the list is still being loaded
         // — going back during the first draw would take the reader out of a page they
@@ -181,6 +195,10 @@ struct WorkflowPage: View {
     @ViewBuilder
     private func actions(_ summary: WorkflowSummary) -> some View {
         Group {
+            Button(role: .destructive) { confirmsDelete = true } label: {
+                Label("Delete…", systemImage: "trash")
+            }
+            .help("Delete this workflow file from disk")
             if summary.isArchived {
                 Button {
                     Task { await model.setWorkflowArchived(summary, false) }

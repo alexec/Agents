@@ -252,6 +252,11 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.WorkflowArchiveRequest.self)
                 return .success(try JSONValue.encoding(try archiveWorkflow(request)))
 
+            case DaemonAPI.Method.workflowsDelete:
+                let request = try require(params, as: DaemonAPI.WorkflowRequest.self)
+                try deleteWorkflow(request)
+                return .success(try JSONValue.encoding(DaemonAPI.Empty()))
+
             case DaemonAPI.Method.workflowsLimit:
                 return .success(try JSONValue.encoding(readWorkflowLimit()))
 

@@ -30,6 +30,7 @@ struct WorkflowPage: View {
     /// Whether the Mac has runs past the ones shown. Archived runs are not in the
     /// phone's list until this page asks for them, so it cannot count them itself.
     @State private var moreRuns = false
+    @State private var confirmsDelete = false
 
     private static let runsAtFirst = 3
     private static let runsPerMore = 6
@@ -62,7 +63,26 @@ struct WorkflowPage: View {
                     ToolbarItem(placement: .topBarTrailing) { PinWorkflowButton(summary: summary) }
                 }
                 ToolbarItem(placement: .topBarTrailing) { archiveButton(summary) }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(role: .destructive) { confirmsDelete = true } label: {
+                        Label("Delete…", systemImage: "trash")
+                    }
+                    .disabled(model.isStale)
+                }
             }
+        }
+        .confirmationDialog("Delete \"\(summary?.workflow.name ?? "workflow")\"? Its file is removed from disk.",
+                            isPresented: $confirmsDelete, titleVisibility: .visible) {
+            if let summary {
+                Button("Delete", role: .destructive) {
+                    Task {
+                        if await model.deleteWorkflow(summary) { model.openWorkflow = nil }
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The file can be restored from the project's git history.")
         }
         .onChange(of: workflowID) { shownRuns = Self.runsAtFirst }
         // Its runs, archived ones too, a page at a time; again when one starts.

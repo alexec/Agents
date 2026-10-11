@@ -1114,6 +1114,16 @@ final class AppModel {
         }
     }
 
+    /// Delete a workflow's file from its project (#605).
+    func deleteWorkflow(_ summary: WorkflowSummary, on host: HostID? = nil) async -> Bool {
+        let host = host ?? selectedProjectHost
+        return await attempt(on: host) {
+            try await self.client(for: host).call(
+                DaemonAPI.Method.workflowsDelete,
+                DaemonAPI.WorkflowRequest(folder: summary.folder, workflowID: summary.workflowID))
+        }
+    }
+
     /// Turn one on or off, keeping its place on the list (#100). Turning one on when
     /// the total is already running is refused, and said (#506).
     func setWorkflowEnabled(_ summary: WorkflowSummary, _ enabled: Bool) async {

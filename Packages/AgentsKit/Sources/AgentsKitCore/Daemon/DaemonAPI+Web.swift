@@ -153,6 +153,7 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 Row(Method.workflowsArchive, params: WorkflowArchiveRequest.self, result: WorkflowSummary.self,
                     kind: .hostRequest),
+                Row(Method.workflowsDelete, params: WorkflowRequest.self, result: Empty.self, kind: .hostRequest),
                 // Its settings, labels and cooldown on the page (#162), each control its one key.
                 Row(Method.workflowsSettings, params: WorkflowSettingsRequest.self, result: WorkflowSummary.self,
                     kind: .hostRequest),

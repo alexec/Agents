@@ -1541,6 +1541,29 @@ extension DaemonCore {
         return try rereadAfterWrite(workflow)
     }
 
+    /// Delete the workflow file at the person's request. The watcher and normal rescan
+    /// broadcast `workflow/removed` to every client; remove its pin and persisted queue
+    /// and outcome state at the same time.
+    public func deleteWorkflow(_ request: DaemonAPI.WorkflowRequest) throws {
+        guard let workflow = workflow(request.workflowID, in: request.folder) else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchWorkflow,
+                               message: "There is no workflow called \(request.workflowID) in this project.")
+        }
+        let file = WorkflowFile.url(for: workflow.workflowID, in: workflow.folder)
+        do {
+            try FileManager.default.removeItem(at: file)
+        } catch {
+            throw JSONRPCError(code: DaemonAPI.Failure.deleteRefused,
+                               message: "Could not delete workflow file: \(error.localizedDescription)")
+        }
+        try unpinWorkflowByPerson(request)
+        var records = workflowStore.load()
+        records.states.removeAll { $0.folder == workflow.folder && $0.workflowID == workflow.workflowID }
+        try keep("this workflow's deleted state") { try workflowStore.save(records) }
+        rescanWorkflows(in: workflow.folder)
+        scheduleMCPEventsReconcile()
+    }
+
     /// The workflow as its file now says, after the app wrote it.
     ///
     /// Synchronously, and not through the watcher. The watcher is debounced by 250ms and

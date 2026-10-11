@@ -2102,6 +2102,7 @@ export interface Methods {
   "views/show": { params: ViewShowRequest; result: Empty };
   "workflows/approve": { params: WorkflowApproveRequest; result: WorkflowSummary };
   "workflows/archive": { params: WorkflowArchiveRequest; result: WorkflowSummary };
+  "workflows/delete": { params: WorkflowRequest; result: Empty };
   "workflows/deny": { params: WorkflowApproveRequest; result: WorkflowSummary };
   "workflows/enable": { params: WorkflowEnableRequest; result: WorkflowSummary };
   "workflows/list": { params: WorkflowsListRequest; result: WorkflowSummary[] };
@@ -2205,6 +2206,7 @@ export const MethodTarget = {
   "views/show": "host",
   "workflows/approve": "host",
   "workflows/archive": "host",
+  "workflows/delete": "host",
   "workflows/deny": "host",
   "workflows/enable": "host",
   "workflows/list": "host",
