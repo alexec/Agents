@@ -437,6 +437,58 @@ struct DeletionTests {
         try await core.deleteNow(open.id)
         #expect(await core.agent(open.id) == nil)
     }
+
+    // MARK: Deleting a project (#677)
+
+    @Test func deletingAnArchivedProjectDeletesEverySessionAndLeavesTheFolder() async throws {
+        let (locations, work) = try temporary()
+        let old = archived(work, daysAgo: 3)
+        var finished = Agent(runtimeID: "claude", cwd: work, title: "Finished", state: .finished,
+                             endedReason: .endTurn)
+        finished.lastActivityAt = now
+        let core = try await core(locations, seeded: [old, finished])
+        _ = try await core.archiveProject(work)
+
+        try await core.deleteProject(work)
+
+        #expect(await core.agent(old.id) == nil)
+        #expect(await core.agent(finished.id) == nil)
+        #expect(!folderExists(locations, old.id))
+        #expect(!folderExists(locations, finished.id))
+        #expect(await !core.allProjects().contains { $0.folder == work })
+        #expect(FileManager.default.fileExists(atPath: work.path))
+        // And after a restart: nothing was left to bring it back.
+        let again = try await self.core(locations)
+        #expect(await !again.allProjects().contains { $0.folder == work })
+    }
+
+    @Test func aProjectThatIsNotArchivedIsNotDeleted() async throws {
+        let (locations, work) = try temporary()
+        let old = archived(work, daysAgo: 3)
+        let core = try await core(locations, seeded: [old])
+        await #expect(throws: JSONRPCError.self) { try await core.deleteProject(work) }
+        #expect(await core.agent(old.id) != nil)
+        #expect(await core.allProjects().contains { $0.folder == work })
+    }
+
+    @Test func aProjectWithAHeldSessionDeletesNothingAndSaysWhich() async throws {
+        let (locations, work) = try temporary()
+        let free = archived(work, daysAgo: 3, title: "Free")
+        let inRun = archived(work, daysAgo: 3, title: "Nightly run")
+        let core = try await core(locations, seeded: [free, inRun])
+        _ = try await core.archiveProject(work)
+        await core.putRun(WorkflowRun(workflowID: "nightly", folder: work,
+                                      trigger: .event(EventPattern("agent.finished")), agentID: inRun.id))
+        do {
+            try await core.deleteProject(work)
+            Issue.record("a project with a held session was deleted")
+        } catch let error as JSONRPCError {
+            #expect(error.code == DaemonAPI.Failure.deleteRefused)
+            #expect(error.message.contains("Nightly run"))
+        }
+        #expect(await core.agent(free.id) != nil)
+        #expect(await core.agent(inRun.id) != nil)
+    }
 }
 
 extension DaemonCore {

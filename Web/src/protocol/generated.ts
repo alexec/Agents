@@ -1238,6 +1238,10 @@ export interface ProjectPins {
   workflows?: string[];
 }
 
+export interface ProjectRemovedNotification {
+  folder: URLString;
+}
+
 export interface ProjectRequest {
   folder: URLString;
 }
@@ -2089,6 +2093,7 @@ export interface Methods {
   "projects/chatState": { params: Empty; result: ChatProjectState };
   "projects/clone": { params: CloneRequest; result: ProjectSummary };
   "projects/clones": { params: Empty; result: CloneSummary[] };
+  "projects/delete": { params: ProjectRequest; result: Empty };
   "projects/keepGuardedChange": { params: GuardedChangeRequest; result: ProjectSummary };
   "projects/list": { params: ProjectsListRequest; result: ProjectSummary[] };
   "projects/readGuardedChange": { params: GuardedChangeRequest; result: GuardedChangeReading };
@@ -2193,6 +2198,7 @@ export const MethodTarget = {
   "projects/chatState": "host",
   "projects/clone": "host",
   "projects/clones": "host",
+  "projects/delete": "host",
   "projects/keepGuardedChange": "host",
   "projects/list": "host",
   "projects/readGuardedChange": "host",
@@ -2244,6 +2250,7 @@ export interface Notifications {
   "pages/changed": PagesChangedNotification;
   "pins/changed": PinsChangedNotification;
   "project/changed": ProjectSummary;
+  "project/removed": ProjectRemovedNotification;
   "storage/writeFailed": WriteFailure;
   "store/notesChanged": StoreNotes;
   "workflow/changed": WorkflowSummary;
@@ -2383,6 +2390,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Project: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits", "diskSpace", "pinned"] },
   ProjectDetection: { required: ["enabled", "paths"], optional: [] },
   ProjectPins: { required: ["folder", "pins"], optional: ["sessions", "workflows"] },
+  ProjectRemovedNotification: { required: ["folder"], optional: [] },
   ProjectRequest: { required: ["folder"], optional: [] },
   ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: ["isChat", "guardedChanges"] },
   ProjectsListRequest: { required: ["includeArchived"], optional: [] },

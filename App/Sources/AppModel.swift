@@ -1911,6 +1911,24 @@ final class AppModel {
         }
     }
 
+    /// Delete an archived project (#677): every session in it and its record; its folder
+    /// stays. Out of the list at once, as `project/removed` would take it; a refusal says
+    /// which sessions hold it.
+    func deleteProject(_ key: ProjectKey) async -> Result<Void, JSONRPCError> {
+        do {
+            _ = try await client(for: key.host).call(DaemonAPI.Method.projectsDelete,
+                                                     DaemonAPI.ProjectRequest(folder: key.folder),
+                                                     returning: DaemonAPI.Empty.self)
+            work.removeProject(key)
+            settleProjectSelection()
+            return .success(())
+        } catch let error as JSONRPCError {
+            return .failure(error)
+        } catch {
+            return .failure(JSONRPCError(code: -1, message: error.localizedDescription))
+        }
+    }
+
     /// The person's helper limits for a project (#64). Through the window only: the
     /// daemon refuses the method to agents and phones.
     func setHelperLimits(_ limits: HelperLimits, for key: ProjectKey) async {

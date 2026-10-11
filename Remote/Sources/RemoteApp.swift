@@ -169,6 +169,17 @@ struct RemoteView: View {
         } message: { _ in
             Text(DeletionWords.confirmMessage)
         }
+        // Delete… on an archived project (#677), asked here as a session's is.
+        .confirmationDialog(DeletionWords.projectConfirmTitle(model.askingToDeleteProject.map { summary in
+                                SidebarOrder.label(summary) { model.hostLabel($0) } } ?? ""),
+                            isPresented: Binding(get: { model.askingToDeleteProject != nil },
+                                                 set: { if !$0 { model.askingToDeleteProject = nil } }),
+                            titleVisibility: .visible, presenting: model.askingToDeleteProject) { summary in
+            Button("Delete", role: .destructive) { Task { await model.deleteProject(summary) } }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text(DeletionWords.projectConfirmMessage)
+        }
         // A send refused because the folder has gone (#119), with the ways on.
         .alert("This agent’s folder isn’t there",
                isPresented: Binding(get: { model.folderGone != nil && model.problem == nil },

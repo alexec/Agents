@@ -337,6 +337,8 @@ public final class AgentsModel {
     public enum Update: Sendable {
         case agentChanged(Agent)
         case projectChanged(DaemonAPI.ProjectSummary)
+        /// Deleted (#677): its host stamped as `projectChanged`'s is.
+        case projectRemoved(ProjectKey)
         case entry(DaemonAPI.EntryNotification)
         case permission(DaemonAPI.PermissionNotification)
         case elicitation(DaemonAPI.ElicitationNotification)
@@ -386,6 +388,8 @@ public final class AgentsModel {
         switch method {
         case DaemonAPI.Notification.agentChanged: return decode(Agent.self, Update.agentChanged)
         case DaemonAPI.Notification.projectChanged: return decode(DaemonAPI.ProjectSummary.self, Update.projectChanged)
+        case DaemonAPI.Notification.projectRemoved:
+            return decode(DaemonAPI.ProjectRemovedNotification.self) { .projectRemoved(ProjectKey(folder: $0.folder)) }
         case DaemonAPI.Notification.agentEntry: return decode(DaemonAPI.EntryNotification.self, Update.entry)
         case DaemonAPI.Notification.agentPermission: return decode(DaemonAPI.PermissionNotification.self, Update.permission)
         case DaemonAPI.Notification.agentElicitation: return decode(DaemonAPI.ElicitationNotification.self, Update.elicitation)
@@ -443,7 +447,7 @@ public final class AgentsModel {
         apply(Self.stamp(update, host: host))
     }
 
-    nonisolated static func stamp(_ update: Update, host: HostID) -> Update {
+    public nonisolated static func stamp(_ update: Update, host: HostID) -> Update {
         switch update {
         case .agentChanged(var agent):
             agent.host = host
@@ -451,6 +455,9 @@ public final class AgentsModel {
         case .projectChanged(var summary):
             summary.host = host
             return .projectChanged(summary)
+        case .projectRemoved(var key):
+            key.host = host
+            return .projectRemoved(key)
         default:
             return update
         }
@@ -469,6 +476,9 @@ public final class AgentsModel {
 
         case .projectChanged(let summary):
             upsert(summary)
+
+        case .projectRemoved(let key):
+            removeProject(key)
 
         case .entry(let notification):
             guard notification.agentID == watching else { return }
@@ -832,6 +842,12 @@ public final class AgentsModel {
     public func takeListed(_ listed: [Agent]) {
         guard !listed.isEmpty else { return }
         for agent in listed { file(agent.keepingLists(of: byID[agent.id])) }
+    }
+
+    /// Deleted (#677): out of the list. Its sessions went before it, each by its own
+    /// `agent/removed`.
+    public func removeProject(_ key: ProjectKey) {
+        projects.removeAll { $0.key == key }
     }
 
     public func replaceProjects(_ listed: [DaemonAPI.ProjectSummary]) {

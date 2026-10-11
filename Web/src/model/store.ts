@@ -5,7 +5,7 @@ import { batch, computed, signal, type ReadonlySignal, type Signal } from "@prea
 import type {
   Agent, AgentRemovedNotification, ResumingNotification, ControlHost, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
-  WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
+  WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, ProjectRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, DiskState, StoreNotes,
   ChatProjectState, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
@@ -356,6 +356,10 @@ export class Work {
       case "agent/changed":
         this.upsertAgent(params as Agent, host);
         return true;
+      case "project/removed":
+        // Deleted (#677); its sessions went before it, each by its own agent/removed.
+        this.removeProject((params as ProjectRemovedNotification).folder, host);
+        return true;
       case "project/changed":
         this.upsertProject(params as ProjectSummary, host);
         return true;
@@ -480,6 +484,11 @@ export class Work {
       default:
         return false;
     }
+  }
+
+  removeProject(folder: string, host: string): void {
+    const list = (this.projects.value[host] ?? []).filter((p) => folderKey(p.project.folder) !== folderKey(folder));
+    this.projects.value = { ...this.projects.value, [host]: list };
   }
 
   upsertProject(summary: ProjectSummary, host: string): void {
@@ -1393,6 +1402,16 @@ export class Store extends Work {
     const summary = await this.act("projects/unarchive", { folder: folder as never }, host);
     if (summary) this.upsertProject(summary, host);
     return summary;
+  }
+
+  /**
+   * An archived project deleted (#677), asked first: every session in it and its record; its
+   * folder stays. A refusal says which sessions hold it.
+   */
+  async deleteProject(host: string, folder: string): Promise<boolean> {
+    if (await this.act("projects/delete", { folder: folder as never }, host) === null) return false;
+    this.removeProject(folder, host);
+    return true;
   }
 
   /**

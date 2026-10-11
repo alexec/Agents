@@ -179,12 +179,16 @@ public enum DaemonAPI {
         /// (022). The daemon writes rather than the window, so that it knows the
         /// person did — that is what lets it tell the agent on its next turn.
         public static let artifactWrite = "artifact/write"
-        // A project is a folder. These four are everything that can be done to one,
-        // which is to say: notice it, and put it away.
+        // A project is a folder. These five are everything that can be done to one,
+        // which is to say: notice it, put it away, and forget it.
         public static let projectsList = "projects/list"
         public static let projectsAdd = "projects/add"
         public static let projectsArchive = "projects/archive"
         public static let projectsUnarchive = "projects/unarchive"
+        /// Delete an archived project (#677): every session in it, as `agents/delete`
+        /// deletes one, and its record. Its folder is not touched. The person's alone;
+        /// each client asks first.
+        public static let projectsDelete = "projects/delete"
         /// Why this host has a chat project or not (#229), for a New Chat that found no
         /// summary marked `isChat` in the list.
         public static let projectsChatState = "projects/chatState"
@@ -461,6 +465,9 @@ public enum DaemonAPI {
         /// A project appeared, was archived, or its counts moved. Windows upsert by
         /// folder, the way they upsert agents by id.
         public static let projectChanged = "project/changed"
+        /// A project was deleted (#677). Carries `ProjectRemovedNotification`; windows
+        /// drop it by folder.
+        public static let projectRemoved = "project/removed"
         /// A clone began, or ended either way (027). Every window hears it, because a
         /// clone belongs to the Mac and not to the window that asked for it.
         public static let cloneChanged = "clone/changed"
@@ -2308,6 +2315,13 @@ public enum DaemonAPI {
         public init(folder: URL, workflowID: String) {
             self.folder = folder
             self.workflowID = workflowID
+        }
+    }
+
+    public struct ProjectRemovedNotification: Codable, Sendable {
+        public var folder: URL
+        public init(folder: URL) {
+            self.folder = folder
         }
     }
 

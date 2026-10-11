@@ -106,10 +106,11 @@ struct RemoteSidebar: View {
             if !model.shelvedProjects.isEmpty, searched.isEmpty {
                 Section(isExpanded: $showsArchived) {
                     ForEach(model.shelvedProjects, id: \.key) { summary in
-                        ArchivedProjectRow(summary: summary, isDisabled: model.isStale
-                                            || model.hostIsOffline(summary.host)) {
-                            await model.unarchiveProject(summary)
-                        }
+                        ArchivedProjectRow(summary: summary,
+                                           label: SidebarOrder.label(summary) { model.hostLabel($0) },
+                                           isDisabled: model.isStale || model.hostIsOffline(summary.host),
+                                           bringBack: { await model.unarchiveProject(summary) },
+                                           delete: { model.askingToDeleteProject = summary })
                         .appText(.supporting)
                     }
                 } header: {
