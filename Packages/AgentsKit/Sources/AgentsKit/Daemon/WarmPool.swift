@@ -36,7 +36,7 @@ public enum WarmPool {
         /// The person has prompted it at least once: a chat, not a workflow's or an
         /// agent's errand.
         public var personsConversation = false
-        /// It asks the person to archive it (#584): put down, nobody is expected.
+        /// It waits for the person to approve archiving it (#584, #649): put down, nobody is expected.
         public var asksToArchive = false
         public var lastPersonPrompt: Date?
         /// The person's usual gap between prompts here, when there are enough to say.

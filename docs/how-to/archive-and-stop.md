@@ -13,7 +13,7 @@ Two ways to put an agent down, each keeping its whole conversation:
 - **Archive** puts away a chat you are done with. It folds out of sight under **Archived sessions**.
   It can be brought back.
 
-An agent that has finished can also ask you to archive it. You agree with one click.
+An agent that has finished can also archive itself. Where that needs your approval, you approve it with one click.
 
 ## Before you start
 
@@ -48,26 +48,28 @@ An agent that has finished can also ask you to archive it. You agree with one cl
    On iPhone and iPad, open **Archived**, open the chat, and choose **Bring Back** from
    the **Actions** menu.
 
-**Archive a chat that asks to be archived**
+**Approve archiving a chat**
 
-An agent that thinks its work is finished can ask to be archived. If its turn ends
-**Complete**, **Nothing to do** or **Partly done**, the chat carries an **Asks to archive**
-mark on its row, as the unread mark is. It stays in its group, usually **Done**; a
-partly done one stays under **Needs you**. Nothing is hidden until you archive it.
+An agent that thinks its work is finished archives its chat with `archive_session`. Where
+that needs your approval, and its turn ends **Complete**, **Nothing to do** or **Partly
+done**, the chat carries an **Archiving needs approval** mark on its row, as the unread
+mark is. It stays in its group, usually **Done**; a
+partly done one stays under **Needs you**. Nothing is hidden until you approve it.
 
-1. Click **Archive** beside the mark on the Mac's row, or in the strip over the chat. On
-   iPhone, iPad and the web page, the strip over the chat has **Archive** too, and so do
-   the row's menu and its swipe.
-2. Or open **To Archive**, at the top of the sidebar. It gathers every chat that asks, in
-   every project and on every host, and is shown only when one does. **Archive All** in its
-   heading archives them all (on the Mac, it is also in the heading's right-click menu).
-3. To keep the chat instead, send it a prompt. That drops the request. So does a later turn
+1. Click **Approve** beside the mark on the Mac's row, or in the strip over the chat. On
+   iPhone, iPad and the web page, the strip over the chat has **Approve** too, and the
+   row's menu and its swipe have **Archive**.
+2. Or open **Approve Archiving**, at the top of the sidebar. It gathers every chat waiting
+   for approval, in every project and on every host, and is shown only when one is.
+   **Approve All** in its heading archives them all (on the Mac, it is also in the
+   heading's right-click menu).
+3. To keep the chat instead, send it a prompt. That drops it. So does a later turn
    that ends wanting you: with a question, stuck, blocked or crashed. Bringing back an
-   archived chat does not bring the request back.
+   archived chat does not bring the mark back.
 
 A workflow's run whose workflow allows it to archive itself, and a helper in a project
-where agents may archive their helpers, are archived without asking you, if the turn ends
-**Complete** or **Nothing to do**. A partly done one still asks you. See
+where agents may archive their helpers, are archived without your approval, if the turn ends
+**Complete** or **Nothing to do**. A partly done one still waits for it. See
 [When a run is done](../reference/workflows.md#when-a-run-is-done) and
 **Agents may archive the helpers they started** in the
 [settings reference](../reference/settings.md).

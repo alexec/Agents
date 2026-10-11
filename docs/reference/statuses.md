@@ -53,25 +53,25 @@ To leave a finished conversation to come back to, choose **Mark as Unread** from
 menu. It stays unread until you open it again. **Mark as Read** clears the mark without
 opening it.
 
-## Asks to archive
+## Archiving needs approval
 
-**Asks to archive** is a mark on a row, like the unread mark, not a group. An agent that
-thinks its work is finished asks for its session to be archived, and once its turn ends the
-row carries the mark. The session stays where its ending puts it: usually **Done**, or
+**Archiving needs approval** is a mark on a row, like the unread mark, not a group. An agent
+that thinks its work is finished archives its session with `archive_session`; where that
+needs your approval, the row carries the mark once its turn ends. The session stays where its ending puts it: usually **Done**, or
 **Needs you** with the mark beside it for one that is **Partly done**. Nothing is hidden
 until you archive it.
 
-- **Archive** beside the mark on the Mac's row, or in the strip over the chat on the Mac,
-  iPhone, iPad and web page, archives it with one click. On the Remote and the web page the
-  row shows the mark, and **Archive** is in the row's menu and its swipe.
-- **To Archive**, at the top of the sidebar after **Pinned**, **Needs You**, **Working** and
-  **Unread**, gathers every session that asks, across every project and host. It is shown
-  only when one does. **Archive All** in its heading archives them all; on the Mac it is
+- **Approve** beside the mark on the Mac's row, or in the strip over the chat on the Mac,
+  iPhone, iPad and web page, approves archiving it with one click. On the Remote and the web
+  page the row shows the mark, and **Archive** is in the row's menu and its swipe.
+- **Approve Archiving**, at the top of the sidebar after **Pinned**, **Needs You**, **Working** and
+  **Unread**, gathers every session waiting for approval, across every project and host. It
+  is shown only when one is. **Approve All** in its heading archives them all; on the Mac it is
   also in the heading's right-click menu.
 - The mark goes when you send the session a prompt, when a later turn ends wanting you
   (with a question, stuck, blocked or crashed), or when the session is archived. Bringing
   it back does not bring the mark back. A workflow's prompt, or the app's own, leaves it.
-- A session that may already archive itself is archived instead of asking, if its turn
+- A session that may already archive itself is archived without your approval, if its turn
   ends **Complete** or **Nothing to do**: a workflow's run whose workflow says
   `when-done: archive-allowed` or `archive`, and a helper in a project where agents may
   archive the helpers they started.

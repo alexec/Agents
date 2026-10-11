@@ -54,14 +54,14 @@ extension DaemonCore {
         changed(agent)
         var note = Self.afterTurnNote(after)
         if after == .requestArchive, agent.pendingMove != nil {
-            note += " You move first, and stay there asking rather than being started again."
+            note += " You move first, and stay there waiting for approval rather than being started again."
         } else if after == .requestArchive, let say = archivesWithoutAskingNote(agentID, agent) {
             note = say
         }
         return note + " Anything the person sends before then drops it."
     }
 
-    /// What an agent asking to be archived is told when nobody needs to agree (#584,
+    /// What an agent asking to be archived is told when nobody needs to approve it (#584,
     /// decision 2): its workflow lets its run archive itself, or the agent that
     /// started it may archive it. Nil when the person is asked.
     private func archivesWithoutAskingNote(_ agentID: UUID, _ agent: Agent) -> String? {
@@ -69,7 +69,7 @@ extension DaemonCore {
             || (agent.startedByAgent != nil && agentsMayArchive(in: agent.projectFolder))
         guard may else { return nil }
         return "Once this turn ends, this conversation will be archived if it ended done or with nothing to do, "
-            + "as nobody needs to agree; otherwise the person will be asked."
+            + "as nobody needs to approve it; otherwise it waits for the person to approve archiving it."
     }
 
     /// `set_session_labels`: the agent's own labels, changed now.

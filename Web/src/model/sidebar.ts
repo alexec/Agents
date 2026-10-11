@@ -1,6 +1,6 @@
 // What the Things-style sidebar (#495, #499) gathers and in what order, as the window's and the
 // Remote's `SidebarSmartRow` and `SidebarProjectFold` (AgentsKitCore/Sidebar) work it out: the
-// smart groups at the top across every project (Pinned, Needs You, Working, Unread, To Archive), and
+// smart groups at the top across every project (Pinned, Needs You, Working, Unread, Approve Archiving), and
 // each project's sessions as one list, newest started first, the state the row's mark. Each session
 // is listed once, in its first group (#587).
 import type { Agent, WorkflowSummary } from "../protocol/generated";
@@ -9,11 +9,11 @@ import { queryMatches, type LabelQuery } from "./labels";
 
 export type SmartRow = "pinned" | "needsYou" | "working" | "unread" | "toArchive";
 
-/** In the sidebar's order: Pinned first, then by what they want, then what asks to be archived (#584). */
+/** In the sidebar's order: Pinned first, then by what they want, then what waits for archive approval (#584, #649). */
 export const smartRows: readonly SmartRow[] = ["pinned", "needsYou", "working", "unread", "toArchive"];
 
 export const smartTitles: Record<SmartRow, string> = {
-  pinned: "Pinned", needsYou: "Needs You", working: "Working", unread: "Unread", toArchive: "To Archive",
+  pinned: "Pinned", needsYou: "Needs You", working: "Working", unread: "Unread", toArchive: "Approve Archiving",
 };
 
 /** Pinned and Needs You start open, so the first thing the page says is who is waiting; the others start folded. */
@@ -23,8 +23,8 @@ export function smartStartsOpen(row: SmartRow): boolean {
 
 /**
  * Where a live session is listed (#587), as `SidebarSmartRow.home`: once, in the first of the smart
- * groups it belongs to (Pinned, Needs You, Working, To Archive (#584), Unread), or, in none of them,
- * under its project (null). To Archive comes before Unread though it is drawn after it, so Archive
+ * groups it belongs to (Pinned, Needs You, Working, Approve Archiving (#584), Unread), or, in none of them,
+ * under its project (null). Approve Archiving comes before Unread though it is drawn after it, so Archive
  * All reaches every session that asks.
  */
 export function home(agent: Agent, isPinned: boolean): SmartRow | null {
@@ -37,7 +37,7 @@ export function home(agent: Agent, isPinned: boolean): SmartRow | null {
   }
 }
 
-/** Whether a live session, not pinned, is listed under Needs You, Working, Unread or To Archive. */
+/** Whether a live session, not pinned, is listed under Needs You, Working, Unread or Approve Archiving. */
 export function inSmartRow(row: Exclude<SmartRow, "pinned">, agent: Agent): boolean {
   return home(agent, false) === row;
 }

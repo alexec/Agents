@@ -3285,7 +3285,7 @@ final class RemoteModel {
         }
     }
     /// Archive every session in the projects named that asks to be archived (#584): the
-    /// To Archive group's Archive All, one Archive at a time as on the Mac.
+    /// Approve Archiving group's Approve All, one Archive at a time as on the Mac.
     func archiveAllRequested(in projects: [ProjectKey]) async {
         for agent in SidebarSmartRow.toArchive.agents(in: work, projects: projects) { await archive(agent.id) }
     }

@@ -1164,19 +1164,19 @@ public actor AppService {
         "name": .string(archiveSessionToolName),
         "title": "Archive this session or one you started",
         "description": """
-            With no id: ask for this session to be archived once this turn ends, \
-            when you have finished and cleaned up. Only if the turn ends done, \
-            nothing_to_do or partly_done; anything the person sends first drops it. The \
-            person sees the ask on your row and archives it, or leaves it. Where nobody \
-            needs to agree — your workflow lets its run archive itself, or the session \
-            that started you may archive you — you are archived instead, if the turn \
-            ends done or nothing_to_do. Goes with move_worktree: you move, and stay \
-            there asking.
+            With no id: archive this session once this turn ends, when you have \
+            finished and cleaned up. Only if the turn ends done, nothing_to_do or \
+            partly_done; anything the person sends first drops it. Where nobody needs \
+            to approve it — your workflow lets its run archive itself, or the session \
+            that started you may archive you — it is archived, if the turn ends done or \
+            nothing_to_do. Otherwise the person approves archiving it from your row, or \
+            leaves it. Goes with move_worktree: you move, and stay there waiting for \
+            approval.
 
             With an id: the same for a session you started with start_session, once its \
             work is merged or abandoned. Where this project lets you archive the sessions \
             you started (a Project Settings switch) it is archived now, or once its turn \
-            ends; otherwise it asks the person. Either way its running place is freed \
+            ends; otherwise the person approves it. Either way its running place is freed \
             once it is done; it keeps its not-archived place until it is archived. Archive \
             a finished session rather than removing its worktree under it. Never the \
             person's own sessions or another session's.

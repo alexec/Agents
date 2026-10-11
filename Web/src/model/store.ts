@@ -1626,7 +1626,7 @@ export class Store extends Work {
   }
 
   /**
-   * To Archive's Archive All (#584): each session given, one Archive at a time on its own host,
+   * Approve Archiving's Approve All (#584): each session given, one Archive at a time on its own host,
    * as the window's does, so each shows on its way and one that fails does not stop the rest.
    */
   async archiveAll(sessions: readonly { host: string; agentID: string }[]): Promise<void> {

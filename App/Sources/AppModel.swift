@@ -3789,7 +3789,7 @@ final class AppModel {
     }
 
     /// Archive every session in the projects named that asks to be archived (#584): the
-    /// To Archive group's Archive All. One at a time, each as its own Archive, so each
+    /// Approve Archiving group's Approve All. One at a time, each as its own Archive, so each
     /// shows on its way and one that fails says why without stopping the rest.
     func archiveAllRequested(in projects: [ProjectKey]) async {
         let asking = SidebarSmartRow.toArchive.agents(in: work, projects: projects)

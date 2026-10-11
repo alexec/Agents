@@ -1,9 +1,10 @@
 import Foundation
 
-/// An agent's ask that its session be archived, waiting for the person's OK (#584).
+/// An agent's `archive_session` that waits for the person to approve archiving the
+/// session (#584, #649).
 ///
 /// A mark on the row, like unread, and never a group: the session stays where its
-/// ending puts it (usually Done) until the person archives it. Kept beside the state
+/// ending puts it (usually Done) until the person approves it. Kept beside the state
 /// and the ending and replacing neither, so taking it away changes nothing else.
 /// Replaces parking (040), which hid a finished session in a group of its own.
 public enum ArchiveRequest: Codable, Hashable, Sendable {
@@ -28,14 +29,14 @@ public enum ArchiveRequest: Codable, Hashable, Sendable {
 }
 
 public extension Agent {
-    /// Whether the row carries the Asks to archive mark: asked, and not archived yet.
+    /// Whether the row carries the Archiving needs approval mark: asked, and not archived yet.
     var asksToArchive: Bool {
         archiveRequest?.isRequested == true && state != .archived
     }
 }
 
 /// Where an agent asked, with a tool it called during its turn, to be put once the turn
-/// is over. A request to archive waits for the person's OK, unless something may
+/// is over. A request to archive waits for the person's approval, unless something may
 /// already archive the session without asking (#584): its workflow, or the agent that
 /// started it. Archiving outright is for a workflow's run alone, and only when the
 /// workflow's author allowed it with `when-done:` (#433).
@@ -91,6 +92,6 @@ public enum AfterTurn: String, Codable, Hashable, Sendable {
     public static let archiveNotAllowed = """
         Nothing was recorded: only a workflow's run can archive itself, and only when \
         its workflow says when-done: archive-allowed or archive. Call archive_session \
-        with no id instead.
+        with no id instead, and the person approves it.
         """
 }

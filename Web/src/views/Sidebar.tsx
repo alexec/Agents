@@ -143,7 +143,7 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
           <summary class="sidebar-head-label" data-fold="activity">Activity</summary>
           <ActivityRows store={store} chosen={r.activity} onPick={(page: ActivityPage) => go({ activity: page })} />
         </details>
-        {/* Pinned, Needs You, Working, Unread, To Archive: a group each across every project and host (#495, #584). */}
+        {/* Pinned, Needs You, Working, Unread, Approve Archiving: a group each across every project and host (#495, #584). */}
         {projects.length > 0 && smartRows.map((row) => (
           <SmartFold key={row} row={row} store={store} projects={projects} query={query} linkDown={linkDown} />
         ))}
@@ -285,9 +285,9 @@ type SmartLine = Placed & ({ kind: "session"; agent: Agent } | { kind: "workflow
   & { pins?: string[] | undefined };
 
 /**
- * One of the groups at the top of the sidebar (#495): Pinned, Needs You, Working, Unread or To
- * Archive (#584), across every project and host, each row naming its project. To Archive's head has
- * Archive All, for every session it gathers, whatever a search shows. Drawn only with something in it, and while
+ * One of the groups at the top of the sidebar (#495): Pinned, Needs You, Working, Unread or Approve
+ * Archiving (#584, #649), across every project and host, each row naming its project. Approve Archiving's
+ * head has Approve All, for every session it gathers, whatever a search shows. Drawn only with something in it, and while
  * searching only with a match (#507); Unread still is while it keeps the open session. Folded, it
  * lists nothing but counts.
  */

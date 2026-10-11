@@ -6,7 +6,7 @@ import Foundation
 /// agent, as a starting agent decides for its helpers. Only a session the workflow
 /// started gets it: a triggering workflow borrows somebody else's, which stays theirs.
 public enum WorkflowWhenDone: String, Codable, Hashable, Sendable, CaseIterable {
-    /// The run stays in the list, and may ask the person to archive it (#584). The
+    /// The run stays in the list, and may wait for the person to approve archiving it (#584, #649). The
     /// default, and a file that does not say: the person looks at every run. `park`
     /// before #584, and still read as this.
     case keep

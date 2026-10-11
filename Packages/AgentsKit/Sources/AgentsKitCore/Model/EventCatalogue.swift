@@ -151,7 +151,7 @@ public enum EventCatalogue {
         EventKind("agent.failed", .project, about(EventDetail("reason", values: EndedReason.allCases.map(\.code))),
                   "An agent in this project ended in an error."),
         EventKind("agent.archive_requested", .project, about(outcome),
-                  "An agent in this project asked to be archived, and waits for the person's OK."),
+                  "An agent in this project archived itself, and waits for the person to approve it."),
         EventKind("agent.messaged", .project, about(EventDetail("from"), EventDetail("from_title")),
                   "An agent in this project was sent a message by another, with message_session."),
         EventKind("agent.archived", .project, about(EventDetail("by", values: ["agent", "you"]), outcome),
