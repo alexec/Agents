@@ -142,22 +142,6 @@ extension AppService {
                                                           untilMinutes: untilMinutes, message: message),
                                   fallback: "Waiting.")
             }
-        } pins: { call in
-            // Always the caller's own project folder: the daemon takes it from the token (#159).
-            switch call {
-            case .pin(let arguments):
-                return await send(DaemonAPI.Method.pinsPinPage,
-                                  DaemonAPI.PinToolRequest(token: token, arguments: arguments), fallback: "Pinned.")
-            case .unpin(let arguments):
-                return await send(DaemonAPI.Method.pinsUnpinPage,
-                                  DaemonAPI.PinToolRequest(token: token, arguments: arguments), fallback: "Unpinned.")
-            case .movePin(let arguments):
-                return await send(DaemonAPI.Method.pinsMovePin,
-                                  DaemonAPI.PinToolRequest(token: token, arguments: arguments), fallback: "Moved.")
-            case .pinSession(let arguments):
-                return await send(DaemonAPI.Method.pinsPinSessionTool,
-                                  DaemonAPI.PinToolRequest(token: token, arguments: arguments), fallback: "Pinned.")
-            }
         } viewTool: { name, arguments in
             // The whole result back, not a note: the view is drawn from it (#187).
             let params: JSONValue

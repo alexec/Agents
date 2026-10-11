@@ -93,9 +93,8 @@ ties a view to a tool call the model made. A pin is the host making that call it
   conversation. Its `ui/message` and `ui/update-model-context` are refused, and the refusal
   goes in the daemon's log.
 - **How to pin one.** **Pin to Project** in the view's menu, beside its name in the chat
-  or in full screen, when the server says the call can feed a pin. An agent pins one with
-  `pin_page` and `view` (`server`, `uri`, `tool`, `arguments`). `unpin_page` and `move_pin`
-  take the view's `ui://` address as its `path`.
+  or in full screen, when the server says the call can feed a pin. Only you pin one:
+  agents have no pin tools.
 
 ## Views from your own servers
 

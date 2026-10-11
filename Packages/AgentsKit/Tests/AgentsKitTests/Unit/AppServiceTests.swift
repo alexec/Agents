@@ -50,8 +50,8 @@ struct AppServiceTests {
         // tool; starting and stopping only for an agent that may use them — which is the
         // default. Labels and moving (053) have tools of their own since #481. Listing,
         // reading and messaging sessions (065, #560) sit after them, then the three lease
-        // tools (036) and the three event tools (042), for every agent. The pin tools
-        // (#159, #180) come last, for every agent.
+        // tools (036) and the three event tools (042), for every agent. No pin tools
+        // since #640: pinning is the person's.
         #expect(tools.compactMap { $0["name"]?.stringValue }
             == [AppService.showFileToolName,
                 AppService.workflowToolName, AppService.askFormToolName,
@@ -63,9 +63,7 @@ struct AppServiceTests {
                 AppService.messageSessionToolName,
                 AppService.leaseResourceToolName, AppService.releaseResourceToolName,
                 AppService.listResourcesToolName,
-                AppService.waitForEventToolName, AppService.cancelWaitToolName,
-                AppService.pinPageToolName, AppService.unpinPageToolName, AppService.movePinToolName,
-                AppService.pinSessionToolName])
+                AppService.waitForEventToolName, AppService.cancelWaitToolName])
 
         try #require(tools.count > 2)
         let showFile = tools[0]["inputSchema"]
@@ -375,17 +373,6 @@ struct AppServiceTests {
     /// The app tells its own tools apart by the end of their names (a runtime may
     /// prefix them), so no tool's name may end with another's. 036's release_resource
     /// once ended with lease_resource, and every release became an extension.
-    /// The one pair that does (#159): unpin_page ends with pin_page, so it is matched first,
-    /// under every runtime's spelling. A real agent's unpin was taken for a pin before this.
-    @Test func unpinPageIsNeverTakenForPinPage() throws {
-        for prefix in ["", "mcp__agents__", "agents_", "agents__"] {
-            #expect(try AppService.pinCall(named: prefix + AppTool.unpinPage, ["path": "a.md"])?.get()
-                    == .unpin(arguments: ["path": "a.md"]))
-            #expect(try AppService.pinCall(named: prefix + AppTool.pinPage, ["path": "a.md"])?.get()
-                    == .pin(arguments: ["path": "a.md"]))
-        }
-    }
-
     @Test func noToolNameEndsWithAnother() {
         let names = [AppTool.showFile, AppTool.manageWorkflows, AppTool.askForm,
                      AppTool.startSession, AppTool.stopSession, AppTool.archiveSession,

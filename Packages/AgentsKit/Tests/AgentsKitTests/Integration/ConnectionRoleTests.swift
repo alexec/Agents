@@ -405,10 +405,10 @@ struct ConnectionRoleTests {
     }
 
     @Test func aHelperMayCallEveryToolItRelaysAndOnlyThose() {
-        // 26 tools (three more since #481, message_session since #560, publish_event gone
-        // with #639, archive_agent folded into archive_session by #638), a tool with a view
-        // (#187), and the two a stranger has.
-        #expect(ConnectionRole.agentMethods.count == 29)
+        // 22 tools (three more since #481, message_session since #560, publish_event gone
+        // with #639, archive_agent folded into archive_session by #638, the four pin tools
+        // gone in #640), a tool with a view (#187), and the two a stranger has.
+        #expect(ConnectionRole.agentMethods.count == 25)
         #expect(ConnectionRole.agent.allows(DaemonAPI.Method.agentsAskForm))
         #expect(ConnectionRole.stranger.allows(DaemonAPI.Method.daemonStatus))
         #expect(!ConnectionRole.agent.allows(DaemonAPI.Method.filesBrowse))

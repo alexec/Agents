@@ -103,14 +103,10 @@ public enum AppTool {
     /// answered; kept so a conversation that called it still draws as the app's own call.
     public static let retiredPublishEvent = "publish_event"
 
-    /// Pin a Markdown or HTML page under the project (#159).
-    public static let pinPage = "pin_page"
-    /// Unpin a page this agent pinned (#159).
-    public static let unpinPage = "unpin_page"
-    /// Put a pinned page somewhere else among the pins (#159).
-    public static let movePin = "move_pin"
-    /// Pin or unpin the agent's own session at the top of its project (#180).
-    public static let pinSession = "pin_session"
+    /// The pin tools (#159, #180), until #640: pinning is the person's. No longer offered
+    /// or answered; kept so a conversation that called them still draws as the app's own
+    /// calls.
+    public static let retiredPins = ["pin_page", "unpin_page", "move_pin", "pin_session"]
 
     /// The older names for the two halves of `finishTurn`, served from 2026-09-23 (023)
     /// until 2026-09-29. No longer offered or answered; kept only so a conversation that
@@ -125,7 +121,7 @@ public enum AppTool {
         finishTurn, showFile, manageWorkflows, askForm, suggestNextPrompt, startSession, stopSession, archiveSession,
         leaseResource, releaseResource, listResources, waitForEvent,
         cancelWait, listSessions, readSession,
-        pinPage, unpinPage, movePin, pinSession, setSessionLabels, moveWorktree, messageSession,
+        setSessionLabels, moveWorktree, messageSession,
     ]
 
     /// How runtimes put the server's name in front of a tool's, as measured: Claude's
@@ -138,7 +134,7 @@ public enum AppTool {
     public static func isServedByTheApp(_ called: String) -> Bool {
         serverPrefixes.contains { prefix in
             called.hasPrefix(prefix)
-                && (all + retiredAgentTools + [retiredPublishEvent]).contains(String(called.dropFirst(prefix.count)))
+                && (all + retiredAgentTools + [retiredPublishEvent] + retiredPins).contains(String(called.dropFirst(prefix.count)))
         }
     }
 }

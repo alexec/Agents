@@ -26,12 +26,6 @@ public extension DaemonAPI.Method {
     static let pinsUnpinWorkflow = "pins/unpinWorkflow"
     /// A person's drop or Move item among the pinned workflows: the whole new order.
     static let pinsArrangeWorkflows = "pins/arrangeWorkflows"
-    /// `pin_session`, relayed: an agent pins or unpins its own session.
-    static let pinsPinSessionTool = "pins/pinSessionTool"
-    /// `pin_page`, `unpin_page` and `move_pin`, relayed.
-    static let pinsPinPage = "pins/pinPage"
-    static let pinsUnpinPage = "pins/unpinPage"
-    static let pinsMovePin = "pins/movePin"
 }
 
 public extension DaemonAPI.Notification {
@@ -114,17 +108,6 @@ public extension DaemonAPI {
             self.folder = folder
             self.path = path
             self.text = text
-        }
-    }
-
-    /// An agent's pin tool, as it called it: the daemon checks the arguments.
-    struct PinToolRequest: Codable, Sendable, Hashable {
-        public var token: String
-        public var arguments: JSONValue
-
-        public init(token: String, arguments: JSONValue) {
-            self.token = token
-            self.arguments = arguments
         }
     }
 
