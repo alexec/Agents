@@ -42,12 +42,12 @@ JSON. A token is taken as about four bytes.
 
 | Session | Bytes | About |
 | --- | --- | --- |
-| An agent the person started (24 tools) | 43,623 | 10,900 tokens |
-| An agent another agent started (20 tools) | 37,965 | 9,500 tokens |
-| Grok's rules, which repeat the tools in its system prompt | 7,750 | 1,940 tokens |
-| The briefing, sent once with the first prompt (Claude) | 2,083 | 520 tokens |
+| An agent the person started (23 tools) | 42,623 | 10,650 tokens |
+| An agent another agent started (19 tools) | 36,965 | 9,240 tokens |
+| Grok's rules, which repeat the tools in its system prompt | 7,436 | 1,860 tokens |
+| The briefing, sent once with the first prompt (Claude) | 2,024 | 510 tokens |
 
-Measured on 2026-10-10. `manage_workflows` is the largest at 20,211 bytes, then
+Measured on 2026-10-10, after `publish_event` was removed (#639). `manage_workflows` is the largest at 19,910 bytes, then
 `start_agent` (now `start_session`) at 3,398; every other tool is under 2,800. `suggest_next_prompt` adds
 476 bytes (~119 tokens). `finish_turn` was 8,509 until it was split (below).
 
@@ -60,7 +60,7 @@ What a runtime does with the list differs:
   rules instead (see [Why agents' own tools are taken away](scoped-tools.md)). That is about
   2,200 tokens, fixed for the session.
 - **Codex, OpenCode, Gemini, Copilot, Cursor and Antigravity** send every listed schema
-  with every request: about 10,900 tokens, against the 97 K a Codex turn reads on average.
+  with every request: about 10,650 tokens, against the 97 K a Codex turn reads on average.
 
 A project's own MCP servers are added on top, in the same way for each runtime. They are
 the person's choice, and they are not measured here. To measure one, list its tools
