@@ -16,7 +16,7 @@ public enum AppViewTheme {
         func pair(_ light: String, _ dark: String) -> String { "light-dark(\(light), \(dark))" }
         let ground = ("#f7f8f9", "#1c1d20"), raised = ("#ffffff", "#26282c"), well = ("#f0f2f4", "#2a2d31")
         let wash = ("#e7eaee", "#33363b"), rule = ("#dde1e6", "#3a3e44"), ink = ("#1c1d20", "#e8eaed")
-        let accent = ("#5b3be0", "#ab8eff"), danger = ("#b4232b", "#f08086")
+        let accent = ("#1f5fc8", "#7fb0ff"), danger = ("#b4232b", "#f08086")
         let success = ("#2d765c", "#8bc6a7"), warning = ("#ba4a13", "#f0a06b")
         let secondaryInk = ("rgb(28 29 32 / 66%)", "rgb(232 234 237 / 66%)")
         let tertiaryInk = ("rgb(28 29 32 / 45%)", "rgb(232 234 237 / 45%)")

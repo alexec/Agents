@@ -25,7 +25,7 @@ import UIKit
 ///     wash      #E7EAEE   #33363B   a row under the pointer, a picked item
 ///     rule      #DDE1E6   #3A3E44   hairlines between rows and round raised things
 ///     ink       #1C1D20   #E8EAED   text drawn as ink
-///     accent    #5B3BE0   #AB8EFF   the icon's violet (#156): links, focus, the prominent
+///     accent    #1F5FC8   #7FB0FF   the icon's cobalt (#156, #695): links, focus, the prominent
 ///                                   button's fill; `Color.accentColor`, from the asset
 enum Paper {
     static let ground = Color(light: 0xF7F8F9, dark: 0x1C1D20)
@@ -35,7 +35,7 @@ enum Paper {
     static let wash = Color(light: 0xE7EAEE, dark: 0x33363B)
     static let rule = Color(light: 0xDDE1E6, dark: 0x3A3E44)
     static let ink = Color(light: 0x1C1D20, dark: 0xE8EAED)
-    /// The violet, from the asset catalogue rather than a hex here, so a control and
+    /// The cobalt, from the asset catalogue rather than a hex here, so a control and
     /// the system's own focus rings and selections agree. The one place a view reaches it.
     static let accent = Color.accentColor
 
@@ -232,7 +232,7 @@ extension ButtonStyle where Self == PaperButtonStyle<RoundedRectangle> {
 }
 
 /// The one control on a card that is the answer: the accent, with the ground as its text
-/// (6.3:1 light, 6.6:1 dark; white on the dark violet would be 2.6:1). Replaces
+/// (5.6:1 light, 7.7:1 dark; white on the dark cobalt would be 2.2:1). Replaces
 /// `.buttonStyle(.glassProminent)`.
 struct PaperProminentButtonStyle<Outline: InsettableShape>: ButtonStyle {
     let outline: Outline

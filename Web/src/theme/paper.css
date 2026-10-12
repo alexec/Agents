@@ -4,9 +4,9 @@
 
    Crisp paper (#326): cool near-white in the light, a neutral charcoal in the dark, and
    hairlines that carry the crispness rather than the tint. The paper is still the
-   accent's home, so the violet is unchanged (#156) and clears 6.2:1 on the ground and
-   5.9:1 on the well. Nothing is drawn in the accent on a selection, where it would be
-   4.9:1 in the light and 4.1:1 in the dark. */
+   accent's home: the icon's cobalt (#695, was #156's violet) clears 5.6:1 on the ground
+   and 5.3:1 on the well. Nothing is drawn in the accent on a selection, where it would be
+   4.4:1 in the light and 4.9:1 in the dark. */
 
 :root {
   color-scheme: light dark;
@@ -29,10 +29,9 @@
   /* Soft and short: paper lifted a little off the desk. Neutral, so the lift reads as
      lift and not as a smudge. */
   --paper-shadow: rgb(32 36 42 / 10%);
-  /* The app icon's violet (#156): links, focus, controls and the prominent button's fill,
-     as the window's AccentColor. Unchanged by #326; the numbers are against the cool
-     ground. */
-  --accent: #5b3be0;
+  /* The app icon's cobalt (#156, #695): links, focus, controls and the prominent button's fill,
+     as the window's AccentColor. The numbers are against the cool ground. */
+  --accent: #1f5fc8;
   accent-color: var(--accent);
 
   /* The three tints, and only Needs you is drawn in colour in a list (FR-018). Mixed for a
@@ -63,9 +62,9 @@
     --paper-ink: #e8eaed;
     --paper-selection: #3a3e44;
     --paper-shadow: rgb(0 0 0 / 10%);
-    /* Light enough for text on dark paper (6.5:1 on the ground, 5.3:1 on the well); white
-       can't read on it, so what is drawn on it is the ground, at 6.5:1. */
-    --accent: #ab8eff;
+    /* Light enough for text on dark paper (7.7:1 on the ground, 6.3:1 on the well); white
+       can't read on it, so what is drawn on it is the ground, at 7.7:1. */
+    --accent: #7fb0ff;
 
     --tint-attention: #f0a06b;
     --tint-failure: #f08086;
