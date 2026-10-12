@@ -6,6 +6,8 @@ import SwiftUI
 /// heading says it (#587); as a row, a dot when something in it is waiting on you.
 struct ProjectRow: View {
     @Environment(RemoteModel.self) private var model
+    /// The smart groups turned off in Settings ▸ Sidebar (#846), for the count.
+    @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = ""
     let summary: DaemonAPI.ProjectSummary
     /// The name as the sidebar shows it: `server:Project` on a server.
     var label: String? = nil
@@ -77,7 +79,10 @@ struct ProjectRow: View {
     }
 
     /// The sessions its group lists, each listed once (`SidebarSmartRow.home`).
-    private var ownCount: Int { SidebarProjectFold.ownCount(summary.key, in: model.work, keptInUnread: model.keptInUnread) }
+    private var ownCount: Int {
+        SidebarProjectFold.ownCount(summary.key, in: model.work, keptInUnread: model.keptInUnread,
+                                    on: SidebarSmartRow.on(off: smartOff))
+    }
 
     /// What is going on in there, in the Mac row's words and order: urgency first, and
     /// only ever two facts.

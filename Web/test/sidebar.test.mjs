@@ -182,6 +182,77 @@ test("the session Unread keeps is not under its project too, until another is op
   assert.equal(keepsInUnread(agent("gone", 4, { state: "archived" }), []), false);
 });
 
+test("a group turned off is not drawn, and its sessions go to the next group they fit, or under their project (#846)", async () => {
+  const { smartAgents, smartRows, projectSessions, ownCount, keepsInUnread, pinnedSessions } = await load("src/model/sidebar.ts");
+  const live = [
+    agent("pinned-asking", 1, { state: "waitingOnUser" }),
+    agent("asking", 2, { state: "waitingOnUser" }),
+    agent("working", 3, { state: "running" }),
+    agent("archiving", 4, { isUnread: true, archiveRequest: { requested: { at: 1 } } }),
+    agent("unread", 5, { isUnread: true }),
+    agent("read", 6),
+  ];
+  const pins = ["pinned-asking"];
+  const all = new Set(smartRows);
+  const without = (...off) => new Set(smartRows.filter((row) => !off.includes(row)));
+  // What each group lists, as the sidebar draws it: Pinned by its pins while on, the rest by `home`.
+  const listing = (on) => {
+    const rows = Object.fromEntries(smartRows.map((row) => [row, !on.has(row) ? []
+      : row === "pinned" ? pinnedSessions(live, pins).map((a) => a.id)
+      : smartAgents(row, live, undefined, pins, on).map((a) => a.id)]));
+    const own = projectSessions(live, pins, undefined, undefined, on).map((a) => a.id);
+    assert.equal(ownCount(live, pins, undefined, on), own.length, "the project's count is what it lists");
+    const every = [...Object.values(rows).flat(), ...own];
+    assert.equal(new Set(every).size, every.length, "once each");
+    assert.equal(every.length, live.length, "none left out");
+    return { rows, own };
+  };
+
+  listing(all);
+  // Pinned off: the pinned session that asks is in Needs You.
+  const noPins = listing(without("pinned"));
+  assert.deepEqual(noPins.rows.pinned, []);
+  assert.deepEqual(new Set(noPins.rows.needsYou), new Set(["pinned-asking", "asking", "archiving"]));
+  // Needs You off: the unread one asking to be archived goes to Unread, the one asking under its project.
+  const noNeeds = listing(without("needsYou"));
+  assert.deepEqual(new Set(noNeeds.rows.unread), new Set(["archiving", "unread"]));
+  assert.ok(noNeeds.own.includes("asking"));
+  // Working off: the working session goes under its project.
+  assert.ok(listing(without("working")).own.includes("working"));
+  // Every group off: all six under the project, the pinned one too, and Unread keeps nothing.
+  const none = listing(new Set());
+  assert.deepEqual(new Set(none.own), new Set(live.map((a) => a.id)));
+  assert.equal(keepsInUnread(live[5], [], new Set()), false, "Unread off keeps nothing");
+  assert.equal(keepsInUnread(live[5], ["read"], without("pinned")), true, "a pin counts only while Pinned is on");
+});
+
+test("the groups on round-trip through what this browser keeps: the groups off (#846)", async () => {
+  const { smartRowsOn, smartRowsOff } = await load("src/model/smartGroups.ts");
+  const all = ["pinned", "needsYou", "working", "unread"];
+  assert.deepEqual([...smartRowsOn("")], all);
+  assert.deepEqual([...smartRowsOn(null)], all, "nothing kept: every group on");
+  assert.equal(smartRowsOff(new Set(all)), "");
+  assert.equal(smartRowsOff(new Set(["unread", "needsYou"])), "pinned,working", "in the sidebar's order");
+  assert.deepEqual([...smartRowsOn("pinned,working,gone")], ["needsYou", "unread"], "a name not a group's is passed over");
+  for (const off of ["", "pinned", "needsYou,unread", "pinned,needsYou,working,unread"]) {
+    assert.equal(smartRowsOff(smartRowsOn(off)), off);
+  }
+});
+
+test("Settings is in the address on its own (#846)", async () => {
+  globalThis.location = { hash: "" };
+  globalThis.addEventListener = () => {};
+  try {
+    const { parseRoute, routeHash } = await load("src/route.ts");
+    assert.equal(routeHash({ settings: true, host: "mac", project: "file:///w/a" }), "#/settings");
+    assert.deepEqual(parseRoute("#/settings"), { settings: true });
+    assert.deepEqual(parseRoute("#/a/settings"), {}, "not an Activity page");
+  } finally {
+    delete globalThis.location;
+    delete globalThis.addEventListener;
+  }
+});
+
 test("New Session starts in the project last started in, while it is live (#495)", async () => {
   const { newSessionProject, rememberedProject, rememberProject } = await load("src/model/sidebar.ts");
   const live = [{ host: "mac", folder: "file:///w/a/" }, { host: "box", folder: "file:///w/b" }];

@@ -19,6 +19,9 @@ export const smartTitles: Record<SmartRow, string> = {
   pinned: "Pinned", needsYou: "Needs You", working: "Working", unread: "Unread",
 };
 
+/** Every group, on: as each browser starts until one is turned off (#846). */
+export const allSmartRows: ReadonlySet<SmartRow> = new Set(smartRows);
+
 /** Pinned and Needs You start open, so the first thing the page says is who is waiting; the others start folded. */
 export function smartStartsOpen(row: SmartRow): boolean {
   return row === "pinned" || row === "needsYou";
@@ -27,21 +30,24 @@ export function smartStartsOpen(row: SmartRow): boolean {
 /**
  * Where a live session is listed (#587), as `SidebarSmartRow.home`: once, in the first of the smart
  * groups it belongs to (Pinned, Needs You (asking, blocked, or asking to be archived, #773), Working,
- * Unread), or, in none of them, under its project (null).
+ * Unread), or, in none of them, under its project (null). A group turned off (#846) is passed over:
+ * its sessions go to the next one they fit, so one unread that asks to be archived goes to Unread
+ * with Needs You off.
  */
-export function home(agent: Agent, isPinned: boolean): SmartRow | null {
-  if (isPinned) return "pinned";
-  switch (groupOf(agent)) {
-    case "needsAttention": case "blocked": return "needsYou";
-    case "running": return "working";
-    case "archived": return null;
-    default: return asksToArchive(agent) ? "needsYou" : showsUnread(agent) ? "unread" : null;
-  }
+export function home(agent: Agent, isPinned: boolean, on: ReadonlySet<SmartRow> = allSmartRows): SmartRow | null {
+  const group = groupOf(agent);
+  if (group === "archived") return null;
+  if (isPinned && on.has("pinned")) return "pinned";
+  const waits = group === "needsAttention" || group === "blocked" || (group !== "running" && asksToArchive(agent));
+  if (waits && on.has("needsYou")) return "needsYou";
+  if (group === "running" && on.has("working")) return "working";
+  return showsUnread(agent) && on.has("unread") ? "unread" : null;
 }
 
 /** Whether a live session, not pinned, is listed under Needs You, Working or Unread. */
-export function inSmartRow(row: Exclude<SmartRow, "pinned">, agent: Agent): boolean {
-  return home(agent, false) === row;
+export function inSmartRow(row: Exclude<SmartRow, "pinned">, agent: Agent,
+  on: ReadonlySet<SmartRow> = allSmartRows): boolean {
+  return home(agent, false, on) === row;
 }
 
 /** The mark a session's row carries in the sidebar (#495): what it wants, or null for its own status mark. */
@@ -76,38 +82,42 @@ export function pinnedWorkflows(held: readonly WorkflowSummary[], pins: readonly
  * A project's live sessions as one list (#495), those a smart group lists left out, as each is
  * listed once (#587): newest started first, not by last activity, so a working session does not
  * climb past the pointer with every line (#357). `kept` is the session Unread keeps while it is
- * open, listed there and not here (#689).
+ * open, listed there and not here (#689). `on` is the smart groups turned on (#846): with Pinned
+ * off, the pinned are listed here as any other.
  */
 export function projectSessions(live: readonly Agent[], pins: readonly string[], query?: LabelQuery,
-  kept?: string): Agent[] {
+  kept?: string, on: ReadonlySet<SmartRow> = allSmartRows): Agent[] {
   const pinned = new Set(pins);
-  return live.filter((a) => home(a, pinned.has(a.id)) === null && a.id !== kept && (!query || queryMatches(query, a)))
+  return live.filter((a) => home(a, pinned.has(a.id), on) === null && a.id !== kept && (!query || queryMatches(query, a)))
     .sort(byStart);
 }
 
 /** How many sessions a project's own group lists, folded or not (#587), as `SidebarProjectFold.ownCount`. */
-export function ownCount(live: readonly Agent[], pins: readonly string[], kept?: string): number {
-  return projectSessions(live, pins, undefined, kept).length;
+export function ownCount(live: readonly Agent[], pins: readonly string[], kept?: string,
+  on: ReadonlySet<SmartRow> = allSmartRows): number {
+  return projectSessions(live, pins, undefined, kept, on).length;
 }
 
 /**
  * Whether Unread keeps the session opened from it (#495), as `SidebarSmartRow.keptInUnread`: not
- * once it belongs elsewhere (archived, pinned, waiting, working or asking to be archived).
+ * once it belongs elsewhere (archived, pinned, waiting, working or asking to be archived). Only
+ * while Unread is on, and pinned only counts while Pinned is on (#846).
  */
-export function keepsInUnread(agent: Agent, pins: readonly string[]): boolean {
-  if (agent.state === "archived" || pins.includes(agent.id)) return false;
-  const at = home(agent, false);
+export function keepsInUnread(agent: Agent, pins: readonly string[], on: ReadonlySet<SmartRow> = allSmartRows): boolean {
+  if (!on.has("unread") || agent.state === "archived" || (on.has("pinned") && pins.includes(agent.id))) return false;
+  const at = home(agent, false, on);
   return at === null || at === "unread";
 }
 
 /**
  * What a smart group (not Pinned) gathers from the projects' live sessions, the pinned left out
- * as they are listed in Pinned (#587): newest started first.
+ * as they are listed in Pinned (#587): newest started first. With a group off (#846), each goes
+ * where `home` puts it, the pinned too while Pinned is off; a group off gathers nothing.
  */
 export function smartAgents(row: Exclude<SmartRow, "pinned">, live: readonly Agent[], query?: LabelQuery,
-  pins: readonly string[] = []): Agent[] {
+  pins: readonly string[] = [], on: ReadonlySet<SmartRow> = allSmartRows): Agent[] {
   const pinned = new Set(pins);
-  return live.filter((a) => !pinned.has(a.id) && inSmartRow(row, a) && (!query || queryMatches(query, a))).sort(byStart);
+  return live.filter((a) => home(a, pinned.has(a.id), on) === row && (!query || queryMatches(query, a))).sort(byStart);
 }
 
 /**

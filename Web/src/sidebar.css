@@ -146,6 +146,12 @@
 .with-sidebar .runtime-list li.out .strong { color: var(--tint-failure); }
 .with-sidebar .spending-today { font-size: calc(20px * var(--text-scale)); margin: 8px 0 4px; }
 .with-sidebar .activity-body .close { color: var(--tint-failure); opacity: 1; }
+/* This browser's Settings (#846): a row per setting, its name then its control, under each section's heading. */
+.with-sidebar .settings-body > section { margin-bottom: 12px; }
+.with-sidebar .settings-body .setting { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  max-width: 420px; padding: 6px 8px; border-bottom: 1px solid var(--paper-rule); }
+.with-sidebar .settings-body select { font: inherit; color: inherit; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-control); }
+.with-sidebar .settings-body .hint { max-width: 420px; font-size: calc(12px * var(--text-scale)); line-height: 1.45; }
 .with-sidebar .event-day { font-size: calc(12px * var(--text-scale)); font-weight: 600; margin: 14px 8px 4px; opacity: 0.65; }
 .with-sidebar .event-list .event-name { font-family: var(--font-mono); font-size: calc(11px * var(--text-scale)); }
 .with-sidebar .event-consequence { display: block; margin-left: 8px; }

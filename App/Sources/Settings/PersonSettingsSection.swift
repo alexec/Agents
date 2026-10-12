@@ -2,7 +2,7 @@ import AgentsKitCore
 import Foundation
 import SwiftUI
 
-/// Settings ▸ General ▸ What agents call you (#121). The name every agent is told to use
+/// Settings ▸ Account ▸ What agents call you (#121). The name every agent is told to use
 /// for the person, in questions above all, and the pronouns they gave, if any.
 ///
 /// Blank follows this Mac's account (the placeholder shows what that gives). Kept by the

@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 221 rows: **149 same**, **45 by design**, **27 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 222 rows: **150 same**, **45 by design**, **27 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -28,7 +28,7 @@ Of 221 rows: **149 same**, **45 by design**, **27 delta** (after #188, #189, #19
 | Worktrees and Files | 11 | 5 | 6 |
 | Pins | 4 | 1 | 0 |
 | Workflows page | 15 | 1 | 2 |
-| Settings and Project Settings | 1 | 8 | 0 |
+| Settings and Project Settings | 2 | 8 | 0 |
 | Pool, runtimes and spending | 8 | 1 | 2 |
 | Events and resources | 2 | 1 | 2 |
 | Notifications and badges | 3 | 1 | 0 |
@@ -292,15 +292,16 @@ The deltas are tracked by 29 issues:
 
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
-| Settings (General, Appearance, Agent Runtimes, Agent Configuration, Limits, Resources, Control plane); Agent Configuration was *Shared* (#754) | `A/Settings/SettingsWindow.swift`, Agent Configuration's pages in `A/Config/AgentConfiguration/` | None | None | **by design** (the Mac's) |
+| Settings (Appearance, Sidebar, Account, Mac: General split in four, #846; Agent Runtimes, Agent Configuration, Cost, Resources, Control plane); Agent Configuration was *Shared* (#754) | `A/Settings/SettingsWindow.swift`, Agent Configuration's pages in `A/Config/AgentConfiguration/` | *Settings…* at the sidebar's foot: Appearance and Sidebar only (#846), `R/Sidebar/RemoteSidebar.swift` (`RemoteSettings`) | *Settings* at the sidebar's foot: Appearance and Sidebar only (#846), `W/views/Settings.tsx` | **by design** (the rest is the Mac's) |
+| Smart groups on or off (#846): Pinned, Needs You, Working, Unread, per device, all on at first; one off is not drawn and its sessions go to the next group they fit, or under their project | Settings ▸ Sidebar: `S/SidebarSettingsSection.swift`; the rule in `K/Sidebar/SidebarSmartRow.swift` (`home(of:in:isPinned:on:)`), kept under `sidebarSmartGroupsOff` | Settings ▸ Sidebar, the same section | Settings ▸ Sidebar: `W/views/Settings.tsx`; the rule in `W/model/sidebar.ts`, kept in localStorage `agents.sidebarSmartGroupsOff` | **same** (built 2026-10-12; walk owed) |
 | Project Settings: General (helper limits, disk lines; #64, #126, #195), then Agent Configuration, the same pages as Settings for the project's `.agents` (Overview counting what is there, Instructions, Skills, MCP servers, Plugins, Other files; #97, #754) (Worktrees moved to Activity, #790) | `A/Projects/ProjectSettingsSheet.swift`, the pages `A/Config/AgentConfiguration/`, read by `personal/shared` with a folder | None | None | **by design** (#754: Alex chose Mac only; neither has Settings) |
 | A change to `.agents/project.json` or `.agents/pins.json` made outside the app, or a workflow waiting for an OK (#569), waits, with Keep / Undo and the diff (#502, #531): asked over the prompt of the agent that made it, or on the project's page when none did, and notified as a need | `S/Chat/GuardedChangeCard.swift` over `A/Chat/ChatView.swift` and on `A/Projects/ProjectAgentsView.swift`; also Project Settings ▸ General | The same card over `R/Chat/RemoteChatView.swift` and on `R/StartAgent/StartAgentView.swift` | `W/views/GuardedChange.tsx` over `W/views/Chat.tsx` and on `W/views/NewAgent.tsx` | **same** |
 | Add an MCP server (from the registry, or by hand with Verify, #305), a skill, plugins (059); the Marketplace menu and Manage Marketplaces… (#687) | `A/Catalog/` | None | None | **by design** |
 | Sign in to an MCP server with OAuth, **needs sign-in** on its row, Sign out (#306) | `A/Catalog/MCPSignInSheet.swift`, `A/Projects/ProjectMCPSection.swift` | None | None | **by design** (the server rows and the browser sign-in are the window's; neither client lists MCP servers, and the grant never leaves the host) |
 | Light and dark | System / Light / Dark: `A/Settings/AppearanceSettingsView.swift` | The system's | `prefers-color-scheme`: `W/theme/paper.css:48` | **by design** (a setting) |
-| Text size: Default, Large, Larger (#750), per device, never sent; the marks beside text grow with it; the terminal keeps its own | Settings ▸ General beside Appearance: `A/Settings/AppearanceSettingsView.swift`; each step times 1, 1.15 or 1.3 in `S/TypeScale.swift` (`TextSize`, `appText`, `glyph`); kept per root, `--text-size` for walks | The sidebar's foot beside Forget This iPhone: `R/Sidebar/RemoteSidebar.swift`; Dynamic Type moved up one or two steps from the system's (`R/TextSizeRoot.swift`) | The sidebar's foot beside Forget This Browser: `W/views/Sidebar.tsx`, kept in localStorage (`W/model/textSize.ts`); one `--text-scale` on the root multiplies every font-size (`W/theme/paper.css`) | **same** (built 2026-10-12; walk of the three steps owed) |
+| Text size: Default, Large, Larger (#750), per device, never sent; the marks beside text grow with it; the terminal keeps its own | Settings ▸ Appearance: `A/Settings/AppearanceSettingsView.swift`; each step times 1, 1.15 or 1.3 in `S/TypeScale.swift` (`TextSize`, `appText`, `glyph`); kept per root, `--text-size` for walks | Settings ▸ Appearance, from the sidebar's foot (#846): `R/Sidebar/RemoteSidebar.swift`; Dynamic Type moved up one or two steps from the system's (`R/TextSizeRoot.swift`) | Settings ▸ Appearance, from the sidebar's foot (#846): `W/views/Settings.tsx`, kept in localStorage (`W/model/textSize.ts`); one `--text-scale` on the root multiplies every font-size (`W/theme/paper.css`) | **same** (built 2026-10-12; walk of the three steps owed) |
 | The accent (#156) | AccentColor | AccentColor | `--accent`, the same values | **same** |
-| What agents call you (#121) | Settings ▸ General | None | None | **by design** |
+| What agents call you (#121) | Settings ▸ Account | None | None | **by design** |
 | Warm pool size (#183) | Settings ▸ General | None | None | **by design** |
 | The most workflows that may run (#506): the setting, and the number in force on an over-the-limit row and in its refusal | The setting in Settings ▸ Cost: `A/Settings/CostSettingsView.swift`; the number on the row and status card from `WorkflowSummary.totalLimit`: `A/Projects/WorkflowRow.swift`, `S/WorkflowStatus.swift` | The number on the status card: `S/WorkflowStatus.swift`; a refused Turn On says why | The number on the row and status card, and in a refusal's words: `W/model/workflows.ts`; a refused Turn On says why | The number: **same**. The setting: **by design** (Settings are the Mac's) |
 

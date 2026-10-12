@@ -9,6 +9,8 @@ import SwiftUI
 /// project you happen to have open, folded or not.
 struct ProjectRow: View {
     @Environment(AppModel.self) private var model
+    /// The smart groups turned off in Settings ▸ Sidebar (#846), for the count.
+    @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = ""
     let summary: DaemonAPI.ProjectSummary
     /// The name as the sidebar shows it: `server:Project` on a server.
     var label: String? = nil
@@ -58,7 +60,8 @@ struct ProjectRow: View {
             if asHeading {
                 // How many its group lists, as every group's heading says it (#587). Who
                 // needs you is in Needs You at the top, so no dot.
-                let own = SidebarProjectFold.ownCount(summary.key, in: model.work, keptInUnread: model.keptInUnread)
+                let own = SidebarProjectFold.ownCount(summary.key, in: model.work, keptInUnread: model.keptInUnread,
+                                                     on: SidebarSmartRow.on(off: smartOff))
                 if own > 0 {
                     Text("\(own)")
                         .monospacedDigit()
@@ -141,7 +144,8 @@ struct ProjectRow: View {
         if summary.project.isPinned { parts.append("pinned") }
         if !summary.exists { parts.append("folder is missing") }
         if asHeading {
-            let own = SidebarProjectFold.ownCount(summary.key, in: model.work, keptInUnread: model.keptInUnread)
+            let own = SidebarProjectFold.ownCount(summary.key, in: model.work, keptInUnread: model.keptInUnread,
+                                                     on: SidebarSmartRow.on(off: smartOff))
             if own > 0 { parts.append("\(own)") }
         } else if let subtitle {
             parts.append(subtitle)

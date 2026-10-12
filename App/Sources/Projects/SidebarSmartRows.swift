@@ -14,10 +14,14 @@ struct SmartFold: View {
     let folds: SidebarFolds
     /// The search's words, already trimmed; empty when there is no search.
     let query: String
+    /// The smart groups turned off in Settings ▸ Sidebar (#846): their sessions are listed
+    /// by the next group they fit.
+    @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = ""
+    private var on: Set<SidebarSmartRow> { SidebarSmartRow.on(off: smartOff) }
 
     var body: some View {
         // Unread with nothing unread is still drawn while it keeps the open session.
-        if row.isShown(in: model.work, projects: projects, query: query) || keptUnread != nil {
+        if row.isShown(in: model.work, projects: projects, query: query, on: on) || keptUnread != nil {
             fold
         }
     }
@@ -49,7 +53,7 @@ struct SmartFold: View {
 
     /// The group's heading. No Approve All (#704): each is approved from its own row.
     private func heading(_ open: Binding<Bool>) -> some View {
-        SmartRowLabel(row: row, count: row.count(in: model.work, projects: projects)) {
+        SmartRowLabel(row: row, count: row.count(in: model.work, projects: projects, on: on)) {
             open.wrappedValue.toggle()
         }
     }
@@ -57,7 +61,7 @@ struct SmartFold: View {
     /// What the row lists. Unread keeps the session opened from it (`keptInUnread`) in
     /// its place, read now, until another is opened: its count has already dropped.
     private var shown: [Agent] {
-        var agents = row.agents(in: model.work, projects: projects, query: query)
+        var agents = row.agents(in: model.work, projects: projects, query: query, on: on)
         if let kept = keptUnread, !agents.contains(where: { $0.id == kept.id }) {
             let at = agents.firstIndex { $0.createdAt < kept.createdAt } ?? agents.endIndex
             agents.insert(kept, at: at)
@@ -67,7 +71,7 @@ struct SmartFold: View {
 
     /// The session Unread keeps, read, while it is the one open; none while searching.
     private var keptUnread: Agent? {
-        row == .unread ? SidebarSmartRow.keptInUnread(model.keptInUnread, in: model.work, query: query) : nil
+        row == .unread ? SidebarSmartRow.keptInUnread(model.keptInUnread, in: model.work, query: query, on: on) : nil
     }
 
     /// Every project's pinned sessions, then its pinned workflows, each dragged into the

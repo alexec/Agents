@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Settings ▸ General ▸ Sleep. The switch and the hours after the last agent stops.
+/// Settings ▸ Mac ▸ Sleep. The switch and the hours after the last agent stops.
 ///
 /// What the daemon holds, not what was last clicked. Nil until it has answered, so a
 /// daemon too old to know the method draws Appearance and nothing under it.

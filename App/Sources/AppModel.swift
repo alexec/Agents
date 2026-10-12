@@ -109,7 +109,7 @@ final class AppModel {
     var wakeState: DaemonAPI.WakeState? { work.wakeState }
     /// What this Mac's host could not read in this run (#205), said at the sidebar's foot.
     var storeNotes: [String] { work.storeNotes }
-    /// The switch and the hours (Settings ▸ General ▸ Sleep). Nil until the daemon has
+    /// The switch and the hours (Settings ▸ Mac ▸ Sleep). Nil until the daemon has
     /// said, including a daemon too old to know the method.
     private(set) var wakeSettings: WakeSettings?
     /// How many workflows turned on may run across every project (#506): the Mac's,
@@ -1522,7 +1522,7 @@ final class AppModel {
     }
 
     /// The switch and the hours. A daemon too old to know the method leaves this nil,
-    /// and Settings ▸ General draws Appearance alone.
+    /// and Settings ▸ Mac draws Archived agents alone.
     func refreshWakeSettings() async {
         wakeSettings = try? await client.call(DaemonAPI.Method.wakeSettings,
                                               Optional<String>.none,
@@ -2243,7 +2243,7 @@ final class AppModel {
     /// Whether any host made a chat project, live or archived (#694).
     var hasChatProjects: Bool { projects.contains { $0.isChat == true } }
 
-    /// Settings ▸ General ▸ Chat project turned off (#694): every host's chat project is
+    /// Settings ▸ Account ▸ Chat project turned off (#694): every host's chat project is
     /// archived. New Chat leaves the File menu.
     var chatProjectSwitchedOff: Bool {
         let chats = projects.filter { $0.isChat == true }

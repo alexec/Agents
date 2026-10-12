@@ -29,6 +29,10 @@ struct RemoteSidebar: View {
     @AppStorage("showsActivity") private var showsActivity = true
     /// Add Project… or Clone Project from Git URL…, on a host, from the + (#537).
     @State private var adding: NewProject?
+    /// The smart groups turned off in Settings ▸ Sidebar (#846).
+    @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = ""
+    /// Settings (#846), opened from the sidebar's foot.
+    @State private var showsSettings = false
 
     private var selection: Binding<SidebarItem?> {
         Binding(get: { model.sidebarItem },
@@ -85,7 +89,9 @@ struct RemoteSidebar: View {
 
                 // Pinned, Needs You, Working, Unread: a group each across every project
                 // and host (#495), headed and folding as a project's is.
-                ForEach(SidebarSmartRow.allCases, id: \.self) { row in
+                // A group turned off in Settings ▸ Sidebar is not drawn (#846).
+                let on = SidebarSmartRow.on(off: smartOff)
+                ForEach(SidebarSmartRow.allCases.filter(on.contains), id: \.self) { row in
                     RemoteSmartFold(row: row, projects: projects, folds: folds, query: searched)
                 }
             }
@@ -149,9 +155,10 @@ struct RemoteSidebar: View {
             }
 
             // This device, at the very foot, as the page's sidebar ends with its browser
-            // (#344): its text size (#750), and the way to forget it from here.
+            // (#344): its Settings (#846), and the way to forget it from here.
             Section {
-                TextSizeRow()
+                Button("Settings…") { showsSettings = true }
+                    .appText(.supporting)
                 if !model.needsPairing {
                     ForgetThisDeviceRow()
                 }
@@ -168,6 +175,7 @@ struct RemoteSidebar: View {
             }
         }
         .sheet(item: $adding) { NewProjectSheet(adding: $0) }
+        .sheet(isPresented: $showsSettings) { RemoteSettings() }
         .searchable(text: $query, prompt: "Search")
         .task(id: query) {
             let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -220,12 +228,16 @@ private struct RemoteSmartFold: View {
     let folds: SidebarFolds
     /// The search's words, already trimmed; empty when there is no search.
     let query: String
+    /// The smart groups turned off in Settings ▸ Sidebar (#846): their sessions are listed
+    /// by the next group they fit.
+    @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = ""
+    private var on: Set<SidebarSmartRow> { SidebarSmartRow.on(off: smartOff) }
 
     var body: some View {
         let keys = projects.map(\.key)
         // Empty, or with no match for a search, the group is not drawn (#507); Unread
         // with nothing unread still is while it keeps the open session.
-        if row.isShown(in: model.work, projects: keys, query: query) || keptUnread != nil {
+        if row.isShown(in: model.work, projects: keys, query: query, on: on) || keptUnread != nil {
             fold(keys)
         }
     }
@@ -248,14 +260,14 @@ private struct RemoteSmartFold: View {
                 }
             }
         } header: {
-            SmartHeading(row: row, count: row.count(in: model.work, projects: keys))
+            SmartHeading(row: row, count: row.count(in: model.work, projects: keys, on: on))
         }
     }
 
     /// What the group lists. Unread keeps the session opened from it (`keptInUnread`) in
     /// its place, read now, until another is opened: its count has already dropped.
     private func shown(_ keys: [ProjectKey]) -> [Agent] {
-        var agents = row.agents(in: model.work, projects: keys, query: query)
+        var agents = row.agents(in: model.work, projects: keys, query: query, on: on)
         if let kept = keptUnread, !agents.contains(where: { $0.id == kept.id }) {
             let at = agents.firstIndex { $0.createdAt < kept.createdAt } ?? agents.endIndex
             agents.insert(kept, at: at)
@@ -265,7 +277,7 @@ private struct RemoteSmartFold: View {
 
     /// The session Unread keeps, read, while it is the one open; none while searching.
     private var keptUnread: Agent? {
-        row == .unread ? SidebarSmartRow.keptInUnread(model.keptInUnread, in: model.work, query: query) : nil
+        row == .unread ? SidebarSmartRow.keptInUnread(model.keptInUnread, in: model.work, query: query, on: on) : nil
     }
 
     /// One project's pinned sessions (#180), then its pinned workflows (#432), each
@@ -395,12 +407,14 @@ private struct RemoteProjectFold: View {
 
     /// Put Files in Drop Box… from the row's menu (#231).
     @State private var fillingDropbox = false
+    /// The smart groups turned off in Settings ▸ Sidebar (#846).
+    @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = ""
 
     private var key: ProjectKey { summary.key }
 
     var body: some View {
         let fold = SidebarProjectFold(key, label: label, in: model.work, query: query, isOpen: folds.isOpen(key),
-                                      keptInUnread: model.keptInUnread)
+                                      keptInUnread: model.keptInUnread, on: SidebarSmartRow.on(off: smartOff))
         let isOpen = fold.isUnfolded
         if fold.isShown {
             // A search holds every match open.
@@ -527,8 +541,34 @@ private extension View {
     }
 }
 
+/// Settings (#846): Appearance and Sidebar, both kept on this device only, as the window's
+/// Settings panes of the same names and the page's Settings keep theirs. Everything else
+/// follows the Mac.
+private struct RemoteSettings: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Appearance") {
+                    TextSizeRow()
+                }
+                .paperListRow()
+                SidebarSettingsSection()
+            }
+            .scrollContentBackground(.hidden)
+            .background(Paper.ground)
+            .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+            }
+        }
+    }
+}
+
 /// Text Size (#750): Default, Large or Larger, kept on this device only, as the window's
-/// Settings ▸ General and the page's sidebar foot keep theirs.
+/// Settings ▸ Appearance and the page's Settings keep theirs.
 private struct TextSizeRow: View {
     @AppStorage(TextSize.defaultsKey) private var textSize = TextSize.standard
 

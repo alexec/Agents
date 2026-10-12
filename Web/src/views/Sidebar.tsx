@@ -4,7 +4,8 @@
 // then what wants the person across every project — Pinned, Needs You, Working, Unread — each drawn
 // only with something in it (#507), Needs You with what waits for an OK after its sessions (#773); then a group per project, its sessions newest started first
 // with their state the row's mark, its workflows, and one Archived row opening a page; then the
-// archived projects; and at the foot what the hosts and this browser are doing. Never more than two
+// archived projects; and at the foot what the hosts and this browser are doing, and Settings (#846),
+// where each smart group can be turned off. Never more than two
 // levels deep. No host headings: a server's project reads `host:Project`. A project's row only
 // folds (#375).
 //
@@ -17,7 +18,7 @@ import { useEffect } from "preact/hooks";
 import { actDoing, type Store } from "../model/store";
 import { byStart, folderKey, projectFolder, showsUnread } from "../model/groups";
 import { folds } from "../model/folds";
-import { chooseTextSize, parseTextSize, textSize, textSizes } from "../model/textSize";
+import { smartGroupsOn } from "../model/smartGroups";
 import { macHostNoticeDetail, macHostNoticeTitle } from "../model/macHostNotice";
 import { parseQuery, queryMatches, type LabelQuery } from "../model/labels";
 import { keepsInUnread, newSessionProject, ownCount, pinnedSessions, pinnedWorkflows, projectSessions, rememberedProject, rememberProject,
@@ -116,7 +117,7 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
     if (!r.host || !r.project || !(r.session || r.workflow || r.page || r.archive || r.mcp)) return;
     const agent = r.session ? store.agent(r.host, r.session) : undefined;
     if (agent && inOpenSmartRow(store, r.host, agent)) return;
-    if (r.workflow && folds.isSmartOpen("pinned") && store.workflowPinsIn(r.host, r.project).includes(r.workflow)) return;
+    if (r.workflow && smartGroupsOn.peek().has("pinned") && folds.isSmartOpen("pinned") && store.workflowPinsIn(r.host, r.project).includes(r.workflow)) return;
     folds.set(r.host, r.project, true);
   }, [r.host, r.project, r.session, r.workflow, r.page, r.archive, r.mcp]);
   // The next New Session at the top starts here too (#495).
@@ -150,8 +151,9 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
           <summary class="sidebar-head-label" data-fold="activity">Activity</summary>
           <ActivityRows store={store} chosen={r.activity} onPick={(page: ActivityPage) => go({ activity: page })} />
         </details>
-        {/* Pinned, Needs You, Working, Unread: a group each across every project and host (#495, #773). */}
-        {projects.length > 0 && smartRows.map((row) => (
+        {/* Pinned, Needs You, Working, Unread: a group each across every project and host (#495, #773),
+            each that is on in this browser's Settings (#846). */}
+        {projects.length > 0 && smartRows.filter((row) => smartGroupsOn.value.has(row)).map((row) => (
           <SmartFold key={row} row={row} store={store} projects={projects} query={query} linkDown={linkDown} />
         ))}
         {/* One group per project (#495), its name the group's heading, its sessions the rows. */}
@@ -206,14 +208,9 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
         )))}
         <div class="identity">
           <span>{browserName()} on this Mac</span>
-          {/* This browser's text size (#750), as the window's Settings ▸ General and the
-              Remote's sidebar foot keep theirs. */}
-          <label class="text-size">
-            Text size{" "}
-            <select value={textSize.value} onChange={(e) => chooseTextSize(parseTextSize(e.currentTarget.value))}>
-              {textSizes.map(({ size, title }) => <option value={size} key={size}>{title}</option>)}
-            </select>
-          </label>
+          {/* This browser's Settings (#846): its text size (#750) and which smart groups are on,
+              as the window's Settings ▸ Appearance and ▸ Sidebar. */}
+          <button class="link" aria-current={!!r.settings} onClick={() => go({ settings: true })}>Settings</button>
           {confirming.value ? (
             <span class="confirm">
               <button onClick={() => void session.forgetThisBrowser()}>Forget</button>
@@ -252,11 +249,12 @@ function liveSessions(store: Store, host: string, folder: string): Agent[] {
 
 /** Whether a session is in sight under an open group at the top, so its project need not unfold. */
 function inOpenSmartRow(store: Store, host: string, agent: Agent): boolean {
-  if (folds.isSmartOpen("pinned") && store.sessionPinsIn(host, projectFolder(agent)).includes(agent.id)) return true;
-  const kept = keptInUnread.peek();
-  if (folds.isSmartOpen("unread") && kept?.host === host && kept.id === agent.id) return true;
+  const on = smartGroupsOn.peek();
   const pins = store.sessionPinsIn(host, projectFolder(agent));
-  return (["needsYou", "working", "unread"] as const).some((row) => folds.isSmartOpen(row) && smartAgents(row, [agent], undefined, pins).length > 0);
+  if (on.has("pinned") && folds.isSmartOpen("pinned") && pins.includes(agent.id)) return true;
+  const kept = keptInUnread.peek();
+  if (on.has("unread") && folds.isSmartOpen("unread") && kept?.host === host && kept.id === agent.id) return true;
+  return (["needsYou", "working", "unread"] as const).some((row) => folds.isSmartOpen(row) && smartAgents(row, [agent], undefined, pins, on).length > 0);
 }
 
 /** A search narrows workflows by name and what they are; one asking for a label leaves them out. */
@@ -334,6 +332,8 @@ function SmartFold({ row, store, projects, query, linkDown }: {
   }, [holding]);
 
   const open = folds.isSmartOpen(row);
+  // The groups on (#846): one off passes its sessions to the next they fit.
+  const on = smartGroupsOn.value;
   let count = 0;
   let lines: SmartLine[] = [];
   let keptPlace: Placed | undefined;
@@ -359,13 +359,13 @@ function SmartFold({ row, store, projects, query, linkDown }: {
       const live = liveSessions(store, placed.host.id, placed.project.project.folder);
       // The pinned are in Pinned alone: each session is listed once (#587).
       const pins = store.sessionPinsIn(placed.host.id, placed.project.project.folder);
-      count += smartAgents(row, live, undefined, pins).length;
-      if (open || parsed) for (const agent of smartAgents(row, live, parsed, pins)) found.set(agent, placed);
+      count += smartAgents(row, live, undefined, pins, on).length;
+      if (open || parsed) for (const agent of smartAgents(row, live, parsed, pins, on)) found.set(agent, placed);
     }
     // Unread keeps the session opened from it in its place, read now; none while searching.
     const kept = row === "unread" && !parsed ? keptInUnread.value : null;
     const keptAgent = kept ? store.agent(kept.host, kept.id) : undefined;
-    keptPlace = keptAgent && keepsInUnread(keptAgent, store.sessionPinsIn(kept!.host, projectFolder(keptAgent))) ? projects.find(({ host, project }) =>
+    keptPlace = keptAgent && keepsInUnread(keptAgent, store.sessionPinsIn(kept!.host, projectFolder(keptAgent)), on) ? projects.find(({ host, project }) =>
       host.id === kept!.host && folderKey(project.project.folder) === projectFolder(keptAgent)) : undefined;
     // Each under the session that started it when this group lists that too (#835).
     const listed = withKept([...found.keys()].sort(byStart), keptPlace ? keptAgent : undefined);
@@ -451,20 +451,23 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   // The matcher is made once per fold, not per row.
   const parsed = searching ? parseQuery(query) : undefined;
   const live = view.headings.flatMap((h) => h.agents);
-  // Those a group at the top lists are there alone (#495, #587), out of the project's list.
+  // Those a group at the top lists are there alone (#495, #587), out of the project's list. A
+  // group turned off (#846) lists nothing, so its sessions are here unless the next group has them.
+  const on = smartGroupsOn.value;
   const pins = store.sessionPinsIn(host.id, folder);
   // The one Unread keeps while it is open is listed there, not here too (#689).
   const keptID = !parsed && keptInUnread.value?.host === host.id ? keptInUnread.value.id : undefined;
   const keptAgent = keptID ? live.find((a) => a.id === keptID) : undefined;
-  const kept = keptAgent && keepsInUnread(keptAgent, pins) ? keptAgent.id : undefined;
-  const sessions = !unfolded ? [] : projectSessions(live, pins, parsed, kept);
+  const kept = keptAgent && keepsInUnread(keptAgent, pins, on) ? keptAgent.id : undefined;
+  const sessions = !unfolded ? [] : projectSessions(live, pins, parsed, kept, on);
   // The heading's grey count, as every group's heading has one (#587), folded or not.
-  const own = ownCount(live, pins, kept);
+  const own = ownCount(live, pins, kept, on);
   const archived = !unfolded || !parsed ? [] : view.archived.filter((a) => queryMatches(parsed, a));
   const allWorkflows = (unfolded ? store.projectWorkflows(host.id, folder) : [])
     .filter(workflowMatches(store, host.id, parsed))
     .sort((a, b) => a.workflow.name.localeCompare(b.workflow.name));
-  const flowPins = store.workflowPinsIn(host.id, folder);
+  // With Pinned off (#846), the pinned workflows are in the project's list with the rest.
+  const flowPins = on.has("pinned") ? store.workflowPinsIn(host.id, folder) : [];
   const workflows = allWorkflows.filter((w) => !w.isArchived && !flowPins.includes(w.workflow.workflowID));
   const archivedWorkflows = allWorkflows.filter((w) => w.isArchived);
   const nameMatches = label.toLowerCase().includes(query.toLowerCase());

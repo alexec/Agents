@@ -17,6 +17,9 @@ struct ProjectListView: View {
     @AppStorage("showsArchivedProjects") private var showsArchived = false
     /// Activity, open until folded, and kept so.
     @AppStorage("showsActivity") private var showsActivity = true
+    /// The smart groups turned off in Settings ▸ Sidebar (#846).
+    @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = ""
+    private var smartOn: Set<SidebarSmartRow> { SidebarSmartRow.on(off: smartOff) }
     @State private var folds = SidebarFolds()
     /// What the list has highlighted — one or several (⌘-click), sessions and workflows
     /// alike. Drives bulk Archive; `selection` is still the one thing the detail reads.
@@ -99,7 +102,8 @@ struct ProjectListView: View {
             // Pinned, Needs You (with everything waiting for an OK, #773), Working, Unread: a group each, headed and folding as a
             // project's is, so every group in the list lines up alike (#495). Empty, or
             // with no match for a search, a group is not drawn (#507).
-            ForEach(SidebarSmartRow.allCases, id: \.self) { row in
+            // A group turned off in Settings ▸ Sidebar is not drawn (#846).
+            ForEach(SidebarSmartRow.allCases.filter(smartOn.contains), id: \.self) { row in
                 SmartFold(row: row, projects: orderedProjects.map(\.key), folds: folds, query: searched)
             }
 
@@ -374,6 +378,7 @@ struct ProjectListView: View {
 /// A search unfolds every project with something that matches and hides the rest.
 private struct ProjectFold: View {
     @Environment(AppModel.self) private var model
+    @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = ""
     @Environment(WindowRequests.self) private var requests
     let summary: DaemonAPI.ProjectSummary
     let folds: SidebarFolds
@@ -389,7 +394,8 @@ private struct ProjectFold: View {
         // reads its own numbers off the project's shelf (#165). What goes under which
         // heading is the shared model's, which the Remote draws too (#226).
         let fold = SidebarProjectFold(key, label: label, in: model.work, query: query,
-                                      isOpen: folds.isOpen(key), keptInUnread: model.keptInUnread)
+                                      isOpen: folds.isOpen(key), keptInUnread: model.keptInUnread,
+                                      on: SidebarSmartRow.on(off: smartOff))
         let isOpen = fold.isUnfolded
         if fold.isShown {
             Section(isExpanded: Binding(

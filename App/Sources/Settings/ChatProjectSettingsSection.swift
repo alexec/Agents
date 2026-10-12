@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Settings ▸ General ▸ Chat (#694): whether there is a chat project (#229) at all.
+/// Settings ▸ Account ▸ Chat (#694): whether there is a chat project (#229) at all.
 ///
 /// Read from the projects, not kept apart: on while any host's chat project is live. Off
 /// archives each one and takes New Chat out of the File menu; on brings them back. Not
