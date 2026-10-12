@@ -908,8 +908,8 @@ extension EnvironmentValues {
 }
 
 /// A picked row in the focused sidebar of the key window is filled with the accent, and
-/// macOS draws its text white: 2.5:1 on the dark violet. The ground is 6.6:1 there, and
-/// 6.3:1 on the light one, as on the prominent button (#156). The list tells no row it
+/// macOS draws its text white: 2.2:1 on the dark cobalt. The ground is 7.7:1 there, and
+/// 5.6:1 on the light one, as on the prominent button (#156). The list tells no row it
 /// is drawn so (`backgroundProminence` stays standard in a macOS sidebar), so the row
 /// works it out from what is picked, the list's focus and the window's.
 private struct SidebarInk: ViewModifier {
