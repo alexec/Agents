@@ -17,6 +17,10 @@ extension Trait where Self == ConditionTrait {
     ///   starts at accept; on a loaded runner seeing it took over 2 s and the close
     ///   landed inside the 8 s (2026-10-05, run 37247106522). Fix: time the 8 s from the
     ///   connect, then take it out of here.
+    /// - HandoverTests.aForwardingCopyForwardsAgainAfterARestart — stops and starts five
+    ///   copies on one port; on a loaded runner the bind fails with "Address already in use"
+    ///   (both attempts of run 38313026962). Fix: keep the port across the restarts (#848),
+    ///   then take it out of here.
     static var flakyUnderLoad: Self {
         let environment = ProcessInfo.processInfo.environment
         return .disabled(if: (environment["CI"] != nil || environment["AGENTS_QUARANTINE"] == "1")
