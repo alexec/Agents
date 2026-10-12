@@ -8,7 +8,7 @@ mesh, every method answers `providersNeedOneCopy` (R4).
 
 | Method | Params | Result |
 |---|---|---|
-| `providers/list` | `{}` | `{ providers: [ProviderSummary] }`. This also starts a refresh, whose results come as `control/providersChanged`. |
+| `providers/list` | `{}` | `{ providers: [ProviderSummary] }`, as last listed. A page that opens also sends `providers/refresh` (FR-004). |
 | `providers/add` | `{ name, kind, command?, args?, url?, headers?, commands?, map?, secrets: {NAME: value} }` | `ProviderSummary`, once the server has been connected and checked and has listed. Refusals name what is missing ("It has no workspace_stop tool"). |
 | `providers/update` | `{ id, …same fields, secrets? }` | `ProviderSummary`. Secrets that are left out are kept. |
 | `providers/remove` | `{ id }` | `{}`. Its hosts stay, unlinked (US2 AS5). |

@@ -50,6 +50,7 @@ export const Failure = {
   notChanged: -32034,
   notConfirmed: -32010,
   notInWorkflowFolder: -32016,
+  notLinked: -32065,
   notOffered: -32039,
   notPermitted: -32045,
   notSupported: -32009,
@@ -57,6 +58,8 @@ export const Failure = {
   outsideScratchRoot: -32098,
   pinRefused: -32061,
   projectHasLiveAgents: -32013,
+  providerFailed: -32066,
+  providersNeedOneCopy: -32064,
   runtimeNotFound: -32001,
   runtimeWillNotStart: -32002,
   sandboxWillNotStart: -32061,
@@ -510,6 +513,7 @@ export interface ControlHost {
   relay?: boolean;
   signInFrom?: Record<string, HostID>;
   tunnel?: HostTunnel;
+  workspace?: HostWorkspace;
 }
 
 export interface ControlStatus {
@@ -912,6 +916,16 @@ export interface HostJoinStatus {
   at: WireDate;
 }
 
+export interface HostRequest {
+  host: HostID;
+  purge?: boolean;
+}
+
+export interface HostStop {
+  host: HostID;
+  confirmRunning?: boolean;
+}
+
 export interface HostTunnel {
   up: boolean;
   problem?: string;
@@ -921,6 +935,25 @@ export interface HostTunnelChanged {
   name: string;
   host?: HostID;
   tunnel: HostTunnel;
+}
+
+export interface HostWorkspace {
+  provider: ProviderID;
+  providerName: string;
+  workspace: string;
+  workspaceName: string;
+  workspaceState: string;
+  hostState?: string;
+  phase?: string;
+  since?: WireDate;
+  problem?: string;
+  stoppedBy?: string;
+  canStart: boolean;
+  canStop: boolean;
+  startWhenUsed: boolean;
+  stopWhenIdleMinutes?: number;
+  cost?: string;
+  current: boolean;
 }
 
 export interface HostedMCPSnapshot {
@@ -1272,6 +1305,8 @@ export interface PromptRequest {
   from: PromptOrigin;
   sendID?: UUID;
 }
+
+export type ProviderID = string & { readonly __brand: "ProviderID" };
 
 export interface QueuedPrompt {
   id: UUID;
@@ -2070,6 +2105,8 @@ export interface Methods {
   "files/unwatch": { params: FilesWatchRequest; result: Empty };
   "files/watch": { params: FilesWatchRequest; result: Empty };
   "hosts/list": { params: Empty; result: ControlHost[] };
+  "hosts/start": { params: HostRequest; result: ControlHost };
+  "hosts/stop": { params: HostStop; result: ControlHost };
   "leases/snapshot": { params: Empty; result: LeaseSnapshot };
   "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
   "modes/remembered": { params: Empty; result: Record<string, JSONValue> };
@@ -2176,6 +2213,8 @@ export const MethodTarget = {
   "files/unwatch": "host",
   "files/watch": "host",
   "hosts/list": "control",
+  "hosts/start": "control",
+  "hosts/stop": "control",
   "leases/snapshot": "host",
   "mcp/hosted": "host",
   "modes/remembered": "host",
@@ -2299,7 +2338,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConfigChoiceGroup: { required: ["options"], optional: ["name", "group"] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ContinueInProjectRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
-  ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "tunnel"] },
+  ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "tunnel", "workspace"] },
   ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "thisMacHost", "projectDetection", "unjoinedTunnels"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily"] },
@@ -2349,8 +2388,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Headline: { required: ["h1", "h2", "h3"], optional: [] },
   HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive"] },
   HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
+  HostRequest: { required: ["host"], optional: ["purge"] },
+  HostStop: { required: ["host"], optional: ["confirmRunning"] },
   HostTunnel: { required: ["up"], optional: ["problem"] },
   HostTunnelChanged: { required: ["name", "tunnel"], optional: ["host"] },
+  HostWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost"] },
   HostedMCPSnapshot: { required: ["servers", "at"], optional: [] },
   HostedMCPStatus: { required: ["name", "state", "restarts", "users"], optional: ["project", "since", "retryAt", "lastError"] },
   LabelVocabularyRequest: { required: ["folder"], optional: [] },

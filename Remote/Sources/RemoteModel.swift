@@ -229,6 +229,9 @@ final class RemoteModel {
     /// with no control plane.
     @ObservationIgnored private var otherHosts: [HostID: DaemonClient] = [:]
     @ObservationIgnored private var hostWatch: Task<Void, Never>?
+    /// The watch's own client of the control plane while it is connected, for the control
+    /// plane's own requests (`hosts/start`, #691). Nil against a bridge with no control plane.
+    @ObservationIgnored private var controlPlane: DaemonClient?
     /// What `hosts/list` last said, so the project list can name each host (058, frame H).
     /// Empty when this phone is not a client of a control plane.
     private(set) var controlHosts: [DaemonAPI.ControlHost] = []
@@ -1477,6 +1480,33 @@ final class RemoteModel {
         startingIn.flatMap { work.project($0)?.host } ?? .mac
     }
 
+    /// A host's row as `hosts/list` last said it: its state, and the workspace it runs on (#691).
+    func controlHost(_ host: HostID) -> DaemonAPI.ControlHost? {
+        controlHosts.first { $0.id == host }
+    }
+
+    /// The hosts whose `hosts/start` is out now, so the strip's Start waits for it (#691).
+    private(set) var hostsBeingStarted: Set<HostID> = []
+
+    /// Start the workspace `host` runs on (#691, the strip's Start). The control plane answers
+    /// at once; the start's progress comes as `control/hostChanged`, and a refusal is said
+    /// in `problem`.
+    func startHost(_ host: HostID) async {
+        guard let control = controlPlane else {
+            problem = "The control plane isn’t answering, so \(hostName(host)) could not be started."
+            return
+        }
+        hostsBeingStarted.insert(host)
+        defer { hostsBeingStarted.remove(host) }
+        do {
+            let row = try await control.call(DaemonAPI.Method.hostsStart, DaemonAPI.HostRequest(host: host),
+                                             returning: DaemonAPI.ControlHost.self)
+            if let index = controlHosts.firstIndex(where: { $0.id == row.id }) { controlHosts[index] = row }
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
     /// When each other host was last seen to go, for the strip over its chats (#239):
     /// set as it leaves `reachableHosts`, cleared as it comes back.
     private(set) var hostDownSince: [HostID: Date] = [:]
@@ -1507,6 +1537,7 @@ final class RemoteModel {
                 backoff.trying()
                 if (try? await control.connect(startIfNeeded: false, timeout: .seconds(5))) != nil {
                     backoff.connected()
+                    self?.controlPlane = control
                     await self?.syncOtherHosts(control, link: link)
                     for await change in control.notifications() where change.method == DaemonAPI.Notification.controlHostChanged {
                         guard let self, !Task.isCancelled else { return }
@@ -1515,6 +1546,7 @@ final class RemoteModel {
                         await self.syncOtherHosts(control, link: link)
                     }
                     note("hosts: the control plane's watch closed")
+                    if self?.controlPlane === control { self?.controlPlane = nil }
                 }
                 guard !Task.isCancelled, self != nil else { return }
                 await backoff.wait()
@@ -1532,6 +1564,7 @@ final class RemoteModel {
         (baseLink as? ControlPlaneLink)?.watching.stop()
         hostWatch?.cancel()
         hostWatch = nil
+        controlPlane = nil
         listening?.cancel()
         listening = nil
         for (_, other) in otherHosts { await other.disconnect() }

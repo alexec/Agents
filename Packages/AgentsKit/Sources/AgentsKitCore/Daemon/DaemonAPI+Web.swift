@@ -193,6 +193,9 @@ public extension DaemonAPI {
                 Row(Method.controlStatus, params: Empty.self, result: ControlStatus.self, kind: .controlRequest),
                 Row(Method.hostsList, params: Empty.self, result: [ControlHost].self, kind: .controlRequest),
                 Row(Method.clientsForgetSelf, params: Empty.self, result: Empty.self, kind: .controlRequest),
+                // A linked host's workspace (#691): Start on the offline strip.
+                Row(Method.hostsStart, params: HostRequest.self, result: ControlHost.self, kind: .controlRequest),
+                Row(Method.hostsStop, params: HostStop.self, result: ControlHost.self, kind: .controlRequest),
                 // Heard
                 Row(Notification.agentChanged, params: Agent.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.agentEntry, params: EntryNotification.self, result: Empty.self, kind: .hostNotification),
@@ -233,7 +236,8 @@ public extension DaemonAPI {
                     kind: .hostNotification),
                 Row(Notification.pagesChanged, params: PagesChangedNotification.self, result: Empty.self,
                     kind: .hostNotification),
-                // An ad-hoc dictionary from ControlRouter.describe.
+                // An ad-hoc dictionary from ControlRouter.described: a `ControlHost`'s state, and
+                // its `workspace` (#691) when it is linked.
                 Row(Notification.controlHostChanged, params: JSONValue.self, result: Empty.self, kind: .controlNotification),
             ]
         }

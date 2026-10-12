@@ -344,11 +344,13 @@ The deltas are tracked by 29 issues:
 
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
-| A down host over a chat (#83) | This Mac’s strip names hasn’t joined, isn’t running, or hasn’t answered, with Try Again: `A/Chat/OfflineStrip.swift:9-61` | `R/Chat/HostOfflineStrip.swift`, in the window's words (`S/OfflineWords.swift`), no button; the Mac link is `R/StaleBanner.swift` | `W/views/OfflineStrip.tsx`, no button | **by design**: no button on the Remote or the page, which dial the host again by themselves |
+| A down host over a chat (#83) | This Mac’s strip names hasn’t joined, isn’t running, or hasn’t answered, with Try Again: `A/Chat/OfflineStrip.swift` | `R/Chat/HostOfflineStrip.swift`, in the window's words (`S/OfflineWords.swift`), no button; the Mac link is `R/StaleBanner.swift` | `W/views/OfflineStrip.tsx`, no button | **by design**: no button on the Remote or the page for a host that isn't on a workspace, which they dial again by themselves |
+| Start a stopped workspace (#691) | The strip over a linked host's chat says stopped, starting (spinner, phase, a timer counting up) or why it couldn't start, with **Start**: `A/Chat/OfflineStrip.swift`, words in `S/OfflineWords.swift`; Start or Stop on its Hosts row | The same strip: `R/Chat/HostOfflineStrip.swift`, `RemoteModel.startHost` | The same strip: `W/views/OfflineStrip.tsx`, `store.startHost` | **same** |
 | The control plane away | `A/Sidebar/ControlAwayStrip.swift` | `R/StaleBanner.swift` | `W/views/Banner.tsx` | **same** |
 | Reconnect on wake and network change (#82) | `A/WakeAndNetwork.swift` | Yes (its hangs are #208, not parity) | Yes, and the `online` event | **same** |
 | A refused write said in words (#88) | `storage/writeFailed` | `storage/writeFailed`: `R/RemoteModel.swift` | `storage/writeFailed` (unit-tested) | **same** |
 | Hosts and servers | Settings ▸ Control plane overview names not joined or not running: `A/Control/ControlSettingsView.swift:140-156`; hosts: `237-268`; Add a Server: Run a command or Over ssh, with the ssh config's hosts and an ssh tunnel (#610), then the projects to add, picked (#656): `A/Control/ControlAddServerSheet.swift`, `A/Control/HostProjectsPicker.swift` | Host headings | Names in the sidebar, the foot | **by design** (managing hosts is the Mac's) |
+| Workspace providers (#691) | Settings ▸ Control plane ▸ Providers: a provider's workspaces, Add Provider (kind first), Add as Host…, and Link to Workspace… in a host's `···` menu: `A/Control/ControlProvidersPage.swift` | None | None | **by design** (managing hosts is the Mac's) |
 | Pairing | Shows the codes: `A/Control/ControlClientsPane.swift` | Scans: `R/Link/PairingView.swift` | Pastes, or `#code=`: `W/views/Pairing.tsx`, `W/pairLink.ts` | **by design** (#105, #109, #111) |
 
 ## MCP Apps views

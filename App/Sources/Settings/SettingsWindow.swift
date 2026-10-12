@@ -296,6 +296,10 @@ private struct SettingsRail: View {
         heading(.controlPlane)
         controlItem(.overview, count: nil)
         controlItem(.hosts, count: control?.hosts.count)
+        // Workspace providers (#691): only where the control plane can run them.
+        if control?.providersHere != false {
+            controlItem(.providers, count: control.map { $0.providers.count })
+        }
         controlItem(.clients, count: control.map { $0.clients.count })
     }
 

@@ -11,6 +11,13 @@ import AppKit
 final class ControlSettingsModel {
     private(set) var status: DaemonAPI.ControlStatus?
     private(set) var hosts: [DaemonAPI.ControlHost] = []
+    /// Workspace providers (#691), as the control plane last listed them.
+    private(set) var providers: [DaemonAPI.ProviderSummary] = []
+    /// False on a control plane that can't run providers (several copies, research R4).
+    private(set) var providersHere = true
+    /// Servers added from a provider's workspace (Add as Host…), by name: linked to it once
+    /// they join.
+    private var linkOnJoin: [String: (provider: ProviderID, workspace: String)] = [:]
     private(set) var clients: [ClientRecord] = []
     /// How each connected client reaches the control plane now (frame N). Empty from a
     /// control plane that does not say.
@@ -57,6 +64,11 @@ final class ControlSettingsModel {
                         self.installStep = note.params?["step"]?.stringValue
                         continue
                     }
+                    if note.method == DaemonAPI.Notification.controlProvidersChanged,
+                       let listed = try? note.params?["providers"]?.decode([DaemonAPI.ProviderSummary].self) {
+                        self.providers = listed
+                        continue
+                    }
                     if note.method == DaemonAPI.Notification.controlTunnelChanged,
                        let change = try? note.params?.decode(DaemonAPI.HostTunnelChanged.self) {
                         self.tunnels[change.name] = change.tunnel
@@ -87,10 +99,95 @@ final class ControlSettingsModel {
             let links = (try? await client.call(DaemonAPI.Method.clientsConnections,
                                                 returning: [DaemonAPI.ClientConnection].self)) ?? []
             connections = Dictionary(links.map { ($0.client, $0) }, uniquingKeysWith: { $1 })
+            await refreshProviderList()
+            await linkJoined()
             isReachable = true
         } catch {
             isReachable = false
         }
+    }
+
+    // MARK: Workspace providers (#691)
+
+    private func refreshProviderList() async {
+        do {
+            let answer = try await client.call(DaemonAPI.Method.providersList, DaemonAPI.Empty())
+            providers = (try? answer["providers"]?.decode([DaemonAPI.ProviderSummary].self)) ?? []
+            providersHere = true
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.providersNeedOneCopy
+            || error.code == JSONRPCError.methodNotFound {
+            providers = []
+            providersHere = false
+        } catch {}
+    }
+
+    /// Ask every provider for its workspaces now (FR-004: when a page that shows them opens).
+    func listWorkspacesAgain(_ provider: ProviderID? = nil) async {
+        _ = try? await client.call(DaemonAPI.Method.providersRefresh, DaemonAPI.ProviderRequest(id: provider))
+    }
+
+    /// Adds a provider; nil once it is added, or why not, in the control plane's words.
+    func addProvider(_ request: DaemonAPI.ProviderAdd) async -> String? {
+        do {
+            _ = try await client.call(request.id == nil ? DaemonAPI.Method.providersAdd : DaemonAPI.Method.providersUpdate,
+                                      request)
+            await refresh()
+            return nil
+        } catch let error as JSONRPCError {
+            return HostProblem.controlRefusal(error)
+        } catch {
+            return "The control plane can’t be reached."
+        }
+    }
+
+    func removeProvider(_ id: ProviderID) async {
+        await perform(DaemonAPI.Method.providersRemove, DaemonAPI.ProviderRequest(id: id))
+    }
+
+    func link(_ host: HostID, to provider: ProviderID, workspace: String, startWhenUsed: Bool? = nil,
+              stopWhenIdleMinutes: Int? = nil) async {
+        await perform(DaemonAPI.Method.hostsLink,
+                      DaemonAPI.HostLink(host: host, provider: provider, workspace: workspace,
+                                         startWhenUsed: startWhenUsed, stopWhenIdleMinutes: stopWhenIdleMinutes))
+    }
+
+    func unlink(_ host: HostID) async {
+        await perform(DaemonAPI.Method.hostsUnlink, DaemonAPI.HostRequest(host: host))
+    }
+
+    /// `stopWhenIdleMinutes` 0 turns idle stopping off.
+    func setWorkspaceOptions(_ host: HostID, startWhenUsed: Bool? = nil, stopWhenIdleMinutes: Int? = nil) async {
+        await perform(DaemonAPI.Method.hostsSetWorkspaceOptions,
+                      DaemonAPI.HostWorkspaceOptions(host: host, startWhenUsed: startWhenUsed,
+                                                     stopWhenIdleMinutes: stopWhenIdleMinutes))
+    }
+
+    func start(_ host: HostID) async {
+        await perform(DaemonAPI.Method.hostsStart, DaemonAPI.HostRequest(host: host))
+    }
+
+    func stop(_ host: HostID) async {
+        await perform(DaemonAPI.Method.hostsStop, DaemonAPI.HostStop(host: host))
+    }
+
+    /// Links a server added from a workspace once it joins under `name` (Add as Host…).
+    func linkWhenJoined(name: String, provider: ProviderID, workspace: String) async {
+        linkOnJoin[name] = (provider, workspace)
+        await linkJoined()
+    }
+
+    private func linkJoined() async {
+        for (name, wanted) in linkOnJoin {
+            guard let host = hosts.first(where: { $0.name == name && $0.workspace == nil }) else { continue }
+            linkOnJoin[name] = nil
+            _ = try? await client.call(DaemonAPI.Method.hostsLink,
+                                       DaemonAPI.HostLink(host: host.id, provider: wanted.provider, workspace: wanted.workspace))
+        }
+    }
+
+    /// The workspaces no host is linked to yet, by provider, for Link to Workspace….
+    var linkableWorkspaces: [(provider: DaemonAPI.ProviderSummary, workspaces: [DaemonAPI.WorkspaceInfo])] {
+        providers.map { ($0, $0.workspaces) }.filter { !$0.1.isEmpty }
     }
 
     // MARK: Actions

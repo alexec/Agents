@@ -198,9 +198,11 @@ actor MCPClient {
         return result["contents"]?.arrayValue ?? []
     }
 
-    /// `tools/call`'s whole result.
-    func callTool(_ name: String, arguments: JSONValue = [:]) async throws -> JSONValue {
-        guard let result = try await request("tools/call", ["name": .string(name), "arguments": arguments]) else {
+    /// `tools/call`'s whole result. `timeout` overrides the client's own for this call: a
+    /// workspace start may take minutes where a list takes seconds (#691).
+    func callTool(_ name: String, arguments: JSONValue = [:], timeout: Duration? = nil) async throws -> JSONValue {
+        guard let result = try await request("tools/call", ["name": .string(name), "arguments": arguments],
+                                             timeout: timeout) else {
             throw Failure.notMCP
         }
         return result
@@ -235,12 +237,13 @@ actor MCPClient {
     // MARK: JSON-RPC
 
     /// The result of `method`. Nil only when `optional` and the server has no such method.
-    private func request(_ method: String, _ params: JSONValue, optional: Bool = false) async throws -> JSONValue? {
+    private func request(_ method: String, _ params: JSONValue, optional: Bool = false,
+                         timeout: Duration? = nil) async throws -> JSONValue? {
         let id = nextID
         nextID += 1
         let body = try JSONEncoder().encode(JSONValue.object(["jsonrpc": "2.0", "id": .int(id),
                                                               "method": .string(method), "params": params]))
-        let reply = try await exchange(body, id: id)
+        let reply = try await exchange(body, id: id, timeout: timeout ?? self.timeout)
         guard let message = try? JSONValue.parse(reply), message["id"]?.intValue == id else { throw Failure.notMCP }
         if let error = message["error"] {
             let code = error["code"]?.intValue ?? 0
@@ -265,17 +268,17 @@ actor MCPClient {
     }
 
     /// One request out and its answer back, within `timeout`.
-    private func exchange(_ body: Data, id: Int) async throws -> Data {
+    private func exchange(_ body: Data, id: Int, timeout: Duration) async throws -> Data {
         switch server.transport {
         case .stdio:
             guard let process = stdio else { throw Failure.stopped("The server is not running.") }
-            return try await timed(onTimeout: { process.abandon(NSNumber(value: id)) }) {
+            return try await timed(timeout, onTimeout: { process.abandon(NSNumber(value: id)) }) {
                 guard let reply = await process.send(body) else { throw Failure.timedOut }
                 return reply
             }
         case .http:
-            return try await timed(onTimeout: {}) {
-                guard let reply = try await self.post(body, id: id) else { throw Failure.notMCP }
+            return try await timed(timeout, onTimeout: {}) {
+                guard let reply = try await self.post(body, id: id, timeout: timeout) else { throw Failure.notMCP }
                 return reply
             }
         case .sse:
@@ -283,9 +286,8 @@ actor MCPClient {
         }
     }
 
-    private func timed(onTimeout: @escaping @Sendable () -> Void,
+    private func timed(_ timeout: Duration, onTimeout: @escaping @Sendable () -> Void,
                        _ work: @escaping @Sendable () async throws -> Data) async throws -> Data {
-        let timeout = self.timeout
         return try await withThrowingTaskGroup(of: Data?.self) { group in
             group.addTask { try await work() }
             group.addTask {
@@ -304,7 +306,7 @@ actor MCPClient {
     // MARK: Streamable http
 
     /// POST one message. The answer to `id`, or nil for a notification (202).
-    private func post(_ body: Data, id: Int?) async throws -> Data? {
+    private func post(_ body: Data, id: Int?, timeout: Duration? = nil) async throws -> Data? {
         guard case .http(let url, let headers) = server.transport else { throw Failure.transportNotSupported }
         guard let address = URL(string: url), ["http", "https"].contains(address.scheme?.lowercased() ?? "") else {
             throw Failure.unreachable("That is not an http or https address.")
@@ -312,7 +314,7 @@ actor MCPClient {
         var request = URLRequest(url: address)
         request.httpMethod = "POST"
         request.httpBody = body
-        request.timeoutInterval = Double(timeout.components.seconds)
+        request.timeoutInterval = Double((timeout ?? self.timeout).components.seconds)
         for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json, text/event-stream", forHTTPHeaderField: "Accept")

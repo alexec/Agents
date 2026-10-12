@@ -83,6 +83,9 @@ public actor ControlRouter {
     /// devices through iCloud and are given no client channels, only channel 0.
     private var relays: [HostID: Bool] = [:]
     private var states: [HostID: HostState] = [:]
+    /// A linked host's workspace (#691), laid over its state: a host whose workspace is
+    /// stopped is shown stopped, not offline.
+    private var workspaces: [HostID: DaemonAPI.HostWorkspace] = [:]
     /// Where each session last said the person was, keyed by the session, or by the client for
     /// a report made at another copy. Folded per surface, so a client with two sockets (two tabs
     /// of one browser, 071 R11) is active while either is: one record per client let the last
@@ -215,6 +218,7 @@ public actor ControlRouter {
         dropHost(host, generation: nil, newState: nil)
         known.remove(host)
         states[host] = nil
+        workspaces[host] = nil
         broadcastControl(DaemonAPI.Notification.controlHostChanged,
                          ["host": .string(host.rawValue), "state": .string("removed")])
     }
@@ -341,7 +345,33 @@ public actor ControlRouter {
     public func setState(_ state: HostState, of host: HostID) {
         guard states[host] != state else { return }
         states[host] = state
-        broadcastControl(DaemonAPI.Notification.controlHostChanged, Self.describe(host, state))
+        broadcastControl(DaemonAPI.Notification.controlHostChanged, described(host, state))
+    }
+
+    // MARK: Workspaces (#691)
+
+    public func workspace(of host: HostID) -> DaemonAPI.HostWorkspace? { workspaces[host] }
+
+    /// A linked host's workspace changed (its state, a start's phase), or the link went: said
+    /// to every client when it differs.
+    public func setWorkspace(_ workspace: DaemonAPI.HostWorkspace?, of host: HostID) {
+        guard workspaces[host] != workspace else { return }
+        workspaces[host] = workspace
+        guard known.contains(host) else { return }
+        broadcastControl(DaemonAPI.Notification.controlHostChanged,
+                         described(host, states[host] ?? .offline(since: Date())))
+    }
+
+    /// `describe`, with the host's workspace laid over it: its `hostState` names the state
+    /// while the host isn't online (`stopping` whatever it is), and the workspace rides along.
+    public func described(_ host: HostID, _ state: HostState) -> JSONValue {
+        let plain = Self.describe(host, state)
+        guard let workspace = workspaces[host], var params = plain.objectValue else { return plain }
+        if let shown = workspace.hostState, shown == "stopping" || !state.isOnline {
+            params["state"] = .string(shown)
+        }
+        if let encoded = try? JSONValue.encoding(workspace) { params["workspace"] = encoded }
+        return .object(params)
     }
 
     private func dropHost(_ host: HostID, generation: UUID?, newState: HostState?) {

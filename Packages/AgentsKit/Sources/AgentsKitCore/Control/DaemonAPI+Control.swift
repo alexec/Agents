@@ -162,7 +162,8 @@ public extension DaemonAPI {
         public var name: String
         public var platform: String
         public var version: String
-        /// `online`, `offline`, `connecting`, `needsUpdate` or `failed`.
+        /// `online`, `offline`, `connecting`, `needsUpdate` or `failed`; for a host linked to
+        /// a workspace (#691) also `stopped`, `starting` or `stopping`.
         public var state: String
         public var reach: String
         public var machineID: String?
@@ -174,6 +175,8 @@ public extension DaemonAPI {
         /// control plane holds over ssh (#435): how that session stands. Nil for a host
         /// that dials it directly.
         public var tunnel: HostTunnel?
+        /// The provider's workspace it runs on, which can be started and stopped (#691).
+        public var workspace: HostWorkspace?
 
         public init(id: HostID, name: String, platform: String, version: String, state: String,
                     reach: String, machineID: String?, relay: Bool? = nil) {
@@ -277,6 +280,8 @@ public extension DaemonAPI {
         public var host: HostID
         /// As in `ControlHost.state`, or `removed`.
         public var state: String
+        /// As in `ControlHost.workspace`.
+        public var workspace: HostWorkspace?
     }
 
     /// `host/hello`, on every connect of an uplink.

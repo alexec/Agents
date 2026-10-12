@@ -148,18 +148,29 @@ A second Mac joins the same way, with Agents Host.
 
 ### Remove a server
 
-1. In **Settings ▸ Control plane ▸ Hosts**, find the server and click **Remove…**, then
-   **Remove**.
+1. In **Settings ▸ Control plane ▸ Hosts**, find the server, open its `···` menu and choose
+   **Remove…**, then **Remove**.
 
    It stops connecting, and every window and device stops seeing it. Its agents are left
    running where they are, and `~/.agents-server` on the server is not touched.
+
+### Or add it from a workspace provider
+
+If the server is a workspace of a provider you have added (a Docker container, a DigitalOcean
+droplet, a Codespace), open **Settings ▸ Control plane ▸ Providers** and choose **Add as
+Host…** beside it. Add a Server opens over ssh, with the address the provider gives already
+filled in. Once the server joins, it is linked to its workspace, so it can be started and
+stopped from Agents. See [Start workspaces from Agents](start-workspaces-from-agents.md).
 
 ## When the server is offline
 
 If the server loses its network, or the host stops, **Hosts** marks it offline and its
 projects go grey. Agents already working there keep working. The host reconnects by
-itself when it can, and you see everything that happened meanwhile. **Check again** asks
-at once.
+itself when it can, and you see everything that happened meanwhile. **Check again**, in
+its `···` menu, asks at once.
+
+A server linked to a provider's workspace shows **Stopped** instead when its workspace is
+stopped, with **Start** on its row and over its chats on every screen.
 
 ## Updating a server
 
@@ -184,3 +195,4 @@ the new one on the same folder, so do it when no agent there is in the middle of
 
 - [Projects, hosts and worktrees](../explanation/projects-hosts-worktrees.md).
 - [The control plane](../explanation/control-plane.md).
+- [Start workspaces from Agents](start-workspaces-from-agents.md).

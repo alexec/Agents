@@ -5,12 +5,13 @@ import SwiftUI
 /// Settings ▸ Control plane (058, frames D–G): where it runs, the machines it reaches and
 /// the screens that reach it. One group in the rail, opening like Shared.
 enum ControlPage: Hashable {
-    case overview, hosts, clients
+    case overview, hosts, providers, clients
 
     var title: String {
         switch self {
         case .overview: "Overview"
         case .hosts: "Hosts"
+        case .providers: "Providers"
         case .clients: "Clients"
         }
     }
@@ -38,6 +39,7 @@ struct ControlSettingsView: View {
                 switch page {
                 case .overview: ControlOverviewPage(control: control, page: $page)
                 case .hosts: ControlHostsPage(control: control)
+                case .providers: ControlProvidersPage(control: control)
                 case .clients: ControlClientsPage(control: control)
                 }
                 if let problem = control.problem {
@@ -241,6 +243,10 @@ struct ControlHostsPage: View {
     @State private var addingByCode = false
     @State private var addingServer = false
     @State private var choosing: DaemonAPI.ControlHost?
+    /// Link to Workspace… (#691, L5).
+    @State private var linking: DaemonAPI.ControlHost?
+    /// Stop, asked first while agents are working there (L2).
+    @State private var stopping: DaemonAPI.ControlHost?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -255,11 +261,10 @@ struct ControlHostsPage: View {
                 ForEach(control.otherHosts) { host in
                     Divider()
                     ControlRow(dot: dot(host), title: host.name, detail: line(host)) {
+                        // One main action and a menu of the rest (#691, L2).
                         HStack(spacing: 8) {
-                            // A relay runs no agents, so it has no projects.
-                            if host.relay == nil { chooseProjects(host) }
-                            Button("Check again") { Task { await control.checkAgain(host.id) } }.buttonStyle(.paper)
-                            Button("Remove…") { removing = host }.buttonStyle(.paper)
+                            mainAction(host)
+                            hostMenu(host)
                         }
                         // The buttons keep their one line; the line beside them wraps.
                         .fixedSize()
@@ -285,6 +290,17 @@ struct ControlHostsPage: View {
         }
         .sheet(isPresented: $addingByCode) { CodeSheet(control: control, purpose: .host).paperSheet() }
         .sheet(isPresented: $addingServer) { ControlAddServerSheet(control: control).paperSheet() }
+        .sheet(item: $linking) { host in
+            LinkWorkspaceSheet(control: control, host: host).paperSheet()
+        }
+        .confirmationDialog(stopping.map { "Stop \($0.name)?" } ?? "",
+                            isPresented: Binding(get: { stopping != nil }, set: { if !$0 { stopping = nil } }),
+                            titleVisibility: .visible, presenting: stopping) { host in
+            Button("Stop") { Task { await control.stop(host.id) } }
+            Button("Cancel", role: .cancel) {}
+        } message: { host in
+            Text("\(workingNames(host).joined(separator: " and ")) \(workingNames(host).count == 1 ? "is" : "are") working there. Stopping its workspace stops them.")
+        }
         .sheet(item: $choosing) { host in
             ChooseProjectsSheet(host: host.id, hostName: host.id == control.thisMacHost?.id ? "This Mac" : host.name,
                                 paths: control.suggestedPaths).paperSheet()
@@ -307,11 +323,86 @@ struct ControlHostsPage: View {
     }
 
     private func dot(_ host: DaemonAPI.ControlHost) -> ControlDot {
-        switch host.state {
+        if host.workspace?.problem != nil { return .attention }
+        return switch host.state {
         case "online": .online
         case "needsUpdate", "failed": .attention
         default: .offline
         }
+    }
+
+    // MARK: A linked host's workspace (#691, L2)
+
+    /// Start or Stop for a linked host, while nothing is under way; Check again for any other.
+    @ViewBuilder
+    private func mainAction(_ host: DaemonAPI.ControlHost) -> some View {
+        if let workspace = host.workspace {
+            if host.state == "starting" || host.state == "stopping" {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text(host.state == "starting" ? "Starting…" : "Stopping…").appText(.supporting).foregroundStyle(.secondary)
+                }
+            } else if host.state == "online" || !workspace.canStart {
+                Button("Stop") {
+                    if workingNames(host).isEmpty { Task { await control.stop(host.id) } } else { stopping = host }
+                }
+                .buttonStyle(.paper)
+                .disabled(!workspace.canStop)
+                .help("Stops \(workspace.workspaceName) at \(workspace.providerName).")
+            } else {
+                Button("Start") { Task { await control.start(host.id) } }
+                    .buttonStyle(.paper)
+                    .help("Starts \(workspace.workspaceName) at \(workspace.providerName).")
+            }
+        } else {
+            Button("Check again") { Task { await control.checkAgain(host.id) } }.buttonStyle(.paper)
+        }
+    }
+
+    private func hostMenu(_ host: DaemonAPI.ControlHost) -> some View {
+        Menu {
+            // A relay runs no agents, so it has no projects.
+            if host.relay == nil {
+                Button("Choose Projects…") { choosing = host }.disabled(host.state != "online")
+            }
+            if host.workspace != nil {
+                Button("Check again") { Task { await control.checkAgain(host.id) } }
+            }
+            if host.relay == nil, control.providersHere {
+                Divider()
+                if let workspace = host.workspace {
+                    Button("Unlink from \(workspace.workspaceName)") { Task { await control.unlink(host.id) } }
+                    Toggle("Start when used", isOn: Binding(
+                        get: { workspace.startWhenUsed },
+                        set: { on in Task { await control.setWorkspaceOptions(host.id, startWhenUsed: on) } }))
+                    Picker("Stop when idle", selection: Binding(
+                        get: { workspace.stopWhenIdleMinutes ?? 0 },
+                        set: { minutes in Task { await control.setWorkspaceOptions(host.id, stopWhenIdleMinutes: minutes) } })) {
+                        Text("Off").tag(0)
+                        Text("After 15 minutes").tag(15)
+                        Text("After 30 minutes").tag(30)
+                        Text("After 1 hour").tag(60)
+                        Text("After 2 hours").tag(120)
+                    }
+                } else {
+                    Button("Link to Workspace…") { linking = host }.disabled(control.providers.isEmpty)
+                }
+            }
+            Divider()
+            Button("Remove…") { removing = host }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .accessibilityLabel("More for \(host.name)")
+    }
+
+    /// The agents working on a host now, by name, for Stop's question.
+    private func workingNames(_ host: DaemonAPI.ControlHost) -> [String] {
+        model.work.agents.filter { $0.host == host.id && ($0.state == .running || $0.state == .starting) }
+            .map { $0.title ?? "An agent" }
     }
 
     private func thisMacLine(_ host: DaemonAPI.ControlHost) -> String {
@@ -340,6 +431,17 @@ struct ControlHostsPage: View {
         if host.state != "online" { parts.append(host.state.capitalized) }
         if !host.platform.isEmpty { parts.append(host.platform.replacingOccurrences(of: " ", with: " · ")) }
         if !host.version.isEmpty { parts.append("Agents \(host.version)") }
+        if let workspace = host.workspace {
+            // Linked (#691, L2): where it runs, and what Agents does with it, on a line of its own.
+            parts.append("\(workspace.providerName): \(workspace.workspaceName)")
+            if host.state != "online", let cost = workspace.cost { parts.append(cost) }
+            var second: [String] = []
+            if let problem = workspace.problem { second.append(problem) }
+            if let minutes = workspace.stopWhenIdleMinutes { second.append("Stops after \(minutes) minutes idle") }
+            if workspace.startWhenUsed { second.append("Starts when used") }
+            if !workspace.current { second.append("\(workspace.providerName) didn’t answer its last list") }
+            return parts.joined(separator: " · ") + (second.isEmpty ? "" : "\n" + second.joined(separator: " · "))
+        }
         if let tunnel = host.tunnel {
             // Behind a bastion (#435): it dials through a session this Mac holds.
             parts.append(tunnel.up ? "connects through an ssh tunnel"

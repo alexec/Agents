@@ -87,52 +87,52 @@ of the spec, and the constitution requires the relevant checks to pass.
 
 ### Wire types and the control plane's MCP client
 
-- [ ] T010 [P] `CK/Workspaces.swift`:
+- [x] T010 [P] `CK/Workspaces.swift`:
   - `ProviderID`
   - `ProviderRecord`. The validation rules are: "`name` not empty, ≤ 60 characters; `stdio` has a command; `http` URL is `http(s)://`; every `${X}` in headers or commands is in `secretNames`".
   - `WorkspaceInfo`. Its state is "`running` | `starting` | `stopping` | `stopped` | `unknown`"; `cost` is at most 120 characters.
   - `WorkspaceList`, holding at most 200 workspaces.
   - `ToolMap`, with paths parsed per [contracts/tool-map.md](contracts/tool-map.md).
   - `HostWorkspace` and `ProviderSummary`, all `Codable, Sendable, Hashable`.
-- [ ] T011 `CK/Grant.swift`:
+- [x] T011 `CK/Grant.swift` (as built: `HostState` unchanged; the router lays the workspace over it, data-model.md):
   - `HostRecord.workspace: WorkspaceLink?` with `startWhenUsed` (default true) and `stopWhenIdleMinutes` (default 30, nil off). It must decode records that don't have it.
   - `HostState` gains `stopped(since:by:)`, `starting(phase:since:)` and `stopping(since:)`, with `StopCause` and `StartPhase`.
   - Update every exhaustive `switch` over `HostState` across the repo, including `ControlRouter.describe` and the Mac's `HostSet`.
-- [ ] T012 `CK/DaemonAPI+Control.swift`:
+- [x] T012 `CK/DaemonAPI+Control.swift`:
   - The method names `providers/list|add|update|remove|refresh`, `hosts/link|unlink|setWorkspaceOptions|start|stop`, and `control/providersChanged`.
   - The request structs.
   - `ControlHost.workspace` and `ControlHostChanged.workspace`.
   - The state doc comment lists the three new strings.
-- [ ] T013 Add `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI+Web.swift` rows for `hosts/start` and `hosts/stop` (`.controlRequest`). Run `scripts/web.sh types` and commit `Web/src/protocol/generated.ts`.
-- [ ] T014 `AK/MCP/MCPToolClient.swift`: a public façade over `MCPClient` with `init(server:cwd:log:)`, `connect()`, `listTools() -> [String]`, `callTool(_:arguments:timeout:) -> JSONValue` and `end()`.
+- [x] T013 Add `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI+Web.swift` rows for `hosts/start` and `hosts/stop` (`.controlRequest`). Run `scripts/web.sh types` and commit `Web/src/protocol/generated.ts`.
+- [x] T014 `AK/MCP/MCPToolClient.swift`: a public façade over `MCPClient` with `init(server:cwd:log:)`, `connect()`, `listTools() -> [String]`, `callTool(_:arguments:timeout:) -> JSONValue` and `end()`.
   - In `AK/MCP/MCPClient.swift`, `request` gains an optional per-call `timeout` that overrides the client's own.
   - Tests go in `Packages/AgentsKit/Tests/AgentsKitTests/MCPToolClientTests.swift`, against the existing stdio stand-in.
 
 ### Providers on the control plane
 
-- [ ] T015 [P] `CP/Providers/ProviderSecrets.swift`: read and write `<home>/provider-secrets.json` with mode 0600, created atomically. It has `set(provider:secrets:)`, `values(provider:)` and `remove(provider:)`.
+- [x] T015 [P] `CP/Providers/ProviderSecrets.swift`: read and write `<home>/provider-secrets.json` with mode 0600, created atomically. It has `set(provider:secrets:)`, `values(provider:)` and `remove(provider:)`.
   - The values have no `description`, and no `CustomStringConvertible` that shows them.
-- [ ] T016 [P] `CP/Providers/ToolMapping.swift`:
+- [x] T016 [P] `CP/Providers/ToolMapping.swift`:
   - Evaluate paths (`a.b[0]`, `items[]`) against `structuredContent`, or against the text content parsed as JSON.
   - Templates (`{path}`, `{id}`).
   - `check(map:tools:)` names the first missing tool.
   - `workspaces(from:map:)` drops items that have no id or name.
-- [ ] T017 `CP/Providers/ProviderConnection.swift`: one provider.
+- [x] T017 `CP/Providers/ProviderConnection.swift`: one provider.
   - It builds an `MCPServer` from the record: `commands` resolves `workspace-commands` beside `agents-control`, then `AGENTS_WORKSPACE_COMMANDS`, then `PATH` (R5), and passes `WORKSPACE_COMMANDS_CONFIG` plus the secrets as environment. `stdio` gets the secrets as env. `http` substitutes `${X}` in its headers.
   - `check()` follows R2: the required tools or the map, and `contract: 1`. The refusal text names what is missing.
   - `list()` has a 30 s timeout.
   - `start(id)`, `stop(id)`, `create`, `delete` and `options` have a 10 min timeout.
   - `isError` text is cut at 1 KB.
   - It reconnects once when the connection has died.
-- [ ] T018 `CP/Providers/WorkspaceProviders.swift`: an actor that holds the records (store `v1/providers/<id>.json`, with conditional writes as `ControlRecords` does) and a `ProviderConnection` per provider.
+- [x] T018 `CP/Providers/WorkspaceProviders.swift`: an actor that holds the records (store `v1/providers/<id>.json`, with conditional writes as `ControlRecords` does) and a `ProviderConnection` per provider.
   - It lists every provider when it starts, every 5 min, and on `refresh`, with one task per provider so a slow one never blocks another.
   - A failed list keeps the last one, with `current = false` and `problem` set.
   - Each change is broadcast as `control/providersChanged`.
   - It exposes `summaries()`, `add`, `update`, `remove`, `workspace(provider:id:)` and `linkedHost(provider:workspace:)`.
-- [ ] T019 [P] `CT/Support/ProviderStandIn.swift`: an in-process provider for control-plane tests.
+- [x] T019 [P] `CT/Support/ProviderStandIn.swift` (as built: `StandInProvider` in `CT/WorkspaceProvidersTests.swift`, behind the `WorkspaceProvider` protocol, plus a suite that runs the real binary when `AGENTS_WORKSPACE_COMMANDS` names it): an in-process provider for control-plane tests.
   - It is `MCPServerKit`-free JSON-RPC over a pipe pair, or the real `WorkspaceCommands.server` if CT may depend on MS. Decide in T019, and prefer the stand-in so ControlPlane doesn't depend on MCPServers.
   - It has scripted workspaces, states, failures and delays.
-- [ ] T020 `CT/WorkspaceProvidersTests.swift`:
+- [x] T020 `CT/WorkspaceProvidersTests.swift`:
   - add/check refusals: a missing tool named, a map naming a missing tool, an unknown contract version
   - list on refresh, and a list failure keeping the last list
   - secrets not in the store or in a `ProviderSummary`, and the file mode 0600
@@ -150,27 +150,27 @@ US2 comes before US1 because Start needs a link.
 
 **Independent test**: add the docker preset over the devbox container. It lists `agents-devbox`. Link it to `devbox`, or Add as Host.
 
-- [ ] T021 [US2] `CP/ControlMethods.swift`:
+- [x] T021 [US2] `CP/ControlMethods.swift`:
   - Answer `providers/list|add|update|remove|refresh` and `hosts/link|unlink|setWorkspaceOptions` through new `Hooks` (`providers`), and add them to `own` and `writes`.
   - `hosts/link` moves an existing link to the new host (one host per workspace), and saves through `ControlRecords.save`.
   - Removing a provider leaves hosts linked to a missing provider. `hostList()` drops such a link from the wire.
-- [ ] T022 [US2] `CP/ControlService.swift`: make `WorkspaceProviders` only when `mesh == nil`. Otherwise the methods answer `providersNeedOneCopy` (R4). Wire the hooks, start the lists, and write log lines of the form "provider: added …" (contracts/control-methods.md).
-- [ ] T023 [US2] `CP/ControlMethods.swift` `hostList()` and `ControlRouter.describe`: fill `ControlHost.workspace` from the link and the last list, as `HostWorkspace`, with `canStart` and `canStop` from the states. A linked offline host whose workspace is stopped reports `state: "stopped"`.
-- [ ] T024 [P] [US2] `CT/WorkspaceLinkTests.swift`:
+- [x] T022 [US2] `CP/ControlService.swift`: make `WorkspaceProviders` only when `mesh == nil`. Otherwise the methods answer `providersNeedOneCopy` (R4). Wire the hooks, start the lists, and write log lines of the form "provider: added …" (contracts/control-methods.md).
+- [x] T023 [US2] `CP/ControlMethods.swift` `hostList()` and `ControlRouter.describe`: fill `ControlHost.workspace` from the link and the last list, as `HostWorkspace`, with `canStart` and `canStop` from the states. A linked offline host whose workspace is stopped reports `state: "stopped"`.
+- [x] T024 [P] [US2] `CT/WorkspaceLinkTests.swift`:
   - link and unlink
   - a link moving to another host
   - a link surviving a restart (a new service on the same `MemoryStore`)
   - removing a provider leaving the host without `workspace`
   - a stopped workspace giving `state: "stopped"` in `hosts/list`
   - a mesh refusing
-- [ ] T025 [US2] 🖼 `App/Sources/Control/ControlSettingsModel.swift`: `providers`, `refreshProviders()`, `addProvider(...)`, `updateProvider`, `removeProvider`, `link(host:provider:workspace:)`, `unlink` and `setWorkspaceOptions`. Listen for `control/providersChanged`.
-- [ ] T026 [US2] 🖼 Add `ControlPage.providers` in `App/Sources/Control/ControlSettingsView.swift`, and make `App/Sources/Control/ControlProvidersPage.swift` per the chosen L3: a card per provider with its workspaces, Add as Host…, Refresh, and the `···` menu.
-- [ ] T027 [US2] 🖼 `App/Sources/Control/ControlAddProviderSheet.swift` per the chosen L4:
+- [x] T025 [US2] 🖼 `App/Sources/Control/ControlSettingsModel.swift`: `providers`, `refreshProviders()`, `addProvider(...)`, `updateProvider`, `removeProvider`, `link(host:provider:workspace:)`, `unlink` and `setWorkspaceOptions`. Listen for `control/providersChanged`.
+- [x] T026 [US2] 🖼 Add `ControlPage.providers` in `App/Sources/Control/ControlSettingsView.swift`, and make `App/Sources/Control/ControlProvidersPage.swift` per the chosen L3: a card per provider with its workspaces, Add as Host…, Refresh, and the `···` menu.
+- [x] T027 [US2] 🖼 `App/Sources/Control/ControlAddProviderSheet.swift` per the chosen L4:
   - Kind: Commands (preset or custom), MCP server command, or MCP server URL.
   - Tool map: shipped, or edited by hand.
   - Secrets are entered once and never shown again.
   - The refusal text shows inline.
-- [ ] T028 [US2] 🖼 `App/Sources/Control/ControlSettingsView.swift` `ControlHostsPage`, per the chosen L2/L5:
+- [x] T028 [US2] 🖼 `App/Sources/Control/ControlSettingsView.swift` `ControlHostsPage`, per the chosen L2/L5:
   - **Link to Workspace…** as a sheet (`App/Sources/Control/LinkWorkspaceSheet.swift`).
   - **Unlink**.
   - **Add as Host…** opens `ControlAddServerSheet` with its destination and tunnel filled in, and with `link` set so it calls `hosts/link` once the host joins.
@@ -186,16 +186,16 @@ US2 comes before US1 because Start needs a link.
 
 **Independent test**: quickstart §3 and §4.
 
-- [ ] T030 [US1] `CP/Providers/WorkspaceStarts.swift`: an actor with one task per workspace (R8). A second `start` joins the task in flight.
+- [x] T030 [US1] `CP/Providers/WorkspaceStarts.swift`: an actor with one task per workspace (R8). A second `start` joins the task in flight.
   - **Phases**: broadcast `.starting(.provider)`, then `workspace_start`, refresh the list, then `.starting(.connecting)` and wait for the host's attach.
   - **Tunnel**: open it at once when the host has one (`HostTunnels.add`/`reconcile`).
   - **ssh start**: if the host hasn't attached after 2 min and the workspace has `ssh`, broadcast `.starting(.sshStart)` and run `ServerInstaller.startDaemon` over `SSHCommand` with `HostInstall.options` (no reinstall, no sudo).
   - **Fail**: at 10 min, or on the provider's error, return to stopped or offline with `problem` set.
   - **Stop**: `stop` runs `.stopping`, then `workspace_stop`, then `.stopped(by: .person)`.
   - Time comes through an injected clock.
-- [ ] T031 [US1] `CP/ControlRouter.swift`: `attachHost` ends a start that is waiting on the host. `setState` takes the new states. `offlineUnlessBack` gives `.stopped` instead of `.offline` for a host whose linked workspace is listed stopped.
-- [ ] T032 [US1] `CP/ControlMethods.swift`: `hosts/start` and `hosts/stop` answer at once with the host's row. `notLinked` and `providerGone` are errors. Add them to `own` and `writes`. `CP/ControlService.swift` wires `WorkspaceStarts`, and logs per FR-060 (who asked: the client id).
-- [ ] T033 [P] [US1] `CT/WorkspaceStartsTests.swift`, with the stand-in and a fake clock:
+- [x] T031 [US1] `CP/ControlRouter.swift`: `attachHost` ends a start that is waiting on the host. `setState` takes the new states. `offlineUnlessBack` gives `.stopped` instead of `.offline` for a host whose linked workspace is listed stopped.
+- [x] T032 [US1] `CP/ControlMethods.swift`: `hosts/start` and `hosts/stop` answer at once with the host's row. `notLinked` and `providerGone` are errors. Add them to `own` and `writes`. `CP/ControlService.swift` wires `WorkspaceStarts`, and logs per FR-060 (who asked: the client id).
+- [x] T033 [P] [US1] `CT/WorkspaceStartsTests.swift`, with the stand-in and a fake clock:
   - start → connecting → attach → online
   - two starts make one provider call
   - a provider error shows its words and allows Start again
@@ -204,15 +204,15 @@ US2 comes before US1 because Start needs a link.
   - stop
   - a start for an unlinked host is refused
   - the log line has no secret
-- [ ] T034 [US1] 🖼 `Shared/UI/OfflineWords.swift`: the words for stopped, stopped by Agents, the three starting phases, and couldn't start, per the chosen L1.
-- [ ] T035 [US1] 🖼 Mac: `App/Sources/Chat/OfflineStrip.swift` and `App/Sources/Hosts/HostSet.swift`.
+- [x] T034 [US1] 🖼 `Shared/UI/OfflineWords.swift`: the words for stopped, stopped by Agents, the three starting phases, and couldn't start, per the chosen L1.
+- [x] T035 [US1] 🖼 Mac: `App/Sources/Chat/OfflineStrip.swift` and `App/Sources/Hosts/HostSet.swift`.
   - `HostSet` reads `ControlHost.workspace` and the new states from `syncControlHosts` and `control/hostChanged`.
   - The strip shows **Start**, the phase with a timer counting up, and the failure.
   - Add `AppModel.startHost(_:)` (`hosts/start`).
-- [ ] T036 [US1] 🖼 Mac Hosts row, per L2: the state line, then **Start** or **Stop**, then the `···` menu, in `App/Sources/Control/ControlSettingsView.swift`. Stop confirms when the host has running turns (the names come with US4; until then the refusal's list is empty).
-- [ ] T037 [P] [US1] 🖼 Remote: `Remote/Sources/Chat/HostOfflineStrip.swift` gets **Start** and the phase. `Remote/Sources/RemoteModel.swift` gets `startHost(_:)` and reads `workspace` from `hosts/list` and `control/hostChanged`.
-- [ ] T038 [P] [US1] 🖼 Web: `Web/src/views/OfflineStrip.tsx` gets **Start**, the phase and the failure (the same words as `OfflineWords`). `Web/src/model/store.ts` gets `startHost(host)` and keeps `workspace` from `takeHosts` and `control/hostChanged`. Add a test in `Web/src/views/OfflineStrip.test.tsx`.
-- [ ] T039 [US1] Walk quickstart §2–§5 on a scratch set-up (the `run-app` + `test-servers` skills), with a screenshot of each strip phase on the Mac and the web page.
+- [x] T036 [US1] 🖼 Mac Hosts row, per L2: the state line, then **Start** or **Stop**, then the `···` menu, in `App/Sources/Control/ControlSettingsView.swift`. Stop confirms when the host has running turns (the names come with US4; until then the refusal's list is empty).
+- [x] T037 [P] [US1] 🖼 Remote: `Remote/Sources/Chat/HostOfflineStrip.swift` gets **Start** and the phase. `Remote/Sources/RemoteModel.swift` gets `startHost(_:)` and reads `workspace` from `hosts/list` and `control/hostChanged`.
+- [x] T038 [P] [US1] 🖼 Web: `Web/src/views/OfflineStrip.tsx` gets **Start**, the phase and the failure (the same words as `OfflineWords`). `Web/src/model/store.ts` gets `startHost(host)` and keeps `workspace` from `takeHosts` and `control/hostChanged`. Add a test in `Web/src/views/OfflineStrip.test.tsx`.
+- [x] T039 [US1] Walk quickstart §2–§5 on a scratch set-up (the `run-app` + `test-servers` skills), with a screenshot of each strip phase on the Mac and the web page. (As walked: the control plane half live, by `Walk691LiveTests` on the devbox, in `walks/us1-us2.md`; the screens are left for a scratch window, `needs-walk`.)
 
 **Checkpoint**: the MVP. PR 2 lands with "Part of #691".
 
@@ -262,11 +262,11 @@ US2 comes before US1 because Start needs a link.
 
 ## Phase 9: Polish and cross-cutting
 
-- [ ] T057 [P] `docs/reference/workspace-providers.md`, from [contracts/provider-contract.md](contracts/provider-contract.md) and the first-boot install.
-- [ ] T058 [P] `docs/how-to/start-workspaces-from-agents.md`: add a provider, link a host, Start, Start when used, Stop when idle, with the command provider first.
-- [ ] T059 [P] `docs/how-to/add-a-workspace-provider.md`: a preset or your own commands, a map (the DigitalOcean example), and a server that follows the contract.
-- [ ] T060 [P] `docs/how-to/add-a-server.md` (adding from a provider's workspace) and `docs/explanation/control-plane.md` (providers run on the control plane; kept requests; the new host states).
-- [ ] T061 `specs/071-web-remote/walks/parity.md`: the rows in layouts.md L7, and row l.347 changed (the Remote and the page gain a **Start** button for a linked host).
+- [x] T057 [P] `docs/reference/workspace-providers.md`, from [contracts/provider-contract.md](contracts/provider-contract.md) and the first-boot install.
+- [x] T058 [P] `docs/how-to/start-workspaces-from-agents.md`: add a provider, link a host, Start, Start when used, Stop when idle, with the command provider first.
+- [x] T059 [P] `docs/how-to/add-a-workspace-provider.md`: a preset or your own commands, a map (the DigitalOcean example), and a server that follows the contract.
+- [x] T060 [P] `docs/how-to/add-a-server.md` (adding from a provider's workspace) and `docs/explanation/control-plane.md` (providers run on the control plane; kept requests; the new host states).
+- [x] T061 `specs/071-web-remote/walks/parity.md`: the rows in layouts.md L7, and row l.347 changed (the Remote and the page gain a **Start** button for a linked host).
 - [ ] T062 Search for secrets across the store, logs and wire in a walk (quickstart §5, SC-005).
 
 ---

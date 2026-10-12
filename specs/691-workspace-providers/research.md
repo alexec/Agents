@@ -147,6 +147,10 @@ and the variable lets walks use `swift build`'s output now.
   `hostIsOnline`. A new string therefore reads as "not online" on older clients, the same as
   today.
 
+**As built**: `HostState` gained no cases. The router keeps the `HostWorkspace` per host
+and lays its `hostState` over the state it describes (data-model.md), so no exhaustive switch
+across the clients had to change.
+
 ## R8. Starting
 
 **Decision**: The `WorkspaceStarts` actor keeps a task per workspace (US1 AS4: a second

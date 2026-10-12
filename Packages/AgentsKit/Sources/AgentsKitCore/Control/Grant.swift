@@ -185,6 +185,9 @@ public struct HostRecord: Codable, Hashable, Sendable, Identifiable {
     /// Set before #656 on a host that was to add the projects it found (#429). Never set
     /// now; one left over is cleared when that host next says hello, and it is not told.
     public var detectProjects: Bool?
+    /// The provider's workspace this host runs on, which the control plane can start and stop
+    /// (#691). Nil for a host nothing can start.
+    public var workspace: WorkspaceLink?
 
     public init(id: HostID, name: String, publicKey: Data? = nil, reach: HostReach = .dialOut,
                 platform: String = "", version: String = "", installed: Bool = false,
