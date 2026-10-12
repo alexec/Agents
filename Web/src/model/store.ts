@@ -9,7 +9,7 @@ import type {
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, DiskState, StoreNotes,
   ChatProjectState, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
-  GuardedChange, GuardedChangeReading,
+  GuardedChange, GuardedChangeReading, HostJoinStatus,
 } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -17,6 +17,7 @@ import type { FolderGoneAsk } from "./missingFolder";
 import { describe, methodNotFound } from "./errors";
 import { log } from "../log";
 import { folderKey, projectFolder, projectView, type ProjectView } from "./groups";
+import { decideMacHostNotice, type MacHostNotice } from "./macHostNotice";
 import { DisplayBuilder, keepingTurns, storedTurn, turns, type ChatTurn, type Item } from "./turns";
 import { sortedRuntimes } from "./runtimes";
 import { blockLines, openBlock } from "./block";
@@ -311,6 +312,15 @@ export class Work {
   readonly disk = signal<Record<string, DiskState>>({});
   /** Each host's files it could not read in this run (#205, #223), replaced whole by each store/notesChanged. */
   readonly storeNotes = signal<Record<string, string[]>>({});
+  /** The control plane's machine, and how this Mac's host says its join stands (#666), from `control/status`. */
+  readonly plane = signal<{ machineID: string; thisMacHost?: HostJoinStatus | undefined } | null>(null);
+  /** Why this Mac's host is quiet, as the window says it (#666), or nil while it is online. */
+  readonly macHostNotice: ReadonlySignal<MacHostNotice | null> = computed(() => {
+    const plane = this.plane.value;
+    const mac = this.hosts.value.find((h) => h.id === "mac");
+    const onThisMac = !!plane?.machineID && plane.machineID === mac?.machineID;
+    return decideMacHostNotice(onThisMac, mac?.state, plane?.thisMacHost);
+  });
   /** The mode last chosen for each runtime, by host (029). */
   readonly rememberedModes = signal<Record<string, Record<string, JSONValue>>>({});
 
@@ -878,6 +888,11 @@ export class Store extends Work {
         this.hostChanged(params);
         return;
       }
+      if (method === "control/thisMacHostChanged") {
+        const plane = this.plane.value;
+        if (plane) this.plane.value = { ...plane, thisMacHost: (params as HostJoinStatus | null) ?? undefined };
+        return;
+      }
       if (host) this.apply(method, params, host);
     });
     link.onState((state) => {
@@ -903,7 +918,7 @@ export class Store extends Work {
    */
   load(): Promise<void> {
     return this.once("*", async () => {
-      const hosts = await this.link.call("hosts/list", {});
+      const [hosts] = await Promise.all([this.link.call("hosts/list", {}), this.loadPlane()]);
       this.takeHosts(hosts);
       await Promise.all(this.hosts.value.filter((host) => host.state === "online").map((host) => this.onHost(host.id, async () => {
         // A removal that landed while this waited is not loaded back (#291).
@@ -913,6 +928,12 @@ export class Store extends Work {
       const watching = this.watching.value;
       if (watching) await this.loadTranscript(watching.host, watching.session);
     });
+  }
+
+  /** The control plane's status, for this Mac's host notice; a plane that can't say leaves it as it was. */
+  private async loadPlane(): Promise<void> {
+    const status = await this.link.call("control/status", {}).catch(() => null);
+    if (status) this.plane.value = { machineID: status.machineID, thisMacHost: status.thisMacHost };
   }
 
   /** One load of a host at a time: `load` and `reloadHost` queue here rather than running together (#291). */
