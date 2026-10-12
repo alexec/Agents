@@ -1132,4 +1132,5 @@ button.plain:hover { opacity: 1; }
 .usage-hit { fill: transparent; cursor: pointer; }
 .usage-grid { stroke: var(--paper-rule); stroke-width: 1; }
 .usage-average { stroke: currentColor; opacity: 0.5; stroke-width: 1; stroke-dasharray: 4 3; }
+.usage-share { display: flex; justify-content: space-between; gap: 24px; margin: 4px 0; font-variant-numeric: tabular-nums; }
 .usage-axis { fill: currentColor; opacity: 0.6; font-size: 11px; font-variant-numeric: tabular-nums; }

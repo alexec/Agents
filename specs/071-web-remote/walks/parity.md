@@ -29,7 +29,7 @@ Of 217 rows: **145 same**, **45 by design**, **27 delta** (after #188, #189, #19
 | Pins | 4 | 1 | 0 |
 | Workflows page | 15 | 1 | 2 |
 | Settings and Project Settings | 1 | 8 | 0 |
-| Pool, runtimes and spending | 7 | 1 | 2 |
+| Pool, runtimes and spending | 8 | 1 | 2 |
 | Events and resources | 2 | 1 | 2 |
 | Notifications and badges | 3 | 1 | 0 |
 | Disk strip | 2 | 1 | 0 |
@@ -310,6 +310,7 @@ The deltas are tracked by 29 issues:
 | *working/total* in Activity, red dot only when none work (#379) | `RuntimeTally` over this Mac's runtimes: `A/Runtimes/RuntimesView.swift` (`RuntimesRow`) | `RuntimeTally` over the Mac's runtimes: `R/Sidebar/RemoteSidebar.swift` (`RuntimesRow`) | `runtimeTally` over every host's runtimes, as its page lists them: `W/model/runtimes.ts`, `W/views/Activity.tsx` | **same** |
 | Assess a runtime (#47) | Settings ▸ Agent Runtimes | *Assess in…* | None | **by design** (#47) |
 | Cost (was *Spending*, #380): the page, menu item and Settings tab are called *Cost*; all time, project shares | `A/Spending/SpendingView.swift:31-39` | `R/Projects/TotalsView.swift:31-42` | All time, project shares, unmeasured floor and today's host totals: `W/views/Activity.tsx` | **same** |
+| Usage charts on Cost (#823): D / W / M / 3M bars of cost or tokens, the daily average and a picked bar's figure, each runtime's share, cache reads and unpriced turns said beside them; This Mac's history (`usage/history`), bars worked out in `K/Model/UsageChart.swift` | `S/UsageCharts.swift` in `A/Spending/SpendingView.swift` | The same view, in `R/Projects/TotalsView.swift` | The same bars from `W/model/usage.ts`, drawn in `W/views/UsageCharts.tsx` on `W/views/Activity.tsx`; This Mac's, or the first host's with no Mac | **same**; walked on a scratch root 2026-10-12 (window W and 3M; page W and 3M, same figures) |
 | Today's cost, in Activity: the row reads *Cost* (was *Today* / *Spending*, #380) | This Mac and every server: `A/Projects/ProjectListView.swift:719-722` | This Mac only: `R/Projects/ProjectListView.swift:189-191` | Every host: `W/views/Activity.tsx:26-32` | **delta**: Remote #248 |
 | Close to full | 0.85: `K/Model/Usage.swift:35` | The same | 0.85: `W/views/Activity.tsx` | **same** |
 | Daily limit read-outs | Settings ▸ Limits: `A/Settings/CostSettingsView.swift` | *Today X of limit*, *limit reached*; no per-agent line: `R/Projects/TotalsView.swift:96-121` | Daily and per-agent; *Nothing new will start until tomorrow*: `W/views/Activity.tsx` | **delta**: Remote #248. The setting: **by design** |

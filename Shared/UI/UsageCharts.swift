@@ -94,7 +94,9 @@ private struct UsageChartBody: View {
         }
         guard let first = chart.bars.first?.start, let last = chart.bars.last?.start else { return "" }
         if chart.range == .day { return "Today" }
-        return (first ..< last.addingTimeInterval(1)).formatted(.interval.day().month().year())
+        // 3M's last bar is a week that ends today, not on the day it starts.
+        let end = chart.range == .threeMonths ? Calendar.current.date(byAdding: .day, value: 6, to: last) ?? last : last
+        return (first ..< end.addingTimeInterval(1)).formatted(.interval.day().month().year())
     }
 
     private var unit: Calendar.Component {

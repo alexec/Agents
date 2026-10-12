@@ -73,7 +73,7 @@ export function UsageCharts({ history, runtimeName }: { history: UsageHistory | 
             )}
           </svg>
           {chart.shares.map((share) => (
-            <p key={share.runtime}>{name(share.runtime)}<span class="detail">{usageWords(chart, share.value)}</span></p>
+            <p key={share.runtime} class="usage-share"><span>{name(share.runtime)}</span><span>{usageWords(chart, share.value)}</span></p>
           ))}
         </>
       )}
@@ -114,8 +114,10 @@ function when(range: UsageRange, bars: UsageBar[], bar: UsageBar | null): string
   }
   if (range === "D") return "Today";
   const first = bars[0]?.start;
-  const last = bars[bars.length - 1]?.start;
-  if (!first || !last) return "";
+  const lastStart = bars[bars.length - 1]?.start;
+  if (!first || !lastStart) return "";
+  // 3M's last bar is a week that ends today, not on the day it starts.
+  const last = range === "3M" ? new Date(lastStart.getFullYear(), lastStart.getMonth(), lastStart.getDate() + 6) : lastStart;
   const f = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric" });
   return f.formatRange(first, last);
 }
