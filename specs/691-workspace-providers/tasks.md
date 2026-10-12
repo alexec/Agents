@@ -174,7 +174,7 @@ US2 comes before US1 because Start needs a link.
   - **Link to Workspace…** as a sheet (`App/Sources/Control/LinkWorkspaceSheet.swift`).
   - **Unlink**.
   - **Add as Host…** opens `ControlAddServerSheet` with its destination and tunnel filled in, and with `link` set so it calls `hosts/link` once the host joins.
-- [ ] T029 [P] [US2] Ship the DigitalOcean tool map (FR-072) in `CK/ShippedToolMaps.swift`, once its server's tool names have been checked (`npx @digitalocean/mcp` `tools/list` without a token). If it has no power on/off, ship no map, and make `doctl` the DigitalOcean example in the docs. Test that the map passes `ToolMapping.check` against the recorded tool list.
+- [x] T029 [P] [US2] Ship the DigitalOcean tool map (FR-072) in `CK/ShippedToolMaps.swift`, once its server's tool names have been checked (`npx @digitalocean/mcp` `tools/list` without a token). If it has no power on/off, ship no map, and make `doctl` the DigitalOcean example in the docs. Test that the map passes `ToolMapping.check` against the recorded tool list.
 
 **Checkpoint**: a provider can be added on the Mac and its workspace linked.
 
