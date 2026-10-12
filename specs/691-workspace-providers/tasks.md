@@ -222,17 +222,17 @@ US2 comes before US1 because Start needs a link.
 
 **Goal**: a prompt or an agent start for a stopped host is kept, starts it, and is delivered once it is up.
 
-- [ ] T040 [US3] Confirm the method names that are kept (the prompt send and the agent starts) and their idempotence keys, in `CK/DaemonAPI.swift`. Record them in research.md R9.
-- [ ] T041 [US3] `CP/Providers/KeptRequests.swift`: store `v1/kept/<host>/<seq>.json` ("at most 20 per host"; past that, refused with "‹host› is starting; too many prompts are waiting"), with `keep`, `drop`, `pending(host)` and `deliver`.
-- [ ] T042 [US3] `CP/ControlRouter.swift`: for a host that is stopped or starting, with `startWhenUsed`, peek at the method of a client line. Keep a kept method, answer `{kept}`, and start the workspace. Refuse everything else as today, with the stopped wording (FR-022). On attach, open a `.kept` channel and replay in order.
-- [ ] T043 [US3] `hosts/dropKept` and `control/keptChanged`. A failed start marks the kept requests as not sent, with the reason.
-- [ ] T044 [P] [US3] `CT/KeptRequestsTests.swift`:
+- [x] T040 [US3] Confirm the method names that are kept (the prompt send and the agent starts) and their idempotence keys, in `CK/DaemonAPI.swift`. Record them in research.md R9.
+- [x] T041 [US3] `CP/Providers/KeptRequests.swift`: store `v1/kept/<host>/<seq>.json` ("at most 20 per host"; past that, refused with "‹host› is starting; too many prompts are waiting"), with `keep`, `drop`, `pending(host)` and `deliver`.
+- [x] T042 [US3] `CP/ControlRouter.swift`: for a host that is stopped or starting, with `startWhenUsed`, peek at the method of a client line. Keep a kept method, answer `{kept}`, and start the workspace. Refuse everything else as today, with the stopped wording (FR-022). On attach, open a `.kept` channel and replay in order.
+- [x] T043 [US3] `hosts/dropKept` and `control/keptChanged`. A failed start marks the kept requests as not sent, with the reason.
+- [x] T044 [P] [US3] `CT/KeptRequestsTests.swift`:
   - a kept send is delivered once after attach, and survives a restart
   - × drops it
   - the limit of 20
   - a read never starts the host
   - with start when used off, a request is refused
-- [ ] T045 [US3] 🖼 Clients (L6): a kept prompt as a queued bubble with "Waiting for ‹host› to start" and ×, in `Shared/UI` (Mac + Remote) and `Web/src/views/Chat.tsx`. A failed send shows Try Again.
+- [x] T045 [US3] 🖼 Clients (L6): a kept prompt as a queued bubble with "Waiting for ‹host› to start" and ×, in `Shared/UI` (Mac + Remote) and `Web/src/views/Chat.tsx`. A failed send shows Try Again.
 
 ## Phase 6: User Story 4 – Stop a workspace when idle (P2)
 

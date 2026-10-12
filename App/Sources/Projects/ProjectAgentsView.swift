@@ -51,6 +51,19 @@ struct ProjectAgentsView: View {
             Spacer(minLength: 24)
             heading
             Spacer(minLength: 24)
+            // Starts kept for this project's stopped workspace (#691 US3, layouts.md L6a):
+            // the agent each makes opens once the host is up.
+            if let summary, case let starts = model.keptStarts(on: summary.host, in: summary.key.folder), !starts.isEmpty {
+                VStack(spacing: 10) {
+                    ForEach(starts) { KeptPromptRow(kept: $0) }
+                }
+                .chatColumn()
+                .padding(.bottom, 12)
+                .environment(\.chatActions, ChatActions(
+                    dropKept: { [model] in await model.dropKept($0) },
+                    retryKept: { [model] in await model.retryKept($0) },
+                    hostName: { [model] in model.hosts.label($0) }))
+            }
             // Its own margins, the same as in a chat. The folder is this project's and
             // not the bar's to change.
             PromptBar(folderIsFixed: true)

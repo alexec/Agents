@@ -928,7 +928,8 @@ struct PromptBar: View {
     /// prompt is showing.
     /// The machine this prompt would go to (037).
     private var targetHost: HostID { agent?.host ?? model.selectedProjectHost }
-    private var targetOffline: Bool { model.hosts.isOffline(targetHost) }
+    /// Offline, and not a stopped workspace that keeps what is sent until it is up (#691 US3).
+    private var targetOffline: Bool { model.hosts.isOffline(targetHost) && !model.startsWhenUsed(targetHost) }
 
     /// Who the prompt goes to, as the pending mark says it.
     private var recipient: String {

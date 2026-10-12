@@ -661,6 +661,10 @@ final class AppModel {
     @ObservationIgnored private var controlRequests: DaemonClient?
     /// Hosts whose Start was pressed here and not answered yet.
     private(set) var hostsBeingStarted: Set<HostID> = []
+    /// Prompts and starts the control plane keeps for stopped workspaces (#691 US3), every host's.
+    var kept: [DaemonAPI.KeptRequest] = []
+    /// The kept starts the New Agent prompt has shown here: the one that reaches its host opens.
+    @ObservationIgnored var keptStartsShown: Set<UUID> = []
     @ObservationIgnored private var controlWatch: Task<Void, Never>?
     /// Every host the control plane last listed, this Mac's included. Nil when the
     /// window is not its client; empty until the first list arrives (058, R11).
@@ -2523,8 +2527,11 @@ final class AppModel {
                     backoff.connected()
                     self?.controlPlaneDidAnswer()
                     await self?.syncControlHosts(control)
+                    await self?.loadKept(control)
                     for await note in control.notifications() {
                         switch note.method {
+                        case DaemonAPI.Notification.controlKeptChanged, DaemonAPI.Notification.controlKeptDelivered:
+                            await self?.heardKept(note.method, note.params)
                         case DaemonAPI.Notification.controlHostChanged:
                             self?.hostCameOnline(note.params)
                             await self?.syncControlHosts(control)
@@ -2585,6 +2592,97 @@ final class AppModel {
             problem = HostProblem.controlRefusal(error)
         } catch {
             problem = "The control plane can’t be reached, so \(hosts.label(host)) can’t be started."
+        }
+    }
+
+    // MARK: Kept for a stopped workspace (#691 US3)
+
+    /// Whether a prompt or a start for `host` now is kept rather than refused: it is linked
+    /// to a workspace that is stopped or starting, and starts when used (FR-020).
+    func startsWhenUsed(_ host: HostID) -> Bool {
+        guard let row = hosts.controlRows[host], row.workspace?.startWhenUsed == true else { return false }
+        return row.state == "stopped" || row.state == "starting"
+    }
+
+    /// The prompts kept for one agent, oldest first.
+    func kept(for agentID: UUID) -> [DaemonAPI.KeptRequest] {
+        kept.filter { !$0.isStart && $0.agentID == agentID }
+    }
+
+    /// The agent starts kept for one project.
+    func keptStarts(on host: HostID, in folder: URL) -> [DaemonAPI.KeptRequest] {
+        let folder = Project.standardize(folder)
+        return kept.filter { $0.isStart && $0.host == host && $0.folder.map(Project.standardize) == folder }
+    }
+
+    /// A kept request, as the control plane said it when it answered: shown at once,
+    /// before `control/keptChanged` comes.
+    @discardableResult
+    func noteKept(_ error: JSONRPCError) -> DaemonAPI.KeptRequest? {
+        guard let said = try? error.data?.decode(DaemonAPI.KeptRequest.self) else { return nil }
+        if !kept.contains(where: { $0.id == said.id }) { kept.append(said) }
+        return said
+    }
+
+    /// Sends a prompt or a start for a host whose link is closed while it is stopped, to the
+    /// control plane, which keeps it. What was kept, or nil with `problem` saying why not.
+    private func keepThroughControl(_ host: HostID, _ method: String, _ params: some Encodable) async -> DaemonAPI.KeptRequest? {
+        guard let controlRequests, let params = try? JSONValue.encoding(params) else {
+            problem = "Not sent — the control plane can’t be reached."
+            return nil
+        }
+        do {
+            _ = try await controlRequests.call(DaemonAPI.Method.hostsKeep,
+                                               DaemonAPI.KeepRequest(host: host, method: method, params: params))
+            return nil
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.kept {
+            return noteKept(error)
+        } catch let error as JSONRPCError {
+            problem = error.message
+            return nil
+        } catch {
+            problem = "Not sent — the control plane can’t be reached."
+            return nil
+        }
+    }
+
+    private func loadKept(_ control: DaemonClient) async {
+        // A control plane without providers keeps nothing.
+        kept = (try? await control.call(DaemonAPI.Method.hostsListKept, returning: DaemonAPI.KeptList.self))?.kept ?? []
+    }
+
+    private func heardKept(_ method: String, _ params: JSONValue?) async {
+        if method == DaemonAPI.Notification.controlKeptChanged {
+            kept = (try? params?.decode(DaemonAPI.KeptList.self))?.kept ?? []
+            return
+        }
+        // A kept start reached its host: the agent it made opens, if this window showed it.
+        guard let delivered = try? params?.decode(DaemonAPI.KeptDelivered.self),
+              keptStartsShown.remove(delivered.id) != nil, let agentID = delivered.agentID else { return }
+        await refreshServer(delivered.host)
+        justStarted = agentID
+        selection = agentID
+    }
+
+    /// × on a kept prompt: it isn't sent, and the workspace keeps starting (US3 AS3).
+    func dropKept(_ request: DaemonAPI.KeptRequest) async {
+        kept.removeAll { $0.id == request.id }
+        await keptCall(DaemonAPI.Method.hostsDropKept, request)
+    }
+
+    /// Try Again on one that wasn't sent: kept again, and the workspace started.
+    func retryKept(_ request: DaemonAPI.KeptRequest) async {
+        await keptCall(DaemonAPI.Method.hostsRetryKept, request)
+    }
+
+    private func keptCall(_ method: String, _ request: DaemonAPI.KeptRequest) async {
+        guard let controlRequests else { return }
+        do {
+            _ = try await controlRequests.call(method, DaemonAPI.KeptRequestID(host: request.host, id: request.id))
+        } catch let error as JSONRPCError {
+            problem = HostProblem.controlRefusal(error)
+        } catch {
+            problem = "The control plane can’t be reached."
         }
     }
 
@@ -3705,6 +3803,15 @@ final class AppModel {
                                              mcpServers: draftServers,
                                              worktree: draftWorktree,
                                              sandbox: draftSandbox, labels: labels, persona: draftPersona)
+        // A stopped workspace that starts when used: kept, and shown under this prompt (#691 US3).
+        if selectedProjectHost != .mac, hosts.isOffline(selectedProjectHost), startsWhenUsed(selectedProjectHost) {
+            var kept = request
+            kept.draftID = nil
+            kept.requestID = UUID()
+            guard let said = await keepThroughControl(selectedProjectHost, DaemonAPI.Method.agentsStart, kept) else { return false }
+            keptStartsShown.insert(said.id)
+            return true
+        }
         do {
             let id = try await selectedHostClient.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
             draftID = nil
@@ -3724,6 +3831,12 @@ final class AppModel {
             selection = id
             draftSandboxRefusal = nil
             return true
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.kept {
+            // Kept until its stopped workspace is up (#691 US3): shown under this prompt, and
+            // the agent it makes opens once the host is up.
+            if let kept = noteKept(error) { keptStartsShown.insert(kept.id) }
+            draftID = nil
+            return true
         } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.sandboxWillNotStart {
             // Said over the prompt, which keeps what was typed, with the way on (064).
             draftSandboxRefusal = try? error.data?.decode(DaemonAPI.SandboxWillNotStart.self)
@@ -3742,6 +3855,15 @@ final class AppModel {
     func send(_ text: String, attachments: [Attachment] = []) async -> Bool {
         guard let selection, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         let host = host(ofAgent: selection)
+        // A stopped workspace that starts when used: kept by the control plane (#691 US3).
+        if host != .mac, hosts.isOffline(host), startsWhenUsed(host) {
+            guard attachments.isEmpty else {
+                problem = "Attachments can’t wait for \(hosts.label(host)) to start. Send the words alone, or start it first."
+                return false
+            }
+            return await keepThroughControl(host, DaemonAPI.Method.agentsPrompt,
+                                            DaemonAPI.PromptRequest(agentID: selection, text: text, sendID: UUID())) != nil
+        }
         if host != .mac {
             guard let carried = await carry(attachments, to: host, for: selection) else { return false }
             let sendID = UUID()
@@ -4390,6 +4512,10 @@ final class AppModel {
         while true {
             do {
                 try await work(client(for: host))
+                return true
+            } catch let refused as JSONRPCError where refused.code == DaemonAPI.Failure.kept {
+                // Kept for a stopped workspace (#691 US3): its bubble says so; it goes when the host is up.
+                noteKept(refused)
                 return true
             } catch let refused as JSONRPCError {
                 fail(refused, on: host)

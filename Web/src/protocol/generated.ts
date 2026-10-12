@@ -34,6 +34,7 @@ export const Failure = {
   folderInTheWay: -32025,
   hostOffline: -32090,
   importedAgent: -32096,
+  kept: -32067,
   lastOperator: -32092,
   leaseRefused: -32035,
   needsSignIn: -32007,
@@ -975,6 +976,33 @@ export interface HostedMCPStatus {
   lastError?: string;
   restarts: number;
   users: number;
+}
+
+export interface KeptDelivered {
+  host: HostID;
+  id: UUID;
+  agentID?: UUID;
+}
+
+export interface KeptList {
+  kept: KeptRequest[];
+}
+
+export interface KeptRequest {
+  id: UUID;
+  host: HostID;
+  kind: string;
+  agentID?: UUID;
+  text: string;
+  folder?: URLString;
+  runtimeID?: string;
+  at: WireDate;
+  failed?: string;
+}
+
+export interface KeptRequestID {
+  host: HostID;
+  id: UUID;
 }
 
 export interface LabelVocabularyRequest {
@@ -2129,7 +2157,10 @@ export interface Methods {
   "files/read": { params: FilesReadRequest; result: FileReading };
   "files/unwatch": { params: FilesWatchRequest; result: Empty };
   "files/watch": { params: FilesWatchRequest; result: Empty };
+  "hosts/dropKept": { params: KeptRequestID; result: Empty };
   "hosts/list": { params: Empty; result: ControlHost[] };
+  "hosts/listKept": { params: Empty; result: KeptList };
+  "hosts/retryKept": { params: KeptRequestID; result: Empty };
   "hosts/start": { params: HostRequest; result: ControlHost };
   "hosts/stop": { params: HostStop; result: ControlHost };
   "leases/snapshot": { params: Empty; result: LeaseSnapshot };
@@ -2239,7 +2270,10 @@ export const MethodTarget = {
   "files/read": "host",
   "files/unwatch": "host",
   "files/watch": "host",
+  "hosts/dropKept": "control",
   "hosts/list": "control",
+  "hosts/listKept": "control",
+  "hosts/retryKept": "control",
   "hosts/start": "control",
   "hosts/stop": "control",
   "leases/snapshot": "host",
@@ -2311,6 +2345,8 @@ export interface Notifications {
   "attention/changed": AttentionNotification;
   "clone/changed": CloneNotification;
   "control/hostChanged": JSONValue;
+  "control/keptChanged": KeptList;
+  "control/keptDelivered": KeptDelivered;
   "disk/changed": DiskState;
   "files/changed": FilesChangedNotification;
   "leases/changed": LeaseSnapshot;
@@ -2423,6 +2459,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HostWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost"] },
   HostedMCPSnapshot: { required: ["servers", "at"], optional: [] },
   HostedMCPStatus: { required: ["name", "state", "restarts", "users"], optional: ["project", "since", "retryAt", "lastError"] },
+  KeptDelivered: { required: ["host", "id"], optional: ["agentID"] },
+  KeptList: { required: ["kept"], optional: [] },
+  KeptRequest: { required: ["id", "host", "kind", "text", "at"], optional: ["agentID", "folder", "runtimeID", "failed"] },
+  KeptRequestID: { required: ["host", "id"], optional: [] },
   LabelVocabularyRequest: { required: ["folder"], optional: [] },
   Lease: { required: ["resource", "displayName", "holder", "grantedAt", "expiresAt", "warned"], optional: [] },
   LeaseSnapshot: { required: ["resources", "at"], optional: [] },

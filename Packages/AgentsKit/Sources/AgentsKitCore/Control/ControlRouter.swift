@@ -58,6 +58,8 @@ public actor ControlRouter {
         case peer(String, Int)
         /// The other end of a tunnel between two hosts (T091): that host's channel.
         case tunnel(HostID, Int)
+        /// A kept request being delivered (#691 US3), waiting on its reply.
+        case kept(UUID)
     }
 
     private struct HostSession {
@@ -86,6 +88,12 @@ public actor ControlRouter {
     /// A linked host's workspace (#691), laid over its state: a host whose workspace is
     /// stopped is shown stopped, not offline.
     private var workspaces: [HostID: DaemonAPI.HostWorkspace] = [:]
+    /// Keeps a prompt or agent start for a stopped host (#691 US3); nil where nothing is kept.
+    private var keeper: (any KeptHandling)?
+    /// The last keep asked for, so kept requests are stored in the order they came.
+    private var keeping: Task<Void, Never>?
+    /// Kept requests on their way to a host, by their delivery, until it answers.
+    private var keptWaits: [UUID: CheckedContinuation<JSONRPCMessage?, Never>] = [:]
     /// Where each session last said the person was, keyed by the session, or by the client for
     /// a report made at another copy. Folded per surface, so a client with two sockets (two tabs
     /// of one browser, 071 R11) is active while either is: one record per client let the last
@@ -234,6 +242,7 @@ public actor ControlRouter {
         hosts[host] = HostSession(transport: transport, generation: generation, local: local)
         setState(.online, of: host)
         for session in clients.keys { openChannel(for: session, to: host) }
+        if local, let keeper { Task { await keeper.attached(host) } }
         Task { [weak self] in
             do {
                 for try await line in transport.lines() { await self?.hostLine(line, from: host) }
@@ -404,6 +413,9 @@ public actor ControlRouter {
             case .tunnel(let other, let theirs):
                 hosts[other]?.channels[theirs] = nil
                 try? hosts[other]?.transport.write(line: ControlWire.close(theirs))
+            // Not answered: it stays kept for the next time the host is up.
+            case .kept(let delivery):
+                keptWaits.removeValue(forKey: delivery)?.resume(returning: nil)
             }
         }
         if let newState { setState(newState, of: host) }
@@ -527,6 +539,15 @@ public actor ControlRouter {
                 if case .tunnel(let other, let theirs) = target {
                     try? hosts[other]?.transport.write(line: ControlWire.channel(theirs, message: message))
                 }
+                // A kept request's reply ends its channel; anything else said there is not for anyone.
+                if case .kept(let delivery) = target, let reply = try? JSONRPCCodec.decode(line: message) {
+                    switch reply {
+                    case .success, .failure:
+                        endKept(delivery, channel: channel, on: host, reply: reply)
+                    case .request, .notification:
+                        break
+                    }
+                }
                 return
             }
             guard let session = clients[sessionID] else { return }
@@ -552,6 +573,8 @@ public actor ControlRouter {
             case .tunnel(let other, let theirs):
                 hosts[other]?.channels[theirs] = nil
                 try? hosts[other]?.transport.write(line: ControlWire.close(theirs))
+            case .kept(let delivery):
+                keptWaits.removeValue(forKey: delivery)?.resume(returning: nil)
             }
         case .fanOut(let channels, let message):
             fanOut(message, to: channels, from: host)
@@ -581,7 +604,7 @@ public actor ControlRouter {
             case .peer(let peer, let theirs)?:
                 // Channel by channel, which a copy of any age reads.
                 peers[peer]?(PeerWire.frame(host, ControlWire.channel(theirs, message: message)))
-            case .tunnel?, nil:
+            case .tunnel?, .kept?, nil:
                 continue
             }
         }
@@ -753,8 +776,18 @@ public actor ControlRouter {
                              error: JSONRPCError(code: DaemonAPI.Failure.noSuchHost, message: "No host is called \(host.rawValue)."))
             }
             guard let channel = session.channels[host], let uplink = hosts[host] else {
-                return reply(to: sessionID, host: host, id: id, wrapped: wrapped,
-                             error: JSONRPCError(code: DaemonAPI.Failure.hostOffline, message: "That host is offline."))
+                // A prompt or a start for a stopped workspace may be kept, and start it (#691 US3).
+                if let keeper, DaemonAPI.Method.keptMethods.contains(method) {
+                    let caller = session.caller, before = keeping
+                    let refusal = offlineRefusal(host)
+                    keeping = Task { [weak self] in
+                        await before?.value
+                        let answer = await keeper.keep(host: host, method: method, params: params, from: caller)
+                        await self?.reply(to: sessionID, host: host, id: id, wrapped: wrapped, error: answer ?? refusal)
+                    }
+                    return
+                }
+                return reply(to: sessionID, host: host, id: id, wrapped: wrapped, error: offlineRefusal(host))
             }
             // An uplink that has ended but is not yet dropped takes nothing: said, not lost (#62).
             do {
@@ -807,6 +840,56 @@ public actor ControlRouter {
         let failure = JSONRPCError(code: JSONRPCError.parseError, message: "The control plane could not read that message.")
         guard let reply = try? JSONRPCCodec.encode(.failure(id: nil, error: failure)) else { return }
         write(wrapped ? ControlWire.wrap(host: host, message: reply) : reply, to: sessionID)
+    }
+
+    /// What a request for a host that isn't up is answered with: a host whose workspace is
+    /// stopped says so, and that it can be started (FR-022).
+    private func offlineRefusal(_ host: HostID) -> JSONRPCError {
+        if workspaces[host]?.hostState == "stopped" {
+            return JSONRPCError(code: DaemonAPI.Failure.hostOffline,
+                                message: "That host is stopped. Start it to reach it.")
+        }
+        return JSONRPCError(code: DaemonAPI.Failure.hostOffline, message: "That host is offline.")
+    }
+
+    // MARK: Kept requests (#691 US3)
+
+    public func setKeeper(_ keeper: (any KeptHandling)?) { self.keeper = keeper }
+
+    /// Sends a kept request to a host on a channel of its own, bound to the client that
+    /// asked, and waits for its reply. Nil when the host isn't here, goes before it answers,
+    /// or takes longer than `patience`: the request stays kept.
+    public func deliverKept(_ method: String, params: JSONValue?, as client: UUID, kind: ClientRecord.Kind,
+                            to host: HostID, patience: Duration = .seconds(60)) async -> JSONRPCMessage? {
+        guard relays[host] == nil, var session = hosts[host] else { return nil }
+        let delivery = UUID()
+        let channel = session.nextChannel
+        session.nextChannel += 1
+        session.channels[channel] = .kept(delivery)
+        hosts[host] = session
+        let open = ControlWire.ChannelOpen(client: client.uuidString, device: kind == .mac ? nil : client)
+        let request = JSONRPCMessage.request(id: .string("kept-\(delivery.uuidString)"), method: method, params: params)
+        guard let line = try? JSONRPCCodec.encode(request),
+              (try? session.transport.write(line: ControlWire.open(channel, open))) != nil,
+              (try? session.transport.write(line: ControlWire.channel(channel, message: line))) != nil else {
+            hosts[host]?.channels[channel] = nil
+            return nil
+        }
+        let timeout = Task { [weak self] in
+            try? await Task.sleep(for: patience)
+            await self?.endKept(delivery, channel: channel, on: host, reply: nil)
+        }
+        let reply = await withCheckedContinuation { keptWaits[delivery] = $0 }
+        timeout.cancel()
+        return reply
+    }
+
+    private func endKept(_ delivery: UUID, channel: Int, on host: HostID, reply: JSONRPCMessage?) {
+        guard let waiting = keptWaits.removeValue(forKey: delivery) else { return }
+        if hosts[host]?.channels.removeValue(forKey: channel) != nil {
+            try? hosts[host]?.transport.write(line: ControlWire.close(channel))
+        }
+        waiting.resume(returning: reply)
     }
 
     private func reply(to sessionID: UUID, host: HostID?, id: JSONRPCID, wrapped: Bool, error: JSONRPCError) {

@@ -336,7 +336,11 @@ struct RemoteChatView: View {
             reloadTranscript: { [model] in await model.loadTranscript() },
             continueWithoutSandbox: sandboxAnswer(carryOn: true),
             keepStopped: sandboxAnswer(carryOn: false),
-            waitingSandbox: waitingSandbox)
+            waitingSandbox: waitingSandbox,
+            kept: { [model] agentID in model.kept(for: agentID) },
+            dropKept: { [model] in await model.dropKept($0) },
+            retryKept: { [model] in await model.retryKept($0) },
+            hostName: { [model] in model.hostName($0) })
     }
 
     /// What a view in the chat may ask of the phone (#187): the Mac it is on, the person's

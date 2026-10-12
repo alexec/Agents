@@ -333,6 +333,16 @@ public final class ControlService: @unchecked Sendable {
                 log: { [weak self] in self?.log($0) })
         }
         hooks.workspaces = providers
+        // Prompts and starts for a stopped workspace, kept until it is up (US3).
+        if let providers, await providers.kept == nil {
+            let kept = KeptRequests(
+                store: configuration.store, router: router,
+                hooks: .init(keepable: { await providers.keepable($0) },
+                             start: { await providers.startForUse($0, by: $1) }),
+                log: { [weak self] in self?.log($0) })
+            await providers.keep(with: kept)
+            await router.setKeeper(kept)
+        }
         await methods.setHooks(hooks)
         await tunnels?.start()
         await providers?.start()
@@ -420,6 +430,7 @@ public final class ControlService: @unchecked Sendable {
     /// A change made here: on every peer link first, then into `events/` for a copy that
     /// missed it.
     func announce(_ event: ControlEvent) async {
+        if event.kind == .hostRemoved { await providers?.kept?.forget(HostID(rawValue: event.subject)) }
         await mesh?.broadcast(PeerWire.event(event))
         let millis = Int(event.at.timeIntervalSince1970 * 1000)
         let day = event.at.formatted(Date.ISO8601FormatStyle().year().month().day())

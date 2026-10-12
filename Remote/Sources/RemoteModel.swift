@@ -1058,6 +1058,16 @@ final class RemoteModel {
         isStarting = true
         defer { isStarting = false }
         startRefusal = nil
+        // A stopped workspace that starts when used: kept, and shown on this page until the
+        // agent it makes opens (#691 US3, layouts.md L6a).
+        if let host = work.project(request.cwd)?.host, host != .mac, isStale(on: host), startsWhenUsed(host) {
+            var kept = request
+            kept.draftID = nil
+            guard let said = await keepThroughControl(host, DaemonAPI.Method.agentsStart, kept) else { return false }
+            keptStartsShown.insert(said.id)
+            StartDraftKeeper.shared.clear(in: request.cwd)
+            return true
+        }
         unsettledStart = request
         do {
             let id = try await sendOnce(DaemonAPI.Method.agentsStart, request).decode(UUID.self)
@@ -1116,7 +1126,7 @@ final class RemoteModel {
 
     private func startRefusalBeforeSending(in folder: URL) -> String? {
         let host = work.project(folder)?.host ?? .mac
-        if isStale(on: host) { return notAnswering(host, "nothing was started.") }
+        if isStale(on: host), !(host != .mac && startsWhenUsed(host)) { return notAnswering(host, "nothing was started.") }
         guard let summary = work.project(folder) else { return nil }
         if summary.project.isArchived { return "This project was archived on the Mac, so nothing was started." }
         if !summary.exists { return "This project's folder is not on the Mac any more, so nothing was started." }
@@ -1531,6 +1541,85 @@ final class RemoteModel {
 
     /// The hosts whose `hosts/start` is out now, so the strip's Start waits for it (#691).
     private(set) var hostsBeingStarted: Set<HostID> = []
+    /// Prompts and starts the control plane keeps for stopped workspaces (#691 US3), every host's.
+    private(set) var kept: [DaemonAPI.KeptRequest] = []
+    /// The kept starts the start page has shown here: the one that reaches its host opens.
+    @ObservationIgnored private var keptStartsShown: Set<UUID> = []
+
+    /// Whether a prompt or a start for `host` now is kept rather than refused: it is linked
+    /// to a workspace that is stopped or starting, and starts when used (FR-020).
+    func startsWhenUsed(_ host: HostID) -> Bool {
+        guard let row = controlHosts.first(where: { $0.id == host }), row.workspace?.startWhenUsed == true else { return false }
+        return row.state == "stopped" || row.state == "starting"
+    }
+
+    func kept(for agentID: UUID) -> [DaemonAPI.KeptRequest] {
+        kept.filter { !$0.isStart && $0.agentID == agentID }
+    }
+
+    func keptStarts(in folder: URL) -> [DaemonAPI.KeptRequest] {
+        let folder = Project.standardize(folder)
+        return kept.filter { $0.isStart && $0.folder.map(Project.standardize) == folder }
+    }
+
+    /// A prompt or a start for a stopped workspace's host, whose link is closed while it is
+    /// down, sent to the control plane to keep (#691 US3). What was kept, or nil with why not.
+    private func keepThroughControl(_ host: HostID, _ method: String, _ params: some Encodable) async -> DaemonAPI.KeptRequest? {
+        guard let control = controlPlane, let params = try? JSONValue.encoding(params) else {
+            problem = "The control plane isn’t answering, so that was not sent."
+            return nil
+        }
+        do {
+            _ = try await control.call(DaemonAPI.Method.hostsKeep, DaemonAPI.KeepRequest(host: host, method: method, params: params))
+            return nil
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.kept {
+            guard let said = try? error.data?.decode(DaemonAPI.KeptRequest.self) else { return nil }
+            if !kept.contains(where: { $0.id == said.id }) { kept.append(said) }
+            return said
+        } catch {
+            problem = sentence(for: error)
+            return nil
+        }
+    }
+
+    private func loadKept(_ control: DaemonClient) async {
+        kept = (try? await control.call(DaemonAPI.Method.hostsListKept, returning: DaemonAPI.KeptList.self))?.kept ?? []
+    }
+
+    private func heardKept(_ method: String, _ params: JSONValue?) async {
+        if method == DaemonAPI.Notification.controlKeptChanged {
+            kept = (try? params?.decode(DaemonAPI.KeptList.self))?.kept ?? []
+            return
+        }
+        // A kept start reached its host: the agent it made opens, if this phone showed it.
+        guard let delivered = try? params?.decode(DaemonAPI.KeptDelivered.self),
+              keptStartsShown.remove(delivered.id) != nil, let agentID = delivered.agentID,
+              let folder = startingIn else { return }
+        await started(agentID, in: folder, open: true)
+    }
+
+    /// × on a kept prompt: it isn't sent, and the workspace keeps starting (US3 AS3).
+    func dropKept(_ request: DaemonAPI.KeptRequest) async {
+        kept.removeAll { $0.id == request.id }
+        await keptCall(DaemonAPI.Method.hostsDropKept, request)
+    }
+
+    /// Try Again on one that wasn't sent: kept again, and the workspace started.
+    func retryKept(_ request: DaemonAPI.KeptRequest) async {
+        await keptCall(DaemonAPI.Method.hostsRetryKept, request)
+    }
+
+    private func keptCall(_ method: String, _ request: DaemonAPI.KeptRequest) async {
+        guard let control = controlPlane else {
+            problem = "The control plane isn’t answering."
+            return
+        }
+        do {
+            _ = try await control.call(method, DaemonAPI.KeptRequestID(host: request.host, id: request.id))
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
 
     /// Start the workspace `host` runs on (#691, the strip's Start). The control plane answers
     /// at once; the start's progress comes as `control/hostChanged`, and a refusal is said
@@ -1583,8 +1672,15 @@ final class RemoteModel {
                     backoff.connected()
                     self?.controlPlane = control
                     await self?.syncOtherHosts(control, link: link)
-                    for await change in control.notifications() where change.method == DaemonAPI.Notification.controlHostChanged {
+                    await self?.loadKept(control)
+                    for await change in control.notifications() {
                         guard let self, !Task.isCancelled else { return }
+                        if change.method == DaemonAPI.Notification.controlKeptChanged
+                            || change.method == DaemonAPI.Notification.controlKeptDelivered {
+                            await self.heardKept(change.method, change.params)
+                            continue
+                        }
+                        guard change.method == DaemonAPI.Notification.controlHostChanged else { continue }
                         // A host back while this phone waits out its backoff: go back now (#172).
                         if !self.isConnected, change.params?["state"]?.stringValue == "online" { self.backoff.nudge() }
                         await self.syncOtherHosts(control, link: link)
@@ -3191,6 +3287,15 @@ final class RemoteModel {
     /// the phone (029): nothing the runtime cannot take, and nothing too big for the link.
     func send(_ what: String, attachments: [Attachment] = [], to agentID: UUID) async -> Bool {
         let host = work.agent(agentID)?.host ?? .mac
+        // A stopped workspace that starts when used: kept by the control plane (#691 US3).
+        if host != .mac, isStale(on: host), startsWhenUsed(host) {
+            guard attachments.isEmpty else {
+                problem = "Attachments can’t wait for \(hostName(host)) to start. Send the words alone, or start it first."
+                return false
+            }
+            return await keepThroughControl(host, DaemonAPI.Method.agentsPrompt,
+                                            DaemonAPI.PromptRequest(agentID: agentID, text: what, sendID: UUID())) != nil
+        }
         guard !isStale(on: host) else {
             problem = notAnswering(host, "that was not sent.")
             return false

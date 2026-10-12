@@ -176,7 +176,7 @@ runs.
 drops, and is shown `.stopping` and then `.stopped(by: nil)` when the next list says so. The
 control plane does not send `daemon/quit` first, because the provider owns the machine.
 
-## R9. Kept requests (US3, a later PR)
+## R9. Kept requests (US3)
 
 **Decision**:
 - The router does not parse requests today. For a host whose state is stopped or starting
@@ -194,6 +194,21 @@ Every other request keeps today's refusal (FR-022).
 
 **Risk**: A send's id and its idempotence. The Mac's `sendToServer` already retries with the
 same `sendID`, and the daemon dedupes by it, so replaying is safe. This is checked in the US3 PR.
+
+**As built (US3, T040)**:
+- The kept methods are `agents/prompt` (deduped by `sendID`) and `agents/start` (deduped by
+  `requestID`). The Remote sends no `sendID`, and an older client may send no `requestID`, so
+  the control plane fills one in before it stores the request. A start's `draftID` is dropped:
+  the draft was a runtime on the host before it stopped.
+- The router asks a `KeptHandling` (`KeptRequests` in ControlPlaneKit) for a kept method to a
+  host it can't reach. Kept requests are answered with the error `kept` (-32067), whose `data`
+  is the `KeptRequest`, so an older client shows the sentence and a new one draws the bubble.
+- The window and the Remote can't use that path: their link to a host closes while the host is
+  offline (`ControlLink`). They send the same request to `hosts/keep {host, method, params}` on
+  the control plane's own connection. The web page's one socket reaches the router either way.
+- Delivery opens a channel per request (`Target.kept`), bound to the client that sent it, and
+  waits up to 60 s for the host's answer; a host that goes first leaves it kept. A start's
+  answer is broadcast as `control/keptDelivered` with the agent it made.
 
 ## R10. Idle (US4, a later PR)
 

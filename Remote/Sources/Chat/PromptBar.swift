@@ -324,7 +324,8 @@ struct PromptBar: View {
     }
 
     private var canSend: Bool {
-        !model.isStale(agent) && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        // A stopped workspace that starts when used keeps what is sent until it is up (#691 US3).
+        (!model.isStale(agent) || model.startsWhenUsed(agent.host)) && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     /// Whether what is typed now will wait for the turn to end rather than go.

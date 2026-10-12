@@ -248,7 +248,8 @@ public actor ControlMethods: ControlHandling {
     ]
 
     private func answer(method: String, params: JSONValue?, from caller: ControlRouter.Caller) async throws -> JSONValue {
-        let readsOnly = [DaemonAPI.Method.providersList, DaemonAPI.Method.providersRefresh].contains(method)
+        let readsOnly = [DaemonAPI.Method.providersList, DaemonAPI.Method.providersRefresh,
+                         DaemonAPI.Method.hostsListKept].contains(method)
         if frozen, Self.writes.contains(method) || (DaemonAPI.Method.workspaceMethods.contains(method) && !readsOnly) {
             throw JSONRPCError(code: DaemonAPI.Failure.storeUnavailable,
                                message: "The control plane is moving to another machine. Nothing was changed; try again in a minute.")

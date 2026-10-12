@@ -12,6 +12,15 @@ any client code is written.** The rest of each screen is as it is today.
   kind, with Back. The single form drawn below is what was not chosen; its fields stay, split
   by kind.
 
+**Settled by Alex, 2026-10-12, for US3–US5**:
+- **L6**: a kept prompt is a queued bubble, "Waiting for ‹host› to start · ×".
+- **L6a**: a new agent started on a stopped host opens its chat at once, with its first
+  prompt kept as in L6. The agent is made when the host connects; × drops it and the empty
+  chat goes.
+- **L8**: the scheduled-workflows warning is a line on the Hosts row.
+- **L9**: New Workspace… is a button on the provider card, then a sheet and a confirmation.
+  Delete Workspace… is in the Hosts row's `···` menu.
+
 ## L1. The offline strip, for a linked host (all three clients)
 
 This is today's strip (`OfflineStrip`, `HostOfflineStrip`, `OfflineStrip.tsx`), with one
@@ -175,7 +184,7 @@ The single form, which was not chosen:
 Only unlinked workspaces are listed. A workspace already linked to another host is shown
 greyed as "linked to X".
 
-## L6. Kept prompts (US3, all three clients; for later, shown now for context)
+## L6. Kept prompts (US3, all three clients)
 
 ```text
                                    ┌──────────────────────────────┐
@@ -185,6 +194,61 @@ greyed as "linked to X".
 ```
 
 This is the queued-bubble style of #95, with the line under it saying what it waits for.
+
+- The offline strip (L1) shows as well, so the start's phase and timer are visible.
+- × drops the kept prompt on every client. The workspace keeps starting (US3 AS3).
+- A failed start turns each kept prompt into a not-sent bubble, with the reason and
+  **Try Again**, as a failed send is shown today (US3 AS4).
+
+### L6a. A new agent on a stopped host
+
+New Agent in a project on a stopped host opens the new chat at once: its first prompt is the
+kept bubble of L6, under the L1 strip. The agent itself is made when the host connects, and its
+transcript follows as usual. × on the bubble drops the request, and the empty chat goes.
+
+## L8. The scheduled-workflows warning (US4, Mac Hosts row)
+
+Shown only when the host has scheduled workflows and **Stop when idle** is on: a third grey
+line on its row.
+
+```text
+│ ● devbox    Online · Linux · 0.9.2 · Docker: agents-devbox                │
+│             Stops after 30 minutes idle                 [Stop] [ ··· ]    │
+│             ⚠ 2 scheduled workflows here don't run while it is stopped.   │
+```
+
+## L9. New Workspace… and Delete Workspace… (US5, Mac only)
+
+**New Workspace…** is a button beside **Refresh** on a provider card whose provider offers
+`workspace_create`. It opens a sheet drawn from `workspace_options`, then a confirmation:
+
+```text
+┌ New Workspace on DigitalOcean ─────────────┐
+│ Name    [build-2           ]               │
+│ Region  [ lon1 ▾ ]                         │
+│ Size    [ s-2vcpu-4gb ▾ ]                  │
+│ Image   [ ubuntu-24-04 ▾ ]                 │
+│                         [Cancel] [Make…]   │
+└────────────────────────────────────────────┘
+→ Make build-2 on DigitalOcean?
+  s-2vcpu-4gb · lon1 · $0.036/h when running
+                          [Cancel] [Make]
+```
+
+- The cost line shows only when the provider gives one.
+- Once made, the workspace shows in the card as **Joining…** until its host joins and is
+  linked.
+- Cancel at either step makes nothing (US5 AS3).
+
+**Delete Workspace…** is in a linked host's `···` menu on the Hosts row (L2), with a
+destructive confirmation:
+
+```text
+Delete build-2?
+The workspace and everything on its disk are deleted, and host build-2 is
+removed with its 3 agents.
+                                   [Cancel] [Delete]
+```
 
 ## L7. Remote and web
 
