@@ -492,16 +492,24 @@ struct HostWindow: View {
 
     // MARK: Relay
 
+    /// Off until turned on, and only where the control plane runs (#809).
     private var relay: some View {
         card {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Relay for my devices").font(.headline)
-                    Text("Your iPhone and iPad reach your agents through your iCloud when away, and are told when an agent needs you. Not in this build yet.")
-                        .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Text(model.relayLine)
+                        .font(.callout)
+                        .foregroundStyle(model.relayFailed ? AnyShapeStyle(Color.orange) : AnyShapeStyle(.secondary))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
-                Toggle("Relay for my devices", isOn: .constant(false)).labelsHidden().toggleStyle(.switch).disabled(true)
+                Toggle("Relay for my devices",
+                       isOn: Binding(get: { model.settings.relaysForDevices },
+                                     set: { on in Task { await model.setRelay(on) } }))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .disabled(model.busy != nil || (!model.settings.relaysForDevices && !(model.relayAvailable && model.controlRunning)))
             }
             .padding(16)
         }

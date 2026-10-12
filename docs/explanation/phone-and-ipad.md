@@ -109,10 +109,10 @@ sealed to your device and posted to your own iCloud account. When the question i
 answered, or goes away, the notice is taken down.
 
 The relay and notifications are run by a Mac host, because they need your iCloud account.
-In this build, Agents Host cannot switch them on yet: its **Relay for my devices** row says
-**Not in this build yet**. Until it can, a device reaches your agents only where it can
-reach the control plane's address, and gets no notifications. A set-up with no Mac host at
-all never has them.
+Turn on **Relay for my devices** in Agents Host, on the Mac that runs the control plane.
+It is off until you do. While it is off, a device reaches your agents only where it can
+reach the control plane's address, and gets no notifications; a paired device stays
+paired. A set-up with no Mac running the control plane has no relay yet (#824).
 
 ## Forgetting a device
 

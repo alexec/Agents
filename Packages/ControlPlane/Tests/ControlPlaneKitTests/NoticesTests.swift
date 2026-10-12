@@ -85,6 +85,34 @@ struct NoticesTests {
         }
     }
 
+    /// Agents Host's Relay for my devices (#809): off and on again over the session the
+    /// control plane's key proves, keeping the enrolment; a host that runs agents refused.
+    @Test func agentsHostSwitchesTheRelayWithTheControlKey() async throws {
+        let running = try await base.start()
+        defer { Task { await running.service.stop() } }
+        let relay = try await relay(running)
+        defer { relay.relay.stop() }
+        let handover = try await Handover.Link(running.url, pin: nil, privateKey: control.privateKey)
+        await eventually { await running.service.router.relayHeldHere() == relay.host }
+
+        _ = try await handover.call(Handover.Method.setRelay,
+                                    try JSONValue.encoding(DaemonAPI.HostRelayRequest(host: relay.host, relay: false)))
+        #expect(await running.service.methods.allHosts.first { $0.id == relay.host }?.relay == false)
+        await eventually { await running.service.router.relayHeldHere() == nil }
+
+        _ = try await handover.call(Handover.Method.setRelay,
+                                    try JSONValue.encoding(DaemonAPI.HostRelayRequest(host: relay.host, relay: true)))
+        #expect(await running.service.methods.allHosts.first { $0.id == relay.host }?.relay == true)
+        await eventually { await running.service.router.relayHeldHere() == relay.host }
+
+        let (host, uplink) = try await base.host(at: running.url, code: try await running.service.codes.issue(.host).text)
+        defer { uplink.stop() }
+        await #expect(throws: JSONRPCError.self) {
+            _ = try await handover.call(Handover.Method.setRelay,
+                                        try JSONValue.encoding(DaemonAPI.HostRelayRequest(host: host, relay: true)))
+        }
+    }
+
     @Test func aNeedIsSealedToTheDeviceAndWithdrawn() async throws {
         let running = try await base.start()
         defer { Task { await running.service.stop() } }

@@ -1,3 +1,4 @@
+import AgentsKit
 import AgentsKitCore
 import Foundation
 import ServiceManagement
@@ -6,7 +7,7 @@ import ServiceManagement
 /// T055; moved here from the window, which runs nothing now).
 ///
 /// `agentsd` is always registered once a role is chosen; `agents-control` only while
-/// *Run it here* is on. On the ordinary set-up both are launch agents in the bundle,
+/// *Run it here* is on; `agents-relay` only while *Relay for my devices* is (#809). On the ordinary set-up both are launch agents in the bundle,
 /// registered with `SMAppService`: they show under Login Items as Agents Host, and
 /// registering again finds them registered (US2-4: nothing twice).
 ///
@@ -22,7 +23,7 @@ struct LocalServices {
         case failed(String)
     }
 
-    enum Job { case control, daemon }
+    enum Job { case control, daemon, relay }
 
     // MARK: Registering
 
@@ -41,6 +42,7 @@ struct LocalServices {
     func remove() async {
         await unregister(.control)
         await unregister(.daemon)
+        await unregister(.relay)
     }
 
     /// launchd stops it and starts it again at once. Every client and host redials.
@@ -94,8 +96,36 @@ struct LocalServices {
     /// Whether this Mac's host has joined a control plane already.
     var hostJoined: Bool { ControlMembership.load(paths.hostLocations.controlHostMembership) != nil }
 
-    func label(_ job: Job) -> String { job == .control ? paths.controlLabel : paths.daemonLabel }
-    private func plist(_ job: Job) -> String { job == .control ? HostPaths.controlPlist : HostPaths.daemonPlist }
+    func label(_ job: Job) -> String {
+        switch job {
+        case .control: paths.controlLabel
+        case .daemon: paths.daemonLabel
+        case .relay: paths.relayLabel
+        }
+    }
+
+    private func plist(_ job: Job) -> String {
+        switch job {
+        case .control: HostPaths.controlPlist
+        case .daemon: HostPaths.daemonPlist
+        case .relay: HostPaths.relayPlist
+        }
+    }
+
+    /// Leave the relay a one-time host code where it reads it on its next start (#809).
+    func leaveRelayCode(_ code: String) throws {
+        let files = paths.relayFiles
+        do {
+            try FileManager.default.createDirectory(at: files.folder, withIntermediateDirectories: true)
+            try StoreCoding.writeAtomically(Data(code.utf8), to: files.joinCode, permissions: 0o600)
+        } catch {
+            throw ControlService.Failure(WriteFailure(error, keeping: "the relay's code")?.message
+                ?? "could not leave the relay its code: \(error.localizedDescription)")
+        }
+    }
+
+    /// The relay host this Mac's relay joined as, once it has.
+    var relayHost: HostID? { ControlMembership.load(paths.relayFiles.membership)?.host }
 
     private func registerWithSystem(_ job: Job) -> Outcome {
         let service = SMAppService.agent(plistName: plist(job))
@@ -129,6 +159,11 @@ struct LocalServices {
         case .daemon:
             arguments = [paths.agentsd.path, "--control-network"]
             variables = [StoreLocations.rootVariable: paths.hostRoot.path, "PATH": path]
+        case .relay:
+            // `<root>/relay`, and a walk's folder standing in for iCloud when it gives one.
+            arguments = [paths.agentsRelay.path]
+            variables = [StoreLocations.rootVariable: paths.scratchRoot?.path ?? "", "PATH": path]
+            if let stand = environment["AGENTS_RELAY_FOLDER"] { variables["AGENTS_RELAY_FOLDER"] = stand }
         }
         #if DEBUG
         // A walk's stand-in for a public root (#61, Pebble), for the host to follow a move.
@@ -137,7 +172,11 @@ struct LocalServices {
         guard FileManager.default.isExecutableFile(atPath: arguments[0]) else {
             return .failed("This copy of Agents Host has no \(URL(fileURLWithPath: arguments[0]).lastPathComponent) in it.")
         }
-        let folder = job == .control ? paths.controlHome : paths.hostRoot
+        let folder = switch job {
+        case .control: paths.controlHome
+        case .daemon: paths.hostRoot
+        case .relay: paths.relayFiles.folder
+        }
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         var plist: [String: Any] = [
             "Label": label(job),

@@ -150,7 +150,7 @@
   <text class="title" x="1006" y="504">agents-relay.app (optional)</text>
   <text class="small" x="1006" y="524">in Agents Host's Helpers; iCloud</text>
   <text class="small" x="1006" y="542">mailbox for phones away from home</text>
-  <text class="small" x="1006" y="560">and notifications; not in this build yet</text>
+  <text class="small" x="1006" y="560">and notifications, when switched on</text>
 
   <!-- Legend -->
   <line x1="40" y1="940" x2="90" y2="940" class="spawn"/>

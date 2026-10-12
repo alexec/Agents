@@ -171,6 +171,16 @@ final class HostModel {
             clients = nil
             hosts = nil
         }
+        if settings.relaysForDevices {
+            let relayState = await services.state(.relay)
+            relayJob = relayState
+            relayLogin = services.loginStatus(.relay)
+            relayRunning = relayState.running
+        } else {
+            relayJob = nil
+            relayLogin = nil
+            relayRunning = false
+        }
         await readForwarding()
         await readReturnForwarding()
         await countWork()
@@ -460,6 +470,10 @@ final class HostModel {
             }
         }
         settings.role = .joinElsewhere
+        // The relay was this Mac's control plane's, which stops now (Alex: no relay under
+        // Join elsewhere).
+        if settings.relaysForDevices { await services.unregister(.relay) }
+        settings.relay = nil
         settings.save(paths)
         await services.unregister(.control)
         let wasRunning = await services.running(.daemon) != nil
@@ -691,6 +705,101 @@ final class HostModel {
             problem = why
             return false
         }
+    }
+
+    // MARK: Relay for my devices (#809)
+
+    private(set) var relayRunning = false
+    private(set) var relayJob: LaunchJobState?
+    private(set) var relayLogin: LoginItemStatus?
+
+    /// Where it may be turned on: where the control plane runs, which makes the relay's
+    /// code (Alex: not under Join elsewhere). Off may always be chosen.
+    var relayAvailable: Bool {
+        settings.role == .runHere && settings.movedTo == nil && settings.receiving != true
+    }
+
+    /// The relay's line under its switch: what it does when on, and how it stands.
+    var relayLine: String {
+        guard settings.relaysForDevices else {
+            return relayAvailable
+                ? "Your iPhone and iPad reach your agents through your iCloud when away, and are told when an agent needs you."
+                : "Turn it on at the Mac that runs your control plane."
+        }
+        if relayRunning {
+            return services.relayHost == nil
+                ? "Joining the control plane…"
+                : "On: your iPhone and iPad reach your agents through your iCloud when away, and are told when an agent needs you."
+        }
+        if let relayJob, let relayLogin, let failure = HostJobFailure.diagnose(relayJob, login: relayLogin) {
+            return failure.reason("The relay")
+        }
+        return "Starting…"
+    }
+
+    /// On but not running, and launchd or macOS says why.
+    var relayFailed: Bool {
+        guard settings.relaysForDevices, !relayRunning, let relayJob, let relayLogin else { return false }
+        return HostJobFailure.diagnose(relayJob, login: relayLogin) != nil
+    }
+
+    /// Turn the relay on or off (#809). On: the first time, a host code is left in the
+    /// relay's folder and it enrols as a relay host; after that the control plane is told it
+    /// relays again (`hosts/setRelay`). Then its launch agent is registered. Off: the control
+    /// plane is told, and the launch agent unregistered; the enrolment is kept (Alex), so on
+    /// again resumes at once. Paired devices stay paired either way.
+    func setRelay(_ on: Bool) async {
+        guard busy == nil, settings.relaysForDevices != on else { return }
+        problem = nil
+        if on {
+            guard relayAvailable, controlRunning else {
+                problem = "Turn the relay on where the control plane runs, while it is running."
+                return
+            }
+            busy = "Starting the relay…"
+            defer { busy = nil }
+            if let host = services.relayHost {
+                let told = await tellRelay(host, on: true)
+                guard told.ok else {
+                    problem = "The control plane didn’t switch the relay on: \(told.problem)"
+                    return
+                }
+            } else {
+                guard let code = await makeOwnHostCode() else {
+                    problem = "The control plane made no code for the relay. Its log is at \(paths.controlLog.path)."
+                    return
+                }
+                do { try services.leaveRelayCode(code) } catch { problem = "\(error)"; return }
+            }
+            settings.relay = true
+            settings.save(paths)
+            guard await start(.relay) else {
+                settings.relay = false
+                settings.save(paths)
+                await refresh()
+                return
+            }
+        } else {
+            busy = "Stopping the relay…"
+            defer { busy = nil }
+            // Told only where it can be: a control plane moved away keeps the relay as it was.
+            if let host = services.relayHost, relayAvailable, controlRunning {
+                let told = await tellRelay(host, on: false)
+                if !told.ok { problem = "The relay stopped, but the control plane wasn’t told: \(told.problem)" }
+            }
+            await services.unregister(.relay)
+            settings.relay = false
+            settings.save(paths)
+        }
+        try? await Task.sleep(for: .seconds(1))
+        await refresh()
+    }
+
+    /// `hosts/setRelay`, over the session the control plane's key proves.
+    private func tellRelay(_ host: HostID, on: Bool) async -> ControlTool.Result {
+        await ControlTool.run(["handover", "relay", "--at", "self", "--host", host.rawValue, on ? "--on" : "--off",
+                               "--home", paths.controlHome.path, "--port", String(paths.port)],
+                              paths: paths, settings: settings)
     }
 
     // MARK: The store

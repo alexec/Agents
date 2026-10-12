@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- The iCloud relay for the person's devices (058, T096; #809): registered by Relay for
+     my devices with SMAppService while it is on, shown under Login Items as Agents Host,
+     kept running by launchd. The first time, Agents Host leaves it a one-time host code
+     in its folder. It runs from its own bundle in Helpers, whose profile carries the
+     iCloud container. -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.alexecollins.agentshost.relay</string>
+    <key>BundleProgram</key>
+    <string>Contents/Helpers/agents-relay.app/Contents/MacOS/agents-relay</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>agents-relay</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ProcessType</key>
+    <string>Interactive</string>
+</dict>
+</plist>

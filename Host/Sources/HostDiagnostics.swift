@@ -42,6 +42,8 @@ struct HostDiagnostics {
         lines.append("Role: \(settings.role)")
         lines.append("Store: \(settings.store)")
         lines.append("Web remote: \(settings.servesWebRemote ? "on" : "off")")
+        lines.append("Relay for my devices: \(settings.relaysForDevices ? "on" : "off")"
+                     + (services.relayHost.map { ", joined as \($0.rawValue)" } ?? ", not joined"))
         if let moved = settings.movedTo { lines.append("Moved to: \(moved)") }
         if let from = settings.returnedFrom { lines.append("Returned from: \(from)") }
         lines.append("Host joined: \(services.hostJoined ? "yes" : "no")")
@@ -49,7 +51,7 @@ struct HostDiagnostics {
             lines.append("Host join: \(join.summary)")
         }
 
-        for (job, name) in [(LocalServices.Job.control, "Control plane"), (.daemon, "This Mac’s host")] {
+        for (job, name) in [(LocalServices.Job.control, "Control plane"), (.daemon, "This Mac’s host"), (.relay, "Relay")] {
             section("\(name) (\(services.label(job)))")
             let state = await services.state(job)
             let login = services.loginStatus(job)
@@ -66,7 +68,8 @@ struct HostDiagnostics {
             lines.append("\(port): \(await Self.listening(port) ?? "nothing")")
         }
 
-        for (name, log) in [("control.log", paths.controlLog), ("daemon.log", paths.hostLocations.log)] {
+        for (name, log) in [("control.log", paths.controlLog), ("daemon.log", paths.hostLocations.log),
+                            ("relay.log", paths.relayLog)] {
             section("\(name), the last \(Self.logLines) lines (\(log.path))")
             lines.append("```")
             lines.append(Self.tail(log, lines: Self.logLines) ?? "(none)")

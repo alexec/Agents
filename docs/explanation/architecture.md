@@ -22,7 +22,8 @@ app's own tools (`mcp__agents__*`) over MCP.
 
 Agents also polls **MCP servers** for the events that trigger workflows, clones and pushes
 to **GitHub** with git, and installs runtimes from **package registries**. A relay through
-**iCloud**, for phones away from home, is planned and not in this build.
+**iCloud** carries phones away from home, and their notifications, when **Relay for my
+devices** is on.
 
 ## Containers
 

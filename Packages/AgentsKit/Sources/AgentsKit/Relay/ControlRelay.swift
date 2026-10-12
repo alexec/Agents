@@ -28,6 +28,9 @@ public final class ControlRelay: @unchecked Sendable {
         public init(folder: URL) { self.folder = folder }
         public var membership: URL { folder.appendingPathComponent("relay-host.json") }
         public var key: URL { folder.appendingPathComponent("relay-key") }
+        /// A one-time host code Agents Host leaves before it starts the relay (#809), read
+        /// in place of `--join` until the relay has joined, and removed once it has.
+        public var joinCode: URL { folder.appendingPathComponent("relay-join-code") }
     }
 
     public typealias Dial = @Sendable (URL, String?) async throws -> any LineTransport

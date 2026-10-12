@@ -1,3 +1,4 @@
+import AgentsKit
 import AgentsKitCore
 import Foundation
 
@@ -59,9 +60,24 @@ struct HostPaths: Sendable, Equatable {
 
     static let controlPlist = "com.alexecollins.agentshost.control.plist"
     static let daemonPlist = "com.alexecollins.agentshost.daemon.plist"
+    static let relayPlist = "com.alexecollins.agentshost.relay.plist"
 
     var controlLabel: String { scratch ? "com.alexecollins.agentshost.control.scratch-\(suffix)" : "com.alexecollins.agentshost.control" }
     var daemonLabel: String { scratch ? "com.alexecollins.agentshost.daemon.scratch-\(suffix)" : "com.alexecollins.agentshost.daemon" }
+    var relayLabel: String { scratch ? "com.alexecollins.agentshost.relay.scratch-\(suffix)" : "com.alexecollins.agentshost.relay" }
+
+    /// The scratch root itself, which `agents-relay` is given as `AGENTS_ROOT`.
+    var scratchRoot: URL? { scratch ? controlHome.deletingLastPathComponent() : nil }
+
+    /// `agents-relay`'s membership, key and first code (#809), where it looks for them:
+    /// `<root>/relay` on a scratch set-up, else `~/Library/Application Support/Agents Relay`.
+    var relayFiles: ControlRelay.Files {
+        let folder = scratchRoot?.appendingPathComponent("relay", isDirectory: true)
+            ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("Agents Relay", isDirectory: true)
+        return ControlRelay.Files(folder: folder)
+    }
+    var relayLog: URL { relayFiles.folder.appendingPathComponent("relay.log") }
 
     var controlLog: URL { controlHome.appendingPathComponent("control.log") }
     var hostLocations: StoreLocations { StoreLocations(root: hostRoot) }
@@ -74,4 +90,5 @@ struct HostPaths: Sendable, Equatable {
     /// The built web remote, Web/dist, built and copied in by project.yml (071 research R8, #473).
     var webRemote: URL { Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/dist", isDirectory: true) }
     var agentsd: URL { helpers.appendingPathComponent("agentsd") }
+    var agentsRelay: URL { helpers.appendingPathComponent("agents-relay.app/Contents/MacOS/agents-relay") }
 }
