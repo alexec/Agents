@@ -12,10 +12,16 @@ import { folderKey } from "../model/groups";
 import { describe } from "../model/errors";
 import type { FileStamp, PinView } from "../protocol/generated";
 import { go } from "../route";
-import { isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
+import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
 import { LiveDocument, type PageSource } from "./LiveDocument";
 import { BackToList } from "./BackToList";
 import { PinnedViewPage } from "./PinnedViewPage";
+
+/** A screen with no pointer to hover: there a held finger opens the menu (#663), with its Move Up and
+ *  Down, rather than lifting the row to drag it. */
+function touchOnly(): boolean {
+  return typeof matchMedia === "function" && matchMedia("(hover: none)").matches;
+}
 
 export function PinnedPageRows({ store, host, folder, chosen, down }: {
   store: Store; host: string; folder: string; chosen: string | undefined; down: boolean;
@@ -55,12 +61,12 @@ export function PinnedPageRows({ store, host, folder, chosen, down }: {
   return (
     <div class="group pins" role="group" aria-label="Pinned pages" onDragOver={over} onDrop={drop(null)}>
       {pins.map((pin) => (
-        <div class="nav-item" key={pin.path} draggable={!down}
+        <div class="nav-item" key={pin.path} draggable={!down && !touchOnly()}
           onDragStart={(e) => { dragged.value = pin.path; e.dataTransfer?.setData("text/plain", pin.path); }}
           onDragEnd={() => (dragged.value = null)}
           onDragOver={over} onDrop={drop(pin.path)}
           onContextMenu={(e) => openContextMenu(e, menu(pin))}
-          onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu(pin)); }}>
+          onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu(pin)); }} {...holdForMenu(() => menu(pin))}>
           <div class={`row pin${chosen === pin.path ? " chosen" : ""}${pin.missing ? " missing" : ""}${dragged.value === pin.path ? " dragging" : ""}`}>
             <button class="pick" aria-current={chosen === pin.path}
               title={pin.missing ? `Missing: ${pin.path}${pin.missingReason ? `: ${pin.missingReason}` : ""}` : pin.path}

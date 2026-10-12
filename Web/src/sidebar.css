@@ -195,3 +195,13 @@
 .event-detail dt { opacity: 0.6; }
 .event-detail dd { margin: 0; overflow-wrap: anywhere; user-select: text; }
 .event-detail .event-name { font-family: var(--font-mono); margin: 0; }
+
+/* A finger's rows (#663): at least 44 px tall, and held without the page selecting their words or
+   calling up its own sheet, since a held finger opens the row's menu. */
+@media (pointer: coarse) {
+  .with-sidebar .sidebar .row { min-height: 44px; align-content: center; }
+  .with-sidebar .sidebar .row.project .pick { align-self: stretch; justify-content: center; }
+  .with-sidebar .sidebar .row, .with-sidebar .sidebar .nav-item {
+    -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+  }
+}

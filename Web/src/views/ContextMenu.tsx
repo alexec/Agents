@@ -1,6 +1,7 @@
 // A row's context menu in the sidebar (#151), as the window's rows have them: opened by a right
-// click where it was clicked, or by the keyboard's menu key or Shift-F10 at the row. Escape or a
-// click elsewhere closes it, and the keys move through its items.
+// click where it was clicked, by the keyboard's menu key or Shift-F10 at the row, or by a finger
+// held on the row (#663), which is how a phone asks, as Safari there sends no contextmenu. Escape
+// or a click elsewhere closes it, and the keys move through its items.
 import { signal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 
@@ -32,6 +33,74 @@ export function openContextMenu(event: MouseEvent | KeyboardEvent, items: MenuIt
   }
   const box = from?.getBoundingClientRect();
   open.value = { x: (box?.left ?? 0) + 24, y: box?.bottom ?? 0, items, from };
+}
+
+/** How long a finger stays on a row, and how far it may wander, before its menu opens (#663). */
+export const holdMilliseconds = 500;
+const holdSlop = 10;
+
+/**
+ * A finger held still on a row: `start` when it lands, `move` as it goes, `end` when it lifts or the
+ * page takes it for a scroll. `fire` runs once it has stayed `holdMilliseconds` within `holdSlop`.
+ */
+export class Hold {
+  private timer: ReturnType<typeof setTimeout> | undefined;
+  private x = 0;
+  private y = 0;
+
+  start(x: number, y: number, fire: () => void): void {
+    this.end();
+    this.x = x;
+    this.y = y;
+    this.timer = setTimeout(() => { this.timer = undefined; fire(); }, holdMilliseconds);
+  }
+
+  move(x: number, y: number): void {
+    if (Math.hypot(x - this.x, y - this.y) > holdSlop) this.end();
+  }
+
+  end(): void {
+    if (this.timer !== undefined) clearTimeout(this.timer);
+    this.timer = undefined;
+  }
+}
+
+/**
+ * The pointer handlers that open `items` when a finger (or pen) is held on the row, spread beside
+ * its onContextMenu. A mouse is left to its right click. The click that lifting the finger makes is
+ * swallowed, so the hold does not also pick the row.
+ */
+export function holdForMenu(items: () => MenuItem[]) {
+  return {
+    onPointerDown: (e: PointerEvent) => {
+      if (e.pointerType === "mouse" || !e.isPrimary) return;
+      const from = e.currentTarget instanceof HTMLElement ? e.currentTarget : null;
+      const { clientX: x, clientY: y } = e;
+      hold.start(x, y, () => {
+        const shown = items();
+        if (shown.length === 0) return;
+        swallowNextClick();
+        open.value = { x, y, items: shown, from };
+      });
+    },
+    onPointerMove: (e: PointerEvent) => hold.move(e.clientX, e.clientY),
+    onPointerUp: () => hold.end(),
+    onPointerCancel: () => hold.end(),
+  };
+}
+
+/** One finger at a time: kept outside the rows, so a row drawn again mid-hold still ends it. */
+const hold = new Hold();
+
+/** Drops the click a lifted finger makes, until the next touch lands (Android may send none). */
+function swallowNextClick(): void {
+  const swallow = (e: Event) => { e.preventDefault(); e.stopPropagation(); done(); };
+  const done = () => {
+    removeEventListener("click", swallow, true);
+    removeEventListener("pointerdown", done, true);
+  };
+  addEventListener("click", swallow, true);
+  addEventListener("pointerdown", done, true);
 }
 
 /** The keys that open a row's menu without a pointer. */
