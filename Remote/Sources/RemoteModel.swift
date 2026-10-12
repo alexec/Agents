@@ -2245,10 +2245,11 @@ final class RemoteModel {
     }
 
     /// A project's Archived fold has opened: a page of its newest archived sessions, from
-    /// the project's own host (#533).
-    func loadArchived(in key: ProjectKey) async {
+    /// the project's own host (#533). Answers whether the host did (#664).
+    @discardableResult
+    func loadArchived(in key: ProjectKey) async -> Bool {
         openArchivedFolds.insert(Project.standardize(key.folder))
-        await loadArchivedAgents(in: key, limit: SidebarProjectFold.archivedShown)
+        return await loadArchivedAgents(in: key, limit: SidebarProjectFold.archivedShown)
     }
 
     /// A project's Archived fold has closed: what it held is let go, but for the chat open
@@ -2305,14 +2306,16 @@ final class RemoteModel {
     }
 
     /// A project's newest archived sessions, asked of the project's own host and stamped
-    /// as its own, as the window's (#533).
-    func loadArchivedAgents(in key: ProjectKey, limit: Int) async {
+    /// as its own, as the window's (#533). Answers whether the host did (#664).
+    @discardableResult
+    func loadArchivedAgents(in key: ProjectKey, limit: Int) async -> Bool {
         let request = DaemonAPI.ListRequest(archivedCommands: false, archivedOnly: true,
                                             folder: key.folder, limit: limit, lean: true)
         guard let target = hostClient(key.host),
               let listed = try? await target.call(DaemonAPI.Method.agentsList, request,
-                                                  returning: [Agent].self) else { return }
+                                                  returning: [Agent].self) else { return false }
         work.takeListed(listed.map { var agent = $0; agent.host = key.host; return agent })
+        return true
     }
 
     /// The client for `host`: the Mac's own, or a server's while it answers.

@@ -909,12 +909,16 @@ final class AppModel {
 
     /// A project's newest archived sessions, for its Archived fold when it opens (#164):
     /// the window holds the live agents, and a page of archived ones per open fold.
-    func loadArchived(in key: ProjectKey) async {
+    /// Answers whether the host did, so the page can tell an empty archive from a silent
+    /// host (#664).
+    @discardableResult
+    func loadArchived(in key: ProjectKey) async -> Bool {
         let request = DaemonAPI.ListRequest(archivedOnly: true, folder: key.folder,
                                             limit: Self.archivedShown, lean: true)
         guard let listed = try? await client(for: key.host).call(DaemonAPI.Method.agentsList, request,
-                                                                  returning: [Agent].self) else { return }
+                                                                  returning: [Agent].self) else { return false }
         work.takeListed(listed.map { var agent = $0; agent.host = key.host; return agent })
+        return true
     }
 
     /// Let go of a project's archived sessions when its Archived fold closes (#165),
