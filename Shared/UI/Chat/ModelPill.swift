@@ -42,7 +42,7 @@ struct ModelPill: View {
                 Text(title)
                 Image(systemName: "chevron.down")
                     // Decorative: a glyph in a capsule, not text (FR-015).
-                    .font(.system(size: 8, weight: .semibold))
+                    .glyph(size: 8, weight: .semibold)
                     .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 10)

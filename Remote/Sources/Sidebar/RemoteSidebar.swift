@@ -146,9 +146,10 @@ struct RemoteSidebar: View {
             }
 
             // This device, at the very foot, as the page's sidebar ends with its browser
-            // (#344): the way to forget it from here.
-            if !model.needsPairing {
-                Section {
+            // (#344): its text size (#750), and the way to forget it from here.
+            Section {
+                TextSizeRow()
+                if !model.needsPairing {
                     ForgetThisDeviceRow()
                 }
             }
@@ -467,6 +468,20 @@ private extension View {
                 .accessibilityHidden(true)
             self
         }
+    }
+}
+
+/// Text Size (#750): Default, Large or Larger, kept on this device only, as the window's
+/// Settings ▸ General and the page's sidebar foot keep theirs.
+private struct TextSizeRow: View {
+    @AppStorage(TextSize.defaultsKey) private var textSize = TextSize.standard
+
+    var body: some View {
+        Picker("Text Size", selection: $textSize) {
+            ForEach(TextSize.allCases) { Text($0.title).tag($0) }
+        }
+        .pickerStyle(.menu)
+        .appText(.supporting)
     }
 }
 

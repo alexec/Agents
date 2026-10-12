@@ -36,6 +36,7 @@ struct RemoteApp: App {
             RemoteView()
                 .background(Paper.ground)
                 .environment(model)
+                .chosenTextSize()
                 // A new model on a new link once the phone pairs with a control plane.
                 .id(ObjectIdentifier(model))
                 .task { push.received = { [model] userInfo in await model.receivedPush(userInfo) } }

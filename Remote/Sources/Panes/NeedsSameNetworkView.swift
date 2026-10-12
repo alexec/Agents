@@ -14,7 +14,7 @@ struct NeedsSameNetworkView: View {
         VStack(spacing: 12) {
             Image(systemName: "house")
                 // Decorative: a glyph above the words, not text, and hidden from VoiceOver.
-                .font(.system(size: 28, weight: .light))
+                .glyph(size: 28, weight: .light)
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
             Text("Needs the same network as your Mac")

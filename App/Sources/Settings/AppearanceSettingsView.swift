@@ -59,7 +59,31 @@ enum Appearance: String, CaseIterable, Identifiable {
     }
 }
 
-/// Settings ▸ General: appearance, what agents call you, the chat project, whether this Mac
+extension TextSize {
+    /// Where the choice is kept: scoped by root as `Appearance` is, so a scratch copy
+    /// walked at Larger leaves the real app as it was (#750).
+    static var defaultsKey: String {
+        let locations = StoreLocations.default
+        return locations.isStandard ? "textSize" : "textSize.root:\(locations.name)"
+    }
+}
+
+extension View {
+    /// Hands the person's text size, or the launch override, to everything below.
+    func chosenTextSize() -> some View {
+        modifier(ChosenTextSize())
+    }
+}
+
+private struct ChosenTextSize: ViewModifier {
+    @AppStorage(TextSize.defaultsKey) private var textSize = TextSize.standard
+
+    func body(content: Content) -> some View {
+        content.environment(\.textSize, TextSize.launchOverride ?? textSize)
+    }
+}
+
+/// Settings ▸ General: appearance, text size, what agents call you, the chat project, whether this Mac
 /// stays awake, and archived agents.
 struct GeneralSettingsView: View {
     @Environment(AppModel.self) private var model
@@ -83,6 +107,7 @@ struct GeneralSettingsView: View {
 
 struct AppearanceSettingsView: View {
     @AppStorage(Appearance.defaultsKey) private var appearance = Appearance.system
+    @AppStorage(TextSize.defaultsKey) private var textSize = TextSize.standard
 
     var body: some View {
         Section {
@@ -90,8 +115,14 @@ struct AppearanceSettingsView: View {
                 ForEach(Appearance.allCases) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented)
+            // Beside the appearance, and per Mac like it (#750): the whole app's text,
+            // with the marks beside it. The terminal keeps its own size.
+            Picker("Text size", selection: $textSize) {
+                ForEach(TextSize.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
         } footer: {
-            Text("System follows your Mac, and changes with it.")
+            Text("System follows your Mac, and changes with it. Text size is for this Mac only; the terminal keeps its own.")
                 .appText(.fine)
                 .foregroundStyle(.secondary)
         }

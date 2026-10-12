@@ -330,6 +330,9 @@ private struct SessionMark: View {
         }
     }
 
+    /// The well grows with the text beside it (#750), so the row keeps its shape.
+    @Environment(\.textSize) private var textSize
+
     var body: some View {
         Group {
             switch kind {
@@ -351,7 +354,7 @@ private struct SessionMark: View {
                 Image(systemName: ArchiveRequestWords.symbol).foregroundStyle(Paper.accent)
             }
         }
-        .frame(width: 16, height: 16)
+        .frame(width: 16 * textSize.scale, height: 16 * textSize.scale)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
     }
@@ -388,6 +391,8 @@ struct StatusIcon: View {
     /// Waiting for an allowance to come back (052, US4): it will carry on by itself, so
     /// it does not want a person, whatever its stopped shape says.
     var isWaitingForAllowance = false
+    /// The well grows with the text beside it (#750), so the row keeps its shape.
+    @Environment(\.textSize) private var textSize
 
     private var shape: StatusShape {
         StatusShape(state: state, outcome: outcome, isWaiting: isWaiting, isComingBack: isComingBack,
@@ -401,15 +406,15 @@ struct StatusIcon: View {
             if let symbol = shape.symbol {
                 Image(systemName: symbol)
                     // Decorative: a glyph filling an 18-point well, not text (FR-015).
-                    .font(.system(size: 15))
+                    .glyph(size: 15)
                     .foregroundStyle((StatusShape.isTinted(shape, isWaitingForAllowance: isWaitingForAllowance)
                                       ? StateTint.attention : .none)
                         .style(or: .secondary))
             } else {
-                SyncedSpinner(diameter: 12)
+                SyncedSpinner(diameter: 12 * textSize.scale)
             }
         }
-        .frame(width: 18, height: 18)
+        .frame(width: 18 * textSize.scale, height: 18 * textSize.scale)
         .help(description)
         .accessibilityLabel(description)
     }
@@ -426,10 +431,12 @@ struct StatusIcon: View {
 /// The unread mark before a row's title (#70). Grey, not the attention colour: unread
 /// is news, not a need. Silent to a screen reader, which hears the title's value instead.
 struct UnreadDot: View {
+    @Environment(\.textSize) private var textSize
+
     var body: some View {
         Circle()
             .fill(.secondary)
-            .frame(width: 7, height: 7)
+            .frame(width: 7 * textSize.scale, height: 7 * textSize.scale)
             .accessibilityHidden(true)
     }
 }

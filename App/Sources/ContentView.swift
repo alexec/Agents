@@ -350,6 +350,8 @@ struct ContentView: View {
         .onChange(of: model.needsPersonCount, initial: true) { _, count in
             NSApp.dockTile.badgeLabel = count > 0 ? "\(count)" : nil
         }
+        // The person's text size (#750), for every view in the window and its sheets.
+        .chosenTextSize()
     }
 }
 

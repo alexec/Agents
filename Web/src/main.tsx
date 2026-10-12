@@ -6,7 +6,10 @@ import { App } from "./App";
 import { Store } from "./model/store";
 import { Session } from "./session";
 import { startPresence } from "./presence";
+import { applyTextSize } from "./model/textSize";
 
+// Before the first paint, so the page never draws at Default and then grows (#750).
+applyTextSize();
 const session = new Session();
 const store = new Store(session.link);
 startPresence(store);

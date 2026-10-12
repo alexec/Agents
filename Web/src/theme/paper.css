@@ -49,7 +49,15 @@
      (Shared/UI/TypeScale.swift), and one monospace for code. */
   --font-text: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* The person's text size (#750): Default, Large or Larger, set on the root by
+     model/textSize.ts and kept in this browser. Every font-size, and the marks drawn beside
+     text, is multiplied by it, as the window multiplies its steps (Shared/UI/TypeScale.swift). */
+  --text-scale: 1;
 }
+
+:root[data-text-size="large"] { --text-scale: 1.15; }
+:root[data-text-size="larger"] { --text-scale: 1.3; }
 
 @media (prefers-color-scheme: dark) {
   :root {

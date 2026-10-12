@@ -17,6 +17,7 @@ import { useEffect } from "preact/hooks";
 import { actDoing, type Store } from "../model/store";
 import { byStart, folderKey, projectFolder, showsUnread } from "../model/groups";
 import { folds } from "../model/folds";
+import { chooseTextSize, parseTextSize, textSize, textSizes } from "../model/textSize";
 import { macHostNoticeDetail, macHostNoticeTitle } from "../model/macHostNotice";
 import { parseQuery, queryMatches, type LabelQuery } from "../model/labels";
 import { keepsInUnread, newSessionProject, ownCount, pinnedSessions, pinnedWorkflows, projectSessions, rememberedProject, rememberProject,
@@ -202,6 +203,14 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
         )))}
         <div class="identity">
           <span>{browserName()} on this Mac</span>
+          {/* This browser's text size (#750), as the window's Settings ▸ General and the
+              Remote's sidebar foot keep theirs. */}
+          <label class="text-size">
+            Text size{" "}
+            <select value={textSize.value} onChange={(e) => chooseTextSize(parseTextSize(e.currentTarget.value))}>
+              {textSizes.map(({ size, title }) => <option value={size} key={size}>{title}</option>)}
+            </select>
+          </label>
           {confirming.value ? (
             <span class="confirm">
               <button onClick={() => void session.forgetThisBrowser()}>Forget</button>

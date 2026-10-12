@@ -308,7 +308,7 @@ private struct WaitingNow: View {
                             Button {
                                 Task { await model.cancelWait(of: agent.agentID) }
                             } label: {
-                                Image(systemName: "xmark").font(.caption) // decorative glyph
+                                Image(systemName: "xmark").glyph(.caption) // decorative glyph
                             }
                             .buttonStyle(.plain)
                             .foregroundStyle(.secondary)

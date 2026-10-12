@@ -24,6 +24,7 @@ extension EnvironmentValues {
 struct MarkdownText: View {
     @Environment(\.textFillsWidth) private var fillsWidth
     @Environment(\.textIsLazy) private var isLazy
+    @Environment(\.textSize) private var textSize
     let markdown: String
     /// The document's own location, when there is one, so a relative image can be
     /// found. Nil in the conversation, where there is no document to be relative to —
@@ -102,7 +103,7 @@ struct MarkdownText: View {
             // Not a step of the scale: `TextStep.heading` says why, and resolves the
             // ladder once for both apps. The consistency check allows it by name.
             self.text(text, caret: caret)
-                .font(TextStep.heading(level: level))
+                .font(TextStep.heading(level: level, size: textSize))
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
                 .linkPointer(text)

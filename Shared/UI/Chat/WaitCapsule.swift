@@ -33,7 +33,7 @@ struct WaitCapsule: View {
                 .help(status.line)
                 if let cancel {
                     Button(action: cancel) {
-                        Image(systemName: "xmark").font(.caption2) // decorative glyph
+                        Image(systemName: "xmark").glyph(.caption2) // decorative glyph
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
