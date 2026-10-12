@@ -160,7 +160,6 @@ public enum DotAgents {
             routes.append("- **\(when)** \(verb) `\(path)\(isDirectory(project.appending(path: path)) ? "/" : "")`.")
         }
         routes.append("- **For a task a skill covers:** USE the skill in `.agents/skills/`.")
-        routes.append("- **When a task calls for a specialist perspective:** ADOPT a persona from `.agents/personas/`.")
         routes.append("- **For a plugin this project carries:** LOOK in `.agents/plugins/`.")
         let this = chat ? """
 

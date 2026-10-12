@@ -138,6 +138,7 @@ export interface Agent {
   pendingMove?: PendingMove;
   startingPoint?: StartingPoint;
   startRequestID?: UUID;
+  persona?: string;
   restartPickUps?: number;
   report?: WorkReport;
   outcomeAsked?: boolean;
@@ -1146,6 +1147,21 @@ export interface PermissionRequest {
   subagent?: string;
 }
 
+export interface Persona {
+  id: string;
+  name: string;
+  description?: string;
+  origin: PersonaOrigin;
+  settings: WorkflowSettings;
+  problem?: string;
+}
+
+export type PersonaOrigin = "project" | "personal";
+
+export interface PersonasListRequest {
+  folder: URLString;
+}
+
 export interface PinArrangeRequest {
   folder: URLString;
   paths: string[];
@@ -1571,6 +1587,7 @@ export interface StartRequest {
   requestID?: UUID;
   sandbox?: SandboxChoice;
   labels: string[];
+  persona?: string;
 }
 
 export interface StartingPoint {
@@ -2121,6 +2138,7 @@ export interface Methods {
   "options/remembered": { params: RememberedOptionsRequest; result: ConfigOption[] };
   "permissions/answer": { params: AnswerRequest; result: Empty };
   "permissions/pending": { params: Empty; result: PermissionRequest[] };
+  "personas/list": { params: PersonasListRequest; result: Persona[] };
   "pins/arrange": { params: PinArrangeRequest; result: Empty };
   "pins/arrangeSessions": { params: PinArrangeSessionsRequest; result: Empty };
   "pins/arrangeWorkflows": { params: PinArrangeWorkflowsRequest; result: Empty };
@@ -2230,6 +2248,7 @@ export const MethodTarget = {
   "options/remembered": "host",
   "permissions/answer": "host",
   "permissions/pending": "host",
+  "personas/list": "host",
   "pins/arrange": "host",
   "pins/arrangeSessions": "host",
   "pins/arrangeWorkflows": "host",
@@ -2312,7 +2331,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ACPAuthMethod: { required: ["id"], optional: ["name", "description", "_meta"] },
   ACPPromptCapabilities: { required: [], optional: ["image", "audio", "embeddedContext"] },
   ACPProviderInfo: { required: ["id"], optional: ["name", "protocol", "configured"] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart"] },
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },
   AgentWorktree: { required: ["name", "root", "project", "madeByApp"], optional: ["branch", "base"] },
@@ -2425,6 +2444,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PermissionNotification: { required: ["agentID"], optional: ["request", "requestID"] },
   PermissionOption: { required: ["optionID", "name", "kind"], optional: [] },
   PermissionRequest: { required: ["id", "agentID", "toolCall", "options", "askedAt"], optional: ["subagent"] },
+  Persona: { required: ["id", "name", "origin", "settings"], optional: ["description", "problem"] },
+  PersonasListRequest: { required: ["folder"], optional: [] },
   PinArrangeRequest: { required: ["folder", "paths"], optional: [] },
   PinArrangeSessionsRequest: { required: ["folder", "agentIDs"], optional: [] },
   PinArrangeWorkflowsRequest: { required: ["folder", "workflowIDs"], optional: [] },
@@ -2476,7 +2497,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ShownFile: { required: ["path"], optional: ["line"] },
   SlashCommand: { required: ["name"], optional: ["description", "inputHint"] },
   StartOptions: { required: ["values", "extraArguments"], optional: [] },
-  StartRequest: { required: ["runtimeID", "cwd", "prompt", "attachments", "startOptions", "additionalDirectories", "mcpServers", "labels"], optional: ["draftID", "worktree", "requestID", "sandbox"] },
+  StartRequest: { required: ["runtimeID", "cwd", "prompt", "attachments", "startOptions", "additionalDirectories", "mcpServers", "labels"], optional: ["draftID", "worktree", "requestID", "sandbox", "persona"] },
   StartingPoint: { required: ["repository", "commit"], optional: [] },
   StopBackgroundRequest: { required: ["agentID", "itemID"], optional: [] },
   StoreNotes: { required: ["notes"], optional: [] },

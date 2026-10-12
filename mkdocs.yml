@@ -113,6 +113,7 @@ nav:
       - reference/agent-tools.md
       - reference/settings.md
       - reference/workflows.md
+      - reference/personas.md
       - reference/events.md
       - reference/workspace-providers.md
       - reference/keyboard-shortcuts.md

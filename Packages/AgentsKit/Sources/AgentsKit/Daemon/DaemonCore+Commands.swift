@@ -347,6 +347,12 @@ extension DaemonCore {
         }
         agent.madeInRoot = rootID
         agent.sandboxOverride = request.sandbox
+        // Only one there is (#760): a persona gone since the form listed it starts the
+        // agent without one rather than refusing what the person typed.
+        if let persona = request.persona,
+           PersonaFile.find(persona, project: request.cwd, home: locations.personalHome) != nil {
+            agent.persona = persona
+        }
         agent.startedByWorkflow = workflow?.id
         agent.startedByRun = workflow?.run
         // Taken off the queue, or archived, while its runtime was being made (#362).
@@ -1375,7 +1381,9 @@ extension DaemonCore {
         //
         // The runtime is read first on purpose: an agent that has somehow gone keeps its
         // place in the queue rather than having the briefing quietly spent on nobody.
+        var briefed = false
         if let runtimeID = agents[agentID]?.runtimeID, needsBriefing.remove(agentID) != nil {
+            briefed = true
             // An agent another agent started hears nothing about starting agents: it
             // was not given the tools (028).
             let managesAgents = agents[agentID]?.startedByAgent == nil
@@ -1392,6 +1400,14 @@ extension DaemonCore {
                                             managesAgents: managesAgents,
                                             movesItself: RuntimeCatalog.canMoveFolders(runtimeID: runtimeID),
                                             naming: naming, declared: declaredResources)))
+        }
+        // The persona it was started as (#760), with the briefing and for the same
+        // reason: standing context, once per conversation. Read now, so an edit to the
+        // file reaches the next conversation, and from the project the agent belongs to.
+        if briefed, let agent = agents[agentID], let id = agent.persona,
+           let found = PersonaFile.find(id, project: agent.projectFolder, home: locations.personalHome),
+           !found.prompt.isEmpty {
+            ours.append(.text(found.prompt))
         }
         // What the app owes the agent about this prompt, and only the agent (042).
         if let preface { ours.append(.text(preface)) }

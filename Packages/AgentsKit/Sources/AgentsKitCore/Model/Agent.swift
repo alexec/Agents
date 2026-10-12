@@ -184,6 +184,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// its reply was lost finds the agent the first attempt made, including across a
     /// daemon restart, and how a phone that dropped mid-send finds it in the list.
     public var startRequestID: UUID?
+    /// The persona it was started as (#760), by id: its prompt goes with every briefing,
+    /// read from the file each time. Nil for most agents.
+    public var persona: String?
 
     /// How many times in a row this chat has been picked back up after the daemon
     /// went, without a turn since reaching its own end. On the record and not in
@@ -335,6 +338,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         pendingMove = (try? c.decodeIfPresent(PendingMove.self, forKey: .pendingMove)) ?? nil
         startingPoint = try c.decodeIfPresent(StartingPoint.self, forKey: .startingPoint)
         startRequestID = try c.decodeIfPresent(UUID.self, forKey: .startRequestID)
+        persona = try c.decodeIfPresent(String.self, forKey: .persona)
         // New in 011, and counted from nothing, so every record written before the
         // restart guard existed opens as a chat that has never been picked back up.
         restartPickUps = try c.decodeIfPresent(Int.self, forKey: .restartPickUps) ?? 0
@@ -434,6 +438,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(pendingMove, forKey: .pendingMove)
         try c.encodeIfPresent(startingPoint, forKey: .startingPoint)
         try c.encodeIfPresent(startRequestID, forKey: .startRequestID)
+        try c.encodeIfPresent(persona, forKey: .persona)
         if restartPickUps != 0 { try c.encode(restartPickUps, forKey: .restartPickUps) }
         try c.encodeIfPresent(report, forKey: .report)
         if outcomeAsked { try c.encode(outcomeAsked, forKey: .outcomeAsked) }
@@ -468,6 +473,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case usage, lastTurnUsage, costToDate, costCeiling, plans, additionalDirectories, mcpServers
         case queuedPrompts, suggestedPrompts
         case startedByWorkflow, startedByRun, startedByAgent, chainDepth, eventWait, startRequestID
+        case persona
         case worktree
         case pendingMove
         case startingPoint

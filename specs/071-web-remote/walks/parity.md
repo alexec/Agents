@@ -24,7 +24,7 @@ Of 217 rows: **145 same**, **45 by design**, **27 delta** (after #188, #189, #19
 | Chat turns and turn detail | 23 | 4 | 2 |
 | Prompt bar and queued prompts | 20 | 3 | 0 |
 | Question and permission cards | 13 | 3 | 0 |
-| Start sheet and new project | 17 | 5 | 0 |
+| Start sheet and new project | 18 | 5 | 0 |
 | Worktrees and Files | 9 | 6 | 6 |
 | Pins | 4 | 1 | 0 |
 | Workflows page | 15 | 1 | 2 |
@@ -196,6 +196,7 @@ The deltas are tracked by 29 issues:
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
 | Its shape | A bar on the project: `A/Chat/PromptBar.swift:242-347` | A sheet: `R/StartAgent/StartAgentView.swift:25-46` | A bar: `W/views/NewAgent.tsx:154-210` | **by design** |
+| Persona (#760) | First row of the bar before an agent exists: segments, a menu on the chat project, the description under it; sets what it names, keeps the rest, adds its labels: `A/Chat/PromptBar.swift` (`personaChoice`), `A/AppModel.swift` (`choosePersona`) | First section of the start page, the same: `R/StartAgent/StartAgentView.swift` (`personaSection`), `R/RemoteModel.swift` (`choosePersona`) | Under the project's name, the same: `W/views/NewAgent.tsx`, `W/model/personas.ts` | **same** |
 | Runtimes listed by name (#154) | `RuntimeCatalog.sortedByName` | The same | `W/model/runtimes.ts` | **same** |
 | Available and Out groups | For this Mac's projects: `A/Chat/PromptBar.swift:310-346, 1065-1087` | The project's host's runtimes, split only for this Mac's projects: `R/StartAgent/ChoiceRows.swift:57-140`, `R/RemoteModel.swift` `startRuntimes` (#240); under an available one's name, *Needs signing in* or its account, as the window's `signInNote` says it (#538) | Available, Out and Can't start, from the host's `isOut`, in runs only when one is out; under each, *Needs signing in* or its account (`runtimeNote`): `W/views/NewAgent.tsx:289-292`, `W/model/runtimes.ts` | **same** (#240, #257, #538) |
 | Default runtime | `RuntimeCatalog.newSessionRuntime`: the kept form's, else Claude, else the first: `A/Chat/PromptBar.swift:1119`, `K/Runtimes/RuntimeCatalog.swift:127-136` | The same rule, on this project's host, its kept choice in its defaults: `R/RemoteModel.swift:472-479, 527` | Its twin, held to the same fixture: `W/model/runtimes.ts`, `W/views/NewAgent.tsx` | **same** (#264) |

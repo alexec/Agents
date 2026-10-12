@@ -40,7 +40,7 @@ struct SharedOtherFilesPage: View {
 
     static func use(_ kind: DaemonAPI.OtherFile.Kind) -> String {
         switch kind {
-        case .persona: "A persona: agents can be asked to adopt it"
+        case .persona: "A persona: picked when an agent starts"
         case .git: "~/.agents is a git repository"
         case .managed: "Kept by the skills installer; the app leaves it alone"
         case .unused: "Not read by any agent"

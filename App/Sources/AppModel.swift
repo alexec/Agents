@@ -578,9 +578,21 @@ final class AppModel {
             draftWorktree = nil
             draftWorktrees = .notARepository
             Task { await loadDraftWorktrees() }
+            // A persona is a file in one project, or the home's (#760).
+            draftPersona = nil
+            draftPersonas = []
+            Task { await loadDraftPersonas() }
         }
     }
     var draftRuntimeID: String?
+    /// The kinds of session the draft folder offers (#760): the project's personas and
+    /// the home's, as the host lists them.
+    private(set) var draftPersonas: [Persona] = []
+    /// The one picked, by id, sent with the start so the agent gets its prompt.
+    private(set) var draftPersona: String?
+    /// A persona picked while its runtime's options were still to come: laid over them
+    /// when they arrive.
+    private var pendingPersona: Persona?
     /// Where in the project the next agent works, when not the project folder (030).
     /// Deliberately not kept with the rest of the form: a worktree is decided per
     /// agent, so it goes back to the project folder after every start (FR-004).
@@ -3517,6 +3529,40 @@ final class AppModel {
         draftWorktrees = answer
     }
 
+    /// The personas the draft folder offers (#760). A host too old to know the method
+    /// offers none, and the choice is not drawn.
+    func loadDraftPersonas() async {
+        guard let folder = draftCwd else { return }
+        let listed = (try? await selectedHostClient.call(DaemonAPI.Method.personasList,
+                                                         DaemonAPI.PersonasListRequest(folder: folder),
+                                                         returning: [Persona].self)) ?? []
+        guard folder == draftCwd else { return }
+        draftPersonas = listed
+        if let draftPersona, !listed.contains(where: { $0.id == draftPersona && $0.problem == nil }) {
+            self.draftPersona = nil
+        }
+    }
+
+    /// Pick a kind of session (#760): every setting it names is set, and every one it
+    /// leaves out stays as the form has it. Nil picks none, and changes nothing else.
+    func choosePersona(_ persona: Persona?) {
+        draftPersona = persona?.id
+        pendingPersona = nil
+        guard let persona else { return }
+        if let runtimeID = persona.settings.runtimeID, runtimeID != draftRuntimeID,
+           availableRuntimes.contains(where: { $0.runtime.id == runtimeID }) {
+            draftRuntimeID = runtimeID
+            pendingPersona = persona
+            Task { await loadDraftOptions() }
+            return
+        }
+        if draftOptions.isEmpty {
+            pendingPersona = persona
+        } else {
+            draftChosen.merge(persona.choices(against: draftOptions)) { _, new in new }
+        }
+    }
+
     /// What the open agent's project has, for the Worktree choice on its page (053).
     func loadAgentWorktrees(of agent: Agent) async {
         let folder = agent.projectFolder
@@ -3616,6 +3662,11 @@ final class AppModel {
             draftChosen[mode.id] = ModeMemory.startingValue(
                 remembered: rememberedMode(for: runtimeID), for: mode)
         }
+        // Over the mode remembered, because the persona was picked after it (#760).
+        if let persona = pendingPersona, !draftOptions.isEmpty {
+            draftChosen.merge(persona.choices(against: draftOptions)) { _, new in new }
+            pendingPersona = nil
+        }
     }
 
     /// The runtime starting behind a form drawn from memory has answered at last, and
@@ -3653,7 +3704,7 @@ final class AppModel {
                                              additionalDirectories: draftFolders,
                                              mcpServers: draftServers,
                                              worktree: draftWorktree,
-                                             sandbox: draftSandbox, labels: labels)
+                                             sandbox: draftSandbox, labels: labels, persona: draftPersona)
         do {
             let id = try await selectedHostClient.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
             draftID = nil

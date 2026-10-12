@@ -767,6 +767,12 @@ button.remove:hover { opacity: 1; }
 /* A new session: the project's name and folder in the middle, the bar at the foot (#108). */
 .new-heading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 20px; text-align: center; }
 .new-heading h1 { margin: 0; font-size: 22px; font-weight: 600; }
+.new-heading .persona-choice { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 10px; max-width: 100%; }
+.new-heading .persona-choice p { white-space: normal; }
+.segmented { display: inline-flex; background: var(--paper-raised); flex-wrap: wrap; justify-content: center; border: 1px solid var(--paper-rule); border-radius: 8px; overflow: hidden; }
+.segmented button { border: 0; border-radius: 0; background: none; padding: 4px 12px; font: inherit; font-size: 13px; color: inherit; cursor: pointer; }
+.segmented button + button { border-left: 1px solid var(--paper-rule); }
+.segmented button.on { background: var(--paper-selection); }
 .new-heading p { margin: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .menu-anchor.reach { margin-right: 0; }
 .popover.up { top: auto; bottom: 32px; }

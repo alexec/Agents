@@ -63,6 +63,7 @@ struct StartAgentView: View {
                     }
                 }
             }
+            personaSection
             ChoiceRows()
             Section("Reach") {
                 ForEach(model.startFolders, id: \.self) { folder in
@@ -98,6 +99,54 @@ struct StartAgentView: View {
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top, spacing: 0) { HostOfflineStrip(host: model.startHost) }
         .safeAreaInset(edge: .bottom, spacing: 0) { promptBar }
+    }
+
+    /// The project's personas, first (#760): segments on a project, a menu on the chat
+    /// project, and what the picked one is for under them. Not drawn where there are none.
+    @ViewBuilder private var personaSection: some View {
+        let usable = model.startPersonas.filter { $0.problem == nil }
+        let broken = model.startPersonas.filter { $0.problem != nil }
+        if !model.startPersonas.isEmpty {
+            Section {
+                let selection = Binding<String>(get: { model.startPersona ?? "" },
+                                                set: { id in pickPersona(id) })
+                if !usable.isEmpty {
+                    if model.work.project(project)?.isChat == true {
+                        Picker("Persona", selection: selection) {
+                            Text("None").tag("")
+                            ForEach(usable) { Text($0.name).tag($0.id) }
+                        }
+                    } else {
+                        Picker("Persona", selection: selection) {
+                            Text("None").tag("")
+                            ForEach(usable) { Text($0.name).tag($0.id) }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                    }
+                }
+                ForEach(broken) { persona in
+                    Text("\(persona.id).md: \(persona.problem ?? "")")
+                        .appText(.supporting)
+                        .foregroundStyle(.secondary)
+                }
+            } footer: {
+                if let description = usable.first(where: { $0.id == model.startPersona })?.description {
+                    Text(description)
+                }
+            }
+            .disabled(model.isStarting)
+        }
+    }
+
+    /// Every setting the persona names, and its labels beside any already there.
+    private func pickPersona(_ id: String) {
+        let persona = model.startPersonas.first { $0.id == id }
+        for label in persona?.settings.labels ?? []
+        where !draftLabels.contains(where: { SessionLabelPolicy.key($0) == SessionLabelPolicy.key(label) }) {
+            draftLabels.append(label)
+        }
+        Task { await model.choosePersona(persona) }
     }
 
     private var promptBar: some View {
