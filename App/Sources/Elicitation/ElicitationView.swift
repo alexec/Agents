@@ -69,7 +69,7 @@ struct ElicitationView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .paperRaised(in: RoundedRectangle(cornerRadius: 16))
         }
-        // Floats above the prompt bar, in its column.
+        // At the end of the conversation, in its column (#723).
         .chatColumn()
         .onAppear { fillInDefaults() }
         // A second question arriving while the first is still on screen starts at

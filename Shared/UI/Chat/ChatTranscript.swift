@@ -32,6 +32,10 @@ struct ChatTranscript: View {
     let loadEarlier: () async -> Void
     /// How much of the foot of the pane the floating prompt covers.
     var bottomInset: CGFloat = 0
+    /// What waits on the person (questions, forms, guarded changes), drawn as the last
+    /// thing in the conversation rather than over it, so what led to it can be scrolled
+    /// back to past it (#723). Each card keeps the chat column itself.
+    var cards: AnyView? = nil
     /// Somebody asked for the end: the prompt was sent, or the menu command was used.
     /// A counter rather than a flag, so two asks in a row both land.
     var scrollToEndToken = 0
@@ -109,6 +113,9 @@ struct ChatTranscript: View {
     /// Whether there is more conversation than pane. No point offering a way to the
     /// end of something already wholly on screen.
     @State private var canScroll = false
+    /// Whether any of the waiting cards is on screen. Scrolled away from, the way back
+    /// says a question is waiting (#723).
+    @State private var cardsShown = true
     /// How tall the pane is, which the foot's margin is held to (#371).
     @State private var paneHeight: CGFloat?
     /// The tallest honest content height seen for this conversation.
@@ -182,55 +189,64 @@ struct ChatTranscript: View {
         let liveID = isWorking ? rows.last?.id : nil
         ScrollViewReader { scroller in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 14) {
-                    if let loadFailure {
-                        LoadFailureLine(sentence: loadFailure.sentence, retry: actions.reloadTranscript)
+                VStack(spacing: 14) {
+                    LazyVStack(alignment: .leading, spacing: 14) {
+                        if let loadFailure {
+                            LoadFailureLine(sentence: loadFailure.sentence, retry: actions.reloadTranscript)
+                        }
+                        if hasMore {
+                            // No button. Reaching the top is the ask.
+                            ProgressView()
+                                .controlSize(.small)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                        }
+                        // Folded once by the model as each entry lands, not here on every
+                        // redraw: a reply arrives several chunks a second.
+                        // Each turn at the app's level, or the one chosen for it. A new turn
+                        // leaves the ones before it as they were: one being read stays open.
+                        ForEach(rows) { turn in
+                            TurnView(turn: turn,
+                                     detail: turnViews[turn.id] ?? defaultDetail,
+                                     fetched: fetchedTurns[turn.id]?.items,
+                                     hasEarlier: fetchedTurns[turn.id]?.hasEarlier(than: turn) ?? false,
+                                     fetchFailed: failedTurns.contains(turn.id),
+                                     isLive: turn.id == liveID,
+                                     toggle: { toggle(turn) },
+                                     fetch: { await fetch(turn) },
+                                     fetchEarlier: { await fetchEarlier(turn) })
+                                .equatable()
+                                .id(turn.id)
+                        }
+                        .environment(\.backgroundWork, agent.background)
+                        .environment(\.textIsLazy, true)
+                        ForEach(agent.queuedPrompts) { queued in
+                            QueuedPromptRow(prompt: queued, agentID: agent.id,
+                                            canSendNow: canSendNow)
+                        }
+                        // Live, and so at the foot rather than in the record: the chat
+                        // itself says what the row in the list says, and it stops saying
+                        // it the moment the prompt lands.
+                        if isComingBack {
+                            ComingBackLine()
+                        } else if agent.state == .running || agent.state == .starting {
+                            WorkingLine()
+                        }
                     }
-                    if hasMore {
-                        // No button. Reaching the top is the ask.
-                        ProgressView()
-                            .controlSize(.small)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                    }
-                    // Folded once by the model as each entry lands, not here on every
-                    // redraw: a reply arrives several chunks a second.
-                    // Each turn at the app's level, or the one chosen for it. A new turn
-                    // leaves the ones before it as they were: one being read stays open.
-                    ForEach(rows) { turn in
-                        TurnView(turn: turn,
-                                 detail: turnViews[turn.id] ?? defaultDetail,
-                                 fetched: fetchedTurns[turn.id]?.items,
-                                 hasEarlier: fetchedTurns[turn.id]?.hasEarlier(than: turn) ?? false,
-                                 fetchFailed: failedTurns.contains(turn.id),
-                                 isLive: turn.id == liveID,
-                                 toggle: { toggle(turn) },
-                                 fetch: { await fetch(turn) },
-                                 fetchEarlier: { await fetchEarlier(turn) })
-                            .equatable()
-                            .id(turn.id)
-                    }
-                    .environment(\.backgroundWork, agent.background)
-                    .environment(\.textIsLazy, true)
-                    ForEach(agent.queuedPrompts) { queued in
-                        QueuedPromptRow(prompt: queued, agentID: agent.id,
-                                        canSendNow: canSendNow)
-                    }
-                    // Live, and so at the foot rather than in the record: the chat
-                    // itself says what the row in the list says, and it stops saying
-                    // it the moment the prompt lands.
-                    if isComingBack {
-                        ComingBackLine()
-                    } else if agent.state == .running || agent.state == .starting {
-                        WorkingLine()
+                    // The chat column, shared with the prompt bar below it and with the
+                    // cards at the end: one pair of edges down the pane, set in one place
+                    // (FR-021).
+                    .chatColumn()
+                    .scrollTargetLayout()
+                    // Outside the lazy stack, so a card scrolled far away is still built:
+                    // its half-filled answers and its ⌘1…9 stay with it (#723).
+                    if let cards {
+                        cards
+                            .onScrollVisibilityChange(threshold: 0.2) { cardsShown = $0 }
+                            .onDisappear { cardsShown = true }
                     }
                     Color.clear.frame(height: 1).id(bottom)
                 }
-                // The chat column, shared with the prompt bar below it and with the
-                // cards that float above that: one pair of edges down the pane, set in
-                // one place (FR-021).
-                .chatColumn()
                 .padding(.vertical, 20)
-                .scrollTargetLayout()
             }
             // Hidden while it pages back to where the reader left it, so the end does not
             // show first and then jump (#378).
@@ -448,14 +464,13 @@ struct ChatTranscript: View {
             }
             // Nobody is reading a chat that is not on screen, so it may be trimmed again.
             .onDisappear { onFollowing(true) }
-            // The floor rose: a question or a permission card appeared above the
-            // prompt bar, and the transcript's bottom margin grew with it. The
-            // geometry does not count that as the end moving — content size and
-            // offset are what they were — so whoever was following was left with the
-            // last thing said, usually the question itself, under the glass. Only for
-            // the follower: a reader elsewhere is not moved (FR-010), and the card
-            // floats in view for them regardless. A turn of the run loop later, so
-            // the new margin is in force before the pane is asked to reach the end.
+            // The floor rose: the prompt bar grew, and the transcript's bottom margin
+            // grew with it. The geometry does not count that as the end moving —
+            // content size and offset are what they were — so whoever was following
+            // was left with the last thing said under the glass. Only for the
+            // follower: a reader elsewhere is not moved (FR-010). A turn of the run
+            // loop later, so the new margin is in force before the pane is asked to
+            // reach the end.
             .onChange(of: bottomInset) { before, after in
                 guard after > before, isFollowing else { return }
                 Task { @MainActor in
@@ -467,18 +482,21 @@ struct ChatTranscript: View {
                 // scroll view eased every correction, so a reader and the pane pulled
                 // against each other for the length of the ease.
                 ZStack(alignment: .bottom) {
-                    if canScroll, !isFollowing {
-                        JumpToEnd(hasNewBelow: hasNewBelow) { goToEnd(scroller) }
+                    if canScroll, !isFollowing || questionWaiting {
+                        JumpToEnd(hasNewBelow: hasNewBelow, questionWaiting: questionWaiting) { goToEnd(scroller) }
                             // Clear of the floating prompt, whose height the chat has
                             // already measured for the transcript's own bottom inset.
                             .padding(.bottom, bottomInset + 12)
                             .transition(.opacity)
                     }
                 }
-                .animation(.easeOut(duration: 0.15), value: canScroll && !isFollowing)
+                .animation(.easeOut(duration: 0.15), value: canScroll && (!isFollowing || questionWaiting))
             }
         }
     }
+
+    /// A card waits on the person and none of it is on screen (#723).
+    private var questionWaiting: Bool { cards != nil && !cardsShown }
 
     /// Open a turn's steps, or close them. Open is the app's level when that shows
     /// steps, and Steps when it does not; closed is always the outcome, never a trip

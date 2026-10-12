@@ -12,6 +12,8 @@ struct Transcript: View {
     let agent: Agent
     /// How much of the foot of the pane the floating prompt covers.
     var bottomInset: CGFloat = 0
+    /// What waits on the person, drawn at the end of the conversation (#723).
+    var cards: AnyView? = nil
 
     var body: some View {
         ChatTranscript(agent: agent,
@@ -27,6 +29,7 @@ struct Transcript: View {
                        settleKey: model.selection,
                        loadEarlier: { await model.loadEarlier() },
                        bottomInset: bottomInset,
+                       cards: cards,
                        // The artifacts pane asked for the message something came
                        // from (FR-042).
                        scrollToEndToken: model.scrollToEndToken,

@@ -61,7 +61,7 @@ struct PermissionView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .paperRaised(in: RoundedRectangle(cornerRadius: 16))
         }
-        // Floats above the prompt bar, in its column.
+        // At the end of the conversation, in its column (#723).
         .chatColumn()
     }
 

@@ -365,6 +365,22 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     }
   }, [focus, rows, level.value, chosen.value]);
 
+  // What waits on the person is the last thing in the conversation, not over it (#723). Scrolled
+  // out of sight, the way back says a question is waiting.
+  const waiting = useRef<HTMLDivElement>(null);
+  const waitingShown = useSignal(true);
+  const anyWaiting = store.permissionsFor(host, session).length > 0 || store.elicitationsFor(host, session).length > 0
+    || store.guardedChanges(host, { session }).length > 0;
+  useEffect(() => {
+    const el = waiting.current;
+    const root = scroller.current;
+    if (!el || !root) return;
+    const watcher = new IntersectionObserver(([seen]) => (waitingShown.value = seen?.isIntersecting ?? true), { root, threshold: 0.2 });
+    watcher.observe(el);
+    return () => watcher.disconnect();
+  }, [host, session]);
+  const questionWaiting = anyWaiting && !waitingShown.value;
+
   const toEnd = () => {
     const el = scroller.current;
     follow(true);
@@ -514,6 +530,12 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           : agent && (agent.state === "running" || agent.state === "starting") && (
           <p class="working" aria-label="Working"><span class="spinner" /></p>
         )}
+        {/* Outside the turns, at the end, as the window's ChatTranscript has them (#723). */}
+        <div class="waiting" ref={waiting}>
+          {/* A change its agent made to the project's own files, asked here (#531). */}
+          <GuardedChangeCards store={store} host={host} where={{ session }} down={down} />
+          <Cards store={store} host={host} session={session} down={down} />
+        </div>
       </div>
       {subagent.value && (
         <SubagentSteps store={store} item={agent?.background?.find((b) => b.id === subagent.value!.id) ?? subagent.value}
@@ -521,20 +543,20 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       )}
       </ViewLayerContext.Provider>
       </CallActionsContext.Provider>
-      {/* As JumpToEnd: shown whenever the reader is away from the end; what came since, said in words. */}
-      {(away.value || newBelow.value) && (
-        <button class={`jump${newBelow.value ? " news" : ""}`} onClick={toEnd}
-          title={newBelow.value ? "Go to the end, where something new is" : "Go to the end"}
-          aria-label={newBelow.value ? "Go to the end of the conversation, where something new is" : "Go to the end of the conversation"}>
-          <span aria-hidden="true">↓</span>{newBelow.value && " Something new"}
+      {/* As JumpToEnd: shown whenever the reader is away from the end; what came since, or a question
+          waiting there, said in words. */}
+      {(away.value || newBelow.value || questionWaiting) && (
+        <button class={`jump${newBelow.value || questionWaiting ? " news" : ""}`} onClick={toEnd}
+          title={questionWaiting ? "Go to the question waiting at the end"
+            : newBelow.value ? "Go to the end, where something new is" : "Go to the end"}
+          aria-label={questionWaiting ? "Go to the question waiting at the end of the conversation"
+            : newBelow.value ? "Go to the end of the conversation, where something new is" : "Go to the end of the conversation"}>
+          <span aria-hidden="true">↓</span>{questionWaiting ? " Question waiting" : newBelow.value && " Something new"}
         </button>
       )}
       <footer class="foot">
         <BackgroundRows store={store} host={host} agent={agent} disabled={down} steps={(item) => (subagent.value = item)} />
         {agent && <Capsules store={store} host={host} agent={agent} />}
-        {/* A change its agent made to the project's own files, asked here (#531). */}
-        <GuardedChangeCards store={store} host={host} where={{ session }} down={down} />
-        <Cards store={store} host={host} session={session} down={down} />
         <Prompt store={store} draftKey={`${host}|${session}`} placeholder={promptPlaceholder(agent)} disabled={down || !agent}
           stop={agent && hasTurnInFlight(agent) ? () => void store.perform(host, agent.id, "agents/stop") : undefined}
           acting={agent && store.onItsWay.value[agent.id]}

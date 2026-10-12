@@ -484,11 +484,12 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 .subagent-steps p { margin: 0; }
 .subagent-steps .asked { padding: 10px; border-radius: 8px; background: var(--paper-ground); display: flex; flex-direction: column; gap: 3px; }
 
-/* Cards above the prompt: a question or a permission, answered here or elsewhere. */
-/* In a short window the cards give up height, not the prompt: the foot is never taller than the
-   column, a card shrinks before the prompt does, and a single choice's list scrolls (#381, the
-   window's #371). */
-.cards { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; min-height: 0; overflow-y: auto; }
+/* Cards at the end of the conversation (#723): a question or a permission, answered here or
+   elsewhere. A long question or a single choice's list scrolls inside its card (#381, the window's
+   #371). */
+.cards { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.waiting { display: flex; flex-direction: column; gap: 8px; }
+.waiting:empty { display: none; }
 .card {
   min-height: 0;
   flex-shrink: 1;
@@ -543,7 +544,8 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 
 .foot { padding: 0 12px 12px; max-height: 100%; min-height: 0; display: flex; flex-direction: column; }
 .foot > * { flex-shrink: 0; }
-.foot > .cards { flex-shrink: 1; }
+/* A new session's guarded changes still sit over its prompt (#531). */
+.foot > .cards { flex-shrink: 1; margin-bottom: 8px; overflow-y: auto; }
 
 /* The prompt bar, as the window's (#108): where and labels over the input on the left, the runtime
    on the right; attach and send inside the input; the runtime's menus under it. */

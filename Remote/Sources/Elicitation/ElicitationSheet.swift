@@ -51,8 +51,8 @@ struct ElicitationSheet: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .paperRaised(in: RoundedRectangle(cornerRadius: 18))
-        // In the chat column with the prompt under it and the conversation
-        // above, as on the Mac (033).
+        // In the chat column, at the end of the conversation, as on the Mac
+        // (033, #723).
         .chatColumn()
         .animation(.snappy(duration: 0.2), value: chosen)
     }
