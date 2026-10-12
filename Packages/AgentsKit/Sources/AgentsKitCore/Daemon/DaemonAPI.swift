@@ -303,6 +303,10 @@ public enum DaemonAPI {
         public static let worktreesCheck = "worktrees/check"
         /// Remove a worktree the app made, and its branch when that is safe.
         public static let worktreesRemove = "worktrees/remove"
+        /// Every project's worktrees on this host, for Activity ▸ Worktrees (#790).
+        public static let worktreesAll = "worktrees/all"
+        /// Delete the build output git ignores in an idle worktree the app made (#790).
+        public static let worktreesRemoveBuildOutput = "worktrees/removeBuildOutput"
         /// The person moving an agent into a worktree or back to its project folder, or
         /// taking back a move still waiting for the turn to end (053).
         public static let agentsMove = "agents/move"
@@ -536,6 +540,9 @@ public enum DaemonAPI {
         public static let leasesChanged = "leases/changed"
         /// A volume went low or came back, or how much a low one has free moved (#195).
         public static let diskChanged = "disk/changed"
+        /// Worktrees measured in the background (#790): each one's size as `worktrees/list`
+        /// and `worktrees/all` will now give it, for a list already drawn to fill in.
+        public static let worktreesSized = "worktrees/sized"
 
         /// The Mac is now being kept awake, or is not. Sent only when the verdict
         /// moves — `reviseWakefulness` is reached on every streamed token, and a
@@ -2965,11 +2972,20 @@ public enum DaemonAPI {
         public var agents: [UUID]
         /// What git says about it. Nil when its folder is gone, or from an older daemon.
         public var status: WorktreeStatus?
+        /// How much it holds on disk (#790), as last measured in the background. Nil until
+        /// it has been, for the project folder, and from an older daemon: a list never
+        /// waits for a walk.
+        public var size: WorktreeSize?
 
         public var id: URL { root }
 
+        /// No agent that is not archived works in it (#790): what may be removed, and
+        /// what Activity ▸ Worktrees puts first.
+        public var isIdle: Bool { agents.isEmpty }
+
         public init(name: String, root: URL, branch: String?, isProjectFolder: Bool,
-                    exists: Bool, madeByApp: Bool, agents: [UUID], status: WorktreeStatus? = nil) {
+                    exists: Bool, madeByApp: Bool, agents: [UUID], status: WorktreeStatus? = nil,
+                    size: WorktreeSize? = nil) {
             self.name = name
             self.root = root
             self.branch = branch
@@ -2978,6 +2994,7 @@ public enum DaemonAPI {
             self.madeByApp = madeByApp
             self.agents = agents
             self.status = status
+            self.size = size
         }
 
         public init(from decoder: any Decoder) throws {
@@ -2990,6 +3007,70 @@ public enum DaemonAPI {
             madeByApp = try c.decodeIfPresent(Bool.self, forKey: .madeByApp) ?? false
             agents = try c.decodeIfPresent([UUID].self, forKey: .agents) ?? []
             status = try c.decodeIfPresent(WorktreeStatus.self, forKey: .status)
+            size = try c.decodeIfPresent(WorktreeSize.self, forKey: .size)
+        }
+
+        /// Activity ▸ Worktrees' order (#790): idle ones first, the largest of each first,
+        /// those not measured yet after, then by name.
+        public static func cleanupOrder(_ a: WorktreeSummary, _ b: WorktreeSummary) -> Bool {
+            if a.isIdle != b.isIdle { return a.isIdle }
+            let (x, y) = (a.size?.bytes ?? -1, b.size?.bytes ?? -1)
+            if x != y { return x > y }
+            return a.name.localizedStandardCompare(b.name) == .orderedAscending
+        }
+    }
+
+    /// How much a worktree holds on disk (#790), walked off the daemon's actor within a
+    /// budget of files and time and kept for ten minutes.
+    public struct WorktreeSize: Codable, Hashable, Sendable {
+        public var bytes: Int64
+        /// The walk ran out of its budget: it holds at least this much.
+        public var partial: Bool
+
+        public init(bytes: Int64, partial: Bool = false) {
+            self.bytes = bytes
+            self.partial = partial
+        }
+
+        /// "4.1 GB", or "over 4.1 GB" when the walk ran out.
+        public var words: String { (partial ? "over " : "") + DiskSpace.words(bytes) }
+    }
+
+    /// `worktrees/sized`: worktrees just measured.
+    public struct WorktreesSized: Codable, Hashable, Sendable {
+        public var sizes: [WorktreeSizeNote]
+        public init(sizes: [WorktreeSizeNote]) { self.sizes = sizes }
+    }
+
+    public struct WorktreeSizeNote: Codable, Hashable, Sendable {
+        public var root: URL
+        public var size: WorktreeSize
+        public init(root: URL, size: WorktreeSize) {
+            self.root = root
+            self.size = size
+        }
+    }
+
+    /// One project's worktrees, the project folder left out, for `worktrees/all`.
+    public struct ProjectWorktrees: Codable, Hashable, Sendable, Identifiable {
+        public var project: URL
+        public var worktrees: [WorktreeSummary]
+        public var id: URL { project }
+        public init(project: URL, worktrees: [WorktreeSummary]) {
+            self.project = project
+            self.worktrees = worktrees
+        }
+    }
+
+    /// `worktrees/removeBuildOutput`: the folders deleted, and about how much they held.
+    public struct BuildOutputRemoved: Codable, Hashable, Sendable {
+        /// Relative to the worktree: `build`, `Web/node_modules`.
+        public var removed: [String]
+        public var freed: WorktreeSize
+
+        public init(removed: [String], freed: WorktreeSize) {
+            self.removed = removed
+            self.freed = freed
         }
     }
 
