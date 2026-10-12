@@ -36,8 +36,9 @@ func config(_ json: JSON) throws -> CommandConfig { try CommandConfig.from(json)
 @Suite struct CommandConfigTests {
     @Test func writtenOutWorkspacesTakeTheirNameAsID() throws {
         let c = try config(["workspaces": [["name": "devstack", "start": "cws start", "stop": "cws stop"]]])
+        let entry = try #require(c.workspaces.first)
         #expect(c.workspaces.map(\.id) == ["devstack"])
-        #expect(c.workspaces[0].commands.status == nil)
+        #expect(entry.commands.status == nil)
     }
 
     @Test func refusesWhatCannotRun() {
