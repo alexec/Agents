@@ -357,6 +357,50 @@ struct ConnectionRoleTests {
         }
     }
 
+    // MARK: Linux servers (#726)
+
+    private typealias Status = PeerCredentials.ProcessStatus
+
+    /// The lines that matter, as Debian's kernel writes them for an ssh login's session.
+    @Test func procStatusIsRead() {
+        let status = "Name:\tsshd\nUmask:\t0022\nState:\tS (sleeping)\nTgid:\t3389\nPid:\t3389\nPPid:\t3383\n"
+            + "Uid:\t1000\t1000\t1000\t1000\nGid:\t1000\t1000\t1000\t1000\n"
+        #expect(Status(status: status) == Status(name: "sshd", uid: 1000, parent: 3383))
+        #expect(Status(status: "Name:\tbash\nPPid:\t1\n") == nil)
+    }
+
+    /// The Mac's forward is carried by the login's own sshd, whose parent is the root one.
+    @Test func anSSHLoginsSessionIsControl() {
+        for name in ["sshd", "sshd-session"] {
+            #expect(PeerCredentials.isSSHSession(Status(name: name, uid: 1000, parent: 3383),
+                                                 parent: Status(name: name, uid: 0, parent: 1)))
+        }
+    }
+
+    /// Everything an agent can start: under the daemon, orphaned to a container's sshd at
+    /// pid 1, named sshd under its own shell, or run by cron as root's child.
+    @Test func nothingAnAgentStartsIsAnSSHSession() {
+        let cases: [(Status, Status?)] = [
+            (Status(name: "socat", uid: 1000, parent: 400), Status(name: "bash", uid: 1000, parent: 300)),
+            (Status(name: "sshd", uid: 1000, parent: 1), Status(name: "sshd", uid: 0, parent: 0)),
+            (Status(name: "sshd", uid: 1000, parent: 400), Status(name: "bash", uid: 1000, parent: 300)),
+            (Status(name: "socat", uid: 1000, parent: 3383), Status(name: "sshd", uid: 0, parent: 1)),
+            (Status(name: "sshd", uid: 1000, parent: 500), Status(name: "cron", uid: 0, parent: 1)),
+            (Status(name: "sshd", uid: 1000, parent: 3383), nil),
+        ]
+        for (peer, parent) in cases {
+            #expect(!PeerCredentials.isSSHSession(peer, parent: parent), "\(peer) under \(String(describing: parent))")
+        }
+    }
+
+    /// This test is no ssh login, so the Linux door makes it a stranger.
+    @Test func aShellIsAStrangerToALinuxServer() {
+        var pair: [Int32] = [0, 0]  // index-ok: two descriptors, filled by socketpair
+        #expect(socketpair(AF_UNIX, SOCK_STREAM, 0, &pair) == 0)
+        defer { close(pair[0]); close(pair[1]) }
+        #expect(RolePolicy.sshSessions.role(pair[0]) == .stranger)
+    }
+
     // MARK: Signatures
 
     /// This test binary is not the app, the bridge or the helper, so under the real
