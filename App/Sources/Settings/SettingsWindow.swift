@@ -249,17 +249,6 @@ private struct SettingsRail: View {
                 }
             }
             Spacer()
-            if pane == .agentConfiguration {
-                Text("Your own set, for every project. A project’s own .agents folder is under Agent Configuration in its Project Settings.")
-                    .appText(.fine).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(10)
-            } else if pane == .runtimes {
-                Text("Each runtime on this Mac: where it is, how it signs in, and how it asks permission.")
-                    .appText(.fine).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(10)
-            }
         }
         .padding(12)
         .frame(width: 200)
