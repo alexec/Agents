@@ -32,8 +32,13 @@ Agents' ◐ cells, and why:
   [The control plane](../explanation/control-plane.md).
 - **Sandboxed tools:** the app passes each runtime's own command sandbox through, and adds
   none of its own. See [Runtimes](runtimes.md).
+- **End-to-end encrypted relay:** built but not switched on. `agents-relay` seals each
+  message so only the control plane and that one device can read it, and carries it
+  through the person's own iCloud, but Agents Host does not start it yet, so its
+  **Relay for my devices** switch is greyed (#809). Until then a phone away from home
+  reaches agents only when the control plane has a public address.
 - **Notifications:** the Mac gets them. The relay that takes them to the iPhone and iPad
-  is not in this build, and the web page gets none. See
+  is not switched on yet (#809), and the web page gets none. See
   [Phone and iPad](../explanation/phone-and-ipad.md).
 - **Pull requests:** the ci board lists them. Nothing can be created, reviewed or merged in
   the app.
@@ -51,7 +56,7 @@ Agents' ◐ cells, and why:
 
 Agents has none of these at all:
 
-- Android app, Windows or Linux desktop, an end-to-end encrypted relay in this build.
+- Android app (#810), Windows or Linux desktop (#811).
 - Sessions side by side, sessions as a tree, a task board.
 - A browser the agent drives, simulator panes, language servers.
 - Plugins of its own, several accounts per runtime, teams.
@@ -172,7 +177,7 @@ Agents has none of these at all:
 
 | App | Windows or Linux desktop | iPhone or iPad app | Android app | Web client | End-to-end encrypted relay | Notifications |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|
-| **Agents** | ○ | ● | ○ | ● | ○ | ◐ |
+| **Agents** | ○ | ● | ○ | ● | ◐ | ◐ |
 | Agentastic | ○ | ◐ | ○ | ○ | ● | ● |
 | Atelier (was Acepe) | ◐ | ○ | ○ | ○ | ○ | ?⃝ |
 | Claude Code | ● | ● | ● | ● | ○ | ● |
