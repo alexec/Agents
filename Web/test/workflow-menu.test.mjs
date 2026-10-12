@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";
 
-const { workflowActions } = await load("src/views/WorkflowRow.tsx");
+const { workflowActions, lastRan } = await load("src/views/WorkflowRow.tsx");
 const summary = (fields = {}) => ({ workflow: { workflowID: "n", triggers: [], mode: "new", prompt: "", settings: {}, unknownFields: {} },
   isArchived: false, isEnabled: true, isRunning: false, ...fields });
 
@@ -23,4 +23,11 @@ test("one waiting for its OK is approved or denied here, not run (#391)", () => 
 
 test("an archived one can be brought back or deleted (#605)", () => {
   assert.deepEqual(workflowActions(summary({ isArchived: true }), false), ["open", "bringBack", "delete"]);
+});
+
+test("the row's end says when it last ran, and nothing for one that never has (#755)", () => {
+  assert.equal(lastRan(summary()), null);
+  // Seconds since 2001, as the wire's dates are; the first of them is still a time.
+  assert.equal(lastRan(summary({ lastFiredAt: 0 }))?.toISOString(), "2001-01-01T00:00:00.000Z");
+  assert.equal(lastRan(summary({ lastFiredAt: 3_600, isRunning: true }))?.toISOString(), "2001-01-01T01:00:00.000Z");
 });
