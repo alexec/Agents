@@ -82,19 +82,35 @@ struct WorkspaceToolsTests {
         #expect(asked.all.last?.agent.hasPrefix("Cursor") == true)
     }
 
+    /// DigitalOcean, which makes and deletes, with devbox linked; and Docker, which does neither.
+    private static let listing = (try? JSONValue.encoding(DaemonAPI.AgentWorkspaces(providers: [
+        .init(id: ProviderID(rawValue: "do"), name: "DigitalOcean", canMake: true, canDelete: true,
+              workspaces: [.init(id: "1", name: "devbox", state: "stopped", host: "devbox", hostState: "stopped")]),
+        .init(id: ProviderID(rawValue: "dk"), name: "Docker", canMake: false, canDelete: false,
+              workspaces: [.init(id: "c1", name: "box", state: "running", host: "box", hostState: "online")]),
+    ]))) ?? [:]
+
+    /// The listing for `workspacesForAgent`, and `answer` for everything else.
+    private static func listing(else answer: JSONValue) -> @Sendable (DaemonAPI.HostWorkspaceCall) -> JSONValue {
+        { $0.method == DaemonAPI.Method.workspacesForAgent ? listing : answer }
+    }
+
+    private func changes(_ asked: Asked) -> [String] {
+        asked.all.map(\.method).filter { $0 != DaemonAPI.Method.workspacesForAgent }
+    }
+
     @Test func makeAsksFirstAndMakesNothingWithoutAYes() async throws {
         let asked = Asked()
-        let core = try await core(token: "t2", asked: asked) { _ in
-            (try? JSONValue.encoding(DaemonAPI.ProviderCreated(
-                workspace: .init(id: "ws-b", name: "b-2", state: "starting"), joining: true))) ?? [:]
-        }
-        let saidNo = Task { try await core.workspaceTool(.init(token: "t2", action: .make, provider: "DigitalOcean", name: "b-2")) }
+        let created = (try? JSONValue.encoding(DaemonAPI.ProviderCreated(
+            workspace: .init(id: "ws-b", name: "b-2", state: "starting"), joining: true))) ?? [:]
+        let core = try await core(token: "t2", asked: asked, answer: Self.listing(else: created))
+        let saidNo = Task { try await core.workspaceTool(.init(token: "t2", action: .make, provider: "digitalocean", name: "b-2")) }
         await eventually("the question is on the card") { await !core.pendingElicitations().isEmpty }
-        #expect(asked.all.isEmpty)
+        #expect(changes(asked).isEmpty)
         let first = try #require(await core.pendingElicitations().first)
         try await core.answerElicitation(.init(requestID: first.id, action: .accept, content: ["go": "no"]))
         #expect(try await saidNo.value.hasPrefix("Nothing was made"))
-        #expect(asked.all.isEmpty)
+        #expect(changes(asked).isEmpty)
 
         let saidYes = Task { try await core.workspaceTool(.init(token: "t2", action: .make, provider: "DigitalOcean", name: "b-2",
                                                                 options: ["size": "big"])) }
@@ -102,19 +118,54 @@ struct WorkspaceToolsTests {
         let second = try #require(await core.pendingElicitations().first)
         try await core.answerElicitation(.init(requestID: second.id, action: .accept, content: ["go": "yes"]))
         #expect(try await saidYes.value.hasPrefix("Made b-2"))
-        #expect(asked.all.map(\.method) == [DaemonAPI.Method.providersCreate])
-        #expect(asked.all.first?.params["options"] == ["size": "big"])
+        #expect(changes(asked) == [DaemonAPI.Method.providersCreate])
+        #expect(asked.all.last?.params["id"] == "do")
+        #expect(asked.all.last?.params["options"] == ["size": "big"])
     }
 
     @Test func deleteAsksFirstToo() async throws {
         let asked = Asked()
-        let core = try await core(token: "t3", asked: asked) { _ in [:] }
-        let skipped = Task { try await core.workspaceTool(.init(token: "t3", action: .delete, host: "devbox")) }
+        let core = try await core(token: "t3", asked: asked, answer: Self.listing(else: [:]))
+        let skipped = Task { try await core.workspaceTool(.init(token: "t3", action: .delete, host: "DevBox")) }
         await eventually("the question is on the card") { await !core.pendingElicitations().isEmpty }
         let form = try #require(await core.pendingElicitations().first)
         try await core.answerElicitation(.init(requestID: form.id, action: .decline))
         #expect(try await skipped.value.hasPrefix("Nothing was deleted"))
-        #expect(asked.all.isEmpty)
+        #expect(changes(asked).isEmpty)
+    }
+
+    /// What can't be done is refused at once, and nobody is asked about it (#855).
+    @Test func whatCannotBeDoneIsRefusedWithoutACard() async throws {
+        let asked = Asked()
+        let core = try await core(token: "t5", asked: asked, answer: Self.listing(else: [:]))
+        let refusals: [(DaemonAPI.WorkspaceToolRequest, String)] = [
+            (.init(token: "t5", action: .make, provider: "Hetzner", name: "b-2"), "no provider is called Hetzner. There are DigitalOcean, Docker."),
+            (.init(token: "t5", action: .make, provider: "Docker", name: "b-2"), "Docker can’t make workspaces."),
+            (.init(token: "t5", action: .make, provider: "do", name: "DEVBOX"), "has a workspace called DEVBOX already."),
+            (.init(token: "t5", action: .delete, host: "no-such-host"), "no workspace runs a host called no-such-host."),
+            (.init(token: "t5", action: .delete, host: "box"), "runs on Docker, which can’t delete workspaces."),
+        ]
+        for (request, said) in refusals {
+            do {
+                _ = try await core.workspaceTool(request)
+                Issue.record("\(request.action) went ahead")
+            } catch let error as JSONRPCError {
+                #expect(error.message.contains(said), "\(error.message)")
+            }
+        }
+        #expect(await core.pendingElicitations().isEmpty)
+        #expect(changes(asked).isEmpty)
+    }
+
+    @Test func withoutProvidersNothingIsMadeOrAsked() async throws {
+        let asked = Asked()
+        let core = try await core(token: "t6", asked: asked) { _ in
+            (try? JSONValue.encoding(DaemonAPI.AgentWorkspaces(providers: []))) ?? [:]
+        }
+        await #expect(throws: JSONRPCError.self) {
+            try await core.workspaceTool(.init(token: "t6", action: .make, provider: "x", name: "y"))
+        }
+        #expect(await core.pendingElicitations().isEmpty)
     }
 
     @Test func offAControlPlaneThereAreNoWorkspaces() async throws {
