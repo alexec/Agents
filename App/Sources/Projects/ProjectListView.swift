@@ -57,7 +57,7 @@ struct ProjectListView: View {
 
     /// A hosted server stopped while in use: MCP Servers' icon says so in red (#587, #589).
     private var mcpServersStopped: Bool {
-        HostedMCPWords.tally(model.hostedMCP?.servers ?? [])?.stopped == true
+        MCPHealthWords.tally(model.work.mcpHealthSnapshot()?.personal ?? [])?.failing == true
     }
 
     var body: some View {
@@ -305,6 +305,8 @@ struct ProjectListView: View {
             folds.set(key, open: true)
         } else if case .archive(let key) = item {
             folds.set(key, open: true)
+        } else if case .projectMCPServers(let key) = item {
+            folds.set(key, open: true)
         } else if case .project(let key) = item {
             // A new session, from ⌘N or a menu: its row is in the fold.
             folds.set(key, open: true)
@@ -417,6 +419,14 @@ private struct ProjectFold: View {
                     // match is one click away as it was.
                     searchMatches(fold)
                 } else {
+                    // Its MCP servers (#753), when its .agents/mcp.json has any: a page, red
+                    // when one does not answer.
+                    let servers = model.work.mcpServers(in: key)
+                    if let tally = MCPHealthWords.tally(servers) {
+                        ProjectPageRow(title: "MCP Servers", systemImage: "server.rack",
+                                       item: .projectMCPServers(key), warns: tally.failing)
+                            .help(tally.words)
+                    }
                     // The archive, one row opening a page (#495): never a fold inside
                     // the group.
                     let archived = fold.archivedCount(summary) + fold.archivedWorkflows.count

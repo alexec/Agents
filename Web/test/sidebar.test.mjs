@@ -182,6 +182,9 @@ test("an Activity page is in the address on its own, and an unknown one is ignor
     assert.equal(routeHash({ activity: "events", host: "mac", project: "file:///w/a" }), "#/a/events");
     assert.deepEqual(parseRoute("#/a/spending"), { activity: "spending" });
     assert.deepEqual(parseRoute("#/a/mcp"), { activity: "mcp" }, "MCP Servers has a page of its own (#589)");
+    assert.deepEqual(parseRoute("#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/m/1"), { host: "mac", project: "file:///w/a", mcp: true },
+      "a project's MCP Servers has a page of its own (#753)");
+    assert.equal(routeHash({ host: "mac", project: "file:///w/a", mcp: true }), "#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/m/1");
     assert.deepEqual(parseRoute("#/a/settings"), {});
   } finally {
     delete globalThis.location;
@@ -195,6 +198,39 @@ test("the MCP Servers row: none hosted says nothing, one stopped in use is the c
   assert.equal(hostedTally([]), null);
   assert.deepEqual(hostedTally([server("gh", "running"), server("ci", "idle")]), { words: "1 running", stopped: false });
   assert.deepEqual(hostedTally([server("gh", "running"), server("ci", "restarting")]), { words: "1 stopped", stopped: true });
+});
+
+test("MCP Servers: every server's health, the person's and each project's, in the words the Mac has (#753)", async () => {
+  const { healthTally, healthLine, healthKind, healthLastError, healthTone, personalServers, projectServers, fileProblem } =
+    await load("src/model/hostedMCP.ts");
+  const snapshot = {
+    at: 0,
+    problems: [{ project: "/w/b", message: "mcp.json is not valid JSON. (line 3)" }],
+    servers: [
+      { name: "github", transport: "http", hosted: false, check: "answered", tools: 3, checkedAt: 0 },
+      { name: "local", transport: "stdio", hosted: false, check: "failed", lastError: "The command was not found.", checkedAt: 0 },
+      { name: "shared", transport: "stdio", hosted: true, check: "unchecked" },
+      { name: "tools", project: "/w/a", transport: "stdio", hosted: false, check: "waiting" },
+    ],
+  };
+  assert.deepEqual(personalServers(snapshot).map((s) => s.name), ["github", "local", "shared"]);
+  assert.deepEqual(projectServers(snapshot, "file:///w/a/").map((s) => s.name), ["tools"], "a folder URL finds the path");
+  assert.equal(fileProblem(snapshot, "file:///w/b"), "mcp.json is not valid JSON. (line 3)");
+  assert.equal(fileProblem(snapshot), undefined);
+  const [github, local, shared, tools] = snapshot.servers;
+  assert.match(healthLine(github), /^Answered · 3 tools · checked \d\d:\d\d$/);
+  assert.match(healthLine(local), /^Didn't answer · checked /);
+  assert.equal(healthLastError(local), "The command was not found.");
+  assert.equal(healthLastError(github), undefined);
+  assert.equal(healthLine(shared), "Hosted · starts on the first call");
+  assert.equal(healthKind(local), "stdio · run in each session");
+  assert.equal(healthKind(shared), "stdio · hosted");
+  assert.equal(healthLine(tools), "Waiting for approval in this project's settings, so it is not started");
+  assert.equal(healthTone(local), "failing");
+  assert.equal(healthTone(shared), "quiet");
+  assert.equal(healthTally([]), null);
+  assert.deepEqual(healthTally(personalServers(snapshot)), { words: "1 not answering", failing: true });
+  assert.deepEqual(healthTally([github, shared]), { words: "2 servers", failing: false });
 });
 
 test("Activity rows: spending added up by currency, headroom, out of the pool", async () => {

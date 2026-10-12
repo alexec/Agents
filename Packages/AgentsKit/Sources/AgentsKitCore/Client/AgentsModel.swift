@@ -231,6 +231,9 @@ public final class AgentsModel {
     /// The MCP servers the host runs for every agent (#488), as the daemon last said.
     /// Replaced whole by each `mcp/hostedChanged`. Nil from a daemon too old to host any.
     public private(set) var hostedMCP: DaemonAPI.HostedMCPSnapshot?
+    /// Every MCP server each host's `mcp.json` files name, and how each is doing (#753), by
+    /// host. Replaced whole by each `mcp/healthChanged`. Empty for a daemon too old to say.
+    public private(set) var mcpHealth: [HostID: DaemonAPI.MCPHealthSnapshot] = [:]
     /// Every volume that is low on space (#195), as the daemon last said. Replaced whole
     /// by each `disk/changed`. Empty from a daemon too old to say, which draws nothing.
     public private(set) var disk = DiskState()
@@ -355,6 +358,8 @@ public final class AgentsModel {
         case agentRemoved(DaemonAPI.AgentRemovedNotification)
         case leasesChanged(DaemonAPI.LeaseSnapshot)
         case hostedMCPChanged(DaemonAPI.HostedMCPSnapshot)
+        /// From the Mac until `stamp` says which host.
+        case mcpHealthChanged(DaemonAPI.MCPHealthSnapshot, host: HostID)
         case diskChanged(DiskState)
         case eventsChanged(DaemonAPI.EventsChange)
         case modesChanged(DaemonAPI.RememberedModes)
@@ -408,6 +413,8 @@ public final class AgentsModel {
         case DaemonAPI.Notification.leasesChanged: return decode(DaemonAPI.LeaseSnapshot.self, Update.leasesChanged)
         case DaemonAPI.Notification.mcpHostedChanged:
             return decode(DaemonAPI.HostedMCPSnapshot.self, Update.hostedMCPChanged)
+        case DaemonAPI.Notification.mcpHealthChanged:
+            return decode(DaemonAPI.MCPHealthSnapshot.self) { Update.mcpHealthChanged($0, host: .mac) }
         case DaemonAPI.Notification.diskChanged: return decode(DiskState.self, Update.diskChanged)
         case DaemonAPI.Notification.eventsChanged: return decode(DaemonAPI.EventsChange.self, Update.eventsChanged)
         case DaemonAPI.Notification.modesChanged: return decode(DaemonAPI.RememberedModes.self, Update.modesChanged)
@@ -458,6 +465,8 @@ public final class AgentsModel {
         case .projectRemoved(var key):
             key.host = host
             return .projectRemoved(key)
+        case .mcpHealthChanged(let snapshot, _):
+            return .mcpHealthChanged(snapshot, host: host)
         default:
             return update
         }
@@ -589,6 +598,9 @@ public final class AgentsModel {
 
         case .hostedMCPChanged(let snapshot):
             hostedMCP = snapshot
+
+        case .mcpHealthChanged(let snapshot, let host):
+            mcpHealth[host] = snapshot
 
         case .diskChanged(let state):
             disk = state
@@ -884,6 +896,24 @@ public final class AgentsModel {
     public func replaceRetentionState(_ state: DaemonAPI.RetentionState) { retentionState = state }
     public func replaceRuntimeAllowances(_ allowances: RuntimeAllowances) { runtimeAllowances = allowances }
     public func replaceHostedMCP(_ snapshot: DaemonAPI.HostedMCPSnapshot) { hostedMCP = snapshot }
+    public func replaceMCPHealth(_ snapshot: DaemonAPI.MCPHealthSnapshot, from host: HostID = .mac) {
+        mcpHealth[host] = snapshot
+    }
+
+    /// A host's MCP servers (#753); from a Mac too old to say, its hosted servers alone, as
+    /// the page showed them before.
+    public func mcpHealthSnapshot(_ host: HostID = .mac) -> DaemonAPI.MCPHealthSnapshot? {
+        if let snapshot = mcpHealth[host] { return snapshot }
+        guard host == .mac, let hosted = hostedMCP else { return nil }
+        return .init(servers: hosted.servers.map {
+            .init(name: $0.name, project: $0.project, transport: .stdio, hosted: true, live: $0)
+        }, at: hosted.at)
+    }
+
+    /// One project's MCP servers (#753), from its host's snapshot.
+    public func mcpServers(in project: ProjectKey) -> [DaemonAPI.MCPServerHealth] {
+        mcpHealthSnapshot(project.host)?.servers(in: project.folder.path) ?? []
+    }
     public func replaceLeases(_ snapshot: DaemonAPI.LeaseSnapshot) {
         leases = snapshot
         reindexLeases()

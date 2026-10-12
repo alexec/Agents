@@ -151,11 +151,13 @@ struct ProjectPageRow: View {
     let title: String
     let systemImage: String
     let item: SidebarItem
+    /// Red when the page has something wrong to say, as an Activity row's (#753).
+    var warns = false
 
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: systemImage)
-                .foregroundStyle(Paper.accent)
+                .foregroundStyle(warns ? StateTint.failure.style(or: .primary) : AnyShapeStyle(Paper.accent))
                 .frame(width: 16)
                 .accessibilityHidden(true)
             // White, as every row's title is (#587); nothing at its end, which is only

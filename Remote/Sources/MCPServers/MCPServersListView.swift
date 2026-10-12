@@ -1,71 +1,71 @@
 import AgentsKitCore
 import SwiftUI
 
-/// The MCP servers the Mac runs once for every agent (#488), a page of its own under
-/// Activity (#589), as the window's: what each is doing, and why it last stopped.
-/// Read-only, as Resources is: a server is hosted from its `mcp.json` on the Mac.
+/// Every MCP server in one `mcp.json` and how each is doing (#753), as the window's: under
+/// Activity, the person's own on the Mac (#589); under a project, its `.agents/mcp.json`.
+/// Read-only but for Check Now: servers are edited in Settings.
 struct MCPServersListView: View {
     @Environment(RemoteModel.self) private var model
+    /// Nil for the person's own servers, on the Mac.
+    var project: ProjectKey?
+    @State private var checking = false
 
-    private var servers: [DaemonAPI.HostedMCPStatus] { model.work.hostedMCP?.servers ?? [] }
+    private var snapshot: DaemonAPI.MCPHealthSnapshot? { model.work.mcpHealthSnapshot(project?.host ?? .mac) }
+
+    private var servers: [DaemonAPI.MCPServerHealth] {
+        guard let project else { return snapshot?.personal ?? [] }
+        return model.work.mcpServers(in: project)
+    }
+
+    private var problem: String? { snapshot?.problem(in: project?.folder.path) }
 
     var body: some View {
         List {
             Section {
-                if servers.isEmpty {
-                    Text("No hosted servers. Every MCP server runs in each session that uses it.")
+                if let problem {
+                    Text(problem).foregroundStyle(StateTint.failure.style(or: .secondary))
+                } else if servers.isEmpty {
+                    Text(project == nil ? MCPHealthWords.personalEmpty : MCPHealthWords.projectEmpty)
                         .foregroundStyle(.secondary)
                 }
-                ForEach(servers) { HostedMCPListRow(status: $0) }
+                ForEach(servers) { MCPHealthRow(server: $0) }
                     .paperListRow()
             } footer: {
-                Text("Run once on the Mac and shared with every agent, from \"hosted\": true on a stdio entry in mcp.json.")
+                Text(project == nil ? MCPHealthWords.personalIntro : MCPHealthWords.projectIntro)
             }
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(Paper.ground)
-        .navigationTitle("MCP Servers")
-        // The hosted servers are read with the leases.
+        .navigationTitle(project.flatMap { model.work.project($0)?.name }.map { "\($0): MCP Servers" } ?? "MCP Servers")
+        .toolbar {
+            Button("Check Now") {
+                checking = true
+                Task {
+                    await model.checkMCPHealth(project: project)
+                    checking = false
+                }
+            }
+            .disabled(checking || !servers.contains { !$0.hosted })
+        }
+        // The servers are read with the leases.
         .shows([.leases])
     }
 }
 
-/// A server the Mac hosts for every agent (#488): what it is doing, and why it last stopped.
-private struct HostedMCPListRow: View {
-    let status: DaemonAPI.HostedMCPStatus
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(status.name).fontWeight(.semibold)
-                Spacer()
-                Text(HostedMCPWords.place(status)).appText(.fine).foregroundStyle(.secondary)
-            }
-            Text(HostedMCPWords.line(status)).appText(.fine).foregroundStyle(.secondary)
-            if let error = HostedMCPWords.lastError(status) {
-                Text(error).appText(.fine)
-                    .foregroundStyle(status.state == .restarting
-                                     ? StateTint.failure.style(or: .secondary) : AnyShapeStyle(.secondary))
-            }
-        }
-        .accessibilityElement(children: .combine)
-    }
-}
-
-/// The way in, under Activity: how many run, and a red dot when one stopped while in use.
+/// The way in, under Activity: a red icon when one of the person's servers does not answer.
 struct MCPServersRow: View {
     @Environment(RemoteModel.self) private var model
 
     var body: some View {
-        // The title alone (#587): how many run is said to VoiceOver, and one stopped turns
-        // the row's icon red (`activityIcon(_:warns:)`).
+        // The title alone (#587): the count is said to VoiceOver, and one not answering
+        // turns the row's icon red (`activityIcon(_:warns:)`).
         HStack(alignment: .firstTextBaseline) {
             Text("MCP Servers")
             Spacer()
         }
         .accessibilityElement(children: .combine)
-        .accessibilityValue(HostedMCPWords.tally(model.work.hostedMCP?.servers ?? [])?.words ?? "")
+        .accessibilityValue(MCPHealthWords.tally(model.work.mcpHealthSnapshot()?.personal ?? [])?.words ?? "")
         .accessibilityHint("Opens MCP Servers")
     }
 }

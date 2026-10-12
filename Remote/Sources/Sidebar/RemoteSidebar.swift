@@ -45,9 +45,9 @@ struct RemoteSidebar: View {
         RuntimeTally(model.runtimes, allowances: model.runtimeAllowances)?.noneWorking == true
     }
 
-    /// A hosted server stopped while in use: MCP Servers' icon says so in red (#587, #589).
+    /// One of the person's servers does not answer: MCP Servers' icon says so in red (#587, #753).
     private var mcpServersStopped: Bool {
-        HostedMCPWords.tally(model.work.hostedMCP?.servers ?? [])?.stopped == true
+        MCPHealthWords.tally(model.work.mcpHealthSnapshot()?.personal ?? [])?.failing == true
     }
 
     private var servers: [HostID] {
@@ -372,6 +372,12 @@ private struct RemoteProjectFold: View {
                     // match is one tap away.
                     searchMatches(fold)
                 } else if isOpen {
+                    // Its MCP servers (#753), when its .agents/mcp.json has any: a page, red
+                    // when one does not answer.
+                    if let tally = MCPHealthWords.tally(model.work.mcpServers(in: key)) {
+                        ProjectPageRow(title: "MCP Servers", systemImage: "server.rack", count: nil,
+                                       item: .projectMCPServers(key), warns: tally.failing, value: tally.words)
+                    }
                     // The archive, one row opening a page (#495): never a fold inside
                     // the group.
                     let archived = fold.archivedCount(summary) + fold.archivedWorkflows.count
@@ -421,13 +427,17 @@ private struct RemoteProjectFold: View {
 private struct ProjectPageRow: View {
     let title: String
     let systemImage: String
-    let count: Int
+    let count: Int?
     let item: SidebarItem
+    /// Red when the page has something wrong to say (#753).
+    var warns = false
+    /// What VoiceOver says after the title, when it is not the count.
+    var value: String?
 
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: systemImage)
-                .foregroundStyle(Paper.accent)
+                .foregroundStyle(warns ? StateTint.failure.style(or: .primary) : AnyShapeStyle(Paper.accent))
                 .frame(width: 20)
                 .accessibilityHidden(true)
             // Nothing at its end, which is only a session's (#587): the count is
@@ -438,7 +448,7 @@ private struct ProjectPageRow: View {
         }
         .appText(.supporting)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(title), \(count)")
+        .accessibilityLabel([title, value ?? count.map(String.init)].compactMap { $0 }.joined(separator: ", "))
         .tag(item)
     }
 }

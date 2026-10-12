@@ -43,6 +43,7 @@ final class RemoteModel {
             openWorkflow = nil
             openPin = nil
             openArchive = false
+            openMCPServers = false
             if selectedProject != nil { openActivity = nil }
             letGoOfProjects(keeping: selectedProject)
         }
@@ -553,6 +554,8 @@ final class RemoteModel {
     /// The project's archive (#495, #498): its archived sessions and workflows, a page
     /// opened from one row in the sidebar rather than folds inside the project's.
     var openArchive = false
+    /// The project's MCP servers (#753), a page opened from its row in the sidebar.
+    var openMCPServers = false
     /// The session opened while it was unread, kept in the sidebar's Unread until another
     /// is opened (#495), so it does not leave the list under the finger on the tap.
     private(set) var keptInUnread: UUID?
@@ -576,6 +579,7 @@ final class RemoteModel {
             guard let folder = selectedProject else { return nil }
             let key = ProjectKey(host: selectedSummary?.host ?? .mac, folder: folder)
             if openArchive { return .archive(key) }
+            if openMCPServers { return .projectMCPServers(key) }
             if let openPin { return .pin(openPin, in: key) }
             if let openWorkflow { return .workflow(openWorkflow, in: key) }
             if let selection { return .session(selection) }
@@ -590,12 +594,14 @@ final class RemoteModel {
                 openWorkflow = nil
                 openPin = nil
                 openArchive = false
+                openMCPServers = false
             case .project(let key):
                 selectedProject = key.folder
                 selection = nil
                 openPin = nil
                 openWorkflow = nil
                 openArchive = false
+                openMCPServers = false
                 // The next New Session at the sidebar's top starts here too (#495).
                 rememberNewSessionProject(key)
             case .session(let id):
@@ -603,18 +609,21 @@ final class RemoteModel {
                 openPin = nil
                 openWorkflow = nil
                 openArchive = false
+                openMCPServers = false
                 selection = id
             case .workflow(let id, let key):
                 selectedProject = key.folder
                 openPin = nil
                 selection = nil
                 openArchive = false
+                openMCPServers = false
                 openWorkflow = id
             case .pin(let path, let key):
                 selectedProject = key.folder
                 openWorkflow = nil
                 selection = nil
                 openArchive = false
+                openMCPServers = false
                 openPin = path
             case .spending, .resources, .events, .runtimes, .mcpServers:
                 openActivity = newValue
@@ -625,7 +634,16 @@ final class RemoteModel {
                 selection = nil
                 openPin = nil
                 openWorkflow = nil
+                openMCPServers = false
                 openArchive = true
+            case .projectMCPServers(let key):
+                // The project's MCP servers (#753), with what is opened from it pushed over it.
+                selectedProject = key.folder
+                selection = nil
+                openPin = nil
+                openWorkflow = nil
+                openArchive = false
+                openMCPServers = true
             }
         }
     }
@@ -1644,6 +1662,11 @@ final class RemoteModel {
                                                     returning: [DaemonAPI.ProjectSummary].self) {
                 work.replaceProjects(projects, from: id)
             }
+            // Its projects' MCP servers, for their rows in the sidebar (#753).
+            if let health = try? await other.call(DaemonAPI.Method.mcpHealth, Optional<String>.none,
+                                                  returning: DaemonAPI.MCPHealthSnapshot.self) {
+                work.replaceMCPHealth(health, from: id)
+            }
             if let agents = try? await other.listAgents(DaemonAPI.ListRequest(includeArchived: false, lean: true)) {
                 work.replaceAgents(agents, from: id)
             }
@@ -2617,6 +2640,22 @@ final class RemoteModel {
                                                returning: DaemonAPI.HostedMCPSnapshot.self) {
             work.replaceHostedMCP(hosted)
         }
+        // Every MCP server on the Mac and how each is doing (#753).
+        if let health = try? await client.call(DaemonAPI.Method.mcpHealth, Optional<String>.none,
+                                               returning: DaemonAPI.MCPHealthSnapshot.self) {
+            work.replaceMCPHealth(health)
+        }
+    }
+
+    /// Check Now on the person's own servers (no project) or a project's (#753), on the
+    /// project's own host.
+    func checkMCPHealth(project: ProjectKey?) async {
+        let host = project?.host ?? .mac
+        guard let target = hostClient(host),
+              let snapshot = try? await target.call(DaemonAPI.Method.mcpHealthCheck,
+                                                    DaemonAPI.MCPHealthCheckRequest(project: project?.folder.path),
+                                                    returning: DaemonAPI.MCPHealthSnapshot.self) else { return }
+        work.replaceMCPHealth(snapshot, from: host)
     }
 
     /// Every volume on the Mac low on space (#196), for the strip under the banner. A Mac
