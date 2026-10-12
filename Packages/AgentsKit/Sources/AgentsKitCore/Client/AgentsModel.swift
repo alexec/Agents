@@ -247,6 +247,12 @@ public final class AgentsModel {
     /// Every volume that is low on space (#195), as the daemon last said. Replaced whole
     /// by each `disk/changed`. Empty from a daemon too old to say, which draws nothing.
     public private(set) var disk = DiskState()
+    /// Every project's worktrees on each host (#790), for Activity ▸ Worktrees, as last
+    /// asked: a list, not kept up by the host, so asked again when the page is shown.
+    public private(set) var worktrees: [HostID: [DaemonAPI.ProjectWorktrees]] = [:]
+    /// Each worktree's size as `worktrees/sized` last said, by host and root, newer than
+    /// any list: a chooser or a page already drawn fills in from here.
+    public private(set) var worktreeSizes: [HostID: [URL: DaemonAPI.WorktreeSize]] = [:]
     /// The newest events (042), newest first, as far back as has been paged in. A new
     /// or changed event from `events/changed` is put in by its position. Empty until a
     /// page has been asked for, and on a daemon too old to have events.
@@ -371,6 +377,8 @@ public final class AgentsModel {
         /// From the Mac until `stamp` says which host.
         case mcpHealthChanged(DaemonAPI.MCPHealthSnapshot, host: HostID)
         case diskChanged(DiskState)
+        /// From the Mac until `stamp` says which host.
+        case worktreesSized(DaemonAPI.WorktreesSized, host: HostID)
         case eventsChanged(DaemonAPI.EventsChange)
         case modesChanged(DaemonAPI.RememberedModes)
         case wakeChanged(DaemonAPI.WakeState)
@@ -426,6 +434,8 @@ public final class AgentsModel {
         case DaemonAPI.Notification.mcpHealthChanged:
             return decode(DaemonAPI.MCPHealthSnapshot.self) { Update.mcpHealthChanged($0, host: .mac) }
         case DaemonAPI.Notification.diskChanged: return decode(DiskState.self, Update.diskChanged)
+        case DaemonAPI.Notification.worktreesSized:
+            return decode(DaemonAPI.WorktreesSized.self) { Update.worktreesSized($0, host: .mac) }
         case DaemonAPI.Notification.eventsChanged: return decode(DaemonAPI.EventsChange.self, Update.eventsChanged)
         case DaemonAPI.Notification.modesChanged: return decode(DaemonAPI.RememberedModes.self, Update.modesChanged)
         case DaemonAPI.Notification.wakeChanged: return decode(DaemonAPI.WakeState.self, Update.wakeChanged)
@@ -477,6 +487,8 @@ public final class AgentsModel {
             return .projectRemoved(key)
         case .mcpHealthChanged(let snapshot, _):
             return .mcpHealthChanged(snapshot, host: host)
+        case .worktreesSized(let sized, _):
+            return .worktreesSized(sized, host: host)
         default:
             return update
         }
@@ -614,6 +626,9 @@ public final class AgentsModel {
 
         case .diskChanged(let state):
             disk = state
+
+        case .worktreesSized(let sized, let host):
+            for note in sized.sizes { worktreeSizes[host, default: [:]][note.root] = note.size }
 
         case .eventsChanged(let change):
             waitingAgents = change.waiting
@@ -919,6 +934,35 @@ public final class AgentsModel {
         return .init(servers: hosted.servers.map {
             .init(name: $0.name, project: $0.project, transport: .stdio, hosted: true, live: $0)
         }, at: hosted.at)
+    }
+
+    /// A host's worktrees as `worktrees/all` answered (#790). The sizes heard since are
+    /// kept apart, and win: `size(of:on:)`.
+    public func replaceWorktrees(_ listed: [DaemonAPI.ProjectWorktrees], from host: HostID = .mac) {
+        worktrees[host] = listed
+        // What the list now says is as new as anything heard before it.
+        worktreeSizes[host] = nil
+    }
+
+    /// A worktree's size, the newest heard: from `worktrees/sized`, else its list's.
+    public func size(of worktree: DaemonAPI.WorktreeSummary, on host: HostID = .mac) -> DaemonAPI.WorktreeSize? {
+        worktreeSizes[host]?[worktree.root] ?? worktree.size
+    }
+
+    /// A host's worktrees with the sizes heard since filled in, each project's in
+    /// `cleanupOrder`, the projects holding the most idle first.
+    public func worktreesForCleanup(on host: HostID = .mac) -> [DaemonAPI.ProjectWorktrees] {
+        let sized = (worktrees[host] ?? []).map { group in
+            DaemonAPI.ProjectWorktrees(project: group.project, worktrees: group.worktrees.map { worktree in
+                var worktree = worktree
+                worktree.size = size(of: worktree, on: host)
+                return worktree
+            }.sorted(by: DaemonAPI.WorktreeSummary.cleanupOrder))
+        }
+        return sized.enumerated().sorted { a, b in
+            let (x, y) = (WorktreeTally(a.element.worktrees).idleBytes, WorktreeTally(b.element.worktrees).idleBytes)
+            return x != y ? x > y : a.offset < b.offset
+        }.map(\.element)
     }
 
     /// One project's MCP servers (#753), from its host's snapshot.

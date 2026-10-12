@@ -161,6 +161,7 @@ final class AppModel {
             showsRuntimes = false
             showsMCPServers = false
             showsTime = false
+            showsWorktrees = false
             // The same rule as picking a project: what you picked is what you see,
             // and a conversation or a workflow left open underneath would be waiting
             // to reappear when the bill is closed, which is a place nobody chose to
@@ -183,6 +184,7 @@ final class AppModel {
             showsRuntimes = false
             showsMCPServers = false
             showsTime = false
+            showsWorktrees = false
             selection = nil
             openWorkflow = nil
             projectPage = nil
@@ -200,6 +202,7 @@ final class AppModel {
             showsRuntimes = false
             showsMCPServers = false
             showsTime = false
+            showsWorktrees = false
             selection = nil
             openWorkflow = nil
             projectPage = nil
@@ -220,6 +223,7 @@ final class AppModel {
             showsEvents = false
             showsMCPServers = false
             showsTime = false
+            showsWorktrees = false
             selection = nil
             openWorkflow = nil
             projectPage = nil
@@ -238,6 +242,7 @@ final class AppModel {
             showsEvents = false
             showsRuntimes = false
             showsTime = false
+            showsWorktrees = false
             selection = nil
             openWorkflow = nil
             projectPage = nil
@@ -255,6 +260,26 @@ final class AppModel {
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
+            showsWorktrees = false
+            selection = nil
+            openWorkflow = nil
+            projectPage = nil
+            composing = false
+        }
+    }
+
+    /// Whether the window is showing Worktrees: every project's, and how much each holds
+    /// on disk (#790). A page like MCP Servers, and not persisted for the same reason; it
+    /// was in Project Settings, which are for what a person sets, not what changes.
+    var showsWorktrees = false {
+        didSet {
+            guard showsWorktrees, showsWorktrees != oldValue else { return }
+            showsSpending = false
+            showsResources = false
+            showsEvents = false
+            showsRuntimes = false
+            showsMCPServers = false
+            showsTime = false
             selection = nil
             openWorkflow = nil
             projectPage = nil
@@ -306,6 +331,7 @@ final class AppModel {
         showsRuntimes = false
         showsMCPServers = false
         showsTime = false
+        showsWorktrees = false
         if let agent = agents.first(where: { $0.id == agentID }) {
             select(ProjectKey(host: agent.host, folder: agent.projectFolder))
         }
@@ -322,6 +348,7 @@ final class AppModel {
         showsRuntimes = false
         showsMCPServers = false
         showsTime = false
+        showsWorktrees = false
         select(key)
         openWorkflow = nil
         projectPage = nil
@@ -341,6 +368,7 @@ final class AppModel {
             if showsResources { return .resources }
             if showsRuntimes { return .runtimes }
             if showsMCPServers { return .mcpServers }
+            if showsWorktrees { return .worktrees }
             if showsSpending { return .spending }
             if showsTime { return .time }
             guard let key = selectedProjectKey else { return nil }
@@ -362,6 +390,7 @@ final class AppModel {
                 showsRuntimes = false
                 showsMCPServers = false
                 showsTime = false
+                showsWorktrees = false
                 select(key)
                 openWorkflow = id
             case .pin(let path, let key):
@@ -382,6 +411,8 @@ final class AppModel {
                 showRuntimes()
             case .mcpServers:
                 showsMCPServers = true
+            case .worktrees:
+                showsWorktrees = true
             case .project(let key):
                 showsSpending = false
                 showsResources = false
@@ -389,6 +420,7 @@ final class AppModel {
                 showsRuntimes = false
                 showsMCPServers = false
                 showsTime = false
+                showsWorktrees = false
                 showProject(key)
             case nil:
                 // A list that clears its own selection — which macOS does while rows
@@ -407,6 +439,7 @@ final class AppModel {
         showsRuntimes = false
         showsMCPServers = false
         showsTime = false
+        showsWorktrees = false
         select(key)
         projectPage = page
     }
@@ -433,6 +466,7 @@ final class AppModel {
         showsRuntimes = false
         showsMCPServers = false
         showsTime = false
+        showsWorktrees = false
         select(key)
         // A new session in it (#366): the project's own page is where a session starts,
         // as New Session has it. The project's row in the sidebar only folds (#375).
@@ -603,6 +637,7 @@ final class AppModel {
         showsRuntimes = false
         showsMCPServers = false
         showsTime = false
+        showsWorktrees = false
         select(key)
         openPin = path
     }
@@ -3710,12 +3745,19 @@ final class AppModel {
         }
     }
 
-    /// What removing one of the project's worktrees would lose, or nil when it could
+    /// Every project's worktrees on this Mac, for Activity ▸ Worktrees (#790). Sizes the
+    /// daemon has not measured yet come later, on `worktrees/sized`.
+    func loadWorktrees() async {
+        guard let listed = try? await client.call(DaemonAPI.Method.worktreesAll, DaemonAPI.Empty(),
+                                                  returning: [DaemonAPI.ProjectWorktrees].self) else { return }
+        work.replaceWorktrees(listed)
+    }
+
+    /// What removing one of a project's worktrees would lose, or nil when it could
     /// not be asked (and `problem` says why).
-    func checkWorktreeRemoval(_ root: URL) async -> DaemonAPI.RemovalCheck? {
-        guard let project = draftCwd else { return nil }
+    func checkWorktreeRemoval(_ root: URL, in project: URL) async -> DaemonAPI.RemovalCheck? {
         do {
-            return try await selectedHostClient.call(DaemonAPI.Method.worktreesCheck,
+            return try await client.call(DaemonAPI.Method.worktreesCheck,
                                          DaemonAPI.WorktreeRemovalRequest(project: project, root: root),
                                          returning: DaemonAPI.RemovalCheck.self)
         } catch {
@@ -3724,19 +3766,40 @@ final class AppModel {
         }
     }
 
-    /// Remove one of the project's worktrees. `confirmed` is the person having seen
+    /// Remove one of a project's worktrees. `confirmed` is the person having seen
     /// what would be lost; the daemon checks again either way.
-    func removeWorktree(_ root: URL, confirmed: Bool) async {
-        guard let project = draftCwd else { return }
+    func removeWorktree(_ root: URL, in project: URL, confirmed: Bool) async {
         do {
-            _ = try await selectedHostClient.call(DaemonAPI.Method.worktreesRemove,
+            _ = try await client.call(DaemonAPI.Method.worktreesRemove,
                                       DaemonAPI.WorktreeRemovalRequest(project: project, root: root,
                                                                        confirmed: confirmed),
                                       returning: DaemonAPI.WorktreeRemoved.self)
         } catch {
             problem = describe(error)
         }
-        await loadDraftWorktrees()
+        await loadWorktrees()
+        if draftCwd != nil { await loadDraftWorktrees() }
+    }
+
+    /// Delete an idle worktree's build output (#790), and say what it freed; nil when it
+    /// could not (and `problem` says why).
+    func removeBuildOutput(_ root: URL, in project: URL) async -> String? {
+        defer { Task { await loadWorktrees() } }
+        do {
+            let removed = try await client.call(DaemonAPI.Method.worktreesRemoveBuildOutput,
+                                                DaemonAPI.WorktreeRemovalRequest(project: project, root: root),
+                                                returning: DaemonAPI.BuildOutputRemoved.self)
+            return WorktreeTally.freedWords(removed)
+        } catch {
+            problem = describe(error)
+            return nil
+        }
+    }
+
+    /// Clean up worktrees (030): a new session in the project, offered the words.
+    func offerCleanUp(in project: URL) {
+        showProject(ProjectKey(folder: project))
+        offeredPrompt = WorktreeTally.cleanUpPrompt
     }
 
     /// What an agent changed (035). Asked by the Changes pane on its own triggers —

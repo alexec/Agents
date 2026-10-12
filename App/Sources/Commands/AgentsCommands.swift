@@ -141,6 +141,7 @@ struct AgentsCommands: Commands {
             Button("Runtimes") { model.showRuntimes() }
                 .keyboardShortcut("r", modifiers: [.command, .option])
             Button("MCP Servers") { model.showsMCPServers = true }
+            Button("Worktrees") { model.showsWorktrees = true }
             Button("Cost") { model.showsSpending = true }
                 .keyboardShortcut("s", modifiers: [.command, .option])
             Button("Time") { model.showsTime = true }
