@@ -68,9 +68,9 @@ struct RemoteChatView: View {
 
     private var conversation: some View {
         // The Mac's shape (033): the conversation runs the full height and the prompt
-        // area floats over its foot, with a question floating above that. The
-        // conversation is told how tall they are so the last thing said can still be
-        // scrolled clear of them.
+        // area floats over its foot. A question is the last thing in the conversation,
+        // not over it (#723). The conversation is told how tall the prompt is so the
+        // last thing said can still be scrolled clear of it.
         ZStack(alignment: .bottom) {
             if let agent {
                 ChatTranscript(agent: agent,
@@ -84,6 +84,7 @@ struct RemoteChatView: View {
                                settleKey: model.selection,
                                loadEarlier: { await model.loadEarlier() },
                                bottomInset: formHeight,
+                               cards: cards,
                                scrollToEndToken: model.scrollToEndToken,
                                // The conversation is the only thing that knows how tall
                                // it is, and the page it asks for next should be sized to
@@ -248,44 +249,47 @@ struct RemoteChatView: View {
         }
     }
 
-    /// The question, the form and the prompt, floating over the foot of the
-    /// conversation in its column, as on the Mac (FR-018).
+    /// What waits on the person, at the end of the conversation as on the Mac (#723):
+    /// nothing when nothing does, so the conversation has no way back to one to offer.
     ///
-    /// The prompt stays under a question rather than giving way to it, so what would be
-    /// typed past it is in view. The question card keeps the phone's own shape — its
-    /// options stacked and what it covers shown in full — because a row of buttons at
-    /// a large text size is a row of truncated words.
-    private var form: some View {
-        VStack(spacing: 12) {
-            if !model.questionsForSelection.isEmpty {
-                ScrollView {
-                    VStack(spacing: 12) {
-                        ForEach(model.questionsForSelection) { request in
-                            // A fresh sheet per question, so a tap in flight on the last one is not
-                            // carried over to the next.
-                            PermissionSheet(request: request)
-                                .id(request.id)
-                                .transition(.move(edge: .bottom).combined(with: .opacity))
-                        }
-                    }
-                }
-                .frame(maxHeight: 300)
-                .fixedSize(horizontal: false, vertical: true)
+    /// The question card keeps the phone's own shape — its options stacked and what it
+    /// covers shown in full — because a row of buttons at a large text size is a row of
+    /// truncated words.
+    private var cards: AnyView? {
+        guard let agent else { return nil }
+        let questions = model.questionsForSelection
+        let guarded = model.guardedChangesForSelection
+        let form = model.formForSelection
+        guard !questions.isEmpty || !guarded.isEmpty || form != nil else { return nil }
+        return AnyView(VStack(spacing: 12) {
+            ForEach(questions) { request in
+                // A fresh sheet per question, so a tap in flight on the last one is not
+                // carried over to the next.
+                PermissionSheet(request: request)
+                    .id(request.id)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             // A change its agent made to the project's own files waits the same way (#531).
-            if let agent {
-                ForEach(model.guardedChangesForSelection) { change in
-                    GuardedChangeQuestion(change: change, key: ProjectKey(host: agent.host, folder: agent.projectFolder))
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
+            ForEach(guarded) { change in
+                GuardedChangeQuestion(change: change, key: ProjectKey(host: agent.host, folder: agent.projectFolder))
+                    .chatColumn()
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-            // A form waits the same way a permission does and floats with it, never
+            // A form waits the same way a permission does and sits with it, never
             // hidden behind one (#243), as on the Mac.
-            if let form = model.formForSelection {
+            if let form {
                 ElicitationSheet(request: form)
                     .id(form.id)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
+        })
+    }
+
+    /// The prompt, floating over the foot of the conversation in its column, as on the
+    /// Mac (FR-018). It stays under a question rather than giving way to it, so what
+    /// would be typed past it is in view.
+    private var form: some View {
+        VStack(spacing: 12) {
             if let agent {
                 // Kept on an archived chat, as on the window and the page (#242): what is
                 // typed there brings it back ("Say what next, and this comes back").

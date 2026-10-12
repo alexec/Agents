@@ -10,7 +10,8 @@ import SwiftUI
 /// Once there is a conversation the bar floats: the transcript runs the full height of
 /// the pane and scrolls underneath it, the way controls sit over content everywhere
 /// else on the system. The transcript is told how tall the bar is so the last thing an
-/// agent said can still be scrolled clear of it.
+/// agent said can still be scrolled clear of it. What waits on the person is the last
+/// thing in the transcript, not over it (#723).
 struct ChatView: View {
     @Environment(AppModel.self) private var model
     @Environment(SidebarFrame.self) private var frame
@@ -26,7 +27,7 @@ struct ChatView: View {
         Group {
             if let agent {
                 ZStack(alignment: .bottom) {
-                    Transcript(agent: agent, bottomInset: formHeight)
+                    Transcript(agent: agent, bottomInset: formHeight, cards: cards)
                         // What was exchanged, a swipe away, as on the phone.
                         .swipeToShowPane(show: {
                             frame.pane = .artifacts
@@ -217,28 +218,25 @@ struct ChatView: View {
         model.offlineHelp(for: model.selectedAgent?.host ?? .mac)
     }
 
-    private var form: some View {
-        VStack(spacing: 12) {
-            if !model.permissionsForSelection.isEmpty {
-                ScrollView {
-                    VStack(spacing: 12) {
-                        ForEach(model.permissionsForSelection) { request in
-                            PermissionView(request: request)
-                                .disabled(selectedHostOffline)
-                                .help(selectedHostOffline ? offlineHelp : "")
-                        }
-                    }
-                }
-                .frame(maxHeight: 300)
-                .fixedSize(horizontal: false, vertical: true)
+    /// What waits on the person, at the end of the transcript (#723): nothing when
+    /// nothing does, so the transcript has no way back to a question to offer.
+    private var cards: AnyView? {
+        guard let agent = model.selectedAgent else { return nil }
+        let guarded = model.work.guardedChanges(askedIn: agent.id)
+        guard !model.permissionsForSelection.isEmpty || !guarded.isEmpty
+                || model.elicitationForSelection != nil else { return nil }
+        return AnyView(VStack(spacing: 12) {
+            ForEach(model.permissionsForSelection) { request in
+                PermissionView(request: request)
+                    .disabled(selectedHostOffline)
+                    .help(selectedHostOffline ? offlineHelp : "")
             }
             // A change its agent made to the project's own files waits the same way (#531).
-            if let agent = model.selectedAgent {
-                ForEach(model.work.guardedChanges(askedIn: agent.id)) { change in
-                    GuardedChangeQuestion(change: change, key: ProjectKey(host: agent.host, folder: agent.projectFolder))
-                }
+            ForEach(guarded) { change in
+                GuardedChangeQuestion(change: change, key: ProjectKey(host: agent.host, folder: agent.projectFolder))
+                    .chatColumn()
             }
-            // A form waits the same way a permission question does, and floats with it.
+            // A form waits the same way a permission question does, and sits with it.
             if let request = model.elicitationForSelection {
                 // A fresh card per form, so the answers and the step reached on one
                 // are not carried into the next.
@@ -247,8 +245,11 @@ struct ChatView: View {
                     .disabled(selectedHostOffline)
                     .help(selectedHostOffline ? offlineHelp : "")
             }
-            PromptBar()
-        }
-        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { formHeight = $0 }
+        })
+    }
+
+    private var form: some View {
+        PromptBar()
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { formHeight = $0 }
     }
 }

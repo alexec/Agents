@@ -1,5 +1,5 @@
-// Permission requests and question cards above the prompt (071 FR-024; PermissionView.swift and
-// ElicitationView.swift). Answering one here answers it everywhere. One answered somewhere else
+// Permission requests and question cards at the end of the conversation (071 FR-024, #723;
+// PermissionView.swift and ElicitationView.swift). Answering one here answers it everywhere. One answered somewhere else
 // while it is on screen says so, and its buttons do nothing (US2 scenario 5).
 //
 // The first card takes keys, as the window's do (#256): Return its first real answer when no field
