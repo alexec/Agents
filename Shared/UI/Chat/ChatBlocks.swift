@@ -182,6 +182,8 @@ struct PlanView: View {
                     Text(entry.content)
                         .appText(.reading)
                         .foregroundStyle(entry.status == .completed ? .secondary : .primary)
+                        // The step being worked, which the plan strip names too (#776).
+                        .fontWeight(entry.status == .inProgress && plan.state == .current ? .semibold : nil)
                         .strikethrough(plan.state == .withdrawn)
                 }
                 // The mark is a glyph; the status is said in words instead (FR-037).

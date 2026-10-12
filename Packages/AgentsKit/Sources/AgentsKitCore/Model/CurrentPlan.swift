@@ -25,4 +25,15 @@ extension Plan {
         }
         return "\(doing.content) — \(progress)"
     }
+
+    /// The card's own words (#776): the step being worked, or "Plan" between steps.
+    /// `stripSummary` stays the line read aloud, which says both halves at once.
+    public var stripStep: String {
+        entries.first(where: { $0.status == .inProgress })?.content ?? "Plan"
+    }
+
+    /// How many steps are done, for the count and the bar under it.
+    public var stripDone: Int {
+        entries.filter { $0.status == .completed }.count
+    }
 }
