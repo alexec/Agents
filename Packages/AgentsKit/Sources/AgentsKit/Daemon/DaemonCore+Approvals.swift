@@ -197,7 +197,12 @@ extension DaemonCore {
             _ = approve ? try keepGuardedChange(request) : try undoGuardedChange(request)
         case .mcpServer:
             if approve {
+                #if canImport(CryptoKit)
                 _ = try await mcpApprove(.init(destination: .project(folder: folder.path), name: answer.key, digest: try digest()))
+                #else
+                // The MCP catalogue, which approves a server, is Mac-only (#799).
+                throw Self.mcpRefusal(.failed("Approve this server from a Mac."))
+                #endif
             } else {
                 try denyMCPServer(answer.key, digest: try digest(), in: folder)
                 approvalKitMoved(in: folder)

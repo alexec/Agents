@@ -1,5 +1,5 @@
-#if canImport(CryptoKit)
 import Foundation
+#if canImport(CryptoKit)
 
 /// Searching the MCP Registry and adding servers (060, contracts/mcp-methods.md).
 extension DaemonCore {
@@ -299,10 +299,13 @@ extension DaemonCore {
         case .project: "project"
         }
     }
+}
+#endif
 
+// Outside the CryptoKit guard: Needs You (#773) refuses with it on Linux too.
+extension DaemonCore {
     static func mcpRefusal(_ error: DaemonAPI.MCPCatalogError) -> JSONRPCError {
         JSONRPCError(code: DaemonAPI.Failure.mcpCatalogRefused, message: MCPCatalogWords.sentence(error),
                      data: try? JSONValue.encoding(error))
     }
 }
-#endif
