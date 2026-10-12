@@ -26,7 +26,7 @@ import type { Agent, ControlHost, ProjectSummary, WorkflowSummary } from "../pro
 import { go, route, type ActivityPage } from "../route";
 import { browserName, type Session } from "../session";
 import { ActivityRows } from "./Activity";
-import { isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
+import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
 import { CloningRows, EmptyProjects, NewProjectMenu } from "./NewProject";
 import { putFilesInDropbox, useDropboxDrop } from "./DropboxDialog";
 import { rowExtras, SessionRow } from "./SessionRow";
@@ -476,7 +476,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
             // through the list folds nothing.
             if (e.detail > 0 && !searching) fold(!unfolded);
           }}
-          onContextMenu={(e) => openContextMenu(e, projectMenu)}
+          onContextMenu={(e) => openContextMenu(e, projectMenu)} {...holdForMenu(() => projectMenu)}
           onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, projectMenu); }}>
           <span class="title">{project.isChat === true && <ChatMark />}{label}</span>
           {/* A heading, as the groups' at the top (#587): who needs you is in Needs You, so no
@@ -543,7 +543,7 @@ function ArchivedProjectRow({ store, host, project, down }: {
   ];
   return (
     <div class="row archived-project" title={folderPath(folder)}
-      onContextMenu={(e) => openContextMenu(e, menu)}>
+      onContextMenu={(e) => openContextMenu(e, menu)} {...holdForMenu(() => menu)}>
       <span class="title">{label}</span>
       <button class="link" disabled={down} onClick={() => void bringBack()}
         onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu); }}>Bring Back</button>
@@ -595,7 +595,7 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
   const drop = useDropboxDrop(store, host, folder, down);
   return (
     <div class={`nav-item${drop.targeted ? " drop-target" : ""}`} onContextMenu={(e) => openContextMenu(e, menu())}
-      onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }} {...drop.props}>
+      onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }} {...holdForMenu(menu)} {...drop.props}>
       {/* No wait lines: in the sidebar a session's row is its title and one line (#587). */}
       <SessionRow agent={agent} chosen={chosen} onPick={() => go({ host, project: folder, session: agent.id })} going={going}
         extras={rowExtras(store, host, agent)}

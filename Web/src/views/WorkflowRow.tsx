@@ -9,7 +9,7 @@ import { useSignal } from "@preact/signals";
 import type { WorkflowSummary } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { canBeApproved, canBeDenied, isOn, isUnapproved, workflowStatus } from "../model/workflows";
-import { isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
+import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
 
 export function WorkflowRow({ store, host, summary, disabled, chosen, onPick, pinnedAt, place }: {
   store: Store; host: string; summary: WorkflowSummary; disabled: boolean; chosen: boolean; onPick: () => void;
@@ -22,7 +22,7 @@ export function WorkflowRow({ store, host, summary, disabled, chosen, onPick, pi
   const menu = () => workflowMenu(store, host, summary, disabled, onPick, pinnedAt);
   return (
     <div class={`row workflow${chosen ? " chosen" : ""}`} onContextMenu={(e) => openContextMenu(e, menu())}
-      onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }}>
+      onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }} {...holdForMenu(menu)}>
       <button class="pick" aria-current={chosen} onClick={onPick}
         title={!isOn(summary) && !summary.isArchived ? `Turned off. Open ${summary.workflow.name}` : `Open ${summary.workflow.name}`}>
         <span class={`workflow-mark${status.tinted ? " tinted" : ""}`} role="img" aria-label={status.words} title={status.words}>{status.mark}</span>
