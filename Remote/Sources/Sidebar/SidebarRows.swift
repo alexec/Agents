@@ -188,9 +188,10 @@ private struct SessionMark: View {
     }
 }
 
-/// One workflow under its project: its name, and nothing at its end, which is only a
-/// session's (#587): off is its pause mark, said to VoiceOver (#100). What it does is
-/// its page's to say (#495). Its page opens in the detail as a session's chat does.
+/// One workflow under its project: its name, and at its end when it last ran, as a
+/// session's row has its time (#755), or nothing if it never has: off is its pause mark,
+/// said to VoiceOver (#100). What it does is its page's to say (#495). Its page opens in
+/// the detail as a session's chat does.
 struct SidebarWorkflowRow: View {
     @Environment(RemoteModel.self) private var model
     let summary: WorkflowSummary
@@ -208,6 +209,10 @@ struct SidebarWorkflowRow: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 4)
+            // A running one counts from when this run started (#755).
+            if let at = summary.lastFiredAt {
+                ActivityTime(date: at)
+            }
         }
         .accessibilityElement(children: .combine)
         .accessibilityValue(!summary.isEnabled && !summary.isArchived ? "turned off" : "")

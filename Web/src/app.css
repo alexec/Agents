@@ -888,12 +888,14 @@ button.remove:hover { opacity: 1; }
 /* US5: a workflow row: mark and name, as the window's (#547); its actions are in its context menu. */
 .row.workflow { box-sizing: border-box; grid-template-columns: minmax(0, 1fr); align-items: center; padding: 0; cursor: default; }
 /* The row's name opens its page (#98). */
-.row.workflow .pick { display: grid; grid-template-columns: 18px minmax(0, 1fr); column-gap: 8px; align-items: center; min-width: 0;
+.row.workflow .pick { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; column-gap: 8px; align-items: center; min-width: 0;
   text-align: left; border: none; background: none; padding: 6px 4px 6px 10px; color: inherit; font: inherit; }
 .row.workflow:hover { background: none; }
 /* A session's weight (#520): regular, heavier only while it waits for an OK. */
 .row.workflow .title { font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row.workflow .title.needs-ok { font-weight: 600; }
+/* When it last ran (#755), as a session's time is drawn. */
+.row.workflow .when { font-size: 11px; opacity: 0.45; font-variant-numeric: tabular-nums; }
 .workflow-mark { opacity: 0.55; text-align: center; }
 .workflow-mark.tinted { color: var(--tint-attention); opacity: 1; }
 

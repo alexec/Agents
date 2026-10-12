@@ -144,9 +144,12 @@ struct WorkflowListRow: View {
             // The title only (Alex, #495): what it does is the tooltip and the page's.
             EmptyView()
         } trailing: {
-            // Nothing (#587): only a session's row has a time there. Off is marked where
-            // it stands, rather than moved (#100), by its icon and its tooltip.
-            EmptyView()
+            // When it last ran, as a session's row has its time (#755); nothing if it never
+            // has. A running one counts from when this run started. Off is marked where it
+            // stands, rather than moved (#100), by its icon and its tooltip.
+            if let at = summary.lastFiredAt {
+                ActivityTime(date: at)
+            }
         }
         .listRowInsets(.vertical, 2)
         .help(!summary.isEnabled && !summary.isArchived ? "Turned off. \(summary.workflow.summary)" : summary.workflow.summary)

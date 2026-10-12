@@ -1,6 +1,7 @@
 // One workflow under a project's sessions (071 US5; ProjectWorkRows.swift): its status mark and its
-// name, as the window's and the Remote's rows (#547); nothing at its end, which is only a session's
-// (#587), so Off is its mark and its tooltip. What it is is its page's to say (#495).
+// name, as the window's and the Remote's rows (#547), and at its end when it last ran, as a session's
+// row has its time (#755), or nothing if it never has. Off is its mark and its tooltip. What it is is
+// its page's to say (#495).
 // Chosen, it opens its page in the chat's place, as the window's list does (#98). Its actions are in
 // its right-click / menu-key menu, as a session row's are (#151): Run Now, Approve or Deny on This
 // Host while it waits for its OK, Pin (#432) and, under Pinned, Move Up and Down, Turn Off or On
@@ -10,6 +11,8 @@ import type { WorkflowSummary } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { canBeApproved, canBeDenied, isOn, isUnapproved, workflowStatus } from "../model/workflows";
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
+import { fromWireDate } from "../protocol/dates";
+import { shortAgo } from "../model/activity";
 
 export function WorkflowRow({ store, host, summary, disabled, chosen, onPick, pinnedAt, place }: {
   store: Store; host: string; summary: WorkflowSummary; disabled: boolean; chosen: boolean; onPick: () => void;
@@ -19,6 +22,7 @@ export function WorkflowRow({ store, host, summary, disabled, chosen, onPick, pi
   place?: string | undefined;
 }) {
   const status = workflowStatus(summary);
+  const ran = lastRan(summary);
   const menu = () => workflowMenu(store, host, summary, disabled, onPick, pinnedAt);
   return (
     <div class={`row workflow${chosen ? " chosen" : ""}`} onContextMenu={(e) => openContextMenu(e, menu())}
@@ -32,9 +36,15 @@ export function WorkflowRow({ store, host, summary, disabled, chosen, onPick, pi
           {place ? <span class="name">{summary.workflow.name}</span> : summary.workflow.name}
           {place && <span class="place"> {place}</span>}
         </span>
+        {ran && <time class="when" dateTime={ran.toISOString()} title={ran.toLocaleString()}>{shortAgo(ran)}</time>}
       </button>
     </div>
   );
+}
+
+/** When it last ran, for the row's end (#755): none if it never has; a running one's is when this run started. */
+export function lastRan(summary: WorkflowSummary): Date | null {
+  return summary.lastFiredAt === undefined ? null : fromWireDate(summary.lastFiredAt);
 }
 
 /** Run Now, for one that may run: not archived, not waiting for its OK. */
