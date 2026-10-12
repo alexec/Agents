@@ -34,7 +34,7 @@ struct WorktreesListView: View {
                              ?? group.project.lastPathComponent)
                         Spacer()
                         Button("Clean Up") { model.offerCleanUp(in: group.project) }
-                            .font(.footnote)
+                            .appText(.fine)
                             .accessibilityLabel("Clean up worktrees")
                             .accessibilityHint("A new session here, offered the words to remove what has been merged")
                     }
@@ -69,14 +69,14 @@ private struct WorktreeListRow: View {
                     .lineLimit(1)
                     .strikethrough(!worktree.exists)
                 Text(worktree.exists ? ChoiceRows.worktreeDetail(worktree) : "\(worktree.branch ?? "detached") · its folder is gone")
-                    .font(.subheadline)
+                    .appText(.supporting)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
             Spacer(minLength: 8)
             if worktree.exists {
                 Text(worktree.size?.words ?? WorktreeTally.measuring)
-                    .font(.subheadline)
+                    .appText(.supporting)
                     .monospacedDigit()
                     .foregroundStyle(worktree.size == nil ? .tertiary : .secondary)
             }
