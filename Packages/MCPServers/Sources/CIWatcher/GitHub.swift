@@ -48,6 +48,8 @@ public struct FailedRunData: Sendable {
     public var headSha: String
     public var run: RunRef
     public var failedJobs: [(name: String, url: String)]
+    /// Whether the PR's author is one of the repo's own (#728).
+    public var trusted: Bool
 
     var json: JSON {
         ["pr": pr.json, "headSha": .string(headSha),
@@ -104,6 +106,9 @@ public struct IssueActivity: Sendable {
     public var at: String
     public var issue: Issue
     public var what: What
+    /// Whether whoever did it is one of the repo's own (#728): who opened it, commented or
+    /// labelled it, or who closed it.
+    public var trusted: Bool
 
     public var kind: IssueKind {
         switch what {
@@ -189,6 +194,21 @@ func runURL(_ repo: String, _ runId: Int) -> String { "https://github.com/\(repo
 func clip(_ text: String?) -> String {
     let body = text ?? ""
     return body.count > commentChars ? String(body.prefix(commentChars)) + "…" : body
+}
+
+/// Whether GitHub's `author_association` and account make someone the repo's own (#728): its
+/// owner, a member of its organisation or a collaborator, and not a bot. Anyone else's issue,
+/// comment or pull request raises no event unless the workflow asks for `anyone`.
+func isTrusted(association: String?, login: String?, type: String? = nil) -> Bool {
+    let bot = type == "Bot" || (login ?? "").hasSuffix("[bot]")
+    return !bot && ["OWNER", "MEMBER", "COLLABORATOR"].contains((association ?? "").uppercased())
+}
+
+/// Whether a label or a close was the repo's own doing (#728). Labelling takes triage access,
+/// so a person who did it is trusted; closing does not, since an author may close their own.
+func isTrustedActor(_ actor: String, type: String? = nil, closing: Bool, issueAuthor: String, authorTrusted: Bool) -> Bool {
+    if type == "Bot" || actor.hasSuffix("[bot]") { return false }
+    return !closing || actor != issueAuthor || authorTrusted
 }
 
 func reasonOf(_ reason: String?) -> String { reason == "not_planned" ? "not_planned" : "completed" }

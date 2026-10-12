@@ -22,21 +22,31 @@ It listens on no port, and holds no token: every GitHub call is `gh api` (or `gh
 
 | Name | `inputSchema` | `data` | `eventId` |
 |---|---|---|---|
-| `checks.failed` | `repo` (string, `owner/name`; left out, the project folder's repo, #702), `branch` (string, only runs on that PR branch), `pr` (positive integer, only that pull request); given filters must all hold | `{ pr: {number, title, branch, url}, headSha, run: {id, attempt, name, url}, failedJobs: [{name, url}] }` | `checks.failed:{repo}:{runId}:{attempt}` |
+| `checks.failed` | `repo` (string, `owner/name`; left out, the project folder's repo, #702), `branch` (string, only runs on that PR branch), `pr` (positive integer, only that pull request), `anyone` (boolean, #728); given filters must all hold | `{ pr: {number, title, branch, url}, headSha, run: {id, attempt, name, url}, failedJobs: [{name, url}] }` | `checks.failed:{repo}:{runId}:{attempt}` |
 | `pr.merged` | `repo` (optional), `branch` (string, only the PR from that branch), `pr` (positive integer, only that pull request); given filters must all hold | `{ pr: {number, title, branch, url}, mergedAt, mergeSha }` | `pr.merged:{repo}:{number}` |
 | `pr.closed` (#702) | `repo` (optional), `branch` (string, only the PR from that branch), `pr` (positive integer, only that pull request); given filters must all hold | `{ pr: {number, title, branch, url}, closedAt }; closed without merging` | `pr.closed:{repo}:{number}:{closedAt}` |
 | `pr.conflicted` (#712) | as `pr.closed` | `{ pr: {number, title, branch, url}, conflictedAt }`; a PR open and in conflict now that was not at the last poll. The cursor's ids are the PRs in conflict then; a first poll takes those already in conflict as known; one GitHub has not worked out keeps its state | `pr.conflicted:{repo}:{number}:{conflictedAt}` |
 
-| `issue.opened` (#682) | `repo` (optional), `label` (only issues opened with it) | `{ issue: {number, title, author, labels, url}, openedAt }` | `issue.opened:{repo}:{number}` |
-| `issue.labelled` | `repo` (optional), `label` (only when it is the label added), `issue` (positive integer) | `{ issue, label, by, labelledAt }` | `issue.labelled:{repo}:{eventId}` |
-| `issue.commented` | `repo` (optional), `label` (only issues with it), `issue` | `{ issue, comment: {author, url, body}, commentedAt }`; `body` is cut to 4000 characters | `issue.commented:{repo}:{commentId}` |
-| `issue.closed` | `repo` (optional), `label` (only issues with it), `issue` | `{ issue, reason: "completed"\|"not_planned", by, closedAt }` | `issue.closed:{repo}:{eventId}` |
+| `issue.opened` (#682) | `repo` (optional), `label` (only issues opened with it), `anyone` | `{ issue: {number, title, author, labels, url}, openedAt }` | `issue.opened:{repo}:{number}` |
+| `issue.labelled` | `repo` (optional), `label` (only when it is the label added), `issue` (positive integer), `anyone` | `{ issue, label, by, labelledAt }` | `issue.labelled:{repo}:{eventId}` |
+| `issue.commented` | `repo` (optional), `label` (only issues with it), `issue`, `anyone` | `{ issue, comment: {author, url, body}, commentedAt }`; `body` is cut to 4000 characters | `issue.commented:{repo}:{commentId}` |
+| `issue.closed` | `repo` (optional), `label` (only issues with it), `issue`, `anyone` | `{ issue, reason: "completed"\|"not_planned", by, closedAt }` | `issue.closed:{repo}:{eventId}` |
 
 All have `delivery: ["poll"]`. Pull requests are never issues here, though GitHub lists them
 together. The issue events read `issues` (by created), `issues/comments` and `issues/events`
 (GitHub keeps 90 days of those). Every name is `noun.verbed`, and no noun is one the
 app reserves, so workflows name them as they are (`checks.failed`), with no prefix. The cursor and paging rules are in
 [research R10](../research.md#r10-the-ci-watcher-turning-github-into-events-with-a-cursor).
+
+**Whose doing it is (#728).** On a public repo anyone can open an issue, comment or send a
+pull request, and an issue's or comment's body goes into the prompt. So by default an event is
+raised only for the repo's own people: GitHub's `author_association` is `OWNER`, `MEMBER` or
+`COLLABORATOR`, and the account is not a bot (`type: "Bot"` or a login ending `[bot]`).
+That is the issue's author for `issue.opened`, the comment's for `issue.commented`, the PR's
+for `checks.failed` (a fork's PR included), and the actor for `issue.labelled` (labelling takes
+triage access, so only bots are left out). For `issue.closed` it is the actor, except that an
+author outside the repo closing their own issue does not count. `anyone: true` raises them
+all. The `pr.*` events are left as they are: their data is a PR's number, title and branch.
 
 ## Tools
 

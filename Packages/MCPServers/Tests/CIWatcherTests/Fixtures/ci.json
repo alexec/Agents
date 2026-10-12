@@ -3,18 +3,22 @@
     "alexec/Agents": {
       "prs": [
         {
+          "author": "alexec",
           "number": 401,
           "title": "Make the sidebar fold faster",
           "branch": "agents/fold-faster",
+          "authorAssociation": "OWNER",
           "url": "https://github.com/alexec/Agents/pull/401",
           "state": "open",
           "checks": "passing",
           "updatedAt": "2026-10-01T09:00:00Z"
         },
         {
+          "author": "alexec",
           "number": 402,
           "title": "Queue helpers past the limit",
           "branch": "agents/queue-helpers",
+          "authorAssociation": "OWNER",
           "url": "https://github.com/alexec/Agents/pull/402",
           "state": "open",
           "checks": "failing",
@@ -22,9 +26,11 @@
           "updatedAt": "2026-10-01T10:00:00Z"
         },
         {
+          "author": "alexec",
           "number": 400,
           "title": "Tasks for MCP integrations",
           "branch": "agents/tasks-383",
+          "authorAssociation": "OWNER",
           "url": "https://github.com/alexec/Agents/pull/400",
           "state": "merged",
           "mergedAt": "2026-10-01T08:00:00Z",
@@ -75,6 +81,7 @@
           "labels": [
             "bug"
           ],
+          "authorAssociation": "OWNER",
           "url": "https://github.com/alexec/Agents/issues/410",
           "state": "open",
           "createdAt": "2026-10-01T07:00:00Z",
@@ -83,6 +90,7 @@
             {
               "id": 7001,
               "author": "alexec",
+              "authorAssociation": "OWNER",
               "url": "https://github.com/alexec/Agents/issues/410#issuecomment-7001",
               "body": "Seen again after a restart.",
               "createdAt": "2026-10-01T11:00:00Z"
@@ -105,6 +113,7 @@
           "labels": [
             "enhancement"
           ],
+          "authorAssociation": "OWNER",
           "url": "https://github.com/alexec/Agents/issues/411",
           "state": "open",
           "createdAt": "2026-10-01T08:00:00Z",
@@ -119,6 +128,7 @@
           "labels": [
             "bug"
           ],
+          "authorAssociation": "OWNER",
           "url": "https://github.com/alexec/Agents/issues/409",
           "state": "closed",
           "createdAt": "2026-09-30T08:00:00Z",

@@ -3,6 +3,8 @@ import MCPServerKit
 
 /// GitHub as a JSON file, for tests and walks: read on every call, so a test or a walk can
 /// append runs, PRs and issues while it runs; reruns and comments are written back to it.
+/// An issue's, comment's or PR's `authorAssociation` is GitHub's (`OWNER`, `NONE`…); left out,
+/// it is `NONE`, as a stranger. A login ending `[bot]` is a bot.
 /// `"gh": "notSignedIn"` or `"gh": {"rateLimitedForMs": n}` makes every call fail that way.
 public struct FakeGitHub: GitHub {
     public let file: URL
@@ -70,7 +72,8 @@ public struct FakeGitHub: GitHub {
         let run = try findRun(data, repo, ref.id)
         return FailedRunData(pr: Self.toPR(p), headSha: ref.headSha, run: ref,
                              failedJobs: (run["jobs"]?.array ?? []).filter { isFailed($0["conclusion"]?.string) }
-                                 .map { ($0["name"]?.string ?? "", $0["url"]?.string ?? "") })
+                                 .map { ($0["name"]?.string ?? "", $0["url"]?.string ?? "") },
+                             trusted: isTrusted(association: p["authorAssociation"]?.string, login: p["author"]?.string))
     }
 
     public func defaultRepo() async throws -> String {
@@ -104,25 +107,29 @@ public struct FakeGitHub: GitHub {
         var items = [IssueActivity]()
         for i in list(try load(), repo, "issues") {
             let issue = Self.toIssue(i)
+            let authorTrusted = isTrusted(association: i["authorAssociation"]?.string, login: issue.author)
             if kind == .opened {
-                items.append(IssueActivity(id: String(i["number"]?.int ?? 0), at: i["createdAt"]?.string ?? "", issue: issue, what: .opened))
+                items.append(IssueActivity(id: String(i["number"]?.int ?? 0), at: i["createdAt"]?.string ?? "", issue: issue,
+                                           what: .opened, trusted: authorTrusted))
             }
             if kind == .commented {
                 for c in i["comments"]?.array ?? [] {
                     items.append(IssueActivity(
                         id: Self.id(c["id"]), at: c["createdAt"]?.string ?? "", issue: issue,
-                        what: .commented(author: c["author"]?.string ?? "", url: c["url"]?.string ?? "", body: clip(c["body"]?.string))))
+                        what: .commented(author: c["author"]?.string ?? "", url: c["url"]?.string ?? "", body: clip(c["body"]?.string)),
+                        trusted: isTrusted(association: c["authorAssociation"]?.string, login: c["author"]?.string)))
                 }
             }
             for e in i["events"]?.array ?? [] {
                 let by = e["actor"]?.string ?? ""
+                let trusted = isTrustedActor(by, closing: kind == .closed, issueAuthor: issue.author, authorTrusted: authorTrusted)
                 if kind == .labelled, e["event"]?.string == "labeled" {
                     items.append(IssueActivity(id: Self.id(e["id"]), at: e["createdAt"]?.string ?? "", issue: issue,
-                                               what: .labelled(label: e["label"]?.string ?? "", by: by)))
+                                               what: .labelled(label: e["label"]?.string ?? "", by: by), trusted: trusted))
                 }
                 if kind == .closed, e["event"]?.string == "closed" {
                     items.append(IssueActivity(id: Self.id(e["id"]), at: e["createdAt"]?.string ?? "", issue: issue,
-                                               what: .closed(reason: reasonOf(e["reason"]?.string), by: by)))
+                                               what: .closed(reason: reasonOf(e["reason"]?.string), by: by), trusted: trusted))
                 }
             }
         }
