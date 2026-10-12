@@ -41,7 +41,7 @@ final class MCPStdioProcess: @unchecked Sendable {
         self.log = log
         process.executableURL = URL(filePath: "/usr/bin/env")
         process.arguments = [command] + args
-        process.environment = RuntimeEnvironment.forRuntimes().merging(env) { $1 }
+        process.environment = RuntimeEnvironment.forMCPServers().merging(env) { $1 }
         process.currentDirectoryURL = RuntimeProcess.folderURL(cwd)
         process.standardInput = input
         process.standardOutput = output

@@ -231,14 +231,17 @@ public actor RealGitHub: GitHub {
 
     public func listPRs(repo: String) async throws -> [BoardPR] {
         let result = await Self.gh(["pr", "list", "-R", repo, "--state", "open", "--limit", "100",
-                                    "--json", "number,title,headRefName,statusCheckRollup,url"])
+                                    "--json", "number,title,headRefName,statusCheckRollup,url,mergeable"])
         if result.code != 0 { throw Self.failure(result.missing, result.stderr, nil) }
         let list = (try? JSON.parse(result.stdout))?.array ?? []
         return list.map { p in
             let (checks, failedRunId) = rollup(p["statusCheckRollup"]?.array)
+            // UNKNOWN while GitHub works it out: neither yes nor no.
+            let mergeable = p["mergeable"]?.string
             return BoardPR(pr: PR(number: p["number"]?.int ?? 0, title: p["title"]?.string ?? "",
                                   branch: p["headRefName"]?.string ?? "", url: p["url"]?.string ?? ""),
-                           checks: checks, failedRunId: failedRunId)
+                           checks: checks, failedRunId: failedRunId,
+                           conflicts: mergeable == "CONFLICTING" ? true : mergeable == "MERGEABLE" ? false : nil)
         }
     }
 

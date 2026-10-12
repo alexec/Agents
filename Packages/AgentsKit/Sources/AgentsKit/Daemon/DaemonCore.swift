@@ -1830,7 +1830,8 @@ public struct ProcessSessionLauncher: SessionLauncher {
                                          + RuntimePolicyFiles(locations: locations).arguments(for: policy),
                                      cwd: cwd,
                                      environment: Self.environment(for: policy, locations: locations,
-                                                                   onto: LoginShellPath.environment(),
+                                                                   onto: RuntimeEnvironment.withShippedServers(
+                                                                       LoginShellPath.environment(), first: false),
                                                                    onServer: onServer)
                                          .merging(sandbox.environment) { _, sandbox in sandbox },
                                      capabilities: Self.capabilities(for: policy),

@@ -23,4 +23,18 @@ struct RuntimeEnvironmentTests {
         #expect(!given.keys.contains { $0.hasPrefix("CLAUDE") })
         #expect(given["HOME"] == ProcessInfo.processInfo.environment["HOME"])
     }
+
+    /// The MCP servers Agents ships sit beside agentsd (#700): first on a server's PATH, so
+    /// `"command": "ci-watcher"` is ours on any host; last on a runtime's, shadowing nothing.
+    @Test func theShippedServersFolderGoesOnPath() {
+        let folder = URL(filePath: "/Applications/Agents Host.app/Contents/Helpers")
+        let given = ["PATH": "/opt/homebrew/bin:/Applications/Agents Host.app/Contents/Helpers:/usr/bin", "HOME": "/Users/a"]
+        #expect(RuntimeEnvironment.withShippedServers(given, first: true, folder: folder)["PATH"]
+            == "/Applications/Agents Host.app/Contents/Helpers:/opt/homebrew/bin:/usr/bin")
+        #expect(RuntimeEnvironment.withShippedServers(given, first: false, folder: folder)["PATH"]
+            == "/opt/homebrew/bin:/usr/bin:/Applications/Agents Host.app/Contents/Helpers")
+        #expect(RuntimeEnvironment.withShippedServers(given, first: true, folder: nil) == given)
+        #expect(RuntimeEnvironment.withShippedServers(["HOME": "/Users/a"], first: true, folder: folder)["PATH"]
+            == "/Applications/Agents Host.app/Contents/Helpers")
+    }
 }

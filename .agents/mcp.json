@@ -1,1 +1,1 @@
-{ "mcpServers": { "ci": { "command": "node", "args": ["Integrations/ci-watcher/server.ts"], "hosted": true } } }
+{ "mcpServers": { "ci": { "command": "ci-watcher", "hosted": true } } }

@@ -38,6 +38,7 @@ a:hover { text-decoration: underline; }
 .pill.passing { background: var(--color-background-success); color: var(--color-text-success); }
 .pill.failing { background: var(--color-background-danger); color: var(--color-text-danger); }
 .pill.running { background: var(--color-background-info); color: var(--color-text-info); }
+.pill.conflicts { background: var(--color-background-warning); color: var(--color-text-warning); }
 button { font: inherit; font-size: 13px; color: var(--color-text-primary); background: var(--color-background-primary);
   border: 1px solid var(--color-border-primary); border-radius: var(--border-radius-sm); padding: 2px 10px; cursor: pointer; }
 button:disabled { opacity: 0.5; cursor: default; }
@@ -106,7 +107,10 @@ button:disabled { opacity: 0.5; cursor: default; }
     return el("li", {}, [
       link(`#${pr.number}`, pr.url),
       el("span", { className: "title", textContent: pr.title, title: pr.title }),
-      el("span", { className: `pill ${checks}`, textContent: PILLS[checks] }),
+      el("span", {}, [
+        el("span", { className: `pill ${checks}`, textContent: PILLS[checks] }),
+        ...(pr.conflicts ? [" ", el("span", { className: "pill conflicts", textContent: "Conflicts", title: "Conflicts with its base: rebase it" })] : []),
+      ]),
       action,
       el("span", { className: "branch", textContent: pr.branch, title: pr.branch }),
     ]);

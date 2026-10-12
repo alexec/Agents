@@ -1,5 +1,6 @@
 #!/bin/zsh
-# Build agentsd for Linux servers (037): two static binaries the app copies over ssh.
+# Build agentsd for Linux servers (037): two static binaries the app copies over ssh, and
+# beside each the MCP servers Agents ships (#700), which a host puts next to agentsd.
 #
 #   ./scripts/build-linux-agentsd.sh           # build both, copy into App/Resources/servers
 #   ./scripts/build-linux-agentsd.sh --check   # build both, copy nothing (the pre-merge gate)
@@ -11,6 +12,7 @@
 #   agentsd-linux-<arch>          the binary, stripped
 #   agentsd-linux-<arch>.sha256   its SHA-256, which is its identity: the installer names
 #                                 it on the server by this and compares it on every connect
+#   ci-watcher-linux-<arch>       the CI watcher (Packages/MCPServers), and its .sha256
 # and once:
 #   VERSION                       MARKETING_VERSION+CURRENT_PROJECT_VERSION from project.yml,
 #                                 used only to refuse a server running a newer app's build
@@ -56,6 +58,20 @@ for arch in x86_64 aarch64; do
         cp $bin $out/agentsd-linux-$arch
         sha256 $out/agentsd-linux-$arch > $out/agentsd-linux-$arch.sha256
     fi
+
+    for server in ci-watcher; do
+        print "building $server for $arch-linux…"
+        $swift build --package-path $root/Packages/MCPServers -c release \
+            --swift-sdk $arch-swift-linux-musl --product $server \
+            -Xswiftc -gnone -Xlinker -s
+        bin=$($swift build --package-path $root/Packages/MCPServers -c release --swift-sdk $arch-swift-linux-musl --show-bin-path)/$server
+        file $bin | grep -q "statically linked" || { print -u2 "$bin is not static"; exit 1; }
+        print "  $bin ($(( $(wc -c < $bin) / 1048576 )) MB)"
+        if (( ! check )); then
+            cp $bin $out/$server-linux-$arch
+            sha256 $out/$server-linux-$arch > $out/$server-linux-$arch.sha256
+        fi
+    done
 done
 
 if (( ! check )); then

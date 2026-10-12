@@ -1,10 +1,12 @@
 # Contract: the CI watcher MCP server
 
-`Integrations/ci-watcher/`, a stdio server the daemon hosts (#488; until then it was an
-http server on `127.0.0.1:8795`). It is set up in the project's `.agents/mcp.json` as `ci`:
+`Packages/MCPServers` (`CIWatcher`, the `ci-watcher` binary), a stdio server the daemon hosts
+(#488; until then it was an http server on `127.0.0.1:8795`). Since #700 it is a static Swift
+binary that Agents Host and the Linux host carry beside `agentsd`; it was `node server.ts`
+in `Integrations/ci-watcher/` before. It is set up in the project's `.agents/mcp.json` as `ci`:
 
 ```json
-{ "mcpServers": { "ci": { "command": "node", "args": ["Integrations/ci-watcher/server.ts"], "hosted": true } } }
+{ "mcpServers": { "ci": { "command": "ci-watcher", "hosted": true } } }
 ```
 
 It listens on no port, and holds no token: every GitHub call is `gh api` (or `gh pr list`) as the signed-in person.

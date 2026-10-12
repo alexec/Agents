@@ -19,10 +19,13 @@ public struct BoardPR: Sendable {
     public var pr: PR
     public var checks: Checks
     public var failedRunId: Int?
+    /// Whether it conflicts with its base (#712); nil while GitHub is still working it out.
+    public var conflicts: Bool?
 
     var json: JSON {
         var j = pr.json.merging(["checks": .string(checks.rawValue)])
         if let failedRunId { j["failedRunId"] = .int(failedRunId) }
+        if let conflicts { j["conflicts"] = .bool(conflicts) }
         return j
     }
 }

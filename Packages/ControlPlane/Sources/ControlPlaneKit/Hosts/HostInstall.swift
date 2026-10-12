@@ -149,6 +149,11 @@ public struct HostInstall: Sendable {
         await progress(name, "setUp")
         try await Self.words(keyGiven: keyGiven) { try await installer.install(binary: binary.file, sha256: binary.sha256, firstInstall: true) }
         try await Self.words(keyGiven: keyGiven) { try await installer.swapCurrent(to: binary.sha256, version: binary.version, installedBy: "control plane") }
+        // The MCP servers Agents ships (#700), beside agentsd. One that fails to copy leaves the
+        // host without it, not without a host.
+        for server in ServerFiles.shippedServers(for: arch, in: servers) {
+            try? await installer.installServer(named: server.name, binary: server.file, sha256: server.sha256)
+        }
         // A host code, left in the host's root and read once: never on its command line,
         // where `ps` would show it. Through a tunnel, it names the server's end of the
         // tunnel, which is held from now so the host's first dial finds it (#435, #610).

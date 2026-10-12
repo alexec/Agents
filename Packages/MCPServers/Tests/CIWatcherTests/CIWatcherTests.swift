@@ -123,7 +123,7 @@ func editIssue(_ r: inout JSON, _ number: Int, _ change: (inout JSON) -> Void) {
     @Test func eventsListGivesEveryEventPollOnlyWithTheirSchemas() async throws {
         let events = try #require(try await h.ok("events/list")["events"]?.array)
         #expect(events.compactMap { $0["name"]?.string }.sorted() ==
-            ["checks.failed", "issue.closed", "issue.commented", "issue.labelled", "issue.opened", "pr.closed", "pr.merged"])
+            ["checks.failed", "issue.closed", "issue.commented", "issue.labelled", "issue.opened", "pr.closed", "pr.conflicted", "pr.merged"])
         for e in events {
             #expect(e["delivery"] == ["poll"])
             #expect(e["description"]?.string?.isEmpty == false)
@@ -402,6 +402,53 @@ func editIssue(_ r: inout JSON, _ number: Int, _ change: (inout JSON) -> Void) {
             #expect(t["inputSchema"]?["required"]?.array?.contains("repo") == false)
             #expect(t["inputSchema"]?["properties"]?["repo"]?["type"] == "string")
         }
+    }
+
+    @Test func listPrsMarksAPRThatConflictsWithItsBase() async throws {
+        try h.editRepo { append(&$0, "prs", openPR(712, "agents/stale", ["checks": "none", "conflicts": true])) }
+        let prs = try await h.call("list_prs", ["repo": .string(repo)])["structuredContent"]?["prs"]?.array ?? []
+        #expect(prs.first { $0["number"] == 712 }?["conflicts"] == true)
+        #expect(prs.first { $0["number"] == 402 }?["conflicts"] == nil, "one not worked out yet says nothing")
+    }
+
+    @Test func prConflictedRaisesAPROncePerConflictNewOnesOnly() async throws {
+        func conflicts(_ number: Int, _ value: Bool?) throws {
+            try h.editRepo { r in
+                var prs = r["prs"]?.array ?? []
+                if let i = prs.firstIndex(where: { $0["number"]?.int == number }) { prs[i]["conflicts"] = value.map(JSON.bool) }
+                r["prs"] = .array(prs)
+            }
+        }
+        let all: JSON = ["repo": .string(repo)]
+        try h.editRepo { append(&$0, "prs", openPR(720, "agents/old-conflict", ["conflicts": true]), openPR(721, "agents/fresh", ["conflicts": false])) }
+        let first = try await h.poll("pr.conflicted", all, .null)
+        #expect(first["events"] == [], "one already in conflict is known, not raised")
+
+        try conflicts(721, true)
+        let raised = try await h.poll("pr.conflicted", all, first["cursor"] ?? .null)
+        let events = raised["events"]?.array ?? []
+        #expect(events.compactMap { $0["data"]?["pr"]?["number"]?.int } == [721])
+        #expect(events.first?["data"]?["pr"]?["branch"] == "agents/fresh")
+        #expect(events.first?["eventId"]?.string?.hasPrefix("pr.conflicted:\(repo):721:") == true)
+
+        try conflicts(721, nil)
+        let unknown = try await h.poll("pr.conflicted", all, raised["cursor"] ?? .null)
+        try conflicts(721, true)
+        let still = try await h.poll("pr.conflicted", all, unknown["cursor"] ?? .null)
+        #expect(ids(unknown) + ids(still) == [], "not worked out yet keeps its state")
+
+        try conflicts(721, false)
+        let clean = try await h.poll("pr.conflicted", all, still["cursor"] ?? .null)
+        try conflicts(721, true)
+        let again = try await h.poll("pr.conflicted", all, clean["cursor"] ?? .null)
+        #expect((again["events"]?.array ?? []).compactMap { $0["data"]?["pr"]?["number"]?.int } == [721],
+                "rebased and conflicting anew is raised again")
+
+        let only721: JSON = ["repo": .string(repo), "pr": 721]
+        try conflicts(720, false)
+        let narrowed = try await h.poll("pr.conflicted", only721, .null)
+        try conflicts(720, true)
+        #expect(try await h.poll("pr.conflicted", only721, narrowed["cursor"] ?? .null)["events"] == [], "pr narrows")
     }
 
     @Test func eachToolsResultShape() async throws {
