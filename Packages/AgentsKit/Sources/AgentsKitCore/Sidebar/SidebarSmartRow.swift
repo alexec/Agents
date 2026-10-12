@@ -12,8 +12,8 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
     /// order and each project's pin order. Out of their projects' groups (Alex, #495).
     case pinned
     case needsYou, working, unread
-    /// Sessions waiting for the person to approve archiving them (#584, #649), with
-    /// Approve All on it.
+    /// Sessions waiting for the person to approve archiving them (#584, #649), each
+    /// approved from its own row (no Approve All, #704, #667).
     case toArchive
 
     public var title: String {
@@ -70,7 +70,7 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
     /// Where a live session is listed (#587): once, in the first of the smart groups it
     /// belongs to — Pinned, Needs You, Working, Approve Archiving (#584), Unread — or, in none of
     /// them, under its project. Nil for its project. Approve Archiving comes before Unread though
-    /// it is drawn after it, so Approve All reaches every session that asks.
+    /// it is drawn after it, so every session that asks is listed where it is approved.
     public static func home(of agent: Agent, in group: AgentGroup, isPinned: Bool) -> SidebarSmartRow? {
         if isPinned { return .pinned }
         switch group {
