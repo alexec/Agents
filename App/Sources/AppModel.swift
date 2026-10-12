@@ -2886,13 +2886,20 @@ final class AppModel {
         }
     }
 
-    /// What every agent shares, for Settings ▸ Shared (054). Nil when it could not be read;
-    /// the tab then keeps what it last had.
-    func sharedSnapshot() async -> DaemonAPI.SharedSnapshot? {
+    /// What every agent shares, for Settings ▸ Agent Configuration (054, #754), or with a
+    /// project's folder what its `.agents` holds, for the same pages in Project Settings.
+    /// Nil when it could not be read; the page then keeps what it last had.
+    func sharedSnapshot(project: URL? = nil) async -> DaemonAPI.SharedSnapshot? {
         var snapshot: DaemonAPI.SharedSnapshot?
         _ = await attempt {
-            snapshot = try await self.client.call(DaemonAPI.Method.personalShared, Optional<String>.none,
-                                                  returning: DaemonAPI.SharedSnapshot.self)
+            if let project {
+                snapshot = try await self.client.call(DaemonAPI.Method.personalShared,
+                                                      DaemonAPI.SharedRequest(folder: project.path),
+                                                      returning: DaemonAPI.SharedSnapshot.self)
+            } else {
+                snapshot = try await self.client.call(DaemonAPI.Method.personalShared, Optional<String>.none,
+                                                      returning: DaemonAPI.SharedSnapshot.self)
+            }
         }
         return snapshot
     }

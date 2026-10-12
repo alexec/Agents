@@ -26,8 +26,8 @@ app puts first on the PATH of every server it starts. Named by its bare name, th
 runs on any host, with nothing else installed there.
 
 Only a local server can be hosted: `"hosted"` on an entry with a `url` is a problem with
-the file, and the Shared tab says so. A project's entry with `"hosted"` added or changed is
-approved again, in the project's **MCP servers** section, as any changed entry is.
+the file, and the Agent Configuration page says so. A project's entry with `"hosted"` added or changed is
+approved again, in **Project Settings ▸ Agent Configuration ▸ MCP servers**, as any changed entry is.
 
 ## What the app does with it
 

@@ -294,6 +294,9 @@ extension DaemonCore {
                 return .success(try JSONValue.encoding(runtimeStatuses()))
 
             case DaemonAPI.Method.personalShared:
+                if let folder = try decode(params, as: DaemonAPI.SharedRequest.self)?.folder {
+                    return .success(try JSONValue.encoding(try projectShared(folder)))
+                }
                 #if canImport(CryptoKit)
                 return .success(try JSONValue.encoding(withManagedSkills(sharedSnapshot())))
                 #else

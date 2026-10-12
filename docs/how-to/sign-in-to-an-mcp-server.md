@@ -13,7 +13,7 @@ describes, in your own browser. The next agent you start has the server, with yo
 
 ## See which servers want it
 
-Open **Settings ▸ Shared ▸ MCP servers**, or a project's **MCP servers** section. A remote
+Open **Settings ▸ Agent Configuration ▸ MCP servers**, or **Project Settings ▸ Agent Configuration ▸ MCP servers**. A remote
 server that asked for a sign-in says **needs sign-in** on its row, the way a missing secret
 says **NAME not set**. Agents start without it until you sign in.
 

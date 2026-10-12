@@ -163,15 +163,18 @@ the server keep whatever they were set up with there.
 Your set goes to each runtime the way that runtime can take it, which differs. Some read
 `~/.agents/skills` themselves; for others the app places links, which it never puts back
 once you delete them; MCP servers go with each conversation as it starts, so nothing is
-written into a runtime's own config. **Settings ▸ Shared** shows what each runtime ends up
+written into a runtime's own config. **Settings ▸ Agent Configuration** shows what each runtime ends up
 with. See [Share skills, instructions and servers with every agent](../how-to/share-skills-across-agents.md).
 
-A project's instructions, skills, MCP servers and plugins are set up in **Project Settings**,
-a sheet opened from the project page's toolbar, the project's context menu in the sidebar, or
-**File ▸ Project Settings…** (Option-Command-comma). Those are the same sections as **Settings ▸ Shared**.
-The folder is the only difference: yours is `~/.agents`, the project's is its `.agents`, and
-its instructions are `AGENTS.md` at the top of the project. Because that folder is committed,
-a skill added there reaches everyone who clones the project; one added in **Settings ▸ Shared**
+A project's instructions, skills, MCP servers and plugins are set up in **Project Settings ▸
+Agent Configuration**, a sheet opened from the project page's toolbar, the project's context
+menu in the sidebar, or **File ▸ Project Settings…** (Option-Command-comma). Its pages are the
+same as **Settings ▸ Agent Configuration**: Overview, Instructions, Skills, MCP servers,
+Plugins and Other files, between the project's own **General** and **Worktrees**. The folder
+is the difference: yours is `~/.agents`, the project's is its `.agents`, and its instructions
+are `AGENTS.md` at the top of the project. A project's Overview counts what is there, where
+yours also shows what each runtime gets. Because that folder is committed,
+a skill added there reaches everyone who clones the project; one added in **Settings ▸ Agent Configuration**
 is yours alone. A worktree has its own `.agents`, so a change there stays on that branch until
 it is merged. **General** also holds the project's two limits on agents that other agents start: how many may be running (3 unless you change it) and how many may be kept until you archive them (5). They are saved in the project's own `.agents/project.json`, so they go wherever the project goes. A change to that file, or to `.agents/pins.json`, made outside the app is not used until you keep it there; see [Settings](../reference/settings.md). See [Agent tools](../reference/agent-tools.md). On a server, Project Settings shows only **General**. See
 [Add a skill from a catalogue](../how-to/add-a-skill-from-a-catalogue.md).

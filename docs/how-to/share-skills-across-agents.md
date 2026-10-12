@@ -56,7 +56,7 @@ To find one on the MCP Registry and add it from the app, see
 writes names each secret as `${NAME}`, and the value goes in `~/.agents/secrets.env`, which
 is yours alone, readable only by you, and never committed. When an agent starts, the app
 fills each `${NAME}` from that file. A name that is not set means that server is left out
-of the session, and **Settings ▸ Shared** says which name is missing. The value is never
+of the session, and **Settings ▸ Agent Configuration** says which name is missing. The value is never
 shown or logged.
 
 To add one by hand, edit `~/.agents/mcp.json`, in the same shape Claude Code and Cursor use:
@@ -75,7 +75,7 @@ To add one by hand, edit `~/.agents/mcp.json`, in the same shape Claude Code and
 A server with `command` runs on your Mac; one with `url` is reached over http, or sse when
 `type` says so. The next agent to start, or to be picked back up, has it. The file is read
 each time and never copied anywhere, and its env and header values are never shown or
-logged. **Settings ▸ Shared** lists them by name only.
+logged. **Settings ▸ Agent Configuration** lists them by name only.
 
 What each runtime does with them:
 
@@ -128,7 +128,7 @@ nothing needs copying by hand:
 
 - Each skill folder in `~/.claude/skills` moves to `~/.agents/skills`, and a link to it takes
   its place. A skill with the same name already in `~/.agents/skills` is a clash: both are
-  left exactly where they are, and **Settings ▸ Shared** shows it.
+  left exactly where they are, and **Settings ▸ Agent Configuration** shows it.
 - If there is no `~/.agents/AGENTS.md`, the first instructions file found moves there, from
   Claude, then Codex, then Copilot, then Grok, and is linked back. With none anywhere, the app
   writes a short `AGENTS.md` that says what it is for.
@@ -138,7 +138,7 @@ linked into or deleted.
 
 ## See what every agent gets
 
-Open **Settings ▸ Shared**. The overview shows, for each runtime, how many of your
+Open **Settings ▸ Agent Configuration**. The overview shows, for each runtime, how many of your
 instructions, skills, servers and plugins it gets, and lists everything that needs a look:
 a clash, something left out, a runtime with no way in. Each page has **Edit** to open the
 file in your editor and **Reveal in Finder**.

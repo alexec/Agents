@@ -19,7 +19,7 @@ extension PersonalDotAgents {
         DotAgents.pluginFolders(in: home.appending(path: "\(folder)/\(plugins)", directoryHint: .isDirectory))
     }
 
-    /// What a plugin is, for the Shared tab and the Codex index.
+    /// What a plugin is, for the Agent Configuration page and the Codex index.
     public struct PluginInfo: Codable, Equatable, Sendable {
         public struct Contents: Codable, Equatable, Sendable {
             public var skills = 0

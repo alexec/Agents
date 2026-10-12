@@ -1,7 +1,7 @@
 import Foundation
 
 /// `personal/shared` (054, contracts/personal-shared.md): what is in the person's
-/// `~/.agents` and which runtime gets each thing, for Settings ▸ Shared. Read-only, worked
+/// `~/.agents` and which runtime gets each thing, for Settings ▸ Agent Configuration. Read-only, worked
 /// out from disk on every call, and for the Mac window only.
 ///
 /// Nothing in it is a value from `mcp.json`: a server's env and headers go by name only,
@@ -11,8 +11,20 @@ extension DaemonAPI.Method {
 }
 
 extension DaemonAPI {
+    /// `personal/shared` with no params reads `~/.agents`; with a project's folder, that
+    /// project's `.agents` (#754), which has no per-runtime reach.
+    public struct SharedRequest: Codable, Equatable, Sendable {
+        public var folder: String?
+
+        public init(folder: String? = nil) {
+            self.folder = folder
+        }
+    }
+}
+
+extension DaemonAPI {
     public struct SharedSnapshot: Codable, Equatable, Sendable {
-        /// `~/.agents`.
+        /// `~/.agents`, or a project's `.agents` (#754).
         public var home: String
         /// False for a copy of the app with no personal home (a scratch root), when
         /// everything else is empty.
@@ -238,9 +250,11 @@ extension DaemonAPI {
     public struct OtherFile: Codable, Equatable, Sendable, Identifiable {
         public enum Kind: String, Codable, Sendable {
             case persona, git, managed, unused
+            /// The app's own, in a project's `.agents`: its settings, pins, workflows (#754).
+            case app
         }
 
-        /// Relative to `~/.agents`.
+        /// Relative to `~/.agents`, or to a project's `.agents`.
         public var path: String
         public var kind: Kind
 
