@@ -136,6 +136,16 @@ const EVENTS = [
     }, []),
     payloadSchema: { type: "object", properties: { pr: prSchema, closedAt: { type: "string" } } },
   },
+  {
+    name: "pr.conflicted",
+    title: "Pull request in conflict",
+    description: "An open pull request began to conflict with its base, so it cannot merge and its CI may not run until it is rebased. Once per conflict: it is raised again only after the PR merges cleanly and then conflicts anew.",
+    delivery: ["poll"],
+    inputSchema: schema({
+      repo: repoProperty, branch: { type: "string", description: "Only the PR from this branch." }, pr: prProperty,
+    }, []),
+    payloadSchema: { type: "object", properties: { pr: prSchema, conflictedAt: { type: "string" } } },
+  },
   ...issueEvents(),
 ];
 
@@ -246,6 +256,12 @@ async function poll(gh: GitHub, params: any) {
   if (!event) throw new RpcError(-32011, `no event ${params?.name}; this server offers ${EVENTS.map((e) => e.name).join(", ")}`);
   const args = await withRepo(gh, check(event.inputSchema, params.arguments));
   const maxEvents = Math.min(MAX_EVENTS, Math.max(1, Number.isInteger(params.maxEvents) ? params.maxEvents : 50));
+  if (event.name === "pr.conflicted") {
+    // A first poll takes the PRs already in conflict as known: only new conflicts are raised.
+    const first = params.cursor === null || params.cursor === undefined;
+    const result = await pollConflicts(gh, args, first ? { since: "", ids: [] } : decodeCursor(params.cursor), first ? MAX_EVENTS : maxEvents);
+    return first ? { ...result, events: [], hasMore: false } : result;
+  }
   if (params.cursor === null || params.cursor === undefined) {
     return { events: [], cursor: encodeCursor({ since: new Date().toISOString(), ids: [] }),
       truncated: false, hasMore: false, nextPollMs: NEXT_POLL_MS };
@@ -286,13 +302,43 @@ async function poll(gh: GitHub, params: any) {
   };
 }
 
+/**
+ * A conflict has no time on GitHub, only a state, so `pr.conflicted` diffs it: the cursor's
+ * ids are the PRs that were in conflict at the last poll, and one that is now and was not
+ * then is raised. A PR GitHub has not worked out yet (UNKNOWN) keeps the state it had (#712).
+ */
+async function pollConflicts(gh: GitHub, args: Record<string, any>, cursor: Cursor, maxEvents: number) {
+  let prs;
+  try {
+    prs = await gh.listPRs(args.repo);
+  } catch (error) {
+    throw eventsError(error);
+  }
+  const was = new Set(cursor.ids);
+  const id = (number: number) => `pr.conflicted:${args.repo}:${number}`;
+  const wanted = prs.filter((p) => (args.pr === undefined || p.number === args.pr) && (args.branch === undefined || p.branch === args.branch));
+  const now = wanted.filter((p) => p.conflicts === true || (p.conflicts === undefined && was.has(id(p.number))));
+  const fresh = now.filter((p) => !was.has(id(p.number))).sort((a, b) => a.number - b.number);
+  const taken = fresh.slice(0, maxEvents);
+  const time = new Date().toISOString();
+  const ids = [...now.filter((p) => was.has(id(p.number))), ...taken].map((p) => id(p.number));
+  return {
+    events: taken.map((p) => ({ eventId: `${id(p.number)}:${time}`, name: "pr.conflicted", timestamp: time,
+      data: { pr: { number: p.number, title: p.title, branch: p.branch, url: p.url }, conflictedAt: time } })),
+    cursor: encodeCursor({ since: time, ids }),
+    truncated: false,
+    hasMore: fresh.length > taken.length,
+    nextPollMs: NEXT_POLL_MS,
+  };
+}
+
 // MARK: Tools
 
 const TOOLS = [
   {
     name: "list_prs",
     title: "List pull requests",
-    description: "The repo's open pull requests, each with its checks: passing, failing, running or none. A failing one has the failed run's id for failed_log and rerun_failed. One that conflicts with its base has conflicts: true; its CI may never run until it is rebased.",
+    description: "The repo's open pull requests, each with its checks: passing, failing, running or none. A failing one has the failed run's id for failed_log and rerun_failed. conflicts says whether it conflicts with its base (left out while GitHub works it out); one in conflict may get no CI until it is rebased.",
     inputSchema: schema({ repo: repoProperty }, []),
     annotations: { readOnlyHint: true },
     _meta: { ui: { resourceUri: "ui://ci/board", visibility: ["model", "app"] }, "ui/resourceUri": "ui://ci/board" },
@@ -387,7 +433,7 @@ async function handle(gh: GitHub, method: string, params: any): Promise<unknown>
         capabilities: { tools: {}, resources: {}, events: { listChanged: false },
           extensions: { "io.modelcontextprotocol/ui": {} } },
         serverInfo: { name: "ci-watcher", title: "CI watcher", version: VERSION },
-        instructions: "This repo's pull requests, their CI, and its issues. Events: checks.failed, pr.merged, pr.closed, issue.opened, issue.labelled, issue.commented, issue.closed. Tools list pull requests and issues, read logs, rerun failed jobs and comment, as the signed-in gh user.",
+        instructions: "This repo's pull requests, their CI, and its issues. Events: checks.failed, pr.merged, pr.conflicted, pr.closed, issue.opened, issue.labelled, issue.commented, issue.closed. Tools list pull requests and issues, read logs, rerun failed jobs and comment, as the signed-in gh user.",
       };
     }
     case "ping": return {};

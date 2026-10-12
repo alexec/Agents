@@ -23,6 +23,7 @@ It listens on no port, and holds no token: every GitHub call is `gh api` (or `gh
 | `checks.failed` | `repo` (string, `owner/name`; left out, the project folder's repo, #702), `branch` (string, only runs on that PR branch), `pr` (positive integer, only that pull request); given filters must all hold | `{ pr: {number, title, branch, url}, headSha, run: {id, attempt, name, url}, failedJobs: [{name, url}] }` | `checks.failed:{repo}:{runId}:{attempt}` |
 | `pr.merged` | `repo` (optional), `branch` (string, only the PR from that branch), `pr` (positive integer, only that pull request); given filters must all hold | `{ pr: {number, title, branch, url}, mergedAt, mergeSha }` | `pr.merged:{repo}:{number}` |
 | `pr.closed` (#702) | `repo` (optional), `branch` (string, only the PR from that branch), `pr` (positive integer, only that pull request); given filters must all hold | `{ pr: {number, title, branch, url}, closedAt }; closed without merging` | `pr.closed:{repo}:{number}:{closedAt}` |
+| `pr.conflicted` (#712) | as `pr.closed` | `{ pr: {number, title, branch, url}, conflictedAt }`; a PR open and in conflict now that was not at the last poll. The cursor's ids are the PRs in conflict then; a first poll takes those already in conflict as known; one GitHub has not worked out keeps its state | `pr.conflicted:{repo}:{number}:{conflictedAt}` |
 
 | `issue.opened` (#682) | `repo` (optional), `label` (only issues opened with it) | `{ issue: {number, title, author, labels, url}, openedAt }` | `issue.opened:{repo}:{number}` |
 | `issue.labelled` | `repo` (optional), `label` (only when it is the label added), `issue` (positive integer) | `{ issue, label, by, labelledAt }` | `issue.labelled:{repo}:{eventId}` |
@@ -39,7 +40,7 @@ app reserves, so workflows name them as they are (`checks.failed`), with no pref
 
 | Tool | Input | Result | Annotations | Visibility |
 |---|---|---|---|---|
-| `list_prs` | `repo` | `{ prs: [{number, title, branch, url, checks: "passing"\|"failing"\|"running"\|"none", failedRunId?, conflicts?: true}] }` | `readOnlyHint: true` | `model`, `app`; `_meta.ui.resourceUri: "ui://ci/board"` |
+| `list_prs` | `repo` | `{ prs: [{number, title, branch, url, checks: "passing"\|"failing"\|"running"\|"none", failedRunId?, conflicts?: boolean}] }`; `conflicts` is left out while GitHub works it out | `readOnlyHint: true` | `model`, `app`; `_meta.ui.resourceUri: "ui://ci/board"` |
 | `list_issues` | `repo`, optional `label` | `{ issues: [{number, title, author, labels, url, comments, updatedAt}] }`, open issues newest updated first, at most 100 | `readOnlyHint: true` | `model`, `app`; `_meta.ui.resourceUri: "ui://ci/issues"` |
 | `failed_log` | `repo`, `runId`, optional `job` | The last 300 lines of each failed job's log, as text | `readOnlyHint: true` | `model` |
 | `rerun_failed` | `repo`, `runId` | `{ rerun: true, url }` | none: it changes something | `model`, `app` |

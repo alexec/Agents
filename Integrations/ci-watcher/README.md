@@ -12,6 +12,7 @@ in the project's `.agents/mcp.json` as `ci`, and the **Fix failed checks** workf
 | Event | `checks.failed` | A pull request's Actions run finished with a failure. Arguments: `repo`, optional `branch` and `pr`. |
 | Event | `pr.merged` | A pull request was merged. Arguments: `repo`, optional `branch` and `pr`. |
 | Event | `pr.closed` | A pull request was closed without being merged (#702). Arguments: `repo`, optional `branch` and `pr`. |
+| Event | `pr.conflicted` | An open pull request began to conflict with its base (#712): once per conflict, and not for one already in conflict when the wait or trigger starts. Arguments: `repo`, optional `branch` and `pr`. |
 | Event | `issue.opened` | An issue (not a PR) was opened. Arguments: `repo`, optional `label`. |
 | Event | `issue.labelled` | A label was added to an issue. Arguments: `repo`, optional `label` (the one added) and `issue`. |
 | Event | `issue.commented` | A comment was left on an issue; its body is cut to 4000 characters. Arguments: `repo`, optional `label` and `issue`. |

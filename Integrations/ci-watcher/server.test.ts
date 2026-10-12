@@ -100,7 +100,7 @@ test("a notification is answered with nothing", async () => {
 test("events/list gives every event, poll only, with their schemas", async () => {
   const { events } = await ok("events/list");
   assert.deepEqual(events.map((e: any) => e.name).sort(),
-    ["checks.failed", "issue.closed", "issue.commented", "issue.labelled", "issue.opened", "pr.closed", "pr.merged"]);
+    ["checks.failed", "issue.closed", "issue.commented", "issue.labelled", "issue.opened", "pr.closed", "pr.conflicted", "pr.merged"]);
   for (const e of events) {
     assert.deepEqual(e.delivery, ["poll"]);
     assert.ok(e.description);
@@ -389,8 +389,43 @@ test("list_prs marks a PR that conflicts with its base", async () => {
   edit((d) => repoData(d).prs.push(openPR(712, "agents/stale", { checks: "none", conflicts: true })));
   const prs = (await ok("tools/call", { name: "list_prs", arguments: { repo: REPO } })).structuredContent.prs;
   assert.equal(prs.find((p: any) => p.number === 712).conflicts, true);
-  assert.ok(!("conflicts" in prs.find((p: any) => p.number === 402)), "one that merges cleanly says nothing");
+  assert.ok(!("conflicts" in prs.find((p: any) => p.number === 402)), "one not worked out yet says nothing");
   edit((d) => { repoData(d).prs = repoData(d).prs.filter((p: any) => p.number !== 712); });
+});
+
+test("pr.conflicted raises a PR once per conflict, new ones only", async () => {
+  const conflicts = (number: number, value: boolean | undefined) => edit((d) => {
+    const pr = repoData(d).prs.find((p: any) => p.number === number);
+    if (value === undefined) delete pr.conflicts; else pr.conflicts = value;
+  });
+  edit((d) => repoData(d).prs.push(openPR(720, "agents/old-conflict", { conflicts: true }), openPR(721, "agents/fresh", { conflicts: false })));
+  const first = await poll("pr.conflicted", { repo: REPO }, null);
+  assert.deepEqual(first.events, [], "one already in conflict is known, not raised");
+
+  conflicts(721, true);
+  const raised = await poll("pr.conflicted", { repo: REPO }, first.cursor);
+  assert.deepEqual(raised.events.map((e: any) => e.data.pr.number), [721]);
+  assert.equal(raised.events[0].data.pr.branch, "agents/fresh");
+  assert.match(raised.events[0].eventId, new RegExp(`^pr\\.conflicted:${REPO}:721:`));
+
+  conflicts(721, undefined);
+  const unknown = await poll("pr.conflicted", { repo: REPO }, raised.cursor);
+  conflicts(721, true);
+  const still = await poll("pr.conflicted", { repo: REPO }, unknown.cursor);
+  assert.deepEqual([...unknown.events, ...still.events], [], "not worked out yet keeps its state");
+
+  conflicts(721, false);
+  const clean = await poll("pr.conflicted", { repo: REPO }, still.cursor);
+  conflicts(721, true);
+  const again = await poll("pr.conflicted", { repo: REPO }, clean.cursor);
+  assert.deepEqual(again.events.map((e: any) => e.data.pr.number), [721], "rebased and conflicting anew is raised again");
+
+  conflicts(720, false);
+  const narrowed = await poll("pr.conflicted", { repo: REPO, pr: 721 }, null);
+  conflicts(720, true);
+  const other = await poll("pr.conflicted", { repo: REPO, pr: 721 }, narrowed.cursor);
+  assert.deepEqual(other.events, [], "pr narrows");
+  edit((d) => { repoData(d).prs = repoData(d).prs.filter((p: any) => p.number !== 720 && p.number !== 721); });
 });
 
 test("each tool's result shape", async () => {
