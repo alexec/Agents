@@ -298,6 +298,8 @@ extension DaemonAPI {
         /// From the app's own sidecar; nil for a skill the CLI added.
         public var commit: String?
         public var committedAt: Date?
+        /// The id of the marketplace it was added from (#746), such as `provided:skills-sh`;
+        /// `skills.sh` in a record written before that.
         public var catalogue: String?
         /// The folder no longer matches what was recorded: the person has edited it.
         public var edited: Bool
