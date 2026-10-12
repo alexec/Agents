@@ -17,6 +17,7 @@ import { actDoing, type Store } from "../model/store";
 import { byStart, folderKey, projectFolder, showsUnread } from "../model/groups";
 import { archiveAllHelp, archiveAllLabel } from "../model/archiveWords";
 import { folds } from "../model/folds";
+import { macHostNoticeDetail, macHostNoticeTitle } from "../model/macHostNotice";
 import { parseQuery, queryMatches, type LabelQuery } from "../model/labels";
 import { keepsInUnread, newSessionProject, ownCount, pinnedSessions, pinnedWorkflows, projectSessions, rememberedProject, rememberProject,
   smartAgents, smartRows, smartTitles, withKept, type ProjectKey, type SmartRow } from "../model/sidebar";
@@ -122,6 +123,8 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
   const archived = archivedProjects(store.hosts.value, store.projects.value);
   const showsArchived = folds.showsArchivedProjects.value;
   const offline = store.hosts.value.filter((h) => h.state !== "online");
+  const macHost = store.hosts.value.find((h) => h.id === "mac");
+  const macNotice = store.macHostNotice.value;
   const query = searched.value;
   return (
     <nav class="sidebar" aria-label="Sidebar">
@@ -175,15 +178,17 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
       {/* What the hosts and this browser are doing, pinned at the foot: status lines rather than
           somewhere to go. Each is absent when there is nothing to say. */}
       <footer class="sidebar-foot">
-        {/* This Mac's host still connecting is said as the window says it, not as down (#250). */}
-        {offline.map((host) => host.id === "mac" && host.state === "connecting" ? (
-          <p class="foot-line quiet" role="status" key={host.id}>Connecting…</p>
-        ) : host.id === "mac" ? (
-          <div class="host-down" role="status" key={host.id}>
-            <p class="strong">⚠︎ This Mac’s host isn’t answering</p>
-            <p class="quiet small">What’s listed is what it last said. The control plane is trying again by itself.</p>
-          </div>
+        {/* This Mac's host: still connecting is said as the window says it, not as down (#250); down,
+            why, in the window's words, when the control plane knows (#666). */}
+        {macNotice && (macHost?.state === "connecting" && macNotice.kind === "notAnswering" ? (
+          <p class="foot-line quiet" role="status">Connecting…</p>
         ) : (
+          <div class="host-down" role="status">
+            <p class="strong">⚠︎ {macHostNoticeTitle(macNotice)}</p>
+            <p class="quiet small">{macHostNoticeDetail(macNotice)}</p>
+          </div>
+        ))}
+        {offline.filter((host) => host.id !== "mac").map((host) => (
           <p class="foot-line" role="status" key={host.id}>
             <span aria-hidden="true">⚡︎</span> {host.name} is {host.state === "connecting" ? "connecting…" : "offline"}
           </p>
