@@ -1,7 +1,8 @@
 #!/bin/zsh
 # agents-control for Linux (058, T068): static musl binaries for x86_64 and aarch64, cross-built
 # on this Mac with the swift.org toolchain and its static Linux SDK, as build-linux-agentsd.sh
-# does for the daemon. They land in deploy/bin/, named by Docker's TARGETARCH.
+# does for the daemon. Beside each, workspace-commands (#691, #806), the command provider the
+# control plane looks for next to itself. They land in deploy/bin/, named by Docker's TARGETARCH.
 set -euo pipefail
 
 root=${0:A:h:h}
@@ -23,6 +24,14 @@ for arch in $arches; do
     file $bin | grep -q "statically linked" || { print -u2 "$bin is not static"; exit 1; }
     cp $bin $out/agents-control-linux-${docker[$arch]}
     print "  $out/agents-control-linux-${docker[$arch]} ($(( $(stat -f %z $bin) / 1048576 )) MB)"
+
+    print "building workspace-commands for $arch-linux…"
+    $swift build --package-path $root/Packages/MCPServers -c release \
+        --swift-sdk $arch-swift-linux-musl --product workspace-commands -Xswiftc -gnone -Xlinker -s
+    bin=$($swift build --package-path $root/Packages/MCPServers -c release --swift-sdk $arch-swift-linux-musl --show-bin-path)/workspace-commands
+    file $bin | grep -q "statically linked" || { print -u2 "$bin is not static"; exit 1; }
+    cp $bin $out/workspace-commands-linux-${docker[$arch]}
+    print "  $out/workspace-commands-linux-${docker[$arch]} ($(( $(stat -f %z $bin) / 1048576 )) MB)"
 done
 
 # The web remote (071), built here as it is not checked in (#473), so the image can serve it
