@@ -13,13 +13,15 @@
 // again; and the form's runtime, choices and reach are kept between starts.
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import type { Attachment, BranchSummary, ConfigOption, JSONValue, RuntimeStatus, SandboxChoice, SlashCommand, StartRequest, UUID,
+import type { Attachment, BranchSummary, ConfigOption, JSONValue, Persona, RuntimeStatus, SandboxChoice, SlashCommand, StartRequest, UUID,
   WorktreeSummary } from "../protocol/generated";
 import type { SandboxWillNotStart, Store } from "../model/store";
 import { drawable, modeOption, modeStartsOn, choices, same } from "../model/options";
 import { folderKey } from "../model/groups";
 import { formRuntime, newSessionRuntime, runtimeRuns, unavailableReason } from "../model/runtimes";
 import { formFor, keepForm, keptForm } from "../model/startForm";
+import { personaChoices, withPersonaLabels } from "../model/personas";
+import { chatProject } from "../model/chat";
 import { sandboxCardTitle, sandboxChoiceWords, sandboxChoices, sandboxExplanation, sandboxOverrideWords, sandboxState,
   sandboxStateWords, sandboxWhy, startWithout } from "../model/sandbox";
 import { go } from "../route";
@@ -94,6 +96,10 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   const lastSent = useRef<{ text: string; attachments: Attachment[] } | null>(null);
   /** Asked again by Try again. */
   const asking = useSignal(0);
+  /** The project's personas (#760), the one picked by id, and one picked before its runtime's menus came. */
+  const personas = useSignal<Persona[]>([]);
+  const persona = useSignal<string | undefined>(undefined);
+  const pendingPersona = useRef<Persona | undefined>(undefined);
 
   useEffect(() => {
     // What each runtime takes changes once it has run: asked again as the form opens.
@@ -102,6 +108,10 @@ export function NewAgent({ store, host, folder, projectName, down }: {
     folders.value = keptForm(storage).folders;
     labels.value = [];
     refusal.value = null;
+    persona.value = undefined;
+    pendingPersona.current = undefined;
+    personas.value = [];
+    void store.personas(host, folder).then((list) => (personas.value = list));
     void store.worktrees(host, folder).then((list) => {
       worktrees.value = (list?.worktrees ?? []).filter((w) => !w.isProjectFolder);
       branches.value = list?.branches ?? [];
@@ -138,7 +148,13 @@ export function NewAgent({ store, host, folder, projectName, down }: {
       const value = mode ? modeStartsOn(store.rememberedModes.value[host]?.[chosenRuntime], mode) : undefined;
       // The choices left on this runtime, where they are still choices; the mode remembered otherwise.
       const left = kept.peek().runtimeID === chosenRuntime ? kept.peek().chosen : {};
-      const chosen = keep(options, mode && value !== undefined && left[mode.id] === undefined ? { ...left, [mode.id]: value } : left);
+      let chosen = keep(options, mode && value !== undefined && left[mode.id] === undefined ? { ...left, [mode.id]: value } : left);
+      // Over the mode remembered, because the persona was picked after it (#760).
+      const waiting = pendingPersona.current;
+      if (waiting && options.length) {
+        chosen = { ...chosen, ...personaChoices(waiting, options) };
+        pendingPersona.current = undefined;
+      }
       form.value = { draftID: answer.draftID, options, commands: answer.commands, chosen, state: "ready" };
     });
     return () => {
@@ -160,6 +176,30 @@ export function NewAgent({ store, host, folder, projectName, down }: {
     form.value = { ...form.peek(), options, commands: correction.commands, chosen: keep(options, form.peek().chosen), state: "ready" };
   }, [correction]);
 
+  // Pick a kind of session (#760): what it names is set, what it leaves out stays as the form has it.
+  const choosePersona = (id: string) => {
+    const picked = personas.value.find((p) => p.id === id && p.problem === undefined);
+    persona.value = picked?.id;
+    pendingPersona.current = undefined;
+    if (!picked) return;
+    labels.value = withPersonaLabels(labels.value, picked);
+    const wanted = picked.settings.runtimeID;
+    if (wanted !== undefined && wanted !== chosenRuntime && runs.available.some((r) => r.runtime.id === wanted)) {
+      pendingPersona.current = picked;
+      runtimeID.value = wanted;
+      sandbox.value = undefined;
+      refusal.value = null;
+      return;
+    }
+    if (form.value.state !== "ready") pendingPersona.current = picked;
+    else form.value = { ...form.value, chosen: { ...form.value.chosen, ...personaChoices(picked, form.value.options) } };
+  };
+  const usablePersonas = personas.value.filter((p) => p.problem === undefined);
+  const brokenPersonas = personas.value.filter((p) => p.problem !== undefined);
+  const chat = chatProject(store.projects.value[host]);
+  const isChatProject = chat !== undefined && folderKey(chat.project.folder) === folderKey(folder);
+  const description = usablePersonas.find((p) => p.id === persona.value)?.description;
+
   const capabilities = chosenRuntime ? store.account(host, chosenRuntime)?.promptCapabilities : undefined;
 
   const start = async (text: string, attachments: Attachment[], override = sandbox.value) => {
@@ -178,6 +218,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
       ...(w.kind === "new" ? { worktree: { new: {} } } : w.kind === "existing" ? { worktree: { existing: { _0: w.root as never } } }
         : w.kind === "branch" ? { worktree: { branch: { _0: w.name } } } : {}),
       ...(override ? { sandbox: override } : {}),
+      ...(persona.value ? { persona: persona.value } : {}),
       // Kept until this start succeeds, so a retry after a timeout is the same start (#291).
       requestID: store.startRequestID(host, folder),
     };
@@ -244,6 +285,29 @@ export function NewAgent({ store, host, folder, projectName, down }: {
       <div class="scroll new-heading">
         <ProjectSwitch store={store} host={host} folder={folder} projectName={projectName} down={down} />
         <p class="quiet" title={path}>{path} · {machine}</p>
+        {personas.value.length > 0 && (
+          <div class="persona-choice">
+            {usablePersonas.length > 0 && (isChatProject ? (
+              <label class="pill select" title="Persona">
+                <span aria-hidden="true">{usablePersonas.find((p) => p.id === persona.value)?.name ?? "No persona"} ▾</span>
+                <select aria-label="Persona" disabled={down} value={persona.value ?? ""}
+                  onChange={(e) => choosePersona((e.currentTarget as HTMLSelectElement).value)}>
+                  <option value="">No persona</option>
+                  {usablePersonas.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </label>
+            ) : (
+              <div class="segmented" role="radiogroup" aria-label="Persona">
+                {[{ id: "", name: "None" }, ...usablePersonas].map((p) => (
+                  <button key={p.id} role="radio" aria-checked={(persona.value ?? "") === p.id} disabled={down}
+                    class={(persona.value ?? "") === p.id ? "on" : ""} onClick={() => choosePersona(p.id)}>{p.name}</button>
+                ))}
+              </div>
+            ))}
+            {description && <p class="quiet small">{description}</p>}
+            {brokenPersonas.map((p) => <p key={p.id} class="quiet small">{p.id}.md: {p.problem}</p>)}
+          </div>
+        )}
       </div>
       <footer class="foot">
         {/* A change to the project's own files that no session can be asked about (#531). */}

@@ -145,47 +145,6 @@ public enum WorkflowFile {
             problem = .triggerNotSupported(triggers[0].name)
         }
 
-        // How the agent should be started. A key that is there but is not a scalar —
-        // a list, or a block under it — is a file somebody has to fix, because the one
-        // thing worse than a workflow that does not run is one that runs with a
-        // permission we guessed at. A key with nothing after it says nothing, which is
-        // the same as leaving it out.
-        func setting(_ key: String) throws -> String? {
-            guard let node = mapping[key] else { return nil }
-            guard let value = node.scalar else {
-                throw YAMLNode.Failure("`\(key):` must be a single value")
-            }
-            return value.isEmpty ? nil : value
-        }
-        // Everything else the runtime offers, by its own id, one scalar each. A value
-        // left empty says nothing, as it does at the top level.
-        func options() throws -> [String: String] {
-            guard let node = mapping[WorkflowSettings.Setting.options] else { return [:] }
-            if node.scalar?.isEmpty == true { return [:] }
-            guard case .mapping(let pairs) = node else {
-                throw YAMLNode.Failure("`options:` must be a list of keys, like `fast: true`")
-            }
-            var named: [String: String] = [:]
-            for (id, value) in pairs {
-                guard let text = value.scalar else {
-                    throw YAMLNode.Failure("`\(id):` under `options:` must be a single value")
-                }
-                if !text.isEmpty { named[id] = text }
-            }
-            return named
-        }
-        func labels() throws -> [String] {
-            guard let node = mapping["labels"] else { return [] }
-            guard let values = node.sequenceValues else {
-                throw YAMLNode.Failure("`labels:` must be a list of names")
-            }
-            do {
-                return try SessionLabelPolicy.change(current: [], add: values, actor: .agent,
-                                                     projectLabels: []).map(\.value)
-            } catch {
-                throw YAMLNode.Failure("`labels:` \(error.localizedDescription)")
-            }
-        }
         // How long from one run's start to the next (#103). Wrong, it is a file to fix
         // rather than a cooldown to guess at: a workflow meant to run once an hour and
         // running on every trigger is the thing the key was written to stop.
@@ -255,11 +214,7 @@ public enum WorkflowFile {
 
         let settings: WorkflowSettings
         do {
-            settings = WorkflowSettings(permissionMode: try setting("permission-mode"),
-                                        runtimeID: try setting("runtime"),
-                                        model: try setting("model"),
-                                        effort: try setting("effort"),
-                                        options: try options(), labels: try labels())
+            settings = try Self.settings(from: mapping)
         } catch let error as YAMLNode.Failure {
             return broken(error.message)
         } catch {
@@ -282,6 +237,57 @@ public enum WorkflowFile {
                         prompt: body, problem: problem, unknownFields: unknown,
                         settings: settings, cooldown: cooldown, enabled: enabled,
                         archived: archived, hosts: hosts, whenDone: whenDone)
+    }
+
+    /// The settings keys a workflow and a persona (#760) share: `permission-mode`,
+    /// `runtime`, `model`, `effort`, `options:` and `labels:`.
+    static func settings(from mapping: [String: YAMLNode]) throws -> WorkflowSettings {
+        // How the agent should be started. A key that is there but is not a scalar —
+        // a list, or a block under it — is a file somebody has to fix, because the one
+        // thing worse than a workflow that does not run is one that runs with a
+        // permission we guessed at. A key with nothing after it says nothing, which is
+        // the same as leaving it out.
+        func setting(_ key: String) throws -> String? {
+            guard let node = mapping[key] else { return nil }
+            guard let value = node.scalar else {
+                throw YAMLNode.Failure("`\(key):` must be a single value")
+            }
+            return value.isEmpty ? nil : value
+        }
+        // Everything else the runtime offers, by its own id, one scalar each. A value
+        // left empty says nothing, as it does at the top level.
+        func options() throws -> [String: String] {
+            guard let node = mapping[WorkflowSettings.Setting.options] else { return [:] }
+            if node.scalar?.isEmpty == true { return [:] }
+            guard case .mapping(let pairs) = node else {
+                throw YAMLNode.Failure("`options:` must be a list of keys, like `fast: true`")
+            }
+            var named: [String: String] = [:]
+            for (id, value) in pairs {
+                guard let text = value.scalar else {
+                    throw YAMLNode.Failure("`\(id):` under `options:` must be a single value")
+                }
+                if !text.isEmpty { named[id] = text }
+            }
+            return named
+        }
+        func labels() throws -> [String] {
+            guard let node = mapping["labels"] else { return [] }
+            guard let values = node.sequenceValues else {
+                throw YAMLNode.Failure("`labels:` must be a list of names")
+            }
+            do {
+                return try SessionLabelPolicy.change(current: [], add: values, actor: .agent,
+                                                     projectLabels: []).map(\.value)
+            } catch {
+                throw YAMLNode.Failure("`labels:` \(error.localizedDescription)")
+            }
+        }
+        return WorkflowSettings(permissionMode: try setting("permission-mode"),
+                                runtimeID: try setting("runtime"),
+                                model: try setting("model"),
+                                effort: try setting("effort"),
+                                options: try options(), labels: try labels())
     }
 
     /// The machine ids under `hosts:`. A bare id and a list of them are the same

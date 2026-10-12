@@ -57,8 +57,11 @@ struct WorkflowTriggerCodingTests {
     }
 
     @Test func existingTriggersKeepTheirShape() throws {
-        let data = try JSONEncoder().encode(WorkflowTrigger.unrecognised(name: "x", keys: [:]))
-        #expect(String(decoding: data, as: UTF8.self) == #"{"unrecognised":{"name":"x","keys":{}}}"#)
+        // Sorted: an encoder's key order is the hash's, and differs run to run.
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        let data = try encoder.encode(WorkflowTrigger.unrecognised(name: "x", keys: [:]))
+        #expect(String(decoding: data, as: UTF8.self) == #"{"unrecognised":{"keys":{},"name":"x"}}"#)
     }
 
     /// A state written while a pull request's run was refused: the refusal is one this

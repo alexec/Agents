@@ -227,6 +227,8 @@ public enum DaemonAPI {
 
         // Workflows: the prompts a project keeps that run themselves.
         public static let workflowsList = "workflows/list"
+        /// The personas a start in a project can pick (#760), as `[Persona]`.
+        public static let personasList = "personas/list"
         public static let workflowsRun = "workflows/run"
         /// Put one away, or bring it back. The user's one way of overruling a workflow
         /// an agent wrote, which is why it is here and not only in the file system.
@@ -873,13 +875,17 @@ public enum DaemonAPI {
         public var sandbox: SandboxChoice?
         /// Labels chosen by the person on the new-session form.
         public var labels: [String]
+        /// The persona picked on the form (#760), by id. Its settings are already in
+        /// the rest of the request; this brings its prompt.
+        public var persona: String?
 
         public init(runtimeID: String, cwd: URL, prompt: String,
                     attachments: [Attachment] = [],
                     startOptions: StartOptions = .none, draftID: UUID? = nil,
                     additionalDirectories: [URL] = [], mcpServers: [MCPServer] = [],
                     worktree: WorktreeChoice? = nil, requestID: UUID? = nil,
-                    sandbox: SandboxChoice? = nil, labels: [String] = []) {
+                    sandbox: SandboxChoice? = nil, labels: [String] = [], persona: String? = nil) {
+            self.persona = persona
             self.sandbox = sandbox
             self.worktree = worktree
             self.runtimeID = runtimeID
@@ -911,6 +917,7 @@ public enum DaemonAPI {
             requestID = try c.decodeIfPresent(UUID.self, forKey: .requestID)
             sandbox = try c.decodeIfPresent(SandboxChoice.self, forKey: .sandbox)
             labels = try c.decodeIfPresent([String].self, forKey: .labels) ?? []
+            persona = try c.decodeIfPresent(String.self, forKey: .persona)
         }
 
         /// What goes to the runtime: the words, then whatever was attached.

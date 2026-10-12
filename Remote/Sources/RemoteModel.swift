@@ -757,6 +757,13 @@ final class RemoteModel {
     /// person has since moved off is recognised as that and let go.
     private var startGeneration = 0
 
+    /// The kinds of session the page's project offers (#760), the project's and the
+    /// home's as its host lists them, and the one picked, by id.
+    private(set) var startPersonas: [Persona] = []
+    private(set) var startPersona: String?
+    /// Picked while its runtime's choices were still to come: laid over them on arrival.
+    private var pendingStartPersona: Persona?
+
     var startRuntime: RuntimeStatus? { startRuntimes.first { $0.runtime.id == startRuntimeID } }
 
     /// What the page offers: the runtimes of the project's own host, the Mac's or a
@@ -777,6 +784,10 @@ final class RemoteModel {
         startWorktree = nil
         startWorktrees = .notARepository
         Task { await loadStartWorktrees(in: folder) }
+        startPersona = nil
+        pendingStartPersona = nil
+        startPersonas = []
+        Task { await loadStartPersonas(in: folder) }
         if !startShowsParts {
             startShowsParts = true
             await showing(Self.startParts)
@@ -816,6 +827,34 @@ final class RemoteModel {
             ?? .notARepository
         guard startingIn == folder else { return }
         startWorktrees = answer
+    }
+
+    /// The project's personas (#760). A host too old to know the method offers none.
+    private func loadStartPersonas(in folder: URL) async {
+        let request = DaemonAPI.PersonasListRequest(folder: folder)
+        let listed = (try? await client(for: request).call(DaemonAPI.Method.personasList, request,
+                                                           returning: [Persona].self)) ?? []
+        guard startingIn == folder else { return }
+        startPersonas = listed
+    }
+
+    /// Pick a kind of session (#760): every setting it names is set, every one it leaves
+    /// out stays as the page has it. Nil picks none and changes nothing else.
+    func choosePersona(_ persona: Persona?) async {
+        startPersona = persona?.id
+        pendingStartPersona = nil
+        guard let persona else { return }
+        if let runtimeID = persona.settings.runtimeID, runtimeID != startRuntimeID,
+           startAvailableRuntimeIDs.contains(runtimeID) {
+            pendingStartPersona = persona
+            await chooseRuntime(runtimeID)
+            return
+        }
+        if startChoicesState != .ready {
+            pendingStartPersona = persona
+        } else {
+            startChosen.merge(persona.choices(against: startOptions)) { _, new in new }
+        }
     }
 
     /// The branch an agent's project folder is on, for the place over its prompt (#242).
@@ -912,6 +951,11 @@ final class RemoteModel {
            let value = ModeMemory.startingValue(remembered: work.rememberedMode(for: runtimeID), for: mode) {
             kept[mode.id] = value
         }
+        // Over the mode remembered, because the persona was picked after it (#760).
+        if let persona = pendingStartPersona, !startOptions.isEmpty {
+            kept.merge(persona.choices(against: startOptions)) { _, new in new }
+            pendingStartPersona = nil
+        }
         startChosen = kept
         startChoicesState = .ready
     }
@@ -980,7 +1024,7 @@ final class RemoteModel {
             runtimeID: runtimeID, cwd: folder, prompt: words, attachments: attachments,
             startOptions: StartOptions(values: startChosen), draftID: startDraftID,
             additionalDirectories: startFolders, worktree: startWorktree, requestID: retrying ?? UUID(), sandbox: startSandbox,
-            labels: labels)
+            labels: labels, persona: startPersona)
         return await send(start: request)
     }
 

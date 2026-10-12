@@ -236,6 +236,11 @@ extension DaemonCore {
                 let request = try decode(params, as: DaemonAPI.WorkflowsListRequest.self) ?? .init()
                 return .success(try JSONValue.encoding(allWorkflows(in: request.folder)))
 
+            case DaemonAPI.Method.personasList:
+                let request = try require(params, as: DaemonAPI.PersonasListRequest.self)
+                return .success(try JSONValue.encoding(
+                    PersonaFile.list(project: request.folder, home: locations.personalHome)))
+
             case DaemonAPI.Method.workflowsRun:
                 let request = try require(params, as: DaemonAPI.WorkflowRequest.self)
                 return .success(try JSONValue.encoding(try await runWorkflow(request)))

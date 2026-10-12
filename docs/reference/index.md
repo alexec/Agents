@@ -20,6 +20,7 @@ something up, not for reading through.
   and setting, and when a workflow does not run.
 - [Workspace providers](workspace-providers.md): the tools a workspace provider offers, and
   how the control plane checks and calls them.
+- [Personas](personas.md): the persona file format, where personas live, and what picking one does.
 - [Events](events.md): everything the app records, for waits, workflow triggers and the
   Events page.
 - [Keyboard shortcuts](keyboard-shortcuts.md): every shortcut and menu command on the Mac.

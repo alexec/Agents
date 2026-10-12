@@ -6,7 +6,7 @@ import type {
   Agent, AgentRemovedNotification, ResumingNotification, ControlHost, HostID, HostWorkspace, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, ProjectRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
-  StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, DiskState, StoreNotes,
+  StartRequest, UUID, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, DiskState, StoreNotes,
   ChatProjectState, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, HostJoinStatus,
@@ -2021,6 +2021,11 @@ export class Store extends Work {
 
   async labelVocabulary(host: string, folder: string): Promise<string[]> {
     return (await this.link.call("agents/labelVocabulary", { folder: folder as never }, host).catch(() => null)) ?? [];
+  }
+
+  /** The personas a start in this project can pick (#760); none from a host too old to know them. */
+  async personas(host: string, folder: string): Promise<Persona[]> {
+    return (await this.link.call("personas/list", { folder: folder as never }, host).catch(() => null)) ?? [];
   }
 
   async worktrees(host: string, folder: string): Promise<WorktreesListResponse | null> {
