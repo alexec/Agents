@@ -4,6 +4,7 @@
 #
 #   ./scripts/build-linux-agentsd.sh           # build both, copy into App/Resources/servers
 #   ./scripts/build-linux-agentsd.sh --check   # build both, copy nothing (the pre-merge gate)
+#   ./scripts/build-linux-agentsd.sh --check x86_64   # one architecture (CI's linux job, #805)
 #
 # Needs the swift.org toolchain matching Xcode's Swift version and its Static Linux SDK
 # (see specs/037-cloud-agents/quickstart.md). Xcode's own toolchain cannot use the SDK.
@@ -20,7 +21,9 @@ set -euo pipefail
 
 root=${0:A:h:h}
 check=0
-[[ ${1:-} == --check ]] && check=1
+[[ ${1:-} == --check ]] && { check=1; shift }
+arches=("$@")
+(( $#arches )) || arches=(x86_64 aarch64)
 
 # SWIFT names the swift.org toolchain's swift outright: the release workflow builds on Linux
 # (#669), where there is no xcrun and the toolchain is the one on PATH.
@@ -44,7 +47,7 @@ out=$root/App/Resources/servers
 
 sha256() { if (( $+commands[shasum] )); then shasum -a 256 $1; else sha256sum $1; fi | cut -d' ' -f1 }
 
-for arch in x86_64 aarch64; do
+for arch in $arches; do
     print "building agentsd for $arch-linux…"
     $swift build --package-path $root/Daemon -c release \
         --swift-sdk $arch-swift-linux-musl --product agentsd \

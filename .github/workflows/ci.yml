@@ -43,6 +43,7 @@ jobs:
       apps: ${{ steps.test-selection.outputs.apps }}
       packages: ${{ steps.test-selection.outputs.packages }}
       mcpservers: ${{ steps.test-selection.outputs.mcpservers }}
+      linux: ${{ steps.test-selection.outputs.linux }}
     steps:
       - name: Let a burst of merges settle
         if: github.event_name == 'push'
@@ -452,6 +453,70 @@ jobs:
       - uses: actions/checkout@v6
       - name: Test MCPServers
         run: swift test --package-path Packages/MCPServers
+
+  # The Linux hosts (#805): agentsd and ci-watcher, static, for x86_64 only, as
+  # scripts/build-linux-agentsd.sh --check builds them before a ship. A Mac-only symbol
+  # used from code Linux compiles, such as a member declared behind `canImport(CryptoKit)`,
+  # passes every macOS job and broke this build twice in a day (#788, #799), found only when
+  # shipping. One architecture is enough for that: the sources are the same for both. The
+  # toolchain and SDK are the release workflow's linux job's; move them together. The build
+  # is warm from main's newest cache, which only a push to main saves, so pull requests do
+  # not fill the cache with one each.
+  linux:
+    needs: select
+    if: ${{ always() && !cancelled() && (needs.select.result != 'success' || needs.select.outputs.linux != 'skip') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    container: swift:6.4.0-noble
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Tools and the Static Linux SDK
+        run: |
+          apt-get update -qq && apt-get install -y -qq zsh file >/dev/null
+          swift sdk install \
+            https://download.swift.org/swift-6.4.0-release/static-sdk/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz \
+            --checksum 47d2fd89eebfdf9eb4d536b6710414297f755c17926cdebc4742c08982b40a9e
+
+      # Taken before the build, as hashFiles over Daemon/** after it would read .build.
+      - name: Cache key
+        id: linux-keys
+        env:
+          RESOLVED: ${{ hashFiles('Daemon/Package.resolved', 'Packages/AgentsKit/Package.resolved') }}
+          SOURCES: ${{ hashFiles('Daemon/**', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Sources/**', 'Packages/AgentsKit/Plugins/**', 'Packages/MCPServers/**') }}
+        run: echo "key=linux-x86_64-swift-6.4.0-${RESOLVED}-${SOURCES}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the Linux build cache
+        id: linux-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            Daemon/.build
+            Packages/MCPServers/.build
+          key: ${{ steps.linux-keys.outputs.key }}
+          restore-keys: |
+            linux-x86_64-swift-6.4.0-${{ hashFiles('Daemon/Package.resolved', 'Packages/AgentsKit/Package.resolved') }}-
+            linux-x86_64-swift-6.4.0-
+
+      - name: Build agentsd and ci-watcher for Linux
+        id: build-linux
+        shell: bash
+        env:
+          SWIFT: swift
+          RESTORED: ${{ steps.linux-cache.outputs.cache-matched-key }}
+        run: |
+          source scripts/ci-clean-retry.sh
+          clean_retry "$RESTORED" Daemon/.build Packages/MCPServers/.build -- \
+            zsh scripts/build-linux-agentsd.sh --check x86_64
+
+      - name: Save the Linux build cache
+        if: ${{ github.event_name == 'push' && steps.linux-cache.outputs.cache-hit != 'true' && steps.build-linux.outcome == 'success' }}
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            Daemon/.build
+            Packages/MCPServers/.build
+          key: ${{ steps.linux-keys.outputs.key }}
 
   # The web remote (071, D7, research R8): a build with the pinned Node, then tsc, the lint
   # that keeps agent output inert, the licence list and the web tests, which hold the build to
