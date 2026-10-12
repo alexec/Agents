@@ -679,6 +679,8 @@ extension DaemonCore {
             // an agent: a runaway that can raise its own limit is not stopped.
             case DaemonAPI.Method.costState:
                 return .success(try JSONValue.encoding(await costState()))
+            case DaemonAPI.Method.usageHistory:
+                return .success(try JSONValue.encoding(usageHistory()))
 
             // Asked once by a window on connecting. A window opened while a hold was
             // already in place heard no broadcast, and would otherwise say nothing

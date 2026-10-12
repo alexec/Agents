@@ -232,6 +232,9 @@ public struct StoreLocations: Sendable {
     /// Not a history and must never be shown as one: what is kept beyond today exists
     /// only so every boundary question has an unambiguous answer.
     public var spend: URL { root.appendingPathComponent("spend.json") }
+    /// What the work used by hour and by day, per runtime (#823), for the usage charts.
+    /// Bounded: 168 hours and 90 days (`UsageHistory`).
+    public var usageHistory: URL { root.appendingPathComponent("usage-history.json") }
 
     public func agent(_ id: UUID) -> URL {
         agents.appendingPathComponent(id.uuidString, isDirectory: true)

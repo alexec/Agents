@@ -1854,6 +1854,23 @@ export interface Usage {
   at: WireDate;
 }
 
+export interface UsageBucket {
+  cost: Record<string, number>;
+  inputTokens: number;
+  outputTokens: number;
+  thoughtTokens: number;
+  cachedReadTokens: number;
+  cachedWriteTokens: number;
+  turns: number;
+  unpricedTurns: number;
+}
+
+export interface UsageHistory {
+  hours: Record<string, Record<string, UsageBucket>>;
+  days: Record<string, Record<string, UsageBucket>>;
+  now: string;
+}
+
 export interface ViewCallRequest {
   agentID: UUID;
   project?: URLString;
@@ -2269,6 +2286,7 @@ export interface Methods {
   "sandbox/state": { params: Empty; result: SandboxSettings };
   "store/notes": { params: Empty; result: StoreNotes };
   "surface/identify": { params: SurfaceIdentification; result: Empty };
+  "usage/history": { params: Empty; result: UsageHistory };
   "views/call": { params: ViewCallRequest; result: JSONValue };
   "views/context": { params: ViewContextRequest; result: Empty };
   "views/log": { params: ViewLogRequest; result: Empty };
@@ -2386,6 +2404,7 @@ export const MethodTarget = {
   "sandbox/state": "host",
   "store/notes": "host",
   "surface/identify": "host",
+  "usage/history": "host",
   "views/call": "host",
   "views/context": "host",
   "views/log": "host",
@@ -2635,6 +2654,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   TurnsRequest: { required: ["agentID", "limit"], optional: ["before"] },
   UnqueueRequest: { required: ["agentID", "promptID"], optional: [] },
   Usage: { required: ["used", "size", "at"], optional: ["cost"] },
+  UsageBucket: { required: ["cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns"], optional: [] },
+  UsageHistory: { required: ["hours", "days", "now"], optional: [] },
   ViewCallRequest: { required: ["agentID", "viewID", "name"], optional: ["project", "arguments", "feed", "server"] },
   ViewContextRequest: { required: ["agentID", "viewID"], optional: ["uri", "content", "structuredContent"] },
   ViewLogRequest: { required: ["agentID", "viewID"], optional: ["level", "data"] },

@@ -378,6 +378,8 @@ public actor DaemonCore {
     /// restart, and it counts agents that have since ended or been archived, so it
     /// cannot be derived from the agents that happen to still be about.
     lazy var spendLedger = SpendLedger(locations: locations)
+    /// What the work used by hour and by day, per runtime (#823): the usage charts.
+    let usageLedger: UsageLedger
 
     // MARK: Leases (036)
 
@@ -959,6 +961,10 @@ public actor DaemonCore {
         self.mailbox = mailbox
         self.power = power ?? IOKitPowerSource()
         self.wakefulness = wakefulness ?? ProcessInfoWakefulness()
+        let usageLedger = UsageLedger(locations: locations, now: self.now())
+        self.usageLedger = usageLedger
+        // A first run reads what is on disk to start the charts with, off the actor.
+        Task.detached(priority: .utility) { usageLedger.seedIfNeeded() }
     }
 
     /// Record what a handshake said about a runtime, and tell the windows if it moved.

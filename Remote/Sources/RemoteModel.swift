@@ -2715,6 +2715,12 @@ final class RemoteModel {
         await refreshEvents()
     }
 
+    /// What the Mac's work used by hour and by day (#823), for the charts on Cost. Nil
+    /// from a daemon too old to know the method.
+    func usageHistory() async -> UsageHistory? {
+        try? await client.call(DaemonAPI.Method.usageHistory, Optional<String>.none, returning: UsageHistory.self)
+    }
+
     private func refreshServerCost(_ host: HostID) async {
         guard let other = otherHosts[host], reachableHosts.contains(host),
               let state = try? await other.call(DaemonAPI.Method.costState,

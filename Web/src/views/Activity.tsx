@@ -16,6 +16,7 @@ import { folderKey, projectFolder } from "../model/groups";
 import { runtimeTally } from "../model/runtimes";
 import { healthTally, personalEmpty, personalIntro, personalServers } from "../model/hostedMCP";
 import { refusalMessage } from "../model/workflows";
+import { UsageCharts } from "./UsageCharts";
 
 function navigate(destination: { host: string; project: string; session?: string; workflow?: string }): void {
   const parts = ["h", destination.host, "p", destination.project];
@@ -195,6 +196,7 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
     for (const host of hosts) {
       if (page === "events") void store.loadEvents(host.id, 100);
       if (page === "spending") void store.loadCost(host.id);
+      if (page === "spending") void store.loadRuntimes(host.id);
       if (page === "runtimes") void store.loadRuntimes(host.id);
     }
   }, [page]);
@@ -414,8 +416,15 @@ function SpendingPage({ store, hostName }: { store: Store; hostName: (host: stri
   const unmeasured = projects.reduce((count, project) => count + project.unmeasuredAgents, 0);
   const costs = Object.entries(store.costs.value);
   const today = totalWords(todayTotals(store.costs.value));
+  // The charts are This Mac's, as on the window and the Remote; another host's when there is no Mac.
+  const chartHost = store.hosts.value.some((h) => h.id === "mac") ? "mac" : store.hosts.value[0]?.id;
+  const chartCost = chartHost ? store.costs.value[chartHost] : undefined;
+  useEffect(() => { if (chartHost) void store.loadUsage(chartHost); }, [chartHost, chartCost]);
+  const runtimeName = (id: string) =>
+    (chartHost && store.runtimes.value[chartHost]?.find((s) => s.runtime.id === id)?.runtime.name) || id;
   return (
     <>
+      {chartHost && <UsageCharts history={store.usage.value[chartHost]} runtimeName={runtimeName} />}
       <p class="spending-today"><span class="quiet">All time</span> <span class="strong">{totalWords(totals) ?? "Nothing has been spent yet"}</span></p>
       {currencies.map((currency) => (
         <section key={currency}>

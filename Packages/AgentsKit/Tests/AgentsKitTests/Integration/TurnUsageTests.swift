@@ -102,6 +102,15 @@ struct TurnUsageTests {
         #expect(agent.costIsUnmeasured == false,
                 "the runtime said what it costs; saying otherwise over the top of a figure we hold was the bug")
         #expect(agent.isUnmeasured == false, "and the same on the surface that totals projects")
+
+        // The usage charts (#823) have the same price, under the runtime, beside its tokens.
+        await eventually("the turn reached the usage history") {
+            await core.usageHistory().days.values.contains { $0["claude"]?.turns ?? 0 > 0 }
+        }
+        let claude = await core.usageHistory().days.values.compactMap { $0["claude"] }
+        #expect(claude.reduce(Decimal(0)) { $0 + ($1.cost["USD"] ?? 0) } == 0.25)
+        #expect(claude.allSatisfy { $0.inputTokens == 6 * $0.turns })
+        #expect(claude.allSatisfy { $0.unpricedTurns == 0 })
     }
 
     /// The reading is a running total, so the same figure arriving three times is one

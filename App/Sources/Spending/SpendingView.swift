@@ -8,7 +8,8 @@ import SwiftUI
 /// is a thing you have to know exists, and the figure that was supposed to advertise
 /// it sat at the foot of a column hiding itself whenever nothing had been banked.
 ///
-/// It reads `model.projects` and nothing else. The grand total and the shares beneath it
+/// The usage charts at the top (#823) fetch the host's history; everything below them
+/// reads `model.projects` and nothing else. The grand total and the shares beneath it
 /// are folded from the same array in the same render, which is what makes it impossible
 /// for the total to disagree with the lines under it, or for either to be stale relative
 /// to the sidebar. It fetches nothing.
@@ -28,6 +29,9 @@ struct SpendingView: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                // Over time, as Health draws it (#823).
+                UsageChartsSection(load: { await model.usageHistory() }, refresh: model.costState)
+                    .padding(.bottom, 8)
                 if spending.isEmpty {
                     nothingSpent
                 } else {

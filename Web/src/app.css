@@ -1120,3 +1120,16 @@ button.plain:hover { opacity: 1; }
 .mcp-dot.good { background: currentColor; border-color: currentColor; opacity: 0.55; }
 .mcp-dot.failing { background: var(--tint-failure); border-color: var(--tint-failure); opacity: 1; }
 .mcp-servers button { margin-top: 8px; }
+
+/* The usage charts on Cost (#823), as Health draws them. */
+.usage-charts { margin-bottom: 24px; }
+.usage-charts .segmented { margin: 0 4px 8px 0; }
+.usage-headline p { margin: 0; }
+.usage-figure { font-size: calc(28px * var(--text-scale)); font-weight: 600; font-variant-numeric: tabular-nums; }
+.usage-bars { width: 100%; height: auto; display: block; margin: 8px 0 12px; }
+.usage-bar { fill: var(--accent); cursor: pointer; }
+.usage-bar.dim { opacity: 0.35; }
+.usage-hit { fill: transparent; cursor: pointer; }
+.usage-grid { stroke: var(--paper-rule); stroke-width: 1; }
+.usage-average { stroke: currentColor; opacity: 0.5; stroke-width: 1; stroke-dasharray: 4 3; }
+.usage-axis { fill: currentColor; opacity: 0.6; font-size: 11px; font-variant-numeric: tabular-nums; }
