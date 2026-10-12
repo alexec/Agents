@@ -166,7 +166,7 @@ private struct RuntimeStatusIcon: View {
             } else {
                 Image(systemName: symbol)
                     // Decorative: the row's status glyph, held to its 18-point frame.
-                    .font(.system(size: 15))
+                    .glyph(size: 15)
                     .foregroundStyle(tint.style(or: .secondary))
             }
         }

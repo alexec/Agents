@@ -20,7 +20,7 @@ struct EventDetailView: View {
                     Text(event.name).appText(.reading).monospaced()
                     Spacer()
                     Button(action: close) {
-                        Image(systemName: "xmark").font(.caption) // decorative glyph
+                        Image(systemName: "xmark").glyph(.caption) // decorative glyph
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)

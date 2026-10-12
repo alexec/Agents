@@ -146,13 +146,16 @@ private struct SessionMark: View {
         }
     }
 
+    /// The well grows with the text beside it (#750), so the row keeps its shape.
+    @Environment(\.textSize) private var textSize
+
     var body: some View {
         Group {
             switch kind {
             case .needsYou:
                 Image(systemName: "hand.raised.fill").tinted(.attention)
             case .working:
-                SyncedSpinner(diameter: 14)
+                SyncedSpinner(diameter: 14 * textSize.scale)
             case .queued:
                 Image(systemName: "list.number").foregroundStyle(Paper.accent)
             case .waiting:
@@ -168,8 +171,8 @@ private struct SessionMark: View {
             }
         }
         // Decorative: a mark filling the rows' 20-point well, as `WorkflowMark` (FR-015).
-        .font(.system(size: 14))
-        .frame(width: 20, height: 20)
+        .glyph(size: 14)
+        .frame(width: 20 * textSize.scale, height: 20 * textSize.scale)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
     }
@@ -311,20 +314,23 @@ struct PinWorkflowButton: View {
 struct WorkflowMark: View {
     let summary: WorkflowSummary
 
+    /// The well grows with the text beside it (#750), so the row keeps its shape.
+    @Environment(\.textSize) private var textSize
+
     var body: some View {
         Group {
             if summary.isRunning {
-                SyncedSpinner(diameter: 14)
+                SyncedSpinner(diameter: 14 * textSize.scale)
             } else {
                 Image(systemName: symbol)
                     // Decorative: the workflow's mark filling a 20-point well, not text (FR-015).
-                    .font(.system(size: 14))
+                    .glyph(size: 14)
                     // In the accent, as the sidebar's icons are, unless it wants a person (#495).
                     .foregroundStyle(summary.needsAPerson ? StateTint.attention.style(or: .secondary)
                                      : AnyShapeStyle(Paper.accent))
             }
         }
-        .frame(width: 20, height: 20)
+        .frame(width: 20 * textSize.scale, height: 20 * textSize.scale)
         .accessibilityHidden(true)
     }
 

@@ -14,7 +14,7 @@ struct AttachmentStrip: View {
                     HStack(spacing: 6) {
                         Image(systemName: symbol(for: attachment))
                             // Decorative: a glyph in a badge, not text (FR-015).
-                            .font(.system(size: 10))
+                            .glyph(size: 10)
                         VStack(alignment: .leading, spacing: 0) {
                             Text(attachment.displayName)
                                 .lineLimit(1)
@@ -28,7 +28,7 @@ struct AttachmentStrip: View {
                         } label: {
                             Image(systemName: "xmark")
                                 // Decorative: a glyph in a badge, not text (FR-015).
-                                .font(.system(size: 8, weight: .bold))
+                                .glyph(size: 8, weight: .bold)
                         }
                         .buttonStyle(.plain)
                         .foregroundStyle(.secondary)

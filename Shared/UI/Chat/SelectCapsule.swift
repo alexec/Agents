@@ -20,7 +20,7 @@ struct SelectCapsule<Content: View>: View {
                 Text(title)
                 Image(systemName: "chevron.down")
                     // Decorative: a glyph in a capsule, not text (FR-015).
-                    .font(.system(size: 8, weight: .semibold))
+                    .glyph(size: 8, weight: .semibold)
                     .foregroundStyle(.secondary)
             }
             // The capsule is the button, not the words in it: padding put on outside
@@ -72,7 +72,7 @@ struct BooleanCapsule: View {
             HStack(spacing: 5) {
                 Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
                     // Decorative: a glyph in a capsule, not text (FR-015).
-                    .font(.system(size: 10, weight: .semibold))
+                    .glyph(size: 10, weight: .semibold)
                     .foregroundStyle(isOn ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
                 Text(saysState ? "\(name): \(isOn ? "On" : "Off")" : name)
             }

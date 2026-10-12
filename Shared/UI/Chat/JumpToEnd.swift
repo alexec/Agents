@@ -25,7 +25,7 @@ struct JumpToEnd: View {
             HStack(spacing: 5) {
                 Image(systemName: "arrow.down")
                     // Decorative: a glyph in a capsule, not text (FR-015).
-                    .font(.system(size: 10, weight: .semibold))
+                    .glyph(size: 10, weight: .semibold)
                 if let words {
                     Text(words)
                 }

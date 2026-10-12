@@ -25,6 +25,9 @@ struct ProjectRow: View {
     /// The name's colour, which the chat project's mark takes too (#694).
     private var nameStyle: HierarchicalShapeStyle { summary.exists && !asHeading ? .primary : .secondary }
 
+    /// The dot grows with the title beside it (#750).
+    @Environment(\.textSize) private var textSize
+
     var body: some View {
         HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 1) {
@@ -65,7 +68,7 @@ struct ProjectRow: View {
             } else if needsPerson {
                 Circle()
                     .fill(StateTint.attention.style(or: .secondary))
-                    .frame(width: 7, height: 7)
+                    .frame(width: 7 * textSize.scale, height: 7 * textSize.scale)
                     .accessibilityHidden(true)
             }
         }

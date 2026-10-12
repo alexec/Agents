@@ -401,7 +401,7 @@ struct StatusIcon: View {
             if let symbol = shape.symbol {
                 Image(systemName: symbol)
                     // Decorative: a glyph filling a 20-point well, not text (FR-015).
-                    .font(.system(size: 16))
+                    .glyph(size: 16)
                     .foregroundStyle((shape.wantsAPerson ? StateTint.attention : .none)
                         .style(or: .secondary))
             } else {

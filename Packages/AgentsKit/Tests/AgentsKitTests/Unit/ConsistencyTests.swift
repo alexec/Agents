@@ -164,9 +164,12 @@ struct ConsistencyTests {
     @Test func noTextIsPinnedToAPointSize() async throws {
         // FR-015: everything scales with the reader's text size. The fixed sizes left
         // are glyphs in capsules, wells and badges, and each says so on the line above.
+        // The scale itself is exempt: it is where a step becomes a size, and since #750
+        // it multiplies the Mac's sizes by the person's text size there.
         let pinned = try Regex(#"\.system\(size:"#)
         var violations: [String] = []
         for source in try Self.sources(under: Self.viewDirectories) {
+            guard source.path != Self.scaleDefinition else { continue }
             for (index, line) in source.lines.enumerated() {
                 guard Self.code(line).contains(pinned) else { continue }
                 guard !Self.fontIsAllowed(in: source, at: index) else { continue }

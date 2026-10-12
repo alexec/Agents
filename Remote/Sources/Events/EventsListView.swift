@@ -50,7 +50,7 @@ struct EventsListView: View {
                                 } label: {
                                     Image(systemName: "xmark")
                                         // Decorative: the glyph that ends the wait, not text (FR-015).
-                                        .font(.caption)
+                                        .glyph(.caption)
                                 }
                                 .buttonStyle(.plain)
                                 .foregroundStyle(.secondary)
