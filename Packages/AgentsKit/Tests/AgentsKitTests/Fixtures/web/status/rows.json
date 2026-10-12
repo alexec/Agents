@@ -412,7 +412,7 @@
   {
     "expected" : {
       "shape" : "waiting",
-      "symbol" : "hourglass.circle",
+      "symbol" : "moon.zzz",
       "tinted" : false,
       "words" : "Waiting"
     },
@@ -460,7 +460,7 @@
   {
     "expected" : {
       "shape" : "waiting",
-      "symbol" : "hourglass.circle",
+      "symbol" : "moon.zzz",
       "tinted" : false,
       "words" : "Waiting"
     },
@@ -596,7 +596,7 @@
   {
     "expected" : {
       "shape" : "waiting",
-      "symbol" : "hourglass.circle",
+      "symbol" : "moon.zzz",
       "tinted" : false,
       "words" : "Waiting"
     },
@@ -898,7 +898,7 @@
   {
     "expected" : {
       "shape" : "waiting",
-      "symbol" : "hourglass.circle",
+      "symbol" : "moon.zzz",
       "tinted" : false,
       "words" : "Waiting"
     },
@@ -1454,7 +1454,7 @@
   {
     "expected" : {
       "shape" : "waiting",
-      "symbol" : "hourglass.circle",
+      "symbol" : "moon.zzz",
       "tinted" : false,
       "words" : "Queued"
     },
