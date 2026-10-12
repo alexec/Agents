@@ -1194,3 +1194,11 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .chart-page { display: flex; flex-direction: column; gap: 10px; }
 .chart-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .chart-problem { margin: 0; }
+
+/* Activity ▸ Worktrees (#790): a project's name with Clean up beside it, each row's size at its end. */
+.worktrees .worktrees-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 14px 0 4px; }
+.worktrees .worktree p:first-child { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.worktrees .worktree-size { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.worktrees .worktree-size.faint { opacity: 0.6; }
+.worktrees .struck { text-decoration: line-through; }
+.worktrees .worktree-actions { margin-top: 6px; }

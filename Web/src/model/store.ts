@@ -10,7 +10,9 @@ import type {
   StartRequest, UUID, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
   ChatProjectState, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
-  GuardedChange, GuardedChangeReading, HostJoinStatus, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory } from "../protocol/generated";
+  GuardedChange, GuardedChangeReading, HostJoinStatus, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory,
+  BuildOutputRemoved, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized,
+} from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
@@ -336,6 +338,11 @@ export class Work {
   readonly resuming = signal<Record<string, readonly string[]>>({});
   /** Each host's volumes low on space (#196), replaced whole by each disk/changed, never merged. */
   readonly disk = signal<Record<string, DiskState>>({});
+  /** Each host's projects' worktrees (#790), as `worktrees/all` last answered: asked when Activity ▸
+   * Worktrees is shown, not kept up by the host. */
+  readonly worktreeLists = signal<Record<string, ProjectWorktrees[]>>({});
+  /** Each worktree's size as `worktrees/sized` said since the list, by host and root: newer than it. */
+  readonly worktreeSizes = signal<Record<string, Record<string, WorktreeSize>>>({});
   /** Each host's files it could not read in this run (#205, #223), replaced whole by each store/notesChanged. */
   readonly storeNotes = signal<Record<string, string[]>>({});
   /** The control plane's machine, and how this Mac's host says its join stands (#666), from `control/status`. */
@@ -502,6 +509,12 @@ export class Work {
       case "disk/changed":
         this.disk.value = { ...this.disk.value, [host]: params as DiskState };
         return true;
+      case "worktrees/sized": {
+        const held = { ...(this.worktreeSizes.value[host] ?? {}) };
+        for (const note of (params as WorktreesSized).sizes) held[note.root] = note.size;
+        this.worktreeSizes.value = { ...this.worktreeSizes.value, [host]: held };
+        return true;
+      }
       case "store/notesChanged":
         this.storeNotes.value = { ...this.storeNotes.value, [host]: (params as StoreNotes).notes };
         return true;
@@ -2183,6 +2196,43 @@ export class Store extends Work {
 
   async worktrees(host: string, folder: string): Promise<WorktreesListResponse | null> {
     return this.link.call("worktrees/list", { folder: folder as never }, host).catch(() => null);
+  }
+
+  /** A worktree's size, the newest heard (#790): from `worktrees/sized`, else its list's. */
+  worktreeSize(host: string, worktree: WorktreeSummary): WorktreeSize | undefined {
+    return this.worktreeSizes.value[host]?.[worktree.root] ?? worktree.size;
+  }
+
+  /** Every project's worktrees on a host, for Activity ▸ Worktrees (#790). */
+  async loadWorktrees(host: string): Promise<void> {
+    const listed = await this.link.call("worktrees/all", {}, host).catch(() => null);
+    if (!listed) return;
+    this.worktreeLists.value = { ...this.worktreeLists.value, [host]: listed };
+    // What the list now says is as new as anything heard before it.
+    const { [host]: _, ...rest } = this.worktreeSizes.value;
+    this.worktreeSizes.value = rest;
+  }
+
+  /** What removing a worktree would lose; null when it could not be asked, and the problem says why. */
+  async checkWorktreeRemoval(host: string, project: string, root: string): Promise<RemovalCheck | null> {
+    return this.link.call("worktrees/check", { project: project as never, root: root as never, confirmed: false }, host)
+      .catch((error: unknown) => { this.say(describe(error)); return null; });
+  }
+
+  /** Remove a worktree; the host checks again either way. */
+  async removeWorktree(host: string, project: string, root: string, confirmed: boolean): Promise<void> {
+    await this.link.call("worktrees/remove", { project: project as never, root: root as never, confirmed }, host)
+      .catch((error: unknown) => this.say(describe(error)));
+    await this.loadWorktrees(host);
+  }
+
+  /** Delete an idle worktree's build output, and say what it freed; null when it could not. */
+  async removeBuildOutput(host: string, project: string, root: string): Promise<BuildOutputRemoved | null> {
+    const removed = await this.link.call("worktrees/removeBuildOutput",
+      { project: project as never, root: root as never, confirmed: false }, host)
+      .catch((error: unknown) => { this.say(describe(error)); return null; });
+    void this.loadWorktrees(host);
+    return removed;
   }
 
   /** One start's id per project, kept until that start succeeds, so a retry is not a second agent (#291). */
