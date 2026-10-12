@@ -78,7 +78,17 @@ struct AppServiceTests {
         // specs/022-live-artifacts/contracts/show-file-tool.md says the schema is not
         // to grow. An argument added here is a contract change, and this is what
         // says so.
-        #expect(showFile?["properties"]?.objectValue?.keys.sorted() == ["line", "path"])
+        // Plus the optional `description` every app tool takes (#708), which the contract
+        // now names.
+        #expect(showFile?["properties"]?.objectValue?.keys.sorted() == ["description", "line", "path"])
+
+        // Every app tool takes an optional `description`, the reason the chat draws the
+        // call by (#708), and none requires it.
+        for tool in AppService.tools(managesAgents: true) {
+            let name = tool["name"]?.stringValue ?? "?"
+            #expect(tool["inputSchema"]?["properties"]?["description"] == AppService.callDescriptionProperty, "\(name)")
+            #expect(tool["inputSchema"]?["required"]?.arrayValue?.contains("description") != true, "\(name)")
+        }
 
         let workflows = tools[1]["inputSchema"]
         #expect(workflows?["properties"]?["action"]?["enum"]?.arrayValue?

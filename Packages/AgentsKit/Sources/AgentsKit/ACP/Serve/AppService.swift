@@ -623,9 +623,30 @@ public actor AppService {
         // The agent's own session: labels, and moving, which is not offered on a runtime
         // that would forget the conversation on the way (053, #481).
         let selfTools = [Self.setSessionLabelsTool] + (movesItself ? [Self.moveWorktreeTool] : [])
-        return [Self.showFileTool, Self.workflowTool, Self.askFormTool, Self.suggestNextPromptTool]
+        let tools = [Self.showFileTool, Self.workflowTool, Self.askFormTool, Self.suggestNextPromptTool]
             + agentTools + selfTools + sessionTools + leaseTools
             + eventTools
+        return tools.map(withCallDescription)
+    }
+
+    /// The optional `description` every app tool takes (#708): why the agent is making
+    /// this call, in a sentence for the person. The chat draws any tool call by its
+    /// `description` argument when it has one, as it already does for a shell command,
+    /// so these calls read as the agent's reason rather than the tool's name. Added here
+    /// rather than in each schema so no tool is left without it; the handlers ignore it.
+    static let callDescriptionProperty: JSONValue = [
+        "type": "string",
+        "description": "Why you are making this call, in one short sentence for the person.",
+    ]
+
+    private static func withCallDescription(_ tool: JSONValue) -> JSONValue {
+        guard case .object(var fields) = tool,
+              case .object(var schema)? = fields["inputSchema"] else { return tool }
+        var properties = schema["properties"]?.objectValue ?? [:]
+        properties["description"] = callDescriptionProperty
+        schema["properties"] = .object(properties)
+        fields["inputSchema"] = .object(schema)
+        return .object(fields)
     }
 
     /// The questions an `ask_form` call carried, or why it cannot be asked.
