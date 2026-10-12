@@ -6,7 +6,8 @@ import SwiftUI
 ///
 /// Our extension of MCP Apps: SEP-1865 ties a view to a call the model made, and a pin is
 /// the host making that call itself. There is no agent here, so the view's `ui/message` and
-/// `ui/update-model-context` are refused (`AppViewActions.project`).
+/// `ui/update-model-context` are refused (`AppViewActions.project`). Its `agents/start-agent`
+/// opens the form in this project, as it would from a chat.
 struct PinnedViewPage: View {
     let folder: URL
     let pin: PinView
@@ -14,6 +15,8 @@ struct PinnedViewPage: View {
     /// One of `views/*`, to the host the project is on.
     var call: @MainActor (String, JSONValue) async throws -> JSONValue
     var unpin: @MainActor () async -> Void
+    /// The new-agent form in this project, filled in by the view (#834).
+    var startAgent: (@MainActor (AppViewStart) -> String?)? = nil
 
     @Environment(\.openURL) private var openURL
     @State private var store = AppViewStore()
@@ -75,7 +78,7 @@ struct PinnedViewPage: View {
 
     private var actions: AppViewActions {
         AppViewActions(agentID: place, project: folder, call: call, send: { _ in false },
-                       openLink: { openURL($0) })
+                       openLink: { openURL($0) }, startAgent: startAgent)
     }
 
     /// The host-made call: running with its input, then done with what the tool answered.

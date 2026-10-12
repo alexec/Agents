@@ -727,6 +727,40 @@ final class RemoteModel {
         }
     }
 
+    /// What a ui:// view filled the page with (#834), for the page in its project to take
+    /// once it is on screen. The person still presses Start.
+    struct OfferedStart: Equatable {
+        let folder: URL
+        let start: AppViewStart
+    }
+
+    private(set) var offeredStart: OfferedStart?
+    /// The offered worktree's name, chosen once the page's repository has answered: before
+    /// then the page has no Worktree row, and opening it puts the place back.
+    @ObservationIgnored private var offeredWorktree: (folder: URL, name: String)?
+
+    /// Open the New session page in a view's project, filled in (#834), as New Session
+    /// opens it. Why it did not open, or nil.
+    func offerStart(_ start: AppViewStart, in key: ProjectKey) -> String? {
+        guard let summary = work.project(key) else { return "This project isn’t one the phone knows." }
+        guard !isStarting else { return "An agent is starting. Try again once it has." }
+        offeredStart = OfferedStart(folder: summary.folder, start: start)
+        offeredWorktree = start.worktree.map { (folder: summary.folder, name: $0) }
+        sidebarItem = .project(summary.key)
+        // Already open in this project: its repository is asked again for the worktree.
+        if start.worktree != nil, startingIn == summary.folder {
+            Task { await loadStartWorktrees(in: summary.folder) }
+        }
+        return nil
+    }
+
+    /// The offer for the page in `folder`, taken once.
+    func takeOfferedStart(in folder: URL) -> AppViewStart? {
+        guard let offered = offeredStart, offered.folder == folder else { return nil }
+        offeredStart = nil
+        return offered.start
+    }
+
     enum StartChoicesState: Equatable {
         case loading
         case ready
@@ -845,6 +879,11 @@ final class RemoteModel {
             ?? .notARepository
         guard startingIn == folder else { return }
         startWorktrees = answer
+        // A view's worktree (#834), when there is a repository to make it in.
+        if let offered = offeredWorktree, offered.folder == folder {
+            offeredWorktree = nil
+            if answer.isRepository { await chooseWorktree(.named(offered.name)) }
+        }
     }
 
     /// The project's personas (#760). A host too old to know the method offers none.

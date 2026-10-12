@@ -220,6 +220,9 @@ export class Work {
 
   /** The last file an agent asked to be put in front of the person (`agent/showFile`). */
   readonly shownFile = signal<{ host: string; agentID: string; path: string; line?: number | undefined; at: number } | null>(null);
+  /** A new agent a view filled in (#834, agents/start-agent), for the new-agent form on that
+   *  project to take: the prompt, the labels and the worktree. Starting it is still the person's move. */
+  readonly offeredStart = signal<{ host: string; folder: string; start: { prompt: string; labels: string[]; worktree?: string | undefined } } | null>(null);
   /** The last folders said to have changed, for a pane watching them (`files/changed`). */
   readonly filesChanged = signal<{ host: string; agentID: string; folders: string[]; many: boolean; at: number } | null>(null);
 

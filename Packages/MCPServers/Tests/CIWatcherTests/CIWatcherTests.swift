@@ -635,7 +635,7 @@ func editIssue(_ r: inout JSON, _ number: Int, _ change: (inout JSON) -> Void) {
         #expect(ms > 50000 && ms <= 60000)
     }
 
-    @Test(arguments: [("list_prs", "ui://ci/board", ["rerun_failed", "list_prs"]), ("list_issues", "ui://ci/issues", ["list_issues"])])
+    @Test(arguments: [("list_prs", "ui://ci/board", ["rerun_failed", "list_prs"]), ("list_issues", "ui://ci/issues", ["list_issues", "agents/start-agent", "Start Agent", "--add-assignee @me"])])
     func toolFeedsItsViewWhichResourcesReadServes(tool: String, uri: String, words: [String]) async throws {
         let tools = try await h.ok("tools/list")["tools"]?.array ?? []
         let fed = try #require(tools.first { $0["name"] == .string(tool) })

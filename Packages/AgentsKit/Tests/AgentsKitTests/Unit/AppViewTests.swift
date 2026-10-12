@@ -109,6 +109,26 @@ struct AppViewTests {
         #expect(AppViewBridge.read(["method": "ui/initialize", "id": 1]) == .ignored)
     }
 
+    @Test func aViewAsksForTheNewAgentFormFilledIn() {
+        func ask(_ params: JSONValue) -> AppViewBridge.Ask {
+            AppViewBridge.read(["jsonrpc": "2.0", "id": 7, "method": "agents/start-agent", "params": params])
+        }
+        #expect(ask(["prompt": " Work on #834 ", "labels": ["#834", " #834 "], "worktree": "834 start an agent"])
+            == .startAgent(id: 7, start: AppViewStart(prompt: "Work on #834", labels: ["#834"], worktree: "834 start an agent")))
+        #expect(ask(["prompt": "Go", "worktree": ""]) == .startAgent(id: 7, start: AppViewStart(prompt: "Go")))
+        if case .malformed = ask([:]) {} else { Issue.record("no prompt") }
+        if case .malformed = ask(["prompt": .string(String(repeating: "x", count: AppViewStart.promptLimit + 1))]) {} else {
+            Issue.record("a prompt too long")
+        }
+        if case .malformed = ask(["prompt": "Go", "labels": [1]]) {} else { Issue.record("a label that is not text") }
+        if case .malformed = ask(["prompt": "Go", "labels": [.string(String(repeating: "x", count: 25))]]) {} else {
+            Issue.record("a label too long for a session")
+        }
+        if case .malformed = ask(["prompt": "Go", "labels": .array((0...5).map { .string("l\($0)") })]) {} else {
+            Issue.record("too many labels")
+        }
+    }
+
     @Test func theInitializeAnswerCarriesTheHostContext() {
         let context = AppViewContext(theme: "dark", platform: .desktop, width: 640, maxHeight: 640,
                                      locale: "en-GB", timeZone: "Europe/London", touch: false, hover: true)

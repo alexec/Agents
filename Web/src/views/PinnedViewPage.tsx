@@ -13,6 +13,7 @@ import { go } from "../route";
 import { BackToList } from "./BackToList";
 import { feedParams, pinnedViewCall } from "./chat/appViewBridge";
 import { ViewLayer, type ViewActions } from "./chat/viewLayer";
+import { offerStart } from "./NewAgent";
 
 /** Where this opening's feeding call is, for the call `id` it was made for. */
 type Fed = { id: string } & ({ kind: "feeding" } | { kind: "fed"; answer: JSONValue } | { kind: "failed"; why: string });
@@ -32,6 +33,8 @@ export function PinnedViewPage({ store, host, folder, path, pin, down }: {
     project: folder,
     call: (method, params) => store.link.call(method, params as never, host) as Promise<unknown>,
     send: async () => false,
+    // Its agents/start-agent opens the form in this project, as it would from a chat (#834).
+    startAgent: (start) => offerStart(store, host, folder, start),
   }), [id, host, folder, store]);
   const drawn = !!view && !pin?.missing;
 

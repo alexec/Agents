@@ -32,6 +32,28 @@ test("the bridge reads what a view asks", () => {
   assert.deepEqual(bridge.read("not an object"), { kind: "ignored" });
 });
 
+test("agents/start-agent is read as AppViewStart reads it (#834)", () => {
+  assert.deepEqual(ask("agents/start-agent", { prompt: "  Fix #834 \n", labels: [" #834 ", "#834", "ci"], worktree: " fix-834 " }),
+    { kind: "startAgent", id: 1, start: { prompt: "Fix #834", labels: ["#834", "ci"], worktree: "fix-834" } });
+  // Labels and worktree are optional; an empty worktree leaves the form's place.
+  assert.deepEqual(ask("agents/start-agent", { prompt: "Go", worktree: "  " }), { kind: "startAgent", id: 1, start: { prompt: "Go", labels: [] } });
+  const refused = (params) => ask("agents/start-agent", params);
+  assert.deepEqual(refused({}), { kind: "malformed", id: 1, reason: "agents/start-agent needs a prompt." });
+  assert.deepEqual(refused({ prompt: "   " }), { kind: "malformed", id: 1, reason: "agents/start-agent needs a prompt." });
+  assert.deepEqual(refused({ prompt: 3 }), { kind: "malformed", id: 1, reason: "agents/start-agent needs a prompt." });
+  assert.equal(refused({ prompt: "x".repeat(8001) }).reason, "The prompt is longer than 8000 characters.");
+  assert.equal(ask("agents/start-agent", { prompt: "x".repeat(8000) }).kind, "startAgent");
+  // Counted in characters as Swift counts them: a flag is one, not four UTF-16 units.
+  assert.equal(ask("agents/start-agent", { prompt: "🇬🇧".repeat(8000) }).kind, "startAgent");
+  assert.equal(refused({ prompt: "Go", labels: [" "] }).reason, "Each label is text of 1 to 24 characters.");
+  assert.equal(refused({ prompt: "Go", labels: ["x".repeat(25)] }).reason, "Each label is text of 1 to 24 characters.");
+  assert.equal(refused({ prompt: "Go", labels: [7] }).reason, "Each label is text of 1 to 24 characters.");
+  assert.equal(refused({ prompt: "Go", labels: Array.from({ length: 6 }, (_, i) => `l${i}`) }).reason, "A session can have at most five labels.");
+  // Repeats are counted once, whatever their case, so six with a repeat are five.
+  assert.equal(ask("agents/start-agent", { prompt: "Go", labels: [...Array.from({ length: 5 }, (_, i) => `l${i}`), "L0"] }).start.labels.length, 5);
+  assert.equal(ask("agents/start-agent", { prompt: "Go", worktree: "w".repeat(150) }).start.worktree, "w".repeat(100));
+});
+
 const context = {
   theme: "dark", displayMode: "inline", width: 640, maxHeight: 640, locale: "en-GB", timeZone: "Europe/London",
   touch: false, hover: true, variables: { "--color-background-primary": "light-dark(#fbf9f4, #1c1b19)" }, tool: "show_test_view",

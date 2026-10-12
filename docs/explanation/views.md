@@ -62,6 +62,7 @@ How each client enforces it:
 | `resources/read` | Reads a `ui://` resource of the same server. |
 | `ui/open-link` | Opens an `http`, `https` or `mailto` link in your browser. Any other kind of link is refused. |
 | `ui/message` | **Asks you first.** Under the view: "The view asks to send this as your message", with **Send** and **Don't Send**. Send sends it as your own prompt, exactly as if you had typed it. A view never speaks for you without you. |
+| `agents/start-agent` | **Our extension (#834).** Opens the new-agent form in the view's project, filled in with the view's `prompt`, its `labels` and, when it names one, a new `worktree` of that name. You start the agent, or don't: a view never starts one. From a pinned view, it opens the form in the pin's project. |
 | `ui/update-model-context` | Keeps what the view said, and tells the agent with **your next message**: before your words, not in your bubble, in the same way the app tells an agent that a wait ended. Only the last context from each view is kept, and it is used once. A line under the view says what the agent will be told, with **Don't Tell** to take it back. It is kept in memory only, so a daemon restart forgets it. |
 | `ui/request-display-mode` | `inline` or `fullscreen`. Full screen draws the same view in the chat's place, as a pinned page opens, with **Back to the chat**. You can also go full screen from the button beside the view's name. |
 | `ui/notifications/size-changed` | The view's height in the chat, up to 640 points. |

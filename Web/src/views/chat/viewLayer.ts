@@ -14,7 +14,7 @@ import { encodeDomains } from "../../sandbox/policy";
 import { CallFailed } from "../../wire/link";
 import {
   canPin, type Context, needsShow, serverParam, type ViewAsk, contextChanges, error as rpcError, Feed, initializeResult, noAgentWords, notification, policyWire,
-  read, request, result, viewTitle,
+  read, request, result, type Start, startAgentMethod, viewTitle,
 } from "./appViewBridge";
 
 export interface ViewActions {
@@ -26,6 +26,9 @@ export interface ViewActions {
   send(text: string): Promise<boolean>;
   /** Pins the call's view to the chat's project (#189); answers whether it was pinned. */
   pin?(call: AppViewCall): Promise<boolean>;
+  /** Opens the new-agent form in the view's project, filled in (#834). Why it was not, or null.
+   *  The person starts the agent; a view never does. */
+  startAgent?(start: Start): string | null;
 }
 
 export const maxInlineHeight = 640;
@@ -278,6 +281,14 @@ export class HostedView {
         this.messageID = ask.id;
         this.askedMessage.value = ask.text;
         break;
+      case "startAgent": {
+        const refused = this.actions.startAgent ? this.actions.startAgent(ask.start) : "This app can't open a new agent from here.";
+        if (refused !== null) { this.post(rpcError(ask.id, -32000, refused)); break; }
+        this.post(result(ask.id));
+        void this.actions.call("views/log", { agentID: this.actions.agentID, viewID: this.call.id, level: "info",
+          data: `${startAgentMethod}: the new-agent form opened, filled in` }).catch(() => {});
+        break;
+      }
       case "updateContext": {
         if (this.actions.project) { this.refuse(ask.id, "ui/update-model-context"); break; }
         const words = Array.isArray(ask.content)
