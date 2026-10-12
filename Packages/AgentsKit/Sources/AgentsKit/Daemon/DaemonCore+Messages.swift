@@ -8,8 +8,8 @@ import Foundation
 /// where the caller cannot reach it:
 ///
 /// - the project is the caller's own, as for `read_session`;
-/// - a session the person started is never woken, only queued, so an agent cannot take
-///   over a chat somebody is driving;
+/// - a session that is working, the person's included, reads it once its turn ends, so a
+///   message never cuts into a turn somebody is driving;
 /// - a stopped session is never woken either: a stop is somebody's decision, and a
 ///   message waits in its chat until it is started again;
 /// - a question or permission card the target waits on is never answered by one;
@@ -68,11 +68,11 @@ extension DaemonCore {
                                   sender: sender, hops: hops)
         let busy = target.state.hasTurnInFlight || target.state == .queued
             || turnTasks[target.id] != nil || sending.contains(target.id)
-        let persons = target.startedByAgent == nil && target.startedByWorkflow == nil
         let waitsOnPerson = target.report?.outcome == .needsAnswer && target.state == .finished
         let stopped = target.state == .stopped
-        // Woken only when it is free, not the person's, not stopped, and not waiting on the person.
-        let wakes = !busy && !persons && !stopped && !waitsOnPerson
+        // Woken when it is free, not stopped, and not waiting on the person, whoever
+        // started it (#766): left unread in a finished chat, a message was never read.
+        let wakes = !busy && !stopped && !waitsOnPerson
         if wakes, target.startedByAgent != nil {
             let folder = target.projectFolder
             let limits = helperLimits(in: folder)
@@ -114,10 +114,6 @@ extension DaemonCore {
         if stopped {
             return "Sent to \(name), which is stopped, so it waits in that chat until it is started again; "
                 + "a message does not start a stopped session.\(then)"
-        }
-        if persons {
-            return "Sent to \(name), which the person started, so it waits in that chat until the person "
-                + "next starts it; it is not woken by a message.\(then)"
         }
         if waitsOnPerson {
             return "Sent to \(name). It is waiting on the person's answer, so it reads this once they answer.\(then)"
