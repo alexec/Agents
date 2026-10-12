@@ -18,6 +18,13 @@ struct BriefingTests {
         }
     }
 
+    /// An agent finished, removed its worktree and stopped without asking to be archived:
+    /// only the tool's description said it could (#703).
+    @Test func everyAgentIsToldToArchiveItsOwnSessionWhenDone() {
+        #expect(Briefing.sessions.contains("call \(AppTool.archiveSession) with no id"))
+        #expect(Briefing.sessions.contains("merged or abandoned"))
+    }
+
     /// What the person declared goes inside the lease line, so leasing is said once (#599).
     @Test func theDeclaredResourcesAreInTheLeaseLine() {
         let declared = [DeclaredResource(name: ResourceName("build")!, description: "Before builds.", holders: 2)]

@@ -49,7 +49,8 @@ person-owned label; the whole call is refused if it tries. See
 only to an agent that you or a workflow started. `archive_session` is given to every agent,
 and one started by another agent can ask only for itself. A session started by another
 cannot start sessions of its own. An agent can archive only the sessions it started (and ask
-for its own), never your sessions.
+for its own), never your sessions. Every agent is told, once at the start, to ask to
+archive its own session in its last turn, once its work is merged or abandoned and cleaned up (#703).
 
 Before #638 these were `start_agent`, `stop_agent`, `request_archive`, `archive_agent`,
 `list_my_agents` and `message_agent` (and `park_agent` before `request_archive`). They are

@@ -101,9 +101,17 @@ public enum Briefing {
 
     /// Carrying on another session's work (065). Told to every agent, a helper too: the
     /// person says "continue Login redirect" to whichever chat they opened.
+    ///
+    /// And putting this one away when it is finished (#703). Every agent has
+    /// `archive_session`, but only its description said that with no id it archives the
+    /// agent's own session, and on Claude that description is deferred: an agent merged,
+    /// removed its worktree and stopped, and the person had to ask. One sentence here, on
+    /// the line every agent is told, rather than a line of its own.
     public static let sessions = """
         To continue another session in this project, read it with \(AppTool.readSession) \
-        (by id or exact title; reading changes nothing). \(AppTool.listSessions) lists them.
+        (by id or exact title; reading changes nothing). \(AppTool.listSessions) lists them. \
+        When your own work is merged or abandoned and cleaned up, call \(AppTool.archiveSession) \
+        with no id in that last turn.
         """
 
     /// Worktrees through the app (#615). With `move_worktree` only described, agents
