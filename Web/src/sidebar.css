@@ -70,7 +70,7 @@
 .with-sidebar .sidebar .title.placed :is(.place, .started-by) { flex: none; white-space: pre; }
 
 /* A session's mark in the sidebar (#495): an orange hand, a spinner, a list when queued, an
-   moon (#765), a pause mark (#630), two rings unread, an empty ring once read; every icon in the
+   Zs (#765), a pause mark (#630), two rings unread, an empty ring once read; every icon in the
    accent but the hand. */
 .sidebar-mark { width: 16px; height: 16px; margin-top: 1px; box-sizing: border-box; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center; color: var(--accent); }

@@ -332,7 +332,7 @@ private struct SessionMark: View {
             case .queued:
                 Image(systemName: "list.number").foregroundStyle(Paper.accent)
             case .waiting:
-                Image(systemName: "moon.zzz").foregroundStyle(Paper.accent)
+                Image(systemName: "zzz").foregroundStyle(Paper.accent)
             case .paused:
                 Image(systemName: "pause.circle").foregroundStyle(Paper.accent)
             case .unread:
