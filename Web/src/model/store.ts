@@ -1395,6 +1395,16 @@ export class Store extends Work {
   }
 
   /**
+   * A project put away (#668), as the window's Archive does: it moves to Archived projects with
+   * its sessions. A refusal names the sessions to stop first.
+   */
+  async archiveProject(host: string, folder: string): Promise<ProjectSummary | null> {
+    const summary = await this.act("projects/archive", { folder: folder as never }, host);
+    if (summary) this.upsertProject(summary, host);
+    return summary;
+  }
+
+  /**
    * An archived project brought back (#343), as the window's Bring Back does: a project again,
    * with its new-session form open.
    */

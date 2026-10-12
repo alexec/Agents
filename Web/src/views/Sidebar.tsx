@@ -442,6 +442,14 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
     { label: projectPinned ? "Unpin" : "Pin", disabled: down,
       help: projectPinned ? "Let this project take its place among the others" : "Keep this project at the top of the sidebar",
       run: () => void store.setProjectPinned(host.id, folder, !projectPinned) },
+    // Into Archived projects, asked first (#668), as the window's Archive.
+    { label: "Archive…", disabled: down, help: "Put this project away in Archived projects",
+      run: () => {
+        if (!confirm(`${archiveProjectTitle(label)}\n\n${archiveProjectMessage}`)) return;
+        void store.archiveProject(host.id, folder).then((summary) => {
+          if (summary && here) go({});
+        });
+      } },
   ];
   const row = (agent: Agent) => (
     <SidebarSession key={agent.id} store={store} host={host.id} folder={folder} agent={agent}
@@ -542,6 +550,15 @@ function ArchivedProjectRow({ store, host, project, down }: {
     </div>
   );
 }
+
+/** ProjectArchiveWords.confirmTitle: "Archive “devbox:Agents”?". */
+export function archiveProjectTitle(label: string): string {
+  return `Archive \u201C${label}\u201D?`;
+}
+
+/** ProjectArchiveWords.confirmMessage. */
+export const archiveProjectMessage = "It moves to Archived projects with its sessions, and its workflows stop. "
+  + "Bring Back returns it. Its folder and files are not touched.";
 
 /** DeletionWords.projectConfirmTitle: "Delete “devbox:Agents”?". */
 export function deleteProjectTitle(label: string): string {

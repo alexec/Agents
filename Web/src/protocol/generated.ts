@@ -2090,6 +2090,7 @@ export interface Methods {
   "pins/write": { params: PinWriteRequest; result: Empty };
   "presence/report": { params: PresenceReport; result: Empty };
   "projects/add": { params: ProjectRequest; result: ProjectSummary };
+  "projects/archive": { params: ProjectRequest; result: ProjectSummary };
   "projects/chatState": { params: Empty; result: ChatProjectState };
   "projects/clone": { params: CloneRequest; result: ProjectSummary };
   "projects/clones": { params: Empty; result: CloneSummary[] };
@@ -2195,6 +2196,7 @@ export const MethodTarget = {
   "pins/write": "host",
   "presence/report": "host",
   "projects/add": "host",
+  "projects/archive": "host",
   "projects/chatState": "host",
   "projects/clone": "host",
   "projects/clones": "host",
