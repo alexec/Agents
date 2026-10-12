@@ -690,6 +690,8 @@ public actor DaemonCore {
     /// The person's `gh`, which the skills catalogue reads GitHub through. A test gives
     /// it a fake.
     var gitHubCLI = GitHubCLI()
+    /// What Verify and the health check send http through. A test stands a server in.
+    var mcpVerifyHTTP: MCPClient.HTTPSend?
     #if canImport(CryptoKit)
     /// What searching a catalogue and adding a skill talk to (059). A test gives it a
     /// session that reaches only its stand-in, and endpoints to match.
@@ -710,8 +712,6 @@ public actor DaemonCore {
     lazy var mcpVerifiedStore = MCPVerifiedStore()
     /// How long Verify waits for a server's answers (#305). A test makes it short.
     var mcpVerifyTimeout: Duration = .seconds(20)
-    /// What Verify sends http through. A test stands a server in.
-    var mcpVerifyHTTP: MCPClient.HTTPSend?
     /// Sign-ins under way, by id, until the window has read how they ended (#306).
     var mcpSignInFlows: [UUID: MCPSignInFlow] = [:]
     /// How long one `mcp/sign-in/wait` holds before it answers "waiting".

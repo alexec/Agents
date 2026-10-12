@@ -1,5 +1,5 @@
-#if canImport(CryptoKit)
 import Foundation
+#if canImport(CryptoKit)
 
 /// Searching a catalogue and adding skills to the person or a project (059,
 /// contracts/catalog-methods.md). A person's: none of these is in `agentMethods`.
@@ -40,16 +40,6 @@ extension DaemonCore {
                                       usesRealTrash: realTrash, environment: environment) { folder in
             Self.isProjectFolder(folder, records: records, agentFolders: agentFolders)
         }
-    }
-
-    /// A project on this Mac, one an agent has worked in, or a worktree of either.
-    static func isProjectFolder(_ folder: URL, records: [URL: Project], agentFolders: Set<URL>) -> Bool {
-        let folder = Project.standardize(folder)
-        if records[folder] != nil || agentFolders.contains(folder) { return true }
-        let marker = "/\(WorktreeName.folder)/"
-        guard let range = folder.path.range(of: marker) else { return false }
-        let repo = Project.standardize(URL(filePath: String(folder.path[..<range.lowerBound])))
-        return records[repo] != nil || agentFolders.contains(repo)
     }
 
     // MARK: catalog/search
@@ -248,3 +238,16 @@ enum CatalogWords {
     }
 }
 #endif
+
+// Outside the CryptoKit guard: Agent Configuration (#754) asks it on Linux too.
+extension DaemonCore {
+    /// A project on this Mac, one an agent has worked in, or a worktree of either.
+    static func isProjectFolder(_ folder: URL, records: [URL: Project], agentFolders: Set<URL>) -> Bool {
+        let folder = Project.standardize(folder)
+        if records[folder] != nil || agentFolders.contains(folder) { return true }
+        let marker = "/\(WorktreeName.folder)/"
+        guard let range = folder.path.range(of: marker) else { return false }
+        let repo = Project.standardize(URL(filePath: String(folder.path[..<range.lowerBound])))
+        return records[repo] != nil || agentFolders.contains(repo)
+    }
+}
