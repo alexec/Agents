@@ -5,6 +5,7 @@ public enum MCPCatalogWords {
     public static func sentence(_ error: DaemonAPI.MCPCatalogError) -> String {
         switch error {
         case .unreachable(let host): "Can't reach \(host)."
+        case .timedOut(let host): "\(host) is slow: it did not answer within a minute. Try again."
         case .noPersonalHome: "This copy of the app has no personal ~/.agents."
         case .unmanaged(let path): "A server you wrote is already at \(path), so it was left alone."
         case .mcpUnreadable(let path): "\(path) could not be read, so it was not written."

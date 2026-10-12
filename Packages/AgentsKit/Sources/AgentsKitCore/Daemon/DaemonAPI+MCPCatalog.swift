@@ -102,6 +102,8 @@ extension DaemonAPI {
 
     public enum MCPCatalogError: Error, Codable, Hashable, Sendable {
         case unreachable(host: String)
+        /// The registry answered nothing within its time: slow, not down (#744).
+        case timedOut(host: String)
         case noPersonalHome
         case unmanaged(path: String)
         case mcpUnreadable(path: String)

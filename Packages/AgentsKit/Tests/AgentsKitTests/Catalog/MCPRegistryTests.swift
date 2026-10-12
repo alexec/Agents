@@ -41,5 +41,20 @@ struct MCPRegistryTests {
             Issue.record("wrong type \(error)")
         }
     }
+
+    /// A registry that answers too slowly says so, not that it is down (#744).
+    @Test func timedOutWhenSlow() async {
+        let (session, state) = MCPRegistryStub.make()
+        state.mode = .slow
+        let registry = MCPRegistry(session: session, endpoints: MCPRegistryStub.endpoints)
+        await #expect(throws: DaemonAPI.MCPCatalogError.timedOut(host: "registry.mcp.test")) {
+            _ = try await registry.search("github")
+        }
+        await #expect(throws: DaemonAPI.MCPCatalogError.timedOut(host: "registry.mcp.test")) {
+            _ = try await registry.detail("io.github.github/github-mcp-server")
+        }
+        #expect(MCPRegistryEndpoints.live.request(MCPRegistryStub.endpoints.searchURL(query: "git"))
+            .timeoutInterval >= 60)
+    }
 }
 #endif
