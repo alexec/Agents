@@ -23,7 +23,7 @@ Of 218 rows: **145 same**, **46 by design**, **27 delta** (after #188, #189, #19
 | Session rows and states | 16 | 2 | 5 |
 | Chat turns and turn detail | 23 | 4 | 2 |
 | Prompt bar and queued prompts | 20 | 3 | 0 |
-| Question and permission cards | 13 | 3 | 0 |
+| Question and permission cards | 14 | 3 | 0 |
 | Start sheet and new project | 18 | 5 | 0 |
 | Worktrees and Files | 9 | 6 | 6 |
 | Pins | 4 | 1 | 0 |
@@ -189,6 +189,7 @@ The deltas are tracked by 29 issues:
 | Permission options | `A/Permission/PermissionView.swift:41-48` | `R/Permission/PermissionSheet.swift:110-127` | `W/views/Cards.tsx:176-184` | **same** |
 | What the call will do | Title and kind, plus the diffs and content: `A/Permission/PermissionView.swift:110-125` | Plus the diffs and content: `R/Permission/PermissionSheet.swift:66-106` | Title, kind, diffs and content; a plan instead of *switch_mode*: `W/views/Cards.tsx:224-236` | **same** (#256, #266) |
 | Plan approval | Show plan: the file or the text: `A/Permission/PermissionView.swift:96-111` | The file or the text: `R/Permission/PermissionSheet.swift` (#243) | Show plan: the file or the text: `W/views/Cards.tsx:226-231` | **same** (#243, #256) |
+| An ask to be archived (#827) | A card at the end, after the permission and form cards, in the attention tint: *The agent asks to archive this session*, the agent's last report, **Keep Session** and **Approve**; no strip over the chat: `S/Chat/ArchiveRequestCard.swift`, `A/Chat/ChatView.swift` (`cards`) | The same card: `R/Chat/RemoteChatView.swift` (`cards`) | The same card: `W/views/ArchiveCard.tsx`, `W/views/Chat.tsx` (`.waiting`) | **same** (#827); unwalked |
 | A server key ask | `S/TokenAskCard.swift`, `A/Hosts/Lending.swift:70-90`: kept in the Mac's Keychain, *Save and start* | The same card over the start sheet or the app, on every server's client: `R/StartAgent/TokenAskSheet.swift`, `R/RemoteModel.swift:250-300` (#344) | The same ask as a dialog, on a start or a prompt: `W/views/TokenAsk.tsx`, `W/model/store.ts:1424-1480` (#344) | **same** (#344). Where the key goes is **by design**: the window keeps it; the Remote and the page lend it on their own connection and keep it nowhere, *Lend and start* |
 
 ## Start sheet and new project

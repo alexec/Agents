@@ -61,13 +61,14 @@ needs your approval, the row carries the mark once its turn ends. The session st
 **Needs you** with the mark beside it for one that is **Partly done**. Nothing is hidden
 until you archive it.
 
-- **Approve** beside the mark on the Mac's row, or in the strip over the chat on the Mac,
-  iPhone, iPad and web page, approves archiving it with one click. On the Remote and the web
-  page the row shows the mark, and **Archive** is in the row's menu and its swipe.
-- **Approve Archiving**, at the top of the sidebar after **Pinned**, **Needs You**, **Working** and
-  **Unread**, gathers every session waiting for approval, across every project and host. It
-  is shown only when one is. Each of its rows is approved on its own, by **Approve** or a
-  swipe; there is no Approve All (#704).
+- **A card at the end of the chat** says **The agent asks to archive this session**, in the
+  attention colour, with what the agent said last. **Approve** archives it; **Keep Session**
+  keeps it. It is drawn as a permission question is, on the Mac, iPhone, iPad and web page
+  (#827), and **Question waiting** goes to it when it is out of view.
+- **Approve** is also beside the mark on the Mac's row. On the Remote and the web page,
+  **Archive** is in the row's menu and its swipe.
+- **Needs You** lists every session waiting for approval, across every project and host
+  (#773). Each row is approved on its own; there is no Approve All (#704).
 - The mark goes when you send the session a prompt, when a later turn ends wanting you
   (with a question, stuck, blocked or crashed), or when the session is archived. Bringing
   it back does not bring the mark back. A workflow's prompt, or the app's own, leaves it.

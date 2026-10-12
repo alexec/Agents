@@ -133,24 +133,6 @@ struct RemoteChatView: View {
                 if let agent, agent.missingFolder != nil, agent.state != .archived {
                     RemoteMissingFolderStrip(agent: agent)
                 }
-                // An agent asks for it to be archived (#584): the mark, and the one tap
-                // that agrees, as over the Mac's chat.
-                if let agent, let line = ArchiveRequestWords.line(agent) {
-                    HStack(spacing: 10) {
-                        Label(line, systemImage: ArchiveRequestWords.symbol)
-                            .appText(.fine)
-                            .foregroundStyle(.secondary)
-                        Button(ArchiveRequestWords.archive) {
-                            Task { await model.archive(agent.id) }
-                        }
-                        .buttonStyle(.paper)
-                        .controlSize(.small)
-                        .disabled(model.isStale(agent) || model.acting(agent.id) != nil)
-                        .accessibilityHint(ArchiveRequestWords.archiveHelp)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
-                }
                 // Blocked (039): what it waits on, as the row says it (#341). Carry on is
                 // the toolbar's.
                 if let agent, model.isBlocked(agent) {
@@ -260,7 +242,7 @@ struct RemoteChatView: View {
         let questions = model.questionsForSelection
         let guarded = model.guardedChangesForSelection
         let form = model.formForSelection
-        guard !questions.isEmpty || !guarded.isEmpty || form != nil else { return nil }
+        guard !questions.isEmpty || !guarded.isEmpty || form != nil || agent.asksToArchive else { return nil }
         return AnyView(VStack(spacing: 12) {
             ForEach(questions) { request in
                 // A fresh sheet per question, so a tap in flight on the last one is not
@@ -280,6 +262,15 @@ struct RemoteChatView: View {
             if let form {
                 ElicitationSheet(request: form)
                     .id(form.id)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+            // An ask to be archived waits the same way, last, as on the Mac (#827).
+            if agent.asksToArchive {
+                ArchiveRequestCard(agent: agent,
+                                   approve: { await model.archive(agent.id) },
+                                   keep: { await model.keepSession(agent) },
+                                   isDisabled: model.isStale(agent) || model.acting(agent.id) != nil)
+                    .chatColumn()
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         })

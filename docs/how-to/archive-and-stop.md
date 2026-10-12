@@ -56,12 +56,14 @@ done**, the chat carries an **Archiving needs approval** mark on its row, as the
 mark is. It stays in its group, usually **Done**; a
 partly done one stays under **Needs you**. Nothing is hidden until you approve it.
 
-1. Click **Approve** beside the mark on the Mac's row, or in the strip over the chat. On
-   iPhone, iPad and the web page, the strip over the chat has **Approve** too, and the
-   row's menu and its swipe have **Archive**.
-2. Or open **Approve Archiving**, at the top of the sidebar. It gathers every chat waiting
-   for approval, in every project and on every host, and is shown only when one is.
-   Approve or swipe each row there; the group has no button that archives them all.
+1. Open the chat. At the end of the conversation, a card in orange says **The agent asks
+   to archive this session**, with what the agent said last. Click **Approve** to archive
+   it, or **Keep Session** to keep it. The card is the same on the Mac, iPhone, iPad and the
+   web page. When it is out of view, **Question waiting** takes you to it.
+2. Or use **Needs You**, at the top of the sidebar. It shows every chat waiting for
+   approval, in every project and on every host. **Approve** is beside the mark on the
+   Mac's row; on the Remote and the web page it is in the row's menu and its swipe. Each
+   row is approved on its own; there is no button that archives them all.
 3. To keep the chat instead, send it a prompt. That drops it. So does a later turn
    that ends wanting you: with a question, stuck, blocked or crashed. Bringing back an
    archived chat does not bring the mark back.
