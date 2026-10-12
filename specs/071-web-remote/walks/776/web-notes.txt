@@ -1,0 +1,10 @@
+— plan
+plan failed: waited 30000 ms for document.querySelector(".sessions .row.session")
+errors: []
+— plan
+card: ["☑ Fix the sidebar row 2 of 5 ▸"]
+bar: 40%
+shot w-plan.png
+steps: ["● Find where the row's second line is chosen","● Write a failing test for the stale line","◐ Fix the sidebar row","○ Do the same on the Remote and web","○ Update parity.md"]
+shot w-plan-open.png
+errors: []
