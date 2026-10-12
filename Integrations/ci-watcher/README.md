@@ -12,16 +12,17 @@ in the project's `.agents/mcp.json` as `ci`, and the **Fix failed checks** workf
 | Event | `checks.failed` | A pull request's Actions run finished with a failure. Arguments: `repo`, optional `branch` and `pr`. |
 | Event | `pr.merged` | A pull request was merged. Arguments: `repo`, optional `branch` and `pr`. |
 | Event | `pr.closed` | A pull request was closed without being merged (#702). Arguments: `repo`, optional `branch` and `pr`. |
+| Event | `pr.conflicted` | An open pull request began to conflict with its base (#712): once per conflict, and not for one already in conflict when the wait or trigger starts. Arguments: `repo`, optional `branch` and `pr`. |
 | Event | `issue.opened` | An issue (not a PR) was opened. Arguments: `repo`, optional `label`. |
 | Event | `issue.labelled` | A label was added to an issue. Arguments: `repo`, optional `label` (the one added) and `issue`. |
 | Event | `issue.commented` | A comment was left on an issue; its body is cut to 4000 characters. Arguments: `repo`, optional `label` and `issue`. |
 | Event | `issue.closed` | An issue closed, as `completed` or `not_planned`. Arguments: `repo`, optional `label` and `issue`. |
-| Tool | `list_prs` | Open pull requests and their check state. Read-only; feeds the board. |
+| Tool | `list_prs` | Open pull requests, their check state, and whether each conflicts with its base. Read-only; feeds the board. |
 | Tool | `list_issues` | Open issues with their labels and comment counts, optional `label`. Read-only; feeds the issues view. |
 | Tool | `failed_log` | The last 300 lines of each failed job's log. Read-only. |
 | Tool | `rerun_failed` | Reruns a run's failed jobs. |
 | Tool | `comment_on_pr` | Comments on a pull request. |
-| View | `ui://ci/board` | The open pull requests with a check pill, and **Rerun** on a failing one. |
+| View | `ui://ci/board` | The open pull requests with a check pill, a **Conflicts** pill on one that cannot merge, and **Rerun** on a failing one. |
 | View | `ui://ci/issues` | The open issues with their labels; a label narrows the list, and its ✕ widens it again. |
 
 Every `repo` may be left out (#702): it is then the repo the project's folder pushes to, as

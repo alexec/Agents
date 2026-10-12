@@ -5,7 +5,8 @@ import { readFile, writeFile } from "node:fs/promises";
 
 export interface PR { number: number; title: string; branch: string; url: string }
 export type Checks = "passing" | "failing" | "running" | "none";
-export interface BoardPR extends PR { checks: Checks; failedRunId?: number }
+/** `conflicts`: whether the PR conflicts with its base (#712); left out while GitHub is still working it out. */
+export interface BoardPR extends PR { checks: Checks; failedRunId?: number; conflicts?: boolean }
 
 /** A failed run as listed, before its PR and jobs are looked up. */
 export interface RunRef {
@@ -299,10 +300,11 @@ export function realGitHub(): GitHub {
 
     async listPRs(repo) {
       const result = await run(["pr", "list", "-R", repo, "--state", "open", "--limit", "100",
-        "--json", "number,title,headRefName,statusCheckRollup,url"]);
+        "--json", "number,title,headRefName,statusCheckRollup,url,mergeable"]);
       if (result.code !== 0) throw failure(result.missing, result.stderr, null);
       return (JSON.parse(result.stdout) as any[]).map((p) => ({
         number: p.number, title: p.title, branch: p.headRefName, url: p.url, ...rollup(p.statusCheckRollup),
+        ...(p.mergeable === "CONFLICTING" || p.mergeable === "MERGEABLE" ? { conflicts: p.mergeable === "CONFLICTING" } : {}),
       }));
     },
 
@@ -442,6 +444,7 @@ export function fakeGitHub(file: string): GitHub {
       return (repoOf(await load(), repo).prs as any[]).filter((p) => p.state === "open").map((p) => {
         const out: BoardPR = { ...toPR(p), checks: p.checks ?? "none" };
         if (p.checks === "failing" && p.failedRunId !== undefined) out.failedRunId = p.failedRunId;
+        if (typeof p.conflicts === "boolean") out.conflicts = p.conflicts;
         return out;
       });
     },

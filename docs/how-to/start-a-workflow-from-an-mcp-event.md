@@ -70,8 +70,8 @@ push, and use `comment_on_pr` to say what you changed.
 
 - Without `server:`, the trigger listens to every server here that offers `checks.failed`.
   Add `server: ci` to listen to that one only, or `server: [github, gitlab]` for a list.
-- The `ci` server's `checks.failed`, `pr.merged` and `pr.closed` (closed without merging)
-  all take `repo`, `branch` (only that PR branch) and `pr` (only that pull request, by
+- The `ci` server's `checks.failed`, `pr.merged`, `pr.closed` (closed without merging) and
+  `pr.conflicted` (began to conflict with its base, #712) all take `repo`, `branch` (only that PR branch) and `pr` (only that pull request, by
   number). Left out, `repo` is the one the project's folder pushes to (#702). Given
   together, each must hold: `{pr: 551}` hears only PR 551's failures and merge.
 - Its issue events, `issue.opened`, `issue.labelled`, `issue.commented` and `issue.closed`,
