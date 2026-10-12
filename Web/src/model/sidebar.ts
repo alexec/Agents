@@ -73,16 +73,29 @@ export function pinnedWorkflows(held: readonly WorkflowSummary[], pins: readonly
 /**
  * A project's live sessions as one list (#495), those a smart group lists left out, as each is
  * listed once (#587): newest started first, not by last activity, so a working session does not
- * climb past the pointer with every line (#357).
+ * climb past the pointer with every line (#357). `kept` is the session Unread keeps while it is
+ * open, listed there and not here (#689).
  */
-export function projectSessions(live: readonly Agent[], pins: readonly string[], query?: LabelQuery): Agent[] {
+export function projectSessions(live: readonly Agent[], pins: readonly string[], query?: LabelQuery,
+  kept?: string): Agent[] {
   const pinned = new Set(pins);
-  return live.filter((a) => home(a, pinned.has(a.id)) === null && (!query || queryMatches(query, a))).sort(byStart);
+  return live.filter((a) => home(a, pinned.has(a.id)) === null && a.id !== kept && (!query || queryMatches(query, a)))
+    .sort(byStart);
 }
 
 /** How many sessions a project's own group lists, folded or not (#587), as `SidebarProjectFold.ownCount`. */
-export function ownCount(live: readonly Agent[], pins: readonly string[]): number {
-  return projectSessions(live, pins).length;
+export function ownCount(live: readonly Agent[], pins: readonly string[], kept?: string): number {
+  return projectSessions(live, pins, undefined, kept).length;
+}
+
+/**
+ * Whether Unread keeps the session opened from it (#495), as `SidebarSmartRow.keptInUnread`: not
+ * once it belongs elsewhere (archived, pinned, waiting, working or asking to be archived).
+ */
+export function keepsInUnread(agent: Agent, pins: readonly string[]): boolean {
+  if (agent.state === "archived" || pins.includes(agent.id)) return false;
+  const at = home(agent, false);
+  return at === null || at === "unread";
 }
 
 /**

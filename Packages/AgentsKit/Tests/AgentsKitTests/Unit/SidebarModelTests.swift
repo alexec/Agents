@@ -340,4 +340,29 @@ struct SidebarModelTests {
         #expect(everyRow.count == Set(everyRow).count, "nothing is listed twice")
         #expect(Set(everyRow).count == 7, "nothing is left out")
     }
+
+    /// The session opened from Unread, read now, stays in Unread alone until another is
+    /// opened (#689): not under its project too, nor in its count.
+    @Test func theSessionUnreadKeepsIsNotUnderItsProjectToo() {
+        let model = AgentsModel()
+        let opened = started(api, .finished, "opened", at: 2)
+        let read = started(api, .finished, "read", at: 1)
+        let working = started(api, .running, "working", at: 3)
+        let pinned = started(api, .finished, "pinned", at: 4)
+        model.replaceAgents([opened, read, working, pinned])
+        model.replacePins([ProjectPins(folder: api, pins: [], sessions: [pinned.id])])
+
+        #expect(SidebarSmartRow.keptInUnread(opened.id, in: model)?.id == opened.id)
+        let fold = SidebarProjectFold(key, label: "api", in: model, isOpen: true, keptInUnread: opened.id)
+        #expect(fold.sessions.map(\.id) == [read.id])
+        #expect(SidebarProjectFold.ownCount(key, in: model, keptInUnread: opened.id) == 1)
+        #expect(SidebarProjectFold.ownCount(ProjectKey(host: .mac, folder: web), in: model, keptInUnread: opened.id) == 0)
+        // Let go, it is under its project.
+        #expect(SidebarProjectFold(key, label: "api", in: model, isOpen: true).sessions.map(\.id) == [opened.id, read.id])
+        #expect(SidebarProjectFold.ownCount(key, in: model) == 2)
+        // A search, or a home elsewhere, lets it go too.
+        #expect(SidebarSmartRow.keptInUnread(opened.id, in: model, query: "opened") == nil)
+        #expect(SidebarSmartRow.keptInUnread(working.id, in: model) == nil)
+        #expect(SidebarSmartRow.keptInUnread(pinned.id, in: model) == nil)
+    }
 }

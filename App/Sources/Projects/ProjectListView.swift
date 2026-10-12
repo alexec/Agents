@@ -373,7 +373,7 @@ private struct ProjectFold: View {
         // reads its own numbers off the project's shelf (#165). What goes under which
         // heading is the shared model's, which the Remote draws too (#226).
         let fold = SidebarProjectFold(key, label: label, in: model.work, query: query,
-                                      isOpen: folds.isOpen(key))
+                                      isOpen: folds.isOpen(key), keptInUnread: model.keptInUnread)
         let isOpen = fold.isUnfolded
         if fold.isShown {
             Section(isExpanded: Binding(

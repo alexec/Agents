@@ -76,7 +76,7 @@ struct ProjectRow: View {
     }
 
     /// The sessions its group lists, each listed once (`SidebarSmartRow.home`).
-    private var ownCount: Int { SidebarProjectFold.ownCount(summary.key, in: model.work) }
+    private var ownCount: Int { SidebarProjectFold.ownCount(summary.key, in: model.work, keptInUnread: model.keptInUnread) }
 
     /// What is going on in there, in the Mac row's words and order: urgency first, and
     /// only ever two facts.
