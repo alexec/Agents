@@ -306,7 +306,7 @@ button.link {
    at its left; over the top corner of a reply, on the paper. A touch screen has no pointer, so
    there it sits under the message, always. */
 .copyable { position: relative; }
-.copyable > .copy-message { position: absolute; display: none; background: var(--paper-ground); }
+.copyable > .copy-message { position: absolute; display: none; background: var(--paper-ground); padding: 2px 8px; }
 .bubble.copyable > .copy-message { right: 100%; bottom: 0; margin-right: 6px; }
 .reply.copyable > .copy-message, .note.copyable > .copy-message { top: -2px; right: 0; }
 .copyable:hover > .copy-message, .copy-message:focus-visible { display: block; }
@@ -351,17 +351,19 @@ button.link {
 /* A turn (069): the ask, "N steps", the steps in the turn's margin (no rule, no indent: #148), and the outcome. */
 /* Its text at the window's reading step (15, sans, as every other step since #326); the control is chrome, at fine (11). */
 .turn { display: flex; flex-direction: column; gap: 10px; font-family: var(--font-text); font-size: 15px; }
+/* Plain text you click, flush with the turn's edge: no capsule, no padding (#758). */
 .steps-control {
   align-self: flex-start;
-  border: 1px solid transparent;
+  border: none;
   background: none;
-  border-radius: 999px;
-  padding: 2px 8px;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
   font-family: var(--font-text);
   font-size: 11px;
   opacity: 0.7;
 }
-.steps-control:hover { border-color: var(--paper-rule); opacity: 1; }
+.steps-control:hover { opacity: 1; }
 .steps { display: flex; flex-direction: column; gap: 8px; }
 .run { display: flex; flex-direction: column; gap: 3px; }
 .call-line {
