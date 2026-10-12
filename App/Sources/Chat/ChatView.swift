@@ -168,46 +168,24 @@ struct ChatView: View {
             }
             .chatColumn()
             .padding(.vertical, 8)
-        } else if agent.asksToArchive || model.isBlocked(agent) {
+        } else if model.isBlocked(agent) {
             // Stop is the prompt's own button while the agent works; Archive is on the
             // session's row and in the toolbar. What is left here is only what the page
-            // has to say: that an agent asks for it to be archived, with the one click
-            // that agrees (#584), and what a blocked one waits on and the way on.
+            // has to say: what a blocked one waits on and the way on (039). An ask to be
+            // archived is a card at the end of the transcript (#827).
             HStack(alignment: .top, spacing: 8) {
-                VStack(alignment: .leading, spacing: 4) {
-                    if let line = ArchiveRequestWords.line(agent) {
-                        Label(line, systemImage: ArchiveRequestWords.symbol)
-                            .appText(.fine)
-                            .foregroundStyle(.secondary)
-                    }
-                    // A blocked chat (039): what it waits on, as its row says it (#341).
-                    if model.isBlocked(agent) {
-                        WaitLines(lines: model.blockLines(agent))
-                    }
-                }
+                // What it waits on, as its row says it (#341).
+                WaitLines(lines: model.blockLines(agent))
                 Spacer(minLength: 0)
-                if agent.asksToArchive {
-                    Button {
-                        Task { await model.archive(agent.id, andLeave: true) }
-                    } label: {
-                        Label(ArchiveRequestWords.archive, systemImage: ArchiveRequestWords.symbol)
-                    }
-                    .buttonStyle(.paper)
-                    .appText(.fine)
-                    .help(ArchiveRequestWords.archiveHelp)
-                    .disabled(model.acting(agent.id) != nil)
+                // What the card's Carry on does.
+                Button {
+                    Task { await model.carryOn(agent.id) }
+                } label: {
+                    Label(AgentsModel.carryOnLabel, systemImage: "play.circle")
                 }
-                // A blocked chat (039): what the card's Carry on does.
-                if model.isBlocked(agent) {
-                    Button {
-                        Task { await model.carryOn(agent.id) }
-                    } label: {
-                        Label(AgentsModel.carryOnLabel, systemImage: "play.circle")
-                    }
-                    .buttonStyle(.paper)
-                    .appText(.fine)
-                    .help(AgentsModel.carryOnHelp(for: agent))
-                }
+                .buttonStyle(.paper)
+                .appText(.fine)
+                .help(AgentsModel.carryOnHelp(for: agent))
             }
             .chatColumn()
             .padding(.vertical, 8)
@@ -228,7 +206,7 @@ struct ChatView: View {
         guard let agent = model.selectedAgent else { return nil }
         let guarded = model.work.guardedChanges(askedIn: agent.id)
         guard !model.permissionsForSelection.isEmpty || !guarded.isEmpty
-                || model.elicitationForSelection != nil else { return nil }
+                || model.elicitationForSelection != nil || agent.asksToArchive else { return nil }
         return AnyView(VStack(spacing: 12) {
             ForEach(model.permissionsForSelection) { request in
                 PermissionView(request: request)
@@ -247,6 +225,15 @@ struct ChatView: View {
                 ElicitationView(request: request)
                     .id(request.id)
                     .disabled(selectedHostOffline)
+                    .help(selectedHostOffline ? offlineHelp : "")
+            }
+            // An ask to be archived waits the same way, last (#827).
+            if agent.asksToArchive {
+                ArchiveRequestCard(agent: agent,
+                                   approve: { await model.archive(agent.id, andLeave: true) },
+                                   keep: { await model.keepSession(agent) },
+                                   isDisabled: selectedHostOffline || model.acting(agent.id) != nil)
+                    .chatColumn()
                     .help(selectedHostOffline ? offlineHelp : "")
             }
         })

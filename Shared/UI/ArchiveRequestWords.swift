@@ -10,8 +10,14 @@ import Foundation
 enum ArchiveRequestWords {
     static let symbol = "archivebox"
 
-    /// The mark on the row and over the chat.
+    /// The mark on the row.
     static let mark = "Archiving needs approval"
+
+    /// The card's head at the end of the chat (#827).
+    static let question = "The agent asks to archive this session"
+
+    /// Under the head when the agent said nothing of its own.
+    static let noReport = "The agent says its work is done."
 
     /// The one click that approves it, and archives the session.
     static let archive = "Approve"

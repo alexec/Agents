@@ -25,7 +25,7 @@ import { PromptMenus } from "./PromptMenus";
 import { ContextMeter, CostLimitBanner, SandboxCapsule } from "./PromptStatus";
 import { RenameInput, SessionButtons, SessionMenu } from "./SessionMenu";
 import { drawable } from "../model/options";
-import { projectFolder } from "../model/groups";
+import { asksToArchive, projectFolder } from "../model/groups";
 import { CallActionsContext, detailSummaries, detailTitles, fromLine, ItemRow, turnDetails, TurnView, type CallActions, type TurnDetail } from "./chat/Rows";
 import { Modal } from "./Modal";
 import { nameOf, pathOf, setPane } from "./files/paneState";
@@ -36,7 +36,7 @@ import { viewPin } from "./chat/appViewBridge";
 import { ViewLayer, type ViewActions } from "./chat/viewLayer";
 import { BackToList } from "./BackToList";
 import { comingBackDescription } from "../model/status";
-import { ArchiveStrip } from "./ArchiveStrip";
+import { ArchiveCard } from "./ArchiveCard";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
 import { eventWaitCapsule, leaseMark } from "../model/rowLines";
 import { GuardedChangeCards } from "./GuardedChange";
@@ -376,7 +376,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   const waiting = useRef<HTMLDivElement>(null);
   const waitingShown = useSignal(true);
   const anyWaiting = store.permissionsFor(host, session).length > 0 || store.elicitationsFor(host, session).length > 0
-    || store.guardedChanges(host, { session }).length > 0;
+    || store.guardedChanges(host, { session }).length > 0 || (!!agent && asksToArchive(agent));
   useEffect(() => {
     const el = waiting.current;
     const root = scroller.current;
@@ -508,8 +508,6 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       {hostDown && <OfflineStrip store={store} host={host} />}
       <FolderGoneNotice store={store} host={host} agent={agent} />
       <MissingFolderStrip store={store} host={host} agent={agent} />
-      {/* An agent asks for it to be archived (#584): the mark, and Archive, as the window's strip has it. */}
-      <ArchiveStrip store={store} host={host} agent={agent} disabled={down} />
       <BlockStrip store={store} host={host} agent={agent} disabled={down} />
       {/* What it said it would do, under what it waits on, as the Remote has it (#341). */}
       <CurrentPlanStrip agent={agent} />
@@ -544,6 +542,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           {/* A change its agent made to the project's own files, asked here (#531). */}
           <GuardedChangeCards store={store} host={host} where={{ session }} down={down} />
           <Cards store={store} host={host} session={session} down={down} />
+          {/* An ask to be archived waits the same way, last (#827). */}
+          <ArchiveCard store={store} host={host} agent={agent} disabled={down} />
         </div>
       </div>
       {subagent.value && (
