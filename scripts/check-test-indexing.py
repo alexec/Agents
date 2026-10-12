@@ -8,7 +8,7 @@ quietly. A test that then reads `xs[1]`, `xs.first!` or `x!` traps when the chec
 failed, and a trap ends the whole `swift test` run, not just the one test: every test
 after it goes unrun and unreported. `try #require(...)` stops the test instead.
 
-With no files it scans the tests of AgentsKit, ControlPlane and CodeText. Within each
+With no files it scans the tests of AgentsKit, ControlPlane, CodeText and MCPServers. Within each
 function, once an `#expect` or `eventually` has been seen, it flags:
 
   - a subscript by an integer literal, `xs[1]`, `a.b[0][2]`;
@@ -28,7 +28,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PACKAGES = ["AgentsKit", "ControlPlane", "CodeText"]
+PACKAGES = ["AgentsKit", "ControlPlane", "CodeText", "MCPServers"]
 
 ARMS = re.compile(r"#expect\b|\beventually\w*\s*[({]")
 GUARDS = re.compile(r"#require\b|^\s*guard\b|^\s*(\}\s*else\s+)?if\b")
