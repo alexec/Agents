@@ -11,12 +11,14 @@ struct MisbehavingProviderTests {
     /// Newline-delimited JSON-RPC. `FAKE_MODE` says how it misbehaves; anything else is a
     /// well-behaved provider of one stopped workspace, `devbox`.
     static let script = #"""
-    import json, os, sys, time
+    import json, os, sys, threading, time
     mode = os.environ.get("FAKE_MODE", "")
+    out = threading.Lock()
 
     def send(message):
-        sys.stdout.write(json.dumps(message) + "\n")
-        sys.stdout.flush()
+        with out:
+            sys.stdout.write(json.dumps(message) + "\n")
+            sys.stdout.flush()
 
     def answer(id, content=None, text=None, error=False):
         result = {"content": [{"type": "text", "text": text if text is not None else json.dumps(content)}]}
@@ -40,7 +42,27 @@ struct MisbehavingProviderTests {
                 item(id="devbox", name="twin", state="running"), "not an object", item(id=7, name="numbered")]}
         return {"contract": 1, "workspaces": [item()]}
 
-    for line in sys.stdin:
+    def call(id, tool):
+        if tool == "workspaces_list":
+            if mode == "not-json":
+                answer(id, text="devbox is stopped")
+            else:
+                answer(id, listing())
+        elif mode == "crash" and tool == "workspace_start":
+            os._exit(3)
+        elif mode == "hang" and tool == "workspace_start":
+            time.sleep(30)
+        elif mode == "refuse":
+            answer(id, text="Quota exceeded. " + "x" * 3000, error=True)
+        elif mode == "silent-refusal":
+            answer(id, text="", error=True)
+        elif mode == "bare-start":
+            answer(id, {})
+        else:
+            answer(id, {"workspace": item(state="running" if tool == "workspace_start" else "stopped")})
+
+    # readline, not `for line in sys.stdin`, which waits for more than one line on a pipe.
+    for line in iter(sys.stdin.readline, ""):
         message = json.loads(line)
         method, id = message.get("method"), message.get("id")
         if method == "initialize":
@@ -54,30 +76,18 @@ struct MisbehavingProviderTests {
                 names.remove("workspace_stop")
             send({"jsonrpc": "2.0", "id": id, "result": {"tools": [{"name": n, "inputSchema": {"type": "object"}} for n in names]}})
         elif method == "tools/call":
-            tool = message["params"]["name"]
-            if tool == "workspaces_list":
-                if mode == "not-json":
-                    answer(id, text="devbox is stopped")
-                else:
-                    answer(id, listing())
-            elif mode == "crash" and tool == "workspace_start":
-                os._exit(3)
-            elif mode == "hang" and tool == "workspace_start":
-                time.sleep(30)
-            elif mode == "refuse":
-                answer(id, text="Quota exceeded. " + "x" * 3000, error=True)
-            elif mode == "silent-refusal":
-                answer(id, text="", error=True)
-            elif mode == "bare-start":
-                answer(id, {})
-            else:
-                answer(id, {"workspace": item(state="running" if tool == "workspace_start" else "stopped")})
+            # Each call on its own thread, as a server whose calls overlap.
+            threading.Thread(target=call, args=(id, message["params"]["name"]), daemon=True).start()
         elif id is not None:
             send({"jsonrpc": "2.0", "id": id, "result": {}})
     """#
 
+    /// In a folder of its own: Python reads the script's folder for every import, and the
+    /// temporary folder can hold enough to make that slower than a call's time.
     private static let scriptFile: URL = {
-        let file = FileManager.default.temporaryDirectory.appendingPathComponent("misbehaving-provider-\(UUID().uuidString).py")
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("misbehaving-provider-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let file = folder.appendingPathComponent("provider.py")
         try? script.write(to: file, atomically: true, encoding: .utf8)
         return file
     }()
@@ -85,9 +95,9 @@ struct MisbehavingProviderTests {
     private func provider(_ mode: String, timing: ProviderConnection.Timing = .init(quick: .seconds(5), long: .seconds(5))) throws
         -> ProviderConnection {
         let record = ProviderRecord(id: .init(rawValue: "fake-\(mode)"), name: "Fake", kind: .stdio,
-                                    command: "python3", args: [Self.scriptFile.path])
+                                    command: "python3", args: ["-u", Self.scriptFile.path])
         return try ProviderConnection(record: record, secrets: ["FAKE_MODE": mode],
-                                      cwd: FileManager.default.temporaryDirectory, timing: timing, log: { _ in })
+                                      cwd: Self.scriptFile.deletingLastPathComponent(), timing: timing, log: { _ in })
     }
 
     /// What `work` threw, as the person reads it.
