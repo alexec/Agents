@@ -73,7 +73,8 @@ packages:
   # The control plane as a service (058): Agents Host carries its agents-control.
   ControlPlane:
     path: Packages/ControlPlane
-  # The MCP servers Agents ships (#700): Agents Host carries ci-watcher beside agentsd.
+  # The MCP servers Agents ships (#700): Agents Host carries ci-watcher beside agentsd,
+  # and workspace-commands beside agents-control (#691).
   MCPServers:
     path: Packages/MCPServers
   swift-nio-ssl:
@@ -466,6 +467,11 @@ targets:
         copy:
           destination: wrapper
           subpath: Contents/Helpers
+      # The command workspace provider (#691), which agents-control looks for beside itself.
+      - target: workspace-commands
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
     info:
       path: Host/Info.plist
       properties:
@@ -547,6 +553,33 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.ci-watcher
         PRODUCT_NAME: ci-watcher
+        SDKROOT: macosx
+        SUPPORTED_PLATFORMS: macosx
+        SKIP_INSTALL: YES
+        ENABLE_HARDENED_RUNTIME: YES
+      # The GitHub release (#669): Release signs it with Developer ID, outside the App Store.
+      configs:
+        Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: Developer ID Application
+          OTHER_CODE_SIGN_FLAGS: --timestamp
+
+  # The command workspace provider (#691, #793), an MCP server agents-control starts from
+  # beside itself in Agents Host's bundle.
+  workspace-commands:
+    type: tool
+    supportedDestinations: [macOS]
+    sources:
+      - path: Packages/MCPServers/Sources/workspace-commands
+    dependencies:
+      - package: MCPServers
+        product: WorkspaceCommands
+      - package: MCPServers
+        product: MCPServerKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.workspace-commands
+        PRODUCT_NAME: workspace-commands
         SDKROOT: macosx
         SUPPORTED_PLATFORMS: macosx
         SKIP_INSTALL: YES
