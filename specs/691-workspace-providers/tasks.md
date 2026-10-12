@@ -48,7 +48,7 @@ of the spec, and the constitution requires the relevant checks to pass.
   - `--version` prints the version and exits.
   - It reads `WORKSPACE_COMMANDS_CONFIG`, builds `WorkspaceCommands.server(config:)` and runs `StdioTransport.serve(server, name: "workspace-commands")`.
   - A bad config is written to stderr and exits 2.
-- [ ] T003 [P] Put the layouts in [contracts/layouts.md](contracts/layouts.md) to Alex as a question with previews (L1 strip, L2 Hosts row, L3 Providers page, L4 Add Provider sheet, L5 Link to Workspace…). Record the answers in layouts.md before any 🖼 task starts.
+- [x] T003 [P] Put the layouts in [contracts/layouts.md](contracts/layouts.md) to Alex as a question with previews (L1 strip, L2 Hosts row, L3 Providers page, L4 Add Provider sheet, L5 Link to Workspace…). Record the answers in layouts.md before any 🖼 task starts.
 
 ---
 
