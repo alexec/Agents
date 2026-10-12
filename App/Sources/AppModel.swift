@@ -2841,9 +2841,12 @@ final class AppModel {
 
     /// What a catalogue call said, or why it could not: the sheet shows either, so these
     /// do not go through `attempt`, which would put a failure in the window's banner too.
-    func catalogSearch(_ query: String) async -> DaemonAPI.CatalogSearchAnswer {
+    func catalogSearch(_ query: String, marketplace: String? = nil,
+                       destination: DaemonAPI.SkillDestination? = nil) async -> DaemonAPI.CatalogSearchAnswer {
         do {
-            return try await client.call(DaemonAPI.Method.catalogSearch, DaemonAPI.CatalogSearchRequest(query: query),
+            return try await client.call(DaemonAPI.Method.catalogSearch,
+                                         DaemonAPI.CatalogSearchRequest(query: query, marketplace: marketplace,
+                                                                        destination: destination),
                                          returning: DaemonAPI.CatalogSearchAnswer.self)
         } catch {
             return .init(results: [], error: Self.catalogError(error))
@@ -2933,12 +2936,50 @@ final class AppModel {
         return .failed(String(describing: error))
     }
 
+    // MARK: Marketplaces (#687)
+
+    /// The marketplaces for a kind, a project's among them when it is the destination. Nil
+    /// when the daemon could not be asked.
+    func marketplaces(_ kind: DaemonAPI.CatalogKind,
+                      for destination: DaemonAPI.SkillDestination?) async -> DaemonAPI.MarketplacesListAnswer? {
+        try? await client.call(DaemonAPI.Method.marketplacesList,
+                               DaemonAPI.MarketplacesListRequest(kind: kind, destination: destination),
+                               returning: DaemonAPI.MarketplacesListAnswer.self)
+    }
+
+    /// Nil when added, else the daemon's reason in words.
+    func addMarketplace(_ request: DaemonAPI.MarketplaceAddRequest) async -> String? {
+        await marketplaceCall(DaemonAPI.Method.marketplacesAdd, request)
+    }
+
+    func removeMarketplace(_ id: String) async -> String? {
+        await marketplaceCall(DaemonAPI.Method.marketplacesRemove, DaemonAPI.MarketplaceIDRequest(id: id))
+    }
+
+    func setMarketplace(_ id: String, enabled: Bool) async -> String? {
+        await marketplaceCall(DaemonAPI.Method.marketplacesSetEnabled,
+                              DaemonAPI.MarketplaceSetEnabledRequest(id: id, enabled: enabled))
+    }
+
+    private func marketplaceCall<P: Encodable & Sendable>(_ method: String, _ params: P) async -> String? {
+        do {
+            _ = try await client.call(method, params, returning: DaemonAPI.MarketplacesListAnswer.self)
+            return nil
+        } catch let rpc as JSONRPCError {
+            return rpc.message
+        } catch {
+            return String(describing: error)
+        }
+    }
+
     // MARK: MCP catalogue (060)
 
-    func mcpSearch(_ query: String) async -> DaemonAPI.MCPSearchAnswer {
+    func mcpSearch(_ query: String, marketplace: String? = nil,
+                   destination: DaemonAPI.SkillDestination? = nil) async -> DaemonAPI.MCPSearchAnswer {
         do {
             return try await client.call(DaemonAPI.Method.catalogSearch,
-                                         DaemonAPI.CatalogSearchRequest(query: query, kind: .mcp),
+                                         DaemonAPI.CatalogSearchRequest(query: query, kind: .mcp, marketplace: marketplace,
+                                                                        destination: destination),
                                          returning: DaemonAPI.MCPSearchAnswer.self)
         } catch {
             return .init(results: [], error: Self.mcpError(error))

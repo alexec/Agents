@@ -66,8 +66,15 @@ extension DaemonAPI {
         public var installs: Int
         /// The owner is on the app's short list (research R11). A mark, never a gate.
         public var known: Bool
+        /// The marketplace it was found in (#687); nil for skills.sh.
+        public var marketplace: String?
+        /// The folder of its `SKILL.md` in the repository, when the marketplace knows it.
+        public var skillPath: String?
 
-        public init(id: String, name: String, owner: String, repo: String, skillID: String, installs: Int, known: Bool) {
+        public init(id: String, name: String, owner: String, repo: String, skillID: String, installs: Int, known: Bool,
+                    marketplace: String? = nil, skillPath: String? = nil) {
+            self.marketplace = marketplace
+            self.skillPath = skillPath
             self.id = id
             self.name = name
             self.owner = owner
@@ -110,18 +117,27 @@ extension DaemonAPI {
         public var query: String
         /// `skills` (default, 059) or `mcp` (060).
         public var kind: CatalogKind
-        public init(query: String, kind: CatalogKind = .skills) {
+        /// The marketplace to ask (#687); nil asks the first one on for the kind.
+        public var marketplace: String?
+        /// Where the result would go: a project's own marketplaces are asked only for it.
+        public var destination: SkillDestination?
+        public init(query: String, kind: CatalogKind = .skills, marketplace: String? = nil,
+                    destination: SkillDestination? = nil) {
             self.query = query
             self.kind = kind
+            self.marketplace = marketplace
+            self.destination = destination
         }
 
         public init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             query = try c.decode(String.self, forKey: .query)
             kind = try c.decodeIfPresent(CatalogKind.self, forKey: .kind) ?? .skills
+            marketplace = try c.decodeIfPresent(String.self, forKey: .marketplace)
+            destination = try c.decodeIfPresent(SkillDestination.self, forKey: .destination)
         }
 
-        private enum CodingKeys: String, CodingKey { case query, kind }
+        private enum CodingKeys: String, CodingKey { case query, kind, marketplace, destination }
     }
 
     public struct CatalogSearchAnswer: Codable, Sendable, Equatable {

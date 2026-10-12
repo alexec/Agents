@@ -12,10 +12,15 @@ extension DaemonCore {
         MCPInstaller(sidecar: locations.root.appending(path: "catalog-mcp.json"))
     }
 
-    func mcpSearchResults(_ query: String) async -> DaemonAPI.MCPSearchAnswer {
+    func mcpSearchResults(_ request: DaemonAPI.CatalogSearchRequest) async -> DaemonAPI.MCPSearchAnswer {
+        let query = request.query
+        guard let marketplace = marketplace(request.marketplace, kind: .mcp, destination: request.destination) else {
+            return .init(results: [], error: .failed(request.marketplace == nil ? "Every MCP marketplace is turned off." : "That marketplace is turned off, or no longer listed."))
+        }
         do {
-            let results = try await mcpRegistry.search(query)
-            DaemonLog.shared.write("mcp: search \"\(query)\" → \(results.count)")
+            let results = try await mcpRegistry(for: marketplace).search(query)
+                .map { var r = $0; r.marketplace = marketplace.id; return r }
+            DaemonLog.shared.write("mcp: search \"\(query)\" in \(marketplace.id) → \(results.count)")
             return .init(results: results)
         } catch let error as DaemonAPI.MCPCatalogError {
             DaemonLog.shared.write("mcp: search \"\(query)\" failed: \(error)")
@@ -30,7 +35,10 @@ extension DaemonCore {
             return .init(error: .noPersonalHome)
         }
         do {
-            let detail = try await mcpRegistry.detail(request.result.id)
+            let registry = request.result.marketplace
+                .flatMap { marketplace($0, kind: .mcp, destination: request.destination) }
+                .map { mcpRegistry(for: $0) } ?? mcpRegistry
+            let detail = try await registry.detail(request.result.id)
             let runs = MCPEntryBuilder.availableRuns(detail, onMac: .detect())
             guard let chosen = request.run ?? runs.available.first else {
                 throw DaemonAPI.MCPCatalogError.noRunnableWay

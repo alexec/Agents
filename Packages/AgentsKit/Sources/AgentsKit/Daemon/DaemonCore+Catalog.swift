@@ -55,9 +55,23 @@ extension DaemonCore {
     // MARK: catalog/search
 
     func catalogSearch(_ request: DaemonAPI.CatalogSearchRequest) async -> DaemonAPI.CatalogSearchAnswer {
+        guard let marketplace = marketplace(request.marketplace, kind: .skills, destination: request.destination) else {
+            return .init(results: [], error: .failed(request.marketplace == nil ? "Every skills marketplace is turned off." : "That marketplace is turned off, or no longer listed."))
+        }
         do {
-            let results = try await catalog.search(request.query)
-            DaemonLog.shared.write("catalog: search \"\(request.query)\" → \(results.count)")
+            let results: [DaemonAPI.CatalogResult]
+            switch marketplace.format {
+            case .gitHubSkills:
+                guard let (owner, repo) = SkillsCatalog.gitHubSource(marketplace.url) else {
+                    throw DaemonAPI.CatalogError.failed("\(marketplace.url) is not a GitHub repository.")
+                }
+                results = try await GitHubSkillsCatalog(github: catalogGitHub, owner: owner, repo: repo,
+                                                        marketplace: marketplace.id).search(request.query)
+            case .skillsSh, .mcpRegistry:
+                results = try await skillsCatalog(for: marketplace).search(request.query)
+                    .map { var r = $0; r.marketplace = marketplace.id; return r }
+            }
+            DaemonLog.shared.write("catalog: search \"\(request.query)\" in \(marketplace.id) → \(results.count)")
             return .init(results: results)
         } catch let error as DaemonAPI.CatalogError {
             DaemonLog.shared.write("catalog: search \"\(request.query)\" failed: \(error)")
@@ -69,11 +83,20 @@ extension DaemonCore {
 
     // MARK: catalog/preview
 
+    /// skills.sh, for its copy of a skill's files, only when the skill was found there.
+    func previewCatalog(_ result: DaemonAPI.CatalogResult, destination: DaemonAPI.SkillDestination) -> SkillsCatalog? {
+        guard let id = result.marketplace else { return catalog }
+        guard let found = marketplacesList(.init(kind: .skills, destination: destination)).marketplaces
+            .first(where: { $0.id == id }), found.format == .skillsSh else { return nil }
+        return skillsCatalog(for: found)
+    }
+
     func catalogPreview(_ request: DaemonAPI.CatalogPreviewRequest) async -> DaemonAPI.CatalogPreviewAnswer {
         let id = UUID()
         let folder = await catalogStaging.folder(for: id)
         do {
-            var staged = try await SkillPreviewer(catalog: catalog, github: catalogGitHub)
+            var staged = try await SkillPreviewer(catalog: previewCatalog(request.result, destination: request.destination),
+                                                  github: catalogGitHub)
                 .stage(request.result, into: folder, id: id)
             staged.preview.destinationState = destinationState(of: staged.preview, at: request.destination)
             await catalogStaging.put(staged)

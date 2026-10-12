@@ -299,9 +299,25 @@ extension DaemonCore {
             case DaemonAPI.Method.catalogSearch:
                 let request = try require(params, as: DaemonAPI.CatalogSearchRequest.self)
                 if request.kind == .mcp {
-                    return .success(try JSONValue.encoding(await mcpSearchResults(request.query)))
+                    return .success(try JSONValue.encoding(await mcpSearchResults(request)))
                 }
                 return .success(try JSONValue.encoding(await catalogSearch(request)))
+
+            case DaemonAPI.Method.marketplacesList:
+                let request = try require(params, as: DaemonAPI.MarketplacesListRequest.self)
+                return .success(try JSONValue.encoding(marketplacesList(request)))
+
+            case DaemonAPI.Method.marketplacesAdd:
+                let request = try require(params, as: DaemonAPI.MarketplaceAddRequest.self)
+                return .success(try JSONValue.encoding(try marketplacesAdd(request)))
+
+            case DaemonAPI.Method.marketplacesRemove:
+                let request = try require(params, as: DaemonAPI.MarketplaceIDRequest.self)
+                return .success(try JSONValue.encoding(try marketplacesRemove(request)))
+
+            case DaemonAPI.Method.marketplacesSetEnabled:
+                let request = try require(params, as: DaemonAPI.MarketplaceSetEnabledRequest.self)
+                return .success(try JSONValue.encoding(try marketplacesSetEnabled(request)))
 
             case DaemonAPI.Method.catalogPreview:
                 let request = try require(params, as: DaemonAPI.CatalogPreviewRequest.self)

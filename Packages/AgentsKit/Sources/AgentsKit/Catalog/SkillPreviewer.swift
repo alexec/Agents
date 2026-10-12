@@ -57,7 +57,9 @@ actor SkillStaging {
 }
 
 struct SkillPreviewer: Sendable {
-    let catalog: SkillsCatalog
+    /// skills.sh, whose copy of the files saves fetching them; nil for a skill from another
+    /// marketplace (#687), whose repository skills.sh need not hear about.
+    let catalog: SkillsCatalog?
     let github: GitHubSource
 
     static let maxBytes = 10 * 1024 * 1024
@@ -93,7 +95,7 @@ struct SkillPreviewer: Sendable {
             }
         }
 
-        guard let skillMD = try await findSkill(result.skillID, in: tree, owner: owner, repo: repo, commit: head.commit,
+        guard let skillMD = try await findSkill(result.skillID, path: result.skillPath, in: tree, owner: owner, repo: repo, commit: head.commit,
                                                 unpacked: unpacked) else {
             return empty(result, id: id, head: head, problems: [.notFoundInRepo], staging: staging, now: now)
         }
@@ -116,7 +118,7 @@ struct SkillPreviewer: Sendable {
 
         // The bytes: skills.sh's copy where each file's blob matches the commit's, GitHub's
         // own otherwise, and each file from GitHub checked too.
-        let snapshot = unpacked == nil ? await catalog.snapshot(owner: owner, repo: repo, skillID: result.skillID) : nil
+        let snapshot = unpacked == nil ? await catalog?.snapshot(owner: owner, repo: repo, skillID: result.skillID) : nil
         let copies = Dictionary((snapshot?.files ?? []).map { ($0.path, Data($0.contents.utf8)) }, uniquingKeysWith: { a, _ in a })
         let name: String
         let stagedFolder: URL
@@ -179,12 +181,14 @@ struct SkillPreviewer: Sendable {
         return StagedSkill(preview: preview, folder: stagedFolder, lockKey: skillName, createdAt: now)
     }
 
-    /// Which `SKILL.md` is the skill: a folder named like the id first, then one whose own
-    /// `name` makes the same slug (the CLI's rule, research R2), then a lone one at the top.
-    private func findSkill(_ skillID: String, in tree: [GitHubSource.TreeEntry], owner: String, repo: String,
-                           commit: String, unpacked: URL?) async throws -> String? {
+    /// Which `SKILL.md` is the skill: the one the marketplace named, if it is still there;
+    /// else a folder named like the id, then one whose own `name` makes the same slug (the
+    /// CLI's rule, research R2), then a lone one at the top.
+    private func findSkill(_ skillID: String, path: String?, in tree: [GitHubSource.TreeEntry], owner: String,
+                           repo: String, commit: String, unpacked: URL?) async throws -> String? {
         let candidates = tree.filter { $0.type == "blob" && ($0.path == "SKILL.md" || $0.path.hasSuffix("/SKILL.md")) }
             .map(\.path)
+        if let path, candidates.contains(path) { return path }
         let want = SkillFile.slug(skillID)
         if let byFolder = candidates.first(where: {
             let parts = $0.split(separator: "/")

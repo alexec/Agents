@@ -1,9 +1,10 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Add a skill (059, look/ frames B, C and E): search skills.sh, look at one skill as its
-/// agent will read it, and add it where the sheet was opened (#688): Settings adds to the
-/// person's `~/.agents`, Project Settings to that project's `.agents`.
+/// Add a skill (059, look/ frames B, C and E): search a marketplace (skills.sh unless the
+/// person chose another, #687), look at one skill as its agent will read it, and add it
+/// where the sheet was opened (#688): Settings adds to the person's `~/.agents`, Project
+/// Settings to that project's `.agents`.
 ///
 /// Nothing is added from the list. Choosing a row fetches that skill at its repository's
 /// current commit and shows every file; Add then puts exactly those files in place.
@@ -30,12 +31,21 @@ struct AddSkillSheet: View {
     @State private var opening: DaemonAPI.CatalogResult?
     @State private var preview: DaemonAPI.SkillPreview?
     @State private var previewError: DaemonAPI.CatalogError?
+    @State private var marketplaces: [DaemonAPI.Marketplace] = []
+    @State private var managing = false
+    /// The marketplace last searched, kept across sheets (#687).
+    @AppStorage("catalog.skills.marketplace") private var chosen = "provided:skills-sh"
 
     static let size = CGSize(width: 720, height: 540)
 
     var body: some View {
         VStack(spacing: 0) {
-            if let preview {
+            if managing {
+                MarketplacesPane(kind: .skills, destination: destination, back: {
+                    managing = false
+                    Task { await loadMarketplaces() }
+                })
+            } else if let preview {
                 SkillPreviewView(preview: preview, addTo: destination, projectName: projectName, runtimes: runtimes,
                                  back: { self.preview = nil },
                                  added: { skill in
@@ -59,14 +69,18 @@ struct AddSkillSheet: View {
             HStack(spacing: 10) {
                 Text("Add a skill").appText(.title)
                 Spacer()
+                MarketplaceMenu(marketplaces: marketplaces, chosen: $chosen, manage: { managing = true })
                 Text(projectName.map { "Adds to \($0)" } ?? "Adds to ~/.agents").appText(.fine).foregroundStyle(.secondary)
             }
-            TextField("Search skills", text: $query)
+            TextField("Search \(marketplace?.name ?? "skills")", text: $query)
                 .textFieldStyle(.roundedBorder)
                 .accessibilityLabel("Search skills")
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 6) {
-                    if let searchError {
+                    if marketplace == nil && !marketplaces.isEmpty {
+                        Text("Every skills marketplace is off. Manage Marketplaces… in the menu turns one on.")
+                            .appText(.fine).foregroundStyle(.secondary).padding(.top, 8)
+                    } else if let searchError {
                         CatalogProblemView(error: searchError, retry: { Task { await search(query) } })
                     } else if let previewError {
                         CatalogProblemView(error: previewError, retry: nil)
@@ -77,14 +91,15 @@ struct AddSkillSheet: View {
                 }
             }
             HStack {
-                Text("From skills.sh. Choose one to see what is in it before adding.")
+                Text("From \(marketplace?.host ?? "no marketplace"). Choose one to see what is in it before adding.")
                     .appText(.fine).foregroundStyle(.secondary)
                 Spacer()
                 Button("Cancel") { dismiss() }.buttonStyle(.paper).keyboardShortcut(.cancelAction)
             }
         }
         .padding(18)
-        .task(id: query) {
+        .task { await loadMarketplaces() }
+        .task(id: SearchKey(query: query, marketplace: marketplace?.id)) {
             // A pause after the last keystroke before asking (research R1).
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
@@ -94,7 +109,7 @@ struct AddSkillSheet: View {
 
     private func resultRow(_ result: DaemonAPI.CatalogResult) -> some View {
         SharedRow(chosen: opening?.id == result.id,
-                  label: "\(result.name), \(result.source), \(result.installs) installs"
+                  label: "\(result.name), \(result.source)" + (result.installs > 0 ? ", \(result.installs) installs" : "")
                       + (result.known ? ", known owner" : "") + (added.contains(result.skillID) ? ", added" : ""),
                   action: { Task { await open(result) } }) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -109,7 +124,7 @@ struct AddSkillSheet: View {
                 Spacer(minLength: 8)
                 if opening?.id == result.id {
                     ProgressView().controlSize(.small)
-                } else {
+                } else if result.installs > 0 {
                     Text("\(Self.count(result.installs)) installs").appText(.fine).foregroundStyle(.secondary)
                 }
             }
@@ -120,13 +135,19 @@ struct AddSkillSheet: View {
 
     private func search(_ text: String) async {
         let trimmed = text.trimmingCharacters(in: .whitespaces)
-        guard trimmed.count >= 2 else {
+        guard let marketplace else {
+            results = []; searched = false; searchError = nil
+            return
+        }
+        // A repository is small enough to list whole before anything is typed.
+        let browses = marketplace.format == .gitHubSkills
+        guard trimmed.count >= 2 || (browses && trimmed.isEmpty) else {
             results = []
             searched = false
             searchError = nil
             return
         }
-        let answer = await model.catalogSearch(trimmed)
+        let answer = await model.catalogSearch(trimmed, marketplace: marketplace.id, destination: destination)
         guard text == query else { return }
         results = answer.results
         searchError = answer.error
@@ -145,6 +166,14 @@ struct AddSkillSheet: View {
         } else {
             previewError = answer.error ?? .failed("no answer")
         }
+    }
+
+    private var marketplace: DaemonAPI.Marketplace? {
+        MarketplaceMenu(marketplaces: marketplaces, chosen: .constant(chosen), manage: {}).current
+    }
+
+    private func loadMarketplaces() async {
+        if let answer = await model.marketplaces(.skills, for: destination) { marketplaces = answer.marketplaces }
     }
 
     // MARK: Words

@@ -6,7 +6,9 @@ description: Search skills.sh from the app, look at a skill before it goes in, a
 
 # Add a skill from a catalogue
 
-You can find a skill on [skills.sh](https://skills.sh) and add it without leaving the app,
+You can find a skill on [skills.sh](https://skills.sh), in Anthropic's skills repository, or in
+a marketplace you added (see [Choose marketplaces](choose-marketplaces.md)), and add it
+without leaving the app,
 either for yourself, so every agent you start has it, or to one project, so every agent
 working in that project has it. The app shows you everything in the skill before anything is
 written, and it takes the skill at a fixed commit.
@@ -20,7 +22,9 @@ written, and it takes the skill at a fixed commit.
 ## Add a skill for yourself
 
 1. Open **Settings ▸ Shared ▸ Skills** and choose **Add skill…**.
-2. Type what you are looking for. Results come from skills.sh, most installed first. Each shows
+2. Type what you are looking for. Results come from the marketplace chosen in the
+   **Marketplace** menu: skills.sh lists the most installed first; a repository lists every
+   skill before you type. Each shows
    who wrote it (`owner/repo`) and how many installs it has. **known** marks an owner on the
    app's short list (Anthropic, OpenAI, Google, GitHub, Microsoft, Vercel, Apple and a few
    more). Other owners are not flagged; most good skills come from people. **added** marks one

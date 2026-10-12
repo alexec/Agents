@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Add an MCP server from the registry (060, frames B and C), or by hand (#305).
+/// Add an MCP server from a marketplace (060, frames B and C; #687), or by hand (#305).
 struct AddMCPSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -20,12 +20,21 @@ struct AddMCPSheet: View {
     @State private var adding = false
     @State private var addError: String?
     @State private var byHand = false
+    @State private var marketplaces: [DaemonAPI.Marketplace] = []
+    @State private var managing = false
+    /// The marketplace last searched, kept across sheets (#687).
+    @AppStorage("catalog.mcp.marketplace") private var chosen = "provided:github-mcp"
 
     static let size = CGSize(width: 720, height: 540)
 
     var body: some View {
         VStack(spacing: 0) {
-            if byHand {
+            if managing {
+                MarketplacesPane(kind: .mcp, destination: destination, back: {
+                    managing = false
+                    Task { await loadMarketplaces() }
+                })
+            } else if byHand {
                 AddMCPByHandPane(destination: destination, onBack: { byHand = false },
                                  onCancel: { dismiss() }, onAdded: { onAdded(); dismiss() })
             } else if let preview {
@@ -36,7 +45,8 @@ struct AddMCPSheet: View {
         }
         .frame(width: Self.size.width, height: Self.size.height)
         .background(Paper.ground)
-        .task(id: query) {
+        .task { await loadMarketplaces() }
+        .task(id: SearchKey(query: query, marketplace: marketplace?.id)) {
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
             await search(query)
@@ -48,13 +58,16 @@ struct AddMCPSheet: View {
             HStack {
                 Text("Add an MCP server").appText(.title)
                 Spacer()
-                Text("MCP servers").appText(.fine).foregroundStyle(.secondary)
+                MarketplaceMenu(marketplaces: marketplaces, chosen: $chosen, manage: { managing = true })
             }
-            TextField("Search the registry", text: $query)
+            TextField("Search \(marketplace?.name ?? "the registry")", text: $query)
                 .textFieldStyle(.roundedBorder)
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 6) {
-                    if let searchError {
+                    if marketplace == nil && !marketplaces.isEmpty {
+                        Text("Every MCP marketplace is off. Manage Marketplaces… in the menu turns one on.")
+                            .appText(.fine).foregroundStyle(.secondary)
+                    } else if let searchError {
                         Text(MCPCatalogWords.sentence(searchError)).appText(.fine).foregroundStyle(.secondary)
                     } else if results.isEmpty && searched {
                         Text("No servers match.").appText(.fine).foregroundStyle(.secondary)
@@ -95,7 +108,7 @@ struct AddMCPSheet: View {
                 }
             }
             HStack {
-                Text("From registry.modelcontextprotocol.io. Choose one to see exactly what would run before adding.")
+                Text("From \(marketplace?.host ?? "no marketplace"). Choose one to see exactly what would run before adding.")
                     .appText(.fine).foregroundStyle(.secondary)
                 Spacer()
                 Button("Add by hand…") { byHand = true }.buttonStyle(.paper)
@@ -167,10 +180,23 @@ struct AddMCPSheet: View {
         guard trimmed.count >= 2 else {
             results = []; searched = false; searchError = nil; return
         }
-        let answer = await model.mcpSearch(trimmed)
+        guard let marketplace else {
+            results = []; searched = false; searchError = nil
+            return
+        }
+        let answer = await model.mcpSearch(trimmed, marketplace: marketplace.id, destination: destination)
+        guard trimmed == query.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
         results = answer.results
         searchError = answer.error
         searched = true
+    }
+
+    private var marketplace: DaemonAPI.Marketplace? {
+        MarketplaceMenu(marketplaces: marketplaces, chosen: .constant(chosen), manage: {}).current
+    }
+
+    private func loadMarketplaces() async {
+        if let answer = await model.marketplaces(.mcp, for: destination) { marketplaces = answer.marketplaces }
     }
 
     private func open(_ result: DaemonAPI.MCPCatalogResult) async {
@@ -202,4 +228,10 @@ struct AddMCPSheet: View {
             addError = MCPCatalogWords.sentence(error)
         }
     }
+}
+
+/// A search runs again when either the words or the marketplace change.
+struct SearchKey: Hashable {
+    var query: String
+    var marketplace: String?
 }
