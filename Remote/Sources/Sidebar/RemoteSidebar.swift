@@ -501,7 +501,7 @@ private struct ForgetThisDeviceRow: View {
 }
 
 /// A project's long-press menu: the Mac's, less what the phone leaves to the Mac
-/// (Project Settings, Archive, Show in Finder).
+/// (Project Settings, Show in Finder).
 private struct ProjectMenuItems: View {
     @Environment(RemoteModel.self) private var model
     let summary: DaemonAPI.ProjectSummary
@@ -520,6 +520,13 @@ private struct ProjectMenuItems: View {
         } label: {
             Label(summary.project.isPinned ? "Unpin" : "Pin",
                   systemImage: summary.project.isPinned ? "pin.slash" : "pin")
+        }
+        .disabled(model.isStale(on: summary.host))
+        // Into Archived projects, asked first (#668), as the window's Archive.
+        Button {
+            model.askingToArchiveProject = summary
+        } label: {
+            Label("Archive…", systemImage: "archivebox")
         }
         .disabled(model.isStale(on: summary.host))
     }

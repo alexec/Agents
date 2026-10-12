@@ -91,3 +91,15 @@ public enum DeletionWords {
         "This deletes \(agents(count)) now and frees \(size(bytes)). Their conversations are deleted and cannot be brought back."
     }
 }
+
+/// Archive… on a project's menu, asked first on the phone and the page (#668). The page's
+/// copy is in `Web/src/views/Sidebar.tsx`.
+public enum ProjectArchiveWords {
+    /// "Archive “devbox:Agents”?".
+    public static func confirmTitle(_ label: String) -> String {
+        "Archive \u{201C}\(label)\u{201D}?"
+    }
+
+    public static let confirmMessage = "It moves to Archived projects with its sessions, and its workflows stop. "
+        + "Bring Back returns it. Its folder and files are not touched."
+}

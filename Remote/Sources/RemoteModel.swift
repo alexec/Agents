@@ -2410,6 +2410,33 @@ final class RemoteModel {
         }
     }
 
+    /// The project an Archive… is asking about, until it is answered (#668).
+    var askingToArchiveProject: DaemonAPI.ProjectSummary?
+
+    /// Put a project away (#668), once asked, through its own host, as the window's
+    /// Archive: it moves to Archived projects, its sessions and folder kept. A refusal
+    /// names the sessions to stop first.
+    func archiveProject(_ summary: DaemonAPI.ProjectSummary) async {
+        let host = summary.host
+        let target = host == .mac ? client : otherHosts[host]
+        guard let target, !isStale(on: host), host == .mac || reachableHosts.contains(host) else {
+            problem = "\(hostLabel(host)) is not answering, so that could not be sent."
+            return
+        }
+        do {
+            var archived = try await target.call(DaemonAPI.Method.projectsArchive,
+                                                 DaemonAPI.ProjectRequest(folder: summary.folder),
+                                                 returning: DaemonAPI.ProjectSummary.self)
+            archived.host = host
+            work.upsert(archived)
+            if sidebarItem == .project(summary.key) { sidebarItem = nil }
+        } catch let error as JSONRPCError {
+            problem = error.message
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
     /// Bring an archived project back (#343), through its own host, as the window's Bring
     /// Back does: a project again, with its new-session form open.
     func unarchiveProject(_ summary: DaemonAPI.ProjectSummary) async {

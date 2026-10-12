@@ -169,6 +169,17 @@ struct RemoteView: View {
         } message: { _ in
             Text(DeletionWords.confirmMessage)
         }
+        // Archive… on a project's long press (#668), named as its row is.
+        .confirmationDialog(ProjectArchiveWords.confirmTitle(model.askingToArchiveProject.map { summary in
+                                SidebarOrder.label(summary) { model.hostLabel($0) } } ?? ""),
+                            isPresented: Binding(get: { model.askingToArchiveProject != nil },
+                                                 set: { if !$0 { model.askingToArchiveProject = nil } }),
+                            titleVisibility: .visible, presenting: model.askingToArchiveProject) { summary in
+            Button("Archive") { Task { await model.archiveProject(summary) } }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text(ProjectArchiveWords.confirmMessage)
+        }
         // Delete… on an archived project (#677), asked here as a session's is.
         .confirmationDialog(DeletionWords.projectConfirmTitle(model.askingToDeleteProject.map { summary in
                                 SidebarOrder.label(summary) { model.hostLabel($0) } } ?? ""),

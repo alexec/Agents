@@ -166,6 +166,8 @@ public extension DaemonAPI {
                 Row(Method.projectsAdd, params: ProjectRequest.self, result: ProjectSummary.self, kind: .hostRequest),
                 Row(Method.projectsClone, params: CloneRequest.self, result: ProjectSummary.self, kind: .hostRequest),
                 Row(Method.projectsClones, params: Empty.self, result: [CloneSummary].self, kind: .hostRequest),
+                // Archive… on a project's menu (#668), as the window's project menu has it.
+                Row(Method.projectsArchive, params: ProjectRequest.self, result: ProjectSummary.self, kind: .hostRequest),
                 // Bring Back in the Archived projects fold (#343), as the window's sidebar has it.
                 Row(Method.projectsUnarchive, params: ProjectRequest.self, result: ProjectSummary.self, kind: .hostRequest),
                 // Delete… on an archived project (#677).
