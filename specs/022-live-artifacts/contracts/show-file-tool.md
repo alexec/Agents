@@ -4,6 +4,10 @@ The MCP tool the app serves every agent, as `AppService.showFileTool`. The schem
 touched: `path`, optional `line`, and nothing else. The test that asserts the schema is
 extended to say so, so a later hand does not add an argument without noticing this contract.
 
+**Since #708** every app tool, this one included, also takes an optional `description`: why
+the agent is making the call, which the chat draws as the call's line. It is added to every
+tool's schema in one place (`AppService.tools`), not written into this one.
+
 ## Schema (unchanged)
 
 ```json
