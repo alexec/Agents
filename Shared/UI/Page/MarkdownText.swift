@@ -153,8 +153,9 @@ struct MarkdownText: View {
                 Grid(alignment: .topLeading, horizontalSpacing: 18, verticalSpacing: 6) {
                     GridRow {
                         ForEach(Array(table.header.enumerated()), id: \.offset) { index, cell in
-                            Text(cell)
+                            Text.markingLinks(cell)
                                 .appText(.supporting).fontWeight(.semibold)
+                                .linkPointer(cell)
                                 .gridColumnAlignment(columnAlignment(table, index))
                         }
                     }
@@ -162,7 +163,8 @@ struct MarkdownText: View {
                     ForEach(Array(table.rows.enumerated()), id: \.offset) { _, row in
                         GridRow {
                             ForEach(Array(row.enumerated()), id: \.offset) { _, cell in
-                                Text(cell).appText(.supporting)
+                                Text.markingLinks(cell).appText(.supporting)
+                                    .linkPointer(cell)
                             }
                         }
                     }
@@ -296,12 +298,21 @@ private struct LinkPointer: ViewModifier {
                 }
             }
             .onContinuousHover { phase in
+                // Set on every move, not asked for with `.pointerStyle`: the selectable
+                // text's own view puts its I-beam back over a pointer style (#757).
                 switch phase {
-                case .active(let point): overLink = links.contains { $0.contains(point) }
-                case .ended: overLink = false
+                case .active(let point):
+                    let over = links.contains { $0.contains(point) }
+                    if over {
+                        NSCursor.pointingHand.set()
+                    } else if overLink {
+                        NSCursor.iBeam.set()
+                    }
+                    overLink = over
+                case .ended:
+                    overLink = false
                 }
             }
-            .pointerStyle(overLink ? .link : nil)
     }
 
     private static func links(in layouts: Text.LayoutKey.Value, _ proxy: GeometryProxy) -> [CGRect] {
