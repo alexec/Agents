@@ -142,6 +142,11 @@ extension AppService {
                                                           untilMinutes: untilMinutes, message: message),
                                   fallback: "Waiting.")
             }
+        } workspaces: { call in
+            // The control plane's workspaces (#691 US6): the daemon takes who from the token.
+            var request = call
+            request.token = token
+            return await send(DaemonAPI.Method.agentsWorkspaces, request, fallback: "Done.")
         } viewTool: { name, arguments in
             // The whole result back, not a note: the view is drawn from it (#187).
             let params: JSONValue

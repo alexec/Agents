@@ -309,7 +309,14 @@ struct AddProviderSheet: View {
                         .frame(height: 90)
                         .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Paper.rule))
                         .accessibilityLabel("Tool map")
-                    Text("Leave it empty for a server that follows the contract.").appText(.fine).foregroundStyle(.secondary)
+                    HStack {
+                        Text("Leave it empty for a server that follows the contract.").appText(.fine).foregroundStyle(.secondary)
+                        Spacer()
+                        // The map Agents ships (FR-072), with the command and the secret it reads.
+                        Button("Use DigitalOcean’s") { useDigitalOcean() }
+                            .buttonStyle(.borderless)
+                            .appText(.fine)
+                    }
                 }
             }
             secretsSection
@@ -354,6 +361,18 @@ struct AddProviderSheet: View {
         } footer: {
             Text("Given to the provider as environment, or as ${NAME} in its headers. Kept on the control plane, never shown again.")
                 .appText(.fine).foregroundStyle(.secondary)
+        }
+    }
+
+    private func useDigitalOcean() {
+        byAddress = false
+        if command.trimmingCharacters(in: .whitespaces).isEmpty { command = "npx -y @digitalocean/mcp" }
+        if name.trimmingCharacters(in: .whitespaces).isEmpty { name = "DigitalOcean" }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        if let data = try? encoder.encode(ShippedToolMaps.digitalOcean) { map = String(decoding: data, as: UTF8.self) }
+        if !secrets.contains(where: { $0.name == ShippedToolMaps.digitalOceanSecret }) {
+            secrets.append(Secret(name: ShippedToolMaps.digitalOceanSecret))
         }
     }
 

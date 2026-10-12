@@ -756,6 +756,10 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.AskFormRequest.self)
                 return .success(["note": .string(try await askForm(request))])
 
+            case DaemonAPI.Method.agentsWorkspaces:
+                let request = try require(params, as: DaemonAPI.WorkspaceToolRequest.self)
+                return .success(["note": .string(try await workspaceTool(request))])
+
             case DaemonAPI.Method.artifactWrite:
                 let request = try require(params, as: DaemonAPI.ArtifactWriteRequest.self)
                 try await artifactWrite(request)

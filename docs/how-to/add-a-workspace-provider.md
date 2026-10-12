@@ -55,28 +55,40 @@ beside itself, then where `AGENTS_WORKSPACE_COMMANDS` says, then on its `PATH`. 
 
 Some providers have an MCP server of their own, with tools named their own way. Choose
 **MCP server**, give its command or address, and write a **tool map**. The map says which of
-its tools lists, starts and stops, and where the workspaces are in what it answers:
+its tools lists, starts and stops, and where the workspaces are in what it answers.
+
+Agents ships one for DigitalOcean's server: choose **Use DigitalOcean's** under the tool map.
+It fills in `npx -y @digitalocean/mcp`, the map below, and a `DIGITALOCEAN_API_TOKEN`
+secret for your token. It needs Node where the control plane runs.
 
 ```json
 {
   "list": {
     "tool": "droplet-list",
-    "arguments": { "tag_name": "agents" },
-    "items": "droplets[]",
+    "arguments": { "PerPage": 200 },
+    "items": "droplets",
     "id": "id",
     "name": "name",
     "state": "status",
     "ssh": "root@{networks.v4[0].ip_address}",
-    "states": { "active": "running", "new": "starting", "off": "stopped" }
+    "cost": "${size.price_hourly}/hour while running",
+    "states": { "active": "running", "new": "starting", "off": "stopped", "archive": "stopped" }
   },
-  "start": { "tool": "droplet-actions-power-on", "arguments": { "droplet_id": "{id}" } },
-  "stop":  { "tool": "droplet-actions-power-off", "arguments": { "droplet_id": "{id}" } }
+  "start":  { "tool": "power-on-droplet", "arguments": { "ID": "{id:number}" } },
+  "stop":   { "tool": "power-off-droplet", "arguments": { "ID": "{id:number}" } },
+  "delete": { "tool": "droplet-delete", "arguments": { "ID": "{id:number}" } }
 }
 ```
 
+It lists every droplet in the account. Its server's `droplet-create` can't run a command on
+first boot, so make droplets in DigitalOcean, or use the `doctl` preset.
+
 - A path is dotted keys, with `[0]` for an item of a list.
 - `{path}` inside text is filled in from the workspace.
-- `{id}` in arguments is the workspace's id.
+- `{id}` in arguments is the workspace's id, and `{id:number}` the same as a number.
+- `create`, `delete` and `options` are optional, with the same shape as `start`.
+  `create`'s arguments take `{name}`, `{firstBoot}`, `{options}` and each choice's key, and
+  `"firstBootRuns": true` says the server runs `{firstBoot}` on the new workspace.
 - `states` turns the provider's words into running, starting, stopping or stopped.
 
 The tool names in this example show the shape. Check the server's own tool list for the

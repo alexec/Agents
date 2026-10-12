@@ -436,6 +436,17 @@ public actor ControlMethods: ControlHandling {
         case DaemonAPI.Method.attentionNeed:
             await hooks.need(host, params)
             return [:]
+        case DaemonAPI.Method.hostWorkspaces:
+            // An agent's workspace tool (#691 US6), answered as a client's request would be.
+            let call = try Self.require(params, as: DaemonAPI.HostWorkspaceCall.self)
+            guard DaemonAPI.Method.agentWorkspaceMethods.contains(call.method) else {
+                throw JSONRPCError(code: DaemonAPI.Failure.notPermitted, message: "Agents can’t ask that of the control plane.")
+            }
+            guard let workspaces = hooks.workspaces else {
+                throw JSONRPCError(code: DaemonAPI.Failure.providersNeedOneCopy,
+                                   message: "Workspace providers need a control plane with one copy, for now.")
+            }
+            return try await workspaces.agentCall(from: host, agent: call.agent, method: call.method, params: call.params)
         case DaemonAPI.Method.hostStatus:
             // Whether it is idle, for its workspace's stop when idle (#691 US4).
             if let status = try? params?.decode(DaemonAPI.HostStatus.self) {

@@ -30,6 +30,8 @@ public final class ControlUplink: @unchecked Sendable {
     /// A borrowing host's tunnels asked for and not yet opened, by reference, and the
     /// request each was asked with.
     private var waitingTunnels: [String: CheckedContinuation<any LineTransport, any Error>] = [:]
+    /// Requests on channel 0 waiting on the control plane's answer (`ask`), by their id.
+    private var waitingAnswers: [Int: CheckedContinuation<Result<JSONValue, JSONRPCError>, Never>] = [:]
     private var tunnelAsks: [Int: String] = [:]
     /// The fan-out queue of the uplink up now, by that uplink.
     private var fanQueue: (ObjectIdentifier, DispatchQueue)?
@@ -165,6 +167,14 @@ public final class ControlUplink: @unchecked Sendable {
                     return Array(channels.values)
                 }
                 for channel in open { channel.end(tellingTheControlPlane: false) }
+                let waiting = lock.withLock { () -> [CheckedContinuation<Result<JSONValue, JSONRPCError>, Never>] in
+                    defer { waitingAnswers = [:] }
+                    return Array(waitingAnswers.values)
+                }
+                for one in waiting {
+                    one.resume(returning: .failure(JSONRPCError(code: DaemonAPI.Failure.hostOffline,
+                                                                message: "The control plane went before it answered.")))
+                }
                 DaemonLog.shared.write("uplink: the control plane went; \(open.count) channels closed")
                 onChange(false)
             } catch {
@@ -187,6 +197,37 @@ public final class ControlUplink: @unchecked Sendable {
               let line = try? JSONRPCCodec.encode(.request(id: .number(id), method: method, params: params))
         else { return }
         try? transport.write(line: ControlWire.channel(0, message: line))
+    }
+
+    /// A request of the control plane on channel 0, and its answer (#691 US6). Fails at once
+    /// while the uplink is down, and with the control plane's words when it says no.
+    public func ask(_ method: String, _ params: JSONValue, timeout: Duration = .seconds(660)) async throws -> JSONValue {
+        let (transport, id) = lock.withLock { () -> ((any LineTransport)?, Int) in
+            let id = nextHello
+            nextHello += 1
+            return (uplink, id)
+        }
+        guard let transport, let line = try? JSONRPCCodec.encode(.request(id: .number(id), method: method, params: params)) else {
+            throw JSONRPCError(code: DaemonAPI.Failure.hostOffline, message: "This host can’t reach its control plane now.")
+        }
+        let timer = Task { [weak self] in
+            try? await Task.sleep(for: timeout)
+            self?.answered(id, .failure(JSONRPCError(code: DaemonAPI.Failure.hostOffline,
+                                                     message: "The control plane didn’t answer in time.")))
+        }
+        defer { timer.cancel() }
+        let result = await withCheckedContinuation { continuation in
+            lock.withLock { waitingAnswers[id] = continuation }
+            if (try? transport.write(line: ControlWire.channel(0, message: line))) == nil {
+                answered(id, .failure(JSONRPCError(code: DaemonAPI.Failure.hostOffline,
+                                                   message: "This host can’t reach its control plane now.")))
+            }
+        }
+        return try result.get()
+    }
+
+    private func answered(_ id: Int, _ result: Result<JSONValue, JSONRPCError>) {
+        lock.withLock { waitingAnswers.removeValue(forKey: id) }?.resume(returning: result)
     }
 
     private func sayHello(on transport: any LineTransport) throws {
@@ -227,9 +268,16 @@ public final class ControlUplink: @unchecked Sendable {
             }
             // Replies to `host/hello` and `control/ping`, which nothing waits on; and to
             // `tunnel/open`, whose refusal ends the wait for it.
-            if case .failure(.number(let id), let error)? = try? JSONRPCCodec.decode(line: message),
+            let decoded = try? JSONRPCCodec.decode(line: message)
+            if case .failure(.number(let id), let error)? = decoded,
                let ref = lock.withLock({ tunnelAsks[Int(id)] }) {
                 finishTunnel(ref, .failure(error))
+            }
+            // An answer `ask` is waiting on (#691 US6).
+            switch decoded {
+            case .success(.number(let id), let result)?: answered(Int(id), .success(result))
+            case .failure(.number(let id)?, let error)?: answered(Int(id), .failure(error))
+            default: break
             }
             return
         case .message(let number, let message):

@@ -148,6 +148,9 @@ public actor AppService {
     /// Where those go.
     public typealias SessionsSink = @Sendable (SessionCall) async -> Outcome
 
+    /// A workspace tool (#691 US6), as the agent made it.
+    public typealias WorkspacesSink = @Sendable (DaemonAPI.WorkspaceToolRequest) async -> Outcome
+
     private let connection: JSONRPCConnection?
     private let fileSink: FileSink
     private let askFormSink: AskFormSink
@@ -158,6 +161,7 @@ public actor AppService {
     private let eventsSink: EventsSink
     private let sessionsSink: SessionsSink
     private let selfSink: SelfSink
+    private let workspacesSink: WorkspacesSink
     private let viewToolSink: ViewToolSink
     /// Whether the test view and its tools are offered (#187).
     private let offersTestView: Bool
@@ -197,6 +201,9 @@ public actor AppService {
                 itself: @escaping SelfSink = { _ in
                     .refused("This app cannot change this session.")
                 },
+                workspaces: @escaping WorkspacesSink = { _ in
+                    .refused("This app has no workspaces.")
+                },
                 viewTool: @escaping ViewToolSink = { _, _ in
                     .failure("This app draws no views.")
                 },
@@ -211,6 +218,7 @@ public actor AppService {
         self.eventsSink = events
         self.sessionsSink = sessions
         self.selfSink = itself
+        self.workspacesSink = workspaces
         self.viewToolSink = viewTool
         self.offersTestView = offersTestView
         self.managesAgents = managesAgents
@@ -358,6 +366,13 @@ public actor AppService {
                 switch call {
                 case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
                 case .success(let call): return .success(Self.reply(await sessionsSink(call)))
+                }
+            }
+
+            if let call = Self.workspaceCall(named: name, arguments) {
+                switch call {
+                case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
+                case .success(let call): return .success(Self.reply(await workspacesSink(call)))
                 }
             }
 
@@ -623,9 +638,12 @@ public actor AppService {
         // The agent's own session: labels, and moving, which is not offered on a runtime
         // that would forget the conversation on the way (053, #481).
         let selfTools = [Self.setSessionLabelsTool] + (movesItself ? [Self.moveWorktreeTool] : [])
+        // The control plane's workspaces, for every agent (#691 US6).
+        let workspaceTools = [Self.listWorkspacesTool, Self.startWorkspaceTool, Self.stopWorkspaceTool,
+                              Self.makeWorkspaceTool, Self.deleteWorkspaceTool]
         let tools = [Self.showFileTool, Self.workflowTool, Self.askFormTool, Self.suggestNextPromptTool]
             + agentTools + selfTools + sessionTools + leaseTools
-            + eventTools
+            + eventTools + workspaceTools
         return tools.map(withCallDescription)
     }
 
@@ -647,6 +665,40 @@ public actor AppService {
         schema["properties"] = .object(properties)
         fields["inputSchema"] = .object(schema)
         return .object(fields)
+    }
+
+    /// Which workspace tool a call is (#691 US6), with its arguments read; nil for none. The
+    /// token is the relay's to fill in.
+    static func workspaceCall(named name: String, _ arguments: JSONValue?)
+        -> Result<DaemonAPI.WorkspaceToolRequest, AgentCallProblem>? {
+        func text(_ key: String) -> String? {
+            guard let value = arguments?[key]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !value.isEmpty else { return nil }
+            return value
+        }
+        let action: DaemonAPI.WorkspaceToolRequest.Action
+        if name.hasSuffix(AppTool.listWorkspaces) { action = .list }
+        else if name.hasSuffix(AppTool.startWorkspace) { action = .start }
+        else if name.hasSuffix(AppTool.stopWorkspace) { action = .stop }
+        else if name.hasSuffix(AppTool.makeWorkspace) { action = .make }
+        else if name.hasSuffix(AppTool.deleteWorkspace) { action = .delete }
+        else { return nil }
+        switch action {
+        case .start, .stop, .delete:
+            guard text("host") != nil else { return .failure("Nothing was done: say which host, by its name, in `host`.") }
+        case .make:
+            guard text("provider") != nil, text("name") != nil else {
+                return .failure("Nothing was made: say which `provider`, and the new workspace's `name`.")
+            }
+            if let options = arguments?["options"], options.objectValue == nil {
+                return .failure("Nothing was made: `options` has to be an object of the provider's choices.")
+            }
+        case .list:
+            break
+        }
+        return .success(DaemonAPI.WorkspaceToolRequest(
+            token: "", action: action, host: text("host"), provider: text("provider"), name: text("name"),
+            options: arguments?["options"], confirmRunning: arguments?["confirm_running"]?.boolValue))
     }
 
     /// The questions an `ask_form` call carried, or why it cannot be asked.
@@ -1437,6 +1489,75 @@ public actor AppService {
             ],
             "required": .array(["name"]),
         ],
+    ]
+
+    // MARK: Workspaces (#691 US6)
+
+    private static let hostProperty: JSONValue = [
+        "type": "string",
+        "description": "The host, by its name as list_workspaces gives it.",
+    ]
+
+    static let listWorkspacesTool: JSONValue = [
+        "name": .string(AppTool.listWorkspaces),
+        "title": "List workspaces",
+        "description": """
+            The machines this control plane's hosts run on, from every workspace provider:             each workspace's state, the host it is linked to and that host's state, and, for             a provider that can make workspaces, the choices a new one takes.
+            """,
+        "inputSchema": ["type": "object", "properties": [:]],
+        "annotations": ["readOnlyHint": true],
+    ]
+
+    static let startWorkspaceTool: JSONValue = [
+        "name": .string(AppTool.startWorkspace),
+        "title": "Start a workspace",
+        "description": """
+            Start the workspace a stopped host runs on. It answers at once; the host is up             when it connects, which you can wait for with wait_for_event on server.online.             Then you can start a session in a project there.
+            """,
+        "inputSchema": ["type": "object", "properties": ["host": hostProperty], "required": .array(["host"])],
+    ]
+
+    static let stopWorkspaceTool: JSONValue = [
+        "name": .string(AppTool.stopWorkspace),
+        "title": "Stop a workspace",
+        "description": """
+            Stop the workspace a host runs on. Every agent there stops with it. While agents             are working there it is refused, naming them, unless confirm_running is true.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "host": hostProperty,
+                "confirm_running": ["type": "boolean", "description": "Stop it even though agents are working there."],
+            ],
+            "required": .array(["host"]),
+        ],
+    ]
+
+    static let makeWorkspaceTool: JSONValue = [
+        "name": .string(AppTool.makeWorkspace),
+        "title": "Make a workspace",
+        "description": """
+            Make a new workspace at a provider that can (see list_workspaces), which joins as             a host of the same name. The person is asked first, on the question card, and             nothing is made without their yes. It may cost money while it runs.
+            """,
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "provider": ["type": "string", "description": "The provider, by its name or id from list_workspaces."],
+                "name": ["type": "string", "description": "The new workspace's and host's name: letters, digits and dashes."],
+                "options": ["type": "object", "description": "Its choices, as the provider's options in list_workspaces describe them."],
+            ],
+            "required": .array(["provider", "name"]),
+        ],
+    ]
+
+    static let deleteWorkspaceTool: JSONValue = [
+        "name": .string(AppTool.deleteWorkspace),
+        "title": "Delete a workspace",
+        "description": """
+            Delete the workspace a host runs on, with everything on its disk, and remove the             host and its agents. The person is asked first, on the question card, and nothing             is deleted without their yes.
+            """,
+        "inputSchema": ["type": "object", "properties": ["host": hostProperty], "required": .array(["host"])],
+        "annotations": ["destructiveHint": true],
     ]
 
     static let releaseResourceTool: JSONValue = [

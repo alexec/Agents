@@ -38,6 +38,11 @@ There's no tool for ending a turn. The app works out how each one ended: **Compl
 | `list_resources` | Lists what can be leased on this Mac, and who holds or is waiting for what. Resources declared in Settings ▸ Resources come first, with their descriptions, even when free; the agent is told to lease one whenever its description applies. | The runtime decides. |
 | `wait_for_event` | Waits until something happens in this project or on this Mac, such as `agent.finished`, `branch.moved`, or `mac.wake`, optionally narrowed by a filter: `branch` on `branch.moved` or `why` on `person.away` and `person.back` (one value, or a list meaning any of them, such as `{"branch": ["main", "develop"]}`; checked against the event's `inputSchema` with the same checker as an MCP server's event's, so any other key, or a value a filter cannot have, is refused in the same words, naming what it takes) and with a time limit, `until_minutes`, of 1 minute to 24 hours, which every wait needs: one without it is refused, so no wait can last for ever. The call waits up to 45 s; after that the agent can end its turn, which costs nothing, and it is started again when the event happens or the time runs out. One wait per agent; a new one replaces the old. Also lists recent events, and with action `list` every event it can wait for in one list: the app's, then the project's MCP servers', each a line of JSON in `events/list`'s shape (`name`, `source`, `description`, `inputSchema`, `payloadSchema`). A woken agent's details are named as the `payloadSchema` names them. Named `agents` instead of events, by id or exact title, it is a block: the agent's turn ends at once, it shows as **Blocked**, and it is started again, told how each one ended, once every one has finished, or the first with `wake_on: any`, when it is told which are still running. `until_minutes` is needed here too: with agents, or on its own, it starts it again then anyway, to check on something the app can't see, like a CI run, or a helper still running, which it can wait on again; `message` is what its row says meanwhile. See [Events](events.md). | The runtime decides. |
 | `cancel_wait` | Stops the agent's wait, so nothing starts it again for it. | The runtime decides. |
+| `list_workspaces` | Lists the machines the control plane's hosts run on, from every workspace provider: each workspace's state, the host it is linked to and that host's state, and, for a provider that can make workspaces, the choices a new one takes. Never a provider's secrets. On a host that isn't on a control plane, it says there are none. See [Start workspaces from Agents](../how-to/start-workspaces-from-agents.md). | The runtime decides. |
+| `start_workspace` | Starts the workspace a host runs on, by the host's name. It answers at once; the host is up when it connects, which the agent can wait for with `wait_for_event` on `server.online`. | The runtime decides. |
+| `stop_workspace` | Stops the workspace a host runs on, and every agent there with it. While agents are working there it is refused, naming them, unless the agent says `confirm_running`. | The runtime decides. |
+| `make_workspace` | Makes a new workspace at a provider that can, with its choices; it joins as a host of the same name. It may cost money while it runs. | **Yes, always.** A question card on every client, and nothing is made without your **Make it**. |
+| `delete_workspace` | Deletes the workspace a host runs on, with everything on its disk, and removes the host with its agents. | **Yes, always.** A question card on every client, and nothing is deleted without your **Delete it**. |
 
 `set_session_labels` adds or removes labels owned by the agent. `start_session` can give
 the new session up to five labels, which it owns from its first moment. Labels are
@@ -68,6 +73,10 @@ it; archiving removes a worktree the app made for it once everything in it is co
 change: the tools only read them. They are kept in the project's `.agents/project.json`;
 a value written there by hand is held to the maximums. `list_sessions`, `read_session` and `message_session` are
 given to every agent, including one another agent started.
+
+The five workspace tools are given to every agent. The control plane does what they ask as
+it would for you, and its log names the agent that asked. Agents reach providers only
+through the control plane, never directly.
 
 ## See also
 

@@ -99,3 +99,31 @@ struct MakingWorkspacesTests {
         #expect(map.missing(from: ["list_droplets", "power_on", "power_off", "create_droplet"]) == "delete_droplet")
     }
 }
+
+@Suite("The shipped DigitalOcean map (#691 FR-072)")
+struct ShippedDigitalOceanMapTests {
+    /// The tools `@digitalocean/mcp` 1.5.1 lists that the map names, as recorded on 2026-10-12.
+    static let recorded = ["droplet-list", "power-on-droplet", "power-off-droplet", "droplet-delete", "droplet-create",
+                           "droplet-get", "droplet-action"]
+
+    @Test func itNamesOnlyToolsTheServerHas() throws {
+        let map = try ToolMapping.map(ShippedToolMaps.digitalOcean)
+        #expect(map.missing(from: Self.recorded) == nil)
+        #expect(map.capabilities == ["delete"])
+    }
+
+    @Test func itReadsAListAndPassesNumericIDs() throws {
+        let map = try ToolMapping.map(ShippedToolMaps.digitalOcean)
+        let listed = map.workspaces([
+            "droplets": [[
+                "id": 51234, "name": "agents-devbox", "status": "off",
+                "networks": ["v4": [["ip_address": "203.0.113.7", "type": "public"]]],
+                "size": ["price_hourly": 0.02976],
+            ]],
+        ])
+        #expect(listed == [DaemonAPI.WorkspaceInfo(id: "51234", name: "agents-devbox", state: "stopped",
+                                                    ssh: "root@203.0.113.7", cost: "$0.02976/hour while running")])
+        #expect(map.arguments(map.start, id: "51234") == ["ID": 51234])
+        #expect(map.arguments(map.list, id: nil) == ["PerPage": 200])
+    }
+}

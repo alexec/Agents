@@ -204,7 +204,15 @@ public struct ToolMapping: Sendable, Equatable {
         switch template {
         case .string(let s):
             if s.hasPrefix("{"), s.hasSuffix("}"), !s.dropFirst().contains("{") {
-                return values[String(s.dropFirst().dropLast())]
+                let key = String(s.dropFirst().dropLast())
+                // `{id:number}`: for a server whose ids are numbers (DigitalOcean's).
+                if key.hasSuffix(":number") {
+                    let text = values[String(key.dropLast(":number".count))].flatMap { $0.stringValue ?? scalar($0) }
+                    if let text, let whole = Int(text) { return .int(whole) }
+                    if let text, let number = Double(text) { return .double(number) }
+                    return nil
+                }
+                return values[key]
             }
             var out = s
             for (key, value) in values {
