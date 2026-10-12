@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 217 rows: **145 same**, **45 by design**, **27 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 218 rows: **145 same**, **46 by design**, **27 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -333,6 +333,7 @@ The deltas are tracked by 29 issues:
 |---|---|---|---|---|
 | Notifications | `A/Notifications/MacNotifier.swift:37-79` | Local and push: `R/Notifications/DeviceNotifier.swift:34-98` | None: `W/presence.ts:5` | **by design** (071: the page takes no notices) |
 | The needs-you count | Dock badge: `A/ContentView.swift:267-268` | App icon badge, from the widget's count: `R/RemoteModel.swift` | The tab's title: `W/presence.ts:16-30` | **same** |
+| Installed as an app (#791) | A native app | A native app | A manifest, the Blob icons and light/dark theme-color: `Web/index.html`, `Web/assets/manifest.webmanifest`; installs from Chrome or Safari, from a phone once the page is served at a public address (#61) | **by design** (Mac and Remote are native apps) |
 | Presence: watching and active | Every host; *watching* to the owner: `A/AppModel.swift:2531-2549` | The same: `R/RemoteModel.swift:1604-1618` | The same: `W/presence.ts:36-47` | **same** (#203, checked in #238) |
 | Unread counts on project rows and folds (#70) | Yes | Yes | Yes | **same** |
 

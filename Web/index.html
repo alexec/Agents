@@ -6,6 +6,16 @@
 <meta name="color-scheme" content="light dark">
 <title>Agents</title>
 <link rel="icon" href="/assets/favicon.png">
+<!-- Installs as an app (#791): the manifest, the Blob for iOS's home screen, and a bar that
+     takes the Paper ground (theme/paper.css) in the light and the dark. -->
+<link rel="manifest" href="/assets/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<meta name="theme-color" content="#f7f8f9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1c1d20" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Agents">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="stylesheet" href="/app.css">
 <script type="module" src="/app.js"></script>
 </head>

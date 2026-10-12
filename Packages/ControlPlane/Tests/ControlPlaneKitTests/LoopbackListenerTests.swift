@@ -172,7 +172,7 @@ struct LoopbackListenerTests {
         // data: pictures), no frames but the views' sandbox proxy (#187) and none around the page,
         // no plugins, no form posting, no base to move.
         for clause in ["script-src 'self';", "style-src 'self';", "font-src 'self';", "img-src 'self' blob: data:;",
-                       "frame-ancestors 'none';", "frame-src http://127.0.0.1:8899;", "object-src 'none';", "form-action 'none';",
+                       "frame-ancestors 'none';", "frame-src http://127.0.0.1:8899;", "manifest-src 'self';", "object-src 'none';", "form-action 'none';",
                        "base-uri 'none';"] {
             #expect(csp.contains(clause), "CSP lacks \(clause)")
         }

@@ -84,6 +84,19 @@ Settings, signing runtimes in, pairing and hosts have no screens on the page yet
 in the window. A folder can't be dragged in from Finder, and **Clone Project from Git URL…** doesn't fill
 in a copied address, because the page doesn't read the clipboard. The page has no terminal and no dictation.
 
+### Install it as an app
+
+The page installs as an app of its own, with the Blob icon and its own window:
+
+- **Chrome:** click the install button at the end of the address bar, or choose **Cast, Save, and
+  Share ▸ Install Page as App…** in the **⋮** menu.
+- **Safari:** choose **File ▸ Add to Dock…**.
+
+Safari's app keeps its own website data, so it isn't paired by the tab's key: pair it once by hand,
+as in [Pair a browser by hand](#pair-a-browser-by-hand). Chrome's app shares the browser's key.
+The page is served only to this Mac for now, so it can't be added to a phone's home screen
+until it is served at a public address (#61).
+
 ### Forget the browser
 
 - From the page itself: click **Forget This Browser…** in the footer, then **Forget**.
