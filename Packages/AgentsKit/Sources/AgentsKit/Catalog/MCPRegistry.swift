@@ -29,7 +29,7 @@ struct MCPRegistry: Sendable {
         } catch let error as DaemonAPI.MCPCatalogError {
             throw error
         } catch {
-            throw DaemonAPI.MCPCatalogError.unreachable(host: url.host ?? endpoints.base.host ?? "registry")
+            throw failure(error, url: url)
         }
         guard let decoded = try? JSONDecoder().decode(SearchResponse.self, from: data) else {
             throw DaemonAPI.MCPCatalogError.unreachable(host: url.host ?? endpoints.base.host ?? "registry")
@@ -49,9 +49,16 @@ struct MCPRegistry: Sendable {
         } catch let error as DaemonAPI.MCPCatalogError {
             throw error
         } catch {
-            throw DaemonAPI.MCPCatalogError.unreachable(host: url.host ?? endpoints.base.host ?? "registry")
+            throw failure(error, url: url)
         }
         return try JSONDecoder().decode(DetailResponse.self, from: data).server
+    }
+
+    /// A registry that answers too slowly timed out; it is not unreachable (#744).
+    private func failure(_ error: any Error, url: URL) -> DaemonAPI.MCPCatalogError {
+        let host = url.host ?? endpoints.base.host ?? "registry"
+        if let error = error as? URLError, error.code == .timedOut { return .timedOut(host: host) }
+        return .unreachable(host: host)
     }
 
     // MARK: Wire shapes from the registry

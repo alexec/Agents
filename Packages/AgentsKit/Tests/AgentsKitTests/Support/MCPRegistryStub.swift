@@ -6,7 +6,7 @@ import Foundation
 /// `Fixtures/mcp/http`. Each test gets its own session id in a header so suites do not
 /// cross-talk.
 final class MCPRegistryStub: URLProtocol, @unchecked Sendable {
-    enum Mode: Sendable { case normal, down }
+    enum Mode: Sendable { case normal, down, slow }
 
     final class State: @unchecked Sendable {
         private let lock = NSLock()
@@ -52,6 +52,10 @@ final class MCPRegistryStub: URLProtocol, @unchecked Sendable {
             return
         }
         state.record(url)
+        if state.mode == .slow {
+            client?.urlProtocol(self, didFailWithError: URLError(.timedOut))
+            return
+        }
         let (status, body) = Self.answer(url, state: state)
         let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil,
                                        headerFields: ["Content-Type": "application/json"])!

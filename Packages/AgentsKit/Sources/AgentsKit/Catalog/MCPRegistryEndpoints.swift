@@ -44,8 +44,12 @@ struct MCPRegistryEndpoints: Sendable, Equatable {
         return URL(string: "\(root)/v0.1/servers/\(encoded)/versions/latest")!
     }
 
+    /// The official registry can take half a minute over a search (#744), so a request
+    /// waits a minute before it is called slow.
+    static let timeout: TimeInterval = 60
+
     func request(_ url: URL) -> URLRequest {
-        var request = URLRequest(url: url, timeoutInterval: 15)
+        var request = URLRequest(url: url, timeoutInterval: Self.timeout)
         request.setValue("agents-app", forHTTPHeaderField: "User-Agent")
         if let token, !token.isEmpty { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         return request
