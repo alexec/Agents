@@ -115,5 +115,7 @@ public enum EventWaitEnding: Codable, Hashable, Sendable {
         case prompt
         case stopped
         case archived
+        /// It asked to be archived (#831).
+        case archiveRequested
     }
 }

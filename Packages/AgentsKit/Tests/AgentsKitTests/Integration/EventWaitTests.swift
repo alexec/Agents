@@ -244,6 +244,43 @@ struct EventWaitTests {
         #expect(!(await isWaiting(core, a)))
     }
 
+    @Test func askingToBeArchivedEndsTheWait() async throws {
+        let (locations, work, _) = try temporary()
+        let core = try await makeCore(locations, clock: Clock(), hold: .milliseconds(150))
+        let (a, token) = try await agent(core, in: work, "Done and waiting")
+        _ = try await wait(core, token, ["dropbox.file_added"])
+        try await eventually("turn over, under Waiting") {
+            await core.agents[a]?.group(wantsEyes: false) == .waiting
+        }
+
+        try await core.requestArchive(a)
+
+        // Asking to be put away is not waiting to be woken (#831): the wait goes, and
+        // the event it named wakes nothing.
+        #expect(!(await isWaiting(core, a)))
+        #expect(await core.agents[a]?.archiveRequest?.isRequested == true)
+        await core.raise(draft("dropbox.file_added", in: work))
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(try await wakes(core, a).isEmpty)
+        #expect(await core.agents[a]?.archiveRequest?.isRequested == true)
+    }
+
+    @Test func askingToBeArchivedMidTurnEndsTheWaitWhenTheTurnEnds() async throws {
+        let (locations, work, _) = try temporary()
+        let core = try await makeCore(locations, clock: Clock(), hold: .milliseconds(300))
+        let (a, token) = try await agent(core, in: work, "Asks, then waits")
+        // The ask lands while the wait's call is held, so with the turn in flight.
+        let held = Task { try await wait(core, token, ["dropbox.file_added"]) }
+        try await eventually("the call is held") { await isHeld(core, a) }
+        try await core.requestArchive(a)
+        _ = try await held.value
+
+        try await eventually("asking, and not waiting") {
+            let waiting = await isWaiting(core, a)
+            return await core.agents[a]?.archiveRequest?.isRequested == true && !waiting
+        }
+    }
+
     @Test func aDeadlineWakesItTimedOut() async throws {
         let clock = Clock()
         let (locations, work, _) = try temporary()

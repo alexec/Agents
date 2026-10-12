@@ -2003,6 +2003,8 @@ extension DaemonCore {
         }
         changed(agent)
         if agent.archiveRequest?.isRequested == true {
+            // Asking to be put away is not waiting to be woken (#831).
+            endWait(agentID, by: .archiveRequested)
             // Waiting for the person to archive it is not expecting a reply (#183).
             if warm[agentID] != nil { Task { await self.releaseWarm(agentID, because: "asked to be archived") } }
             raiseAgentEvent("agent.archive_requested", agentID, sentence: "asked to be archived.",

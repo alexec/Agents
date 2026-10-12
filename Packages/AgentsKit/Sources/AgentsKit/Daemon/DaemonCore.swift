@@ -1343,6 +1343,8 @@ public actor DaemonCore {
         // With the outcome of its last report, when it made one (073 FR-005).
         let lastOutcome = agent.report.map { ["outcome": $0.outcome.rawValue] } ?? [:]
         if requestedNow {
+            // Asking to be put away is not waiting to be woken (#831).
+            endWait(agentID, by: .archiveRequested)
             raiseAgentEvent("agent.archive_requested", agentID, sentence: "asked to be archived.",
                             details: lastOutcome, depth: putAwayDepth, endingRun: endingRun)
         }
