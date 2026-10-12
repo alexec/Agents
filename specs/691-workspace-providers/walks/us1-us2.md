@@ -47,11 +47,24 @@ without a word. Now:
 
 Tests: `stopWhileStartingIsRefusedNotDropped`, `stopTheMomentAStartedHostIsOnlineIsHeard`.
 
+## The Mac's screens, on the scratch window
+
+With `AGENTS_WALK691_KEEP=1` the walk stops with the box linked and stopped. Settings was opened
+by accessibility presses on the scratch window's pid, which takes no focus.
+
+- **Hosts** ([mac-hosts.png](mac-hosts.png)), as L2: "Stopped · Linux · arm64 · Agents dev ·
+  Walk 691 Docker: agents-devbox", then "Stops after 30 minutes idle · Starts when used",
+  with **Start** and `···`.
+- **Providers** ([mac-providers.png](mac-providers.png)), as L3: the provider's card with
+  "command provider · docker", when it was listed, and its workspace "linked to w691-devbox".
+  The container shows Running here because something outside the walk had started it again
+  (its restart policy is `unless-stopped`); the page lists afresh when it opens.
+
 ## Not walked here
 
-- **The screens:** the Providers page, Add Provider, the Hosts row, and the strip on the Mac,
-  Remote and web. They were built and their tests and builds pass, but nobody has looked at
-  them on a scratch window yet. That needs the screen, which the walk left to Alex (the PR
-  carries `needs-walk`).
+- **The strip** on the Mac, Remote and web, and the Add Provider and Link sheets. A strip
+  needs a chat or project on the stopped host, and the sheets need typing, which goes to
+  whatever app is in front. They were built, and their tests and builds pass. The PR carries
+  `needs-walk` for them.
 - **Providers other than docker.** doctl, codespaces, coder and workstations are checked by
   their command lines only (`PresetTests`); none was run against a real account.

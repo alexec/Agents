@@ -15,6 +15,9 @@ import Testing
 ///
 ///   AGENTS_WALK691_URL=https://<LAN address>:<port> AGENTS_WALK691_HOME=/tmp/run-x/control \
 ///   AGENTS_WALK691_TOOL=<agents-control> swift test --filter Walk691
+///
+/// With `AGENTS_WALK691_KEEP=1` it stops once the box is linked and stopped, and leaves them,
+/// for a look at the screens.
 @Suite("Walk #691: start a stopped workspace", .serialized, .timeLimit(.minutes(15)),
        .enabled(if: ProcessInfo.processInfo.environment["AGENTS_WALK691_URL"] != nil))
 struct Walk691LiveTests {
@@ -121,6 +124,9 @@ struct Walk691LiveTests {
         let stopped = try #require(await row(control))
         note("stopped row: \(stopped.state), canStart \(stopped.workspace?.canStart == true)")
         #expect(stopped.workspace?.canStart == true)
+
+        // `AGENTS_WALK691_KEEP=1`: stop here, the box linked and stopped, for screenshots.
+        if environment["AGENTS_WALK691_KEEP"] == "1" { return }
 
         // US1: Start, as the strip's button does, twice: one start.
         let pressed = try await control.call(DaemonAPI.Method.hostsStart, DaemonAPI.HostRequest(host: host.id),
