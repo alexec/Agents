@@ -32,6 +32,17 @@ public enum ChildProcess {
         /// The child's process id, once it had started; nil when it never did.
         public var pid: pid_t?
 
+        public init(status: Int32, output: Data, errors: Data, timedOut: Bool = false, failure: String? = nil,
+                    truncated: Bool = false, pid: pid_t? = nil) {
+            self.status = status
+            self.output = output
+            self.errors = errors
+            self.timedOut = timedOut
+            self.failure = failure
+            self.truncated = truncated
+            self.pid = pid
+        }
+
         public var text: String { String(decoding: output, as: UTF8.self) }
         public var errorText: String { String(decoding: errors, as: UTF8.self) }
     }

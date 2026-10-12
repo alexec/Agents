@@ -3,6 +3,15 @@
 These are drawn in text, in the app's existing style. **They go to Alex for a decision before
 any client code is written.** The rest of each screen is as it is today.
 
+**Settled by Alex, 2026-10-12**:
+- **L1**: the one-line strip.
+- **L2**: Start or Stop, plus a `···` menu.
+- **L3**: a Providers page of its own.
+- **L4**: Add Provider starts by picking a kind. A grid (Docker, DigitalOcean, Codespaces,
+  Coder, Workstations, Your own commands, An MCP server) leads to a short form for just that
+  kind, with Back. The single form drawn below is what was not chosen; its fields stay, split
+  by kind.
+
 ## L1. The offline strip, for a linked host (all three clients)
 
 This is today's strip (`OfflineStrip`, `HostOfflineStrip`, `OfflineStrip.tsx`), with one
@@ -100,6 +109,20 @@ Offline, linked, but its workspace is running (it lost the network)
   filled in, and links the host when it joins.
 
 ## L4. Add Provider sheet (Mac only)
+
+Chosen: pick a kind first. The fields below are split into one form per kind.
+
+```text
+┌ Add a Provider ─────────────────────────────┐
+│ [Docker] [DigitalOcean] [Codespaces] [Coder]│
+│ [Workstations] [Your commands] [MCP server] │
+└─────────────────────────────────────────────┘
+→ DigitalOcean:  Name [DigitalOcean]  Tag [agents]
+                 needs doctl signed in on this Mac
+                                     [Back] [Add]
+```
+
+The single form, which was not chosen:
 
 ```text
 ┌ Add a Provider ──────────────────────────────────────────────────────────┐

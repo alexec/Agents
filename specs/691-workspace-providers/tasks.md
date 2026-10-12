@@ -41,14 +41,14 @@ of the spec, and the constitution requires the relevant checks to pass.
 
 ## Phase 1: Setup
 
-- [ ] T001 [P] Add a `WorkspaceCommands` library target, a `workspace-commands` executable target and a `WorkspaceCommandsTests` test target to `MS/Package.swift`.
+- [x] T001 [P] Add a `WorkspaceCommands` library target, a `workspace-commands` executable target and a `WorkspaceCommandsTests` test target to `MS/Package.swift`.
   - All three use `treatAllWarnings(as: .error)`, as the CI watcher's targets do.
   - Nothing in them depends on AgentsKit.
-- [ ] T002 [P] Add `MS/Sources/workspace-commands/main.swift`.
+- [x] T002 [P] Add `MS/Sources/workspace-commands/main.swift`.
   - `--version` prints the version and exits.
   - It reads `WORKSPACE_COMMANDS_CONFIG`, builds `WorkspaceCommands.server(config:)` and runs `StdioTransport.serve(server, name: "workspace-commands")`.
   - A bad config is written to stderr and exits 2.
-- [ ] T003 [P] Put the layouts in [contracts/layouts.md](contracts/layouts.md) to Alex as a question with previews (L1 strip, L2 Hosts row, L3 Providers page, L4 Add Provider sheet, L5 Link to Workspace…). Record the answers in layouts.md before any 🖼 task starts.
+- [x] T003 [P] Put the layouts in [contracts/layouts.md](contracts/layouts.md) to Alex as a question with previews (L1 strip, L2 Hosts row, L3 Providers page, L4 Add Provider sheet, L5 Link to Workspace…). Record the answers in layouts.md before any 🖼 task starts.
 
 ---
 
@@ -56,13 +56,13 @@ of the spec, and the constitution requires the relevant checks to pass.
 
 ### The command provider (contracts/command-provider.md)
 
-- [ ] T004 [P] `MS/Sources/WorkspaceCommands/CommandConfig.swift`: decode the configuration's three shapes: `workspaces` (written out), `list` + `columns` (many from one entry), and `preset` + parameters.
+- [x] T004 [P] `MS/Sources/WorkspaceCommands/CommandConfig.swift`: decode the configuration's three shapes: `workspaces` (written out), `list` + `columns` (many from one entry), and `preset` + parameters.
   - `id` defaults to `name`.
   - `${name}` substitution quotes each value for `/bin/sh` (a single-quote wrap, with `'` escaped).
   - The `states` map is matched case-insensitively after trimming whitespace.
   - Any state outside "`running` | `starting` | `stopping` | `stopped` | `unknown`" is read as `unknown`.
-- [ ] T005 [P] `MS/Sources/WorkspaceCommands/Presets.swift`: the presets `docker`, `doctl`, `codespaces`, `coder` and `gcloud-workstations`, with the commands and state words in the contract's table. Each expands to a `CommandConfig`, and none uses `sudo`.
-- [ ] T006 `MS/Sources/WorkspaceCommands/WorkspaceCommands.swift`: `server(config:environment:)` returns an `MCPServer` with the contract's tools.
+- [x] T005 [P] `MS/Sources/WorkspaceCommands/Presets.swift`: the presets `docker`, `doctl`, `codespaces`, `coder` and `gcloud-workstations`, with the commands and state words in the contract's table. Each expands to a `CommandConfig`, and none uses `sudo`.
+- [x] T006 `MS/Sources/WorkspaceCommands/WorkspaceCommands.swift`: `server(config:environment:)` returns an `MCPServer` with the contract's tools.
   - **Tools**: `workspaces_list`, `workspace_start` and `workspace_stop`, plus `workspace_create`, `workspace_delete` and `workspace_options` only when the config has them.
   - **Results**: `ToolResult.structured`; failures are `ToolResult.error`.
   - **Running commands**: each runs through `ChildProcess.run(URL(filePath: "/bin/sh"), ["-c", line], environment:)`. Timeouts are 25 s for status and list and 595 s for start, stop, create and delete.
@@ -70,20 +70,20 @@ of the spec, and the constitution requires the relevant checks to pass.
   - **Failure text**: the last 20 lines of stderr (or stdout), cut at 1 KB. Exit 127 becomes "‹cli› isn't installed where the control plane runs".
   - **List**: at most 200 workspaces, and `contract: 1`.
   - **Logging**: each command line is logged to stderr before substitution. The environment is never logged.
-- [ ] T007 [P] `MS/Tests/WorkspaceCommandsTests/CommandConfigTests.swift`:
+- [x] T007 [P] `MS/Tests/WorkspaceCommandsTests/CommandConfigTests.swift`:
   - decoding each shape
   - quoting (`${name}` holding `'; rm -rf /`)
   - mapping states
   - every preset's exact command lines, as strings
   - no preset containing `sudo`
-- [ ] T008 `MS/Tests/WorkspaceCommandsTests/WorkspaceCommandsTests.swift`: drive the server in process through `JSONRPC.answer`.
+- [x] T008 `MS/Tests/WorkspaceCommandsTests/WorkspaceCommandsTests.swift` (with T007's tests in the same file): drive the server in process through `JSONRPC.answer`.
   - `workspaces_list` with `status: "echo stopped"`.
   - `workspace_start` with `true` / `false` / `exit 127`, and a status that flips after a file appears.
   - A timeout, using a short deadline seam.
   - `list` + `columns`.
   - A secret env var reaching a command without being logged.
   - `tools/list` shows create, delete and options only when they are configured.
-- [ ] T009 [P] Update `MS/README.md`: a `WorkspaceCommands` / `workspace-commands` row, and a short section with the quickstart §1 example.
+- [x] T009 [P] Update `MS/README.md`: a `WorkspaceCommands` / `workspace-commands` row, and a short section with the quickstart §1 example.
 
 ### Wire types and the control plane's MCP client
 
