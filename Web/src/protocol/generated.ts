@@ -819,7 +819,7 @@ export type EventWaitEnding =
   | { cancelled: { by: EventWaitEndingCanceller } }
   | { couldNotWake: { reason: string } };
 
-export type EventWaitEndingCanceller = "agent" | "person" | "prompt" | "stopped" | "archived";
+export type EventWaitEndingCanceller = "agent" | "person" | "prompt" | "stopped" | "archived" | "archiveRequested";
 
 export interface EventsListRequest {
   before?: number;

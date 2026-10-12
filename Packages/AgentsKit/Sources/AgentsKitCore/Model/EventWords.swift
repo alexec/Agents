@@ -153,6 +153,7 @@ public enum EventWords {
         case .prompt: return "The person sent you a message, which cancelled your wait for \(wait.label)."
         case .stopped: return "You were stopped, which ended your wait for \(wait.label)."
         case .archived: return "You were archived, which ended your wait for \(wait.label)."
+        case .archiveRequested: return "You asked to be archived, which ended your wait for \(wait.label)."
         }
     }
 
