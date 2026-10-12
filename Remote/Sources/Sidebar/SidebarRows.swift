@@ -57,7 +57,7 @@ struct SidebarSessionRow: View {
                     }
                     // Started by a workflow (the Mac row's mark), then by another agent.
                     if let workflowName = startedByWorkflowName {
-                        Image(systemName: "clock.arrow.circlepath")
+                        Image(systemName: "flowchart")
                             .appText(.fine)
                             .foregroundStyle(.tertiary)
                             .accessibilityLabel("started by the workflow \(workflowName)")
@@ -156,7 +156,7 @@ private struct SessionMark: View {
             case .queued:
                 Image(systemName: "list.number").foregroundStyle(Paper.accent)
             case .waiting:
-                Image(systemName: "hourglass").foregroundStyle(Paper.accent)
+                Image(systemName: "moon.zzz").foregroundStyle(Paper.accent)
             case .paused:
                 Image(systemName: "pause.circle").foregroundStyle(Paper.accent)
             case .unread:
@@ -333,10 +333,13 @@ struct WorkflowMark: View {
         // Waiting behind a run is not something wrong (#422).
         if summary.queued > 0 { return "tray.full" }
         if case .refused = summary.lastOutcome { return "exclamationmark.triangle" }
-        if summary.nextFireAt != nil { return "clock" }
+        // An alarm clock for a schedule, a flowchart otherwise (#765): a plain clock read as
+        // a session's Waiting.
+        if summary.nextFireAt != nil { return "alarm.waves.left.and.right" }
         // Run only by hand (#432).
         if summary.workflow.runsOnlyByHand { return "hand.tap" }
-        return "circle.dotted"
+        if !summary.workflow.canFire { return "circle.dotted" }
+        return "flowchart"
     }
 }
 

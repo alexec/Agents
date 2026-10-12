@@ -26,16 +26,6 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
         }
     }
 
-    public var systemImage: String {
-        switch self {
-        case .pinned: "pin"
-        case .needsYou: "hand.raised"
-        case .working: "circle.dotted"
-        case .unread: "circle.inset.filled"
-        case .toArchive: "archivebox"
-        }
-    }
-
     /// Needs You starts open, so the first thing the window says is who is waiting;
     /// the others start folded, their counts in sight.
     public var startsOpen: Bool { self == .pinned || self == .needsYou }

@@ -432,7 +432,7 @@ struct WorkflowPage: View {
 
     private func triggerRow(_ trigger: WorkflowTrigger, at index: Int, _ summary: WorkflowSummary) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: trigger.schedule != nil ? "clock" : "bolt")
+            Image(systemName: trigger.schedule != nil ? "alarm.waves.left.and.right" : "bolt")
                 .appText(.reading).foregroundStyle(.secondary).frame(width: 18)
             VStack(alignment: .leading, spacing: 4) {
                 Text(trigger.summary).appText(.reading).fixedSize(horizontal: false, vertical: true)

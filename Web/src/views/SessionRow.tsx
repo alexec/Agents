@@ -18,7 +18,7 @@ import { folderIsMissing, folderPath, missingFolderLabel } from "../model/missin
 import { shortAgo } from "../model/activity";
 import { sessionMark, type SessionMark } from "../model/sidebar";
 
-const glyphs: Record<StatusShape, string> = { working: "", needsYou: "!", waiting: "⧗", done: "✓", stopped: "■" };
+const glyphs: Record<StatusShape, string> = { working: "", needsYou: "!", waiting: "☾", done: "✓", stopped: "■" };
 
 /** The shape beside a title, with its words for the tooltip and a screen reader. */
 export function StatusMark({ agent, comingBack = false }: { agent: Agent; comingBack?: boolean }) {
@@ -36,7 +36,7 @@ const markWords: Record<SessionMark, string> = { needsYou: "Needs you", working:
 
 /**
  * A session's mark in the sidebar (#495, #499), the window's and the Remote's: an orange hand when
- * it needs the person, a spinner while it works, a numbered list while queued, an hourglass while it waits, a pause mark once
+ * it needs the person, a spinner while it works, a numbered list while queued, a moon while it waits (#765), a pause mark once
  * stopped (#630), two rings when it finished unread, an empty ring once read. Archived keeps its
  * status mark.
  */
@@ -47,7 +47,7 @@ export function SidebarMark({ agent, comingBack = false }: { agent: Agent; comin
     <span class={`sidebar-mark ${mark}`} role="img" aria-label={markWords[mark]} title={markWords[mark]}>
       {mark === "needsYou" && <span class="glyph" aria-hidden="true">✋&#xFE0E;</span>}
       {mark === "queued" && <span class="glyph" aria-hidden="true">≡</span>}
-      {mark === "waiting" && <span class="glyph" aria-hidden="true">⧗</span>}
+      {mark === "waiting" && <span class="glyph" aria-hidden="true">☾</span>}
       {mark === "paused" && <span class="glyph" aria-hidden="true">⏸&#xFE0E;</span>}
       {mark === "asksToArchive" && <span class="glyph" aria-hidden="true">🗃&#xFE0E;</span>}
     </span>
@@ -133,7 +133,7 @@ export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = f
           {/* Started by a workflow or another agent, not typed for by the person (028). */}
           {extras?.startedByWorkflow && (
             <span class="started-by" role="img" title={`Started by the workflow ${extras.startedByWorkflow}`}
-              aria-label={`started by the workflow ${extras.startedByWorkflow}`}>↻</span>
+              aria-label={`started by the workflow ${extras.startedByWorkflow}`}>⧉</span>
           )}
           {extras?.startedByAgent && (
             <span class="started-by" role="img" title={extras.startedByAgent} aria-label={extras.startedByAgent}>⇆</span>
