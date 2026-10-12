@@ -265,6 +265,13 @@ struct AgentMenuItems: View {
             }
             BranchAgentButton(agent: agent)
             ArchiveAgentButton(agent: agent)
+            // Deny an agent's ask to be archived (#773): the session stays.
+            if agent.asksToArchive {
+                Button(ArchiveRequestWords.keep, systemImage: "tray.and.arrow.up") {
+                    Task { await model.keepSession(agent) }
+                }
+                .disabled(model.isStale(agent))
+            }
         } else {
             BringBackAgentButton(agent: agent)
             Button("Delete…", systemImage: "trash", role: .destructive) { model.askingToDelete = agent }

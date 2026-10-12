@@ -10,7 +10,7 @@ import type {
   StartRequest, UUID, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
   ChatProjectState, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
-  GuardedChange, GuardedChangeReading, HostJoinStatus, KeptDelivered, KeptList, KeptRequest,
+  GuardedChange, GuardedChangeReading, HostJoinStatus, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction,
 } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -1578,6 +1578,41 @@ export class Store extends Work {
   async settleGuardedChange(host: string, folder: string, reading: GuardedChangeReading, keep: boolean): Promise<void> {
     const params = { folder: folder as never, path: reading.path, ...(reading.digest !== undefined ? { digest: reading.digest } : {}) };
     const summary = await this.act(keep ? "projects/keepGuardedChange" : "projects/undoGuardedChange", params, host);
+    if (summary) this.upsertProject(summary, host);
+  }
+
+  /**
+   * What a waiting item is (#773): a file's diff against the approved copy, an MCP server's entry,
+   * a plugin's files. Throws a refusal, which the sheet says in its place.
+   */
+  readApproval(host: string, folder: string, approval: Approval): Promise<GuardedChangeReading> {
+    return this.link.call("approvals/read", { folder: folder as never, kind: approval.kind, key: approval.key }, host);
+  }
+
+  /**
+   * Approve, Deny or Request Changes of a waiting item (#773), of the version read (`digest`), so a
+   * change since is refused and not approved. Throws a refusal, which the sheet says in its place,
+   * staying open; answered, the project's list is the host's again.
+   */
+  async answerApproval(host: string, folder: string, approval: Approval, action: ApprovalAction,
+    digest: string | undefined, note?: string): Promise<ProjectSummary> {
+    const summary = await this.link.call("approvals/answer", {
+      folder: folder as never, kind: approval.kind, key: approval.key, action,
+      ...(digest !== undefined ? { digest } : {}), ...(note !== undefined ? { note } : {}),
+    }, host);
+    this.upsertProject(summary, host);
+    return summary;
+  }
+
+  /**
+   * Keep Session (#773): an agent's request to archive its session denied, so the session stays
+   * where it is. From the row's menu, so a refusal is said in `problem`.
+   */
+  async keepSession(host: string, agent: Agent): Promise<void> {
+    const folder = projectFolder(agent);
+    const listed = (this.projects.value[host] ?? []).find((p) => folderKey(p.project.folder) === folder)?.project.folder;
+    const summary = await this.act("approvals/answer",
+      { folder: (listed ?? folder) as never, kind: "archive", key: agent.id, action: "deny" }, host);
     if (summary) this.upsertProject(summary, host);
   }
 

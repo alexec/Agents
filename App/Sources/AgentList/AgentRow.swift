@@ -271,6 +271,11 @@ struct AgentRow: View {
                 Button("Branch") { Task { await model.fork(agent.id) } }
                 Button("Archive") { Task { await model.archive(agent.id, andLeave: true) } }
                     .disabled(isActing)
+                // Deny an agent's ask to be archived (#773): the session stays.
+                if agent.asksToArchive {
+                    Button(ArchiveRequestWords.keep) { Task { await model.keepSession(agent) } }
+                        .disabled(isActing)
+                }
             }
             // Finder only sees this Mac's disk (058, FR-019).
             if model.isOnThisMac(agent.host) {

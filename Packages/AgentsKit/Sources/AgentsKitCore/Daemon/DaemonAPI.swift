@@ -212,6 +212,10 @@ public enum DaemonAPI {
         public static let projectsReadGuardedChange = "projects/readGuardedChange"
         public static let projectsKeepGuardedChange = "projects/keepGuardedChange"
         public static let projectsUndoGuardedChange = "projects/undoGuardedChange"
+        /// Approve, Deny or Request changes on anything in Needs You (#773).
+        public static let approvalsAnswer = "approvals/answer"
+        /// What a waiting item is, before the choice (#773).
+        public static let approvalsRead = "approvals/read"
         /// Every volume that is low on space, for the window's strip (#195).
         public static let diskState = "disk/state"
         /// Clone a Git URL into the home folder and add it (027). Answers when the
@@ -719,6 +723,10 @@ public enum DaemonAPI {
         /// person's Keep or Undo (#502); absent when none is, so an older reader sees
         /// nothing new. Until then the app goes on using the copy last approved.
         public var guardedChanges: [GuardedChange]?
+        /// Everything here waiting for the person's approval (#773): project MCP servers,
+        /// workflows, plugins, guarded files and sessions asking to be archived, as Needs
+        /// You lists them on every client. Absent when nothing waits.
+        public var approvals: [Approval]?
         /// Which machine the project is on, stamped by the window that heard of it and
         /// never sent (037). Not in `CodingKeys`.
         public var host: HostID = .mac
@@ -733,7 +741,7 @@ public enum DaemonAPI {
 
         enum CodingKeys: String, CodingKey {
             case project, name, exists, lastActivityAt, counts, costToDate, unmeasuredAgents
-            case retiredCount, isChat, guardedChanges
+            case retiredCount, isChat, guardedChanges, approvals
         }
 
         /// Whether anything in this project wants the user.
@@ -774,6 +782,9 @@ public enum DaemonAPI {
             unmeasuredAgents = try c.decode(Int.self, forKey: .unmeasuredAgents)
             isChat = try c.decodeIfPresent(Bool.self, forKey: .isChat)
             guardedChanges = try? c.decodeIfPresent([GuardedChange].self, forKey: .guardedChanges)
+            // One by one, so a kind or action from a newer host drops only its own item.
+            approvals = (try? c.decodeIfPresent([LenientApproval].self, forKey: .approvals))
+                .map { $0.compactMap(\.approval) }
         }
     }
 

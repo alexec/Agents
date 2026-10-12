@@ -2,7 +2,7 @@
 // (RemoteSidebar.swift), and below 760 the root list, as the iPhone Remote's (#226, #235).
 // Things-style since #495 (#499): New Session at the top, in the project last started in; Activity;
 // then what wants the person across every project — Pinned, Needs You, Working, Unread — each drawn
-// only with something in it (#507); then a group per project, its sessions newest started first
+// only with something in it (#507), Needs You with what waits for an OK after its sessions (#773); then a group per project, its sessions newest started first
 // with their state the row's mark, its workflows, and one Archived row opening a page; then the
 // archived projects; and at the foot what the hosts and this browser are doing. Never more than two
 // levels deep. No host headings: a server's project reads `host:Project`. A project's row only
@@ -21,7 +21,7 @@ import { chooseTextSize, parseTextSize, textSize, textSizes } from "../model/tex
 import { macHostNoticeDetail, macHostNoticeTitle } from "../model/macHostNotice";
 import { parseQuery, queryMatches, type LabelQuery } from "../model/labels";
 import { keepsInUnread, newSessionProject, ownCount, pinnedSessions, pinnedWorkflows, projectSessions, rememberedProject, rememberProject,
-  smartAgents, smartRows, smartTitles, withKept, type ProjectKey, type SmartRow } from "../model/sidebar";
+  smartAgents, smartApprovals, smartRows, smartTitles, withKept, type ProjectKey, type SmartRow } from "../model/sidebar";
 import { namedRelative, workflowSummary } from "../model/workflows";
 import { fromWireDate } from "../protocol/dates";
 import type { Agent, ControlHost, ProjectSummary, WorkflowSummary } from "../protocol/generated";
@@ -35,6 +35,8 @@ import { rowExtras, SessionRow } from "./SessionRow";
 import { RenameInput, runSessionAction, sessionActions } from "./SessionMenu";
 import { WorkflowRow } from "./WorkflowRow";
 import { PinnedPageRows } from "./Pins";
+import { ApprovalRow } from "./Approval";
+import { approvalID } from "../model/approvals";
 import { memo } from "../render/memo";
 
 /** The most archived matches a fold shows before Show all, as the window's (#176). */
@@ -147,7 +149,7 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
           <summary class="sidebar-head-label" data-fold="activity">Activity</summary>
           <ActivityRows store={store} chosen={r.activity} onPick={(page: ActivityPage) => go({ activity: page })} />
         </details>
-        {/* Pinned, Needs You, Working, Unread, Approve Archiving: a group each across every project and host (#495, #584). */}
+        {/* Pinned, Needs You, Working, Unread: a group each across every project and host (#495, #773). */}
         {projects.length > 0 && smartRows.map((row) => (
           <SmartFold key={row} row={row} store={store} projects={projects} query={query} linkDown={linkDown} />
         ))}
@@ -244,7 +246,7 @@ function inOpenSmartRow(store: Store, host: string, agent: Agent): boolean {
   const kept = keptInUnread.peek();
   if (folds.isSmartOpen("unread") && kept?.host === host && kept.id === agent.id) return true;
   const pins = store.sessionPinsIn(host, projectFolder(agent));
-  return (["needsYou", "working", "unread", "toArchive"] as const).some((row) => folds.isSmartOpen(row) && smartAgents(row, [agent], undefined, pins).length > 0);
+  return (["needsYou", "working", "unread"] as const).some((row) => folds.isSmartOpen(row) && smartAgents(row, [agent], undefined, pins).length > 0);
 }
 
 /** A search narrows workflows by name and what they are; one asking for a label leaves them out. */
@@ -299,9 +301,10 @@ type SmartLine = Placed & ({ kind: "session"; agent: Agent } | { kind: "workflow
   & { pins?: string[] | undefined };
 
 /**
- * One of the groups at the top of the sidebar (#495): Pinned, Needs You, Working, Unread or Approve
- * Archiving (#584, #649), across every project and host, each row naming its project. Approve Archiving's
- * head has no Approve All (#704): each row is approved on its own. Drawn only with something in it, and while
+ * One of the groups at the top of the sidebar (#495): Pinned, Needs You, Working or Unread, across
+ * every project and host, each row naming its project. Needs You lists the sessions asking, blocked or
+ * asking to be archived (#584, #773), then what waits for an OK, oldest first, each answered from its
+ * own sheet (no Approve All, #704); its count is of both. Drawn only with something in it, and while
  * searching only with a match (#507); Unread still is while it keeps the open session. Folded, it
  * lists nothing but counts.
  */
@@ -357,7 +360,11 @@ function SmartFold({ row, store, projects, query, linkDown }: {
     lines = withKept([...found.keys()].sort(byStart), keptPlace ? keptAgent : undefined)
       .map((agent): SmartLine => ({ ...(found.get(agent) ?? keptPlace!), kind: "session", agent }));
   }
-  if (parsed ? lines.length === 0 : count === 0 && !keptPlace) return null;
+  // What waits for an OK, each project's, after the sessions (#773).
+  const waiting = row !== "needsYou" ? [] : projects.map((placed) => ({ project: placed, approvals: placed.project.approvals }));
+  const approvals = smartApprovals(waiting, query);
+  if (row === "needsYou") count += query ? smartApprovals(waiting).length : approvals.length;
+  if (parsed ? lines.length === 0 && approvals.length === 0 : count === 0 && !keptPlace) return null;
   const title = smartTitles[row];
   return (
     <details class={`smart ${row}`} role="group" aria-label={title} open={open}
@@ -383,6 +390,14 @@ function SmartFold({ row, store, projects, query, linkDown }: {
               chosen={r.host === host && r.workflow === line.summary.workflow.workflowID} pinnedAt={line.pins}
               onPick={() => go({ host, project: folder, workflow: line.summary.workflow.workflowID })} />
           </div>
+        );
+      })}
+      {open && approvals.map(({ project: placed, approval }) => {
+        const host = placed.host.id;
+        const folder = placed.project.project.folder;
+        return (
+          <ApprovalRow key={`${host}|${folder}|${approvalID(approval)}`} store={store} host={host} folder={folder}
+            approval={approval} place={projectLabel(placed.host, placed.project)} down={linkDown || !store.hostIsOnline(host)} />
         );
       })}
     </details>
@@ -661,8 +676,8 @@ function navRows(list: HTMLElement): HTMLElement[] {
 }
 
 /**
- * ↑ and ↓ through the list, opening what they land on (a fold's summary is landed on and not
- * opened); → unfolds and ← folds, or steps out to the project; Home and End.
+ * ↑ and ↓ through the list, opening what they land on (a fold's summary and an approval are landed
+ * on and not opened); → unfolds and ← folds, or steps out to the project; Home and End.
  */
 function moveWithKeys(e: KeyboardEvent): void {
   const list = e.currentTarget as HTMLElement;
@@ -675,7 +690,8 @@ function moveWithKeys(e: KeyboardEvent): void {
     e.preventDefault();
     el.focus();
     el.scrollIntoView({ block: "nearest" });
-    if (el.tagName !== "SUMMARY") el.click();
+    // A fold's summary, and what waits for an OK, whose sheet Enter opens (#773), are only landed on.
+    if (el.tagName !== "SUMMARY" && !el.classList.contains("approval")) el.click();
   };
   const fold = current.closest<HTMLElement>(".project-fold");
   const isProject = current.matches(".pick[data-fold=project]");

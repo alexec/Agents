@@ -47,6 +47,7 @@ extension DaemonCore {
         }
         records.approvalsBegan = Date()
         keepQuietly("plugin approvals") { try pluginApprovalStore.save(records) }
+        approvalKitCache.removeAll()
     }
 
     /// Every plugin in the project `folder` belongs to, approved or waiting.
@@ -104,6 +105,7 @@ extension DaemonCore {
         DaemonLog.shared.write("plugins: \(plugin.lastPathComponent) in \(project.path) approved")
         let list = DaemonAPI.PluginsList(folder: project, plugins: projectPlugins(in: project))
         broadcast(DaemonAPI.Notification.pluginsChanged, list)
+        approvalKitMoved(in: Project.standardize(project))
         return list
     }
 }

@@ -266,6 +266,36 @@ export interface AppViewPolicy {
   refused: string[];
 }
 
+export interface Approval {
+  kind: ApprovalKind;
+  key: string;
+  title: string;
+  digest?: string;
+  line: string;
+  since?: WireDate;
+  actions: ApprovalAction[];
+  agentID?: UUID;
+}
+
+export type ApprovalAction = "approve" | "deny" | "requestChanges";
+
+export interface ApprovalAnswer {
+  folder: URLString;
+  kind: ApprovalKind;
+  key: string;
+  digest?: string;
+  action: ApprovalAction;
+  note?: string;
+}
+
+export type ApprovalKind = "mcpServer" | "workflow" | "plugin" | "file" | "archive";
+
+export interface ApprovalReadRequest {
+  folder: URLString;
+  kind: ApprovalKind;
+  key: string;
+}
+
 export type ArchiveRequest =
   | { whenTurnEnds: { since: WireDate } }
   | { requested: { at: WireDate } };
@@ -1368,6 +1398,7 @@ export interface ProjectSummary {
   retiredCount: number;
   isChat?: boolean;
   guardedChanges?: GuardedChange[];
+  approvals?: Approval[];
 }
 
 export interface ProjectsListRequest {
@@ -2168,6 +2199,8 @@ export interface Methods {
   "agents/turns": { params: TurnsRequest; result: TurnsPage };
   "agents/unarchive": { params: AgentRequest; result: Empty };
   "agents/unqueue": { params: UnqueueRequest; result: Empty };
+  "approvals/answer": { params: ApprovalAnswer; result: ProjectSummary };
+  "approvals/read": { params: ApprovalReadRequest; result: GuardedChangeReading };
   "artifact/write": { params: ArtifactWriteRequest; result: Empty };
   "attention/pending": { params: Empty; result: AttentionPending };
   "changes/file": { params: ChangesFileRequest; result: ChangedFileDetail };
@@ -2283,6 +2316,8 @@ export const MethodTarget = {
   "agents/turns": "host",
   "agents/unarchive": "host",
   "agents/unqueue": "host",
+  "approvals/answer": "host",
+  "approvals/read": "host",
   "artifact/write": "host",
   "attention/pending": "host",
   "changes/file": "host",
@@ -2416,6 +2451,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AnswerSandboxRequest: { required: ["agentID", "carryOn"], optional: [] },
   AppViewCall: { required: ["id", "server", "tool", "resourceUri", "state"], optional: ["arguments", "result", "reason", "pinnable"] },
   AppViewPolicy: { required: ["connectDomains", "resourceDomains", "frameDomains", "baseUriDomains", "refused"], optional: [] },
+  Approval: { required: ["kind", "key", "title", "line", "actions"], optional: ["digest", "since", "agentID"] },
+  ApprovalAnswer: { required: ["folder", "kind", "key", "action"], optional: ["digest", "note"] },
+  ApprovalReadRequest: { required: ["folder", "kind", "key"], optional: [] },
   ArtifactWriteRequest: { required: ["agentID", "path", "text"], optional: [] },
   Attachment: { required: ["id", "block", "displayName"], optional: ["byteCount"] },
   AttentionDelivery: { required: ["needID"], optional: ["to"] },
@@ -2547,7 +2585,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProjectPins: { required: ["folder", "pins"], optional: ["sessions", "workflows"] },
   ProjectRemovedNotification: { required: ["folder"], optional: [] },
   ProjectRequest: { required: ["folder"], optional: [] },
-  ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: ["isChat", "guardedChanges"] },
+  ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: ["isChat", "guardedChanges", "approvals"] },
   ProjectsListRequest: { required: ["includeArchived"], optional: [] },
   PromptRequest: { required: ["agentID", "text", "attachments", "from"], optional: ["sendID"] },
   QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface", "sender", "hops"] },

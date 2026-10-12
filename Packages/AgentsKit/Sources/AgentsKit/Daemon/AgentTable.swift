@@ -132,6 +132,8 @@ struct ProjectTally: Equatable {
     /// as a full count would never have had it.
     var currencyHolders: [String: Int] = [:]
     var unmeasured = 0
+    /// The members asking to be archived (#584), for the project's approvals (#773).
+    var asking: Set<UUID> = []
     var newestActivity: Date?
     var oldestCreated: Date?
     /// The agent that held the newest activity, or the oldest start, has gone.
@@ -147,6 +149,7 @@ struct ProjectTally: Equatable {
             currencyHolders[currency, default: 0] += 1
         }
         if agent.isUnmeasured { unmeasured += 1 }
+        if agent.asksToArchive { asking.insert(agent.id) }
         if newestActivity.map({ agent.lastActivityAt >= $0 }) ?? true {
             newestActivity = agent.lastActivityAt
             newestLost = false
@@ -172,6 +175,7 @@ struct ProjectTally: Equatable {
             }
         }
         if agent.isUnmeasured { unmeasured -= 1 }
+        asking.remove(agent.id)
         if agent.lastActivityAt == newestActivity { newestLost = true }
         if agent.createdAt == oldestCreated { oldestLost = true }
     }

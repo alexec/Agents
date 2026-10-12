@@ -1,9 +1,13 @@
 import Foundation
 
 /// One of the rows at the top of the sidebar that gather sessions across every project
-/// and host (#495): Pinned, then by what they want — Needs You, Working, Unread, and the
-/// sessions waiting for the person to approve archiving them, Approve Archiving (#584, #649). Mail's
+/// and host (#495): Pinned, then by what they want — Needs You, Working, Unread. Mail's
 /// Favorites and smart mailboxes, Things' Inbox and Today.
+///
+/// Needs You holds everything waiting for the person (#773): sessions asking a question or
+/// blocked, sessions asking to be archived (#584, #649, once their own group), and each
+/// project's `approvals` — MCP servers, workflows, plugins and guarded files — as rows of
+/// their own.
 ///
 /// Read off each project's shelf (#165), so a folded smart row costs a sum of counts per
 /// project and not a pass over every agent held; only an open one lists its sessions.
@@ -12,9 +16,6 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
     /// order and each project's pin order. Out of their projects' groups (Alex, #495).
     case pinned
     case needsYou, working, unread
-    /// Sessions waiting for the person to approve archiving them (#584, #649), each
-    /// approved from its own row (no Approve All, #704, #667).
-    case toArchive
 
     public var title: String {
         switch self {
@@ -22,7 +23,6 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
         case .needsYou: "Needs You"
         case .working: "Working"
         case .unread: "Unread"
-        case .toArchive: "Approve Archiving"
         }
     }
 
@@ -30,7 +30,8 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
     /// the others start folded, their counts in sight.
     public var startsOpen: Bool { self == .pinned || self == .needsYou }
 
-    /// How many sessions it gathers across the projects named.
+    /// How many sessions it gathers across the projects named, and for Needs You the
+    /// approvals besides.
     @MainActor
     public func count(in work: AgentsModel, projects: [ProjectKey]) -> Int {
         projects.reduce(0) { total, key in
@@ -44,13 +45,12 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
             }
             switch self {
             case .needsYou:
-                return total + (shelf.counts[.needsAttention] ?? 0) + (shelf.counts[.blocked] ?? 0) - pinnedHere
+                return total + (shelf.counts[.needsAttention] ?? 0) + (shelf.counts[.blocked] ?? 0)
+                    + Self.askingAtRest(in: shelf) + Self.ownApprovals(in: work, key).count - pinnedHere
             case .working:
                 return total + (shelf.counts[.running] ?? 0) - pinnedHere
             case .unread:
                 return total + Self.unreadAtRest(in: shelf) - pinnedHere
-            case .toArchive:
-                return total + Self.askingAtRest(in: shelf) - pinnedHere
             case .pinned:
                 return total
             }
@@ -58,16 +58,15 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
     }
 
     /// Where a live session is listed (#587): once, in the first of the smart groups it
-    /// belongs to — Pinned, Needs You, Working, Approve Archiving (#584), Unread — or, in none of
-    /// them, under its project. Nil for its project. Approve Archiving comes before Unread though
-    /// it is drawn after it, so every session that asks is listed where it is approved.
+    /// belongs to — Pinned, Needs You (asking, blocked, or asking to be archived, #773),
+    /// Working, Unread — or, in none of them, under its project. Nil for its project.
     public static func home(of agent: Agent, in group: AgentGroup, isPinned: Bool) -> SidebarSmartRow? {
         if isPinned { return .pinned }
         switch group {
         case .needsAttention, .blocked: return .needsYou
         case .running: return .working
         case .archived: return nil
-        default: return agent.asksToArchive ? .toArchive : agent.showsUnread ? .unread : nil
+        default: return agent.asksToArchive ? .needsYou : agent.showsUnread ? .unread : nil
         }
     }
 
@@ -100,8 +99,8 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
                 .reduce(0) { $0 + (shelf.groups[$1] ?? []).count { $0.showsUnread && $0.asksToArchive } }
     }
 
-    /// Those asking to be archived that are neither waiting on a person nor working: To
-    /// Archive's share (#584).
+    /// Those asking to be archived that are neither waiting on a person nor working: Needs
+    /// You's share of them (#584, #773).
     @MainActor
     static func askingAtRest(in shelf: ProjectShelf) -> Int {
         shelf.asking - busyGroups.reduce(0) { $0 + (shelf.groups[$1] ?? []).count(where: \.asksToArchive) }
@@ -117,6 +116,7 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
         }
         return !agents(in: work, projects: projects, query: query).isEmpty
             || !workflows(in: work, projects: projects, query: query).isEmpty
+            || !approvals(in: work, projects: projects, query: query).isEmpty
     }
 
     /// The sessions it gathers, newest started first, as a search leaves them.
@@ -134,11 +134,11 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
             let held: [Agent] = switch self {
             case .pinned: []
             case .needsYou: (shelf.groups[.needsAttention] ?? []) + (shelf.groups[.blocked] ?? [])
+                + AgentGroup.live.filter { !Self.busyGroups.contains($0) }
+                .flatMap { shelf.groups[$0] ?? [] }.filter(\.asksToArchive)
             case .working: shelf.groups[.running] ?? []
             case .unread: AgentGroup.live.filter { !Self.busyGroups.contains($0) }
                 .flatMap { shelf.groups[$0] ?? [] }.filter { $0.showsUnread && !$0.asksToArchive }
-            case .toArchive: AgentGroup.live.filter { !Self.busyGroups.contains($0) }
-                .flatMap { shelf.groups[$0] ?? [] }.filter(\.asksToArchive)
             }
             // A pinned session is listed in Pinned and nowhere else (#587).
             let pinned = Set(work.pinnedSessions(in: key.folder))
@@ -161,6 +161,29 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
                 .filter { matcher?.matches($0) ?? true }
                 .map { (project: key, workflow: $0) }
         }
+    }
+
+    /// What waits for an OK in the projects named, each with its project (#773): only Needs
+    /// You lists them, oldest first, after its sessions. A search matches the title, the
+    /// kind and the grey line.
+    @MainActor
+    public func approvals(in work: AgentsModel, projects: [ProjectKey], query: String = "")
+        -> [(project: ProjectKey, approval: Approval)] {
+        guard self == .needsYou else { return [] }
+        let words = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return projects.flatMap { key in
+            Self.ownApprovals(in: work, key)
+                .filter { words.isEmpty || "\($0.title) \($0.kindWord) \($0.line)".lowercased().contains(words) }
+                .map { (project: key, approval: $0) }
+        }
+        .sorted { ($0.approval.since ?? .distantPast) < ($1.approval.since ?? .distantPast) }
+    }
+
+    /// One project's approvals drawn as rows of their own: every kind but a session's
+    /// archive request, which is the session's row (`home`).
+    @MainActor
+    public static func ownApprovals(in work: AgentsModel, _ key: ProjectKey) -> [Approval] {
+        (work.project(key)?.approvals ?? []).filter { !$0.isSession }
     }
 
     /// One project's pinned sessions held and not archived, in the order they were put in.

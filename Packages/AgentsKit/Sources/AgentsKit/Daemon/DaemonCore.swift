@@ -330,6 +330,10 @@ public actor DaemonCore {
     /// inside for a project whose file sets none. Let go when the folder's `.agents`
     /// changes and when the daemon writes the file.
     var projectConfigCache: [URL: HelperLimits?] = [:]
+    /// Each project's MCP servers and plugins waiting for approval (#773), as last read:
+    /// the project's summary is made on every streamed token, and these read files. Let go
+    /// when `.agents/mcp.json` or `.agents/plugins` moves, and on every approval of either.
+    var approvalKitCache: [URL: [Approval]] = [:]
     /// Each project's `.agents/project.json` disk space lines as last read (#195), as
     /// `projectConfigCache` holds its helper limits.
     var diskSpaceConfigCache: [URL: DiskThresholds?] = [:]

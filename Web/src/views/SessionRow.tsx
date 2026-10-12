@@ -115,7 +115,7 @@ export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = f
   going?: { doing: string; recipient: string } | undefined;
 }) {
   const running = backgroundMark(agent.background ?? []);
-  // The mark alone: the row is a button, so Archive is the menu's, the strip's and Approve Archiving's (#584).
+  // The mark alone: the row is a button, so Archive is the menu's and the strip's, Keep Session the menu's (#584, #773).
   const asks = archiveLine(agent);
   const activity = fromWireDate(agent.lastActivityAt);
   const labels = agent.labels ?? [];

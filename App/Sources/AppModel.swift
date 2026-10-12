@@ -2037,6 +2037,49 @@ final class AppModel {
         }
     }
 
+    /// What a waiting item in Needs You is (#773), for the person deciding.
+    func readApproval(_ approval: Approval, for key: ProjectKey) async -> GuardedChangeReading? {
+        do {
+            return try await client(for: key.host).call(
+                DaemonAPI.Method.approvalsRead,
+                ApprovalReadRequest(folder: key.folder, kind: approval.kind, key: approval.key),
+                returning: GuardedChangeReading.self)
+        } catch {
+            problem = describe(error)
+            return nil
+        }
+    }
+
+    /// Approve, Deny or Request changes on a waiting item (#773), of the version shown;
+    /// nil when it went, else why not, for the sheet to say.
+    func answerApproval(_ approval: Approval, _ action: Approval.Action, digest: String?, note: String?,
+                        for key: ProjectKey) async -> String? {
+        var answer = ApprovalAnswer(approval, in: key.folder, action: action, note: note)
+        answer.digest = digest ?? approval.digest
+        do {
+            var summary = try await client(for: key.host).call(
+                DaemonAPI.Method.approvalsAnswer, answer, returning: DaemonAPI.ProjectSummary.self)
+            summary.host = key.host
+            upsert(summary)
+            return nil
+        } catch {
+            return describe(error)
+        }
+    }
+
+    /// Approve or Deny from a row's menu, of the version the row shows; a refusal is the
+    /// window's problem to say, as there is no sheet to say it in.
+    func settleApproval(_ approval: Approval, _ action: Approval.Action, for key: ProjectKey) async {
+        if let why = await answerApproval(approval, action, digest: approval.digest, note: nil, for: key) { problem = why }
+    }
+
+    /// Deny a session's ask to be archived (#773): the mark goes and the session stays.
+    func keepSession(_ agent: Agent) async {
+        let ask = Approval(kind: .archive, key: agent.id.uuidString, title: agent.title ?? "", digest: nil,
+                           line: "", actions: [.deny], agentID: agent.id)
+        await settleApproval(ask, .deny, for: ProjectKey(host: agent.host, folder: agent.projectFolder))
+    }
+
     func setDiskSpace(_ lines: DiskThresholds, for key: ProjectKey) async {
         do {
             var summary = try await client(for: key.host).call(

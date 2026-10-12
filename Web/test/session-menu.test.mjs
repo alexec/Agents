@@ -28,8 +28,8 @@ test("an unread finish offers Mark as Read; nothing else offers either (#70)", (
   assert.deepEqual(labels("stopped by the person"), ["Rename…", "Branch", "Archive"]);
 });
 
-test("a session that asks to be archived offers Archive as any other does; there is no Park (#584)", () => {
-  assert.deepEqual(labels("asks to archive, done"), ["Mark as Unread", "Rename…", "Branch", "Archive"]);
+test("a session that asks to be archived offers Archive and Keep Session; there is no Park (#584, #773)", () => {
+  assert.deepEqual(labels("asks to archive, done"), ["Mark as Unread", "Rename…", "Branch", "Archive", "Keep Session"]);
   assert.deepEqual(labels("asks to archive when the turn ends, running"), ["Stop", "Rename…", "Branch", "Archive"]);
 });
 
