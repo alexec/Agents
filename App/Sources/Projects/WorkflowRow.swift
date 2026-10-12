@@ -283,7 +283,7 @@ struct WorkflowStatusIcon: View {
         if !summary.workflow.canFire { return "circle.dashed" }
         // An alarm clock for a schedule, a flowchart otherwise (#765): a plain clock read as
         // a session's Waiting.
-        if summary.nextFireAt != nil { return "alarm.waves.left.and.right" }
+        if summary.nextFireAt != nil { return "alarm" }
         return "flowchart"
     }
 

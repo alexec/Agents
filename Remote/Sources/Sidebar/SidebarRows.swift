@@ -156,7 +156,7 @@ private struct SessionMark: View {
             case .queued:
                 Image(systemName: "list.number").foregroundStyle(Paper.accent)
             case .waiting:
-                Image(systemName: "moon.zzz").foregroundStyle(Paper.accent)
+                Image(systemName: "zzz").foregroundStyle(Paper.accent)
             case .paused:
                 Image(systemName: "pause.circle").foregroundStyle(Paper.accent)
             case .unread:
@@ -335,7 +335,7 @@ struct WorkflowMark: View {
         if case .refused = summary.lastOutcome { return "exclamationmark.triangle" }
         // An alarm clock for a schedule, a flowchart otherwise (#765): a plain clock read as
         // a session's Waiting.
-        if summary.nextFireAt != nil { return "alarm.waves.left.and.right" }
+        if summary.nextFireAt != nil { return "alarm" }
         // Run only by hand (#432).
         if summary.workflow.runsOnlyByHand { return "hand.tap" }
         if !summary.workflow.canFire { return "circle.dotted" }

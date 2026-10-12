@@ -63,7 +63,7 @@ public enum StatusShape: Hashable, Sendable {
         switch self {
         case .working: return nil
         case .needsYou: return "exclamationmark.circle.fill"
-        case .waiting: return "moon.zzz"
+        case .waiting: return "zzz"
         case .done: return "checkmark.circle"
         case .stopped: return "stop.circle"
         }
