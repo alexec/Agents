@@ -1484,6 +1484,12 @@ final class AppModel {
         work.replaceMCPHealth(snapshot, from: host)
     }
 
+    /// What this Mac's work used by hour and by day (#823), for the charts on Cost. Nil
+    /// from a daemon too old to know the method, and the charts stay out.
+    func usageHistory() async -> UsageHistory? {
+        try? await client.call(DaemonAPI.Method.usageHistory, Optional<String>.none, returning: UsageHistory.self)
+    }
+
     /// Every volume low on space (#195). A daemon too old to know the method leaves it
     /// empty, and no strip is drawn.
     func refreshDisk() async {

@@ -57,7 +57,20 @@ const visible = (selector) => page.eval(`[...document.querySelectorAll(${JSON.st
 for (const scene of scenes) {
   say(`— ${scene}`);
   try {
-    if (scene === "sessions") {
+    if (scene === "usage") {
+      // #823: Cost opens with the usage charts, Health's D / W / M / 3M, cost or tokens.
+      await page.eval(`location.hash = "#/a/spending"`);
+      await page.waitFor(`document.querySelector(".usage-charts svg")`, 30_000);
+      say(`headline: ${JSON.stringify(await visible(".usage-headline"))}`);
+      say(`bars: ${await page.eval(`document.querySelectorAll(".usage-bar").length`)}`);
+      await shot("usage-cost-week");
+      await page.press("Tokens");
+      await page.press("3M");
+      await page.waitFor(`document.querySelectorAll(".usage-bar").length === 13`);
+      say(`headline: ${JSON.stringify(await visible(".usage-headline"))}`);
+      say(`notes: ${JSON.stringify(await visible(".usage-charts .quiet.small"))}`);
+      await shot("usage-tokens-3m");
+    } else if (scene === "sessions") {
       // #70 unread, #68 worktree beside labels, sessions column, Archived folds, #100 off in place.
       await openProject();
       await page.waitFor(`document.querySelector(".workflows .row")`, 30_000);

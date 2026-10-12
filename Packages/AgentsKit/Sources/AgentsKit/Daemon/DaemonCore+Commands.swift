@@ -980,6 +980,7 @@ extension DaemonCore {
         // the end of the turn (#177): a turn quotes its cost several times. The ledger
         // is also the only copy that survives the agent being archived.
         spendLedger.record(Cost(amount: added, currency: cost.currency), on: now())
+        usageLedger.record(Cost(amount: added, currency: cost.currency), runtime: agent.runtimeID, on: now())
     }
 
     /// How long a cost banked on a usage update waits to be written, at most.
@@ -1001,6 +1002,7 @@ extension DaemonCore {
         spendSave?.cancel()
         spendSave = nil
         keepQuietly("today's spend") { try spendLedger.flush() }
+        keepQuietly("the usage history") { try usageLedger.flush() }
         let waiting = spendSaveAgents
         spendSaveAgents = []
         for id in waiting { if let agent = agents[id] { saveQuietly(agent) } }
@@ -1025,6 +1027,9 @@ extension DaemonCore {
     // MARK: The reader's limits
 
     public func costState() async -> DaemonAPI.CostState { currentCostState() }
+
+    /// What the work used by hour and by day, per runtime (#823), for the usage charts.
+    public func usageHistory() -> UsageHistory { usageLedger.history(at: now()) }
 
     public func setLimits(_ request: DaemonAPI.SetLimitsRequest) async throws -> DaemonAPI.CostState {
         var limits = limitStore.load()
@@ -1483,7 +1488,11 @@ extension DaemonCore {
                     // two lines comes back having counted the money rather than
                     // having forgotten it.
                     keepQuietly("today's spend") { try spendLedger.add(cost, on: now()) }
+                    usageLedger.record(cost, runtime: agent.runtimeID, on: now())
                 }
+                // The turn's tokens, and whether its runtime has ever priced this agent.
+                usageLedger.record(usage, priced: !agent.isUnmeasured, runtime: agent.runtimeID, on: now())
+                keepQuietly("the usage history") { try usageLedger.flush() }
                 let limits = limitStore.load()
                 crossedItsLimit = agent.isAtCostLimit(under: limits)
                 changed(agent)
