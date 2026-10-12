@@ -13,6 +13,10 @@ watcher around it.
 .claude/skills/ship-app/scripts/ship.sh
 ```
 
+Run it from a worktree of your own at origin/main (#797): the worktree's copy builds and
+installs that worktree, and refuses unless it is clean and at origin/main. Run from the
+main checkout, it builds there instead, which a lane's build can write over.
+
 Pass `--install-mac` only when Alex has asked to install on this Mac. That copies
 Agents Host and the window into `~/Applications` and `launchctl kickstart`s the
 login-item jobs. A development run, a test, and a merge wave never pass it.
@@ -54,11 +58,11 @@ Since 058 the Mac runs:
 There is no phone bridge to start. The Remote reaches the control plane itself.
 
 The script builds `AgentsHost` (Live) into `build/DD-host`, `AgentsStore` into `build/DD-store`
-and the Remote into `build/DD-ios`, one after another in the main checkout, through
+and the Remote into `build/DD-ios`, one after another in the checkout it runs from, through
 `scripts/build-cache.sh` (#234): the packages and compiled outputs come from the cache in
 `~/Library/Caches/Agents-build/` that every worktree and wave shares, so a ship after a
 wave recompiles little. Logs are in `/tmp/ship-app-<sha>/`. It refuses when:
-- the main checkout is not on `main`;
+- the main checkout is not on `main`, or a worktree is not clean at origin/main;
 - a build is running from the main checkout's `build/` (an agent forgot its worktree);
 - the build is not signed by the team;
 - a relaunch is already pending.
