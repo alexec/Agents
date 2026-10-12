@@ -11,6 +11,7 @@ in the project's `.agents/mcp.json` as `ci`, and the **Fix failed checks** workf
 | --- | --- | --- |
 | Event | `checks.failed` | A pull request's Actions run finished with a failure. Arguments: `repo`, optional `branch` and `pr`. |
 | Event | `pr.merged` | A pull request was merged. Arguments: `repo`, optional `branch` and `pr`. |
+| Event | `pr.closed` | A pull request was closed without being merged (#702). Arguments: `repo`, optional `branch` and `pr`. |
 | Event | `issue.opened` | An issue (not a PR) was opened. Arguments: `repo`, optional `label`. |
 | Event | `issue.labelled` | A label was added to an issue. Arguments: `repo`, optional `label` (the one added) and `issue`. |
 | Event | `issue.commented` | A comment was left on an issue; its body is cut to 4000 characters. Arguments: `repo`, optional `label` and `issue`. |
@@ -22,6 +23,10 @@ in the project's `.agents/mcp.json` as `ci`, and the **Fix failed checks** workf
 | Tool | `comment_on_pr` | Comments on a pull request. |
 | View | `ui://ci/board` | The open pull requests with a check pill, and **Rerun** on a failing one. |
 | View | `ui://ci/issues` | The open issues with their labels; a label narrows the list, and its ✕ widens it again. |
+
+Every `repo` may be left out (#702): it is then the repo the project's folder pushes to, as
+`gh repo view` names it there (the server runs in the project's folder). In the fake mode it is
+the file's `defaultRepo`, or its one repo.
 
 ## What it needs
 

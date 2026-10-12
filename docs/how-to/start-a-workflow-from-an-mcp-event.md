@@ -70,11 +70,12 @@ push, and use `comment_on_pr` to say what you changed.
 
 - Without `server:`, the trigger listens to every server here that offers `checks.failed`.
   Add `server: ci` to listen to that one only, or `server: [github, gitlab]` for a list.
-- The `ci` server's `checks.failed` and `pr.merged` both take `repo` (required), `branch`
-  (only that PR branch) and `pr` (only that pull request, by number). Given together,
-  each must hold: `{repo: alexec/Agents, pr: 551}` hears only PR 551's failures and merge.
+- The `ci` server's `checks.failed`, `pr.merged` and `pr.closed` (closed without merging)
+  all take `repo`, `branch` (only that PR branch) and `pr` (only that pull request, by
+  number). Left out, `repo` is the one the project's folder pushes to (#702). Given
+  together, each must hold: `{pr: 551}` hears only PR 551's failures and merge.
 - Its issue events, `issue.opened`, `issue.labelled`, `issue.commented` and `issue.closed`,
-  take `repo` (required) and `label`; all but `issue.opened` also take `issue`, by number.
+  take `repo` (optional, as above) and `label`; all but `issue.opened` also take `issue`, by number.
   On `issue.labelled`, `label` is the label added: `{repo: alexec/Agents, label: bug}` hears
   each issue as it is marked a bug.
 - A filter the server's event doesn't take, or a value of the wrong type, shows on the

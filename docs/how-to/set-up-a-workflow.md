@@ -50,16 +50,19 @@ an agent finishes.
      a `schedule` (on the hour or half hour, with optional hours and days), and any other
      name on [Events](../reference/events.md).
    - Only a few events can be narrowed: `branch.moved` by `branch`, and `person.away` and
-     `person.back` by `why`. To run when `main` moves:
+     `person.back` by `why`. `branch.moved` is only raised for a branch an agent works on,
+     never the default branch (#702); to run when a pull request lands, use the `ci`
+     server's `pr.merged`. To run when one agent's branch moves:
 
      ```yaml
      on:
        - branch.moved:
-           branch: main
+           branch: agents/fix-640
      ```
 
-     The project page then says *When a branch moved: the default branch, or one an agent
-     works on (branch main)*. A list, such as `branch: [main, develop]`, means any of them.
+     The project page then says *When a branch an agent works on moved; never the default
+     branch (branch agents/fix-640)*. A list, such as `branch: [agents/fix-640, agents/fix-641]`,
+     means any of them.
      Any other detail under an event is an error in the file. To act only on some agents,
      such as bug fixes, say which in the prompt: the agent it starts is told which agent
      set it off, and its labels.

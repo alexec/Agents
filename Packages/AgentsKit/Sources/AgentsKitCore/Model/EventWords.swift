@@ -48,6 +48,12 @@ public enum EventWords {
     }
 
     /// Names only a Mac raises, said on a host that is not one (#372).
+    /// A wait on the default branch moving, refused (#702).
+    public static func defaultBranchNotWatched(_ branch: String) -> String {
+        "branch.moved is not raised for \(branch), the default branch: this Mac's copy moves only when someone "
+            + "pulls. To wait for a pull request to land, wait for pr.merged (or pr.closed) with its pr. Nothing is waiting."
+    }
+
     public static func neverHere(_ names: [String]) -> String {
         let one = names.count == 1
         return "\(names.joined(separator: ", ")) \(one ? "is" : "are") only raised on a Mac, and this host is "

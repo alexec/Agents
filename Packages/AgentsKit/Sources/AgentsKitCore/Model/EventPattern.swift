@@ -124,7 +124,7 @@ public struct EventPattern: Hashable, Sendable {
     // MARK: Words
 
     /// The kind's meaning, narrowed by what it is filtered on, for the project page:
-    /// "A branch moved: the default branch, or one an agent works on (branch main)".
+    /// "A branch an agent works on moved; never the default branch (branch agents/fix)".
     public var summary: String {
         let meaning: String
         if let subject = wholeSubject {

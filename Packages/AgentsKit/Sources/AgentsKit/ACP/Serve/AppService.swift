@@ -1344,10 +1344,10 @@ public actor AppService {
                     "type": "object",
                     "description": """
                         Narrow them by what each event's inputSchema takes in action list: \
-                        branch on branch.moved, e.g. {"branch": "main"}, or why on person.away \
+                        branch on branch.moved, e.g. {"branch": "agents/fix-640"}, or why on person.away \
                         and person.back. A list means any of them, e.g. {"why": ["locked", \
                         "idle"]}. For an MCP server's event, such as pr.merged, these are its \
-                        own, sent to it, e.g. {"repo": "owner/name"}; server narrows which \
+                        own, sent to it, e.g. {"pr": 640}; server narrows which \
                         servers. Nothing else narrows an event.
                         """,
                 ],

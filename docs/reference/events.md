@@ -33,7 +33,9 @@ give them as two columns:
   id, and a woken agent is told both under those names.
 - **Filter by** is the `inputSchema`: what a wait's `where` or the keys under a trigger can
   narrow the event by. Only a few events take any:
-  - `branch` on `branch.moved`, for example `branch: main` for one branch;
+  - `branch` on `branch.moved`, for example `branch: agents/fix-640` for one branch. It is
+    raised only for a branch an agent works on, never the default branch (#702), and a wait
+    on the default branch is refused: wait for the `ci` server's `pr.merged` instead;
   - `why` on `person.away` and `person.back`: `locked` or `idle`;
   - an MCP server's event's own, which the server checks (see
     [Events from MCP servers](#events-from-mcp-servers)).
@@ -120,7 +122,7 @@ counting again from the next agent that works.
 
 | Event | Filter by | Details | What it means |
 | --- | --- | --- | --- |
-| `branch.moved` | branch | branch, from, to | A branch moved: the default branch, or one an agent works on. |
+| `branch.moved` | branch | branch, from, to | A branch an agent works on moved; never the default branch. |
 
 ## Drop box
 
@@ -226,7 +228,7 @@ trigger is:
   *No server here offers pr.merge. ci offers checks.failed, pr.merged.*
 - **`where` is the server's.** Its keys are the subscription's arguments, sent to the server
   and checked against the event's filter schema, as a trigger's are: *ci's pr.merged takes
-  repo (required); repo is needed.* They are not matched against the event's details.
+  branch, pr, repo; "sha" is not one of its arguments.* They are not matched against the event's details.
   `server:` narrows it to the servers named.
 - **It subscribes for as long as it waits**, from now, sharing a workflow's subscription
   when they ask for the same thing. When it is answered, times out or is cancelled, the

@@ -269,7 +269,8 @@ struct WorkflowBoundsTests {
 
     // MARK: Walks
 
-    /// Only live agents' branches are watched; an archived agent's are not (#218).
+    /// Only live agents' branches are watched; an archived agent's are not (#218), nor the
+    /// default branch (#702).
     @Test func onlyLiveAgentsBranchesAreWatched() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
@@ -284,7 +285,7 @@ struct WorkflowBoundsTests {
         }
         let core = DaemonCore(store: store, locations: locations, discovery: .findsEverything, launcher: FakeLauncher())
         await core.loadFromDisk()
-        #expect(await core.watchedBranches(in: work, tips: [:]) == ["main", "agents/live"])
+        #expect(await core.watchedBranches(in: work) == ["agents/live"])
     }
 
     /// The tips of folders that are no longer projects go.

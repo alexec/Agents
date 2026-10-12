@@ -68,7 +68,7 @@ const eventMeanings: Record<string, string> = {
   "workflow.ran": "A workflow in this project started an agent",
   "workflow.completed": "A workflow's run in this project finished",
   "workflow.refused": "A workflow in this project did not run, and why",
-  "branch.moved": "A branch moved: the default branch, or one an agent works on",
+  "branch.moved": "A branch an agent works on moved; never the default branch",
   "lease.granted": "An agent was given a lease",
   "lease.released": "A lease was given back, ended or ran out",
   "mac.sleep": "This Mac is going to sleep",

@@ -18,6 +18,8 @@ export interface FailedRunData {
   failedJobs: { name: string; url: string }[];
 }
 export interface MergedPR { pr: PR; mergedAt: string; mergeSha: string }
+/** A pull request closed without being merged. */
+export interface ClosedPR { pr: PR; closedAt: string }
 
 export interface Issue { number: number; title: string; author: string; labels: string[]; url: string }
 export interface ListedIssue extends Issue { comments: number; updatedAt: string }
@@ -34,8 +36,10 @@ export interface GitHub {
   failedRuns(repo: string, branch: string | undefined, since: string): Promise<{ runs: RunRef[]; truncated: boolean }>;
   /** The run's PR and failed jobs, or null when it belongs to no PR. */
   runDetails(repo: string, run: RunRef): Promise<FailedRunData | null>;
-  /** PRs merged at or after `since`. */
-  mergedPRs(repo: string, since: string): Promise<{ prs: MergedPR[]; truncated: boolean }>;
+  /** The repo the server's folder pushes to, owner/name: what an argument without `repo` means (#702). */
+  defaultRepo(): Promise<string>;
+  /** PRs merged, and PRs closed without merging, at or after `since`. */
+  closedPRs(repo: string, since: string): Promise<{ merged: MergedPR[]; closed: ClosedPR[]; truncated: boolean }>;
   listPRs(repo: string): Promise<BoardPR[]>;
   /** What happened to the repo's issues at or after `since`, of one kind. */
   issueActivity(repo: string, kind: IssueKind, since: string): Promise<{ items: IssueActivity[]; truncated: boolean }>;
@@ -167,6 +171,8 @@ function failure(missing: boolean, stderr: string, res: Response | null): GhErro
 export function realGitHub(): GitHub {
   // ETags of GET bodies, so an unchanged listing costs no rate limit (GitHub doesn't count 304s).
   const etags = new Map<string, { etag: string; body: string }>();
+  // Asked of gh once; a failure is asked again next time.
+  let defaultRepo: Promise<string> | undefined;
 
   async function api(path: string, options: { method?: string; fields?: Record<string, string>; cache?: boolean; log?: boolean } = {}) {
     const args = ["api", "-i", path, "-H", "Accept: application/vnd.github+json"];
@@ -259,20 +265,36 @@ export function realGitHub(): GitHub {
       };
     },
 
-    async mergedPRs(repo, since) {
-      const prs: MergedPR[] = [];
+    async defaultRepo() {
+      defaultRepo ??= run(["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"]).then((result) => {
+        const name = result.stdout.trim();
+        if (result.code !== 0 || !name) {
+          defaultRepo = undefined;
+          throw new GhError(result.missing ? "notSignedIn" : "notFound",
+            result.missing ? "gh is not installed" : `repo is needed: ${process.cwd()} has no GitHub repo`);
+        }
+        return name;
+      });
+      return defaultRepo;
+    },
+
+    async closedPRs(repo, since) {
+      const merged: MergedPR[] = [];
+      const closed: ClosedPR[] = [];
       for (let page = 1; page <= MAX_PAGES; page++) {
         const list = await json(`repos/${repo}/pulls?state=closed&sort=updated&direction=desc&per_page=${PER_PAGE}&page=${page}`);
         for (const p of list as any[]) {
-          if (at(p.updated_at) < at(since)) return { prs, truncated: false };
-          if (p.merged_at && at(p.merged_at) >= at(since)) {
-            prs.push({ pr: { number: p.number, title: p.title, branch: p.head.ref, url: p.html_url },
-              mergedAt: p.merged_at, mergeSha: p.merge_commit_sha });
+          if (at(p.updated_at) < at(since)) return { merged, closed, truncated: false };
+          const pr = { number: p.number, title: p.title, branch: p.head.ref, url: p.html_url };
+          if (p.merged_at) {
+            if (at(p.merged_at) >= at(since)) merged.push({ pr, mergedAt: p.merged_at, mergeSha: p.merge_commit_sha });
+          } else if (p.closed_at && at(p.closed_at) >= at(since)) {
+            closed.push({ pr, closedAt: p.closed_at });
           }
         }
-        if (list.length < PER_PAGE) return { prs, truncated: false };
+        if (list.length < PER_PAGE) return { merged, closed, truncated: false };
       }
-      return { prs, truncated: true };
+      return { merged, closed, truncated: true };
     },
 
     async listPRs(repo) {
@@ -396,11 +418,24 @@ export function fakeGitHub(file: string): GitHub {
       };
     },
 
-    async mergedPRs(repo, since) {
-      const prs = (repoOf(await load(), repo).prs as any[])
+    async defaultRepo() {
+      // `defaultRepo` in the file, or its one repo.
+      const data = await load();
+      const repos = Object.keys(data.repos ?? {});
+      const name = data.defaultRepo ?? (repos.length === 1 ? repos[0] : undefined);
+      if (!name) throw new GhError("notFound", "repo is needed: this folder has no GitHub repo");
+      return name;
+    },
+
+    async closedPRs(repo, since) {
+      const prs = repoOf(await load(), repo).prs as any[];
+      const merged = prs
         .filter((p) => p.state === "merged" && p.mergedAt && at(p.mergedAt) >= at(since))
         .map((p) => ({ pr: toPR(p), mergedAt: p.mergedAt, mergeSha: p.mergeSha }));
-      return { prs, truncated: false };
+      const closed = prs
+        .filter((p) => p.state === "closed" && p.closedAt && at(p.closedAt) >= at(since))
+        .map((p) => ({ pr: toPR(p), closedAt: p.closedAt }));
+      return { merged, closed, truncated: false };
     },
 
     async listPRs(repo) {
