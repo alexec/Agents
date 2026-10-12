@@ -1954,6 +1954,14 @@ export class Store extends Work {
     void this.link.call("agents/prewarm", { agentID: agentID as UUID, why }, host).catch(() => {});
   }
 
+  /** The session whose title is being edited (#751), and whether in the chat's header or its row. */
+  readonly renaming = signal<{ id: string; inChat: boolean } | null>(null);
+
+  /** The person's title for a session (#751); empty, the runtime names it again. */
+  async rename(host: string, agentID: string, title: string): Promise<void> {
+    await this.act("agents/rename", { agentID: agentID as UUID, title }, host);
+  }
+
   /** Mark as Unread / Mark as Read (#70). */
   async setUnread(host: string, agentID: string, unread: boolean): Promise<void> {
     await this.act("agents/setUnread", { agentID: agentID as UUID, unread }, host);

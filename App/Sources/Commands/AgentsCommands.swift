@@ -192,6 +192,12 @@ struct AgentsCommands: Commands {
                 Task { await model.setPinned(agent, !pinned) }
             }
             .disabled(agent == nil || agent?.state == .archived)
+            // The person's title (#751), edited in the toolbar.
+            Button("Rename…") {
+                guard let agent else { return }
+                model.renaming = Renaming(id: agent.id, inToolbar: true)
+            }
+            .disabled(agent == nil || agent?.state == .archived)
             Divider()
             Button("Branch") { act { await model.fork($0.id) } }
                 .keyboardShortcut("b", modifiers: [.command, .option])

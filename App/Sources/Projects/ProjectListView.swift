@@ -203,6 +203,8 @@ struct ProjectListView: View {
         }
         // ⌫ archives everything highlighted that is not already archived (one or many).
         .onDeleteCommand { archivePicked() }
+        // Return renames the one session highlighted, as Finder renames a file (#751).
+        .onKeyPress(.return, action: renamePicked)
         .onChange(of: picked) { _, picks in applyPicked(picks) }
         .onChange(of: selection, initial: true) { _, item in applySelection(item) }
         .onChange(of: requests.wantsSessionSearchFocus) { _, wants in
@@ -308,6 +310,14 @@ struct ProjectListView: View {
             folds.set(key, open: true)
         }
         if picked.count <= 1 || !picked.contains(item) { picked = [item] }
+    }
+
+    /// Return on one highlighted session edits its title in its row (#751).
+    private func renamePicked() -> KeyPress.Result {
+        guard model.renaming == nil, picked.count == 1, case .session(let id)? = picked.first,
+              let agent = model.work.agent(id), agent.state != .archived else { return .ignored }
+        model.renaming = Renaming(id: id)
+        return .handled
     }
 
     private func archivePicked() {

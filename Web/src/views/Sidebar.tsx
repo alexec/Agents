@@ -30,7 +30,7 @@ import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./Contex
 import { CloningRows, EmptyProjects, NewProjectMenu } from "./NewProject";
 import { putFilesInDropbox, useDropboxDrop } from "./DropboxDialog";
 import { rowExtras, SessionRow } from "./SessionRow";
-import { runSessionAction, sessionActions } from "./SessionMenu";
+import { RenameInput, runSessionAction, sessionActions } from "./SessionMenu";
 import { WorkflowRow } from "./WorkflowRow";
 import { PinnedPageRows } from "./Pins";
 import { memo } from "../render/memo";
@@ -610,9 +610,11 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
     <div class={`nav-item${drop.targeted ? " drop-target" : ""}`} onContextMenu={(e) => openContextMenu(e, menu())}
       onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }} {...holdForMenu(menu)} {...drop.props}>
       {/* No wait lines: in the sidebar a session's row is its title and one line (#587). */}
-      <SessionRow agent={agent} chosen={chosen} onPick={() => go({ host, project: folder, session: agent.id })} going={going}
+      {store.renaming.value?.id === agent.id && !store.renaming.value.inChat
+        ? <div class="row session renaming"><RenameInput store={store} host={host} agent={agent} /></div>
+        : <SessionRow agent={agent} chosen={chosen} onPick={() => go({ host, project: folder, session: agent.id })} going={going}
         extras={rowExtras(store, host, agent)}
-        inSidebar place={place} />
+        inSidebar place={place} />}
     </div>
   );
 });

@@ -22,7 +22,7 @@ import { Labels } from "./Labels";
 import { Prompt } from "./Prompt";
 import { PromptMenus } from "./PromptMenus";
 import { ContextMeter, CostLimitBanner, SandboxCapsule } from "./PromptStatus";
-import { SessionButtons, SessionMenu } from "./SessionMenu";
+import { RenameInput, SessionButtons, SessionMenu } from "./SessionMenu";
 import { drawable } from "../model/options";
 import { projectFolder } from "../model/groups";
 import { CallActionsContext, detailSummaries, detailTitles, fromLine, ItemRow, TurnView, type CallActions, type TurnDetail } from "./chat/Rows";
@@ -468,7 +468,9 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       )}
       <header class="column-head">
         <BackToList />
-        <h1>{agent?.title ?? "New session"}</h1>
+        {agent && store.renaming.value?.id === agent.id && store.renaming.value.inChat
+          ? <h1><RenameInput store={store} host={host} agent={agent} /></h1>
+          : <h1>{agent?.title ?? "New session"}</h1>}
         <span class="actions">
           <select class="detail" aria-label="Turns" title={detailSummaries[level.value]} value={level.value}
             onChange={(e) => choose((e.currentTarget as HTMLSelectElement).value as TurnDetail)}>
