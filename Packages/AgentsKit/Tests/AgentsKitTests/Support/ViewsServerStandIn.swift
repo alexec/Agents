@@ -11,10 +11,13 @@ import FoundationNetworking
 final class ViewsServerStandIn: @unchecked Sendable {
     private let lock = NSLock()
     private var methods: [String] = []
+    private var urlPaths: [String] = []
     private var sessions = 0
     private var html: String
     var seen: [String] { lock.withLock { methods } }
     var connections: Int { lock.withLock { sessions } }
+    /// The path each request was sent to.
+    var paths: [String] { lock.withLock { urlPaths } }
 
     init(html: String = "<p>weather</p>") { self.html = html }
 
@@ -36,6 +39,7 @@ final class ViewsServerStandIn: @unchecked Sendable {
         let method = request.httpMethod == "POST" ? body?["method"]?.stringValue ?? "?" : request.httpMethod ?? "?"
         let html = lock.withLock { () -> String in
             methods.append(method)
+            urlPaths.append(request.url?.path ?? "")
             if method == "initialize" { sessions += 1 }
             return self.html
         }

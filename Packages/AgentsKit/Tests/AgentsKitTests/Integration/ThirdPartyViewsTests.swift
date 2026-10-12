@@ -149,6 +149,19 @@ struct ThirdPartyViewsTests {
             == PinMissing.localServer)
     }
 
+    @Test func aHostedServersViewsComeThroughItsOneCopy() async throws {
+        let s = try await setUp(#"{"mcpServers":{"kite":{"command":"node","args":["x.js"],"hosted":true}}}"#)
+        let view = try await codexCall(s)
+        #expect(view.server == "kite" && view.resourceURI == "ui://kite/weather")
+        // Reached on the app's endpoint, as a user of the hosted copy while connected.
+        #expect(!s.stand.paths.isEmpty && s.stand.paths.allSatisfy { $0.hasPrefix(HostedMCPServers.pathPrefix) })
+        #expect(await s.core.hostedServers.snapshot().servers.map(\.users) == [1])
+        // The connection ends, and lets the copy go.
+        await s.core.viewClients.endAll()
+        #expect(await s.core.hostedServers.snapshot().servers.map(\.users) == [0])
+        await s.core.hostedServers.stopAll()
+    }
+
     @Test func aServerWaitingForApprovalShowsNothing() async throws {
         let s = try await setUp()
         await s.core.beginMCPApprovalsIfNeeded()
