@@ -19,6 +19,15 @@ test("the chat project is the one marked isChat, and not when archived", () => {
   assert.equal(c.chatProject([archived]), undefined);
 });
 
+test("New Chat is not offered while the chat project is switched off (archived), only then", () => {
+  const chat = project("file:///home/.agents/chat", { summary: { isChat: true } });
+  const archived = project("file:///home/.agents/chat", { summary: { isChat: true }, project: { archivedAt: 5 } });
+  assert.equal(c.chatSwitchedOff(undefined), false);
+  assert.equal(c.chatSwitchedOff([project("file:///work/api")]), false);
+  assert.equal(c.chatSwitchedOff([chat]), false);
+  assert.equal(c.chatSwitchedOff([project("file:///work/api"), archived]), true);
+});
+
 test("New Chat says why there is none, as the window does", () => {
   assert.equal(c.chatProblem({ ready: { folder: "file:///x" } }, "This Mac"), null);
   assert.equal(c.chatProblem({ archived: { folder: "file:///x" } }, "This Mac"), "The chat project on this Mac is archived.");

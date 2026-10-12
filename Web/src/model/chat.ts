@@ -8,6 +8,15 @@ export function chatProject(projects: ProjectSummary[] | undefined): ProjectSumm
   return projects?.find((p) => p.isChat === true && p.project.archivedAt === undefined);
 }
 
+/**
+ * The host's chat project is archived, as the window's Settings ▸ General ▸ Chat project switch leaves
+ * it when off (#694): New Chat is not offered. False when it has none at all, so New Chat can say why.
+ */
+export function chatSwitchedOff(projects: ProjectSummary[] | undefined): boolean {
+  const chats = projects?.filter((p) => p.isChat === true) ?? [];
+  return chats.length > 0 && chats.every((p) => p.project.archivedAt !== undefined);
+}
+
 /** Why New Chat could not open one, in the window's words; null when the host says it is ready. */
 export function chatProblem(state: ChatProjectState | null, host: string): string | null {
   if (state === null) return `${host} has no chat project.`;

@@ -7,7 +7,7 @@ import { useEffect, useRef } from "preact/hooks";
 import type { ControlHost, DirectoryEntry, DirectoryListing, RuntimeStatus } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { gitRemote } from "../model/gitRemote";
-import { chatProblem, chatProject } from "../model/chat";
+import { chatProblem, chatProject, chatSwitchedOff } from "../model/chat";
 import { describe } from "../model/errors";
 import { emptyListRuntimeLine, noAgentRuntime } from "../model/runtimes";
 import { isSafeLink } from "../render/markdown";
@@ -74,7 +74,9 @@ export function NewProjectItems({ store, onChoose }: { store: Store; onChoose?: 
         return (
           <div class="new-project-host" role="group" aria-label={hostItem(host)} key={host.id}>
             {hosts.length > 1 && <p class="menu-head">{hostItem(host)}</p>}
-            <button role="menuitem" disabled={offline} onClick={() => { onChoose?.(); void newChat(store, host.id); }}>New Chat</button>
+            {!chatSwitchedOff(store.projects.value[host.id]) && (
+              <button role="menuitem" disabled={offline} onClick={() => { onChoose?.(); void newChat(store, host.id); }}>New Chat</button>
+            )}
             <button role="menuitem" disabled={offline} onClick={() => choose("folder", host.id)}>Add Project…</button>
             <button role="menuitem" disabled={offline} onClick={() => choose("clone", host.id)}>Clone Project from Git URL…</button>
           </div>

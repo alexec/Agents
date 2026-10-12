@@ -59,8 +59,8 @@ enum Appearance: String, CaseIterable, Identifiable {
     }
 }
 
-/// Settings ▸ General: appearance, what agents call you, whether this Mac stays awake, and
-/// archived agents.
+/// Settings ▸ General: appearance, what agents call you, the chat project, whether this Mac
+/// stays awake, and archived agents.
 struct GeneralSettingsView: View {
     @Environment(AppModel.self) private var model
 
@@ -68,6 +68,7 @@ struct GeneralSettingsView: View {
         Form {
             AppearanceSettingsView()
             PersonSettingsSection()
+            ChatProjectSettingsSection()
             WakeSettingsSection()
             ArchiveSettingsSection()
         }
