@@ -4,7 +4,7 @@ import type { HostJoinStatus } from "../protocol/generated";
 
 export type MacHostNotice =
   | { kind: "notRunning" }
-  | { kind: "notJoined"; problem?: string }
+  | { kind: "notJoined"; problem?: string | undefined }
   | { kind: "uplinkFailing"; problem: string }
   | { kind: "notAnswering" };
 
@@ -57,6 +57,6 @@ export function macHostNoticeDetail(notice: MacHostNotice): string {
 function sentence(problem: string): string {
   const trimmed = problem.trim();
   if (!trimmed) return "";
-  const head = trimmed[0].toUpperCase() + trimmed.slice(1);
+  const head = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
   return head.endsWith(".") ? head : `${head}.`;
 }

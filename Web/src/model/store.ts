@@ -313,7 +313,7 @@ export class Work {
   /** Each host's files it could not read in this run (#205, #223), replaced whole by each store/notesChanged. */
   readonly storeNotes = signal<Record<string, string[]>>({});
   /** The control plane's machine, and how this Mac's host says its join stands (#666), from `control/status`. */
-  readonly plane = signal<{ machineID: string; thisMacHost?: HostJoinStatus } | null>(null);
+  readonly plane = signal<{ machineID: string; thisMacHost?: HostJoinStatus | undefined } | null>(null);
   /** Why this Mac's host is quiet, as the window says it (#666), or nil while it is online. */
   readonly macHostNotice: ReadonlySignal<MacHostNotice | null> = computed(() => {
     const plane = this.plane.value;
