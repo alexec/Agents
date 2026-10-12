@@ -763,6 +763,16 @@ public actor DaemonCore {
     public func deliverNeeds(by tell: @escaping @Sendable (JSONValue) -> Void) {
         tellControl = tell
     }
+    /// Where `host/status` goes, whether this host is idle (#691 US4); nil off a control plane.
+    var tellStatus: (@Sendable (JSONValue) -> Void)?
+    /// What `host/status` last said, so it is said again only when it changes.
+    var toldStatus: DaemonAPI.HostStatus?
+
+    /// The uplink to hand `host/status` to.
+    public func deliverStatus(by tell: @escaping @Sendable (JSONValue) -> Void) {
+        tellStatus = tell
+        reviseHostStatus()
+    }
     /// Whether this is a server's daemon (037, 043): one that stays up with nobody
     /// connected, and was not asked to stay up by a control plane.
     var onServer: Bool { !exitsWhenIdle && !hostsForControlPlane }

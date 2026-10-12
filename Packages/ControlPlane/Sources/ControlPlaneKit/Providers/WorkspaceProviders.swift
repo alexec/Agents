@@ -18,17 +18,20 @@ public actor WorkspaceProviders: WorkspaceHandling {
         /// How often a start looks for the host's connection.
         public var lookEvery: Duration
         public var calls: ProviderConnection.Timing
+        /// What one minute of a stop when idle lasts: a minute, but shorter in tests.
+        public var idleMinute: Duration
 
         public static let standard = Timing(listEvery: .seconds(300), sshAfter: .seconds(120), giveUp: .seconds(600),
                                             lookEvery: .seconds(1), calls: .standard)
 
         public init(listEvery: Duration, sshAfter: Duration, giveUp: Duration, lookEvery: Duration,
-                    calls: ProviderConnection.Timing) {
+                    calls: ProviderConnection.Timing, idleMinute: Duration = .seconds(60)) {
             self.listEvery = listEvery
             self.sshAfter = sshAfter
             self.giveUp = giveUp
             self.lookEvery = lookEvery
             self.calls = calls
+            self.idleMinute = idleMinute
         }
     }
 
@@ -89,6 +92,15 @@ public actor WorkspaceProviders: WorkspaceHandling {
     private var ticker: Task<Void, Never>?
     /// Prompts and agent starts kept for stopped hosts (US3).
     public private(set) var kept: KeptRequests?
+    /// What each host last said about whether it is idle (US4). A host that never says is
+    /// never stopped as idle.
+    private var statuses: [HostID: DaemonAPI.HostStatus] = [:]
+    /// Each linked host's stop when idle, counting down while it stays idle.
+    private var idleTimers: [HostID: Task<Void, Never>] = [:]
+    /// Stops under way because a host was idle, by how many minutes.
+    private var idleStopping: [HostID: Int] = [:]
+    /// "Stopped by Agents after 30 minutes idle", until it is started again.
+    private var stoppedBy: [HostID: String] = [:]
 
     public init(store: any ControlStore, records: ControlRecords, methods: ControlMethods, router: ControlRouter,
                 secrets: ProviderSecrets, timing: Timing = .standard, hooks: Hooks,
@@ -164,18 +176,26 @@ public actor WorkspaceProviders: WorkspaceHandling {
             return try JSONValue.encoding(try await changeLink(host) { $0.workspace = nil })
         case DaemonAPI.Method.hostsSetWorkspaceOptions:
             let options = try Self.require(params, as: DaemonAPI.HostWorkspaceOptions.self)
-            return try JSONValue.encoding(try await changeLink(options.host) { record in
+            return try JSONValue.encoding(try await changeLink(options.host, { record in
                 guard var link = record.workspace else { return }
                 if let on = options.startWhenUsed { link.startWhenUsed = on }
                 if let minutes = options.stopWhenIdleMinutes { link.stopWhenIdleMinutes = minutes > 0 ? minutes : nil }
                 record.workspace = link
-            })
+            }, then: { await self.countIdle(options.host) }))
         case DaemonAPI.Method.hostsStart:
             let host = try Self.require(params, as: DaemonAPI.HostRequest.self).host
             return try JSONValue.encoding(try await begin(.start, host, by: who))
         case DaemonAPI.Method.hostsStop:
-            let host = try Self.require(params, as: DaemonAPI.HostStop.self).host
-            return try JSONValue.encoding(try await begin(.stop, host, by: who))
+            let request = try Self.require(params, as: DaemonAPI.HostStop.self)
+            // Asked first while agents are working there (US4 AS4).
+            if request.confirmRunning != true, let running = statuses[request.host]?.running, !running.isEmpty,
+               await router.state(of: request.host)?.isOnline == true {
+                let name = await records.host(request.host)?.name ?? request.host.rawValue
+                throw JSONRPCError(code: DaemonAPI.Failure.agentsWorking,
+                                   message: "Stop \(name)? \(Self.list(running)) \(running.count == 1 ? "is" : "are") working there.",
+                                   data: ["running": .array(running.map { .string($0) })])
+            }
+            return try JSONValue.encoding(try await begin(.stop, request.host, by: who))
         case DaemonAPI.Method.hostsKeep:
             let request = try Self.require(params, as: DaemonAPI.KeepRequest.self)
             guard let kept, let answer = await kept.keep(host: request.host, method: request.method,
@@ -358,12 +378,14 @@ public actor WorkspaceProviders: WorkspaceHandling {
         }
     }
 
-    private func changeLink(_ host: HostID, _ change: (inout HostRecord) -> Void) async throws -> DaemonAPI.ControlHost {
+    private func changeLink(_ host: HostID, _ change: (inout HostRecord) -> Void,
+                            then after: () async -> Void = {}) async throws -> DaemonAPI.ControlHost {
         guard var record = await records.host(host) else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchHost, message: "No host is called \(host.rawValue).")
         }
         change(&record)
         try await records.save(record)
+        await after()
         let saved = await records.host(host) ?? record
         log("workspace: \(saved.name) \(saved.workspace.map { "linked to \($0.provider)/\($0.workspace)" } ?? "unlinked")")
         await changed()
@@ -404,6 +426,8 @@ public actor WorkspaceProviders: WorkspaceHandling {
         if activities[host] == nil {
             activities[host] = Activity(kind: kind, phase: kind == .start ? "provider" : "stopping", since: Date())
             problems[host] = nil
+            stoppedBy[host] = nil
+            idleTimers.removeValue(forKey: host)?.cancel()
             await changed()
             Task { await self.run(kind, host: host, link: link, by: who) }
         }
@@ -431,6 +455,11 @@ public actor WorkspaceProviders: WorkspaceHandling {
         await refresh(link.provider)
         guard kind == .start else {
             log("workspace: stop \(what) by \(who): ok in \(Self.seconds(since: began))")
+            // Said on its row and strip until it is started again (US4 AS1).
+            if let minutes = idleStopping.removeValue(forKey: host) {
+                stoppedBy[host] = "Stopped by Agents after \(Self.words(minutes: minutes)) idle"
+            }
+            statuses[host] = nil
             await finish(host, link, problem: nil)
             return
         }
@@ -472,6 +501,60 @@ public actor WorkspaceProviders: WorkspaceHandling {
         await finish(host, link, problem: problem)
     }
 
+    // MARK: Stop when idle (US4)
+
+    public func heard(_ host: HostID, status: DaemonAPI.HostStatus) async {
+        let was = statuses[host]
+        statuses[host] = status
+        // Busy again cancels the count; still idle leaves it running (US4 AS2).
+        if !status.idle { idleTimers.removeValue(forKey: host)?.cancel() }
+        if status.idle, was?.idle != true || idleTimers[host] == nil { await countIdle(host) }
+    }
+
+    /// Starts counting down a linked host's stop when idle, from now, if it is idle, online
+    /// and has one; otherwise stops counting.
+    private func countIdle(_ host: HostID) async {
+        idleTimers.removeValue(forKey: host)?.cancel()
+        guard statuses[host]?.idle == true, let minutes = await records.host(host)?.workspace?.stopWhenIdleMinutes,
+              minutes > 0, activities[host] == nil, await router.state(of: host)?.isOnline == true else { return }
+        let wait = timing.idleMinute * minutes
+        idleTimers[host] = Task { [weak self] in
+            try? await Task.sleep(for: wait)
+            guard !Task.isCancelled else { return }
+            await self?.idleFor(host, minutes: minutes)
+        }
+    }
+
+    private func idleFor(_ host: HostID, minutes: Int) async {
+        idleTimers[host] = nil
+        // Still idle, still online, and still set to this (US4 AS1).
+        guard statuses[host]?.idle == true, activities[host] == nil,
+              await router.state(of: host)?.isOnline == true,
+              await records.host(host)?.workspace?.stopWhenIdleMinutes == minutes else { return }
+        idleStopping[host] = minutes
+        do {
+            _ = try await begin(.stop, host, by: "idle (\(minutes) min)")
+        } catch {
+            idleStopping[host] = nil
+            log("workspace: stop \(host) by idle (\(minutes) min): refused: \((error as? JSONRPCError)?.message ?? "\(error)")")
+        }
+    }
+
+    static func words(minutes: Int) -> String {
+        switch minutes {
+        case 60: "1 hour"
+        case let m where m % 60 == 0: "\(m / 60) hours"
+        case 1: "1 minute"
+        default: "\(minutes) minutes"
+        }
+    }
+
+    /// "Claude (fix-login) and Codex (docs)".
+    static func list(_ names: [String]) -> String {
+        guard names.count > 1 else { return names.first ?? "" }
+        return names.dropLast().joined(separator: ", ") + " and " + names.last!
+    }
+
     private func setPhase(_ host: HostID, _ phase: String) async {
         activities[host]?.phase = phase
         await changed()
@@ -480,6 +563,7 @@ public actor WorkspaceProviders: WorkspaceHandling {
     private func finish(_ host: HostID, _ link: WorkspaceLink, problem: String?) async {
         let kind = activities[host]?.kind
         activities[host] = nil
+        idleStopping[host] = nil
         problems[host] = problem
         await changed()
         if kind == .start, let problem { await kept?.startFailed(host, problem) }
@@ -517,6 +601,7 @@ public actor WorkspaceProviders: WorkspaceHandling {
             workspaceName: found?.name ?? link.workspace, workspaceState: state, hostState: hostState,
             phase: activity?.kind == .start ? activity?.phase : nil, since: activity?.since,
             problem: problems[record.id],
+            stoppedBy: hostState == "stopped" ? stoppedBy[record.id] : nil,
             canStart: activity == nil && !["running", "starting"].contains(state),
             canStop: activity == nil && ["running", "starting", "unknown"].contains(state),
             startWhenUsed: link.startWhenUsed ?? true, stopWhenIdleMinutes: link.stopWhenIdleMinutes,

@@ -166,8 +166,23 @@ final class ControlSettingsModel {
         await perform(DaemonAPI.Method.hostsStart, DaemonAPI.HostRequest(host: host))
     }
 
-    func stop(_ host: HostID) async {
-        await perform(DaemonAPI.Method.hostsStop, DaemonAPI.HostStop(host: host))
+    /// Stop. Unconfirmed while agents are working there, the control plane says who they are
+    /// (US4 AS4), and that is answered for the question; nil once it is stopping or refused.
+    func stop(_ host: HostID, confirmed: Bool = false) async -> [String]? {
+        do {
+            _ = try await client.call(DaemonAPI.Method.hostsStop, DaemonAPI.HostStop(host: host, confirmRunning: confirmed ? true : nil))
+            problem = nil
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.agentsWorking {
+            let names = error.data?["running"]?.arrayValue?.compactMap(\.stringValue) ?? []
+            if !names.isEmpty { return names }
+            problem = HostProblem.controlRefusal(error)
+        } catch let error as JSONRPCError {
+            problem = HostProblem.controlRefusal(error)
+        } catch {
+            problem = "The control plane can’t be reached."
+        }
+        await refresh()
+        return nil
     }
 
     /// Links a server added from a workspace once it joins under `name` (Add as Host…).

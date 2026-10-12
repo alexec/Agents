@@ -245,8 +245,9 @@ struct ControlHostsPage: View {
     @State private var choosing: DaemonAPI.ControlHost?
     /// Link to Workspace… (#691, L5).
     @State private var linking: DaemonAPI.ControlHost?
-    /// Stop, asked first while agents are working there (L2).
+    /// Stop, asked first while agents are working there (L2), with who they are.
     @State private var stopping: DaemonAPI.ControlHost?
+    @State private var stoppingNames: [String] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -296,10 +297,10 @@ struct ControlHostsPage: View {
         .confirmationDialog(stopping.map { "Stop \($0.name)?" } ?? "",
                             isPresented: Binding(get: { stopping != nil }, set: { if !$0 { stopping = nil } }),
                             titleVisibility: .visible, presenting: stopping) { host in
-            Button("Stop") { Task { await control.stop(host.id) } }
+            Button("Stop") { Task { _ = await control.stop(host.id, confirmed: true) } }
             Button("Cancel", role: .cancel) {}
-        } message: { host in
-            Text("\(workingNames(host).joined(separator: " and ")) \(workingNames(host).count == 1 ? "is" : "are") working there. Stopping its workspace stops them.")
+        } message: { _ in
+            Text("\(Self.list(stoppingNames)) \(stoppingNames.count == 1 ? "is" : "are") working there. Stopping its workspace stops them.")
         }
         .sheet(item: $choosing) { host in
             ChooseProjectsSheet(host: host.id, hostName: host.id == control.thisMacHost?.id ? "This Mac" : host.name,
@@ -344,7 +345,12 @@ struct ControlHostsPage: View {
                 }
             } else if host.state == "online" || !workspace.canStart {
                 Button("Stop") {
-                    if workingNames(host).isEmpty { Task { await control.stop(host.id) } } else { stopping = host }
+                    // The control plane knows who is working there, from the host itself (US4).
+                    Task {
+                        guard let names = await control.stop(host.id) else { return }
+                        stoppingNames = names
+                        stopping = host
+                    }
                 }
                 .buttonStyle(.paper)
                 .disabled(!workspace.canStop)
@@ -399,10 +405,22 @@ struct ControlHostsPage: View {
         .accessibilityLabel("More for \(host.name)")
     }
 
-    /// The agents working on a host now, by name, for Stop's question.
-    private func workingNames(_ host: DaemonAPI.ControlHost) -> [String] {
-        model.work.agents.filter { $0.host == host.id && ($0.state == .running || $0.state == .starting) }
-            .map { $0.title ?? "An agent" }
+    static func minutes(_ minutes: Int) -> String {
+        minutes == 60 ? "1 hour" : minutes % 60 == 0 ? "\(minutes / 60) hours" : "\(minutes) minutes"
+    }
+
+    /// "Claude (fix-login) and Codex (docs)".
+    static func list(_ names: [String]) -> String {
+        guard names.count > 1 else { return names.first ?? "" }
+        return names.dropLast().joined(separator: ", ") + " and " + names.last!
+    }
+
+    /// The host's workflows that run on a clock (L8): they don't run while it is stopped.
+    private func scheduledWorkflows(_ host: HostID) -> Int {
+        model.work.projects.filter { $0.host == host }
+            .flatMap { model.work.workflows(in: $0.folder) }
+            .filter { !$0.isArchived && $0.isEnabled && !$0.workflow.schedules.isEmpty }
+            .count
     }
 
     private func thisMacLine(_ host: DaemonAPI.ControlHost) -> String {
@@ -437,10 +455,17 @@ struct ControlHostsPage: View {
             if host.state != "online", let cost = workspace.cost { parts.append(cost) }
             var second: [String] = []
             if let problem = workspace.problem { second.append(problem) }
-            if let minutes = workspace.stopWhenIdleMinutes { second.append("Stops after \(minutes) minutes idle") }
+            if let minutes = workspace.stopWhenIdleMinutes { second.append("Stops after \(Self.minutes(minutes)) idle") }
             if workspace.startWhenUsed { second.append("Starts when used") }
             if !workspace.current { second.append("\(workspace.providerName) didn’t answer its last list") }
-            return parts.joined(separator: " · ") + (second.isEmpty ? "" : "\n" + second.joined(separator: " · "))
+            var lines = [parts.joined(separator: " · ")]
+            if !second.isEmpty { lines.append(second.joined(separator: " · ")) }
+            // L8: a host that stops when idle doesn't run its scheduled workflows while stopped.
+            let scheduled = workspace.stopWhenIdleMinutes == nil ? 0 : scheduledWorkflows(host.id)
+            if scheduled > 0 {
+                lines.append("⚠ \(scheduled == 1 ? "1 scheduled workflow here doesn’t" : "\(scheduled) scheduled workflows here don’t") run while it is stopped.")
+            }
+            return lines.joined(separator: "\n")
         }
         if let tunnel = host.tunnel {
             // Behind a bastion (#435): it dials through a session this Mac holds.

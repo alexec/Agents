@@ -111,7 +111,25 @@ Only prompts and new agents start a workspace. Reading a chat or a file on a sto
 doesn't. With **Start when used** off, a prompt to a stopped server is refused, and its strip
 offers **Start**.
 
-Stopping a server once it has been idle is coming (#691).
+### Stop when idle
+
+A workspace costs money while it runs. With **Stop when idle** on, Agents stops it once its
+server has been idle for the whole time you chose: 15, 30 or 60 minutes, or 2 hours. Idle
+means:
+
+- no turn running,
+- no agent waiting on your answer,
+- and no terminal or project shell open.
+
+A turn starting in that time starts the count again. When Agents stops it, its row and the
+strip over its chats say **devbox was stopped by Agents after 30 minutes idle**. With **Start
+when used** on as well, your next prompt starts it again.
+
+A server's scheduled workflows don't run while it is stopped. Its row warns you when it has
+some and **Stop when idle** is on.
+
+A server on a build of Agents from before this never says whether it is idle, so it is never
+stopped as idle. Update it from its row.
 
 ## If it doesn't work
 

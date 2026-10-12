@@ -436,6 +436,12 @@ public actor ControlMethods: ControlHandling {
         case DaemonAPI.Method.attentionNeed:
             await hooks.need(host, params)
             return [:]
+        case DaemonAPI.Method.hostStatus:
+            // Whether it is idle, for its workspace's stop when idle (#691 US4).
+            if let status = try? params?.decode(DaemonAPI.HostStatus.self) {
+                await hooks.workspaces?.heard(host, status: status)
+            }
+            return [:]
         case DaemonAPI.Method.tunnelOpen:
             // Only to a lender an operator said yes to, for that runtime (T091).
             let request = try Self.require(params, as: DaemonAPI.TunnelOpen.self)

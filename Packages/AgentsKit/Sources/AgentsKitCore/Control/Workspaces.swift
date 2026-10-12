@@ -135,6 +135,8 @@ public struct ProviderRecord: Codable, Hashable, Sendable, Identifiable {
 /// executable. Absent on a control plane with several copies (research R4).
 public protocol WorkspaceHandling: Sendable {
     func answer(method: String, params: JSONValue?, from caller: ControlRouter.Caller) async throws -> JSONValue
+    /// A host said whether it is idle (`host/status`, #691 US4).
+    func heard(_ host: HostID, status: DaemonAPI.HostStatus) async
 }
 
 public extension DaemonAPI.Method {
@@ -179,6 +181,8 @@ public extension DaemonAPI.Failure {
     static let notLinked = -32065
     /// The provider said no, in its own words.
     static let providerFailed = -32066
+    /// Stop while agents are working there, not confirmed (US4 AS4). `data` is `{running: [names]}`.
+    static let agentsWorking = -32068
 }
 
 public extension DaemonAPI {
