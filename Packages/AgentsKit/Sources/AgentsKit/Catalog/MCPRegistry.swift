@@ -4,7 +4,8 @@ import Foundation
 import FoundationNetworking
 #endif
 
-/// Search and detail against the official MCP Registry (060, R1, R2).
+/// Search and detail against an MCP Registry (060, R1, R2): the official one, GitHub's, or
+/// a company's own (#687).
 struct MCPRegistry: Sendable {
     var session: URLSession
     var endpoints: MCPRegistryEndpoints
@@ -20,7 +21,7 @@ struct MCPRegistry: Sendable {
         let url = endpoints.searchURL(query: trimmed)
         let data: Data
         do {
-            let (d, response) = try await session.data(from: url)
+            let (d, response) = try await session.data(for: endpoints.request(url))
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
                 throw DaemonAPI.MCPCatalogError.unreachable(host: url.host ?? endpoints.base.host ?? "registry")
             }
@@ -30,7 +31,9 @@ struct MCPRegistry: Sendable {
         } catch {
             throw DaemonAPI.MCPCatalogError.unreachable(host: url.host ?? endpoints.base.host ?? "registry")
         }
-        let decoded = try JSONDecoder().decode(SearchResponse.self, from: data)
+        guard let decoded = try? JSONDecoder().decode(SearchResponse.self, from: data) else {
+            throw DaemonAPI.MCPCatalogError.unreachable(host: url.host ?? endpoints.base.host ?? "registry")
+        }
         return decoded.servers.map { Self.result(from: $0.server) }
     }
 
@@ -38,7 +41,7 @@ struct MCPRegistry: Sendable {
         let url = endpoints.detailURL(name: registryName)
         let data: Data
         do {
-            let (d, response) = try await session.data(from: url)
+            let (d, response) = try await session.data(for: endpoints.request(url))
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
                 throw DaemonAPI.MCPCatalogError.unreachable(host: url.host ?? endpoints.base.host ?? "registry")
             }

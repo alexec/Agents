@@ -74,8 +74,10 @@ something particular done.
   put them in `~/.agents` once, for every runtime and project.
 - [Add a skill from a catalogue](add-a-skill-from-a-catalogue.md): search skills.sh, look
   before it goes in, and add it for yourself or to a project.
-- [Add an MCP server from the registry](add-an-mcp-server-from-the-registry.md): search the
-  MCP Registry, see what would run, and add it for yourself or to a project. Secrets stay
+- [Choose marketplaces](choose-marketplaces.md): which marketplaces Add server… and Add
+  skill… search, and adding your own, such as your company's MCP registry.
+- [Add an MCP server from the registry](add-an-mcp-server-from-the-registry.md): search
+  GitHub's MCP registry or another, see what would run, and add it for yourself or to a project. Secrets stay
   in your own `secrets.env`.
 - [Add an MCP server by hand](add-an-mcp-server-by-hand.md): a local command or a remote
   URL that is not on the registry, verified to answer before anything is written.

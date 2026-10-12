@@ -6,8 +6,9 @@ description: Search the MCP Registry from the app, see exactly what would run, a
 
 # Add an MCP server from the registry
 
-You can find a server on the [MCP Registry](https://registry.modelcontextprotocol.io) and add
-it without leaving the app, either for yourself, so every agent you start has it, or to one
+You can find a server on a registry, [GitHub's](https://github.com/mcp) by default, the
+official [MCP Registry](https://registry.modelcontextprotocol.io), or one you added (see
+[Choose marketplaces](choose-marketplaces.md)), and add it without leaving the app, either for yourself, so every agent you start has it, or to one
 project. The app shows the command or URL before anything is written. A secret is stored as
 `${NAME}` in `mcp.json`, and the value goes in your own `~/.agents/secrets.env`, which is
 never committed and never shown again.
@@ -20,7 +21,8 @@ never committed and never shown again.
 ## Add a server for yourself
 
 1. Open **Settings ▸ Shared ▸ MCP servers** and choose **Add server…**.
-2. Type what you are looking for. Results come from the registry, in its own order. Each
+2. Type what you are looking for. Results come from the marketplace chosen in the
+   **Marketplace** menu, in its own order (GitHub's puts the most starred first). Each
    shows the publisher it has checked (a GitHub org, or a domain), the description, the
    version, and how the server runs. **known** marks a publisher on the app's short list.
    A remote that runs on someone else's host names that host.

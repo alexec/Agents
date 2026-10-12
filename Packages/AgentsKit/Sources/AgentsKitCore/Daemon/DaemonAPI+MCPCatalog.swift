@@ -56,11 +56,15 @@ extension DaemonAPI {
         public var known: Bool
         public var runs: [MCPRunKind]
         public var remoteHost: String?
+        /// The marketplace it was found in (#687); nil for the official registry.
+        public var marketplace: String?
 
         public init(id: String, title: String, description: String, version: String,
-                    publisher: MCPPublisherInfo, known: Bool, runs: [MCPRunKind], remoteHost: String?) {
+                    publisher: MCPPublisherInfo, known: Bool, runs: [MCPRunKind], remoteHost: String?,
+                    marketplace: String? = nil) {
             self.id = id; self.title = title; self.description = description; self.version = version
             self.publisher = publisher; self.known = known; self.runs = runs; self.remoteHost = remoteHost
+            self.marketplace = marketplace
         }
     }
 
