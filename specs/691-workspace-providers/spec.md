@@ -19,10 +19,21 @@ Terminal, start the workspace by hand, and wait.
 There are many providers: DigitalOcean droplets, GitHub Codespaces, Coder, Google Cloud
 Workstations, company-internal ones (CWS), and a Docker container on this Mac. Agents should not
 have code for each. Following #383 ("one MCP server is a whole integration"), a **workspace
-provider is an MCP server** offering a small, fixed set of tools. Anyone can write one for any
-provider, share it as a plugin or through the marketplace, and Agents knows how to use all of
-them the same way. Because they are ordinary MCP tools, agents can use them too, so an agent can
-later start a workspace for a branch, or make a new one.
+provider is an MCP server**, and the control plane uses every provider the same way. Agents
+should not have to write one per provider either, so a server becomes a provider in one of three
+ways:
+
+1. **The command provider**, which Agents ships: each workspace is a few shell commands (start,
+   stop, status), with **presets** for the common CLIs (`doctl`, `gh codespace`, `coder`,
+   `gcloud workstations`, `docker`). Most providers have a CLI, so most need no code at all.
+2. **Any MCP server, with a tool map**: a provider's own MCP server (DigitalOcean has one) whose
+   tools don't follow our names is mapped to them: which tool lists, which starts, and so on.
+3. **Any MCP server that follows the contract** natively, written by anyone and shared as a
+   plugin or through the marketplace.
+
+The command provider is the only MCP server we build. Because providers are ordinary MCP
+servers, agents can use them too, so an agent can later start a workspace for a branch, or make
+a new one.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -87,7 +98,14 @@ states, link one to `devbox`, and add the other as a new host.
    linked.
 5. **Given** a provider is removed, **When** its hosts are next shown, **Then** they stay as
    hosts, unlinked, and lose their **Start** buttons.
-6. **Given** a provider's secret, **When** anything is shown or logged, **Then** the secret is
+6. **Given** an MCP server whose tools don't follow the contract, **When** Alex adds it with a
+   tool map (a preset, or written by hand), **Then** it is listed and used exactly as a server
+   that follows the contract, and a map that names a tool the server lacks is refused, naming
+   it.
+7. **Given** the command provider, **When** Alex picks a preset (such as `doctl`) or types the
+   commands for one workspace, **Then** its workspaces are listed, with no other server to
+   install.
+8. **Given** a provider's secret, **When** anything is shown or logged, **Then** the secret is
    never shown again after it is entered, never sent to a host or a client, and never written
    to the log.
 
@@ -250,6 +268,12 @@ before anything is made.
   | `workspace_create` | a name, chosen options, and optionally a command to run on first boot | The new workspace, as in `workspaces_list`, and whether the command will run. |
   | `workspace_delete` | an id | Once it is gone, or failed with a reason. |
 
+- **FR-001a**: A provider MAY instead be any MCP server with a **tool map**, kept in the
+  provider's configuration: for each contract tool, the server's tool to call, how the contract's
+  arguments become its arguments, and where in its result the contract's fields are (the list,
+  each workspace's id, name, state and ssh destination, and which of its states mean `running`
+  or `stopped`). A mapped server MUST behave, everywhere in this spec, as one that follows the
+  contract. A map MUST be checked against the server's tools when the provider is added.
 - **FR-002**: Providers MUST be configured on the control plane, not on a host, so that they
   can start a workspace whose host is down. A provider is stdio (a command) or http (an
   address), with named secrets.
@@ -315,15 +339,23 @@ before anything is made.
 - **FR-060**: Every start, stop, create and delete, who or what asked for it (a client, an
   agent, a kept prompt, an idle timer), and its result MUST be in the control plane's log.
 
-**The bundled and reference providers**
+**The command provider, presets and maps**
 
-- **FR-070**: Agents MUST ship a **command provider**: a small MCP provider whose workspaces
-  are each a name with a start command, a stop command, an optional status command and an ssh
-  destination (`cws start devstack-1`, `docker start agents-devbox`). It is how a single
-  workspace is set up with no provider of its own, and it goes through the same path as any
-  other provider.
-- **FR-071**: The repo MUST hold a **DigitalOcean provider** (droplets: list, power on, power
-  off, create from options, delete) as the reference for people writing their own.
+- **FR-070**: Agents MUST ship a **command provider**: an MCP server following the contract
+  whose workspaces are each a name with a start command, a stop command, an optional status
+  command (its output gives the state) and an ssh destination (`cws start devstack-1`,
+  `docker start agents-devbox`). Optional list, create and delete commands let one entry stand
+  for many workspaces. It goes through the same path as any other provider.
+- **FR-071**: The command provider MUST come with **presets** for `doctl` (droplets),
+  `gh codespace`, `coder`, `gcloud workstations` and `docker`. A preset fills in the commands; it
+  needs that CLI, signed in, where the control plane runs.
+- **FR-072**: Agents MUST ship a tool map for DigitalOcean's own MCP server, if its tools cover
+  list, power on and power off, as the worked example of a map. Otherwise the `doctl` preset is
+  the DigitalOcean example, and the map is shown with the stand-in server.
+- **FR-073**: The MCP servers Agents ships MUST NOT need a language runtime on the machine
+  that runs them: they are single static binaries, built in Swift by the pipeline that already
+  builds `agentsd` and `agents-control` for Linux, and shipped beside them on the Mac and in
+  the Linux control plane's image. The CI watcher moves to the same (#700).
 
 ### Key Entities
 
@@ -333,6 +365,9 @@ before anything is made.
   last listed, and when.
 - **Link**: a host and the workspace it runs on, with its **Start when used** and **Stop when
   idle** settings.
+- **Tool map**: for a provider that doesn't follow the contract, which of its tools stands for
+  each contract tool, and how arguments and results are translated.
+- **Preset**: a named set of commands for the command provider, for one CLI.
 - **Kept request**: a prompt or agent start for a stopped host, held by the control plane until
   it connects, is cancelled or the start fails.
 
@@ -346,9 +381,11 @@ before anything is made.
   action by Alex, in 10 out of 10 tries, including with the phone locked right after sending.
 - **SC-003**: Across a week, no linked workspace with **Stop when idle** on runs more than its
   idle time plus 5 minutes past its last activity.
-- **SC-004**: A new provider can be written for any service with a CLI or an API in under 200
-  lines, using only the published contract and the reference provider as a guide, and works
-  with no change to Agents.
+- **SC-004**: A provider with a CLI is added with a preset, or with no more than its start,
+  stop and status commands, and a provider with its own MCP server with a map of no more than
+  30 lines. Neither needs any code or a change to Agents.
+- **SC-006**: The command provider runs on a Mac and on a fresh Linux control plane with no
+  Node, Python or other runtime installed.
 - **SC-005**: No provider secret appears in any client, agent transcript or log.
 
 ## Docs *(mandatory)*
@@ -357,7 +394,9 @@ before anything is made.
   when used, Stop when idle, with the command provider as the first example.
 - `docs/reference/workspace-providers.md`: add. The contract: tools, arguments, results, states,
   versions, and how the first-boot install command works.
-- `docs/how-to/write-a-workspace-provider.md`: add. Walk through the DigitalOcean provider.
+- `docs/how-to/add-a-workspace-provider.md`: add. The three ways: a preset or your own commands,
+  a map for a provider's own MCP server (the DigitalOcean example), and a server that follows
+  the contract.
 - `docs/how-to/add-a-server.md`: change. Mention adding a server from a provider's workspace.
 - `docs/explanation/control-plane.md`: change. Providers run on the control plane; kept
   requests; the new host states.
@@ -381,9 +420,13 @@ before anything is made.
   daemon's, which keeps serving agents and #383 event triggers.
 - Providers MAY also offer #383 events (`workspace.stopped`) for workflows, through a host's own
   MCP config. The control plane itself reads the list, and does not need events.
-- Walks use a stand-in provider and the Linux devbox container. The DigitalOcean provider is
-  tested against a stand-in API; trying it on a real account needs Alex's token, and Claude
-  never creates a droplet or account itself.
+- Walks use the command provider on the Linux devbox container (`docker start` / `docker stop`)
+  and a stand-in MCP server for maps. The DigitalOcean example is checked against a stand-in;
+  trying it on a real account needs Alex's token, and Claude never creates a droplet or account
+  itself.
+- The contract tools are those a native provider offers. A mapped provider can always be
+  wrapped later by its own small server if a map can't express it; maps cover the common case,
+  not every API.
 - Kept requests are only prompts and agent starts. Other work that needs a running host
   (scheduled workflows, event triggers on that host) doesn't start a workspace in this feature.
 - A provider configured only in a host's own `~/.agents/mcp.json` gives that host's agents its
