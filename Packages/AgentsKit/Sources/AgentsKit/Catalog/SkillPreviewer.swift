@@ -95,7 +95,7 @@ struct SkillPreviewer: Sendable {
             }
         }
 
-        guard let skillMD = try await findSkill(result.skillID, path: result.skillPath, in: tree, owner: owner, repo: repo, commit: head.commit,
+        guard let skillMD = try await findSkill(result.skillID, path: result.skillPath, in: tree, owner: owner, repo: repo, head: head,
                                                 unpacked: unpacked) else {
             return empty(result, id: id, head: head, problems: [.notFoundInRepo], staging: staging, now: now)
         }
@@ -135,10 +135,12 @@ struct SkillPreviewer: Sendable {
                 data = copy
                 via = "snapshot"
             } else {
-                data = try await github.raw(owner: owner, repo: repo, commit: head.commit, path: entry.path)
-                via = "raw"
+                data = try await github.raw(owner: owner, repo: repo, commit: head.commit, path: entry.path,
+                                            blob: entry.sha, signedIn: head.signedIn)
+                via = head.signedIn ? "gh" : "raw"
                 guard SkillHashes.blobSHA(data) == entry.sha else {
-                    throw DaemonAPI.CatalogError.unreachable(host: github.endpoints.raw.host ?? "raw.githubusercontent.com")
+                    throw DaemonAPI.CatalogError.unreachable(
+                        host: head.signedIn ? "github.com" : github.endpoints.raw.host ?? "raw.githubusercontent.com")
                 }
             }
             total += data.count
@@ -185,21 +187,23 @@ struct SkillPreviewer: Sendable {
     /// else a folder named like the id, then one whose own `name` makes the same slug (the
     /// CLI's rule, research R2), then a lone one at the top.
     private func findSkill(_ skillID: String, path: String?, in tree: [GitHubSource.TreeEntry], owner: String,
-                           repo: String, commit: String, unpacked: URL?) async throws -> String? {
-        let candidates = tree.filter { $0.type == "blob" && ($0.path == "SKILL.md" || $0.path.hasSuffix("/SKILL.md")) }
-            .map(\.path)
+                           repo: String, head: GitHubSource.Head, unpacked: URL?) async throws -> String? {
+        let entries = tree.filter { $0.type == "blob" && ($0.path == "SKILL.md" || $0.path.hasSuffix("/SKILL.md")) }
+        let candidates = entries.map(\.path)
         if let path, candidates.contains(path) { return path }
         let want = SkillFile.slug(skillID)
         if let byFolder = candidates.first(where: {
             let parts = $0.split(separator: "/")
             return parts.count >= 2 && SkillFile.slug(String(parts[parts.count - 2])) == want
         }) { return byFolder }
-        for path in candidates.prefix(20) {
+        for entry in entries.prefix(20) {
+            let path = entry.path
             let data: Data
             if let root = unpacked {
                 data = (try? Data(contentsOf: root.appending(path: path))) ?? Data()
             } else {
-                data = (try? await github.raw(owner: owner, repo: repo, commit: commit, path: path)) ?? Data()
+                data = (try? await github.raw(owner: owner, repo: repo, commit: head.commit, path: path,
+                                              blob: entry.sha, signedIn: head.signedIn)) ?? Data()
             }
             if let name = SkillFile(text: String(decoding: data, as: UTF8.self)).name, SkillFile.slug(name) == want {
                 return path
