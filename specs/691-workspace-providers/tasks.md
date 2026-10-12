@@ -254,9 +254,9 @@ US2 comes before US1 because Start needs a link.
 
 ## Phase 8: User Story 6 – Agents use workspaces (P3)
 
-- [ ] T054 [US6] `AK/ACP/Serve/AppService.swift`: the tools `list_workspaces`, `start_workspace`, `stop_workspace`, `make_workspace` and `delete_workspace`, relayed through `AppService+Relay.swift` to the daemon, then over `ControlUplink` to the control methods. Make and delete go through `askForm` first.
-- [ ] T055 [P] [US6] Tests: the tools are listed; make asks before calling; secrets never appear in results.
-- [ ] T056 [US6] `docs/reference/agent-tools.md`: the workspace tools, and which of them ask first.
+- [x] T054 [US6] `AK/ACP/Serve/AppService.swift`: the tools `list_workspaces`, `start_workspace`, `stop_workspace`, `make_workspace` and `delete_workspace`, relayed through `AppService+Relay.swift` to the daemon, then over `ControlUplink` to the control methods. Make and delete go through `askForm` first.
+- [x] T055 [P] [US6] Tests: the tools are listed; make asks before calling; secrets never appear in results.
+- [x] T056 [US6] `docs/reference/agent-tools.md`: the workspace tools, and which of them ask first.
 
 ---
 

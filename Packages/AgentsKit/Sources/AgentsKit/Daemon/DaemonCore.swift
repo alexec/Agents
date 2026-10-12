@@ -769,6 +769,8 @@ public actor DaemonCore {
     var tellStatus: (@Sendable (JSONValue) -> Void)?
     /// What `host/status` last said, so it is said again only when it changes.
     var toldStatus: DaemonAPI.HostStatus?
+    /// How this host asks its control plane something and waits (#691 US6); nil off one.
+    var askControl: (@Sendable (String, JSONValue) async throws -> JSONValue)?
 
     /// The uplink to hand `host/status` to.
     public func deliverStatus(by tell: @escaping @Sendable (JSONValue) -> Void) {

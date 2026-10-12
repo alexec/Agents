@@ -63,7 +63,8 @@ struct AppServiceTests {
                 AppService.messageSessionToolName,
                 AppService.leaseResourceToolName, AppService.releaseResourceToolName,
                 AppService.listResourcesToolName,
-                AppService.waitForEventToolName, AppService.cancelWaitToolName])
+                AppService.waitForEventToolName, AppService.cancelWaitToolName]
+                + AppTool.workspaceTools)
 
         try #require(tools.count > 2)
         let showFile = tools[0]["inputSchema"]

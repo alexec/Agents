@@ -137,6 +137,9 @@ public protocol WorkspaceHandling: Sendable {
     func answer(method: String, params: JSONValue?, from caller: ControlRouter.Caller) async throws -> JSONValue
     /// A host said whether it is idle (`host/status`, #691 US4).
     func heard(_ host: HostID, status: DaemonAPI.HostStatus) async
+    /// An agent on `host` asked through its workspace tools (US6): one of
+    /// `agentWorkspaceMethods`, logged as that agent's.
+    func agentCall(from host: HostID, agent: String, method: String, params: JSONValue) async throws -> JSONValue
 }
 
 public extension DaemonAPI.Method {

@@ -99,6 +99,21 @@ public enum AppTool {
     /// Stop waiting.
     public static let cancelWait = "cancel_wait"
 
+    // Five for the control plane's workspaces (#691 US6). Offered to every agent. Making and
+    // deleting ask the person first; none ends with another tool's name.
+
+    /// Every provider's workspaces, their hosts, and what a new one takes.
+    public static let listWorkspaces = "list_workspaces"
+    /// Start a host's workspace.
+    public static let startWorkspace = "start_workspace"
+    /// Stop a host's workspace.
+    public static let stopWorkspace = "stop_workspace"
+    /// Make a new workspace at a provider, once the person says yes.
+    public static let makeWorkspace = "make_workspace"
+    /// Delete a host's workspace and the host, once the person says yes.
+    public static let deleteWorkspace = "delete_workspace"
+    public static let workspaceTools = [listWorkspaces, startWorkspace, stopWorkspace, makeWorkspace, deleteWorkspace]
+
     /// What agents announced `custom.` events with until #639. No longer offered or
     /// answered; kept so a conversation that called it still draws as the app's own call.
     public static let retiredPublishEvent = "publish_event"
@@ -122,7 +137,7 @@ public enum AppTool {
         leaseResource, releaseResource, listResources, waitForEvent,
         cancelWait, listSessions, readSession,
         setSessionLabels, moveWorktree, messageSession,
-    ]
+    ] + workspaceTools
 
     /// How runtimes put the server's name in front of a tool's, as measured: Claude's
     /// adapter says `mcp__agents__finish_turn`, Antigravity `agents_finish_turn` (049).

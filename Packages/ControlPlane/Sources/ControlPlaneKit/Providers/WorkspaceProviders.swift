@@ -158,7 +158,62 @@ public actor WorkspaceProviders: WorkspaceHandling {
     // MARK: WorkspaceHandling
 
     public func answer(method: String, params: JSONValue?, from caller: ControlRouter.Caller) async throws -> JSONValue {
-        let who = "client \(caller.client.uuidString.prefix(8).lowercased())"
+        try await answer(method: method, params: params, from: caller, who: "client \(caller.client.uuidString.prefix(8).lowercased())")
+    }
+
+    public func agentCall(from host: HostID, agent: String, method: String, params: JSONValue) async throws -> JSONValue {
+        let hostName = await records.host(host)?.name ?? host.rawValue
+        // No client: the host's own channel. Its removals and events are said as by the host.
+        let caller = ControlRouter.Caller(session: UUID(), client: UUID(), kind: .unknown)
+        if method == DaemonAPI.Method.workspacesForAgent { return try JSONValue.encoding(await forAgent()) }
+        // An agent names hosts and providers as it saw them listed: by name, or by id.
+        guard var given = params.objectValue else {
+            throw JSONRPCError(code: JSONRPCError.invalidParams, message: "Those parameters aren’t an object.")
+        }
+        if let named = given["host"]?.stringValue, await records.host(HostID(rawValue: named)) == nil {
+            guard let found = await records.hosts.first(where: { $0.name.caseInsensitiveCompare(named) == .orderedSame }) else {
+                throw JSONRPCError(code: DaemonAPI.Failure.noSuchHost, message: "No host is called \(named).")
+            }
+            given["host"] = .string(found.id.rawValue)
+        }
+        if let named = given["id"]?.stringValue, providers[ProviderID(rawValue: named)] == nil,
+           [DaemonAPI.Method.providersCreate, DaemonAPI.Method.providersOptions].contains(method) {
+            guard let found = providers.values.first(where: { $0.record.name.caseInsensitiveCompare(named) == .orderedSame }) else {
+                throw JSONRPCError(code: JSONRPCError.invalidParams, message: "No provider is called \(named).")
+            }
+            given["id"] = .string(found.record.id.rawValue)
+        }
+        return try await answer(method: method, params: .object(given), from: caller, who: "agent \(agent) on \(hostName)")
+    }
+
+    /// What an agent is shown (US6 AS1): every provider's workspaces and their hosts, and what
+    /// a new one could be, never a secret or its name.
+    private func forAgent() async -> DaemonAPI.AgentWorkspaces {
+        let hosts = await records.hosts
+        var out: [DaemonAPI.AgentWorkspaces.Provider] = []
+        for summary in await summaries() {
+            var options: JSONValue?
+            if summary.capabilities.contains("create") {
+                options = try? await providerCall(summary.id) { try await $0.options() }
+            }
+            var workspaces: [DaemonAPI.AgentWorkspaces.Workspace] = []
+            for workspace in summary.workspaces {
+                let host = workspace.host.flatMap { id in hosts.first { $0.id == id } }
+                var hostState: String?
+                if let host {
+                    let described = await router.described(host.id, await router.state(of: host.id) ?? .offline(since: Date()))
+                    hostState = described["state"]?.stringValue
+                }
+                workspaces.append(.init(id: workspace.id, name: workspace.name, state: workspace.state,
+                                        host: host?.name, hostState: hostState, cost: workspace.cost))
+            }
+            out.append(.init(id: summary.id, name: summary.name, canMake: summary.capabilities.contains("create"),
+                             canDelete: summary.capabilities.contains("delete"), options: options, workspaces: workspaces))
+        }
+        return DaemonAPI.AgentWorkspaces(providers: out)
+    }
+
+    private func answer(method: String, params: JSONValue?, from caller: ControlRouter.Caller, who: String) async throws -> JSONValue {
         switch method {
         case DaemonAPI.Method.providersList:
             // As last listed: a page that opens asks for `providers/refresh` too (FR-004).
