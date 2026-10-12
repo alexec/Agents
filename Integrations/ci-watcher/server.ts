@@ -292,7 +292,7 @@ const TOOLS = [
   {
     name: "list_prs",
     title: "List pull requests",
-    description: "The repo's open pull requests, each with its checks: passing, failing, running or none. A failing one has the failed run's id for failed_log and rerun_failed.",
+    description: "The repo's open pull requests, each with its checks: passing, failing, running or none. A failing one has the failed run's id for failed_log and rerun_failed. One that conflicts with its base has conflicts: true; its CI may never run until it is rebased.",
     inputSchema: schema({ repo: repoProperty }, []),
     annotations: { readOnlyHint: true },
     _meta: { ui: { resourceUri: "ui://ci/board", visibility: ["model", "app"] }, "ui/resourceUri": "ui://ci/board" },

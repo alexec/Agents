@@ -385,6 +385,14 @@ test("tools/list annotations and visibility", async () => {
   }
 });
 
+test("list_prs marks a PR that conflicts with its base", async () => {
+  edit((d) => repoData(d).prs.push(openPR(712, "agents/stale", { checks: "none", conflicts: true })));
+  const prs = (await ok("tools/call", { name: "list_prs", arguments: { repo: REPO } })).structuredContent.prs;
+  assert.equal(prs.find((p: any) => p.number === 712).conflicts, true);
+  assert.ok(!("conflicts" in prs.find((p: any) => p.number === 402)), "one that merges cleanly says nothing");
+  edit((d) => { repoData(d).prs = repoData(d).prs.filter((p: any) => p.number !== 712); });
+});
+
 test("each tool's result shape", async () => {
   const list = await ok("tools/call", { name: "list_prs", arguments: { repo: REPO } });
   assert.notEqual(list.isError, true);

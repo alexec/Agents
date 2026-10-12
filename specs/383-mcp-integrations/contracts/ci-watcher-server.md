@@ -39,7 +39,7 @@ app reserves, so workflows name them as they are (`checks.failed`), with no pref
 
 | Tool | Input | Result | Annotations | Visibility |
 |---|---|---|---|---|
-| `list_prs` | `repo` | `{ prs: [{number, title, branch, url, checks: "passing"\|"failing"\|"running"\|"none", failedRunId?}] }` | `readOnlyHint: true` | `model`, `app`; `_meta.ui.resourceUri: "ui://ci/board"` |
+| `list_prs` | `repo` | `{ prs: [{number, title, branch, url, checks: "passing"\|"failing"\|"running"\|"none", failedRunId?, conflicts?: true}] }` | `readOnlyHint: true` | `model`, `app`; `_meta.ui.resourceUri: "ui://ci/board"` |
 | `list_issues` | `repo`, optional `label` | `{ issues: [{number, title, author, labels, url, comments, updatedAt}] }`, open issues newest updated first, at most 100 | `readOnlyHint: true` | `model`, `app`; `_meta.ui.resourceUri: "ui://ci/issues"` |
 | `failed_log` | `repo`, `runId`, optional `job` | The last 300 lines of each failed job's log, as text | `readOnlyHint: true` | `model` |
 | `rerun_failed` | `repo`, `runId` | `{ rerun: true, url }` | none: it changes something | `model`, `app` |
@@ -49,7 +49,7 @@ app reserves, so workflows name them as they are (`checks.failed`), with no pref
 
 `ui://ci/board`: one HTML page (`text/html;profile=mcp-app`), with no network
 (`_meta.ui.csp` empty).
-- It draws `list_prs`'s result as a list: number, title, branch, and a check pill.
+- It draws `list_prs`'s result as a list: number, title, branch, a check pill, and a **Conflicts** pill on a PR that conflicts with its base (#712).
 - A failing PR has **Rerun**, which calls `rerun_failed` through `tools/call`, and then
   `list_prs` again.
 - Links open through `ui/open-link`.
