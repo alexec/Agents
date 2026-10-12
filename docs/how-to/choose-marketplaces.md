@@ -44,7 +44,9 @@ What you turn off is saved in `~/.agents/marketplaces.json` as `off`.
 4. Choose **Add**. It is in the menu at once, and saved in `~/.agents/marketplaces.json`.
    **Remove** takes it out again. The token's value stays in `secrets.env`.
 
-A skills repository has to be public for now: the app reads it over plain HTTPS.
+A skills repository can be private: the app reads a private one through `gh`, so it works
+when `gh` is signed in on this Mac with access to the repository, and says the repository
+is unreachable otherwise. A public one is read over plain HTTPS and needs no `gh`.
 
 ## A project's marketplaces
 
