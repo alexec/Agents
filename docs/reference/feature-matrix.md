@@ -17,7 +17,24 @@ wherever its score puts it.
 
 Each table has a **Score** column, and its rows are sorted by it: ● counts 1, ◐ counts 0.5,
 and ○ and ?⃝ count 0, as a percentage of the table's features. An unknown counts as
-missing, so an app with thin docs scores low. [Overall score](#overall-score), after the
+missing, so an app with thin docs scores low. Two features are shown but not scored:
+**Browser or preview**, since every agent already has a full browser on the computer, and
+**Switch when allowance runs out**, which Agents left out on purpose in favour of a new
+agent reading another's work.
+
+A feature that comes from an MCP server is counted the same way for every app:
+
+- ● when the app itself shows it, including through a view drawn from the app's own
+  server, such as Agents' `ci` board.
+- ◐ when a server from the app's own MCP catalogue gives the agent the feature, with
+  nothing shown in the app. Every catalogue here carries Playwright, Linear, Jira and
+  GitLab servers, as the official MCP registry does, so an app with a catalogue has at
+  least ◐ for a browser the agent drives, trackers beyond GitHub and git hosts beyond
+  GitHub.
+- ○ when it takes a server added by hand, or cannot be done.
+
+Passing each runtime's own sandbox through counts as sandboxed tools: an app is not marked
+down for a runtime that has none. [Overall score](#overall-score), after the
 tables, adds every feature up.
 
 The matrix was filled in on 2026-10-12 from each app's own docs, changelog, README,
@@ -32,11 +49,10 @@ on it.
 
 Agents' ◐ cells, and why:
 
-- **Runs with the computer off:** agents on servers keep working, but nothing can reach
-  them while the Mac that runs the control plane sleeps. See
+- **Runs with the computer off:** nothing is lost when the Mac sleeps, but agents on it
+  pause until it wakes, and agents on servers keep working where nothing can reach them
+  while the Mac that runs the control plane sleeps. See
   [The control plane](../explanation/control-plane.md).
-- **Sandboxed tools:** the app passes each runtime's own command sandbox through, and adds
-  none of its own. See [Runtimes](runtimes.md).
 - **End-to-end encrypted relay:** built but not switched on. `agents-relay` seals each
   message so only the control plane and that one device can read it, and carries it
   through the person's own iCloud, but Agents Host does not start it yet, so its
@@ -47,28 +63,30 @@ Agents' ◐ cells, and why:
   [Phone and iPad](../explanation/phone-and-ipad.md).
 - **Pull requests:** the ci board lists them. Nothing can be created, reviewed or merged in
   the app.
-- **Browser or preview:** the Browser pane is on the Mac only.
 - **Starts agents from issues:** only through a workflow on the `ci` server's
   `issue.opened`, and only for GitHub.
 - **Spending limits:** only for runtimes that report a price. See
   [Limit spending](../how-to/limit-spending.md).
-- **Switch when allowance runs out:** done by hand: a new chat on another runtime
-  continues the first. See
-  [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md).
-- **A second agent reviews:** only as a workflow, such as the weekly review-and-fix.
-- **Rich cards in replies:** question and plan cards, ui:// views from MCP servers and
-  live HTML pages, but an agent cannot put a chart or table card in a reply.
+- **A second agent reviews:** only as a workflow, such as the weekly review-and-fix. The
+  `ci` server has no `pr.opened` event yet, so a review cannot start when a pull request
+  opens.
+- **Rich cards in replies:** a tool's ui:// view is drawn in the conversation where the
+  tool was called, but an agent can show only a view some server already has, and the
+  `agents` server has no general table or chart view yet. Views from local (stdio)
+  servers are not drawn yet.
+- **Task board:** the `ci` server's issues view lists GitHub issues in the app, read only.
+- **A browser the agent drives, trackers beyond GitHub, git hosts beyond GitHub:** through
+  Playwright, Linear, Jira and GitLab servers from the MCP marketplace, with nothing shown
+  in the app. A GitLab server of Agents' own is parked (#813).
 
 Agents has none of these at all:
 
 - Android app (#810), Windows or Linux desktop (#811).
-- Sessions side by side, sessions as a tree, a task board.
-- A browser the agent drives, simulator panes, language servers.
-- Plugins of its own, several accounts per runtime, teams.
-- Trackers and git hosts beyond GitHub.
+- Sessions side by side, sessions as a tree.
+- Simulator panes, language servers.
+- Several accounts per runtime, teams.
 
 ## What each feature means
-
 
 **Running agents**
 
@@ -77,14 +95,6 @@ Agents has none of these at all:
 - **Several runtimes:** It runs more than one vendor's agent, such as Claude Code and Codex.
 - **ACP:** It speaks the Agent Client Protocol.
 - **Runs with the computer off:** Agents run on a remote or cloud machine, and can be reached, while the person's own computer is off.
-- **Sandboxed tools:** Agent tools run under a file or network policy, or in a container, that the app sets up.
-
-**Where you reach it**
-
-- **Windows or Linux desktop:** A desktop app for Windows or Linux, not only a terminal program.
-- **iPhone or iPad app:** A native app for iPhone or iPad.
-- **Android app:** A native app for Android.
-- **Web client:** Agent sessions can be used from a browser.
 - **End-to-end encrypted relay:** A phone or browser away from home reaches the agents through a relay that cannot read them.
 - **Notifications:** Push or system notifications when an agent needs the person or finishes.
 
@@ -108,15 +118,6 @@ Agents has none of these at all:
 **Tools in the app**
 
 - **Terminal:** A terminal is built in.
-- **Browser or preview:** A browser or web preview is built in.
-- **A browser the agent drives:** The agent itself can click and read in the built-in browser.
-- **Simulator or emulator panes:** An iOS Simulator or Android Emulator shows in the app.
-- **File editor:** Files can be edited in the app.
-- **Language servers in the editor:** The editor has completion and diagnostics from language servers.
-
-**Tasks and automation**
-
-- **Task board:** A task list or kanban board is built in.
 - **Starts agents from issues:** An issue starts an agent, or an agent is started from an issue in one step.
 - **Trackers beyond GitHub:** Linear, Jira or other trackers are connected in the app.
 - **Scheduled or triggered runs:** Agents start on a schedule or on an event.
@@ -130,7 +131,7 @@ Agents has none of these at all:
 - **Usage or cost:** Usage, allowance or cost is shown.
 - **Spending limits:** Spending can be capped.
 - **Several accounts per runtime:** More than one account for the same runtime, such as two Claude logins.
-- **Switch when allowance runs out:** It moves to another runtime or account, by itself, when one runs out.
+- **Switch when allowance runs out** (not scored): It moves to another runtime or account, by itself, when one runs out.
 
 **Organising**
 
@@ -146,11 +147,11 @@ Agents has none of these at all:
 | App | Several agents at once | A git worktree per agent | Several runtimes | ACP | Runs with the computer off | Sandboxed tools | Score |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|--:|
 | Agentastic | ● | ● | ● | ● | ● | ● | 100% |
-| Codeg | ● | ● | ● | ● | ● | ◐ | 92% |
+| Codeg | ● | ● | ● | ● | ● | ● | 100% |
+| Paseo | ● | ● | ● | ● | ● | ● | 100% |
+| **Agents** | ● | ● | ● | ● | ◐ | ● | 92% |
 | GitHub Copilot | ● | ● | ● | ◐ | ● | ● | 92% |
 | Happy | ● | ● | ● | ◐ | ● | ● | 92% |
-| Paseo | ● | ● | ● | ● | ● | ◐ | 92% |
-| **Agents** | ● | ● | ● | ● | ◐ | ◐ | 83% |
 | Cursor | ● | ● | ○ | ● | ● | ● | 83% |
 | Emdash | ● | ● | ● | ● | ● | ?⃝ | 83% |
 | Nimbalyst | ● | ● | ● | ◐ | ◐ | ● | 83% |
@@ -267,13 +268,13 @@ Agents has none of these at all:
 | Roamgate | ● | ● | ● | ● | ?⃝ | 80% |
 | Sculptor | ● | ● | ?⃝ | ● | ● | 80% |
 | T3 Code | ● | ● | ● | ● | ?⃝ | 80% |
+| **Agents** | ● | ◐ | ◐ | ● | ◐ | 70% |
+| Emdash | ● | ● | ◐ | ● | ?⃝ | 70% |
+| Nimbalyst | ● | ● | ◐ | ● | ?⃝ | 70% |
 | Nuphos | ◐ | ● | ● | ● | ?⃝ | 70% |
 | OpenAI Codex | ● | ● | ◐ | ?⃝ | ● | 70% |
 | Superset | ● | ● | ○ | ● | ◐ | 70% |
-| **Agents** | ● | ◐ | ○ | ● | ◐ | 60% |
 | Atelier (was Acepe) | ● | ● | ○ | ● | ?⃝ | 60% |
-| Emdash | ● | ● | ○ | ● | ?⃝ | 60% |
-| Nimbalyst | ● | ● | ○ | ● | ?⃝ | 60% |
 | Parallel Code | ● | ● | ?⃝ | ● | ?⃝ | 60% |
 | Pragma | ● | ● | ?⃝ | ● | ?⃝ | 60% |
 | Rove | ● | ● | ?⃝ | ● | ?⃝ | 60% |
@@ -282,48 +283,48 @@ Agents has none of these at all:
 | Warp | ● | ?⃝ | ● | ?⃝ | ● | 60% |
 | Maestro | ● | ● | ?⃝ | ?⃝ | ◐ | 50% |
 | VibeiDE | ● | ?⃝ | ?⃝ | ?⃝ | ● | 40% |
+| CodeAgentSwarm | ● | ?⃝ | ◐ | ?⃝ | ?⃝ | 30% |
 | Happy | ● | ?⃝ | ?⃝ | ?⃝ | ◐ | 30% |
 | Claude Squad | ● | ?⃝ | ○ | ?⃝ | ○ | 20% |
-| CodeAgentSwarm | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 20% |
 | DockTerm | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 20% |
 | Helicon | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 20% |
 | ReevesAgents | ○ | ○ | ?⃝ | ○ | ?⃝ | 0% |
 
 ## Tools in the app
 
-| App | Terminal | Browser or preview | A browser the agent drives | Simulator or emulator panes | File editor | Language servers in the editor | Score |
+| App | Terminal | Browser or preview (not scored) | A browser the agent drives | Simulator or emulator panes | File editor | Language servers in the editor | Score |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|--:|
-| Agentastic | ● | ● | ● | ?⃝ | ● | ● | 83% |
-| Cursor | ● | ● | ● | ?⃝ | ● | ● | 83% |
-| GitHub Copilot | ● | ● | ● | ?⃝ | ● | ● | 83% |
-| T3 Code | ● | ● | ● | ● | ● | ○ | 83% |
-| Claude Code | ● | ● | ● | ◐ | ● | ?⃝ | 75% |
-| Nimbalyst | ● | ● | ● | ?⃝ | ● | ◐ | 75% |
-| Superset | ● | ● | ● | ◐ | ● | ?⃝ | 75% |
-| Atelier (was Acepe) | ?⃝ | ● | ● | ?⃝ | ● | ● | 67% |
-| Codeg | ● | ● | ● | ?⃝ | ● | ?⃝ | 67% |
-| Emdash | ● | ● | ?⃝ | ?⃝ | ● | ● | 67% |
-| Maestro | ● | ● | ● | ?⃝ | ● | ?⃝ | 67% |
-| Paseo | ● | ● | ● | ?⃝ | ● | ○ | 67% |
-| Pragma | ● | ● | ● | ?⃝ | ● | ?⃝ | 67% |
-| Warp | ● | ?⃝ | ◐ | ?⃝ | ● | ● | 58% |
-| OpenAI Codex | ● | ● | ● | ?⃝ | ?⃝ | ?⃝ | 50% |
-| Threadlines | ● | ● | ● | ?⃝ | ?⃝ | ?⃝ | 50% |
-| **Agents** | ● | ◐ | ○ | ○ | ● | ○ | 42% |
-| Conductor | ● | ◐ | ?⃝ | ?⃝ | ● | ?⃝ | 42% |
-| DockTerm | ● | ?⃝ | ○ | ○ | ● | ○ | 33% |
-| Nuphos | ● | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 33% |
-| Parallel Code | ● | ● | ○ | ?⃝ | ?⃝ | ?⃝ | 33% |
-| Vibe Kanban | ● | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 33% |
-| CodeAgentSwarm | ● | ?⃝ | ◐ | ?⃝ | ○ | ○ | 25% |
-| Roamgate | ● | ◐ | ?⃝ | ?⃝ | ?⃝ | ○ | 25% |
-| Rove | ● | ◐ | ?⃝ | ?⃝ | ?⃝ | ○ | 25% |
-| VibeiDE | ● | ?⃝ | ◐ | ?⃝ | ?⃝ | ?⃝ | 25% |
-| Claude Squad | ● | ?⃝ | ○ | ○ | ?⃝ | ○ | 17% |
-| Happy | ● | ?⃝ | ?⃝ | ○ | ?⃝ | ?⃝ | 17% |
-| ReevesAgents | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 17% |
-| Sculptor | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 17% |
-| tuios | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 17% |
+| Agentastic | ● | ● | ● | ?⃝ | ● | ● | 80% |
+| Cursor | ● | ● | ● | ?⃝ | ● | ● | 80% |
+| GitHub Copilot | ● | ● | ● | ?⃝ | ● | ● | 80% |
+| T3 Code | ● | ● | ● | ● | ● | ○ | 80% |
+| Claude Code | ● | ● | ● | ◐ | ● | ?⃝ | 70% |
+| Emdash | ● | ● | ◐ | ?⃝ | ● | ● | 70% |
+| Nimbalyst | ● | ● | ● | ?⃝ | ● | ◐ | 70% |
+| Superset | ● | ● | ● | ◐ | ● | ?⃝ | 70% |
+| Warp | ● | ?⃝ | ◐ | ?⃝ | ● | ● | 70% |
+| Atelier (was Acepe) | ?⃝ | ● | ● | ?⃝ | ● | ● | 60% |
+| Codeg | ● | ● | ● | ?⃝ | ● | ?⃝ | 60% |
+| Maestro | ● | ● | ● | ?⃝ | ● | ?⃝ | 60% |
+| Paseo | ● | ● | ● | ?⃝ | ● | ○ | 60% |
+| Pragma | ● | ● | ● | ?⃝ | ● | ?⃝ | 60% |
+| **Agents** | ● | ◐ | ◐ | ○ | ● | ○ | 50% |
+| Conductor | ● | ◐ | ?⃝ | ?⃝ | ● | ?⃝ | 40% |
+| DockTerm | ● | ?⃝ | ○ | ○ | ● | ○ | 40% |
+| OpenAI Codex | ● | ● | ● | ?⃝ | ?⃝ | ?⃝ | 40% |
+| Threadlines | ● | ● | ● | ?⃝ | ?⃝ | ?⃝ | 40% |
+| CodeAgentSwarm | ● | ?⃝ | ◐ | ?⃝ | ○ | ○ | 30% |
+| Vibe Kanban | ● | ● | ◐ | ?⃝ | ?⃝ | ?⃝ | 30% |
+| VibeiDE | ● | ?⃝ | ◐ | ?⃝ | ?⃝ | ?⃝ | 30% |
+| Claude Squad | ● | ?⃝ | ○ | ○ | ?⃝ | ○ | 20% |
+| Happy | ● | ?⃝ | ?⃝ | ○ | ?⃝ | ?⃝ | 20% |
+| Nuphos | ● | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 20% |
+| Parallel Code | ● | ● | ○ | ?⃝ | ?⃝ | ?⃝ | 20% |
+| ReevesAgents | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 20% |
+| Roamgate | ● | ◐ | ?⃝ | ?⃝ | ?⃝ | ○ | 20% |
+| Rove | ● | ◐ | ?⃝ | ?⃝ | ?⃝ | ○ | 20% |
+| Sculptor | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 20% |
+| tuios | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 20% |
 | Helicon | ○ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ○ | 0% |
 
 ## Tasks and automation
@@ -338,6 +339,7 @@ Agents has none of these at all:
 | GitHub Copilot | ?⃝ | ● | ● | ● | ● | ● | 83% |
 | OpenAI Codex | ?⃝ | ● | ● | ● | ● | ● | 83% |
 | Warp | ?⃝ | ● | ● | ● | ● | ● | 83% |
+| **Agents** | ◐ | ◐ | ◐ | ● | ● | ● | 75% |
 | Claude Code | ?⃝ | ● | ◐ | ● | ● | ● | 75% |
 | Conductor | ?⃝ | ● | ● | ● | ◐ | ● | 75% |
 | Nimbalyst | ● | ?⃝ | ◐ | ● | ● | ● | 75% |
@@ -345,7 +347,6 @@ Agents has none of these at all:
 | Maestro | ?⃝ | ● | ?⃝ | ● | ● | ● | 67% |
 | Nuphos | ?⃝ | ?⃝ | ● | ● | ● | ● | 67% |
 | Paseo | ?⃝ | ● | ○ | ● | ● | ● | 67% |
-| **Agents** | ○ | ◐ | ○ | ● | ● | ● | 58% |
 | CodeAgentSwarm | ● | ?⃝ | ◐ | ?⃝ | ● | ● | 58% |
 | Parallel Code | ?⃝ | ● | ◐ | ?⃝ | ● | ● | 58% |
 | Atelier (was Acepe) | ● | ?⃝ | ● | ?⃝ | ?⃝ | ● | 50% |
@@ -355,8 +356,8 @@ Agents has none of these at all:
 | Sculptor | ?⃝ | ?⃝ | ● | ◐ | ?⃝ | ● | 42% |
 | Threadlines | ?⃝ | ?⃝ | ?⃝ | ◐ | ● | ● | 42% |
 | tuios | ?⃝ | ?⃝ | ?⃝ | ◐ | ● | ● | 42% |
+| Vibe Kanban | ○ | ?⃝ | ◐ | ?⃝ | ● | ● | 42% |
 | ReevesAgents | ?⃝ | ○ | ?⃝ | ○ | ● | ● | 33% |
-| Vibe Kanban | ○ | ?⃝ | ?⃝ | ?⃝ | ● | ● | 33% |
 | Roamgate | ?⃝ | ?⃝ | ?⃝ | ◐ | ◐ | ?⃝ | 17% |
 | VibeiDE | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 17% |
 | Claude Squad | ?⃝ | ?⃝ | ○ | ?⃝ | ?⃝ | ?⃝ | 0% |
@@ -365,36 +366,36 @@ Agents has none of these at all:
 
 ## Extensions, accounts and cost
 
-| App | MCP or skills catalogue | Plugins | Usage or cost | Spending limits | Several accounts per runtime | Switch when allowance runs out | Score |
+| App | MCP or skills catalogue | Plugins | Usage or cost | Spending limits | Several accounts per runtime | Switch when allowance runs out (not scored) | Score |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|--:|
-| GitHub Copilot | ● | ● | ● | ● | ● | ?⃝ | 83% |
-| CodeAgentSwarm | ● | ?⃝ | ● | ● | ● | ◐ | 75% |
-| Agentastic | ● | ● | ● | ?⃝ | ● | ?⃝ | 67% |
-| Claude Code | ● | ● | ● | ● | ?⃝ | ?⃝ | 67% |
-| Cursor | ● | ● | ● | ● | ?⃝ | ?⃝ | 67% |
-| OpenAI Codex | ● | ● | ● | ● | ?⃝ | ?⃝ | 67% |
-| Pragma | ?⃝ | ● | ● | ?⃝ | ● | ● | 67% |
-| Nimbalyst | ● | ● | ● | ◐ | ?⃝ | ?⃝ | 58% |
-| Warp | ● | ?⃝ | ● | ● | ◐ | ?⃝ | 58% |
-| **Agents** | ● | ○ | ● | ◐ | ○ | ◐ | 50% |
-| Happy | ?⃝ | ?⃝ | ● | ?⃝ | ● | ● | 50% |
-| Maestro | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ | 50% |
-| Paseo | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ | 50% |
-| Threadlines | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ | 50% |
-| Rove | ?⃝ | ● | ● | ?⃝ | ?⃝ | ◐ | 42% |
-| T3 Code | ?⃝ | ?⃝ | ● | ?⃝ | ● | ◐ | 42% |
-| Codeg | ● | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 33% |
-| Emdash | ● | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 33% |
-| Helicon | ?⃝ | ?⃝ | ● | ?⃝ | ● | ?⃝ | 33% |
-| Superset | ?⃝ | ?⃝ | ● | ?⃝ | ● | ?⃝ | 33% |
-| tuios | ?⃝ | ● | ◐ | ?⃝ | ?⃝ | ?⃝ | 25% |
-| Atelier (was Acepe) | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 17% |
-| DockTerm | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 17% |
-| Nuphos | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 17% |
-| Parallel Code | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 17% |
-| Sculptor | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 17% |
-| Vibe Kanban | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 17% |
-| VibeiDE | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 17% |
+| GitHub Copilot | ● | ● | ● | ● | ● | ?⃝ | 100% |
+| Agentastic | ● | ● | ● | ?⃝ | ● | ?⃝ | 80% |
+| Claude Code | ● | ● | ● | ● | ?⃝ | ?⃝ | 80% |
+| CodeAgentSwarm | ● | ?⃝ | ● | ● | ● | ◐ | 80% |
+| Cursor | ● | ● | ● | ● | ?⃝ | ?⃝ | 80% |
+| OpenAI Codex | ● | ● | ● | ● | ?⃝ | ?⃝ | 80% |
+| **Agents** | ● | ● | ● | ◐ | ○ | ◐ | 70% |
+| Nimbalyst | ● | ● | ● | ◐ | ?⃝ | ?⃝ | 70% |
+| Warp | ● | ?⃝ | ● | ● | ◐ | ?⃝ | 70% |
+| Maestro | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ | 60% |
+| Paseo | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ | 60% |
+| Pragma | ?⃝ | ● | ● | ?⃝ | ● | ● | 60% |
+| Threadlines | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ | 60% |
+| Codeg | ● | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 40% |
+| Emdash | ● | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 40% |
+| Happy | ?⃝ | ?⃝ | ● | ?⃝ | ● | ● | 40% |
+| Helicon | ?⃝ | ?⃝ | ● | ?⃝ | ● | ?⃝ | 40% |
+| Rove | ?⃝ | ● | ● | ?⃝ | ?⃝ | ◐ | 40% |
+| Superset | ?⃝ | ?⃝ | ● | ?⃝ | ● | ?⃝ | 40% |
+| T3 Code | ?⃝ | ?⃝ | ● | ?⃝ | ● | ◐ | 40% |
+| tuios | ?⃝ | ● | ◐ | ?⃝ | ?⃝ | ?⃝ | 30% |
+| Atelier (was Acepe) | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 20% |
+| DockTerm | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 20% |
+| Nuphos | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 20% |
+| Parallel Code | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 20% |
+| Sculptor | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 20% |
+| Vibe Kanban | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 20% |
+| VibeiDE | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 20% |
 | Claude Squad | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 0% |
 | Conductor | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 0% |
 | ReevesAgents | ?⃝ | ?⃝ | ○ | ○ | ?⃝ | ?⃝ | 0% |
@@ -439,43 +440,42 @@ Agents has none of these at all:
 
 ## Overall score
 
-Each app's score in every table, and overall: its points over all 47 features. Sorted by the overall score.
+Each app's score in every table, and overall: its points over the 45 scored features. Sorted by the overall score.
 
 | Rank | App | Running | Reach | Following | Reviewing | Tools | Tasks | Extensions | Organising | Overall |
 |--:|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
-| 1 | GitHub Copilot | 92% | 83% | 100% | 100% | 83% | 83% | 83% | 50% | **84%** |
-| 2 | Paseo | 92% | 100% | 83% | 90% | 67% | 67% | 50% | 100% | **81%** |
-| 3 | Cursor | 83% | 67% | 83% | 100% | 83% | 83% | 67% | 50% | **77%** |
-| 4 | Agentastic | 100% | 42% | 92% | 90% | 83% | 100% | 67% | 33% | **76%** |
-| 4 | Claude Code | 67% | 83% | 92% | 80% | 75% | 75% | 67% | 67% | **76%** |
-| 4 | Codeg | 92% | 67% | 75% | 90% | 67% | 100% | 33% | 83% | **76%** |
-| 4 | Nimbalyst | 83% | 83% | 83% | 60% | 75% | 75% | 58% | 83% | **76%** |
-| 8 | OpenAI Codex | 67% | 83% | 83% | 70% | 50% | 83% | 67% | 67% | **71%** |
-| 9 | T3 Code | 83% | 92% | 67% | 80% | 83% | 50% | 42% | 67% | **70%** |
-| 10 | Pragma | 75% | 83% | 67% | 60% | 67% | 75% | 67% | 50% | **68%** |
-| 10 | Superset | 75% | 42% | 67% | 70% | 75% | 100% | 33% | 83% | **68%** |
-| 10 | Warp | 83% | 58% | 92% | 60% | 58% | 83% | 58% | 50% | **68%** |
-| 13 | Threadlines | 83% | 50% | 67% | 100% | 50% | 42% | 50% | 67% | **63%** |
-| 14 | **Agents** | 83% | 50% | 58% | 60% | 42% | 58% | 50% | 83% | **61%** |
-| 14 | Happy | 92% | 100% | 75% | 30% | 17% | 50% | 50% | 67% | **61%** |
-| 16 | Emdash | 83% | 33% | 67% | 60% | 67% | 50% | 33% | 67% | **57%** |
-| 17 | Maestro | 50% | 50% | 67% | 50% | 67% | 67% | 50% | 50% | **56%** |
-| 17 | Nuphos | 83% | 42% | 75% | 70% | 33% | 67% | 17% | 67% | **56%** |
-| 19 | Parallel Code | 67% | 75% | 75% | 60% | 33% | 58% | 17% | 33% | **52%** |
-| 20 | Conductor | 75% | 25% | 42% | 80% | 42% | 75% | 0% | 67% | **50%** |
-| 20 | Rove | 67% | 33% | 33% | 60% | 25% | 92% | 42% | 50% | **50%** |
-| 22 | Atelier (was Acepe) | 50% | 8% | 75% | 60% | 67% | 50% | 17% | 50% | **47%** |
-| 23 | CodeAgentSwarm | 67% | 58% | 42% | 20% | 25% | 58% | 75% | 17% | **46%** |
-| 24 | Vibe Kanban | 67% | 50% | 33% | 60% | 33% | 33% | 17% | 67% | **45%** |
-| 25 | tuios | 83% | 33% | 58% | 60% | 17% | 42% | 25% | 33% | **44%** |
-| 26 | Roamgate | 67% | 50% | 33% | 80% | 25% | 17% | 0% | 50% | **39%** |
-| 27 | Sculptor | 58% | 33% | 33% | 80% | 17% | 42% | 17% | 33% | **38%** |
-| 28 | VibeiDE | 50% | 50% | 33% | 40% | 25% | 17% | 17% | 8% | **30%** |
-| 29 | Helicon | 42% | 33% | 33% | 20% | 0% | 0% | 33% | 67% | **29%** |
-| 30 | DockTerm | 17% | 33% | 58% | 20% | 33% | 0% | 17% | 33% | **27%** |
-| 31 | ReevesAgents | 33% | 17% | 33% | 0% | 17% | 33% | 0% | 50% | **23%** |
-| 32 | Claude Squad | 50% | 0% | 17% | 20% | 17% | 0% | 0% | 33% | **17%** |
-
+| 1 | GitHub Copilot | 92% | 83% | 100% | 100% | 80% | 83% | 100% | 50% | **86%** |
+| 2 | Paseo | 100% | 100% | 83% | 90% | 60% | 67% | 60% | 100% | **83%** |
+| 3 | Codeg | 100% | 67% | 75% | 90% | 60% | 100% | 40% | 83% | **78%** |
+| 3 | Cursor | 83% | 67% | 83% | 100% | 80% | 83% | 80% | 50% | **78%** |
+| 3 | Nimbalyst | 83% | 83% | 83% | 70% | 70% | 75% | 70% | 83% | **78%** |
+| 6 | Agentastic | 100% | 42% | 92% | 90% | 80% | 100% | 80% | 33% | **77%** |
+| 6 | Claude Code | 67% | 83% | 92% | 80% | 70% | 75% | 80% | 67% | **77%** |
+| 8 | OpenAI Codex | 67% | 83% | 83% | 70% | 40% | 83% | 80% | 67% | **72%** |
+| 9 | Warp | 83% | 58% | 92% | 60% | 70% | 83% | 70% | 50% | **71%** |
+| 10 | T3 Code | 83% | 92% | 67% | 80% | 80% | 50% | 40% | 67% | **70%** |
+| 11 | **Agents** | 92% | 50% | 58% | 70% | 50% | 75% | 70% | 83% | **69%** |
+| 11 | Superset | 75% | 42% | 67% | 70% | 70% | 100% | 40% | 83% | **69%** |
+| 13 | Pragma | 75% | 83% | 67% | 60% | 60% | 75% | 60% | 50% | **67%** |
+| 14 | Threadlines | 83% | 50% | 67% | 100% | 40% | 42% | 60% | 67% | **63%** |
+| 15 | Happy | 92% | 100% | 75% | 30% | 20% | 50% | 40% | 67% | **61%** |
+| 16 | Emdash | 83% | 33% | 67% | 70% | 70% | 50% | 40% | 67% | **60%** |
+| 17 | Maestro | 50% | 50% | 67% | 50% | 60% | 67% | 60% | 50% | **57%** |
+| 17 | Nuphos | 83% | 42% | 75% | 70% | 20% | 67% | 20% | 67% | **57%** |
+| 19 | Parallel Code | 67% | 75% | 75% | 60% | 20% | 58% | 20% | 33% | **52%** |
+| 20 | Conductor | 75% | 25% | 42% | 80% | 40% | 75% | 0% | 67% | **51%** |
+| 21 | Rove | 67% | 33% | 33% | 60% | 20% | 92% | 40% | 50% | **50%** |
+| 22 | CodeAgentSwarm | 67% | 58% | 42% | 30% | 30% | 58% | 80% | 17% | **48%** |
+| 23 | Atelier (was Acepe) | 50% | 8% | 75% | 60% | 60% | 50% | 20% | 50% | **47%** |
+| 23 | Vibe Kanban | 67% | 50% | 33% | 60% | 30% | 42% | 20% | 67% | **47%** |
+| 25 | tuios | 83% | 33% | 58% | 60% | 20% | 42% | 30% | 33% | **46%** |
+| 26 | Roamgate | 67% | 50% | 33% | 80% | 20% | 17% | 0% | 50% | **40%** |
+| 26 | Sculptor | 58% | 33% | 33% | 80% | 20% | 42% | 20% | 33% | **40%** |
+| 28 | VibeiDE | 50% | 50% | 33% | 40% | 30% | 17% | 20% | 8% | **31%** |
+| 29 | Helicon | 42% | 33% | 33% | 20% | 0% | 0% | 40% | 67% | **30%** |
+| 30 | DockTerm | 17% | 33% | 58% | 20% | 40% | 0% | 20% | 33% | **28%** |
+| 31 | ReevesAgents | 33% | 17% | 33% | 0% | 20% | 33% | 0% | 50% | **24%** |
+| 32 | Claude Squad | 50% | 0% | 17% | 20% | 20% | 0% | 0% | 33% | **18%** |
 ## The apps
 
 - **Agents:** this project. Mac window, Remote on iPhone and iPad, web page, and agentsd hosts.
