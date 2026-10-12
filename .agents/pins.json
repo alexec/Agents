@@ -2,31 +2,37 @@
   "pins" : [
     {
       "pinned_by" : {
-        "agent" : "5C451A88-8447-432C-9889-5675A593B5F3"
+        "person" : true
       },
-      "title" : "Pull requests",
       "view" : {
         "arguments" : {
-          "repo" : "alexec/Agents"
+
         },
         "server" : "ci",
         "tool" : "list_prs",
         "uri" : "ui://ci/board"
       }
-    }
-  ],
-  "workflows" : [
-    {
-      "pinned_by" : {
-        "person" : true
-      },
-      "workflow" : "fill-free-slots"
     },
     {
       "pinned_by" : {
         "person" : true
       },
-      "workflow" : "check-the-batch"
+      "view" : {
+        "arguments" : {
+
+        },
+        "server" : "ci",
+        "tool" : "list_issues",
+        "uri" : "ui://ci/issues"
+      }
+    }
+  ],
+  "sessions" : [
+    {
+      "pinned_by" : {
+        "person" : true
+      },
+      "session" : "2262174D-24B6-46C7-9644-59972223F660"
     }
   ]
 }

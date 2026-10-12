@@ -7,6 +7,7 @@ cooldown: 15m
 permission-mode: auto
 enabled: false
 when-done: archive
+archived: true
 ---
 
 The project went idle. As project lead: list the open PRs and open issues (`gh pr list --state open`, `gh issue list --state open`), and list your agents (list_sessions with started_by: me).

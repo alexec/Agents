@@ -7,8 +7,7 @@ on:
       days: [sat]
 agent: new
 runtime: claude
-model: haiku
-effort: default
+model: sonnet
 permission-mode: auto
 cooldown: 6d
 hosts: [8AB85821-9D24-59CE-9737-8FC556923733]

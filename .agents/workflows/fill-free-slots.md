@@ -15,6 +15,7 @@ labels: [lead, intake]
 when-done: archive
 hosts: [8AB85821-9D24-59CE-9737-8FC556923733]
 enabled: false
+archived: true
 ---
 
 You keep this project's agents busy. You run with nobody watching. You find out whether
