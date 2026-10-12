@@ -219,6 +219,12 @@ secrets stay in the control plane's own folder, never in its store. A host linke
 workspace adds three states to the usual ones: **stopped**, **starting** and **stopping**.
 Every client draws them, from the same `hosts/list` and `control/hostChanged` as the rest.
 
+A prompt or a new agent for a stopped workspace's host is **kept** by the control plane, in
+its store, and the workspace is started. When the host connects, the control plane sends each
+kept request to it in order, as the client that sent it, with the same id the client would
+have retried with, so it is done once. Nothing else is kept: any other request for a stopped
+host is refused, and says it is stopped.
+
 For now only a control plane with one copy runs providers, as only one holds ssh tunnels.
 
 ## When the store is down

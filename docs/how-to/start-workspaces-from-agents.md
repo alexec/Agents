@@ -86,9 +86,32 @@ A linked server's `···` menu has two settings:
 - **Start when used**, on by default.
 - **Stop when idle**, after 30 minutes by default.
 
-Both are kept with the link. A prompt to a stopped server still has to wait for Start for
-now. Starting it by sending a prompt, and stopping it once it has been idle, are coming
-(#691).
+Both are kept with the link.
+
+### Start when used
+
+With **Start when used** on, you don't have to press **Start**. Send a prompt to an agent on
+the stopped server, or start a new agent in one of its projects, on the Mac, the iPhone or
+the web page:
+
+- The control plane keeps what you sent and starts the workspace.
+- The chat shows your prompt as a dashed bubble, with **Waiting for devbox to start** under
+  it. A new agent's chat opens at once with its first prompt waiting the same way.
+- When the server connects, the prompt goes, once, in the order it was sent. A new agent is
+  made then, and its chat opens.
+
+What was sent is kept by the control plane, not by the app. You can close the app or lock the
+phone, and it still goes. Up to 20 can wait for one server.
+
+- **To take one back**, press × beside it. The workspace keeps starting.
+- **If the start fails**, each waiting prompt says **Not sent** and why, with **Try Again**.
+- **Attachments can't wait.** Send the words alone, or start the server first.
+
+Only prompts and new agents start a workspace. Reading a chat or a file on a stopped server
+doesn't. With **Start when used** off, a prompt to a stopped server is refused, and its strip
+offers **Start**.
+
+Stopping a server once it has been idle is coming (#691).
 
 ## If it doesn't work
 
