@@ -107,9 +107,9 @@ struct UsageHistoryTests {
     }
 
     @Test("D is today by the hour")
-    func dayIsHourly() {
+    func dayIsHourly() throws {
         let chart = UsageChart(history(), range: .day, metric: .cost)
-        #expect(chart.bars.count == 24)
+        try #require(chart.bars.count == 24)
         #expect(chart.bars[9].value == 4)
         #expect(chart.bars[15].value == 1)
         #expect(chart.total == 5)
