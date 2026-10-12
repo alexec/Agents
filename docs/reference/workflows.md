@@ -145,6 +145,12 @@ permission-mode: plan
 Review the pull request in the event's data, and list anything that looks wrong.
 ```
 
+This project's own `ci` server names it `pr.opened` (#833): a pull request opened, or a
+draft marked ready for review, by the repo's own people. The **Review pull requests**
+workflow (`.agents/workflows/review-pull-requests.md`) starts a new agent on it that reads
+the diff and leaves one comment, and never pushes, approves or merges. It comes with
+`enabled: false`; turn it on with its **Enabled** switch.
+
 Under **Triggers**, the workflow's page shows a line for each server a trigger hears: when
 the server was last asked and when the last event came, or why not. See
 [Start a workflow from an MCP event](../how-to/start-a-workflow-from-an-mcp-event.md).

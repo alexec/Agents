@@ -3,7 +3,7 @@ import MCPServerKit
 
 /// GitHub as a JSON file, for tests and walks: read on every call, so a test or a walk can
 /// append runs, PRs and issues while it runs; reruns and comments are written back to it.
-/// An issue's, comment's or PR's `authorAssociation` is GitHub's (`OWNER`, `NONE`…); left out,
+/// A PR's `draft` is false when left out. An issue's, comment's or PR's `authorAssociation` is GitHub's (`OWNER`, `NONE`…); left out,
 /// it is `NONE`, as a stranger. A login ending `[bot]` is a bot.
 /// `"gh": "notSignedIn"` or `"gh": {"rateLimitedForMs": n}` makes every call fail that way.
 public struct FakeGitHub: GitHub {
@@ -100,6 +100,13 @@ public struct FakeGitHub: GitHub {
             let checks = Checks(rawValue: p["checks"]?.string ?? "") ?? .none
             return BoardPR(pr: Self.toPR(p), checks: checks, failedRunId: checks == .failing ? p["failedRunId"]?.int : nil,
                            conflicts: p["conflicts"]?.bool)
+        }
+    }
+
+    public func openPRs(repo: String) async throws -> [OpenPR] {
+        list(try load(), repo, "prs").filter { $0["state"]?.string == "open" }.map { p in
+            OpenPR(pr: Self.toPR(p), author: p["author"]?.string ?? "", draft: p["draft"]?.bool == true,
+                   trusted: isTrusted(association: p["authorAssociation"]?.string, login: p["author"]?.string))
         }
     }
 

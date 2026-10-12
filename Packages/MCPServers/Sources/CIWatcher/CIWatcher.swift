@@ -20,13 +20,14 @@ public enum CIWatcher {
         let poller = EventPoll()
         return MCPServer(
             info: .init(name: "ci-watcher", title: "CI watcher", version: version),
-            instructions: "This repo's pull requests, their CI, and its issues. Events: checks.failed, pr.merged, pr.conflicted, pr.closed, issue.opened, issue.labelled, issue.commented, issue.closed. Tools list pull requests and issues, read logs, rerun failed jobs and comment, as the signed-in gh user.",
+            instructions: "This repo's pull requests, their CI, and its issues. Events: checks.failed, pr.opened, pr.merged, pr.conflicted, pr.closed, issue.opened, issue.labelled, issue.commented, issue.closed. Tools list pull requests and issues, read logs, rerun failed jobs and comment, as the signed-in gh user.",
             tools: tools, resources: resources, events: events,
             extensions: ["io.modelcontextprotocol/ui": [:]],
             callTool: { tool, arguments in await callTool(gh, tool, arguments) },
             poll: { event, params in
                 let args = try await withRepo(gh, try event.inputSchema.check(params["arguments"]))
                 if event.name == "pr.conflicted" { return try await pollConflicts(gh, args, params) }
+                if event.name == "pr.opened" { return try await pollOpened(gh, args, params) }
                 return try await poller.poll(event: event, params: params,
                                              candidates: { since in try await candidates(gh, event.name, args, since) },
                                              mapError: eventsError)
@@ -82,6 +83,14 @@ public enum CIWatcher {
                       "failedJobs": ["type": "array", "items": ["type": "object", "properties": ["name": ["type": "string"], "url": ["type": "string"]]]],
                   ],
               ]),
+        Event(name: "pr.opened", title: "Pull request opened",
+              description: "A pull request was opened, or a draft was marked ready for review: a PR open and not a draft now that was not at the last poll. Drafts never count. Reopened, it is raised again. Only PRs by the repo's owner, members and collaborators, never a bot, unless anyone is true.",
+              inputSchema: Schema(["repo": repoProperty, "branch": .string("Only the PR from this branch."), "pr": prProperty,
+                                   "anyone": anyoneProperty]),
+              payloadSchema: ["type": "object", "properties": [
+                  "pr": prSchema.merging(["properties": prSchema["properties"]!.merging(["author": ["type": "string"]])]),
+                  "openedAt": ["type": "string"],
+              ]]),
         Event(name: "pr.merged", title: "Pull request merged", description: "A pull request was merged.",
               inputSchema: Schema(["repo": repoProperty, "branch": .string("Only the PR from this branch."), "pr": prProperty]),
               payloadSchema: ["type": "object", "properties": ["pr": prSchema, "mergedAt": ["type": "string"], "mergeSha": ["type": "string"]]]),
@@ -188,28 +197,46 @@ public enum CIWatcher {
         return (list, truncated)
     }
 
-    /// A conflict has no time on GitHub, only a state, so `pr.conflicted` diffs it (#712): the
-    /// cursor's ids are the PRs that were in conflict at the last poll, and one that is now and
-    /// was not then is raised. A first poll takes those already in conflict as known. A PR
+    /// A conflict has no time on GitHub, only a state, so `pr.conflicted` diffs it (#712). A PR
     /// GitHub has not worked out yet keeps the state it had.
     static func pollConflicts(_ gh: some GitHub, _ args: [String: JSON], _ params: JSON) async throws(RPCError) -> JSON {
+        try await pollDiff(name: "pr.conflicted", key: "conflictedAt", args, params) {
+            try await gh.listPRs(repo: args["repo"]?.string ?? "").map { ($0.pr, $0.conflicts, $0.pr.json) }
+        }
+    }
+
+    /// `pr.opened` diffs the open PRs that are not drafts (#833), so a draft marked ready is
+    /// raised as it is. Another's PR is never one, unless anyone is true (#728).
+    static func pollOpened(_ gh: some GitHub, _ args: [String: JSON], _ params: JSON) async throws(RPCError) -> JSON {
+        let anyone = args["anyone"]?.bool == true
+        return try await pollDiff(name: "pr.opened", key: "openedAt", args, params) {
+            try await gh.openPRs(repo: args["repo"]?.string ?? "").filter { anyone || $0.trusted }
+                .map { ($0.pr, !$0.draft, $0.pr.json.merging(["author": .string($0.author)])) }
+        }
+    }
+
+    /// An event for each PR whose state is on now and was not at the last poll: the cursor's ids
+    /// are the PRs that were on then. A first poll takes those already on as known. A state of
+    /// nil keeps the one the PR had.
+    static func pollDiff(name: String, key: String, _ args: [String: JSON], _ params: JSON,
+                         _ states: () async throws -> [(pr: PR, on: Bool?, json: JSON)]) async throws(RPCError) -> JSON {
         let first = params["cursor"] == nil || params["cursor"] == .null
         let cursor = first ? PollCursor(since: "") : try PollCursor.decode(params["cursor"])
         let limit = first ? 100 : min(100, max(1, params["maxEvents"]?.int ?? 50))
-        let prs: [BoardPR]
-        do { prs = try await gh.listPRs(repo: args["repo"]?.string ?? "") } catch { throw eventsError(error) }
+        let prs: [(pr: PR, on: Bool?, json: JSON)]
+        do { prs = try await states() } catch { throw eventsError(error) }
         let repo = args["repo"]?.string ?? "", pr = args["pr"]?.int, branch = args["branch"]?.string
         let was = Set(cursor.ids)
-        let id = { (number: Int) in "pr.conflicted:\(repo):\(number)" }
+        let id = { (number: Int) in "\(name):\(repo):\(number)" }
         let wanted = prs.filter { (pr == nil || $0.pr.number == pr) && (branch == nil || $0.pr.branch == branch) }
-        let now = wanted.filter { $0.conflicts == true || ($0.conflicts == nil && was.contains(id($0.pr.number))) }
+        let now = wanted.filter { $0.on == true || ($0.on == nil && was.contains(id($0.pr.number))) }
         let fresh = now.filter { !was.contains(id($0.pr.number)) }.sorted { $0.pr.number < $1.pr.number }
         let taken = fresh.prefix(limit)
         let time = Time.string(Date())
         let ids = (now.filter { was.contains(id($0.pr.number)) } + taken).map { id($0.pr.number) }
         let events: [JSON] = first ? [] : taken.map {
-            ["eventId": .string("\(id($0.pr.number)):\(time)"), "name": "pr.conflicted", "timestamp": .string(time),
-             "data": ["pr": $0.pr.json, "conflictedAt": .string(time)]]
+            ["eventId": .string("\(id($0.pr.number)):\(time)"), "name": .string(name), "timestamp": .string(time),
+             "data": ["pr": $0.json, key: .string(time)]]
         }
         return ["events": .array(events), "cursor": .string(PollCursor(since: time, ids: ids).encoded), "truncated": false,
                 "hasMore": .bool(!first && fresh.count > taken.count), "nextPollMs": 30000]

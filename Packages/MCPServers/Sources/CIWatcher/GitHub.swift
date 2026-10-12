@@ -58,6 +58,15 @@ public struct FailedRunData: Sendable {
     }
 }
 
+/// An open pull request, as `pr.opened` sees it (#833).
+public struct OpenPR: Sendable {
+    public var pr: PR
+    public var author: String
+    public var draft: Bool
+    /// Whether its author is one of the repo's own (#728).
+    public var trusted: Bool
+}
+
 public struct MergedPR: Sendable {
     public var pr: PR
     public var mergedAt: String
@@ -145,6 +154,8 @@ public protocol GitHub: Sendable {
     /// PRs merged, and PRs closed without merging, at or after `since`.
     func closedPRs(repo: String, since: String) async throws -> (merged: [MergedPR], closed: [ClosedPR], truncated: Bool)
     func listPRs(repo: String) async throws -> [BoardPR]
+    /// Open PRs, drafts too, with their authors.
+    func openPRs(repo: String) async throws -> [OpenPR]
     /// What happened to the repo's issues at or after `since`, of one kind.
     func issueActivity(repo: String, kind: IssueKind, since: String) async throws -> (items: [IssueActivity], truncated: Bool)
     /// Open issues, newest updated first, at most 100; with `label`, only those with it.

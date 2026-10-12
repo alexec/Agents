@@ -23,6 +23,7 @@ It listens on no port, and holds no token: every GitHub call is `gh api` (or `gh
 | Name | `inputSchema` | `data` | `eventId` |
 |---|---|---|---|
 | `checks.failed` | `repo` (string, `owner/name`; left out, the project folder's repo, #702), `branch` (string, only runs on that PR branch), `pr` (positive integer, only that pull request), `anyone` (boolean, #728); given filters must all hold | `{ pr: {number, title, branch, url}, headSha, run: {id, attempt, name, url}, failedJobs: [{name, url}] }` | `checks.failed:{repo}:{runId}:{attempt}` |
+| `pr.opened` (#833) | as `checks.failed` | `{ pr: {number, title, branch, url, author}, openedAt }`; a PR open and not a draft now that was not at the last poll, so a draft marked ready is raised then and a reopened PR again. Drafts never count. The cursor's ids are the open, ready PRs then; a first poll takes those already open as known | `pr.opened:{repo}:{number}:{openedAt}` |
 | `pr.merged` | `repo` (optional), `branch` (string, only the PR from that branch), `pr` (positive integer, only that pull request); given filters must all hold | `{ pr: {number, title, branch, url}, mergedAt, mergeSha }` | `pr.merged:{repo}:{number}` |
 | `pr.closed` (#702) | `repo` (optional), `branch` (string, only the PR from that branch), `pr` (positive integer, only that pull request); given filters must all hold | `{ pr: {number, title, branch, url}, closedAt }; closed without merging` | `pr.closed:{repo}:{number}:{closedAt}` |
 | `pr.conflicted` (#712) | as `pr.closed` | `{ pr: {number, title, branch, url}, conflictedAt }`; a PR open and in conflict now that was not at the last poll. The cursor's ids are the PRs in conflict then; a first poll takes those already in conflict as known; one GitHub has not worked out keeps its state | `pr.conflicted:{repo}:{number}:{conflictedAt}` |
@@ -43,10 +44,10 @@ pull request, and an issue's or comment's body goes into the prompt. So by defau
 raised only for the repo's own people: GitHub's `author_association` is `OWNER`, `MEMBER` or
 `COLLABORATOR`, and the account is not a bot (`type: "Bot"` or a login ending `[bot]`).
 That is the issue's author for `issue.opened`, the comment's for `issue.commented`, the PR's
-for `checks.failed` (a fork's PR included), and the actor for `issue.labelled` (labelling takes
+for `checks.failed` (a fork's PR included) and `pr.opened`, and the actor for `issue.labelled` (labelling takes
 triage access, so only bots are left out). For `issue.closed` it is the actor, except that an
 author outside the repo closing their own issue does not count. `anyone: true` raises them
-all. The `pr.*` events are left as they are: their data is a PR's number, title and branch.
+all. The other `pr.*` events are left as they are: their data is a PR's number, title and branch.
 
 ## Tools
 
