@@ -36,3 +36,6 @@
 - Defaults taken without asking, all easy to change in clarify: Start when used on, Stop when
   idle on at 30 minutes, 2 minutes before an ssh start, 20 kept prompts per host, provider
   settings Mac only (as Hosts settings are today).
+- 2026-10-11, Alex: our own MCP servers are static Swift binaries (no Node on the target), and
+  providers come from the command provider's presets or a tool map over an existing MCP server,
+  not one server per provider (FR-001a, FR-070–073). The CI watcher port is #700.
