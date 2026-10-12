@@ -182,4 +182,47 @@ struct MCPProjectTests {
         #expect(contribution.servers.isEmpty)
         #expect(contribution.waiting == ["postgres"])
     }
+
+    /// #803: the person approves for the project; a session in one of its worktrees runs
+    /// in the worktree, and gets the server while its entry is the one approved.
+    @Test func aWorktreeSessionGetsTheProjectsApprovedServer() throws {
+        let w = try world()
+        let worktree = w.project.appending(path: ".agents/worktrees/fix-it")
+        try FileManager.default.createDirectory(at: worktree, withIntermediateDirectories: true)
+        let entry = OrderedJSON.mcpEntry(stdio: "ci-watcher", args: [], env: [])
+        try MCPJSONFile.upsert(name: "ci", entry: entry, at: MCPJSONFile.projectURL(folder: w.project))
+        try MCPJSONFile.upsert(name: "ci", entry: entry, at: MCPJSONFile.projectURL(folder: worktree))
+        var approvals = MCPApprovals(approvalsBegan: Date())
+        approvals.recordAdded(folder: w.project, name: "ci", entry: entry)
+
+        let contribution = SessionServers.projectContribution(in: worktree, approvals: approvals,
+                                                              secrets: SecretsEnv(lines: []))
+        #expect(contribution.servers.map(\.name) == ["ci"])
+        #expect(contribution.waiting.isEmpty)
+    }
+
+    @Test func aWorktreeThatChangedTheEntryStillWaits() throws {
+        let w = try world()
+        let worktree = w.project.appending(path: ".agents/worktrees/fix-it")
+        try FileManager.default.createDirectory(at: worktree, withIntermediateDirectories: true)
+        let entry = OrderedJSON.mcpEntry(stdio: "ci-watcher", args: [], env: [])
+        try MCPJSONFile.upsert(name: "ci", entry: entry, at: MCPJSONFile.projectURL(folder: w.project))
+        try MCPJSONFile.upsert(name: "ci", entry: .mcpEntry(stdio: "something-else", args: [], env: []),
+                               at: MCPJSONFile.projectURL(folder: worktree))
+        var approvals = MCPApprovals(approvalsBegan: Date())
+        approvals.recordAdded(folder: w.project, name: "ci", entry: entry)
+
+        let contribution = SessionServers.projectContribution(in: worktree, approvals: approvals,
+                                                              secrets: SecretsEnv(lines: []))
+        #expect(contribution.servers.isEmpty)
+        #expect(contribution.waiting == ["ci"])
+    }
+
+    @Test func onlyAWorktreeFolderItselfIsKeyedByItsProject() {
+        let project = Project.standardize(URL(filePath: NSTemporaryDirectory()).appending(path: "p-\(UUID().uuidString)"))
+        let nested = project.appending(path: ".agents/worktrees/a/sub")
+        #expect(MCPApprovals.approvalFolder(project.appending(path: ".agents/worktrees/a")) == project)
+        #expect(MCPApprovals.approvalFolder(project) == project)
+        #expect(MCPApprovals.approvalFolder(nested) == Project.standardize(nested))
+    }
 }

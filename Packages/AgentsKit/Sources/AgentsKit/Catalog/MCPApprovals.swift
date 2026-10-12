@@ -35,9 +35,22 @@ struct MCPApprovals: Codable, Equatable, Sendable {
     static let relativeFile = ".agents/mcp.json"
 
     /// `folder|relative-file|server-name`. The folder is `Project.standardize`'d, so a
-    /// symlink and a trailing slash are the same project the rest of the app already agrees on.
+    /// symlink and a trailing slash are the same project the rest of the app already agrees on,
+    /// and a worktree of a project is keyed by that project (#803): the person approves for
+    /// the project, and a session in its worktree runs there. The digest still has to match
+    /// the worktree's own entry.
     static func key(folder: URL, name: String) -> String {
-        "\(Project.standardize(folder).path)|\(relativeFile)|\(name)"
+        "\(approvalFolder(folder).path)|\(relativeFile)|\(name)"
+    }
+
+    /// The project a folder's approvals are kept under: itself, or for
+    /// `<project>/.agents/worktrees/<name>`, the project.
+    static func approvalFolder(_ folder: URL) -> URL {
+        let folder = Project.standardize(folder)
+        let marker = "/\(WorktreeName.folder)/"
+        guard let range = folder.path.range(of: marker, options: .backwards),
+              !folder.path[range.upperBound...].contains("/") else { return folder }
+        return Project.standardize(URL(filePath: String(folder.path[..<range.lowerBound])))
     }
 
     static func digest(of entry: OrderedJSON) -> String {
