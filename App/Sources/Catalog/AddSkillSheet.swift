@@ -2,7 +2,8 @@ import AgentsKitCore
 import SwiftUI
 
 /// Add a skill (059, look/ frames B, C and E): search skills.sh, look at one skill as its
-/// agent will read it, and add it to the person's `~/.agents` or to a project.
+/// agent will read it, and add it where the sheet was opened (#688): Settings adds to the
+/// person's `~/.agents`, Project Settings to that project's `.agents`.
 ///
 /// Nothing is added from the list. Choosing a row fetches that skill at its repository's
 /// current commit and shows every file; Add then puts exactly those files in place.
@@ -10,7 +11,7 @@ struct AddSkillSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
 
-    /// Where Add points when the sheet opens.
+    /// Where Add puts a skill. There is no choosing another place here.
     let destination: DaemonAPI.SkillDestination
     /// The runtimes the reach dots are drawn for.
     let runtimes: [DaemonAPI.RuntimeName]
@@ -20,7 +21,6 @@ struct AddSkillSheet: View {
     /// Called after a skill was added, so the page behind can read itself again.
     var onAdded: () -> Void = {}
 
-    @State private var addTo: DaemonAPI.SkillDestination = .personal
     @State private var query = ""
     @State private var results: [DaemonAPI.CatalogResult] = []
     @State private var searched = false
@@ -36,7 +36,7 @@ struct AddSkillSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             if let preview {
-                SkillPreviewView(preview: preview, addTo: $addTo, projectName: projectName, runtimes: runtimes,
+                SkillPreviewView(preview: preview, addTo: destination, projectName: projectName, runtimes: runtimes,
                                  back: { self.preview = nil },
                                  added: { skill in
                                      self.added.insert(skill.name)
@@ -49,22 +49,7 @@ struct AddSkillSheet: View {
         }
         .frame(width: Self.size.width, height: Self.size.height)
         .background(Paper.ground)
-        .onAppear {
-            addTo = destination
-            added = installed
-        }
-        // The **added** marks follow Add to, with no new search (US2 #5).
-        .task(id: addTo) {
-            guard addTo != destination || added.isEmpty else { return }
-            switch addTo {
-            case .personal:
-                if let snapshot = await model.sharedSnapshot() {
-                    added = Set(snapshot.skills.filter { $0.source == .personal && $0.managed != nil }.map(\.name))
-                }
-            case .project(let folder):
-                if let listed = await model.projectSkills(URL(filePath: folder)) { added = Set(listed.filter { $0.managed != nil }.map(\.name)) }
-            }
-        }
+        .onAppear { added = installed }
     }
 
     // MARK: Frame B
@@ -74,7 +59,7 @@ struct AddSkillSheet: View {
             HStack(spacing: 10) {
                 Text("Add a skill").appText(.title)
                 Spacer()
-                AddToPicker(addTo: $addTo, projectName: projectName, projectFolder: projectFolder)
+                Text(projectName.map { "Adds to \($0)" } ?? "Adds to ~/.agents").appText(.fine).foregroundStyle(.secondary)
             }
             TextField("Search skills", text: $query)
                 .textFieldStyle(.roundedBorder)
@@ -153,7 +138,7 @@ struct AddSkillSheet: View {
         guard opening == nil else { return }
         opening = result
         previewError = nil
-        let answer = await model.catalogPreview(result, for: addTo)
+        let answer = await model.catalogPreview(result, for: destination)
         opening = nil
         if let fresh = answer.preview {
             preview = fresh
@@ -164,14 +149,9 @@ struct AddSkillSheet: View {
 
     // MARK: Words
 
-    private var projectFolder: String? {
-        if case .project(let folder) = destination { return folder }
-        if let key = model.selectedProjectKey, key.host == .mac { return key.folder.path }
-        return model.liveProjects.first { $0.host == .mac }?.project.folder.path
-    }
-
+    /// The project's name when the sheet adds to a project.
     private var projectName: String? {
-        guard let folder = projectFolder else { return nil }
+        guard case .project(let folder) = destination else { return nil }
         return model.liveProjects.first { $0.project.folder.path == folder }?.name ?? URL(filePath: folder).lastPathComponent
     }
 
@@ -180,28 +160,6 @@ struct AddSkillSheet: View {
         if n >= 10_000 { return "\(Int((Double(n) / 1000).rounded()))k" }
         if n >= 1_000 { return String(format: "%.1fk", Double(n) / 1000) }
         return "\(n)"
-    }
-}
-
-/// Add to: the person, or the project the sheet belongs to.
-struct AddToPicker: View {
-    @Binding var addTo: DaemonAPI.SkillDestination
-    let projectName: String?
-    let projectFolder: String?
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Text("Add to").foregroundStyle(.secondary).fixedSize()
-            Picker("Add to", selection: $addTo) {
-                Text("You").tag(DaemonAPI.SkillDestination.personal)
-                if let projectFolder, let projectName {
-                    Text("\(projectName) (project)").tag(DaemonAPI.SkillDestination.project(folder: projectFolder))
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
-        }
     }
 }
 

@@ -9,7 +9,8 @@ struct SkillPreviewView: View {
     @Environment(\.dismiss) private var dismiss
 
     let preview: DaemonAPI.SkillPreview
-    @Binding var addTo: DaemonAPI.SkillDestination
+    /// Where Add puts it: where the sheet was opened (#688).
+    let addTo: DaemonAPI.SkillDestination
     let projectName: String?
     let runtimes: [DaemonAPI.RuntimeName]
     let back: () -> Void
@@ -22,10 +23,7 @@ struct SkillPreviewView: View {
     @State private var adding = false
     @State private var failure: DaemonAPI.CatalogError?
     @State private var confirmingReplace = false
-    @State private var askedAgain = false
     @State private var confirmingLoss = false
-    /// Frame E: when the name is taken where Add points, whether the other place is free.
-    @State private var otherIsFree = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -34,7 +32,6 @@ struct SkillPreviewView: View {
                     Button("‹ Results", action: back).buttonStyle(.link)
                     Text(preview.name).appText(.title).lineLimit(1)
                     Spacer(minLength: 12)
-                    AddToPicker(addTo: $addTo, projectName: projectName, projectFolder: projectFolder)
                 } else {
                     Text("Update \(preview.name)").appText(.title).lineLimit(1)
                     Spacer(minLength: 12)
@@ -77,20 +74,9 @@ struct SkillPreviewView: View {
             .background(Paper.wash)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .task(id: addTo) {
-            // The preview came with the state for where Add pointed when it was opened;
-            // a change of Add to asks again, with nothing fetched a second time.
-            if state == nil, !askedAgain {
-                state = preview.destinationState
-            } else {
-                state = await model.catalogDestinationState(preview.previewID, for: addTo)
-            }
-            askedAgain = true
-            failure = nil
-            otherIsFree = false
-            if case .unmanaged? = state, update == nil, let other = otherDestination {
-                otherIsFree = await model.catalogDestinationState(preview.previewID, for: other) == .free
-            }
+        .task {
+            // The preview came with the state for where Add points.
+            state = preview.destinationState
         }
         .confirmationDialog("Your edits to \(preview.name) will be lost", isPresented: $confirmingLoss) {
             Button("Update anyway", role: .destructive) { Task { await add(replace: true) } }
@@ -191,12 +177,6 @@ struct SkillPreviewView: View {
         case .unmanaged(let path)?:
             note("You already have a skill called \(preview.name) in \(Self.tilde(URL(filePath: path).deletingLastPathComponent().path)). You made it (it didn't come from here), so the app won't replace it.",
                  attention: true)
-            if otherIsFree {
-                note(addTo == .personal
-                     ? "Adding to \(projectName ?? "the project") would work: in the project its copy is the one agents there get, ahead of yours."
-                     : "Adding to you would work: every agent you start gets it, and this project's own copy still comes first here.",
-                     attention: false)
-            }
         case .managedOther(let source)?:
             note("A skill of this name from \(source) is there already. Adding this one replaces it.", attention: false)
         case .sameSkill(let update)? where self.update == nil:
@@ -281,22 +261,6 @@ struct SkillPreviewView: View {
     }
 
     // MARK: Words
-
-    private var projectFolder: String? {
-        if case .project(let folder) = addTo { return folder }
-        guard let key = model.selectedProjectKey, key.host == .mac else {
-            return model.liveProjects.first { $0.host == .mac }?.project.folder.path
-        }
-        return key.folder.path
-    }
-
-    /// The destination Add to is not pointing at, if there is one to offer.
-    private var otherDestination: DaemonAPI.SkillDestination? {
-        switch addTo {
-        case .personal: projectFolder.map { .project(folder: $0) }
-        case .project: .personal
-        }
-    }
 
     private var placeName: String { addTo == .personal ? "~/.agents" : (projectName ?? "the project") }
 

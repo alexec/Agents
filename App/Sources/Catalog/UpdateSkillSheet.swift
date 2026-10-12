@@ -14,12 +14,11 @@ struct UpdateSkillSheet: View {
 
     @State private var answer: DaemonAPI.SkillUpdatePreviewAnswer?
     @State private var error: DaemonAPI.CatalogError?
-    @State private var addTo: DaemonAPI.SkillDestination = .personal
 
     var body: some View {
         Group {
             if let answer {
-                SkillPreviewView(preview: answer.preview, addTo: $addTo, projectName: nil, runtimes: runtimes,
+                SkillPreviewView(preview: answer.preview, addTo: destination, projectName: nil, runtimes: runtimes,
                                  back: { dismiss() },
                                  added: { _ in
                                      onUpdated()
@@ -38,7 +37,6 @@ struct UpdateSkillSheet: View {
         .frame(width: AddSkillSheet.size.width, height: AddSkillSheet.size.height)
         .background(Paper.ground)
         .task {
-            addTo = destination
             await load()
         }
     }
