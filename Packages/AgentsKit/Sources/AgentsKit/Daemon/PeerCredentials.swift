@@ -71,6 +71,59 @@ enum PeerCredentials {
         #endif
     }
 
+    /// What `/proc/<pid>/status` says of a process: its name, its real uid and its parent.
+    /// Readable for every process, whoever owns it, unless /proc is mounted `hidepid`.
+    struct ProcessStatus: Equatable {
+        var name: String
+        var uid: uid_t
+        var parent: pid_t
+
+        /// Nil for anything without all three lines.
+        init?(status: String) {
+            var fields: [Substring: Substring] = [:]
+            for line in status.split(separator: "\n") {
+                guard let colon = line.firstIndex(of: ":") else { continue }
+                fields[line[..<colon]] = line[line.index(after: colon)...]
+            }
+            guard let name = fields["Name"]?.trimmingCharacters(in: .whitespaces),
+                  let uid = fields["Uid"]?.split(whereSeparator: \.isWhitespace).first.flatMap({ uid_t($0) }),
+                  let parent = fields["PPid"].flatMap({ pid_t($0.trimmingCharacters(in: .whitespaces)) })
+            else { return nil }
+            self.init(name: name, uid: uid, parent: parent)
+        }
+
+        init(name: String, uid: uid_t, parent: pid_t) {
+            self.name = name
+            self.uid = uid
+            self.parent = parent
+        }
+
+        static func of(_ pid: pid_t) -> ProcessStatus? {
+            (try? String(contentsOfFile: "/proc/\(pid)/status", encoding: .utf8)).flatMap(ProcessStatus.init(status:))
+        }
+    }
+
+    /// The names OpenSSH's session processes go by: `sshd` before 9.8, `sshd-session` after.
+    static let sshdNames: Set<String> = ["sshd", "sshd-session"]
+
+    /// Whether `peer`, of this account, is an ssh login's own session process: the one that
+    /// carries a `-L` forward to the socket, which is how a Mac reaches a server's daemon.
+    /// Only the privileged sshd, as root, makes one, so its parent is a root sshd that is not
+    /// pid 1 (in a container sshd may be pid 1, and every orphan is handed to pid 1). Nothing
+    /// an agent starts has a root parent: it descends from the daemon, or, orphaned, from
+    /// pid 1 or a `systemd --user` of this account. A name can be set by anyone, but not on
+    /// a root process.
+    static func isSSHSession(_ peer: ProcessStatus, parent: ProcessStatus?) -> Bool {
+        guard sshdNames.contains(peer.name), peer.parent > 1, let parent, parent.uid == 0 else { return false }
+        return sshdNames.contains(parent.name)
+    }
+
+    /// `isSSHSession`, read from /proc for `pid`.
+    static func isSSHSession(_ pid: pid_t) -> Bool {
+        guard let peer = ProcessStatus.of(pid) else { return false }
+        return isSSHSession(peer, parent: ProcessStatus.of(peer.parent))
+    }
+
     /// Whether `ancestor` is `pid` or one of its forebears, looking no further than
     /// `depth` generations. A runtime starts its MCP servers itself or through a
     /// wrapper or two (`npx`, a login shell), never through many.

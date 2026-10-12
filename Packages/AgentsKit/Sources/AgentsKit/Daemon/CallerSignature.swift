@@ -50,11 +50,13 @@ public struct RolePolicy: Sendable {
     /// The policy for a daemon at `locations`.
     ///
     /// Roles need signatures to tell programs apart, so a daemon that is not signed by
-    /// a team — `swift build`, the tests — cannot hold them, and on Linux there are no
-    /// signatures at all; there the uid check and the private root are the door, and an
-    /// agent on a server can do what that account can. A scratch root is open unless
+    /// a team — `swift build`, the tests — cannot hold them. A scratch root is open unless
     /// `AGENTS_ENFORCE_ROLES` is set: a walk drives its daemon from a shell, and nothing
     /// on a scratch root is anybody's real work.
+    ///
+    /// On Linux there are no signatures at all, and a server's root is never the standard
+    /// one, so every Linux daemon is `sshSessions` (#726): open, it let an agent's own shell
+    /// answer its prompts and delete other agents.
     public static func forDaemon(at locations: StoreLocations,
                                  environment: [String: String] = ProcessInfo.processInfo.environment) -> RolePolicy {
         #if canImport(Security)
@@ -66,8 +68,19 @@ public struct RolePolicy: Sendable {
         }
         return signatures(team: team)
         #else
-        return open
+        return sshSessions
         #endif
+    }
+
+    /// A Linux server's door (#726): control for an ssh login's own session process, which
+    /// is what carries the Mac's forward to the socket, and stranger for anything else. That
+    /// is every process an agent starts, orphaned or not: none is sshd's child. The control
+    /// plane's channels never reach the socket, and helpers reach the daemon over its MCP
+    /// endpoint (#185), so neither is lost. An agent that can ssh into its own account
+    /// with a key it holds is that account's login, and is let in as one.
+    public static let sshSessions = RolePolicy(summary: "control for this account's ssh sessions alone, anything else a stranger") { fd in
+        guard let pid = PeerCredentials.pid(of: fd) else { return .stranger }
+        return PeerCredentials.isSSHSession(pid) ? .control : .stranger
     }
 
     #if canImport(Security)
