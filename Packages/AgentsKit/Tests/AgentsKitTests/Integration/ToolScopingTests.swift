@@ -111,8 +111,8 @@ struct ToolScopingTests {
         }
 
         let sent = await launcher.allAgents.first?.promptContent?.arrayValue ?? []
-        #expect(sent.last?["text"]?.stringValue == Briefing.asSent(to: "cursor"))
-        #expect(sent.last?["text"]?.stringValue?.contains("CreateGoal") == false,
+        #expect(sent.first?["text"]?.stringValue == Briefing.asSent(to: "cursor"))
+        #expect(sent.first?["text"]?.stringValue?.contains("CreateGoal") == false,
                 "Cursor's goal tools are its own to use, not residue to be warned about")
     }
 
@@ -129,7 +129,7 @@ struct ToolScopingTests {
             await launcher.allAgents.first?.promptContent != nil
         }
 
-        let text = await launcher.allAgents.first?.promptContent?.arrayValue?.last?["text"]?.stringValue ?? ""
+        let text = await launcher.allAgents.first?.promptContent?.arrayValue?.first?["text"]?.stringValue ?? ""
         #expect(text.contains(Briefing.naming(.init(runtime: "Grok", person: "Sam", pronouns: "she/her"))))
         #expect(text.contains("\"Grok (this agent) will…\""))
         #expect(text.contains("\"Sam, do you want…?\""))

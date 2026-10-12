@@ -213,7 +213,7 @@ public actor DaemonCore {
     /// runtime's history, so that is the only time it is gone.
     var needsBriefing: Set<UUID> = []
     /// The passages the person changed on a live page since the agent last took a
-    /// turn, keyed by agent. Handed to the agent as a block after the person's next
+    /// turn, keyed by agent. Handed to the agent as a block before the person's next
     /// words, then cleared. Not persisted: the edit itself is on disk in the file,
     /// and a daemon that restarts has nothing to apologise for (022 FR-016).
     var artifactEdits: [UUID: [ArtifactEdit]] = [:]

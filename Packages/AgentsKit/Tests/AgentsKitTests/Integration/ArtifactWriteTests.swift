@@ -114,13 +114,13 @@ struct ArtifactWriteTests {
 
     // MARK: Telling the agent
 
-    /// The blocks the runtime was last sent, once a prompt beginning with `words`
+    /// The blocks the runtime was last sent, once a prompt ending with `words`
     /// has reached it. Waited for rather than read at once: the prompt goes out on a
     /// task of its own.
-    private func sent(to launcher: FakeLauncher, beginningWith words: String) async -> [JSONValue] {
+    private func sent(to launcher: FakeLauncher, endingWith words: String) async -> [JSONValue] {
         await eventuallySome("the prompt reached the runtime") {
             let blocks = await launcher.lastAgent?.promptContent?.arrayValue ?? []
-            return blocks.first?["text"]?.stringValue == words ? blocks : nil
+            return blocks.last?["text"]?.stringValue == words ? blocks : nil
         } ?? []
     }
 
@@ -131,7 +131,7 @@ struct ArtifactWriteTests {
         let launcher = midTurn()
         let core = try await core(launcher, locations: locations, watching: Broadcasts())
         let id = try await started(launcher, core, in: work)
-        _ = await sent(to: launcher, beginningWith: "go")
+        _ = await sent(to: launcher, endingWith: "go")
 
         let path = work.appendingPathComponent("notes.md").path
         try "# T\n\nOne.\n\nTwo.\n".write(toFile: path, atomically: true, encoding: .utf8)
@@ -145,9 +145,9 @@ struct ArtifactWriteTests {
         #expect(try String(contentsOfFile: path, encoding: .utf8) == "# T\n\nOne, mine.\n\nTwo.\n")
 
         try await core.prompt(.init(agentID: id, text: "carry on"))
-        let blocks = await sent(to: launcher, beginningWith: "carry on")
+        let blocks = await sent(to: launcher, endingWith: "carry on")
         let expected = Briefing.artifactEdited([.init(path: path, lines: 3...3, text: "One, mine.")])
-        #expect(blocks.last?["text"]?.stringValue == expected)
+        #expect(blocks.first?["text"]?.stringValue == expected)
     }
 
     @Test func aPassageThePersonChangedIsToldToTheAgentOnItsNextTurn() async throws {
@@ -155,18 +155,18 @@ struct ArtifactWriteTests {
         let launcher = midTurn()
         let core = try await core(launcher, locations: locations, watching: Broadcasts())
         let id = try await started(launcher, core, in: work)
-        _ = await sent(to: launcher, beginningWith: "go")
+        _ = await sent(to: launcher, endingWith: "go")
 
         let path = work.appendingPathComponent("notes.md").path
         try "# T\n\nOne.\n\nTwo.\n".write(toFile: path, atomically: true, encoding: .utf8)
         try await core.artifactWrite(.init(agentID: id, path: path, text: "# T\n\nOne, mine.\n\nTwo.\n"))
 
         try await core.prompt(.init(agentID: id, text: "carry on"))
-        let blocks = await sent(to: launcher, beginningWith: "carry on")
+        let blocks = await sent(to: launcher, endingWith: "carry on")
         let expected = Briefing.artifactEdited([.init(path: path, lines: 3...3, text: "One, mine.")])
-        #expect(blocks.last?["text"]?.stringValue == expected)
+        #expect(blocks.first?["text"]?.stringValue == expected)
         // The briefing went with the first prompt and is not repeated; the note is the
-        // only thing after the person's words.
+        // only thing before the person's words.
         #expect(blocks.count == 2)
 
         // And the transcript records what the person said, and only that.
@@ -179,7 +179,7 @@ struct ArtifactWriteTests {
 
         // Told once. The next prompt carries nothing.
         try await core.prompt(.init(agentID: id, text: "and again"))
-        let again = await sent(to: launcher, beginningWith: "and again")
+        let again = await sent(to: launcher, endingWith: "and again")
         #expect(again.count == 1)
     }
 
@@ -188,7 +188,7 @@ struct ArtifactWriteTests {
         let launcher = midTurn()
         let core = try await core(launcher, locations: locations, watching: Broadcasts())
         let id = try await started(launcher, core, in: work)
-        _ = await sent(to: launcher, beginningWith: "go")
+        _ = await sent(to: launcher, endingWith: "go")
 
         let path = work.appendingPathComponent("notes.md").path
         try "One.\n\nTwo.\n".write(toFile: path, atomically: true, encoding: .utf8)
@@ -196,8 +196,8 @@ struct ArtifactWriteTests {
         try await core.artifactWrite(.init(agentID: id, path: path, text: "One, second.\n\nTwo.\n"))
 
         try await core.prompt(.init(agentID: id, text: "carry on"))
-        let blocks = await sent(to: launcher, beginningWith: "carry on")
-        let note = blocks.last?["text"]?.stringValue ?? ""
+        let blocks = await sent(to: launcher, endingWith: "carry on")
+        let note = blocks.first?["text"]?.stringValue ?? ""
         #expect(note.contains("One, second."))
         #expect(!note.contains("One, first."))
         #expect(note.components(separatedBy: "now read:").count == 2)
@@ -208,14 +208,14 @@ struct ArtifactWriteTests {
         let launcher = midTurn()
         let core = try await core(launcher, locations: locations, watching: Broadcasts())
         let id = try await started(launcher, core, in: work)
-        _ = await sent(to: launcher, beginningWith: "go")
+        _ = await sent(to: launcher, endingWith: "go")
 
         let path = work.appendingPathComponent("notes.md").path
         try "Same.\n".write(toFile: path, atomically: true, encoding: .utf8)
         try await core.artifactWrite(.init(agentID: id, path: path, text: "Same.\n"))
 
         try await core.prompt(.init(agentID: id, text: "carry on"))
-        let blocks = await sent(to: launcher, beginningWith: "carry on")
+        let blocks = await sent(to: launcher, endingWith: "carry on")
         #expect(blocks.count == 1)
     }
 

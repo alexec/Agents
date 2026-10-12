@@ -1357,18 +1357,20 @@ extension DaemonCore {
         endWatch(agentID)
         turnTasks[agentID]?.cancel()
         silencedTurns.remove(agentID)
+        // Everything of ours goes before the person's words (#763), so their words are
+        // the last thing the agent reads and the thing it answers: in order, where it
+        // now works, the briefing, what the app owes it about this prompt, and what the
+        // person changed on a page. The record above is the user's words alone either
+        // way: the transcript says what was said, not what we added to it.
+        var ours: [ContentBlock] = []
+        // Where it now works, when it has just been moved (053): first of all, so what
+        // follows is read from the right folder.
+        if let moved = moveNotes.removeValue(forKey: agentID) { ours.append(.text(moved)) }
         // The words of ours, sent with the first prompt of a conversation and not
         // again. They stay in the runtime's own history from there, and that history is
         // what a runtime replays when the session is picked back up, so sending them
-        // every turn would be paying twice for something already said. The record
-        // above is the user's words alone either way: the transcript says what was
-        // said, not what we added to it.
-        var outgoing = blocks
-        // What the app owes the agent about this prompt, and only the agent (042).
-        if let preface { outgoing.insert(.text(preface), at: 0) }
-        // Where it now works, when it has just been moved (053): first of all, so what
-        // follows is read from the right folder.
-        if let moved = moveNotes.removeValue(forKey: agentID) { outgoing.insert(.text(moved), at: 0) }
+        // every turn would be paying twice for something already said.
+        //
         // The runtime is read first on purpose: an agent that has somehow gone keeps its
         // place in the queue rather than having the briefing quietly spent on nobody.
         if let runtimeID = agents[agentID]?.runtimeID, needsBriefing.remove(agentID) != nil {
@@ -1384,21 +1386,24 @@ extension DaemonCore {
                                          person: personSettings.effectiveName(),
                                          pronouns: personSettings.givenPronouns,
                                          startedBy: starter.map { $0 ?? "" })
-            outgoing.append(.text(Briefing.text(for: ToolPolicyCatalog.policy(for: runtimeID),
-                                                managesAgents: managesAgents,
-                                                movesItself: RuntimeCatalog.canMoveFolders(runtimeID: runtimeID),
-                                                naming: naming, declared: declaredResources)))
+            ours.append(.text(Briefing.text(for: ToolPolicyCatalog.policy(for: runtimeID),
+                                            managesAgents: managesAgents,
+                                            movesItself: RuntimeCatalog.canMoveFolders(runtimeID: runtimeID),
+                                            naming: naming, declared: declaredResources)))
         }
+        // What the app owes the agent about this prompt, and only the agent (042).
+        if let preface { ours.append(.text(preface)) }
         // What the person changed on a live page since this agent last took a turn
-        // (022 FR-016). Told once, here, after their words and in the briefing's
-        // slot, and then forgotten: the edit itself is in the file. Whoever sent the
-        // prompt — the person, a workflow — the agent needs to know either way.
+        // (022 FR-016). Told once, here, and then forgotten: the edit itself is in the
+        // file. Whoever sent the prompt — the person, a workflow — the agent needs to
+        // know either way.
         if let edits = artifactEdits.removeValue(forKey: agentID),
            let note = Briefing.artifactEdited(edits.map {
                Briefing.ArtifactEdit(path: $0.path, lines: $0.lines, text: $0.text)
            }) {
-            outgoing.append(.text(note))
+            ours.append(.text(note))
         }
+        let outgoing = ours + blocks
         turnTasks[agentID] = Task { [weak self] in
             guard let self else { return }
             do {
