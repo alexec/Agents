@@ -117,6 +117,7 @@ nav:
       - reference/events.md
       - reference/workspace-providers.md
       - reference/keyboard-shortcuts.md
+      - reference/feature-matrix.md
   - Explanation:
       - explanation/index.md
       - explanation/why-agents.md

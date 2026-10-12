@@ -24,3 +24,5 @@ something up, not for reading through.
 - [Events](events.md): everything the app records, for waits, workflow triggers and the
   Events page.
 - [Keyboard shortcuts](keyboard-shortcuts.md): every shortcut and menu command on the Mac.
+- [Feature matrix of coding-agent apps](feature-matrix.md): which apps for running several
+  coding agents have which features, Agents included.
