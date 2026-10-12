@@ -74,6 +74,11 @@ all. The other `pr.*` events are left as they are: their data is a PR's number, 
 - A row is number, title, author, comment count, how long since it changed, and its labels.
 - A label calls `list_issues` again with that `label`; the chosen label in the header, with
   ✕, calls it without. A pin's `label` argument starts it narrowed.
+- **Start Agent** on a row (#834) asks the app for its new-agent form, filled in
+  (`agents/start-agent`, an Agents extension of MCP Apps): the prompt "Work on GitHub issue
+  #n (`gh issue view n --repo R`): title", then a line telling the agent to assign the issue
+  to itself (`gh issue edit n --repo R --add-assignee @me`); the label `#n`; and a new
+  worktree named from "n title". The person starts the agent from the form.
 
 ## Errors
 

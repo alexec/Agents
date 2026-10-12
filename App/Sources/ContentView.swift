@@ -134,7 +134,8 @@ struct ContentView: View {
                 if let pin = model.pins(in: key.folder).first(where: { $0.path == path }), let view = pin.view {
                     PinnedViewPage(folder: key.folder, pin: pin, view: view,
                                    call: { method, params in try await model.client(for: key.host).call(method, params) },
-                                   unpin: { await model.unpin(path, in: key) })
+                                   unpin: { await model.unpin(path, in: key) },
+                                   startAgent: { model.offerStart($0, in: key) })
                 } else {
                     PinnedPage(project: key, path: path)
                 }

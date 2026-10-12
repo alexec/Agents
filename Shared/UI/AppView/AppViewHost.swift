@@ -18,6 +18,9 @@ struct AppViewActions {
     var openLink: @MainActor (URL) -> Void
     /// Pin this call's view under the chat's project (#189). Why it was not, or nil.
     var pin: (@MainActor (ViewPin) async -> String?)? = nil
+    /// Open the new-agent form in the view's project, filled in (#834). Why it was not, or
+    /// nil. The person starts the agent; a view never does.
+    var startAgent: (@MainActor (AppViewStart) -> String?)? = nil
 }
 
 /// The views open in one chat, kept by call so a view keeps what it is showing while it is
@@ -379,6 +382,17 @@ final class AppViewHost {
             if let earlier = messageID { send(AppViewBridge.error(earlier, code: -32000, "Another message replaced it.")) }
             messageID = id
             askedMessage = text
+        case .startAgent(let id, let start):
+            guard let startAgent = actions.startAgent else {
+                send(AppViewBridge.error(id, code: -32000, "This app can't open a new agent from here."))
+                return
+            }
+            if let refused = startAgent(start) {
+                send(AppViewBridge.error(id, code: -32000, refused))
+            } else {
+                send(AppViewBridge.result(id))
+                log("agents/start-agent: the new-agent form opened, filled in")
+            }
         case .updateContext(let id, let content, let structured):
             contextLine = AppViewBridge.contextPreface(viewTitle: title, content: content, structuredContent: structured)
                 .map { _ in Self.contextWords(content, structured) }
@@ -415,6 +429,14 @@ final class AppViewHost {
             _ = try? await actions.call(DaemonAPI.Method.viewsLog, try JSONValue.encoding(
                 DaemonAPI.ViewLogRequest(agentID: actions.agentID, viewID: call.id, level: "warning",
                                          data: .string("\(method) refused: the view is on a project's page, with no agent"))))
+        }
+    }
+
+    /// A line in the daemon's log, as the host's rather than the view's.
+    private func log(_ words: String) {
+        Task {
+            _ = try? await actions.call(DaemonAPI.Method.viewsLog, try JSONValue.encoding(
+                DaemonAPI.ViewLogRequest(agentID: actions.agentID, viewID: call.id, level: "info", data: .string(words))))
         }
     }
 

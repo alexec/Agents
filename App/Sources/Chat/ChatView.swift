@@ -87,7 +87,7 @@ struct ChatView: View {
     }
 
     /// What a view in the chat may ask of the Mac (#187): the host the chat is on, the
-    /// person's own send, and the default browser.
+    /// person's own send, the default browser, and a new agent's form (#834).
     private func appViewActions(_ agent: Agent) -> AppViewActions {
         AppViewActions(
             agentID: agent.id,
@@ -96,6 +96,9 @@ struct ChatView: View {
             openLink: { [openURL] url in openURL(url) },
             pin: { [model] view in
                 await model.pinView(view, in: ProjectKey(host: agent.host, folder: agent.projectFolder))
+            },
+            startAgent: { [model] start in
+                model.offerStart(start, in: ProjectKey(host: agent.host, folder: agent.projectFolder))
             })
     }
 

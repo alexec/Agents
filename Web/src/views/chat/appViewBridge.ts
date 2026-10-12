@@ -6,6 +6,8 @@ import type { AppViewCall, AppViewPolicy, JSONValue, UUID, ViewPin } from "../..
 
 export const protocolVersion = "2026-01-26";
 export const displayModes = ["inline", "fullscreen"] as const;
+/** Our extension of MCP Apps (#834): a view asks for the new-agent form, filled in. */
+export const startAgentMethod = "agents/start-agent";
 
 type Id = string | number;
 type Message = { jsonrpc?: unknown; id?: unknown; method?: unknown; params?: unknown; result?: unknown; error?: unknown };
@@ -19,6 +21,8 @@ export type Ask =
   | { kind: "readResource"; id: Id; uri: string }
   | { kind: "openLink"; id: Id; url: string }
   | { kind: "message"; id: Id; text: string }
+  /** Our extension (#834): open the new-agent form, filled in. Never a start. */
+  | { kind: "startAgent"; id: Id; start: Start }
   | { kind: "updateContext"; id: Id; content?: JSONValue | undefined; structuredContent?: JSONValue | undefined }
   | { kind: "displayMode"; id: Id; mode: string }
   | { kind: "sizeChanged"; width?: number | undefined; height?: number | undefined }
@@ -79,6 +83,10 @@ export function read(raw: unknown): Ask {
       if (!text) return { kind: "malformed", id, reason: "ui/message needs text content." };
       return { kind: "message", id, text };
     }
+    case startAgentMethod: {
+      const read = readStart(params);
+      return "refused" in read ? { kind: "malformed", id, reason: read.refused } : { kind: "startAgent", id, start: read.start };
+    }
     case "ui/update-model-context":
       return { kind: "updateContext", id, content: params.content as JSONValue, structuredContent: params.structuredContent as JSONValue };
     case "ui/request-display-mode":
@@ -86,6 +94,44 @@ export function read(raw: unknown): Ask {
     default:
       return { kind: "unknown", id, method };
   }
+}
+
+/** What a view filled the new-agent form with (#834, `agents/start-agent`): AppViewStart. The
+ *  form opens in the view's project, and the person starts the agent, or doesn't. */
+export interface Start {
+  /** The prompt, as the person will see it in the field. */
+  prompt: string;
+  /** Labels set on the form, such as `#834`. */
+  labels: string[];
+  /** A new worktree's name, made with WorktreeChoice's named; unset leaves the form's place. */
+  worktree?: string | undefined;
+}
+
+/** The most a view may put in the field, in characters. */
+export const startPromptLimit = 8000;
+/** A session's own label rules (SessionLabelPolicy), so the form never holds a label its start would refuse. */
+export const startLabelLimit = 5;
+export const startLabelLength = 24;
+
+/** Characters as Swift counts them. */
+const characters = (text: string) => [...new Intl.Segmenter().segment(text)].map((s) => s.segment);
+
+/** Read from the message's parameters, or why not (AppViewStart.read). */
+export function readStart(params: Record<string, unknown>): { start: Start } | { refused: string } {
+  const prompt = typeof params.prompt === "string" ? params.prompt.trim() : "";
+  if (!prompt) return { refused: "agents/start-agent needs a prompt." };
+  if (characters(prompt).length > startPromptLimit) return { refused: `The prompt is longer than ${startPromptLimit} characters.` };
+  const labels: string[] = [];
+  for (const value of Array.isArray(params.labels) ? params.labels : []) {
+    const label = typeof value === "string" ? value.trim() : "";
+    if (!label || characters(label).length > startLabelLength) {
+      return { refused: `Each label is text of 1 to ${startLabelLength} characters.` };
+    }
+    if (!labels.some((l) => l.toLowerCase() === label.toLowerCase())) labels.push(label);
+  }
+  if (labels.length > startLabelLimit) return { refused: "A session can have at most five labels." };
+  const worktree = typeof params.worktree === "string" ? characters(params.worktree.trim()).slice(0, 100).join("") : "";
+  return { start: { prompt, labels, ...(worktree ? { worktree } : {}) } };
 }
 
 export const result = (id: Id, value: unknown = {}) => ({ jsonrpc: "2.0", id, result: value });

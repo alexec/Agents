@@ -32,8 +32,9 @@ import { nameOf, pathOf, setPane } from "./files/paneState";
 import { FileSearch, isOpenFileKey } from "./files/FileSearch";
 import { focusedEntry } from "../model/focus";
 import { ViewLayerContext } from "./chat/AppView";
-import { viewPin } from "./chat/appViewBridge";
+import { type Start, viewPin } from "./chat/appViewBridge";
 import { ViewLayer, type ViewActions } from "./chat/viewLayer";
+import { offerStart } from "./NewAgent";
 import { BackToList } from "./BackToList";
 import { comingBackDescription } from "../model/status";
 import { ArchiveCard } from "./ArchiveCard";
@@ -170,6 +171,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       send: (text) => store.prompt(host, session, text, []),
       // Pin (#189): under the project the chat works in.
       ...(pinFolder ? { pin: (call: AppViewCall) => store.pinView(host, pinFolder, viewPin(call)) } : {}),
+      // A new agent, filled in by the view (#834): the form in the chat's project.
+      ...(pinFolder ? { startAgent: (start: Start) => offerStart(store, host, pinFolder, start) } : {}),
     };
     return { layer, actions };
   }, [layer, host, session, pinFolder]);

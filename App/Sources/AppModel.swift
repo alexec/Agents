@@ -632,6 +632,10 @@ final class AppModel {
     /// field and clears this, because the prompt itself is still the bar's own and
     /// sending it is still the person's move.
     var offeredPrompt: String?
+    /// A new agent a view filled in (#834), for the project page's bar to take once its
+    /// folder is this one: the prompt, the labels and the worktree. Starting it is still
+    /// the person's move.
+    var offeredStart: OfferedStart?
     private(set) var isLoadingDraftOptions = false
     /// Why the last fetch of a runtime's options failed, if it did.
     ///
@@ -1219,6 +1223,20 @@ final class AppModel {
     }
 
     /// Pin a view under a project (#189), from its menu in a chat. Why it was not, or nil.
+    /// A view's `agents/start-agent` (#834): the project's page, its bar filled in. Why
+    /// not, or nil.
+    func offerStart(_ start: AppViewStart, in key: ProjectKey) -> String? {
+        let wanted = Project.standardize(key.folder)
+        guard let project = projects.first(where: {
+            $0.host == key.host && Project.standardize($0.project.folder) == wanted
+        }) else {
+            return "\(key.folder.lastPathComponent) is not a project here."
+        }
+        showProject(ProjectKey(host: key.host, folder: project.project.folder))
+        offeredStart = OfferedStart(folder: project.project.folder, start: start)
+        return nil
+    }
+
     func pinView(_ view: ViewPin, in key: ProjectKey) async -> String? {
         do {
             let pins = try await client(for: key.host).call(DaemonAPI.Method.pinsPin,
@@ -3709,6 +3727,9 @@ final class AppModel {
             ?? .notARepository
         guard generation == draftWorktreesGeneration else { return }
         draftWorktrees = answer
+        // A worktree chosen before the answer came, as a view's start does (#834), is no
+        // choice in a folder that has none: the chooser is hidden, so it could not be undone.
+        if !answer.isRepository { draftWorktree = nil }
     }
 
     /// The personas the draft folder offers (#760). A host too old to know the method
@@ -4698,6 +4719,12 @@ final class AppModel {
 
 /// A failure already put in front of the person in its own way, so `fail` says nothing more.
 struct SaidAlready: Error {}
+
+/// A new agent a view filled in, for the bar on `folder`'s page (#834).
+struct OfferedStart: Equatable {
+    var folder: URL
+    var start: AppViewStart
+}
 
 /// A send refused because the agent's folder has gone (#119): what the daemon said, and
 /// what was typed, for Continue in the project folder to carry on with.

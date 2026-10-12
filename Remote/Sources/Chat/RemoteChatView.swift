@@ -335,14 +335,18 @@ struct RemoteChatView: View {
     }
 
     /// What a view in the chat may ask of the phone (#187): the Mac it is on, the person's
-    /// own send, and the browser.
+    /// own send, the browser, and a new agent's page.
     private func appViewActions(_ agent: Agent) -> AppViewActions {
         AppViewActions(
             agentID: agent.id,
             call: { [model] method, params in try await model.viewCall(method, params) },
             send: { [model] text in await model.send(text, to: agent.id) },
             openLink: { [openURL] url in openURL(url) },
-            pin: { [model] view in await model.pinView(view, in: agent.projectFolder) })
+            pin: { [model] view in await model.pinView(view, in: agent.projectFolder) },
+            // The project's New session page, filled in (#834).
+            startAgent: { [model] start in
+                model.offerStart(start, in: ProjectKey(host: agent.host, folder: agent.projectFolder))
+            })
     }
 
     /// The open agent's sandbox card, while it waits (064).

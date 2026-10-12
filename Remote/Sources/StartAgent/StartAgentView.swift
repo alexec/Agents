@@ -34,8 +34,11 @@ struct StartAgentView: View {
                 // Said rather than restored silently incomplete (025's rule).
                 attachNote = "What was attached was too big to keep with the draft. Attach it again."
             }
+            // After the kept draft, so a view's prompt is what the field holds (#834).
+            takeOffer()
             focused = true
         }
+        .onChange(of: model.offeredStart) { takeOffer() }
         // Said once, when it arrives: a refusal is the one thing on this page a person
         // using VoiceOver would otherwise have to go looking for.
         .onChange(of: model.startRefusal) {
@@ -159,6 +162,16 @@ struct StartAgentView: View {
             draftLabels.append(label)
         }
         Task { await model.choosePersona(persona) }
+    }
+
+    /// What a view filled the page with (#834): its prompt in the field, unsent, and its
+    /// labels beside any already there. Its worktree is the model's to choose.
+    private func takeOffer() {
+        guard let start = model.takeOfferedStart(in: project) else { return }
+        text = start.prompt
+        // Held to what a session takes, as a label typed here is.
+        draftLabels += SessionLabelPolicy.accepted(start.labels, existing: draftLabels)
+        focused = true
     }
 
     private var promptBar: some View {

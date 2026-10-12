@@ -24,6 +24,8 @@ import { personaChoices, withPersonaLabels } from "../model/personas";
 import { chatProject } from "../model/chat";
 import { sandboxCardTitle, sandboxChoiceWords, sandboxChoices, sandboxExplanation, sandboxOverrideWords, sandboxState,
   sandboxStateWords, sandboxWhy, startWithout } from "../model/sandbox";
+import { accepted } from "../model/labels";
+import type { Start } from "./chat/appViewBridge";
 import { go } from "../route";
 import { LabelField } from "./Labels";
 import { Reach } from "./Reach";
@@ -35,7 +37,8 @@ import { orderedProjects, projectLabel } from "./Sidebar";
 import { GuardedChangeCards } from "./GuardedChange";
 import { KeptBubbles } from "./Kept";
 
-type Where = { kind: "project" } | { kind: "new" } | { kind: "existing"; root: string } | { kind: "branch"; name: string };
+type Where = { kind: "project" } | { kind: "new" } | { kind: "existing"; root: string } | { kind: "branch"; name: string }
+  | { kind: "named"; name: string };
 
 const storage = typeof localStorage === "undefined" ? undefined : localStorage;
 
@@ -103,6 +106,17 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   const personas = useSignal<Persona[]>([]);
   const persona = useSignal<string | undefined>(undefined);
   const pendingPersona = useRef<Persona | undefined>(undefined);
+  /** A new worktree a view named (#834), made the place once the folder is known to be a repository. */
+  const offeredWorktree = useRef<string | undefined>(undefined);
+  /** The project whose worktrees are listed, so an offer knows whether it can be placed now. */
+  const listedFor = useRef("");
+  /** Counts the offers taken: the prompt field opens afresh on each, with the view's words. */
+  const filled = useSignal(0);
+  const placeOffered = () => {
+    const name = offeredWorktree.current;
+    offeredWorktree.current = undefined;
+    if (name && isRepository.peek()) where.value = { kind: "named", name };
+  };
 
   useEffect(() => {
     // What each runtime takes changes once it has run: asked again as the form opens.
@@ -110,6 +124,8 @@ export function NewAgent({ store, host, folder, projectName, down }: {
     where.value = { kind: "project" };
     folders.value = keptForm(storage).folders;
     labels.value = [];
+    offeredWorktree.current = undefined;
+    listedFor.current = "";
     refusal.value = null;
     persona.value = undefined;
     pendingPersona.current = undefined;
@@ -121,6 +137,8 @@ export function NewAgent({ store, host, folder, projectName, down }: {
       canMakeNew.value = list?.canMakeNew ?? false;
       whyNot.value = list?.whyNot;
       isRepository.value = list?.isRepository ?? false;
+      listedFor.current = `${host}|${folderKey(folder)}`;
+      placeOffered();
     });
   }, [host, folder]);
 
@@ -130,6 +148,21 @@ export function NewAgent({ store, host, folder, projectName, down }: {
     kept.value = next;
     keepForm(storage, next);
   };
+
+  // A view's agents/start-agent (#834): the form filled in, and nothing started. The person
+  // presses Start, or doesn't. A folder that is not a repository keeps its place.
+  const offered = store.offeredStart.value;
+  const draftKey = `new|${host}|${folderKey(folder)}`;
+  useEffect(() => {
+    if (!offered || offered.host !== host || folderKey(offered.folder) !== folderKey(folder)) return;
+    store.offeredStart.value = null;
+    store.drafts.set(draftKey, { text: offered.start.prompt, attachments: [] });
+    filled.value += 1;
+    // Added to those on the form, held to what a session takes, as a label typed here is.
+    labels.value = [...labels.value, ...accepted(offered.start.labels, labels.value)];
+    offeredWorktree.current = offered.start.worktree;
+    if (listedFor.current === `${host}|${folderKey(folder)}`) placeOffered();
+  }, [offered, host, folder]);
 
   // A draft runtime for the folder it will work in, asked again when either changes.
   const cwd = where.value.kind === "existing" ? where.value.root : folder;
@@ -219,7 +252,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
       ...(form.value.draftID ? { draftID: form.value.draftID as UUID } : {}),
       additionalDirectories: folders.value as never[], mcpServers: [], labels: labels.value,
       ...(w.kind === "new" ? { worktree: { new: {} } } : w.kind === "existing" ? { worktree: { existing: { _0: w.root as never } } }
-        : w.kind === "branch" ? { worktree: { branch: { _0: w.name } } } : {}),
+        : w.kind === "branch" ? { worktree: { branch: { _0: w.name } } } : w.kind === "named" ? { worktree: { named: { _0: w.name } } } : {}),
       ...(override ? { sandbox: override } : {}),
       ...(persona.value ? { persona: persona.value } : {}),
       // Kept until this start succeeds, so a retry after a timeout is the same start (#291).
@@ -284,7 +317,6 @@ export function NewAgent({ store, host, folder, projectName, down }: {
     form.value = { ...form.value, chosen: { ...form.value.chosen, [id]: value } };
     note({ runtimeID: chosenRuntime!, chosen: form.value.chosen });
   };
-  const draftKey = `new|${host}|${folderKey(folder)}`;
   const saying = !chosenRuntime ? <p class="quiet small">No runtime can start on this host.</p>
     : state === "loading" ? <p class="quiet small">Asking {runtimeName} what it offers…</p>
     : typeof state === "object" ? (
@@ -331,7 +363,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
       <footer class="foot">
         {/* A change to the project's own files that no session can be asked about (#531). */}
         <GuardedChangeCards store={store} host={host} where={{ folder }} down={down || !store.hostIsOnline(host)} />
-        <Prompt store={store} draftKey={draftKey} placeholder="What should it do?"
+        <Prompt key={filled.value} store={store} draftKey={draftKey} placeholder="What should it do?"
           capabilities={capabilities} disabled={down || !chosenRuntime || (!store.hostIsOnline(host) && !store.startsWhenUsed(host))} send={start}
           recipient={store.recipient(host)} starting commands={form.value.commands}
           where={(
@@ -343,12 +375,17 @@ export function NewAgent({ store, host, folder, projectName, down }: {
                     onChange={(e) => {
                       const v = (e.currentTarget as HTMLSelectElement).value;
                       where.value = v === "project" ? { kind: "project" } : v === "new" ? { kind: "new" }
+                        : v.startsWith("named:") ? { kind: "named", name: v.slice(6) }
                         : v.startsWith("branch:") ? { kind: "branch", name: v.slice(7) } : { kind: "existing", root: v.slice(9) };
                     }}>
                     <option value="project">Project folder</option>
                     {/* Shown when it can't be made, with why, as the window's (#257). */}
                     <option value="new" disabled={!canMakeNew.value}>
                       New worktree — {canMakeNew.value ? "A new branch from the last commit here" : whyNot.value ?? "Can't be made here"}</option>
+                    {/* The one a view named (#834), offered while it is the place. */}
+                    {where.value.kind === "named" && (
+                      <option value={whereValue(where.value)}>New worktree — {where.value.name}</option>
+                    )}
                     {worktrees.value.length > 0 && (
                       <optgroup label="Worktrees">
                         {worktrees.value.map((w) => (
@@ -437,13 +474,14 @@ export function NewAgent({ store, host, folder, projectName, down }: {
 function whereTitle(where: Where, worktrees: WorktreeSummary[]): string {
   if (where.kind === "project") return "Project folder";
   if (where.kind === "new") return "New worktree";
-  if (where.kind === "branch") return where.name;
+  if (where.kind === "branch" || where.kind === "named") return where.name;
   return worktrees.find((w) => w.root === where.root)?.name ?? "Worktree";
 }
 
 function whereValue(where: Where): string {
   if (where.kind === "existing") return `existing:${where.root}`;
   if (where.kind === "branch") return `branch:${where.name}`;
+  if (where.kind === "named") return `named:${where.name}`;
   return where.kind;
 }
 
@@ -481,6 +519,16 @@ function SandboxPill({ runtimeID, name, override, runtimeDefault, codexMode, dis
       </select>
     </label>
   );
+}
+
+/** A view's agents/start-agent (#834): this form, in the view's project, filled in. Why it was
+ *  not, or null. Nothing starts: the form waits for the person's Start. */
+export function offerStart(store: Store, host: string, folder: string, start: Start): string | null {
+  const project = (store.projects.value[host] ?? []).find((p) => folderKey(p.project.folder) === folderKey(folder));
+  if (!project) return `${decodeURIComponent(folderKey(folder).split("/").pop() ?? folder)} is not a project here.`;
+  store.offeredStart.value = { host, folder: project.project.folder, start };
+  go({ host, project: project.project.folder, compose: true });
+  return null;
 }
 
 /**

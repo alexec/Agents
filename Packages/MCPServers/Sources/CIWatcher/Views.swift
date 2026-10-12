@@ -182,6 +182,7 @@ let issuesHTML = #"""
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Issues</title>
 <!-- The CI watcher's issues (ui://ci/issues): list_issues's result; a label narrows it.
+     Start Agent opens the app's new-agent form filled in for the issue (agents/start-agent, #834).
      It has no network: it speaks only the MCP Apps postMessage bridge to its host. -->
 <style>
 :root { color-scheme: light dark;
@@ -201,10 +202,11 @@ h1 { font-size: 15px; margin: 0; font-weight: 600; }
 .muted { color: var(--color-text-secondary); font-size: var(--font-text-sm-size); }
 .grow { flex: 1; }
 ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: center;
+li { display: grid; grid-template-columns: auto 1fr auto; gap: 2px 10px; align-items: center;
   padding: 6px 4px; border-top: 1px solid var(--color-border-primary); }
 li:first-child { border-top: none; }
 .title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.start { grid-column: 3; grid-row: 1 / span 2; white-space: nowrap; }
 .meta { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center;
   font-size: var(--font-text-sm-size); color: var(--color-text-secondary); }
 a { color: var(--color-text-info); text-decoration: none; cursor: pointer; }
@@ -295,14 +297,30 @@ button:disabled { opacity: 0.5; cursor: default; }
       return pill;
     });
     const comments = issue.comments ? ` · ${issue.comments} comment${issue.comments === 1 ? "" : "s"}` : "";
+    const start = el("button", { type: "button", className: "start", textContent: "Start Agent",
+      title: `A new agent for #${issue.number}, in a worktree of its own` });
+    start.onclick = () => startAgent(issue);
     return el("li", {}, [
       link(`#${issue.number}`, issue.url),
       el("span", { className: "title", textContent: issue.title, title: issue.title }),
+      start,
       el("span", { className: "meta" }, [
         el("span", { textContent: `${issue.author || "someone"}${comments}${issue.updatedAt ? " · " + ago(issue.updatedAt) : ""}` }),
         ...labels,
       ]),
     ]);
+  };
+
+  // The app's new-agent form, filled in for this issue (#834). The person starts it, or not;
+  // the agent assigns the issue to the signed-in gh user once it does.
+  const startAgent = async (issue) => {
+    const n = issue.number, on = repo ? ` --repo ${repo}` : "";
+    const prompt = `Work on GitHub issue #${n} (\`gh issue view ${n}${on}\`): ${issue.title}\n\n`
+      + `First assign it to yourself: \`gh issue edit ${n}${on} --add-assignee @me\`.`;
+    try {
+      await request("agents/start-agent", { prompt, labels: ["#" + n], worktree: `${n} ${issue.title}` });
+      say(`A new agent for #${n} is ready to start.`);
+    } catch (e) { say("Couldn't open a new agent: " + e.message, true); log("start-agent refused: " + e.message, "warning"); }
   };
 
   const list = async () => {

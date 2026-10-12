@@ -79,6 +79,24 @@ struct PromptBar: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focused = true }
     }
 
+    /// A new agent a view filled in (#834): the prompt in the field, its labels on the form
+    /// and its worktree chosen, on this project's page only. Taken after the page has
+    /// settled, since adopting the folder clears the worktree and a kept draft comes back
+    /// on appear; starting it is still the person's move.
+    private func takeOfferedStart() {
+        guard isNew, folderIsFixed, let offered = model.offeredStart, model.draftCwd == offered.folder else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            guard isNew, model.offeredStart == offered, model.draftCwd == offered.folder else { return }
+            model.offeredStart = nil
+            text = offered.start.prompt
+            // Held to what a session takes, as a label typed here is.
+            draftLabels += SessionLabelPolicy.accepted(offered.start.labels, existing: draftLabels)
+            // Kept only if the folder turns out to be a repository (`loadDraftWorktrees`).
+            if let name = offered.start.worktree { model.chooseWorktree(.named(name)) }
+            focused = true
+        }
+    }
+
     private func takeSuggestion() {
         guard let suggestion else { return }
         text = suggestion.prompt
@@ -180,6 +198,8 @@ struct PromptBar: View {
         }
         // Words offered from elsewhere on the page. They land in the field, focused
         // and unsent, the same as a suggestion taken with Tab.
+        .onChange(of: model.offeredStart, initial: true) { takeOfferedStart() }
+        .onChange(of: model.draftCwd) { takeOfferedStart() }
         .onChange(of: model.offeredPrompt) {
             guard let offered = model.offeredPrompt else { return }
             text = offered

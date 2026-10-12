@@ -13,6 +13,9 @@ public enum AppViewBridge {
         ["tool": ["name": .string(tool), "inputSchema": ["type": "object"]]]
     }
 
+    /// Our extension of MCP Apps (#834): a view asks for the new-agent form, filled in.
+    public static let startAgentMethod = "agents/start-agent"
+
     /// The version of MCP Apps this host speaks.
     public static let protocolVersion = "2026-01-26"
 
@@ -25,6 +28,8 @@ public enum AppViewBridge {
         case readResource(id: JSONValue, uri: String)
         case openLink(id: JSONValue, url: URL)
         case message(id: JSONValue, text: String)
+        /// Our extension (#834): open the new-agent form, filled in. Never a start.
+        case startAgent(id: JSONValue, start: AppViewStart)
         case updateContext(id: JSONValue, content: JSONValue?, structuredContent: JSONValue?)
         case displayMode(id: JSONValue, mode: String)
         case sizeChanged(width: Double?, height: Double?)
@@ -87,6 +92,11 @@ public enum AppViewBridge {
                 .joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
             guard !text.isEmpty else { return .malformed(id: id, reason: "ui/message needs text content.") }
             return .message(id: id, text: text)
+        case startAgentMethod:
+            switch AppViewStart.read(params) {
+            case .success(let start): return .startAgent(id: id, start: start)
+            case .failure(let reason): return .malformed(id: id, reason: reason.words)
+            }
         case "ui/update-model-context":
             return .updateContext(id: id, content: params?["content"], structuredContent: params?["structuredContent"])
         case "ui/request-display-mode":
@@ -161,6 +171,53 @@ public enum AppViewBridge {
 
     /// The most of a view's context told to the agent, in characters.
     public static let contextLimit = 8000
+}
+
+/// What a view filled the new-agent form with (#834, `agents/start-agent`). The form opens
+/// in the view's project, and the person starts the agent, or doesn't.
+public struct AppViewStart: Equatable, Sendable {
+    /// The prompt, as the person will see it in the field.
+    public var prompt: String
+    /// Labels set on the form, such as `#834`.
+    public var labels: [String]
+    /// A new worktree's name, made with `WorktreeChoice.named`; nil leaves the form's place.
+    public var worktree: String?
+
+    public struct Refusal: Error, Equatable {
+        public var words: String
+    }
+
+    /// The most a view may put in the field, in characters.
+    public static let promptLimit = 8000
+
+    public init(prompt: String, labels: [String] = [], worktree: String? = nil) {
+        self.prompt = prompt
+        self.labels = labels
+        self.worktree = worktree
+    }
+
+    /// Read from the message's parameters, or why not.
+    public static func read(_ params: JSONValue?) -> Result<AppViewStart, Refusal> {
+        let prompt = (params?["prompt"]?.stringValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !prompt.isEmpty else { return .failure(Refusal(words: "agents/start-agent needs a prompt.")) }
+        guard prompt.count <= promptLimit else {
+            return .failure(Refusal(words: "The prompt is longer than \(promptLimit) characters."))
+        }
+        var labels: [String] = []
+        for value in params?["labels"]?.arrayValue ?? [] {
+            // A session's own rules, so the form never holds a label its start would refuse.
+            guard let label = try? SessionLabelPolicy.cleaned(value.stringValue ?? "") else {
+                return .failure(Refusal(words: "Each label is text of 1 to \(SessionLabelPolicy.maximumLength) characters."))
+            }
+            if !labels.contains(where: { SessionLabelPolicy.key($0) == SessionLabelPolicy.key(label) }) { labels.append(label) }
+        }
+        guard labels.count <= SessionLabelPolicy.maximumCount else {
+            return .failure(Refusal(words: SessionLabelPolicy.Refusal.tooMany.localizedDescription))
+        }
+        let worktree = params?["worktree"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return .success(AppViewStart(prompt: prompt, labels: labels,
+                                     worktree: worktree.flatMap { $0.isEmpty ? nil : String($0.prefix(100)) }))
+    }
 }
 
 /// What the host tells a view about where it is drawn (`hostContext`).
