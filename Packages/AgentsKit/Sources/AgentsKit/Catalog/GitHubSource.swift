@@ -11,6 +11,9 @@ import Foundation
 /// - A file's bytes come from `raw.githubusercontent.com` at the commit, which has no limit.
 /// - When the API says the limit is spent, the whole commit comes as a tarball instead, and
 ///   only the skill's folder is kept.
+/// - A private repository (a company's skills, #697) answers none of the plain HTTPS reads,
+///   so its commit and its files come through the person's `gh` too, and only when it has
+///   access; without it the repository is as unreachable as before.
 struct GitHubSource: Sendable {
     let session: URLSession
     let endpoints: CatalogEndpoints
@@ -23,6 +26,8 @@ struct GitHubSource: Sendable {
     struct Head: Equatable, Sendable {
         var commit: String
         var branch: String?
+        /// Read through `gh` because the plain read was refused: its files come that way too.
+        var signedIn = false
     }
 
     struct TreeEntry: Decodable, Equatable, Sendable {
@@ -33,14 +38,32 @@ struct GitHubSource: Sendable {
         var size: Int?
     }
 
-    /// The default branch's commit, from `info/refs?service=git-upload-pack`.
+    /// The default branch's commit, from `info/refs?service=git-upload-pack`; for a private
+    /// repository, which refuses that read, from the API through the person's `gh`.
     func head(owner: String, repo: String) async throws -> Head {
         var components = URLComponents(url: endpoints.web.appending(path: "\(owner)/\(repo).git/info/refs"),
                                        resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "service", value: "git-upload-pack")]
-        let data = try await get(components.url!)
-        guard let head = Self.parseRefs(data) else { throw DaemonAPI.CatalogError.unreachable(host: host(endpoints.web)) }
+        let refused = DaemonAPI.CatalogError.unreachable(host: host(endpoints.web))
+        guard let data = try? await get(components.url!), let head = Self.parseRefs(data) else {
+            guard let head = await signedInHead(owner: owner, repo: repo) else { throw refused }
+            return head
+        }
         return head
+    }
+
+    /// Two small requests: the repository's default branch, then that branch's commit.
+    private func signedInHead(owner: String, repo: String) async -> Head? {
+        struct Repository: Decodable { var default_branch: String }
+        struct Ref: Decodable { struct Object: Decodable { var sha: String }; var object: Object }
+        guard let gh, endpoints.isLive,
+              let data = try? await gh.api(method: "GET", path: "repos/\(owner)/\(repo)", host: "github.com"),
+              let branch = try? JSONDecoder().decode(Repository.self, from: data).default_branch,
+              let refData = try? await gh.api(method: "GET", path: "repos/\(owner)/\(repo)/git/ref/heads/\(branch)",
+                                              host: "github.com"),
+              let sha = try? JSONDecoder().decode(Ref.self, from: refData).object.sha,
+              sha.count == 40, sha.allSatisfy(\.isHexDigit) else { return nil }
+        return Head(commit: sha.lowercased(), branch: branch, signedIn: true)
     }
 
     /// `pkt-line` text: the first ref line is `<sha> HEAD\0<capabilities>`, and the
@@ -79,9 +102,21 @@ struct GitHubSource: Sendable {
         return answer.tree
     }
 
-    /// One file at `commit`.
-    func raw(owner: String, repo: String, commit: String, path: String) async throws -> Data {
-        try await get(endpoints.raw.appending(path: "\(owner)/\(repo)/\(commit)/\(path)"))
+    /// One file at `commit`: from `raw.githubusercontent.com`, or, for a repository whose
+    /// head came through `gh`, its blob through `gh` (the raw host refuses a private one).
+    func raw(owner: String, repo: String, commit: String, path: String, blob: String? = nil,
+             signedIn: Bool = false) async throws -> Data {
+        if signedIn, let gh, endpoints.isLive, let blob, blob.allSatisfy(\.isHexDigit) {
+            struct Blob: Decodable { var content: String; var encoding: String }
+            guard let data = try? await gh.api(method: "GET", path: "repos/\(owner)/\(repo)/git/blobs/\(blob)",
+                                               host: "github.com"),
+                  let answer = try? JSONDecoder().decode(Blob.self, from: data), answer.encoding == "base64",
+                  let bytes = Data(base64Encoded: answer.content, options: .ignoreUnknownCharacters) else {
+                throw DaemonAPI.CatalogError.unreachable(host: "github.com")
+            }
+            return bytes
+        }
+        return try await get(endpoints.raw.appending(path: "\(owner)/\(repo)/\(commit)/\(path)"))
     }
 
     /// When the skill's folder last changed, for "Taken at". Only through a signed-in `gh`:
