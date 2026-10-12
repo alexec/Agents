@@ -33,7 +33,7 @@ stays the page's one WebSocket: neither that URL nor `http://localhost:<port>` i
 ## Headers on every response, 200 or not
 
 ```text
-Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self'; connect-src ws://localhost:<port>; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; frame-src 'none'; object-src 'none'; worker-src 'none'; manifest-src 'none'; require-trusted-types-for 'script'; trusted-types 'none'
+Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self'; connect-src ws://localhost:<port>; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; frame-src 'none'; object-src 'none'; worker-src 'none'; manifest-src 'self'; require-trusted-types-for 'script'; trusted-types 'none'
 X-Content-Type-Options: nosniff
 Referrer-Policy: no-referrer
 Cross-Origin-Opener-Policy: same-origin
@@ -53,6 +53,7 @@ Content types, by extension only:
 | `.svg` | `image/svg+xml` |
 | `.png` | `image/png` |
 | `.woff2` | `font/woff2` |
+| `.webmanifest` | `application/manifest+json` (#791) |
 
 A file with any other extension in `MANIFEST` stops the listener from starting.
 

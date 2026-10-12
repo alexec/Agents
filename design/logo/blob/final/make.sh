@@ -34,5 +34,11 @@ sips -s format png /tmp/blob-ios.jpg --out "$ROOT/Remote/Resources/Assets.xcasse
 render tile.svg 256 "$ROOT/docs/assets/logo.png"
 render tile.svg 64 "$ROOT/docs/assets/favicon.png"
 render tile.svg 64 "$ROOT/Web/assets/favicon.png"
+# the web page installed as an app (#791): the tile for Chrome, full bleed for a maskable
+# icon and for iOS's home screen, which rounds it itself
+render tile.svg 192 "$ROOT/Web/assets/icon-192.png"
+render tile.svg 512 "$ROOT/Web/assets/icon-512.png"
+render ios.svg 512 "$ROOT/Web/assets/icon-maskable-512.png"
+render ios.svg 180 "$ROOT/Web/assets/apple-touch-icon.png"
 render tile.svg 1024 tile-1024.png
 echo done

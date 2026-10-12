@@ -36,6 +36,7 @@ public struct WebFiles: Sendable {
         "svg": "image/svg+xml",
         "png": "image/png",
         "woff2": "font/woff2",
+        "webmanifest": "application/manifest+json",
     ]
 
     public init(files: [String: File]) { self.files = files }
@@ -95,7 +96,7 @@ public struct LoopbackGate: Sendable {
     public var headers: [(String, String)] {
         [("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; "
             + "font-src 'self'; connect-src ws://localhost:\(port); base-uri 'none'; form-action 'none'; "
-            + "frame-ancestors 'none'; frame-src \(proxyOrigin); object-src 'none'; worker-src 'none'; manifest-src 'none'; "
+            + "frame-ancestors 'none'; frame-src \(proxyOrigin); object-src 'none'; worker-src 'none'; manifest-src 'self'; "
             + "require-trusted-types-for 'script'; trusted-types 'none'"),
          ("X-Content-Type-Options", "nosniff"),
          ("Referrer-Policy", "no-referrer"),
