@@ -133,6 +133,8 @@ jobs:
           echo "base=${{ steps.toolchain.outputs.fingerprint }}-${MANIFESTS}" >> "$GITHUB_OUTPUT"
           echo "xcode=${xcode}" >> "$GITHUB_OUTPUT"
           echo "swiftpm=${swiftpm}" >> "$GITHUB_OUTPUT"
+          agentskit="$(git ls-tree HEAD -- Packages/AgentsKit/Package.swift Packages/AgentsKit/Sources | git hash-object --stdin)"
+          echo "agentskit=${agentskit}" >> "$GITHUB_OUTPUT"
 
       # Restore Xcode and SwiftPM products from separate caches. The Xcode cache
       # can be saved as soon as both app builds finish.
@@ -151,6 +153,24 @@ jobs:
           restore-keys: |
             macos-xcode-27-derived-${{ steps.keys.outputs.base }}-
             macos-xcode-27-derived-${{ steps.toolchain.outputs.fingerprint }}-
+
+      # A graph restored from another tree can hold an AgentsKit that Xcode will not
+      # rebuild: on 2026-10-11 three pull requests (#679, #681, #683) restored main's older
+      # DerivedData, the Swift driver compiled none of AgentsKitCore's changed sources,
+      # AgentsStore failed against the old module, and the clean retry below cost 6–9
+      # minutes each. The save records which AgentsKit sources the graph was built from;
+      # when they differ, only AgentsKit's own objects go, and the rest stays warm.
+      - name: Drop a stale AgentsKit from the Xcode build cache
+        if: steps.xcode-cache.outputs.cache-matched-key != '' && steps.xcode-cache.outputs.cache-hit != 'true'
+        env:
+          AGENTSKIT: ${{ steps.keys.outputs.agentskit }}
+        run: |
+          built="$(cat build/DD/agentskit-sources 2>/dev/null || true)"
+          if [[ "$built" != "$AGENTSKIT" ]]; then
+            echo "AgentsKit sources differ from the restored graph's (${built:-unrecorded}); dropping its objects."
+            rm -rf build/DD/Build/Intermediates.noindex/AgentsKit.build
+            find build/DD/Build/Products -maxdepth 2 -name 'AgentsKit*' -exec rm -rf {} +
+          fi
 
       - name: Restore SwiftPM build cache
         id: swiftpm-cache
@@ -265,6 +285,10 @@ jobs:
       # Only when both app builds actually ran. They are skipped whenever an earlier
       # step fails, and a skipped step used to read as "not successful", so a job that
       # died long before them saved whatever DerivedData it happened to be holding.
+      - name: Record the AgentsKit sources this graph was built from
+        if: ${{ always() && steps.xcode-cache.outputs.cache-hit != 'true' && steps.build-mac.outcome == 'success' && steps.build-remote.outcome == 'success' }}
+        run: echo "${{ steps.keys.outputs.agentskit }}" > build/DD/agentskit-sources
+
       - name: Save Xcode build cache
         if: ${{ always() && steps.xcode-cache.outputs.cache-hit != 'true' && steps.build-mac.outcome == 'success' && steps.build-remote.outcome == 'success' }}
         uses: actions/cache/save@v5
