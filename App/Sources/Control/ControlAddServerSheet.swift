@@ -21,6 +21,25 @@ import SwiftUI
 struct ControlAddServerSheet: View {
     @Environment(\.dismiss) private var dismiss
     let control: ControlSettingsModel
+    /// A provider's workspace being added as a host (#691, Add as Host…): over ssh, with what
+    /// the provider gave filled in, and linked to it once it joins.
+    var prefill: Prefill?
+
+    struct Prefill: Identifiable {
+        var destination: String
+        var name: String
+        var tunnel: Bool
+        var provider: ProviderID
+        var workspace: String
+        var id: String { "\(provider.rawValue)/\(workspace)" }
+
+        /// `alex@127.0.0.1 -p 2222`, as a provider may give it, as ssh takes it in one word.
+        var sshDestination: String {
+            let words = destination.split(whereSeparator: \.isWhitespace).map(String.init)
+            guard words.count == 3, words[1] == "-p", let port = Int(words[2]) else { return destination }
+            return "ssh://\(words[0]):\(port)"
+        }
+    }
 
     enum Way: Hashable { case command, ssh }
     @State private var way: Way = .command
@@ -70,6 +89,14 @@ struct ControlAddServerSheet: View {
         .padding(28)
         .frame(width: 620)
         .task { await watchForJoin() }
+        .onAppear {
+            guard let prefill else { return }
+            way = .ssh
+            destination = prefill.sshDestination
+            name = prefill.name
+            tunnel = prefill.tunnel
+            tunnelChosen = true
+        }
     }
 
     // MARK: M · Run a command
@@ -339,6 +366,9 @@ struct ControlAddServerSheet: View {
             } else {
                 fingerprint = nil
                 outcome = result
+                if case .added(let joined, _) = result, let prefill {
+                    await control.linkWhenJoined(name: joined, provider: prefill.provider, workspace: prefill.workspace)
+                }
             }
         }
     }

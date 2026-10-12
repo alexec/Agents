@@ -163,6 +163,10 @@ func serve() async {
             peerURL: environment["AGENTS_CONTROL_PEER_URL"].flatMap(URL.init(string:)),
             receive: arguments.contains("--receive") || environment["AGENTS_CONTROL_RECEIVE"] == "1")
         configuration.web = web()
+        // Workspace providers (#691) keep their secrets beside the control plane's own key.
+        configuration.providerHome = home ?? environment["AGENTS_CONTROL_PROVIDER_HOME"].map {
+            URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: true)
+        }
         // A copy that was forwarding forwards again after a restart, unless told to serve.
         configuration.resumeForwarding = !arguments.contains("--no-forwarding") && environment["AGENTS_CONTROL_FORWARDING"] != "0"
         // Whether the page is served, for Agents Host to read (071 R3): this run's, or none.

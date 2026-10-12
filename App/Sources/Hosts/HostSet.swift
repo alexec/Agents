@@ -26,6 +26,9 @@ final class HostSet {
     /// Hosts the control plane reaches for this window: their names, and whether each is
     /// online.
     var controlled: [HostID: (label: String, online: Bool)] = [:]
+    /// Each server's row as the control plane last listed it: its state's word, and the
+    /// workspace it runs on when it is linked to one (#691).
+    var controlRows: [HostID: DaemonAPI.ControlHost] = [:]
     var offlineSince: [HostID: Date] { [:] }
 
     init(locations: StoreLocations) {}

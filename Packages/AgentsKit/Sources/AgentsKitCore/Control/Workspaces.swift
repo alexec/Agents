@@ -1,0 +1,375 @@
+import Foundation
+
+// Workspace providers (#691, specs/691-workspace-providers): MCP servers on the control plane
+// that start and stop the machines hosts run on. What is here is records and the wire; the
+// MCP client and the starts are ControlPlaneKit's, handed in as `WorkspaceHandling`.
+
+/// A provider, by the id the control plane gave it.
+public struct ProviderID: RawRepresentable, Codable, Hashable, Sendable, CustomStringConvertible {
+    public var rawValue: String
+    public init(rawValue: String) { self.rawValue = rawValue }
+
+    /// A slug of the name and four random characters: `digitalocean-x7k2`.
+    public static func make(name: String) -> ProviderID {
+        let mapped: [Character] = name.lowercased().map { $0.isASCII && ($0.isLetter || $0.isNumber) ? $0 : "-" }
+        let slug = String(mapped).split(separator: "-", omittingEmptySubsequences: true).joined(separator: "-")
+        let alphabet = Array("abcdefghijklmnopqrstuvwxyz0123456789")
+        let tail = String((0..<4).map { _ in alphabet.randomElement()! })
+        let head = String(slug.prefix(24))
+        return ProviderID(rawValue: "\(head.isEmpty ? "provider" : head)-\(tail)")
+    }
+
+    public var description: String { rawValue }
+}
+
+/// A host and the workspace it runs on (data-model.md, "WorkspaceLink").
+public struct WorkspaceLink: Codable, Hashable, Sendable {
+    public var provider: ProviderID
+    /// The workspace's id, as its provider lists it.
+    public var workspace: String
+    /// A prompt or agent start for it while stopped starts it (US3). Nil reads as on.
+    public var startWhenUsed: Bool?
+    /// Stopped once idle this long (US4); nil is off.
+    public var stopWhenIdleMinutes: Int?
+
+    public static let defaultIdleMinutes = 30
+
+    public init(provider: ProviderID, workspace: String, startWhenUsed: Bool? = true,
+                stopWhenIdleMinutes: Int? = WorkspaceLink.defaultIdleMinutes) {
+        self.provider = provider
+        self.workspace = workspace
+        self.startWhenUsed = startWhenUsed
+        self.stopWhenIdleMinutes = stopWhenIdleMinutes
+    }
+}
+
+/// A provider as the store keeps it, `v1/providers/<id>.json`: never its secrets' values,
+/// which stay in the control plane's own home (research R3).
+public struct ProviderRecord: Codable, Hashable, Sendable, Identifiable {
+    public enum Kind: String, Codable, Sendable {
+        /// The command provider Agents ships (`workspace-commands`).
+        case commands
+        /// An MCP server the control plane runs.
+        case stdio
+        /// An MCP server at an address.
+        case http
+    }
+
+    public var id: ProviderID
+    public var name: String
+    public var kind: Kind
+    public var command: String?
+    public var args: [String]?
+    public var url: String?
+    /// Values may hold `${SECRET}`, filled in from the secrets when the server is reached.
+    public var headers: [String: String]?
+    /// The command provider's configuration (contracts/command-provider.md).
+    public var commands: JSONValue?
+    public var secretNames: [String]
+    /// For a server whose tools don't follow the contract (contracts/tool-map.md).
+    public var map: JSONValue?
+    /// Which optional contract tools it has: `options`, `create`, `delete`.
+    public var capabilities: [String]
+    public var contract: Int
+    public var rev: Int
+    public var forgotten: Bool?
+
+    public init(id: ProviderID, name: String, kind: Kind, command: String? = nil, args: [String]? = nil,
+                url: String? = nil, headers: [String: String]? = nil, commands: JSONValue? = nil,
+                secretNames: [String] = [], map: JSONValue? = nil, capabilities: [String] = [],
+                contract: Int = 1, rev: Int = 0, forgotten: Bool? = nil) {
+        self.id = id
+        self.name = name
+        self.kind = kind
+        self.command = command
+        self.args = args
+        self.url = url
+        self.headers = headers
+        self.commands = commands
+        self.secretNames = secretNames
+        self.map = map
+        self.capabilities = capabilities
+        self.contract = contract
+        self.rev = rev
+        self.forgotten = forgotten
+    }
+
+    /// Why it can't be used as it is, in words for the sheet; nil when it can.
+    public var problem: String? {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        if trimmed.isEmpty { return "Give it a name." }
+        if trimmed.count > 60 { return "The name is over 60 characters." }
+        switch kind {
+        case .commands:
+            if commands?.objectValue == nil { return "Choose a preset or give its commands." }
+        case .stdio:
+            if (command ?? "").trimmingCharacters(in: .whitespaces).isEmpty { return "Give the command that runs the server." }
+        case .http:
+            guard let url, url.hasPrefix("http://") || url.hasPrefix("https://"), URL(string: url) != nil else {
+                return "The address must start with http:// or https://."
+            }
+        }
+        for name in referencedSecrets where !secretNames.contains(name) {
+            return "${\(name)} isn’t one of its secrets."
+        }
+        return nil
+    }
+
+    /// The `${NAME}` its headers name.
+    public var referencedSecrets: [String] {
+        (headers ?? [:]).values.flatMap(Self.placeholders).sorted()
+    }
+
+    static func placeholders(in text: String) -> [String] {
+        var found: [String] = []
+        var rest = Substring(text)
+        while let open = rest.range(of: "${"), let close = rest[open.upperBound...].firstIndex(of: "}") {
+            found.append(String(rest[open.upperBound..<close]))
+            rest = rest[rest.index(after: close)...]
+        }
+        return found
+    }
+}
+
+/// The control plane's part that talks to providers, handed to `ControlMethods` by the
+/// executable. Absent on a control plane with several copies (research R4).
+public protocol WorkspaceHandling: Sendable {
+    func answer(method: String, params: JSONValue?, from caller: ControlRouter.Caller) async throws -> JSONValue
+}
+
+public extension DaemonAPI.Method {
+    /// `{}` → `{providers: [ProviderSummary]}`, as last listed.
+    static let providersList = "providers/list"
+    /// `ProviderAdd` → `ProviderSummary`, once the server has been checked and has listed.
+    static let providersAdd = "providers/add"
+    /// `ProviderAdd` with `id`; secrets left out are kept.
+    static let providersUpdate = "providers/update"
+    /// `ProviderRequest`. Its hosts stay, unlinked.
+    static let providersRemove = "providers/remove"
+    /// `{id?}`: list again, said as `control/providersChanged`.
+    static let providersRefresh = "providers/refresh"
+    /// `HostLink` → `ControlHost`. A workspace linked to another host moves here.
+    static let hostsLink = "hosts/link"
+    /// `HostRequest` → `ControlHost`.
+    static let hostsUnlink = "hosts/unlink"
+    /// `HostWorkspaceOptions` → `ControlHost`.
+    static let hostsSetWorkspaceOptions = "hosts/setWorkspaceOptions"
+    /// `HostRequest` → `ControlHost`, at once; the start goes on, said as `control/hostChanged`.
+    static let hostsStart = "hosts/start"
+    /// `HostStop` → `ControlHost`, at once.
+    static let hostsStop = "hosts/stop"
+
+    /// Every method the control plane's workspace part answers.
+    static let workspaceMethods: Set<String> = [
+        providersList, providersAdd, providersUpdate, providersRemove, providersRefresh,
+        hostsLink, hostsUnlink, hostsSetWorkspaceOptions, hostsStart, hostsStop,
+    ]
+}
+
+public extension DaemonAPI.Notification {
+    /// `{providers: [ProviderSummary]}`.
+    static let controlProvidersChanged = "control/providersChanged"
+}
+
+public extension DaemonAPI.Failure {
+    /// Providers run only on a control plane with one copy, for now (research R4).
+    static let providersNeedOneCopy = -32064
+    /// A start or stop for a host that isn't linked to a workspace.
+    static let notLinked = -32065
+    /// The provider said no, in its own words.
+    static let providerFailed = -32066
+}
+
+public extension DaemonAPI {
+    /// One workspace, as its provider last listed it (contracts/provider-contract.md).
+    struct WorkspaceInfo: Codable, Sendable, Hashable, Identifiable {
+        public var id: String
+        public var name: String
+        /// `running`, `starting`, `stopping`, `stopped` or `unknown`.
+        public var state: String
+        public var ssh: String?
+        public var tunnel: Bool?
+        public var cost: String?
+        /// The host it is linked to, in `providers/list`.
+        public var host: HostID?
+
+        public init(id: String, name: String, state: String, ssh: String? = nil, tunnel: Bool? = nil,
+                    cost: String? = nil, host: HostID? = nil) {
+            self.id = id
+            self.name = name
+            self.state = state
+            self.ssh = ssh
+            self.tunnel = tunnel
+            self.cost = cost
+            self.host = host
+        }
+    }
+
+    /// A provider for the Providers page: never its commands, headers or secrets' values.
+    struct ProviderSummary: Codable, Sendable, Hashable, Identifiable {
+        public var id: ProviderID
+        public var name: String
+        public var kind: String
+        /// Each secret's name, and whether it has a value.
+        public var secrets: [String: Bool]
+        public var capabilities: [String]
+        public var contract: Int
+        public var mapped: Bool
+        /// The command provider's preset, when it uses one.
+        public var preset: String?
+        public var workspaces: [WorkspaceInfo]
+        public var listedAt: Date?
+        /// False once a list has failed after a good one: `workspaces` is what it last said.
+        public var current: Bool
+        public var problem: String?
+
+        public init(id: ProviderID, name: String, kind: String, secrets: [String: Bool] = [:],
+                    capabilities: [String] = [], contract: Int = 1, mapped: Bool = false, preset: String? = nil,
+                    workspaces: [WorkspaceInfo] = [], listedAt: Date? = nil, current: Bool = true,
+                    problem: String? = nil) {
+            self.id = id
+            self.name = name
+            self.kind = kind
+            self.secrets = secrets
+            self.capabilities = capabilities
+            self.contract = contract
+            self.mapped = mapped
+            self.preset = preset
+            self.workspaces = workspaces
+            self.listedAt = listedAt
+            self.current = current
+            self.problem = problem
+        }
+    }
+
+    /// A linked host's workspace, on its `hosts/list` row and in `control/hostChanged`.
+    struct HostWorkspace: Codable, Sendable, Hashable {
+        public var provider: ProviderID
+        public var providerName: String
+        public var workspace: String
+        public var workspaceName: String
+        /// As the provider last listed it.
+        public var workspaceState: String
+        /// What the host is shown as while it isn't online, over its uplink's own state:
+        /// `stopped`, `starting` or `stopping`. `stopping` shows while it is still online too.
+        public var hostState: String?
+        /// While starting: `provider` (asked to start it), `connecting` (waiting for its
+        /// agentsd) or `sshStart` (starting agentsd over ssh).
+        public var phase: String?
+        /// When the start or stop began, for the strip's timer.
+        public var since: Date?
+        /// Why the last start or stop failed, in the provider's words.
+        public var problem: String?
+        /// "Stopped by Agents after 30 minutes idle", already worded.
+        public var stoppedBy: String?
+        public var canStart: Bool
+        public var canStop: Bool
+        public var startWhenUsed: Bool
+        public var stopWhenIdleMinutes: Int?
+        public var cost: String?
+        /// False when the provider's last list failed.
+        public var current: Bool
+
+        public init(provider: ProviderID, providerName: String, workspace: String, workspaceName: String,
+                    workspaceState: String, hostState: String? = nil, phase: String? = nil, since: Date? = nil,
+                    problem: String? = nil, stoppedBy: String? = nil, canStart: Bool = false, canStop: Bool = false,
+                    startWhenUsed: Bool = true, stopWhenIdleMinutes: Int? = nil, cost: String? = nil,
+                    current: Bool = true) {
+            self.provider = provider
+            self.providerName = providerName
+            self.workspace = workspace
+            self.workspaceName = workspaceName
+            self.workspaceState = workspaceState
+            self.hostState = hostState
+            self.phase = phase
+            self.since = since
+            self.problem = problem
+            self.stoppedBy = stoppedBy
+            self.canStart = canStart
+            self.canStop = canStop
+            self.startWhenUsed = startWhenUsed
+            self.stopWhenIdleMinutes = stopWhenIdleMinutes
+            self.cost = cost
+            self.current = current
+        }
+    }
+
+    /// `providers/add` and `providers/update`.
+    struct ProviderAdd: Codable, Sendable, Hashable {
+        /// For an update.
+        public var id: ProviderID?
+        public var name: String
+        public var kind: ProviderRecord.Kind
+        public var command: String?
+        public var args: [String]?
+        public var url: String?
+        public var headers: [String: String]?
+        public var commands: JSONValue?
+        public var map: JSONValue?
+        /// Name to value. Only ever sent to the control plane; never given back.
+        public var secrets: [String: String]?
+
+        public init(id: ProviderID? = nil, name: String, kind: ProviderRecord.Kind, command: String? = nil,
+                    args: [String]? = nil, url: String? = nil, headers: [String: String]? = nil,
+                    commands: JSONValue? = nil, map: JSONValue? = nil, secrets: [String: String]? = nil) {
+            self.id = id
+            self.name = name
+            self.kind = kind
+            self.command = command
+            self.args = args
+            self.url = url
+            self.headers = headers
+            self.commands = commands
+            self.map = map
+            self.secrets = secrets
+        }
+    }
+
+    struct ProviderRequest: Codable, Sendable, Hashable {
+        public var id: ProviderID?
+        public init(id: ProviderID?) { self.id = id }
+    }
+
+    /// `hosts/link`.
+    struct HostLink: Codable, Sendable, Hashable {
+        public var host: HostID
+        public var provider: ProviderID
+        public var workspace: String
+        public var startWhenUsed: Bool?
+        public var stopWhenIdleMinutes: Int?
+
+        public init(host: HostID, provider: ProviderID, workspace: String, startWhenUsed: Bool? = nil,
+                    stopWhenIdleMinutes: Int? = nil) {
+            self.host = host
+            self.provider = provider
+            self.workspace = workspace
+            self.startWhenUsed = startWhenUsed
+            self.stopWhenIdleMinutes = stopWhenIdleMinutes
+        }
+    }
+
+    /// `hosts/setWorkspaceOptions`. `stopWhenIdleMinutes` 0 turns it off.
+    struct HostWorkspaceOptions: Codable, Sendable, Hashable {
+        public var host: HostID
+        public var startWhenUsed: Bool?
+        public var stopWhenIdleMinutes: Int?
+
+        public init(host: HostID, startWhenUsed: Bool? = nil, stopWhenIdleMinutes: Int? = nil) {
+            self.host = host
+            self.startWhenUsed = startWhenUsed
+            self.stopWhenIdleMinutes = stopWhenIdleMinutes
+        }
+    }
+
+    /// `hosts/stop`.
+    struct HostStop: Codable, Sendable, Hashable {
+        public var host: HostID
+        /// Stop even though turns are running there (US4).
+        public var confirmRunning: Bool?
+
+        public init(host: HostID, confirmRunning: Bool? = nil) {
+            self.host = host
+            self.confirmRunning = confirmRunning
+        }
+    }
+}

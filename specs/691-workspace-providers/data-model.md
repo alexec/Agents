@@ -61,7 +61,16 @@ Held per provider as `WorkspaceList`:
 - Removing a provider leaves its hosts' links unresolved. They are cleared the next time the
   host is saved, and until then the host is drawn without Start (US2 AS5).
 
-## HostState (in `Grant.swift`), new cases
+## HostState and the workspace overlay
+
+As built (PR 2), `HostState` is unchanged. Instead the router keeps each linked host's
+`HostWorkspace` (`ControlRouter.setWorkspace`) and lays it over the uplink's own state in
+`ControlRouter.described`. Its `hostState` (`stopped`, `starting`, `stopping`) becomes the
+row's `state` while the host isn't online (`stopping` whatever it is). So no client's switch
+over `HostState` changed, and an older client reads the new words as "not online". The
+transitions below are what clients see.
+
+### What was planned: new cases
 
 ```text
 online

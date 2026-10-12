@@ -641,6 +641,10 @@ final class AppModel {
     /// over `controlLink` (058, US3): what `HostSet` is for servers reached by ssh from
     /// here, with the ssh on the control plane's side.
     @ObservationIgnored private var controlHosts: [HostID: DaemonClient] = [:]
+    /// The control plane's own connection, as the watch made it: for Start on a strip (#691).
+    @ObservationIgnored private var controlRequests: DaemonClient?
+    /// Hosts whose Start was pressed here and not answered yet.
+    private(set) var hostsBeingStarted: Set<HostID> = []
     @ObservationIgnored private var controlWatch: Task<Void, Never>?
     /// Every host the control plane last listed, this Mac's included. Nil when the
     /// window is not its client; empty until the first list arrives (058, R11).
@@ -2496,6 +2500,7 @@ final class AppModel {
         let backoff = controlBackoff
         controlWatch = Task { [weak self] in
             let control = DaemonClient(link: controlLink.controlLink)
+            self?.controlRequests = control
             while !Task.isCancelled {
                 backoff.trying()
                 if (try? await control.connect(startIfNeeded: false, timeout: .seconds(3))) != nil {
@@ -2552,6 +2557,21 @@ final class AppModel {
         if connected, !isConnected { backoff.nudge() }
     }
 
+    /// Start on the strip of a host linked to a stopped workspace (#691): the control plane
+    /// asks its provider, and says how it goes as `control/hostChanged`.
+    func startHost(_ host: HostID) async {
+        guard let controlRequests, !hostsBeingStarted.contains(host) else { return }
+        hostsBeingStarted.insert(host)
+        defer { hostsBeingStarted.remove(host) }
+        do {
+            _ = try await controlRequests.call(DaemonAPI.Method.hostsStart, DaemonAPI.HostRequest(host: host))
+        } catch let error as JSONRPCError {
+            problem = HostProblem.controlRefusal(error)
+        } catch {
+            problem = "The control plane can’t be reached, so \(hosts.label(host)) can’t be started."
+        }
+    }
+
     private func syncControlHosts(_ control: DaemonClient) async {
         guard let controlLink,
               let listed = try? await control.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlHost].self),
@@ -2567,6 +2587,7 @@ final class AppModel {
         // A relay host (`agents-relay`) runs no agents: nothing to reach there.
         let others = listed.filter { $0.id != .mac && $0.relay != true }
         hosts.controlled = Dictionary(uniqueKeysWithValues: others.map { ($0.id, (label: $0.name, online: $0.state == "online")) })
+        hosts.controlRows = Dictionary(uniqueKeysWithValues: others.map { ($0.id, $0) })
         for host in others where host.state == "online" {
             let server = controlHosts[host.id] ?? DaemonClient(link: controlLink.link(for: host.id))
             controlHosts[host.id] = server

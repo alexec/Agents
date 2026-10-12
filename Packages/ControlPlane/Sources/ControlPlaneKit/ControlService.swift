@@ -1,3 +1,4 @@
+import AgentsKit
 import AgentsKitCore
 import ControlDial
 import Foundation
@@ -49,6 +50,13 @@ public final class ControlService: @unchecked Sendable {
         /// How the host on this Mac says its join stands (#113): `serve --host-root` reads
         /// its `control-join.json`, for `control/status`.
         public var thisMacHost: (@Sendable () -> DaemonAPI.HostJoinStatus?)?
+        /// Where workspace providers keep their secrets (#691, research R3): the control
+        /// plane's own home, never the store. Nil for none, and no providers.
+        public var providerHome: URL?
+        /// How long provider calls, starts and lists take; shorter in tests.
+        public var providerTiming: WorkspaceProviders.Timing = .standard
+        /// The command provider's binary, when not found beside `agents-control` (tests).
+        public var commandProvider: URL? = ProviderConnection.commandProvider()
 
         public struct Web: Sendable {
             /// `Web/dist`, with its MANIFEST.
@@ -103,6 +111,8 @@ public final class ControlService: @unchecked Sendable {
     private var refresher: Task<Void, Never>?
     /// The reverse tunnels this copy holds for servers behind a bastion (#435).
     private var tunnels: HostTunnels?
+    /// Workspace providers (#691): only on a single copy with a home for their secrets.
+    public private(set) var providers: WorkspaceProviders?
     private var sweeper: Task<Void, Never>?
     /// When the store was last read again to admit a member it didn't know (#174).
     private let readAgainAt = DateBox()
@@ -300,8 +310,32 @@ public final class ControlService: @unchecked Sendable {
         hooks.need = { [weak self] _, params in await self?.heard(params) }
         hooks.relayChanged = { [weak self] _ in await self?.syncRelays() }
         hooks.clientsChanged = { [weak self] _ in await self?.tellRelayDevices() }
+        // Workspace providers (#691): beside the tunnels, on a single copy only (R4).
+        if mesh == nil, providers == nil, let home = configuration.providerHome {
+            let commandProvider = configuration.commandProvider
+            providers = WorkspaceProviders(
+                store: configuration.store, records: records, methods: methods, router: router,
+                secrets: ProviderSecrets(home: home), timing: configuration.providerTiming,
+                hooks: .init(
+                    sshStart: { record, destination in
+                        var ssh = SSHCommand(executable: HostInstall.sshExecutable,
+                                             name: WorkspaceProviders.sshDestination(destination), controlPath: nil,
+                                             environment: HostInstall.environment(keepAgent: true))
+                        ssh.options = HostInstall.configFile + HostInstall.options(keyFile: nil, knownHosts: nil)
+                        try await ServerInstaller(ssh: ssh).startDaemon(extra: ["--control-network", "--host-name", record.name])
+                    },
+                    openTunnel: { _ in await tunnels?.reconcile() },
+                    connect: { [weak self, timing = configuration.providerTiming] record, secrets in
+                        try ProviderConnection(record: record, secrets: secrets, cwd: home, timing: timing.calls,
+                                               commandProvider: commandProvider,
+                                               log: { [weak self] in self?.log($0) })
+                    }),
+                log: { [weak self] in self?.log($0) })
+        }
+        hooks.workspaces = providers
         await methods.setHooks(hooks)
         await tunnels?.start()
+        await providers?.start()
         await readiness.set(true)
 
         // Leases (T063): a host whose uplink ends here, or whose lease another copy took.
@@ -345,6 +379,7 @@ public final class ControlService: @unchecked Sendable {
         refresher?.cancel()
         sweeper?.cancel()
         await tunnels?.stop()
+        await providers?.stop()
         await leases.stop()
         await mesh?.stop()
         for server in servers { try? await server.close() }

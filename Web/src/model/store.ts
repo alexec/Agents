@@ -3,7 +3,7 @@
 // (research R7). Nothing here decides anything; the hosts do.
 import { batch, computed, signal, type ReadonlySignal, type Signal } from "@preact/signals";
 import type {
-  Agent, AgentRemovedNotification, ResumingNotification, ControlHost, ElicitationNotification, ElicitationRequest, EntryNotification,
+  Agent, AgentRemovedNotification, ResumingNotification, ControlHost, HostID, HostWorkspace, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, ProjectRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, DiskState, StoreNotes,
@@ -819,6 +819,20 @@ export class Work {
     });
   }
 
+  /** The hosts whose `hosts/start` is out now, so the strip's Start waits for it (#691). */
+  readonly hostsBeingStarted = signal<readonly string[]>([]);
+
+  /** One host's row, or its state and workspace, as said now, in place of what was listed. */
+  protected takeHostRow(change: { id: string; state: string; workspace?: HostWorkspace | undefined }): void {
+    const hosts = this.hosts.value;
+    const at = hosts.findIndex((h) => h.id === change.id);
+    if (at < 0) return;
+    const row: ControlHost = { ...hosts[at]!, state: change.state };
+    if (change.workspace) row.workspace = change.workspace;
+    else delete row.workspace;
+    this.takeHosts(hosts.map((h, i) => (i === at ? row : h)));
+  }
+
   /** Whether a host answers: online, or held back for a reason the page says. */
   hostIsOnline(host: string): boolean {
     return this.hosts.value.find((h) => h.id === host)?.state === "online";
@@ -982,11 +996,14 @@ export class Store extends Work {
    * it (the control plane says it twice per connect). A control plane naming no host loads all (#170).
    */
   private hostChanged(params: unknown): void {
-    const host = (params as { host?: unknown } | null)?.host;
+    const said = params as { host?: unknown; state?: unknown; workspace?: HostWorkspace } | null;
+    const host = said?.host;
     if (typeof host !== "string") {
       void this.load();
       return;
     }
+    // Its state and workspace as said, at once: a workspace's start shows its steps as they come (#691).
+    if (typeof said?.state === "string" && said.state !== "removed") this.takeHostRow({ id: host, state: said.state, workspace: said.workspace });
     clearTimeout(this.settling.get(host));
     this.settling.set(host, setTimeout(() => {
       this.settling.delete(host);
@@ -1383,6 +1400,25 @@ export class Store extends Work {
   readonly pendingOptions = signal<Record<string, Record<string, JSONValue>>>({});
   /** What is typed and attached, per session or per new-agent form, kept across a reload (#254). */
   readonly drafts = new Drafts(typeof localStorage === "undefined" ? undefined : localStorage);
+
+  /**
+   * Starts the workspace `host` runs on (#691, the strip's Start). The control plane answers at
+   * once with the host's row; the start's progress comes as `control/hostChanged`, and a refusal
+   * is said in `problem`.
+   */
+  async startHost(host: string): Promise<void> {
+    if (this.hostsBeingStarted.value.includes(host)) return;
+    this.hostsBeingStarted.value = [...this.hostsBeingStarted.value, host];
+    try {
+      const row = await this.link.call("hosts/start", { host: host as HostID });
+      this.takeHostRow(row);
+    } catch (error) {
+      log("call.failed", error instanceof CallFailed ? error.code : undefined);
+      this.say(describe(error));
+    } finally {
+      this.hostsBeingStarted.value = this.hostsBeingStarted.value.filter((h) => h !== host);
+    }
+  }
 
   /** Calls `method`, and on failure says why in `problem` and answers null. */
   async act<M extends keyof Methods>(method: M, params: Methods[M]["params"], host: string): Promise<Methods[M]["result"] | null> {

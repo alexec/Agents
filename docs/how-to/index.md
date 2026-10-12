@@ -18,6 +18,10 @@ something particular done.
   the Mac that runs Agents Host, pair it once, and forget it.
 - [Add a server](add-a-server.md): make a Linux server, or another Mac, a host of your
   control plane.
+- [Start workspaces from Agents](start-workspaces-from-agents.md): let the control plane
+  start and stop the machines your servers run on, and press Start on a stopped one.
+- [Add a workspace provider](add-a-workspace-provider.md): a preset, your own commands, a
+  tool map, or a provider of your own.
 - [Run the control plane in the cloud](run-the-control-plane-in-the-cloud.md): on a
   machine you rent, at your own domain with a public certificate.
 - [Run the control plane as several copies](run-several-copies.md): over one bucket,

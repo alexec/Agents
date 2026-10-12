@@ -14,12 +14,29 @@ struct OfflineStrip: View {
         // The control plane being away is the window's own strip, above everything.
         if let text = line {
             HStack(spacing: 10) {
-                Circle().tinted(.attention).frame(width: 7, height: 7)
+                if starting {
+                    ProgressView().controlSize(.mini)
+                } else {
+                    Circle().tinted(.attention).frame(width: 7, height: 7)
+                }
                 Text(text)
                     .appText(.supporting)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
-                if host != .mac, let next = model.hosts.nextTry[host] {
+                if let workspace, starting, let since = workspace.since {
+                    // How long the start has taken so far (#691, L1).
+                    TimelineView(.periodic(from: since, by: 1)) { context in
+                        Text(OfflineWords.elapsed(since: since, now: context.date))
+                            .appText(.fine).foregroundStyle(.secondary).monospacedDigit()
+                    }
+                } else if let workspace, OfflineWords.offersStart(state: row?.state ?? "offline", workspace: workspace) {
+                    Button("Start") { Task { await model.startHost(host) } }
+                        .controlSize(.small)
+                        .disabled(model.hostsBeingStarted.contains(host))
+                        .help("Starts \(workspace.workspaceName) at \(workspace.providerName).")
+                } else if starting || workspace?.hostState == "stopping" {
+                    EmptyView()
+                } else if host != .mac, let next = model.hosts.nextTry[host] {
                     TimelineView(.periodic(from: .now, by: 1)) { context in
                         let seconds = max(0, Int(next.timeIntervalSince(context.date).rounded(.up)))
                         Text(seconds > 0 ? "Next try in \(seconds) s" : "Trying…")
@@ -43,16 +60,25 @@ struct OfflineStrip: View {
     }
 
     /// This Mac's host names why it is quiet (#303). A server's strip stays the shared
-    /// words, which the Remote uses too.
+    /// words, which the Remote uses too: for one on a provider's workspace, whether it is
+    /// stopped, starting or failed to start (#691).
     private var line: String? {
         guard !model.controlPlaneAway else { return nil }
         if host == .mac, let notice = model.macHostNotice {
             return notice.strip(since: offlineSince)
         }
         guard model.hosts.isOffline(host), case .offline(let since) = model.hosts.state(host) else { return nil }
+        if let row, let workspace,
+           let words = OfflineWords.workspaceLine(name: model.hosts.label(host), state: row.state, workspace: workspace) {
+            return words
+        }
         return OfflineWords.line(host: host, name: model.hosts.label(host),
                                  since: since.formatted(date: .omitted, time: .shortened))
     }
+
+    private var row: DaemonAPI.ControlHost? { host == .mac ? nil : model.hosts.controlRows[host] }
+    private var workspace: DaemonAPI.HostWorkspace? { row?.workspace }
+    private var starting: Bool { workspace != nil && row?.state == "starting" }
 
     private var offlineSince: String? {
         guard case .offline(let since) = model.hosts.state(host) else { return nil }

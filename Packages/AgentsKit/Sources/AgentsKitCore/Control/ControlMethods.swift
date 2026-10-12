@@ -37,6 +37,8 @@ public actor ControlMethods: ControlHandling {
         public var tunnel: @Sendable (HostID) async -> DaemonAPI.HostTunnel? = { _ in nil }
         /// The tunnels whose server has not joined yet (#660); nil where none are held.
         public var unjoinedTunnels: @Sendable () async -> [DaemonAPI.HostTunnelChanged]? = { nil }
+        /// Workspace providers, links, starts and stops (#691); nil where providers can't run.
+        public var workspaces: (any WorkspaceHandling)?
 
         public init(startPairing: @escaping @Sendable (Bool) async throws -> JSONValue = { _ in throw ControlMethods.notHere },
                     stopPairing: @escaping @Sendable () async -> Void = {},
@@ -221,7 +223,7 @@ public actor ControlMethods: ControlHandling {
     public nonisolated func handles(_ method: String) -> Bool {
         // A bare `daemon/ping` from today's Remote is the home host's to answer: that is
         // how the Remote knows its Mac is there.
-        method != DaemonAPI.Method.ping && Self.own.contains(method)
+        method != DaemonAPI.Method.ping && (Self.own.contains(method) || DaemonAPI.Method.workspaceMethods.contains(method))
     }
 
     public func handle(method: String, params: JSONValue?, from caller: ControlRouter.Caller) async throws -> JSONValue {
@@ -246,7 +248,8 @@ public actor ControlMethods: ControlHandling {
     ]
 
     private func answer(method: String, params: JSONValue?, from caller: ControlRouter.Caller) async throws -> JSONValue {
-        if frozen, Self.writes.contains(method) {
+        let readsOnly = [DaemonAPI.Method.providersList, DaemonAPI.Method.providersRefresh].contains(method)
+        if frozen, Self.writes.contains(method) || (DaemonAPI.Method.workspaceMethods.contains(method) && !readsOnly) {
             throw JSONRPCError(code: DaemonAPI.Failure.storeUnavailable,
                                message: "The control plane is moving to another machine. Nothing was changed; try again in a minute.")
         }
@@ -370,6 +373,12 @@ public actor ControlMethods: ControlHandling {
             await hooks.changed(ControlEvent(kind: .hostRemoved, subject: request.host.rawValue, at: Date(),
                                              by: caller.client.uuidString))
             return [:]
+        case _ where DaemonAPI.Method.workspaceMethods.contains(method):
+            guard let workspaces = hooks.workspaces else {
+                throw JSONRPCError(code: DaemonAPI.Failure.providersNeedOneCopy,
+                                   message: "Workspace providers need a control plane with one copy, for now.")
+            }
+            return try await workspaces.answer(method: method, params: params, from: caller)
         default:
             throw JSONRPCError.methodNotFound(method)
         }
@@ -409,9 +418,9 @@ public actor ControlMethods: ControlHandling {
                     changed = true
                 }
             }
-            if changed {
-                await router?.broadcastControl(DaemonAPI.Notification.controlHostChanged,
-                                               ControlRouter.describe(host, .online))
+            if changed, let router {
+                await router.broadcastControl(DaemonAPI.Notification.controlHostChanged,
+                                              await router.described(host, .online))
             }
             if record.relay == true { await hooks.relayChanged(host) }
             await detectProjectsIfDue(host)
@@ -458,19 +467,23 @@ public actor ControlMethods: ControlHandling {
     }
 
     private func hostList() async -> [DaemonAPI.ControlHost] {
-        let states = await router?.hostStates ?? [:]
-        var tunnels: [HostID: DaemonAPI.HostTunnel] = [:]
-        for record in await records.hosts { tunnels[record.id] = await hooks.tunnel(record.id) }
-        return await records.hosts.map { record in
-            let state = states[record.id] ?? .offline(since: Date())
-            var listed = DaemonAPI.ControlHost(id: record.id, name: record.name, platform: record.platform,
-                                               version: record.version,
-                                               state: ControlRouter.describe(record.id, state)["state"]?.stringValue ?? "offline",
-                                               reach: "dialOut", machineID: record.machineID, relay: record.relay)
-            listed.signInFrom = record.signInFrom
-            listed.tunnel = tunnels[record.id]
-            return listed
-        }
+        var listed: [DaemonAPI.ControlHost] = []
+        for record in await records.hosts { listed.append(await hostRow(record)) }
+        return listed
+    }
+
+    /// One `hosts/list` row, as it stands now.
+    public func hostRow(_ record: HostRecord) async -> DaemonAPI.ControlHost {
+        let state = await router?.state(of: record.id) ?? .offline(since: Date())
+        let described = await router?.described(record.id, state) ?? ControlRouter.describe(record.id, state)
+        var listed = DaemonAPI.ControlHost(id: record.id, name: record.name, platform: record.platform,
+                                           version: record.version,
+                                           state: described["state"]?.stringValue ?? "offline",
+                                           reach: "dialOut", machineID: record.machineID, relay: record.relay)
+        listed.signInFrom = record.signInFrom
+        listed.tunnel = await hooks.tunnel(record.id)
+        listed.workspace = await router?.workspace(of: record.id)
+        return listed
     }
 
     private static func require<T: Decodable>(_ params: JSONValue?, as type: T.Type) throws -> T {
