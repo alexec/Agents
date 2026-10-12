@@ -160,12 +160,19 @@ public extension DaemonAPI.Method {
     static let hostsStart = "hosts/start"
     /// `HostStop` → `ControlHost`, at once.
     static let hostsStop = "hosts/stop"
+    /// `ProviderRequest` → `ProviderOptions`: the New Workspace form (US5).
+    static let providersOptions = "providers/options"
+    /// `ProviderCreate` → `ProviderCreated`, once the provider has made it (US5).
+    static let providersCreate = "providers/create"
+    /// `HostRequest` → `{}`: its workspace deleted, then the host removed (US5).
+    static let hostsDeleteWorkspace = "hosts/deleteWorkspace"
 
     /// Every method the control plane's workspace part answers.
     static let workspaceMethods: Set<String> = [
         providersList, providersAdd, providersUpdate, providersRemove, providersRefresh,
         hostsLink, hostsUnlink, hostsSetWorkspaceOptions, hostsStart, hostsStop,
         hostsKeep, hostsListKept, hostsDropKept, hostsRetryKept,
+        providersOptions, providersCreate, hostsDeleteWorkspace,
     ]
 }
 
@@ -363,6 +370,36 @@ public extension DaemonAPI {
             self.host = host
             self.startWhenUsed = startWhenUsed
             self.stopWhenIdleMinutes = stopWhenIdleMinutes
+        }
+    }
+
+    /// `providers/options`: a flat JSON Schema object of strings, integers, booleans and
+    /// enums with titles. An enum's `x-costs` may name each value's cost, for the confirmation.
+    struct ProviderOptions: Codable, Sendable, Hashable {
+        public var schema: JSONValue
+        public init(schema: JSONValue) { self.schema = schema }
+    }
+
+    /// `providers/create`.
+    struct ProviderCreate: Codable, Sendable, Hashable {
+        public var id: ProviderID
+        public var name: String
+        public var options: JSONValue?
+        public init(id: ProviderID, name: String, options: JSONValue? = nil) {
+            self.id = id
+            self.name = name
+            self.options = options
+        }
+    }
+
+    /// What `providers/create` made. `joining`: it runs the install on its first boot, and is
+    /// linked when it joins. Otherwise it is added over its `ssh`, as Add as Host… does.
+    struct ProviderCreated: Codable, Sendable, Hashable {
+        public var workspace: WorkspaceInfo
+        public var joining: Bool
+        public init(workspace: WorkspaceInfo, joining: Bool) {
+            self.workspace = workspace
+            self.joining = joining
         }
     }
 

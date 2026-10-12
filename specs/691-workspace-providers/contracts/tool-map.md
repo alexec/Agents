@@ -46,7 +46,7 @@ left out and the `doctl` preset is the DigitalOcean example.
 | `list.id`, `list.name` | yes | Paths within an item. |
 | `list.state` | yes | A path within an item. Its value is looked up in `states`. If it isn't there, it is used as a contract state when it is one, and as `unknown` otherwise. |
 | `list.ssh`, `list.tunnel`, `list.cost` | no | Paths or templates. |
-| `create`, `delete`, `options` | no | The same shape as `start`. `create.workspace` gives a path to the new item. |
+| `create`, `delete`, `options` | no | The same shape as `start`. Their tools must be in `tools/list` too. `create`'s arguments take `{name}`, `{firstBoot}`, `{options}` (the object) and each option's key; a string that is only `{key}` with no value is left out. `create.firstBootRuns` (default false) says whether the server runs `{firstBoot}`. What it made is found in the next list, by name. |
 
 ## Checking
 

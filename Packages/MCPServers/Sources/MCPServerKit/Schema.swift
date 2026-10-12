@@ -4,7 +4,7 @@ import Foundation
 /// some required and no others allowed. It is listed as JSON Schema and checks what it is given.
 public struct Schema: Sendable {
     public struct Property: Sendable {
-        public enum Kind: String, Sendable { case string, integer, boolean }
+        public enum Kind: String, Sendable { case string, integer, boolean, object }
         public var kind: Kind
         public var description: String?
         /// A regular expression the whole string must match, and what to call its shape.
@@ -25,6 +25,11 @@ public struct Schema: Sendable {
 
         public static func boolean(_ description: String? = nil) -> Property {
             Property(kind: .boolean, description: description, pattern: nil, maxLength: nil, extra: [:])
+        }
+
+        /// Any JSON object, not looked into: a form's choices, say.
+        public static func object(_ description: String? = nil) -> Property {
+            Property(kind: .object, description: description, pattern: nil, maxLength: nil, extra: [:])
         }
 
         public var json: JSON {
@@ -79,6 +84,8 @@ public struct Schema: Sendable {
                 guard let i = value.int, i > 0 else { throw .invalidParams("\(key) must be a positive integer") }
             case .boolean:
                 guard value.bool != nil else { throw .invalidParams("\(key) must be true or false") }
+            case .object:
+                guard value.object != nil else { throw .invalidParams("\(key) must be an object") }
             case .string:
                 guard let s = value.string else { throw .invalidParams("\(key) must be a string") }
                 if let pattern = property.pattern, s.range(of: pattern.regex, options: .regularExpression) == nil {

@@ -8,7 +8,20 @@ public protocol WorkspaceProvider: Sendable {
     func list() async throws -> [DaemonAPI.WorkspaceInfo]
     @discardableResult func start(_ id: String) async throws -> DaemonAPI.WorkspaceInfo?
     @discardableResult func stop(_ id: String) async throws -> DaemonAPI.WorkspaceInfo?
+    /// The New Workspace form, as a JSON Schema object (US5).
+    func options() async throws -> JSONValue
+    /// Makes one; what it made when the provider said, and whether `firstBoot` will run.
+    func create(name: String, options: JSONValue, firstBoot: String?) async throws -> (DaemonAPI.WorkspaceInfo?, Bool)
+    func delete(_ id: String) async throws
     func end() async
+}
+
+public extension WorkspaceProvider {
+    func options() async throws -> JSONValue { throw ProviderFailure("It can’t make workspaces.") }
+    func create(name: String, options: JSONValue, firstBoot: String?) async throws -> (DaemonAPI.WorkspaceInfo?, Bool) {
+        throw ProviderFailure("It can’t make workspaces.")
+    }
+    func delete(_ id: String) async throws { throw ProviderFailure("It can’t delete workspaces.") }
 }
 
 /// One provider's MCP server, reached as its record says (#691, research R1–R2, R5): the
@@ -125,7 +138,8 @@ public actor ProviderConnection: WorkspaceProvider {
         } else if ToolMapping.value(mapping.listing.items, in: content)?.arrayValue == nil {
             throw ProviderFailure("The tool map’s list.items finds no list in what \(mapping.list.tool) answered.")
         }
-        let capabilities = mapping.native ? ToolMapping.optional.filter { tools.contains($0.key) }.map(\.value).sorted() : []
+        let capabilities = mapping.native ? ToolMapping.optional.filter { tools.contains($0.key) }.map(\.value).sorted()
+            : mapping.capabilities
         return Checked(capabilities: capabilities, contract: contract, workspaces: mapping.workspaces(content))
     }
 
@@ -146,6 +160,29 @@ public actor ProviderConnection: WorkspaceProvider {
         try await act(mapping.stop, id)
     }
 
+    // MARK: Making (US5)
+
+    public func options() async throws -> JSONValue {
+        guard let call = mapping.options else { throw ProviderFailure("It has no choices for a new workspace.") }
+        let content = try await self.call(call, values: [:], timeout: timing.quick)
+        return mapping.native ? (content["schema"] ?? [:]) : content
+    }
+
+    public func create(name: String, options: JSONValue, firstBoot: String?) async throws -> (DaemonAPI.WorkspaceInfo?, Bool) {
+        guard let call = mapping.create else { throw ProviderFailure("It can’t make workspaces.") }
+        var values: [String: JSONValue] = ["name": .string(name), "options": options]
+        if let firstBoot { values["firstBoot"] = .string(firstBoot) }
+        for (key, value) in options.objectValue ?? [:] where values[key] == nil { values[key] = value }
+        let content = try await self.call(call, values: values, timeout: timing.long)
+        guard mapping.native else { return (nil, mapping.firstBootRuns) }
+        return (content["workspace"].flatMap(mapping.workspace), content["firstBootRuns"]?.boolValue ?? false)
+    }
+
+    public func delete(_ id: String) async throws {
+        guard let call = mapping.delete else { throw ProviderFailure("It can’t delete workspaces.") }
+        _ = try await self.call(call, values: ["id": .string(id)], timeout: timing.long)
+    }
+
     private func act(_ call: ToolMapping.Call, _ id: String) async throws -> DaemonAPI.WorkspaceInfo? {
         let content = try await self.call(call, id: id, timeout: timing.long)
         return mapping.native ? content["workspace"].flatMap(mapping.workspace) : nil
@@ -157,7 +194,11 @@ public actor ProviderConnection: WorkspaceProvider {
     }
 
     private func call(_ call: ToolMapping.Call, id: String?, timeout: Duration) async throws -> JSONValue {
-        let arguments = mapping.arguments(call, id: id)
+        try await self.call(call, values: ["id": .string(id ?? "")], timeout: timeout)
+    }
+
+    private func call(_ call: ToolMapping.Call, values: [String: JSONValue], timeout: Duration) async throws -> JSONValue {
+        let arguments = mapping.arguments(call, values: values)
         let result = try await connected { try await $0.callTool(call.tool, arguments: arguments, timeout: timeout) }
         return try ToolMapping.content(of: result)
     }

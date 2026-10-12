@@ -248,6 +248,8 @@ struct ControlHostsPage: View {
     /// Stop, asked first while agents are working there (L2), with who they are.
     @State private var stopping: DaemonAPI.ControlHost?
     @State private var stoppingNames: [String] = []
+    /// Delete Workspace… (US5, L9).
+    @State private var deleting: DaemonAPI.ControlHost?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -305,6 +307,14 @@ struct ControlHostsPage: View {
         .sheet(item: $choosing) { host in
             ChooseProjectsSheet(host: host.id, hostName: host.id == control.thisMacHost?.id ? "This Mac" : host.name,
                                 paths: control.suggestedPaths).paperSheet()
+        }
+        .confirmationDialog(deleting.map { "Delete \($0.workspace?.workspaceName ?? $0.name)?" } ?? "",
+                            isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
+                            titleVisibility: .visible, presenting: deleting) { host in
+            Button("Delete", role: .destructive) { Task { await control.deleteWorkspace(host.id) } }
+            Button("Cancel", role: .cancel) {}
+        } message: { host in
+            Text(deleteWords(host))
         }
         .confirmationDialog(removing.map { "Remove \($0.name)?" } ?? "",
                             isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
@@ -378,6 +388,9 @@ struct ControlHostsPage: View {
                 Divider()
                 if let workspace = host.workspace {
                     Button("Unlink from \(workspace.workspaceName)") { Task { await control.unlink(host.id) } }
+                    if control.canDeleteWorkspace(host) {
+                        Button("Delete Workspace…", role: .destructive) { deleting = host }
+                    }
                     Toggle("Start when used", isOn: Binding(
                         get: { workspace.startWhenUsed },
                         set: { on in Task { await control.setWorkspaceOptions(host.id, startWhenUsed: on) } }))
@@ -403,6 +416,14 @@ struct ControlHostsPage: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .accessibilityLabel("More for \(host.name)")
+    }
+
+    /// What Delete Workspace… loses (L9): the workspace and its disk, and the host with its agents.
+    private func deleteWords(_ host: DaemonAPI.ControlHost) -> String {
+        let agents = model.work.agents.filter { $0.host == host.id }.count
+        let workspace = host.workspace.map { "\($0.workspaceName) at \($0.providerName)" } ?? "The workspace"
+        return "\(workspace) and everything on its disk are deleted, and host \(host.name) is removed"
+            + (agents == 0 ? "." : " with its \(agents == 1 ? "agent" : "\(agents) agents").")
     }
 
     static func minutes(_ minutes: Int) -> String {

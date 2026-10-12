@@ -247,10 +247,10 @@ US2 comes before US1 because Start needs a link.
 
 ## Phase 7: User Story 5 – Make a new workspace (P3)
 
-- [ ] T050 [US5] `providers/options`, `providers/create` and `hosts/deleteWorkspace`. For create, issue a host code (`ControlCodes.issue`) and pass `HostInstallScript.command(...)` as `firstBoot`. When `firstBootRuns` is false, install over ssh through `HostInstall`. Link the host once it joins.
-- [ ] T051 [US5] Add create, delete and options to the command provider's config and to `ToolMapping`.
-- [ ] T052 [P] [US5] Tests: create that runs on first boot and joins; create with an ssh install; delete removes the host; cancel makes nothing.
-- [ ] T053 [US5] 🖼 Mac: the New Workspace… form drawn from the schema, a confirmation naming the cost, and Delete Workspace… with its confirmation.
+- [x] T050 [US5] `providers/options`, `providers/create` and `hosts/deleteWorkspace`. For create, issue a host code (`ControlCodes.issue`) and pass `HostInstallScript.command(...)` as `firstBoot`. When `firstBootRuns` is false, install over ssh through `HostInstall`. Link the host once it joins.
+- [x] T051 [US5] Add create, delete and options to the command provider's config and to `ToolMapping`.
+- [x] T052 [P] [US5] Tests: create that runs on first boot and joins; create with an ssh install; delete removes the host; cancel makes nothing.
+- [x] T053 [US5] 🖼 Mac: the New Workspace… form drawn from the schema, a confirmation naming the cost, and Delete Workspace… with its confirmation.
 
 ## Phase 8: User Story 6 – Agents use workspaces (P3)
 

@@ -355,7 +355,7 @@ The deltas are tracked by 29 issues:
 | Reconnect on wake and network change (#82) | `A/WakeAndNetwork.swift` | Yes (its hangs are #208, not parity) | Yes, and the `online` event | **same** |
 | A refused write said in words (#88) | `storage/writeFailed` | `storage/writeFailed`: `R/RemoteModel.swift` | `storage/writeFailed` (unit-tested) | **same** |
 | Hosts and servers | Settings ▸ Control plane overview names not joined or not running: `A/Control/ControlSettingsView.swift:140-156`; hosts: `237-268`; Add a Server: Run a command or Over ssh, with the ssh config's hosts and an ssh tunnel (#610), then the projects to add, picked (#656): `A/Control/ControlAddServerSheet.swift`, `A/Control/HostProjectsPicker.swift` | Host headings | Names in the sidebar, the foot | **by design** (managing hosts is the Mac's) |
-| Workspace providers (#691) | Settings ▸ Control plane ▸ Providers: a provider's workspaces, Add Provider (kind first), Add as Host…, and Link to Workspace… in a host's `···` menu: `A/Control/ControlProvidersPage.swift` | None | None | **by design** (managing hosts is the Mac's) |
+| Workspace providers (#691) | Settings ▸ Control plane ▸ Providers: a provider's workspaces, Add Provider (kind first), Add as Host…, and Link to Workspace… in a host's `···` menu, New Workspace… on a provider's card and Delete Workspace… in a host's `···` menu: `A/Control/ControlProvidersPage.swift`, `A/Control/NewWorkspaceSheet.swift` | None | None | **by design** (managing hosts is the Mac's) |
 | Pairing | Shows the codes: `A/Control/ControlClientsPane.swift` | Scans: `R/Link/PairingView.swift` | Pastes, or `#code=`: `W/views/Pairing.tsx`, `W/pairLink.ts` | **by design** (#105, #109, #111) |
 
 ## MCP Apps views

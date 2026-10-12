@@ -22,8 +22,22 @@ version its list reports; it needs no MCP extension.
 | `workspace_create` | no | `{name, options, firstBoot?}` | `{workspace: Workspace, firstBootRuns}` |
 | `workspace_delete` | no | `{id}` | `{}` once it is gone |
 
-Creating and deleting workspaces from Agents is still to come. A provider may offer those
-tools now, and the control plane notes that it does.
+### Making and deleting
+
+- **`workspace_options`** answers a flat JSON Schema object: string, integer, boolean and
+  `enum` properties, each with a `title`. The **New Workspace** form is drawn from it. An
+  `enum` property may have `x-costs`, its values' costs, such as
+  `{"s-1vcpu-1gb": "$0.009/hour"}`, which the confirmation shows.
+- **`workspace_create`** takes the name, the chosen `options`, and `firstBoot`: one shell
+  line that installs Agents and joins it as a host, with a host code that works once. It
+  ends with the new host's name as its second argument. Run it as the workspace's own user on
+  its first boot, never with sudo. Answer `firstBootRuns: true` if you will. Otherwise the
+  person adds it over its `ssh`, as **Add as Host…** does.
+- **`workspace_delete`** deletes the workspace and everything on it. The control plane then
+  removes its host, as **Remove** does.
+
+Agents asks the person before it makes or deletes anything. The first-boot line is never
+logged.
 
 ## A workspace
 
@@ -59,6 +73,8 @@ tools now, and the control plane notes that it does.
 - **Connecting.** After a successful start, the control plane waits for the host's agentsd
   to connect. After two minutes it starts agentsd over the workspace's `ssh`, without
   installing anything. After ten minutes it gives up.
+- **Linking what it made.** A workspace made with `firstBootRuns` is linked to its host
+  when a host of its name joins, within ten minutes.
 - **Where it runs.** Providers run on the control plane, never on a host, so they can start
   a host that is down. A control plane with several copies doesn't run them yet.
 

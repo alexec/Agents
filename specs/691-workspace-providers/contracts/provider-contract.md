@@ -54,6 +54,7 @@ that is already stopped.
 
 It takes nothing. It returns `{ "schema": <JSON Schema object> }`, a flat object of string,
 integer, boolean and enum properties with titles. The New Workspace form is drawn from it.
+An enum property may carry `x-costs`, `{value: cost}`, for the confirmation (layouts L9).
 
 ## `workspace_create` (optional, US5)
 
@@ -64,7 +65,10 @@ It takes:
 ```
 
 It returns `{ "workspace": { … }, "firstBootRuns": true }`. When `firstBootRuns` is false, the
-control plane installs over the returned `ssh`.
+Mac opens Add a Server with the returned `ssh` filled in, as Add as Host… does: the person
+trusts the new machine's key there. `firstBoot` ends with the host's name, which is the
+workspace's, as `install.sh`'s second argument; the control plane links the host that joins
+under it.
 
 ## `workspace_delete` (optional, US5)
 

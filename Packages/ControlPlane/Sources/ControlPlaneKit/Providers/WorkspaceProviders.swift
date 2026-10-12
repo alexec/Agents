@@ -43,14 +43,21 @@ public actor WorkspaceProviders: WorkspaceHandling {
         public var openTunnel: @Sendable (HostID) async -> Void
         /// A connection to a provider, as its record says.
         public var connect: @Sendable (ProviderRecord, [String: String]) throws -> any WorkspaceProvider
+        /// The one line that installs a host with a new host code (`install.sh`), for a new
+        /// workspace's first boot (US5, FR-041).
+        public var hostCommand: @Sendable () async throws -> String
 
         public init(sshStart: @escaping @Sendable (HostRecord, String) async throws -> Void = { _, _ in
                         throw ProviderFailure("This control plane can’t start agentsd over ssh.")
                     },
                     openTunnel: @escaping @Sendable (HostID) async -> Void = { _ in },
+                    hostCommand: @escaping @Sendable () async throws -> String = {
+                        throw ProviderFailure("This control plane can’t give out host codes.")
+                    },
                     connect: @escaping @Sendable (ProviderRecord, [String: String]) throws -> any WorkspaceProvider) {
             self.sshStart = sshStart
             self.openTunnel = openTunnel
+            self.hostCommand = hostCommand
             self.connect = connect
         }
     }
@@ -196,6 +203,16 @@ public actor WorkspaceProviders: WorkspaceHandling {
                                    data: ["running": .array(running.map { .string($0) })])
             }
             return try JSONValue.encoding(try await begin(.stop, request.host, by: who))
+        case DaemonAPI.Method.providersOptions:
+            guard let id = try Self.require(params, as: DaemonAPI.ProviderRequest.self).id else {
+                throw JSONRPCError(code: JSONRPCError.invalidParams, message: "Which provider?")
+            }
+            return try JSONValue.encoding(DaemonAPI.ProviderOptions(schema: try await providerCall(id) { try await $0.options() }))
+        case DaemonAPI.Method.providersCreate:
+            return try JSONValue.encoding(try await create(try Self.require(params, as: DaemonAPI.ProviderCreate.self), by: who))
+        case DaemonAPI.Method.hostsDeleteWorkspace:
+            try await deleteWorkspace(try Self.require(params, as: DaemonAPI.HostRequest.self).host, by: who, caller: caller)
+            return [:]
         case DaemonAPI.Method.hostsKeep:
             let request = try Self.require(params, as: DaemonAPI.KeepRequest.self)
             guard let kept, let answer = await kept.keep(host: request.host, method: request.method,
@@ -499,6 +516,109 @@ public actor WorkspaceProviders: WorkspaceHandling {
         }
         log("workspace: start \(what) by \(who): failed: didn't connect in \(minutes)")
         await finish(host, link, problem: problem)
+    }
+
+    // MARK: Making and deleting (US5)
+
+    /// Workspaces made here that will install on their first boot, by the host name they will
+    /// join as, until they join and are linked.
+    private var joining: [String: (provider: ProviderID, workspace: String)] = [:]
+
+    /// Makes a workspace (FR-040, FR-041): with a one-time install command and host code for
+    /// its first boot, so it joins by itself and is linked. A provider that can't run it says
+    /// so, and the person adds it over ssh as Add as Host… does.
+    private func create(_ request: DaemonAPI.ProviderCreate, by who: String) async throws -> DaemonAPI.ProviderCreated {
+        guard let provider = providers[request.id]?.record else {
+            throw JSONRPCError(code: JSONRPCError.invalidParams, message: "There is no such provider.")
+        }
+        let name = request.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard Self.isHostName(name) else {
+            throw JSONRPCError(code: JSONRPCError.invalidParams,
+                               message: "A workspace’s name is letters, digits and dashes, and starts with a letter.")
+        }
+        guard !(await records.hosts).contains(where: { $0.name == name }) else {
+            throw JSONRPCError(code: JSONRPCError.invalidParams, message: "There is already a host called \(name).")
+        }
+        // The install line holds a host code: passed on, never logged.
+        let firstBoot = try await hooks.hostCommand() + " " + Self.shellQuoted(name)
+        let began = ContinuousClock.now
+        let made: (DaemonAPI.WorkspaceInfo?, Bool)
+        do {
+            made = try await providerCall(request.id) { try await $0.create(name: name, options: request.options ?? [:], firstBoot: firstBoot) }
+        } catch {
+            log("workspace: create \(name) at \(provider.name) by \(who): failed: \((error as? JSONRPCError)?.message ?? "\(error)")")
+            throw error
+        }
+        await refresh(request.id)
+        let listedNow = listed[request.id]?.workspaces ?? []
+        let found = made.0.map { said in listedNow.first { $0.id == said.id } ?? said }
+            ?? listedNow.first { $0.name == name || $0.id == name }
+        guard let workspace = found else {
+            throw JSONRPCError(code: DaemonAPI.Failure.providerFailed,
+                               message: "\(provider.name) made \(name), but doesn’t list it yet. Refresh in a minute.")
+        }
+        log("workspace: create \(name) (\(request.id)/\(workspace.id)) by \(who): ok in \(Self.seconds(since: began))\(made.1 ? ", joining on first boot" : "")")
+        if made.1 {
+            joining[name] = (request.id, workspace.id)
+            Task { await self.linkWhenJoined(name) }
+        }
+        return DaemonAPI.ProviderCreated(workspace: workspace, joining: made.1)
+    }
+
+    /// Links a made workspace's host once it has joined, within the start's time.
+    private func linkWhenJoined(_ name: String) async {
+        let began = ContinuousClock.now
+        while ContinuousClock.now - began < timing.giveUp, let wanted = joining[name] {
+            if let host = await records.hosts.first(where: { $0.name == name && $0.workspace == nil }) {
+                joining[name] = nil
+                _ = try? await link(DaemonAPI.HostLink(host: host.id, provider: wanted.provider, workspace: wanted.workspace))
+                return
+            }
+            try? await Task.sleep(for: timing.lookEvery)
+        }
+        if joining.removeValue(forKey: name) != nil {
+            log("workspace: \(name) was made but didn't join in \(Self.words(timing.giveUp))")
+        }
+    }
+
+    /// Deletes a linked host's workspace, then removes the host as Remove does (FR-042).
+    private func deleteWorkspace(_ host: HostID, by who: String, caller: ControlRouter.Caller) async throws {
+        guard let record = await records.host(host) else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchHost, message: "No host is called \(host.rawValue).")
+        }
+        guard let link = record.workspace, providers[link.provider] != nil else {
+            throw JSONRPCError(code: DaemonAPI.Failure.notLinked, message: "\(record.name) isn’t linked to a workspace.")
+        }
+        guard activities[host] == nil else {
+            throw JSONRPCError(code: DaemonAPI.Failure.providerFailed,
+                               message: "\(record.name) is starting or stopping. Delete it once that is done.")
+        }
+        do {
+            try await providerCall(link.provider) { try await $0.delete(link.workspace) }
+        } catch {
+            log("workspace: delete \(record.name) (\(link.provider)/\(link.workspace)) by \(who): failed: \((error as? JSONRPCError)?.message ?? "\(error)")")
+            throw error
+        }
+        log("workspace: delete \(record.name) (\(link.provider)/\(link.workspace)) by \(who): ok")
+        _ = try await methods.handle(method: DaemonAPI.Method.hostsRemove, params: ["host": .string(host.rawValue)], from: caller)
+        await refresh(link.provider)
+    }
+
+    /// A provider call, its failure in the provider's words.
+    private func providerCall<T: Sendable>(_ id: ProviderID, _ work: (any WorkspaceProvider) async throws -> T) async throws -> T {
+        do {
+            return try await work(try await connection(id))
+        } catch let failure as ProviderFailure {
+            throw JSONRPCError(code: DaemonAPI.Failure.providerFailed, message: failure.description)
+        }
+    }
+
+    static func isHostName(_ name: String) -> Bool {
+        name.range(of: "^[A-Za-z][A-Za-z0-9-]{0,62}$", options: .regularExpression) != nil
+    }
+
+    static func shellQuoted(_ value: String) -> String {
+        "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
     // MARK: Stop when idle (US4)

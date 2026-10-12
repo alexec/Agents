@@ -131,6 +131,23 @@ some and **Stop when idle** is on.
 A server on a build of Agents from before this never says whether it is idle, so it is never
 stopped as idle. Update it from its row.
 
+## Make a new workspace
+
+For a provider that can make workspaces, its card in **Settings ▸ Control plane ▸
+Providers** has **New Workspace…**.
+
+1. Give it a name, and make its choices: its size or region, say.
+2. Choose **Make…**. Agents says what it will make and, if the provider says, what it costs.
+3. Choose **Make**.
+
+The new workspace shows **Joining…** until it has installed Agents and joined. Then it is
+linked to its host. A provider that can't install on first boot opens **Add a Server** with
+the new workspace filled in, as **Add as Host…** does.
+
+To delete one, choose **Delete Workspace…** in its server's `···` menu on the Hosts page.
+Agents names what is lost first: the workspace, everything on its disk, and the server with
+its agents.
+
 ## If it doesn't work
 
 - **The provider can't list.** Its card says why, and shows what it last listed. Check its
