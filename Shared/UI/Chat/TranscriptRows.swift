@@ -98,7 +98,7 @@ struct TurnView: View, Equatable {
                     if hasEarlier { EarlierStepsControl(fetch: fetchEarlier) }
                     // In the turn's own margin: no rule and no indent (#148).
                     VStack(alignment: .leading, spacing: 10) {
-                        ForEach(steps) { StepRow(item: $0, isOpen: detail == .details) }
+                        ForEach(steps) { StepRow(item: $0, isOpen: detail == .details, rollsUp: detail.rollsUpCalls) }
                     }
                     ForEach(outcome) { StepRow(item: $0, isOpen: false) }
                 }
@@ -214,9 +214,16 @@ private struct StepRow: View {
     let item: TranscriptItem
     /// Every call open from the start, at Details.
     let isOpen: Bool
+    /// At Messages, a run of calls is its last until it is clicked (#759).
+    var rollsUp = false
+    @State private var isUnrolled = false
 
     var body: some View {
         switch item {
+        case .toolRun(_, let calls) where rollsUp && !isUnrolled && calls.count > 1:
+            if let last = calls.last {
+                ToolCallLine(call: last, lineText: last.turnLine, onClick: { isUnrolled = true }, brightensOnHover: true)
+            }
         case .toolRun(_, let calls):
             VStack(alignment: .leading, spacing: isOpen ? 12 : 4) {
                 ForEach(Array(calls.enumerated()), id: \.offset) { _, call in

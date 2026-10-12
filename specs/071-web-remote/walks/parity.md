@@ -21,7 +21,7 @@ Of 217 rows: **145 same**, **45 by design**, **27 delta** (after #188, #189, #19
 |---|---|---|---|
 | Sidebar and project list | 12 | 4 | 5 |
 | Session rows and states | 16 | 2 | 5 |
-| Chat turns and turn detail | 22 | 4 | 2 |
+| Chat turns and turn detail | 23 | 4 | 2 |
 | Prompt bar and queued prompts | 20 | 3 | 0 |
 | Question and permission cards | 13 | 3 | 0 |
 | Start sheet and new project | 17 | 5 | 0 |
@@ -111,7 +111,8 @@ The deltas are tracked by 29 issues:
 
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
-| Outcome / Steps / Details, and the chooser (069) | View ▸ Turns: `A/Commands/AgentsCommands.swift:113` | ··· ▸ Turns show: `R/Chat/RemoteChatView.swift:265` | A select in the chat's head, kept: `W/views/Chat.tsx:29-37, 193` | **same** |
+| Outcome / Messages / Steps / Details, and the chooser (069, Messages #759) | View ▸ Turns: `A/Commands/AgentsCommands.swift` | ··· ▸ Turns show: `R/Chat/RemoteChatView.swift` | A select in the chat's head, kept: `W/views/Chat.tsx` | **same** |
+| Messages: every step but thinking, a run of calls drawn as its last call until clicked, then as Steps draws it; *N steps* from Outcome opens to Messages (#759) | `TurnDetail.messages` in `K/Model/OutcomePage.swift`, `StepRow` in `S/Chat/TranscriptRows.swift`, toggle in `S/Chat/ChatTranscript.swift` | Shared | `StepRow` in `W/views/chat/Rows.tsx`, toggle in `W/views/Chat.tsx` | **same** (unwalked) |
 | Reconnect catch-up keeps one row per turn and entry id (#221) | `K/Client/AgentsModel.swift`; rows deduplicated in `S/Chat/ChatTranscript.swift` | Shared | `W/model/store.ts` | **same** |
 | Concise turn: prompt, *7 steps*, reply, report; no chevron (#148) | `S/Chat/TranscriptRows.swift:38-158` | Shared | `W/views/chat/Rows.tsx:345-399` (walked, #148) | **same** |
 | An open call: diff, Argument, Return (#153) | `S/Chat/TranscriptRows.swift:572-675` | Shared | `W/views/chat/Rows.tsx:128-187`; unknown pieces shown raw | **same** (#252) |

@@ -38,6 +38,19 @@ struct OutcomePageTests {
         TranscriptEntry.display(entries).turns()[0]
     }
 
+    /// Messages sits between Outcome and Steps, shows steps, and a level stored by name
+    /// before it came still reads back as itself (#759).
+    @Test func messagesIsALevelBetweenOutcomeAndSteps() throws {
+        #expect(TurnDetail.allCases == [.outcome, .messages, .steps, .details])
+        #expect(TurnDetail.messages.showsSteps && TurnDetail.messages.rollsUpCalls)
+        #expect(!TurnDetail.steps.rollsUpCalls && !TurnDetail.details.rollsUpCalls)
+        for stored in ["outcome", "steps", "details"] {
+            #expect(TurnDetail(rawValue: stored)?.rawValue == stored)
+        }
+        let decoded = try JSONDecoder().decode([TurnDetail].self, from: Data(#"["steps","messages"]"#.utf8))
+        #expect(decoded == [.steps, .messages])
+    }
+
     @Test func aTurnIsItsAskAndEverythingAfterIt() throws {
         let turns = TranscriptEntry.display([ask("Fix it"), said("Looking."), call("1", "List files"),
                                              call("2"), said("Fixed.")]).turns()

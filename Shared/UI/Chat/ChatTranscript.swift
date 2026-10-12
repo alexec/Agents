@@ -446,9 +446,11 @@ struct ChatTranscript: View {
             // this lands on it.
             .onChange(of: focusedEntry) {
                 guard let focusedEntry else { return }
-                if let turn = rows.first(where: { $0.items.contains { $0.id == focusedEntry } }),
-                   !(turnViews[turn.id] ?? defaultDetail).showsSteps {
-                    turnViews[turn.id] = .steps
+                if let turn = rows.first(where: { $0.items.contains { $0.id == focusedEntry } }) {
+                    let level = turnViews[turn.id] ?? defaultDetail
+                    // Messages folds a run of calls, so a call is only on screen at Steps (#759).
+                    let isCall = turn.items.contains { if case .toolRun = $0 { $0.id == focusedEntry } else { false } }
+                    if !level.showsSteps || (level.rollsUpCalls && isCall) { turnViews[turn.id] = .steps }
                 }
                 // Being sent to a line in the middle is being sent away from the end,
                 // and it was asked for. Following on from here would take the reader
@@ -499,11 +501,11 @@ struct ChatTranscript: View {
     private var questionWaiting: Bool { cards != nil && !cardsShown }
 
     /// Open a turn's steps, or close them. Open is the app's level when that shows
-    /// steps, and Steps when it does not; closed is always the outcome, never a trip
-    /// through Details.
+    /// steps, and Messages when it does not (#759); closed is always the outcome, never
+    /// a trip through Details.
     private func toggle(_ turn: ChatTurn) {
         let now = turnViews[turn.id] ?? defaultDetail
-        turnViews[turn.id] = now.showsSteps ? .outcome : (defaultDetail.showsSteps ? defaultDetail : .steps)
+        turnViews[turn.id] = now.showsSteps ? .outcome : (defaultDetail.showsSteps ? defaultDetail : .messages)
     }
 
     /// A stored turn's entries, the first time it is drawn with its steps. The ask is
