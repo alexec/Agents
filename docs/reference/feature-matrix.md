@@ -6,14 +6,19 @@ description: Which apps for running several coding agents have which features, A
 # Feature matrix of coding-agent apps
 
 This page lists every app the weekly competitor check has found that runs several coding
-agents at once, against the full set of features found across them. Agents is the first
-row. The other apps follow in alphabetical order.
+agents at once, against the full set of features found across them. Agents is in bold,
+wherever its score puts it.
 
 - ● the app has it, in full.
 - ◐ it has part of it: only by hand, only in an alpha, beta or by request, only on some
   platforms or runtimes, or only through someone else's add-on.
 - ○ it does not.
 - ?⃝ unknown: the app's docs, changelog, README and code did not say either way.
+
+Each table has a **Score** column, and its rows are sorted by it: ● counts 1, ◐ counts 0.5,
+and ○ and ?⃝ count 0, as a percentage of the table's features. An unknown counts as
+missing, so an app with thin docs scores low. [Overall score](#overall-score), after the
+tables, adds every feature up.
 
 The matrix was filled in on 2026-10-12 from each app's own docs, changelog, README,
 releases and, where open, source. Every app is held to the same bar, Agents included: a ●
@@ -138,299 +143,338 @@ Agents has none of these at all:
 
 ## Running agents
 
-| App | Several agents at once | A git worktree per agent | Several runtimes | ACP | Runs with the computer off | Sandboxed tools |
-|---|:-:|:-:|:-:|:-:|:-:|:-:|
-| **Agents** | ● | ● | ● | ● | ◐ | ◐ |
-| Agentastic | ● | ● | ● | ● | ● | ● |
-| Atelier (was Acepe) | ● | ?⃝ | ● | ● | ?⃝ | ?⃝ |
-| Claude Code | ● | ● | ○ | ?⃝ | ● | ● |
-| Claude Squad | ● | ● | ● | ○ | ?⃝ | ?⃝ |
-| CodeAgentSwarm | ● | ● | ● | ◐ | ○ | ◐ |
-| Codeg | ● | ● | ● | ● | ● | ◐ |
-| Conductor | ● | ● | ● | ?⃝ | ● | ◐ |
-| Cursor | ● | ● | ○ | ● | ● | ● |
-| DockTerm | ● | ?⃝ | ○ | ?⃝ | ○ | ?⃝ |
-| Emdash | ● | ● | ● | ● | ● | ?⃝ |
-| GitHub Copilot | ● | ● | ● | ◐ | ● | ● |
-| Happy | ● | ● | ● | ◐ | ● | ● |
-| Helicon | ● | ◐ | ○ | ○ | ● | ?⃝ |
-| Maestro | ● | ● | ● | ?⃝ | ?⃝ | ?⃝ |
-| Nimbalyst | ● | ● | ● | ◐ | ◐ | ● |
-| Nuphos | ● | ?⃝ | ● | ● | ● | ● |
-| OpenAI Codex | ● | ● | ○ | ?⃝ | ● | ● |
-| Parallel Code | ● | ● | ● | ?⃝ | ○ | ● |
-| Paseo | ● | ● | ● | ● | ● | ◐ |
-| Pragma | ● | ● | ● | ◐ | ● | ?⃝ |
-| ReevesAgents | ● | ○ | ● | ?⃝ | ?⃝ | ○ |
-| Roamgate | ● | ● | ● | ?⃝ | ● | ?⃝ |
-| Rove | ● | ● | ● | ?⃝ | ● | ?⃝ |
-| Sculptor | ● | ● | ● | ?⃝ | ?⃝ | ◐ |
-| Superset | ● | ● | ● | ?⃝ | ● | ◐ |
-| T3 Code | ● | ● | ● | ● | ● | ?⃝ |
-| Threadlines | ● | ● | ● | ● | ● | ?⃝ |
-| tuios | ● | ● | ● | ● | ● | ○ |
-| Vibe Kanban | ● | ● | ● | ?⃝ | ● | ?⃝ |
-| VibeiDE | ● | ● | ● | ?⃝ | ○ | ?⃝ |
-| Warp | ● | ● | ● | ?⃝ | ● | ● |
+| App | Several agents at once | A git worktree per agent | Several runtimes | ACP | Runs with the computer off | Sandboxed tools | Score |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|--:|
+| Agentastic | ● | ● | ● | ● | ● | ● | 100% |
+| Codeg | ● | ● | ● | ● | ● | ◐ | 92% |
+| GitHub Copilot | ● | ● | ● | ◐ | ● | ● | 92% |
+| Happy | ● | ● | ● | ◐ | ● | ● | 92% |
+| Paseo | ● | ● | ● | ● | ● | ◐ | 92% |
+| **Agents** | ● | ● | ● | ● | ◐ | ◐ | 83% |
+| Cursor | ● | ● | ○ | ● | ● | ● | 83% |
+| Emdash | ● | ● | ● | ● | ● | ?⃝ | 83% |
+| Nimbalyst | ● | ● | ● | ◐ | ◐ | ● | 83% |
+| Nuphos | ● | ?⃝ | ● | ● | ● | ● | 83% |
+| T3 Code | ● | ● | ● | ● | ● | ?⃝ | 83% |
+| Threadlines | ● | ● | ● | ● | ● | ?⃝ | 83% |
+| tuios | ● | ● | ● | ● | ● | ○ | 83% |
+| Warp | ● | ● | ● | ?⃝ | ● | ● | 83% |
+| Conductor | ● | ● | ● | ?⃝ | ● | ◐ | 75% |
+| Pragma | ● | ● | ● | ◐ | ● | ?⃝ | 75% |
+| Superset | ● | ● | ● | ?⃝ | ● | ◐ | 75% |
+| Claude Code | ● | ● | ○ | ?⃝ | ● | ● | 67% |
+| CodeAgentSwarm | ● | ● | ● | ◐ | ○ | ◐ | 67% |
+| OpenAI Codex | ● | ● | ○ | ?⃝ | ● | ● | 67% |
+| Parallel Code | ● | ● | ● | ?⃝ | ○ | ● | 67% |
+| Roamgate | ● | ● | ● | ?⃝ | ● | ?⃝ | 67% |
+| Rove | ● | ● | ● | ?⃝ | ● | ?⃝ | 67% |
+| Vibe Kanban | ● | ● | ● | ?⃝ | ● | ?⃝ | 67% |
+| Sculptor | ● | ● | ● | ?⃝ | ?⃝ | ◐ | 58% |
+| Atelier (was Acepe) | ● | ?⃝ | ● | ● | ?⃝ | ?⃝ | 50% |
+| Claude Squad | ● | ● | ● | ○ | ?⃝ | ?⃝ | 50% |
+| Maestro | ● | ● | ● | ?⃝ | ?⃝ | ?⃝ | 50% |
+| VibeiDE | ● | ● | ● | ?⃝ | ○ | ?⃝ | 50% |
+| Helicon | ● | ◐ | ○ | ○ | ● | ?⃝ | 42% |
+| ReevesAgents | ● | ○ | ● | ?⃝ | ?⃝ | ○ | 33% |
+| DockTerm | ● | ?⃝ | ○ | ?⃝ | ○ | ?⃝ | 17% |
 
 ## Where you reach it
 
-| App | Windows or Linux desktop | iPhone or iPad app | Android app | Web client | End-to-end encrypted relay | Notifications |
-|---|:-:|:-:|:-:|:-:|:-:|:-:|
-| **Agents** | ○ | ● | ○ | ● | ◐ | ◐ |
-| Agentastic | ○ | ◐ | ○ | ○ | ● | ● |
-| Atelier (was Acepe) | ◐ | ○ | ○ | ○ | ○ | ?⃝ |
-| Claude Code | ● | ● | ● | ● | ○ | ● |
-| Claude Squad | ○ | ○ | ○ | ○ | ○ | ○ |
-| CodeAgentSwarm | ● | ◐ | ◐ | ◐ | ?⃝ | ● |
-| Codeg | ● | ◐ | ◐ | ● | ○ | ● |
-| Conductor | ○ | ◐ | ?⃝ | ?⃝ | ○ | ● |
-| Cursor | ● | ● | ○ | ● | ○ | ● |
-| DockTerm | ● | ○ | ○ | ○ | ○ | ● |
-| Emdash | ● | ○ | ○ | ○ | ○ | ● |
-| GitHub Copilot | ● | ● | ● | ● | ?⃝ | ● |
-| Happy | ● | ● | ● | ● | ● | ● |
-| Helicon | ● | ○ | ○ | ● | ○ | ?⃝ |
-| Maestro | ● | ○ | ○ | ● | ○ | ● |
-| Nimbalyst | ● | ● | ◐ | ◐ | ● | ● |
-| Nuphos | ● | ● | ◐ | ?⃝ | ○ | ?⃝ |
-| OpenAI Codex | ● | ● | ● | ● | ?⃝ | ● |
-| Parallel Code | ● | ○ | ● | ● | ◐ | ● |
-| Paseo | ● | ● | ● | ● | ● | ● |
-| Pragma | ● | ● | ● | ● | ○ | ● |
-| ReevesAgents | ○ | ○ | ○ | ● | ○ | ○ |
-| Roamgate | ◐ | ○ | ○ | ● | ◐ | ● |
-| Rove | ○ | ◐ | ◐ | ○ | ○ | ● |
-| Sculptor | ● | ○ | ○ | ?⃝ | ○ | ● |
-| Superset | ◐ | ● | ○ | ○ | ?⃝ | ● |
-| T3 Code | ● | ● | ● | ● | ◐ | ● |
-| Threadlines | ● | ○ | ○ | ● | ● | ?⃝ |
-| tuios | ○ | ○ | ○ | ● | ○ | ● |
-| Vibe Kanban | ● | ○ | ○ | ● | ?⃝ | ● |
-| VibeiDE | ● | ○ | ○ | ● | ● | ?⃝ |
-| Warp | ● | ○ | ○ | ● | ◐ | ● |
+| App | Windows or Linux desktop | iPhone or iPad app | Android app | Web client | End-to-end encrypted relay | Notifications | Score |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|--:|
+| Happy | ● | ● | ● | ● | ● | ● | 100% |
+| Paseo | ● | ● | ● | ● | ● | ● | 100% |
+| T3 Code | ● | ● | ● | ● | ◐ | ● | 92% |
+| Claude Code | ● | ● | ● | ● | ○ | ● | 83% |
+| GitHub Copilot | ● | ● | ● | ● | ?⃝ | ● | 83% |
+| Nimbalyst | ● | ● | ◐ | ◐ | ● | ● | 83% |
+| OpenAI Codex | ● | ● | ● | ● | ?⃝ | ● | 83% |
+| Pragma | ● | ● | ● | ● | ○ | ● | 83% |
+| Parallel Code | ● | ○ | ● | ● | ◐ | ● | 75% |
+| Codeg | ● | ◐ | ◐ | ● | ○ | ● | 67% |
+| Cursor | ● | ● | ○ | ● | ○ | ● | 67% |
+| CodeAgentSwarm | ● | ◐ | ◐ | ◐ | ?⃝ | ● | 58% |
+| Warp | ● | ○ | ○ | ● | ◐ | ● | 58% |
+| **Agents** | ○ | ● | ○ | ● | ◐ | ◐ | 50% |
+| Maestro | ● | ○ | ○ | ● | ○ | ● | 50% |
+| Roamgate | ◐ | ○ | ○ | ● | ◐ | ● | 50% |
+| Threadlines | ● | ○ | ○ | ● | ● | ?⃝ | 50% |
+| Vibe Kanban | ● | ○ | ○ | ● | ?⃝ | ● | 50% |
+| VibeiDE | ● | ○ | ○ | ● | ● | ?⃝ | 50% |
+| Agentastic | ○ | ◐ | ○ | ○ | ● | ● | 42% |
+| Nuphos | ● | ● | ◐ | ?⃝ | ○ | ?⃝ | 42% |
+| Superset | ◐ | ● | ○ | ○ | ?⃝ | ● | 42% |
+| DockTerm | ● | ○ | ○ | ○ | ○ | ● | 33% |
+| Emdash | ● | ○ | ○ | ○ | ○ | ● | 33% |
+| Helicon | ● | ○ | ○ | ● | ○ | ?⃝ | 33% |
+| Rove | ○ | ◐ | ◐ | ○ | ○ | ● | 33% |
+| Sculptor | ● | ○ | ○ | ?⃝ | ○ | ● | 33% |
+| tuios | ○ | ○ | ○ | ● | ○ | ● | 33% |
+| Conductor | ○ | ◐ | ?⃝ | ?⃝ | ○ | ● | 25% |
+| ReevesAgents | ○ | ○ | ○ | ● | ○ | ○ | 17% |
+| Atelier (was Acepe) | ◐ | ○ | ○ | ○ | ○ | ?⃝ | 8% |
+| Claude Squad | ○ | ○ | ○ | ○ | ○ | ○ | 0% |
 
 ## Following and answering
 
-| App | Shows who needs you | Sessions side by side | Sessions as a tree | Send while it works | Voice or dictation | Rich cards in replies |
-|---|:-:|:-:|:-:|:-:|:-:|:-:|
-| **Agents** | ● | ○ | ○ | ● | ● | ◐ |
-| Agentastic | ● | ● | ● | ● | ◐ | ● |
-| Atelier (was Acepe) | ● | ● | ◐ | ● | ● | ○ |
-| Claude Code | ● | ● | ● | ● | ● | ◐ |
-| Claude Squad | ● | ?⃝ | ○ | ?⃝ | ?⃝ | ○ |
-| CodeAgentSwarm | ● | ● | ◐ | ?⃝ | ?⃝ | ?⃝ |
-| Codeg | ● | ● | ◐ | ● | ?⃝ | ● |
-| Conductor | ● | ?⃝ | ?⃝ | ● | ?⃝ | ◐ |
-| Cursor | ● | ● | ?⃝ | ● | ● | ● |
-| DockTerm | ● | ● | ◐ | ?⃝ | ● | ?⃝ |
-| Emdash | ● | ● | ?⃝ | ● | ◐ | ◐ |
-| GitHub Copilot | ● | ● | ● | ● | ● | ● |
-| Happy | ● | ?⃝ | ◐ | ● | ● | ● |
-| Helicon | ● | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ |
-| Maestro | ● | ● | ◐ | ● | ?⃝ | ◐ |
-| Nimbalyst | ● | ?⃝ | ● | ● | ● | ● |
-| Nuphos | ?⃝ | ● | ● | ● | ◐ | ● |
-| OpenAI Codex | ● | ● | ◐ | ● | ● | ◐ |
-| Parallel Code | ● | ● | ● | ● | ◐ | ○ |
-| Paseo | ● | ● | ◐ | ● | ● | ◐ |
-| Pragma | ● | ● | ◐ | ● | ?⃝ | ◐ |
-| ReevesAgents | ?⃝ | ● | ?⃝ | ● | ○ | ○ |
-| Roamgate | ● | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ |
-| Rove | ● | ?⃝ | ?⃝ | ● | ?⃝ | ○ |
-| Sculptor | ● | ?⃝ | ◐ | ?⃝ | ?⃝ | ◐ |
-| Superset | ● | ● | ◐ | ● | ?⃝ | ◐ |
-| T3 Code | ● | ?⃝ | ◐ | ● | ◐ | ● |
-| Threadlines | ● | ?⃝ | ● | ● | ● | ?⃝ |
-| tuios | ● | ● | ◐ | ● | ?⃝ | ○ |
-| Vibe Kanban | ● | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ |
-| VibeiDE | ?⃝ | ● | ?⃝ | ?⃝ | ● | ?⃝ |
-| Warp | ● | ● | ◐ | ● | ● | ● |
+| App | Shows who needs you | Sessions side by side | Sessions as a tree | Send while it works | Voice or dictation | Rich cards in replies | Score |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|--:|
+| GitHub Copilot | ● | ● | ● | ● | ● | ● | 100% |
+| Agentastic | ● | ● | ● | ● | ◐ | ● | 92% |
+| Claude Code | ● | ● | ● | ● | ● | ◐ | 92% |
+| Warp | ● | ● | ◐ | ● | ● | ● | 92% |
+| Cursor | ● | ● | ?⃝ | ● | ● | ● | 83% |
+| Nimbalyst | ● | ?⃝ | ● | ● | ● | ● | 83% |
+| OpenAI Codex | ● | ● | ◐ | ● | ● | ◐ | 83% |
+| Paseo | ● | ● | ◐ | ● | ● | ◐ | 83% |
+| Atelier (was Acepe) | ● | ● | ◐ | ● | ● | ○ | 75% |
+| Codeg | ● | ● | ◐ | ● | ?⃝ | ● | 75% |
+| Happy | ● | ?⃝ | ◐ | ● | ● | ● | 75% |
+| Nuphos | ?⃝ | ● | ● | ● | ◐ | ● | 75% |
+| Parallel Code | ● | ● | ● | ● | ◐ | ○ | 75% |
+| Emdash | ● | ● | ?⃝ | ● | ◐ | ◐ | 67% |
+| Maestro | ● | ● | ◐ | ● | ?⃝ | ◐ | 67% |
+| Pragma | ● | ● | ◐ | ● | ?⃝ | ◐ | 67% |
+| Superset | ● | ● | ◐ | ● | ?⃝ | ◐ | 67% |
+| T3 Code | ● | ?⃝ | ◐ | ● | ◐ | ● | 67% |
+| Threadlines | ● | ?⃝ | ● | ● | ● | ?⃝ | 67% |
+| **Agents** | ● | ○ | ○ | ● | ● | ◐ | 58% |
+| DockTerm | ● | ● | ◐ | ?⃝ | ● | ?⃝ | 58% |
+| tuios | ● | ● | ◐ | ● | ?⃝ | ○ | 58% |
+| CodeAgentSwarm | ● | ● | ◐ | ?⃝ | ?⃝ | ?⃝ | 42% |
+| Conductor | ● | ?⃝ | ?⃝ | ● | ?⃝ | ◐ | 42% |
+| Helicon | ● | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | 33% |
+| ReevesAgents | ?⃝ | ● | ?⃝ | ● | ○ | ○ | 33% |
+| Roamgate | ● | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 33% |
+| Rove | ● | ?⃝ | ?⃝ | ● | ?⃝ | ○ | 33% |
+| Sculptor | ● | ?⃝ | ◐ | ?⃝ | ?⃝ | ◐ | 33% |
+| Vibe Kanban | ● | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | 33% |
+| VibeiDE | ?⃝ | ● | ?⃝ | ?⃝ | ● | ?⃝ | 33% |
+| Claude Squad | ● | ?⃝ | ○ | ?⃝ | ?⃝ | ○ | 17% |
 
 ## Reviewing work
 
-| App | Diff review | Pull requests | Git hosts beyond GitHub | CI checks | A second agent reviews |
-|---|:-:|:-:|:-:|:-:|:-:|
-| **Agents** | ● | ◐ | ○ | ● | ◐ |
-| Agentastic | ● | ● | ◐ | ● | ● |
-| Atelier (was Acepe) | ● | ● | ○ | ● | ?⃝ |
-| Claude Code | ● | ● | ◐ | ● | ◐ |
-| Claude Squad | ● | ?⃝ | ○ | ?⃝ | ○ |
-| CodeAgentSwarm | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ |
-| Codeg | ● | ● | ● | ● | ◐ |
-| Conductor | ● | ● | ?⃝ | ● | ● |
-| Cursor | ● | ● | ● | ● | ● |
-| DockTerm | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ |
-| Emdash | ● | ● | ○ | ● | ?⃝ |
-| GitHub Copilot | ● | ● | ● | ● | ● |
-| Happy | ● | ?⃝ | ?⃝ | ?⃝ | ◐ |
-| Helicon | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ |
-| Maestro | ● | ● | ?⃝ | ?⃝ | ◐ |
-| Nimbalyst | ● | ● | ○ | ● | ?⃝ |
-| Nuphos | ◐ | ● | ● | ● | ?⃝ |
-| OpenAI Codex | ● | ● | ◐ | ?⃝ | ● |
-| Parallel Code | ● | ● | ?⃝ | ● | ?⃝ |
-| Paseo | ● | ● | ● | ● | ◐ |
-| Pragma | ● | ● | ?⃝ | ● | ?⃝ |
-| ReevesAgents | ○ | ○ | ?⃝ | ○ | ?⃝ |
-| Roamgate | ● | ● | ● | ● | ?⃝ |
-| Rove | ● | ● | ?⃝ | ● | ?⃝ |
-| Sculptor | ● | ● | ?⃝ | ● | ● |
-| Superset | ● | ● | ○ | ● | ◐ |
-| T3 Code | ● | ● | ● | ● | ?⃝ |
-| Threadlines | ● | ● | ● | ● | ● |
-| tuios | ● | ● | ?⃝ | ● | ?⃝ |
-| Vibe Kanban | ● | ● | ● | ?⃝ | ?⃝ |
-| VibeiDE | ● | ?⃝ | ?⃝ | ?⃝ | ● |
-| Warp | ● | ?⃝ | ● | ?⃝ | ● |
+| App | Diff review | Pull requests | Git hosts beyond GitHub | CI checks | A second agent reviews | Score |
+|---|:-:|:-:|:-:|:-:|:-:|--:|
+| Cursor | ● | ● | ● | ● | ● | 100% |
+| GitHub Copilot | ● | ● | ● | ● | ● | 100% |
+| Threadlines | ● | ● | ● | ● | ● | 100% |
+| Agentastic | ● | ● | ◐ | ● | ● | 90% |
+| Codeg | ● | ● | ● | ● | ◐ | 90% |
+| Paseo | ● | ● | ● | ● | ◐ | 90% |
+| Claude Code | ● | ● | ◐ | ● | ◐ | 80% |
+| Conductor | ● | ● | ?⃝ | ● | ● | 80% |
+| Roamgate | ● | ● | ● | ● | ?⃝ | 80% |
+| Sculptor | ● | ● | ?⃝ | ● | ● | 80% |
+| T3 Code | ● | ● | ● | ● | ?⃝ | 80% |
+| Nuphos | ◐ | ● | ● | ● | ?⃝ | 70% |
+| OpenAI Codex | ● | ● | ◐ | ?⃝ | ● | 70% |
+| Superset | ● | ● | ○ | ● | ◐ | 70% |
+| **Agents** | ● | ◐ | ○ | ● | ◐ | 60% |
+| Atelier (was Acepe) | ● | ● | ○ | ● | ?⃝ | 60% |
+| Emdash | ● | ● | ○ | ● | ?⃝ | 60% |
+| Nimbalyst | ● | ● | ○ | ● | ?⃝ | 60% |
+| Parallel Code | ● | ● | ?⃝ | ● | ?⃝ | 60% |
+| Pragma | ● | ● | ?⃝ | ● | ?⃝ | 60% |
+| Rove | ● | ● | ?⃝ | ● | ?⃝ | 60% |
+| tuios | ● | ● | ?⃝ | ● | ?⃝ | 60% |
+| Vibe Kanban | ● | ● | ● | ?⃝ | ?⃝ | 60% |
+| Warp | ● | ?⃝ | ● | ?⃝ | ● | 60% |
+| Maestro | ● | ● | ?⃝ | ?⃝ | ◐ | 50% |
+| VibeiDE | ● | ?⃝ | ?⃝ | ?⃝ | ● | 40% |
+| Happy | ● | ?⃝ | ?⃝ | ?⃝ | ◐ | 30% |
+| Claude Squad | ● | ?⃝ | ○ | ?⃝ | ○ | 20% |
+| CodeAgentSwarm | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 20% |
+| DockTerm | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 20% |
+| Helicon | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 20% |
+| ReevesAgents | ○ | ○ | ?⃝ | ○ | ?⃝ | 0% |
 
 ## Tools in the app
 
-| App | Terminal | Browser or preview | A browser the agent drives | Simulator or emulator panes | File editor | Language servers in the editor |
-|---|:-:|:-:|:-:|:-:|:-:|:-:|
-| **Agents** | ● | ◐ | ○ | ○ | ● | ○ |
-| Agentastic | ● | ● | ● | ?⃝ | ● | ● |
-| Atelier (was Acepe) | ?⃝ | ● | ● | ?⃝ | ● | ● |
-| Claude Code | ● | ● | ● | ◐ | ● | ?⃝ |
-| Claude Squad | ● | ?⃝ | ○ | ○ | ?⃝ | ○ |
-| CodeAgentSwarm | ● | ?⃝ | ◐ | ?⃝ | ○ | ○ |
-| Codeg | ● | ● | ● | ?⃝ | ● | ?⃝ |
-| Conductor | ● | ◐ | ?⃝ | ?⃝ | ● | ?⃝ |
-| Cursor | ● | ● | ● | ?⃝ | ● | ● |
-| DockTerm | ● | ?⃝ | ○ | ○ | ● | ○ |
-| Emdash | ● | ● | ?⃝ | ?⃝ | ● | ● |
-| GitHub Copilot | ● | ● | ● | ?⃝ | ● | ● |
-| Happy | ● | ?⃝ | ?⃝ | ○ | ?⃝ | ?⃝ |
-| Helicon | ○ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ○ |
-| Maestro | ● | ● | ● | ?⃝ | ● | ?⃝ |
-| Nimbalyst | ● | ● | ● | ?⃝ | ● | ◐ |
-| Nuphos | ● | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ |
-| OpenAI Codex | ● | ● | ● | ?⃝ | ?⃝ | ?⃝ |
-| Parallel Code | ● | ● | ○ | ?⃝ | ?⃝ | ?⃝ |
-| Paseo | ● | ● | ● | ?⃝ | ● | ○ |
-| Pragma | ● | ● | ● | ?⃝ | ● | ?⃝ |
-| ReevesAgents | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ |
-| Roamgate | ● | ◐ | ?⃝ | ?⃝ | ?⃝ | ○ |
-| Rove | ● | ◐ | ?⃝ | ?⃝ | ?⃝ | ○ |
-| Sculptor | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ |
-| Superset | ● | ● | ● | ◐ | ● | ?⃝ |
-| T3 Code | ● | ● | ● | ● | ● | ○ |
-| Threadlines | ● | ● | ● | ?⃝ | ?⃝ | ?⃝ |
-| tuios | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ |
-| Vibe Kanban | ● | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ |
-| VibeiDE | ● | ?⃝ | ◐ | ?⃝ | ?⃝ | ?⃝ |
-| Warp | ● | ?⃝ | ◐ | ?⃝ | ● | ● |
+| App | Terminal | Browser or preview | A browser the agent drives | Simulator or emulator panes | File editor | Language servers in the editor | Score |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|--:|
+| Agentastic | ● | ● | ● | ?⃝ | ● | ● | 83% |
+| Cursor | ● | ● | ● | ?⃝ | ● | ● | 83% |
+| GitHub Copilot | ● | ● | ● | ?⃝ | ● | ● | 83% |
+| T3 Code | ● | ● | ● | ● | ● | ○ | 83% |
+| Claude Code | ● | ● | ● | ◐ | ● | ?⃝ | 75% |
+| Nimbalyst | ● | ● | ● | ?⃝ | ● | ◐ | 75% |
+| Superset | ● | ● | ● | ◐ | ● | ?⃝ | 75% |
+| Atelier (was Acepe) | ?⃝ | ● | ● | ?⃝ | ● | ● | 67% |
+| Codeg | ● | ● | ● | ?⃝ | ● | ?⃝ | 67% |
+| Emdash | ● | ● | ?⃝ | ?⃝ | ● | ● | 67% |
+| Maestro | ● | ● | ● | ?⃝ | ● | ?⃝ | 67% |
+| Paseo | ● | ● | ● | ?⃝ | ● | ○ | 67% |
+| Pragma | ● | ● | ● | ?⃝ | ● | ?⃝ | 67% |
+| Warp | ● | ?⃝ | ◐ | ?⃝ | ● | ● | 58% |
+| OpenAI Codex | ● | ● | ● | ?⃝ | ?⃝ | ?⃝ | 50% |
+| Threadlines | ● | ● | ● | ?⃝ | ?⃝ | ?⃝ | 50% |
+| **Agents** | ● | ◐ | ○ | ○ | ● | ○ | 42% |
+| Conductor | ● | ◐ | ?⃝ | ?⃝ | ● | ?⃝ | 42% |
+| DockTerm | ● | ?⃝ | ○ | ○ | ● | ○ | 33% |
+| Nuphos | ● | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 33% |
+| Parallel Code | ● | ● | ○ | ?⃝ | ?⃝ | ?⃝ | 33% |
+| Vibe Kanban | ● | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 33% |
+| CodeAgentSwarm | ● | ?⃝ | ◐ | ?⃝ | ○ | ○ | 25% |
+| Roamgate | ● | ◐ | ?⃝ | ?⃝ | ?⃝ | ○ | 25% |
+| Rove | ● | ◐ | ?⃝ | ?⃝ | ?⃝ | ○ | 25% |
+| VibeiDE | ● | ?⃝ | ◐ | ?⃝ | ?⃝ | ?⃝ | 25% |
+| Claude Squad | ● | ?⃝ | ○ | ○ | ?⃝ | ○ | 17% |
+| Happy | ● | ?⃝ | ?⃝ | ○ | ?⃝ | ?⃝ | 17% |
+| ReevesAgents | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 17% |
+| Sculptor | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 17% |
+| tuios | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 17% |
+| Helicon | ○ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ○ | 0% |
 
 ## Tasks and automation
 
-| App | Task board | Starts agents from issues | Trackers beyond GitHub | Scheduled or triggered runs | Agents start agents | The app's own tools for agents |
-|---|:-:|:-:|:-:|:-:|:-:|:-:|
-| **Agents** | ○ | ◐ | ○ | ● | ● | ● |
-| Agentastic | ● | ● | ● | ● | ● | ● |
-| Atelier (was Acepe) | ● | ?⃝ | ● | ?⃝ | ?⃝ | ● |
-| Claude Code | ?⃝ | ● | ◐ | ● | ● | ● |
-| Claude Squad | ?⃝ | ?⃝ | ○ | ?⃝ | ?⃝ | ?⃝ |
-| CodeAgentSwarm | ● | ?⃝ | ◐ | ?⃝ | ● | ● |
-| Codeg | ● | ● | ● | ● | ● | ● |
-| Conductor | ?⃝ | ● | ● | ● | ◐ | ● |
-| Cursor | ?⃝ | ● | ● | ● | ● | ● |
-| DockTerm | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ |
-| Emdash | ○ | ● | ● | ● | ?⃝ | ○ |
-| GitHub Copilot | ?⃝ | ● | ● | ● | ● | ● |
-| Happy | ?⃝ | ?⃝ | ?⃝ | ● | ● | ● |
-| Helicon | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ |
-| Maestro | ?⃝ | ● | ?⃝ | ● | ● | ● |
-| Nimbalyst | ● | ?⃝ | ◐ | ● | ● | ● |
-| Nuphos | ?⃝ | ?⃝ | ● | ● | ● | ● |
-| OpenAI Codex | ?⃝ | ● | ● | ● | ● | ● |
-| Parallel Code | ?⃝ | ● | ◐ | ?⃝ | ● | ● |
-| Paseo | ?⃝ | ● | ○ | ● | ● | ● |
-| Pragma | ● | ◐ | ?⃝ | ● | ● | ● |
-| ReevesAgents | ?⃝ | ○ | ?⃝ | ○ | ● | ● |
-| Roamgate | ?⃝ | ?⃝ | ?⃝ | ◐ | ◐ | ?⃝ |
-| Rove | ● | ● | ◐ | ● | ● | ● |
-| Sculptor | ?⃝ | ?⃝ | ● | ◐ | ?⃝ | ● |
-| Superset | ● | ● | ● | ● | ● | ● |
-| T3 Code | ?⃝ | ?⃝ | ○ | ● | ● | ● |
-| Threadlines | ?⃝ | ?⃝ | ?⃝ | ◐ | ● | ● |
-| tuios | ?⃝ | ?⃝ | ?⃝ | ◐ | ● | ● |
-| Vibe Kanban | ○ | ?⃝ | ?⃝ | ?⃝ | ● | ● |
-| VibeiDE | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ |
-| Warp | ?⃝ | ● | ● | ● | ● | ● |
+| App | Task board | Starts agents from issues | Trackers beyond GitHub | Scheduled or triggered runs | Agents start agents | The app's own tools for agents | Score |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|--:|
+| Agentastic | ● | ● | ● | ● | ● | ● | 100% |
+| Codeg | ● | ● | ● | ● | ● | ● | 100% |
+| Superset | ● | ● | ● | ● | ● | ● | 100% |
+| Rove | ● | ● | ◐ | ● | ● | ● | 92% |
+| Cursor | ?⃝ | ● | ● | ● | ● | ● | 83% |
+| GitHub Copilot | ?⃝ | ● | ● | ● | ● | ● | 83% |
+| OpenAI Codex | ?⃝ | ● | ● | ● | ● | ● | 83% |
+| Warp | ?⃝ | ● | ● | ● | ● | ● | 83% |
+| Claude Code | ?⃝ | ● | ◐ | ● | ● | ● | 75% |
+| Conductor | ?⃝ | ● | ● | ● | ◐ | ● | 75% |
+| Nimbalyst | ● | ?⃝ | ◐ | ● | ● | ● | 75% |
+| Pragma | ● | ◐ | ?⃝ | ● | ● | ● | 75% |
+| Maestro | ?⃝ | ● | ?⃝ | ● | ● | ● | 67% |
+| Nuphos | ?⃝ | ?⃝ | ● | ● | ● | ● | 67% |
+| Paseo | ?⃝ | ● | ○ | ● | ● | ● | 67% |
+| **Agents** | ○ | ◐ | ○ | ● | ● | ● | 58% |
+| CodeAgentSwarm | ● | ?⃝ | ◐ | ?⃝ | ● | ● | 58% |
+| Parallel Code | ?⃝ | ● | ◐ | ?⃝ | ● | ● | 58% |
+| Atelier (was Acepe) | ● | ?⃝ | ● | ?⃝ | ?⃝ | ● | 50% |
+| Emdash | ○ | ● | ● | ● | ?⃝ | ○ | 50% |
+| Happy | ?⃝ | ?⃝ | ?⃝ | ● | ● | ● | 50% |
+| T3 Code | ?⃝ | ?⃝ | ○ | ● | ● | ● | 50% |
+| Sculptor | ?⃝ | ?⃝ | ● | ◐ | ?⃝ | ● | 42% |
+| Threadlines | ?⃝ | ?⃝ | ?⃝ | ◐ | ● | ● | 42% |
+| tuios | ?⃝ | ?⃝ | ?⃝ | ◐ | ● | ● | 42% |
+| ReevesAgents | ?⃝ | ○ | ?⃝ | ○ | ● | ● | 33% |
+| Vibe Kanban | ○ | ?⃝ | ?⃝ | ?⃝ | ● | ● | 33% |
+| Roamgate | ?⃝ | ?⃝ | ?⃝ | ◐ | ◐ | ?⃝ | 17% |
+| VibeiDE | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 17% |
+| Claude Squad | ?⃝ | ?⃝ | ○ | ?⃝ | ?⃝ | ?⃝ | 0% |
+| DockTerm | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 0% |
+| Helicon | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 0% |
 
 ## Extensions, accounts and cost
 
-| App | MCP or skills catalogue | Plugins | Usage or cost | Spending limits | Several accounts per runtime | Switch when allowance runs out |
-|---|:-:|:-:|:-:|:-:|:-:|:-:|
-| **Agents** | ● | ○ | ● | ◐ | ○ | ◐ |
-| Agentastic | ● | ● | ● | ?⃝ | ● | ?⃝ |
-| Atelier (was Acepe) | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ |
-| Claude Code | ● | ● | ● | ● | ?⃝ | ?⃝ |
-| Claude Squad | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ |
-| CodeAgentSwarm | ● | ?⃝ | ● | ● | ● | ◐ |
-| Codeg | ● | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ |
-| Conductor | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ |
-| Cursor | ● | ● | ● | ● | ?⃝ | ?⃝ |
-| DockTerm | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ |
-| Emdash | ● | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ |
-| GitHub Copilot | ● | ● | ● | ● | ● | ?⃝ |
-| Happy | ?⃝ | ?⃝ | ● | ?⃝ | ● | ● |
-| Helicon | ?⃝ | ?⃝ | ● | ?⃝ | ● | ?⃝ |
-| Maestro | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ |
-| Nimbalyst | ● | ● | ● | ◐ | ?⃝ | ?⃝ |
-| Nuphos | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ |
-| OpenAI Codex | ● | ● | ● | ● | ?⃝ | ?⃝ |
-| Parallel Code | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ |
-| Paseo | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ |
-| Pragma | ?⃝ | ● | ● | ?⃝ | ● | ● |
-| ReevesAgents | ?⃝ | ?⃝ | ○ | ○ | ?⃝ | ?⃝ |
-| Roamgate | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ |
-| Rove | ?⃝ | ● | ● | ?⃝ | ?⃝ | ◐ |
-| Sculptor | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ |
-| Superset | ?⃝ | ?⃝ | ● | ?⃝ | ● | ?⃝ |
-| T3 Code | ?⃝ | ?⃝ | ● | ?⃝ | ● | ◐ |
-| Threadlines | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ |
-| tuios | ?⃝ | ● | ◐ | ?⃝ | ?⃝ | ?⃝ |
-| Vibe Kanban | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ |
-| VibeiDE | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ |
-| Warp | ● | ?⃝ | ● | ● | ◐ | ?⃝ |
+| App | MCP or skills catalogue | Plugins | Usage or cost | Spending limits | Several accounts per runtime | Switch when allowance runs out | Score |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|--:|
+| GitHub Copilot | ● | ● | ● | ● | ● | ?⃝ | 83% |
+| CodeAgentSwarm | ● | ?⃝ | ● | ● | ● | ◐ | 75% |
+| Agentastic | ● | ● | ● | ?⃝ | ● | ?⃝ | 67% |
+| Claude Code | ● | ● | ● | ● | ?⃝ | ?⃝ | 67% |
+| Cursor | ● | ● | ● | ● | ?⃝ | ?⃝ | 67% |
+| OpenAI Codex | ● | ● | ● | ● | ?⃝ | ?⃝ | 67% |
+| Pragma | ?⃝ | ● | ● | ?⃝ | ● | ● | 67% |
+| Nimbalyst | ● | ● | ● | ◐ | ?⃝ | ?⃝ | 58% |
+| Warp | ● | ?⃝ | ● | ● | ◐ | ?⃝ | 58% |
+| **Agents** | ● | ○ | ● | ◐ | ○ | ◐ | 50% |
+| Happy | ?⃝ | ?⃝ | ● | ?⃝ | ● | ● | 50% |
+| Maestro | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ | 50% |
+| Paseo | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ | 50% |
+| Threadlines | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ | 50% |
+| Rove | ?⃝ | ● | ● | ?⃝ | ?⃝ | ◐ | 42% |
+| T3 Code | ?⃝ | ?⃝ | ● | ?⃝ | ● | ◐ | 42% |
+| Codeg | ● | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 33% |
+| Emdash | ● | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 33% |
+| Helicon | ?⃝ | ?⃝ | ● | ?⃝ | ● | ?⃝ | 33% |
+| Superset | ?⃝ | ?⃝ | ● | ?⃝ | ● | ?⃝ | 33% |
+| tuios | ?⃝ | ● | ◐ | ?⃝ | ?⃝ | ?⃝ | 25% |
+| Atelier (was Acepe) | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 17% |
+| DockTerm | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 17% |
+| Nuphos | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 17% |
+| Parallel Code | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 17% |
+| Sculptor | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 17% |
+| Vibe Kanban | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 17% |
+| VibeiDE | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 17% |
+| Claude Squad | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 0% |
+| Conductor | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 0% |
+| ReevesAgents | ?⃝ | ?⃝ | ○ | ○ | ?⃝ | ?⃝ | 0% |
+| Roamgate | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 0% |
 
 ## Organising
 
-| App | Labels or tags | Pins | Archive | Teams | Open source | Self-hosted |
-|---|:-:|:-:|:-:|:-:|:-:|:-:|
-| **Agents** | ● | ● | ● | ○ | ● | ● |
-| Agentastic | ?⃝ | ?⃝ | ● | ?⃝ | ○ | ● |
-| Atelier (was Acepe) | ?⃝ | ?⃝ | ● | ?⃝ | ● | ● |
-| Claude Code | ?⃝ | ● | ● | ● | ○ | ● |
-| Claude Squad | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ● | ● |
-| CodeAgentSwarm | ● | ?⃝ | ?⃝ | ?⃝ | ○ | ○ |
-| Codeg | ● | ● | ?⃝ | ● | ● | ● |
-| Conductor | ?⃝ | ● | ● | ● | ○ | ● |
-| Cursor | ?⃝ | ● | ● | ● | ○ | ○ |
-| DockTerm | ?⃝ | ?⃝ | ?⃝ | ○ | ● | ● |
-| Emdash | ?⃝ | ● | ● | ?⃝ | ● | ● |
-| GitHub Copilot | ?⃝ | ● | ● | ● | ○ | ?⃝ |
-| Happy | ?⃝ | ?⃝ | ● | ● | ● | ● |
-| Helicon | ?⃝ | ● | ● | ?⃝ | ● | ● |
-| Maestro | ?⃝ | ● | ?⃝ | ?⃝ | ● | ● |
-| Nimbalyst | ● | ● | ● | ◐ | ● | ◐ |
-| Nuphos | ?⃝ | ● | ?⃝ | ● | ● | ● |
-| OpenAI Codex | ?⃝ | ● | ● | ● | ◐ | ◐ |
-| Parallel Code | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ● | ● |
-| Paseo | ● | ● | ● | ● | ● | ● |
-| Pragma | ?⃝ | ● | ?⃝ | ?⃝ | ● | ● |
-| ReevesAgents | ?⃝ | ?⃝ | ● | ?⃝ | ● | ● |
-| Roamgate | ?⃝ | ● | ?⃝ | ?⃝ | ● | ● |
-| Rove | ?⃝ | ● | ○ | ?⃝ | ● | ● |
-| Sculptor | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ● | ● |
-| Superset | ● | ● | ● | ● | ○ | ● |
-| T3 Code | ?⃝ | ● | ● | ?⃝ | ● | ● |
-| Threadlines | ?⃝ | ● | ● | ?⃝ | ● | ● |
-| tuios | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ● | ● |
-| Vibe Kanban | ○ | ● | ● | ○ | ● | ● |
-| VibeiDE | ?⃝ | ?⃝ | ?⃝ | ◐ | ○ | ?⃝ |
-| Warp | ?⃝ | ● | ?⃝ | ● | ◐ | ◐ |
+| App | Labels or tags | Pins | Archive | Teams | Open source | Self-hosted | Score |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|--:|
+| Paseo | ● | ● | ● | ● | ● | ● | 100% |
+| **Agents** | ● | ● | ● | ○ | ● | ● | 83% |
+| Codeg | ● | ● | ?⃝ | ● | ● | ● | 83% |
+| Nimbalyst | ● | ● | ● | ◐ | ● | ◐ | 83% |
+| Superset | ● | ● | ● | ● | ○ | ● | 83% |
+| Claude Code | ?⃝ | ● | ● | ● | ○ | ● | 67% |
+| Conductor | ?⃝ | ● | ● | ● | ○ | ● | 67% |
+| Emdash | ?⃝ | ● | ● | ?⃝ | ● | ● | 67% |
+| Happy | ?⃝ | ?⃝ | ● | ● | ● | ● | 67% |
+| Helicon | ?⃝ | ● | ● | ?⃝ | ● | ● | 67% |
+| Nuphos | ?⃝ | ● | ?⃝ | ● | ● | ● | 67% |
+| OpenAI Codex | ?⃝ | ● | ● | ● | ◐ | ◐ | 67% |
+| T3 Code | ?⃝ | ● | ● | ?⃝ | ● | ● | 67% |
+| Threadlines | ?⃝ | ● | ● | ?⃝ | ● | ● | 67% |
+| Vibe Kanban | ○ | ● | ● | ○ | ● | ● | 67% |
+| Atelier (was Acepe) | ?⃝ | ?⃝ | ● | ?⃝ | ● | ● | 50% |
+| Cursor | ?⃝ | ● | ● | ● | ○ | ○ | 50% |
+| GitHub Copilot | ?⃝ | ● | ● | ● | ○ | ?⃝ | 50% |
+| Maestro | ?⃝ | ● | ?⃝ | ?⃝ | ● | ● | 50% |
+| Pragma | ?⃝ | ● | ?⃝ | ?⃝ | ● | ● | 50% |
+| ReevesAgents | ?⃝ | ?⃝ | ● | ?⃝ | ● | ● | 50% |
+| Roamgate | ?⃝ | ● | ?⃝ | ?⃝ | ● | ● | 50% |
+| Rove | ?⃝ | ● | ○ | ?⃝ | ● | ● | 50% |
+| Warp | ?⃝ | ● | ?⃝ | ● | ◐ | ◐ | 50% |
+| Agentastic | ?⃝ | ?⃝ | ● | ?⃝ | ○ | ● | 33% |
+| Claude Squad | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ● | ● | 33% |
+| DockTerm | ?⃝ | ?⃝ | ?⃝ | ○ | ● | ● | 33% |
+| Parallel Code | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ● | ● | 33% |
+| Sculptor | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ● | ● | 33% |
+| tuios | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ● | ● | 33% |
+| CodeAgentSwarm | ● | ?⃝ | ?⃝ | ?⃝ | ○ | ○ | 17% |
+| VibeiDE | ?⃝ | ?⃝ | ?⃝ | ◐ | ○ | ?⃝ | 8% |
+
+## Overall score
+
+Each app's score in every table, and overall: its points over all 47 features. Sorted by the overall score.
+
+| Rank | App | Running | Reach | Following | Reviewing | Tools | Tasks | Extensions | Organising | Overall |
+|--:|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
+| 1 | GitHub Copilot | 92% | 83% | 100% | 100% | 83% | 83% | 83% | 50% | **84%** |
+| 2 | Paseo | 92% | 100% | 83% | 90% | 67% | 67% | 50% | 100% | **81%** |
+| 3 | Cursor | 83% | 67% | 83% | 100% | 83% | 83% | 67% | 50% | **77%** |
+| 4 | Agentastic | 100% | 42% | 92% | 90% | 83% | 100% | 67% | 33% | **76%** |
+| 4 | Claude Code | 67% | 83% | 92% | 80% | 75% | 75% | 67% | 67% | **76%** |
+| 4 | Codeg | 92% | 67% | 75% | 90% | 67% | 100% | 33% | 83% | **76%** |
+| 4 | Nimbalyst | 83% | 83% | 83% | 60% | 75% | 75% | 58% | 83% | **76%** |
+| 8 | OpenAI Codex | 67% | 83% | 83% | 70% | 50% | 83% | 67% | 67% | **71%** |
+| 9 | T3 Code | 83% | 92% | 67% | 80% | 83% | 50% | 42% | 67% | **70%** |
+| 10 | Pragma | 75% | 83% | 67% | 60% | 67% | 75% | 67% | 50% | **68%** |
+| 10 | Superset | 75% | 42% | 67% | 70% | 75% | 100% | 33% | 83% | **68%** |
+| 10 | Warp | 83% | 58% | 92% | 60% | 58% | 83% | 58% | 50% | **68%** |
+| 13 | Threadlines | 83% | 50% | 67% | 100% | 50% | 42% | 50% | 67% | **63%** |
+| 14 | **Agents** | 83% | 50% | 58% | 60% | 42% | 58% | 50% | 83% | **61%** |
+| 14 | Happy | 92% | 100% | 75% | 30% | 17% | 50% | 50% | 67% | **61%** |
+| 16 | Emdash | 83% | 33% | 67% | 60% | 67% | 50% | 33% | 67% | **57%** |
+| 17 | Maestro | 50% | 50% | 67% | 50% | 67% | 67% | 50% | 50% | **56%** |
+| 17 | Nuphos | 83% | 42% | 75% | 70% | 33% | 67% | 17% | 67% | **56%** |
+| 19 | Parallel Code | 67% | 75% | 75% | 60% | 33% | 58% | 17% | 33% | **52%** |
+| 20 | Conductor | 75% | 25% | 42% | 80% | 42% | 75% | 0% | 67% | **50%** |
+| 20 | Rove | 67% | 33% | 33% | 60% | 25% | 92% | 42% | 50% | **50%** |
+| 22 | Atelier (was Acepe) | 50% | 8% | 75% | 60% | 67% | 50% | 17% | 50% | **47%** |
+| 23 | CodeAgentSwarm | 67% | 58% | 42% | 20% | 25% | 58% | 75% | 17% | **46%** |
+| 24 | Vibe Kanban | 67% | 50% | 33% | 60% | 33% | 33% | 17% | 67% | **45%** |
+| 25 | tuios | 83% | 33% | 58% | 60% | 17% | 42% | 25% | 33% | **44%** |
+| 26 | Roamgate | 67% | 50% | 33% | 80% | 25% | 17% | 0% | 50% | **39%** |
+| 27 | Sculptor | 58% | 33% | 33% | 80% | 17% | 42% | 17% | 33% | **38%** |
+| 28 | VibeiDE | 50% | 50% | 33% | 40% | 25% | 17% | 17% | 8% | **30%** |
+| 29 | Helicon | 42% | 33% | 33% | 20% | 0% | 0% | 33% | 67% | **29%** |
+| 30 | DockTerm | 17% | 33% | 58% | 20% | 33% | 0% | 17% | 33% | **27%** |
+| 31 | ReevesAgents | 33% | 17% | 33% | 0% | 17% | 33% | 0% | 50% | **23%** |
+| 32 | Claude Squad | 50% | 0% | 17% | 20% | 17% | 0% | 0% | 33% | **17%** |
 
 ## The apps
 
