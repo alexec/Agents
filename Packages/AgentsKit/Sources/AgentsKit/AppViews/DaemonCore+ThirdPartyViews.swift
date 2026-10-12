@@ -11,7 +11,8 @@ import Foundation
 /// of the daemon's own (`MCPClientPool`), on the host that runs the project.
 ///
 /// Only http servers, for now (Q5): a stdio server's views would need a second copy of
-/// it, so they say so instead. A server waiting for approval, missing a secret, or wanting
+/// it, so they say so instead. A hosted one (#488) already has its one copy, which its
+/// views reach over the app's endpoint (#717). A server waiting for approval, missing a secret, or wanting
 /// a sign-in (#306) shows nothing. A new or changed view asks Show / Don't Show once (Q6:
 /// personal servers too). Logged: names, `ui://` addresses, policies and words. Never a
 /// command, URL, header, environment value or body (054 FR-023).
@@ -81,8 +82,28 @@ extension DaemonCore {
 
     /// `name` as a session in `project` is given it, for views: http only.
     func viewServer(_ name: String, project: URL) -> Result<ViewServer, ViewServerProblem> {
-        mcpServer(name, project: project, allowing: [.http])
+        let found = mcpServer(name, project: project, allowing: [.http, .stdio])
+        if case .success(let server) = found, case .stdio = server.filled.transport, !server.hosted {
+            return .failure(.localServer)
+        }
+        return found
     }
+
+    /// How a view's connection reaches `server`: a hosted one through its one copy, as a
+    /// user of its own for as long as the connection lasts (#717). Nil for any other.
+    func viewRoute(_ server: ViewServer) -> MCPClientPool.Route? {
+        guard server.hosted else { return nil }
+        return { [weak self] in
+            guard let self else { throw MCPClientPool.Refusal.localServer }
+            let user = "views-" + UUID().uuidString
+            guard let routed = try await self.hostedRoute(server, user: user) else {
+                return .init(server: server.filled, end: {})
+            }
+            return .init(server: routed, end: { [weak self] in await self?.releaseHostedUser(user) })
+        }
+    }
+
+    private func releaseHostedUser(_ user: String) async { await hostedServers.release(user) }
 
     /// `name` as a session in `project` is given it: the project's approved entries, then
     /// the person's, then plugins' (the first of a name wins, as for sessions), secrets
@@ -175,15 +196,19 @@ extension DaemonCore {
         let pool = viewClients
         let name = server.name
         let at = now()
+        let route = viewRoute(server)
         let load = Task<ServerViewCatalog?, Never> {
             do {
-                return try await pool.with(server.poolKey, server: server.filled, cwd: server.cwd) { client in
+                return try await pool.with(server.poolKey, server: server.filled, cwd: server.cwd, route: route) { client in
                     let tools = try await client.listTools()
                     let resources = try await client.listResources()
                     return ServerViewCatalog.make(server: name, tools: tools, resources: resources, now: at)
                 }
             } catch let failure as MCPClient.Failure {
                 DaemonLog.shared.write("mcp views: \(name)'s views could not be read (\(failure.logWord))")
+                return nil
+            } catch HostedMCPServers.Refusal.tooMany {
+                DaemonLog.shared.write("mcp views: \(name)'s views could not be read (hosted servers full)")
                 return nil
             } catch {
                 DaemonLog.shared.write("mcp views: \(name)'s views could not be read")
@@ -359,7 +384,12 @@ extension DaemonCore {
     private func onServer<T: Sendable>(_ server: ViewServer,
                                        _ body: @Sendable (MCPClient) async throws -> T) async throws -> T {
         do {
-            return try await viewClients.with(server.poolKey, server: server.filled, cwd: server.cwd, body)
+            return try await viewClients.with(server.poolKey, server: server.filled, cwd: server.cwd,
+                                              route: viewRoute(server), body)
+        } catch HostedMCPServers.Refusal.tooMany {
+            DaemonLog.shared.write("mcp views: \(server.name) not reached: hosted servers full")
+            let why = "\(HostedMCPServers.limit) hosted servers are in use on this host."
+            throw JSONRPCError(code: DaemonAPI.Failure.viewRefused, message: ViewServerProblem.unreachable(why).words(server.name))
         } catch MCPClient.Failure.authRequired {
             DaemonLog.shared.write("mcp views: \(server.name) wants a sign-in")
             throw JSONRPCError(code: DaemonAPI.Failure.viewRefused, message: ViewServerProblem.signIn.words(server.name))
