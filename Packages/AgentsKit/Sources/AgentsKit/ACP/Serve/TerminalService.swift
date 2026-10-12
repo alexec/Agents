@@ -16,13 +16,16 @@ public actor TerminalService {
 
     private let scope: FolderScope
     private let defaultCWD: URL
+    private let environment: [String: String]
     private let onOutput: @Sendable (String, String) -> Void
     private var terminals: [String: Terminal] = [:]
 
     public init(scope: FolderScope,
                 defaultCWD: URL,
+                environment: [String: String] = RuntimeEnvironment.forRuntimes(LoginShellPath.environment()),
                 onOutput: @escaping @Sendable (String, String) -> Void = { _, _ in }) {
         self.scope = scope
+        self.environment = environment
         self.defaultCWD = defaultCWD
         self.onOutput = onOutput
     }
@@ -134,7 +137,7 @@ public actor TerminalService {
         let line = ([command] + args).joined(separator: " ")
         process.arguments = ["-lc", line]
         process.currentDirectoryURL = workingDirectory
-        var environment = LoginShellPath.environment()
+        var environment = environment
         for entry in env?.arrayValue ?? [] {
             if let name = entry["name"]?.stringValue, let value = entry["value"]?.stringValue {
                 environment[name] = value

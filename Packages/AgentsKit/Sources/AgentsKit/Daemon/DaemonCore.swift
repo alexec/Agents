@@ -1831,7 +1831,7 @@ public struct ProcessSessionLauncher: SessionLauncher {
                                      cwd: cwd,
                                      environment: Self.environment(for: policy, locations: locations,
                                                                    onto: RuntimeEnvironment.withShippedServers(
-                                                                       LoginShellPath.environment(), first: false),
+                                                                       Self.runtimeEnvironment(runtime.id, locations: locations), first: false),
                                                                    onServer: onServer)
                                          .merging(sandbox.environment) { _, sandbox in sandbox },
                                      capabilities: Self.capabilities(for: policy),
@@ -1853,6 +1853,13 @@ public struct ProcessSessionLauncher: SessionLauncher {
     /// (049: Antigravity's home, and any stray key removed), then anything lent (043) on
     /// top of those, the policy's files (Grok) and its variables (Codex's `CODEX_CONFIG`,
     /// 047), the policy's word last.
+    /// The daemon's environment as far as this runtime is given it (#727): the shell's PATH,
+    /// what every program needs, what the runtime reads, and what the person passes through.
+    static func runtimeEnvironment(_ runtimeID: String, locations: StoreLocations) -> [String: String] {
+        RuntimeEnvironment.forRuntime(runtimeID, LoginShellPath.environment(),
+                                      passing: RuntimeEnvironmentStore(locations: locations).load().names(for: runtimeID))
+    }
+
     static func environment(for policy: ToolPolicy, locations: StoreLocations,
                             onto base: [String: String], onServer: Bool = false) -> [String: String] {
         let own = RuntimeLaunchCatalog.launch(for: policy.runtimeID).environment(over: base, root: locations.root.path)

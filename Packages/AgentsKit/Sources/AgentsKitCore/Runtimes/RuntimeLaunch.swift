@@ -11,6 +11,10 @@ public struct RuntimeLaunch: Hashable, Sendable {
     /// one in the daemon's own environment is never used by accident. `<root>` in a value
     /// is the daemon's root (a server's is its `~/.agents-server`).
     public var environment: [String: String?] = [:]
+    /// What the runtime reads from the person's environment beyond what every program gets
+    /// (#727): its own keys and settings. Nothing else of the daemon's reaches it. A name
+    /// ending in `*` is a prefix.
+    public var passedVariables: [String] = []
     /// Sign-in methods the runtime offers that the app does not (049: Antigravity's API key
     /// and Agent Platform, because Antigravity signs in with a Google account only). Left
     /// off every sign-in sheet, the Mac's and the phone's.
@@ -61,7 +65,8 @@ public struct RuntimeLaunch: Hashable, Sendable {
         }
     }
 
-    public init(runtimeID: String, environment: [String: String?] = [:], hiddenAuthMethods: [String] = [],
+    public init(runtimeID: String, environment: [String: String?] = [:], passedVariables: [String] = [],
+                hiddenAuthMethods: [String] = [],
                 turnErrorPrefix: String? = nil, turnErrorPrefixes: [String] = [],
                 turnNoticePattern: String? = nil, signInNotice: SignInNotice? = nil,
                 asksForTerminalAuthCommand: Bool = false, providerSignOutWord: String? = nil,
@@ -69,6 +74,7 @@ public struct RuntimeLaunch: Hashable, Sendable {
         self.runtimeID = runtimeID
         self.deadlines = deadlines
         self.environment = environment
+        self.passedVariables = passedVariables
         self.hiddenAuthMethods = hiddenAuthMethods
         self.turnErrorPrefixes = !turnErrorPrefixes.isEmpty ? turnErrorPrefixes
             : turnErrorPrefix.map { [$0] } ?? []
@@ -144,10 +150,30 @@ public struct RuntimeLaunch: Hashable, Sendable {
 }
 
 public enum RuntimeLaunchCatalog {
+    /// Its key, a gateway's address and model choices; Bedrock and Vertex are passed through
+    /// by the person (#727), as they are cloud credentials.
+    public static let claude = RuntimeLaunch(
+        runtimeID: "claude",
+        passedVariables: ["ANTHROPIC_*", "CLAUDE_CONFIG_DIR"])
+
+    public static let codex = RuntimeLaunch(
+        runtimeID: "codex",
+        passedVariables: ["OPENAI_*", "CODEX_HOME"])
+
+    public static let gemini = RuntimeLaunch(
+        runtimeID: "gemini",
+        passedVariables: ["GEMINI_*", "GOOGLE_API_KEY", "GOOGLE_CLOUD_PROJECT", "GOOGLE_CLOUD_LOCATION",
+                          "GOOGLE_GENAI_USE_VERTEXAI"])
+
+    public static let grok = RuntimeLaunch(
+        runtimeID: "grok",
+        passedVariables: ["GROK_*", "XAI_*"])
+
     /// Cursor's subscription exhaustion is an ordinary assistant message ending in
     /// `end_turn`, not an ACP failure. Captured from the prompt refusal on 2026-09-28.
     public static let cursor = RuntimeLaunch(
         runtimeID: "cursor",
+        passedVariables: ["CURSOR_*"],
         turnErrorPrefix: LimitRecognition.cursorPlanExhausted)
 
     /// Google's Antigravity ACP server (049, research R5–R10).
@@ -193,7 +219,10 @@ public enum RuntimeLaunchCatalog {
     /// Copilot reports failures as `Error: …` chat text followed by `end_turn`.
     /// Observed on 2026-09-26 for its exhausted monthly quota.
     public static let copilot = RuntimeLaunch(
-        runtimeID: "copilot", turnErrorPrefix: "Error:",
+        runtimeID: "copilot",
+        // Its own GitHub sign-in, in the order it reads them.
+        passedVariables: ["COPILOT_*", "GH_TOKEN", "GITHUB_TOKEN"],
+        turnErrorPrefix: "Error:",
         // ACP sends this notice without a trailing newline, before any error chunks.
         turnNoticePattern: #"^Info: Disabled tools: [a-z_][a-z_0-9]*(?:, [a-z_][a-z_0-9]*)*"#)
 
@@ -219,6 +248,9 @@ public enum RuntimeLaunchCatalog {
             "OPENCODE_AUTH_CONTENT": nil,
             "OPENCODE_ENABLE_QUESTION_TOOL": nil,
         ],
+        // Its own settings, and the keys of the providers it most often signs in with.
+        passedVariables: ["OPENCODE_*", "ANTHROPIC_*", "OPENAI_*", "GEMINI_*", "GOOGLE_GENERATIVE_AI_API_KEY",
+                          "OPENROUTER_*", "XAI_*", "GROQ_*", "MISTRAL_*", "DEEPSEEK_*"],
         // Without it OpenCode offers "Login with opencode" and no command (R6).
         asksForTerminalAuthCommand: true,
         // `opencode auth login` adds a provider; `opencode auth logout` takes one away.
@@ -229,7 +261,7 @@ public enum RuntimeLaunchCatalog {
                                    defaultPath: ".local/share/opencode/auth.json",
                                    lendableTypes: ["api", "wellknown"], signInCommand: "opencode auth login"))
 
-    public static let builtIn: [RuntimeLaunch] = [antigravity, copilot, cursor, opencode]
+    public static let builtIn: [RuntimeLaunch] = [claude, codex, gemini, grok, antigravity, copilot, cursor, opencode]
 
     /// Nothing extra for a runtime that is not listed.
     public static func launch(for runtimeID: String) -> RuntimeLaunch {
