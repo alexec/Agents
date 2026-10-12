@@ -16,6 +16,9 @@
 # development like Debug. Release itself is the App Store archive's. Scratch walks
 # (run-app), merge-wave's checks and the tests stay on Debug.
 #
+# Run from a worktree, it builds and installs that worktree, if clean and at origin/main
+# (#797); run from the main checkout, the main checkout.
+#
 #   ship.sh                 the Remote only; the Mac app stays where it is
 #   ship.sh --install-mac   also copy the Mac app into place and restart its login items
 #   ship.sh --no-build      reuse build/DD-host, build/DD-store and build/DD-ios as they are
@@ -144,6 +147,15 @@ if (( BUILD_ONLY )); then
   # The checkout this copy of the script is in, so a worktree never writes over main's build.
   REPO=$(git -C "$HERE" rev-parse --show-toplevel)
   (( BUILD )) || { echo "--build-only with --no-build has nothing to do" >&2; exit 2; }
+elif [[ $(git -C "$HERE" rev-parse --show-toplevel) != $REPO ]]; then
+  # Run from a worktree (#797): ship that worktree, so the live app is never built in the
+  # main checkout. Only a clean one at origin/main.
+  REPO=$(git -C "$HERE" rev-parse --show-toplevel)
+  git -C "$REPO" fetch -q origin main || { echo "cannot fetch origin main; stop" >&2; exit 1; }
+  [[ $(git -C "$REPO" rev-parse HEAD) == $(git -C "$REPO" rev-parse origin/main) ]] \
+    || { echo "worktree $REPO is not at origin/main; stop" >&2; exit 1; }
+  [[ -z $(git -C "$REPO" status --porcelain --untracked-files=no) ]] \
+    || { echo "worktree $REPO has uncommitted changes; stop" >&2; exit 1; }
 else
   BRANCH=$(git -C "$REPO" --no-optional-locks branch --show-current)
   [[ $BRANCH == main ]] || { echo "main checkout $REPO is on '$BRANCH', not main; stop" >&2; exit 1; }
@@ -154,7 +166,7 @@ CONFIG=Live
 HOSTAPP=$REPO/build/DD-host/Build/Products/$CONFIG/"Agents Host.app"
 STOREAPP=$REPO/build/DD-store/Build/Products/$CONFIG/Agents.app
 IOSAPP=$REPO/build/DD-ios/Build/Products/$CONFIG-iphoneos/Agents.app
-echo "$( (( BUILD_ONLY )) && echo "build only, $REPO" || echo main) $SHA  logs $LOGS"
+echo "$( (( BUILD_ONLY )) && echo "build only, $REPO" || echo "main, $REPO") $SHA  logs $LOGS"
 if [[ -n $(git -C "$REPO" --no-optional-locks status --porcelain --untracked-files=no) ]]; then
   echo "note: $REPO has uncommitted changes; the build includes them"
 fi
