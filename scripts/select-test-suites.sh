@@ -12,7 +12,8 @@
 # ported rules' fixtures and the key vectors. CI's web job checks the rest of Web/ with Node,
 # on every run. A change to App/Sources, Remote/Sources or Shared/UI runs the suites that
 # scan those views (ConsistencyTests, OneGroupingTests), and one to App/Resources/toolsets
-# the two that read the bundled toolsets.
+# the two that read the bundled toolsets. MCPServers (#700), the MCP servers Agents ships,
+# runs on any change to it, on Linux: it depends on nothing else here.
 #
 # CI's macOS jobs are chosen here as well (#594): `apps` is skip only when every changed
 # path is prose or agent config that no build reads, and `packages` (the job that runs
@@ -26,6 +27,7 @@ agentskit=skip
 codetext=skip
 webtypes=skip
 controlplane=skip
+mcpservers=skip
 agentskit_filter=
 codetext_filter=
 apps=build
@@ -35,6 +37,7 @@ full_both() {
 	codetext=full
 	webtypes=run
 	controlplane=run
+	mcpservers=run
 	agentskit_filter=
 	codetext_filter=
 }
@@ -108,6 +111,9 @@ else
 				Packages/ControlPlane/*)
 					controlplane=run
 					;;
+				Packages/MCPServers/*)
+					mcpservers=run
+					;;
 				Web/*)
 					webtypes=run
 					agentskit_touched=true
@@ -155,7 +161,7 @@ else
 					codetext_full_required=true
 					;;
 				# These areas cannot affect either SwiftPM package's tests.
-				App/*|Host/*|Remote/*|RemoteNotify/*|RemoteWidget/*|docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|.github/workflows/*|scripts/select-test-suites.sh|scripts/check-agentsd-links-no-parsers.sh|scripts/web.sh|scripts/slow-tests.sh|scripts/flaky-tests.sh|scripts/normalize-metaltoolchain-cache.py)
+				App/*|Host/*|Remote/*|RemoteNotify/*|RemoteWidget/*|docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|.github/workflows/*|scripts/select-test-suites.sh|scripts/check-test-indexing.py|scripts/check-agentsd-links-no-parsers.sh|scripts/web.sh|scripts/slow-tests.sh|scripts/flaky-tests.sh|scripts/normalize-metaltoolchain-cache.py)
 					;;
 				*)
 					# Root config, CI, scripts, or a new area may change test behavior.
@@ -225,6 +231,7 @@ fi
 	printf 'codetext_filter=%s\n' "$codetext_filter"
 	printf 'webtypes=%s\n' "$webtypes"
 	printf 'controlplane=%s\n' "$controlplane"
+	printf 'mcpservers=%s\n' "$mcpservers"
 	printf 'agentsd=%s\n' "$agentsd"
 	printf 'apps=%s\n' "$apps"
 	if [[ "$webtypes" == skip && "$controlplane" == skip ]]; then

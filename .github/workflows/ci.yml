@@ -42,6 +42,7 @@ jobs:
     outputs:
       apps: ${{ steps.test-selection.outputs.apps }}
       packages: ${{ steps.test-selection.outputs.packages }}
+      mcpservers: ${{ steps.test-selection.outputs.mcpservers }}
     steps:
       - name: Let a burst of merges settle
         if: github.event_name == 'push'
@@ -437,6 +438,20 @@ jobs:
         if: steps.test-selection.outputs.controlplane != 'skip'
         timeout-minutes: 20
         run: swift test --package-path Packages/ControlPlane
+
+  # The MCP servers Agents ships (#700), on Linux, where a cloud host runs them: no macOS
+  # runner to wait for, and the same toolchain as the release's static Linux build. The
+  # package depends on nothing else here, so it runs only when it changes.
+  mcp-servers:
+    needs: select
+    if: ${{ always() && !cancelled() && (needs.select.result != 'success' || needs.select.outputs.mcpservers != 'skip') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: swift:6.4.0-noble
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test MCPServers
+        run: swift test --package-path Packages/MCPServers
 
   # The web remote (071, D7, research R8): a build with the pinned Node, then tsc, the lint
   # that keeps agent output inert, the licence list and the web tests, which hold the build to
