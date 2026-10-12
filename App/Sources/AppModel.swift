@@ -2048,6 +2048,25 @@ final class AppModel {
         ([HostID.mac] + hosts.servers).filter { chatProjectKey(on: $0) != nil }
     }
 
+    /// Whether any host made a chat project, live or archived (#694).
+    var hasChatProjects: Bool { projects.contains { $0.isChat == true } }
+
+    /// Settings ▸ General ▸ Chat project turned off (#694): every host's chat project is
+    /// archived. New Chat leaves the File menu.
+    var chatProjectSwitchedOff: Bool {
+        let chats = projects.filter { $0.isChat == true }
+        return !chats.isEmpty && chats.allSatisfy(\.project.isArchived)
+    }
+
+    /// Off archives every host's chat project; on unarchives them, without opening one.
+    /// Nothing is deleted. A host that refuses (a chat still running) says why.
+    func setChatProject(_ on: Bool) async {
+        let method = on ? DaemonAPI.Method.projectsUnarchive : DaemonAPI.Method.projectsArchive
+        for summary in projects where summary.isChat == true && summary.project.isArchived == on {
+            await callProject(method, summary.key)
+        }
+    }
+
     /// New Chat: the new-session page of the host's chat project. True when it opened;
     /// otherwise the host is asked why there is none, and `chatProblem` says it.
     @discardableResult

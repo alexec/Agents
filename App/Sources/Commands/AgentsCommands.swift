@@ -72,14 +72,17 @@ struct AgentsCommands: Commands {
             Button("New Session in a Worktree") { newSession(inWorktree: true) }
                 .keyboardShortcut("n", modifiers: [.command, .option])
                 .disabled(model.selectedProjectSummary == nil || !model.draftWorktrees.canMakeNew)
-            // A chat in the project this Mac made for chats (#229), with no project to pick.
-            Button("New Chat") { newChat(on: .mac) }
-                .keyboardShortcut("n", modifiers: [.command, .shift])
-            let servers = model.hostsWithChats.filter { $0 != .mac }
-            if !servers.isEmpty {
-                Menu("New Chat On") {
-                    ForEach(servers, id: \.self) { host in
-                        Button(model.hosts.label(host)) { newChat(on: host) }
+            // A chat in the project this Mac made for chats (#229), with no project to pick;
+            // gone while Settings ▸ General ▸ Chat project is off (#694).
+            if !model.chatProjectSwitchedOff {
+                Button("New Chat") { newChat(on: .mac) }
+                    .keyboardShortcut("n", modifiers: [.command, .shift])
+                let servers = model.hostsWithChats.filter { $0 != .mac }
+                if !servers.isEmpty {
+                    Menu("New Chat On") {
+                        ForEach(servers, id: \.self) { host in
+                            Button(model.hosts.label(host)) { newChat(on: host) }
+                        }
                     }
                 }
             }

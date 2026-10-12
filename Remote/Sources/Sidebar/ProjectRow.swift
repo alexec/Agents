@@ -22,26 +22,24 @@ struct ProjectRow: View {
     /// Exactly when something in it is under Needs you.
     private var needsPerson: Bool { (counts[.needsAttention] ?? 0) > 0 }
 
+    /// The name's colour, which the chat project's mark takes too (#694).
+    private var nameStyle: HierarchicalShapeStyle { summary.exists && !asHeading ? .primary : .secondary }
+
     var body: some View {
         HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 4) {
-                    // The chat project (#229) says what it is for.
+                    // The chat project (#229) says what it is for, in its name's grey (#694).
+                    // A pinned project shows no pin: being at the top says it.
                     if summary.isChat == true {
                         Image(systemName: "bubble.left.and.bubble.right")
                             .imageScale(.small)
-                            .foregroundStyle(Paper.accent)
+                            .foregroundStyle(nameStyle)
                             .accessibilityHidden(true)
                     }
                     Text(label ?? summary.name)
                         .lineLimit(1)
-                        .foregroundStyle(summary.exists && !asHeading ? .primary : .secondary)
-                    if summary.project.isPinned {
-                        Image(systemName: "pin.fill")
-                            .imageScale(.small)
-                            .foregroundStyle(Paper.accent)
-                            .accessibilityHidden(true)
-                    }
+                        .foregroundStyle(nameStyle)
                 }
                 if !summary.exists {
                     Text("Folder is missing")
