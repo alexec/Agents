@@ -3883,14 +3883,6 @@ final class AppModel {
         }
     }
 
-    /// Archive every session in the projects named that asks to be archived (#584): the
-    /// Approve Archiving group's Approve All. One at a time, each as its own Archive, so each
-    /// shows on its way and one that fails says why without stopping the rest.
-    func archiveAllRequested(in projects: [ProjectKey]) async {
-        let asking = SidebarSmartRow.toArchive.agents(in: work, projects: projects)
-        for agent in asking { await archive(agent.id, andLeave: true) }
-    }
-
     /// Whether the answer went, so the card can give its buttons back when it did not.
     /// One `sendID` for every try, so the retry through a fresh connection is the same
     /// answer and not a second one (#86).

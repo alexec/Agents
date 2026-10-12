@@ -3319,12 +3319,6 @@ final class RemoteModel {
             problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
         }
     }
-    /// Archive every session in the projects named that asks to be archived (#584): the
-    /// Approve Archiving group's Approve All, one Archive at a time as on the Mac.
-    func archiveAllRequested(in projects: [ProjectKey]) async {
-        for agent in SidebarSmartRow.toArchive.agents(in: work, projects: projects) { await archive(agent.id) }
-    }
-
     /// What is on its way to this agent, if anything: for the control that sent it to
     /// show, and the others to hold (#87).
     func acting(_ agentID: UUID) -> AgentAct? { work.acting[agentID] }

@@ -5,13 +5,7 @@ import { asksToArchive } from "./groups";
 
 export const archiveMark = "Archiving needs approval";
 export const archiveLabel = "Approve";
-export const archiveAllLabel = "Approve All";
 export const archiveHelp = "The agent is done with this session: approve archiving it";
-
-/** ArchiveRequestWords.archiveAllHelp. */
-export function archiveAllHelp(count: number): string {
-  return count === 1 ? "Approve archiving the session that waits for it" : `Approve archiving the ${count} sessions that wait for it`;
-}
 
 /** ArchiveRequestWords.line: "Archiving needs approval", or null for a session that does not. */
 export function archiveLine(agent: Agent): string | null {

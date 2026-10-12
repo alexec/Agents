@@ -59,9 +59,6 @@
    is, the count on the right, Needs You's in the attention tint. */
 .with-sidebar details.smart > summary { display: flex; align-items: baseline; margin-left: 0; opacity: 1;
   color: color-mix(in srgb, currentColor 50%, transparent); }
-/* Approve Archiving's Approve All (#584): before the count, which it pushes right. */
-.with-sidebar details.smart > summary .archive-all { margin-left: auto; font-size: 11px; padding: 0 6px; }
-.with-sidebar details.smart > summary .archive-all + .count { margin-left: 6px; }
 .with-sidebar details.smart > summary .count { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 500; }
 .with-sidebar details.smart > summary .count.needs { color: var(--tint-attention); }
 

@@ -16,17 +16,8 @@ enum ArchiveRequestWords {
     /// The one click that approves it, and archives the session.
     static let archive = "Approve"
 
-    /// What the Approve Archiving group's button does: every session in it.
-    static let archiveAll = "Approve All"
-
     /// The tooltip and the accessibility hint for Approve beside the mark.
     static let archiveHelp = "The agent is done with this session: approve archiving it"
-
-    /// For Approve All, with how many.
-    static func archiveAllHelp(_ count: Int) -> String {
-        count == 1 ? "Approve archiving the session that waits for it"
-            : "Approve archiving the \(count) sessions that wait for it"
-    }
 
     /// "Archiving needs approval", or nil for a session that does not.
     static func line(_ agent: Agent?) -> String? {

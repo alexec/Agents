@@ -1644,14 +1644,6 @@ export class Store extends Work {
     return done;
   }
 
-  /**
-   * Approve Archiving's Approve All (#584): each session given, one Archive at a time on its own host,
-   * as the window's does, so each shows on its way and one that fails does not stop the rest.
-   */
-  async archiveAll(sessions: readonly { host: string; agentID: string }[]): Promise<void> {
-    for (const { host, agentID } of sessions) await this.perform(host, agentID, "agents/archive");
-  }
-
   // MARK: Files, changes and live pages (071 US4)
 
   listFiles(host: string, agentID: string, folder: string) {

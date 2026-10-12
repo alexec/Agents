@@ -66,8 +66,8 @@ until you archive it.
   page the row shows the mark, and **Archive** is in the row's menu and its swipe.
 - **Approve Archiving**, at the top of the sidebar after **Pinned**, **Needs You**, **Working** and
   **Unread**, gathers every session waiting for approval, across every project and host. It
-  is shown only when one is. **Approve All** in its heading archives them all; on the Mac it is
-  also in the heading's right-click menu.
+  is shown only when one is. Each of its rows is approved on its own, by **Approve** or a
+  swipe; there is no Approve All (#704).
 - The mark goes when you send the session a prompt, when a later turn ends wanting you
   (with a question, stuck, blocked or crashed), or when the session is archived. Bringing
   it back does not bring the mark back. A workflow's prompt, or the app's own, leaves it.
