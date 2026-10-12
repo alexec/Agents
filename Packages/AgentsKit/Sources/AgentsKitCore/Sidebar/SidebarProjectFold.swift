@@ -10,7 +10,7 @@ import Foundation
 @MainActor
 public struct SidebarProjectFold {
     /// The most archived sessions a fold holds while open: a page from the host (#164).
-    public static let archivedShown = 50
+    nonisolated public static let archivedShown = 50
     /// The most archived matches a fold shows before Show all (#176).
     public static let matchesShown = 10
 
