@@ -406,6 +406,9 @@ extension DaemonCore {
     /// every live need, and clear stale offers left at the control plane.
     func controlUplinkChanged(_ up: Bool) {
         guard up, hostsForControlPlane else { return }
+        // A control plane that just heard from this host hears whether it is idle (#691 US4).
+        toldStatus = nil
+        reviseHostStatus()
         let live = Set(needs().map(\.id))
         for id in forwardedNeeds where !live.contains(id) { withdrawForwarded(id) }
         forwardedNeeds.subtract(live)

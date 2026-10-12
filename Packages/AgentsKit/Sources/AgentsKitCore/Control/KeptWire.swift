@@ -19,6 +19,8 @@ public extension DaemonAPI.Method {
     /// (FR-020, FR-022). Both are idempotent by an id of their own (`sendID`, `requestID`),
     /// which the control plane fills in when the client left it out.
     static let keptMethods: Set<String> = [agentsPrompt, agentsStart]
+    /// `HostStatus`, from a host on channel 0, whenever it changes (#691 US4).
+    static let hostStatus = "host/status"
     /// `KeepRequest` → never a result: the `kept` error, or the host's refusal. For a client
     /// whose link to a host closes while the host is offline (the window's, the Remote's),
     /// so it can't send the request to the host itself.
@@ -103,6 +105,18 @@ public extension DaemonAPI {
     struct KeptList: Codable, Sendable, Hashable {
         public var kept: [KeptRequest]
         public init(kept: [KeptRequest]) { self.kept = kept }
+    }
+
+    /// `host/status` on channel 0 (#691 US4): whether the host is idle, and what is working
+    /// there when it isn't, for the stop when idle and for Stop's confirmation.
+    struct HostStatus: Codable, Sendable, Hashable {
+        public var idle: Bool
+        /// "Claude (fix-login)": each agent working or waiting on a person.
+        public var running: [String]
+        public init(idle: Bool, running: [String] = []) {
+            self.idle = idle
+            self.running = running
+        }
     }
 
     /// `control/keptDelivered`.

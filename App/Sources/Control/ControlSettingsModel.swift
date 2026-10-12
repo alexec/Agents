@@ -166,8 +166,73 @@ final class ControlSettingsModel {
         await perform(DaemonAPI.Method.hostsStart, DaemonAPI.HostRequest(host: host))
     }
 
-    func stop(_ host: HostID) async {
-        await perform(DaemonAPI.Method.hostsStop, DaemonAPI.HostStop(host: host))
+    /// Stop. Unconfirmed while agents are working there, the control plane says who they are
+    /// (US4 AS4), and that is answered for the question; nil once it is stopping or refused.
+    func stop(_ host: HostID, confirmed: Bool = false) async -> [String]? {
+        do {
+            _ = try await client.call(DaemonAPI.Method.hostsStop, DaemonAPI.HostStop(host: host, confirmRunning: confirmed ? true : nil))
+            problem = nil
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.agentsWorking {
+            let names = error.data?["running"]?.arrayValue?.compactMap(\.stringValue) ?? []
+            if !names.isEmpty { return names }
+            problem = HostProblem.controlRefusal(error)
+        } catch let error as JSONRPCError {
+            problem = HostProblem.controlRefusal(error)
+        } catch {
+            problem = "The control plane can’t be reached."
+        }
+        await refresh()
+        return nil
+    }
+
+    // MARK: Making and deleting workspaces (US5)
+
+    /// Workspaces made here that install on their first boot, as `provider/workspace`, shown
+    /// as Joining… until their host joins and is linked.
+    private(set) var joiningWorkspaces: Set<String> = []
+
+    /// The New Workspace form's schema, or why it couldn't be read.
+    func workspaceOptions(_ provider: ProviderID) async -> Result<JSONValue, WorkspaceRefusal> {
+        do {
+            let options = try await client.call(DaemonAPI.Method.providersOptions, DaemonAPI.ProviderRequest(id: provider),
+                                                returning: DaemonAPI.ProviderOptions.self)
+            return .success(options.schema)
+        } catch let error as JSONRPCError {
+            return .failure(WorkspaceRefusal(error.message))
+        } catch {
+            return .failure(WorkspaceRefusal("The control plane can’t be reached."))
+        }
+    }
+
+    /// Makes a workspace: what was made, or why not in the provider's words.
+    func makeWorkspace(_ provider: ProviderID, name: String, options: JSONValue) async -> Result<DaemonAPI.ProviderCreated, WorkspaceRefusal> {
+        do {
+            let made = try await client.call(DaemonAPI.Method.providersCreate,
+                                             DaemonAPI.ProviderCreate(id: provider, name: name, options: options),
+                                             returning: DaemonAPI.ProviderCreated.self)
+            if made.joining { joiningWorkspaces.insert("\(provider.rawValue)/\(made.workspace.id)") }
+            await refresh()
+            return .success(made)
+        } catch let error as JSONRPCError {
+            return .failure(WorkspaceRefusal(error.message))
+        } catch {
+            return .failure(WorkspaceRefusal("The control plane can’t be reached."))
+        }
+    }
+
+    func isJoining(_ provider: ProviderID, _ workspace: DaemonAPI.WorkspaceInfo) -> Bool {
+        workspace.host == nil && joiningWorkspaces.contains("\(provider.rawValue)/\(workspace.id)")
+    }
+
+    /// Delete Workspace…: the provider deletes it, then the host goes as Remove does.
+    func deleteWorkspace(_ host: HostID) async {
+        await perform(DaemonAPI.Method.hostsDeleteWorkspace, DaemonAPI.HostRequest(host: host))
+    }
+
+    /// Whether the provider a host's workspace is at can delete it.
+    func canDeleteWorkspace(_ host: DaemonAPI.ControlHost) -> Bool {
+        guard let workspace = host.workspace else { return false }
+        return providers.first { $0.id == workspace.provider }?.capabilities.contains("delete") == true
     }
 
     /// Links a server added from a workspace once it joins under `name` (Add as Host…).
@@ -188,6 +253,11 @@ final class ControlSettingsModel {
     /// The workspaces no host is linked to yet, by provider, for Link to Workspace….
     var linkableWorkspaces: [(provider: DaemonAPI.ProviderSummary, workspaces: [DaemonAPI.WorkspaceInfo])] {
         providers.map { ($0, $0.workspaces) }.filter { !$0.1.isEmpty }
+    }
+
+    struct WorkspaceRefusal: Error {
+        var message: String
+        init(_ message: String) { self.message = message }
     }
 
     // MARK: Actions

@@ -271,3 +271,90 @@ func config(_ json: JSON) throws -> CommandConfig { try CommandConfig.from(json)
         #expect(list["structuredContent"]?["workspaces"]?.array?.count == 200)
     }
 }
+
+/// Making and deleting workspaces (US5): a listing's create and delete commands, with the
+/// form's options and the first-boot command filled in as single shell words.
+@Suite struct MakingWorkspacesTests {
+    /// A CLI whose list is what has been made, kept in the recorder's closure.
+    final class Made: @unchecked Sendable {
+        private let lock = NSLock()
+        private var names: [String] = []
+        func add(_ name: String) { lock.withLock { names.append(name) } }
+        func remove(_ name: String) { lock.withLock { names.removeAll { $0 == name } } }
+        var list: String { lock.withLock { names.map { "\($0) \($0) off" }.joined(separator: "\n") } }
+    }
+
+    func server(_ made: Made) throws -> MCPServer {
+        let recorder = Recorder { line in line.hasPrefix("cli list") ? (0, made.list) : (0, "") }
+        return WorkspaceCommands.server(try config([
+            "list": "cli list", "columns": ["id", "name", "state"],
+            "start": "cli start ${id}", "stop": "cli stop ${id}", "states": ["off": "stopped"],
+            "create": "cli make ${name} --size ${size} --user-data ${firstBoot}",
+            "delete": "cli delete ${id}",
+            "options": ["type": "object", "properties": ["size": ["type": "string", "title": "Size", "enum": ["small", "big"]]]],
+        ]), timing: quick, run: recorder.run)
+    }
+
+    @Test func offersTheToolsItCanAnswer() async throws {
+        let server = try server(Made())
+        let tools = try await server.handle(method: "tools/list", params: nil)["tools"]?.array?.compactMap { $0["name"]?.string }
+        #expect(tools == ["workspaces_list", "workspace_start", "workspace_stop", "workspace_options", "workspace_create",
+                          "workspace_delete"])
+        let options = try await call(server, "workspace_options")
+        #expect(options["structuredContent"]?["schema"]?["properties"]?["size"]?["title"] == "Size")
+    }
+
+    @Test func makesOneWithItsChoicesAndFindsItInTheList() async throws {
+        let made = Made()
+        let recorder = Recorder { line in
+            if line.hasPrefix("cli list") { return (0, made.list) }
+            if line.hasPrefix("cli make") { made.add("build-2") }
+            return (0, "")
+        }
+        let server = WorkspaceCommands.server(try config([
+            "list": "cli list", "columns": ["id", "name", "state"],
+            "start": "cli start ${id}", "stop": "cli stop ${id}", "states": ["off": "stopped"],
+            "create": "cli make ${name} --size ${size} --user-data ${firstBoot}",
+        ]), timing: quick, run: recorder.run)
+        let answer = try await call(server, "workspace_create", [
+            "name": "build-2", "options": ["size": "big"], "firstBoot": "curl -fsSL https://x/install.sh | sh -s -- 'code; rm -rf'",
+        ])
+        #expect(answer["structuredContent"]?["workspace"]?["id"] == "build-2")
+        #expect(answer["structuredContent"]?["firstBootRuns"] == true)
+        // The first-boot command is one word, whatever it holds.
+        #expect(recorder.lines.contains("cli make 'build-2' --size 'big' --user-data 'curl -fsSL https://x/install.sh | sh -s -- '\\''code; rm -rf'\\'''"))
+        // A second with the same name is refused.
+        let again = try await call(server, "workspace_create", ["name": "build-2"])
+        #expect(again["isError"] == true)
+    }
+
+    @Test func deletesByItsListingsValues() async throws {
+        let made = Made()
+        made.add("build-2")
+        let recorder = Recorder { line in
+            if line.hasPrefix("cli list") { return (0, made.list) }
+            if line.hasPrefix("cli delete") { made.remove("build-2") }
+            return (0, "")
+        }
+        let server = WorkspaceCommands.server(try config([
+            "list": "cli list", "columns": ["id", "name", "state"],
+            "start": "cli start ${id}", "stop": "cli stop ${id}",
+            "create": "cli make ${name}", "delete": "cli delete ${id}",
+        ]), timing: quick, run: recorder.run)
+        let answer = try await call(server, "workspace_delete", ["id": "build-2"])
+        #expect(answer["isError"] == nil || answer["isError"] == false)
+        #expect(recorder.lines.contains("cli delete 'build-2'"))
+        // Without ${firstBoot}, it says the control plane has to install over ssh.
+        let made2 = try await call(server, "workspace_create", ["name": "other"])
+        #expect(made2["isError"] == true, "the list doesn't show it, as this CLI makes nothing")
+    }
+
+    @Test func createNeedsAListing() {
+        #expect(throws: ConfigError.self) {
+            try config(["workspaces": [["name": "a", "start": "x", "stop": "y"]], "create": "make"])
+        }
+        #expect(throws: ConfigError.self) {
+            try config(["list": "l", "columns": ["id"], "start": "x", "stop": "y", "options": ["type": "object"]])
+        }
+    }
+}

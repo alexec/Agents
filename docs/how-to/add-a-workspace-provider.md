@@ -36,6 +36,17 @@ The commands run with `/bin/sh` on the Mac that runs the control plane, as you, 
 root. A secret you add goes to them as an environment variable of the same name: write
 `$TOKEN` in a command to use it.
 
+To make and delete workspaces from Agents as well, configure the command provider with a
+`list` command and add:
+
+- **`create`**: the command that makes one. `${name}`, `${firstBoot}` and each option's
+  key are filled in, each as one shell word. With `${firstBoot}` in it, the new workspace
+  installs Agents on its first boot. Without it, you add it over ssh once it is made.
+- **`delete`**: the command that deletes one, with `${id}` and its list's columns.
+- **`options`**: the New Workspace form, as a JSON Schema object.
+
+No preset makes workspaces, so this needs **An MCP server** or a provider configured by hand.
+
 The command provider is the `workspace-commands` binary. The control plane looks for it
 beside itself, then where `AGENTS_WORKSPACE_COMMANDS` says, then on its `PATH`. Its configuration is described in full in
 [its contract](https://github.com/alexec/Agents/blob/main/specs/691-workspace-providers/contracts/command-provider.md).

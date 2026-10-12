@@ -47,6 +47,30 @@ actor StandInProvider: WorkspaceProvider {
         return workspaces.first { $0.id == id }
     }
 
+    /// What making a workspace does (US5): whether it runs the first boot, and what it was given.
+    var firstBootRuns = true
+    var firstBoots: [String] = []
+    var deleted: [String] = []
+
+    func set(firstBootRuns: Bool) { self.firstBootRuns = firstBootRuns }
+
+    func options() async throws -> JSONValue {
+        ["type": "object", "properties": ["size": ["type": "string", "title": "Size", "enum": ["small", "big"],
+                                                    "x-costs": ["small": "$0.01/hour", "big": "$0.05/hour"]]]]
+    }
+
+    func create(name: String, options: JSONValue, firstBoot: String?) async throws -> (DaemonAPI.WorkspaceInfo?, Bool) {
+        if let firstBoot { firstBoots.append(firstBoot) }
+        let made = DaemonAPI.WorkspaceInfo(id: "ws-\(name)", name: name, state: "starting", ssh: "root@10.0.0.9")
+        workspaces.append(made)
+        return (made, firstBootRuns)
+    }
+
+    func delete(_ id: String) async throws {
+        deleted.append(id)
+        workspaces.removeAll { $0.id == id }
+    }
+
     func end() async {}
 
     private func setState(_ id: String, _ state: String) {
@@ -95,6 +119,7 @@ struct ProviderHarness {
             store: store, records: records, methods: methods, router: router, secrets: ProviderSecrets(home: home),
             timing: timing,
             hooks: .init(sshStart: { _, destination in sshStarts.add(destination) },
+                         hostCommand: { "curl -fsSL https://cp.local/v1/install.sh | sh -s -- 'agents-control:2:h:secret'" },
                          connect: { _, _ in provider }),
             log: { _ in })
         var hooks = ControlMethods.Hooks()

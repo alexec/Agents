@@ -43,15 +43,37 @@ public struct CommandConfig: Sendable, Equatable {
         public var commands: Commands
     }
 
+    /// Making and deleting workspaces (US5): only beside a listing, which finds what was made.
+    public struct Making: Sendable, Equatable {
+        /// Makes one: `${name}`, `${firstBoot}` and each option's key are filled in.
+        public var create: String?
+        /// Deletes one: `${id}` and its listing's values are filled in.
+        public var delete: String?
+        /// The New Workspace form, as a flat JSON Schema object (`workspace_options`).
+        public var options: JSON?
+
+        public init(create: String? = nil, delete: String? = nil, options: JSON? = nil) {
+            self.create = create
+            self.delete = delete
+            self.options = options
+        }
+
+        /// Whether a made workspace runs the first-boot install itself.
+        public var firstBootRuns: Bool { create?.contains("${firstBoot}") == true }
+    }
+
     public var workspaces: [Entry]
     public var listing: Listing?
     /// The CLI's words for a state, lower-cased, to a contract state.
     public var states: [String: WorkspaceState]
+    public var making: Making
 
-    public init(workspaces: [Entry] = [], listing: Listing? = nil, states: [String: WorkspaceState] = [:]) {
+    public init(workspaces: [Entry] = [], listing: Listing? = nil, states: [String: WorkspaceState] = [:],
+                making: Making = Making()) {
         self.workspaces = workspaces
         self.listing = listing
         self.states = Dictionary(states.map { ($0.key.lowercased(), $0.value) }) { a, _ in a }
+        self.making = making
     }
 
     /// The contract state for what a status command or a listing said.
@@ -104,7 +126,10 @@ extension CommandConfig {
                 throw ConfigError("a list needs columns, or json paths")
             }
             return CommandConfig(listing: Listing(command: list, shape: shape, commands: try commands(json, "")),
-                                 states: states)
+                                 states: states, making: try making(json))
+        }
+        if json["create"] != nil || json["delete"] != nil {
+            throw ConfigError("create and delete need a list command, which finds what they made")
         }
         guard let items = json["workspaces"]?.array, !items.isEmpty else {
             throw ConfigError("give workspaces, a list command, or a preset")
@@ -128,6 +153,15 @@ extension CommandConfig {
                         ssh: json["ssh"]?.string.flatMap { $0.isEmpty ? nil : $0 },
                         tunnel: json["tunnel"]?.bool ?? false,
                         cost: json["cost"]?.string.map { String($0.prefix(120)) })
+    }
+
+    private static func making(_ json: JSON) throws(ConfigError) -> Making {
+        let create = json["create"]?.string.flatMap { $0.isEmpty ? nil : $0 }
+        let delete = json["delete"]?.string.flatMap { $0.isEmpty ? nil : $0 }
+        let options = json["options"]
+        if let options, options.object == nil { throw ConfigError("options must be a JSON Schema object") }
+        if options != nil, create == nil { throw ConfigError("options are for a create command, and there is none") }
+        return Making(create: create, delete: delete, options: options)
     }
 
     private static func stateMap(_ json: JSON?) throws(ConfigError) -> [String: WorkspaceState] {

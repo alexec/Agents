@@ -236,21 +236,21 @@ US2 comes before US1 because Start needs a link.
 
 ## Phase 6: User Story 4 – Stop a workspace when idle (P2)
 
-- [ ] T046 [US4] `AK/Daemon/ControlUplink.swift`: send `host/status {idle, since, running: [agent names]}` on channel 0 when the host's idleness changes. Idle uses `hasWorkInFlight`, `isHoldingAgents` and open shells.
-- [ ] T047 [US4] `CP/ControlMethods.swift` `hostSaid`: keep idleness per host. `CP/Providers/IdleStops.swift` keeps one timer per linked host with `stopWhenIdleMinutes`, cancelled by `idle: false`. When it fires, it calls `WorkspaceStarts.stop(by: .agentsIdle(minutes))`.
-- [ ] T048 [P] [US4] `CT/IdleStopsTests.swift`:
+- [x] T046 [US4] `AK/Daemon/ControlUplink.swift`: send `host/status {idle, since, running: [agent names]}` on channel 0 when the host's idleness changes. Idle uses `hasWorkInFlight`, `isHoldingAgents` and open shells.
+- [x] T047 [US4] `CP/ControlMethods.swift` `hostSaid`: keep idleness per host. `CP/Providers/IdleStops.swift` keeps one timer per linked host with `stopWhenIdleMinutes`, cancelled by `idle: false`. When it fires, it calls `WorkspaceStarts.stop(by: .agentsIdle(minutes))`.
+- [x] T048 [P] [US4] `CT/IdleStopsTests.swift`:
   - idle for the whole period stops the host
   - a turn in between resets the period
   - an older host that sends no status is never stopped
   - Stop with running turns needs a confirmation
-- [ ] T049 [US4] 🖼 The Mac Hosts row warns about scheduled workflows on a host that stops when idle. The Stop confirmation names the running agents.
+- [x] T049 [US4] 🖼 The Mac Hosts row warns about scheduled workflows on a host that stops when idle. The Stop confirmation names the running agents.
 
 ## Phase 7: User Story 5 – Make a new workspace (P3)
 
-- [ ] T050 [US5] `providers/options`, `providers/create` and `hosts/deleteWorkspace`. For create, issue a host code (`ControlCodes.issue`) and pass `HostInstallScript.command(...)` as `firstBoot`. When `firstBootRuns` is false, install over ssh through `HostInstall`. Link the host once it joins.
-- [ ] T051 [US5] Add create, delete and options to the command provider's config and to `ToolMapping`.
-- [ ] T052 [P] [US5] Tests: create that runs on first boot and joins; create with an ssh install; delete removes the host; cancel makes nothing.
-- [ ] T053 [US5] 🖼 Mac: the New Workspace… form drawn from the schema, a confirmation naming the cost, and Delete Workspace… with its confirmation.
+- [x] T050 [US5] `providers/options`, `providers/create` and `hosts/deleteWorkspace`. For create, issue a host code (`ControlCodes.issue`) and pass `HostInstallScript.command(...)` as `firstBoot`. When `firstBootRuns` is false, install over ssh through `HostInstall`. Link the host once it joins.
+- [x] T051 [US5] Add create, delete and options to the command provider's config and to `ToolMapping`.
+- [x] T052 [P] [US5] Tests: create that runs on first boot and joins; create with an ssh install; delete removes the host; cancel makes nothing.
+- [x] T053 [US5] 🖼 Mac: the New Workspace… form drawn from the schema, a confirmation naming the cost, and Delete Workspace… with its confirmation.
 
 ## Phase 8: User Story 6 – Agents use workspaces (P3)
 

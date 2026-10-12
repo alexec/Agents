@@ -19,6 +19,7 @@ export type URLString = string & { readonly __brand: "URLString" };
 /** DaemonAPI.Failure: the codes a call can fail with. */
 export const Failure = {
   agentLimitReached: -32023,
+  agentsWorking: -32068,
   busy: -32040,
   catalogRefused: -32080,
   changedElsewhere: -32093,

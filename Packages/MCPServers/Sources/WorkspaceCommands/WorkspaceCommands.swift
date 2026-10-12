@@ -41,6 +41,23 @@ public enum WorkspaceCommands {
     public static func server(_ config: CommandConfig, timing: Timing = .standard, run: @escaping Runner = shell) -> MCPServer {
         let provider = Provider(config: config, timing: timing, run: run)
         let id = Schema(["id": .string("The workspace's id, as workspaces_list gives it.", maxLength: 512)], required: ["id"])
+        var making: [Tool] = []
+        if config.making.create != nil {
+            making.append(Tool(name: "workspace_options", title: "New workspace options",
+                               description: "The choices for a new workspace, as a JSON Schema object.",
+                               inputSchema: Schema([:]), annotations: ["readOnlyHint": true]))
+            making.append(Tool(name: "workspace_create", title: "Make a workspace",
+                               description: "Makes a workspace with the choices given, and answers once it is listed.",
+                               inputSchema: Schema(["name": .string("The new workspace's name.", maxLength: 128),
+                                                    "options": .object("The choices, as workspace_options describes them."),
+                                                    "firstBoot": .string("A command to run on its first boot.", maxLength: 8192)],
+                                                   required: ["name"])))
+        }
+        if config.making.delete != nil {
+            making.append(Tool(name: "workspace_delete", title: "Delete a workspace",
+                               description: "Deletes the workspace and everything on it.", inputSchema: id,
+                               annotations: ["destructiveHint": true]))
+        }
         return MCPServer(
             info: .init(name: "workspace-commands", title: "Workspace commands", version: version),
             instructions: "A workspace provider (contract \(contract)): lists, starts and stops workspaces by running the shell commands it was configured with.",
@@ -54,7 +71,7 @@ public enum WorkspaceCommands {
                 Tool(name: "workspace_stop", title: "Stop a workspace",
                      description: "Stops the workspace and answers once it is stopped, or with why it isn't.",
                      inputSchema: id),
-            ],
+            ] + making,
             callTool: { tool, arguments in
                 let args = try tool.inputSchema.check(arguments)
                 do {
@@ -64,6 +81,15 @@ public enum WorkspaceCommands {
                         return ToolResult.structured(["contract": .int(contract), "workspaces": .array(all.map(\.json))])
                     case "workspace_start":
                         return ToolResult.structured(["workspace": try await provider.act(.start, args["id"]?.string ?? "").json])
+                    case "workspace_options":
+                        return ToolResult.structured(["schema": config.making.options ?? .object(["type": "object", "properties": .object([:])])])
+                    case "workspace_create":
+                        let made = try await provider.create(name: args["name"]?.string ?? "", options: args["options"]?.object ?? [:],
+                                                             firstBoot: args["firstBoot"]?.string)
+                        return ToolResult.structured(["workspace": made.json, "firstBootRuns": .bool(config.making.firstBootRuns)])
+                    case "workspace_delete":
+                        try await provider.delete(args["id"]?.string ?? "")
+                        return ToolResult.structured([:])
                     default:
                         return ToolResult.structured(["workspace": try await provider.act(.stop, args["id"]?.string ?? "").json])
                     }
@@ -227,6 +253,47 @@ actor Provider {
         }
         throw WorkspaceCommands.Failure(
             reason: "\(workspace.name) was still \(workspace.state.rawValue) after \(Self.words(timing.long)).")
+    }
+
+    // MARK: Making and deleting (US5)
+
+    func create(name: String, options: [String: JSON], firstBoot: String?) async throws -> Workspace {
+        guard let template = config.making.create else { throw WorkspaceCommands.Failure(reason: "It can't make workspaces.") }
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { throw WorkspaceCommands.Failure(reason: "A new workspace needs a name.") }
+        if try await list().contains(where: { $0.name == name || $0.id == name }) {
+            throw WorkspaceCommands.Failure(reason: "There is already a workspace called \(name).")
+        }
+        var values: [String: String] = ["name": name, "firstBoot": firstBoot ?? ""]
+        for (key, value) in options {
+            switch value {
+            case .string(let s): values[key] = s
+            case .int(let i): values[key] = String(i)
+            case .double(let d): values[key] = String(d)
+            case .bool(let b): values[key] = String(b)
+            default: continue
+            }
+        }
+        // The first-boot command carries a host code: logged as the template, never filled in.
+        log("workspace-commands: create \(name): \(template)")
+        let outcome = await run(Template.fill(template, values, quoted: true), timing.long)
+        guard outcome.status == 0, !outcome.timedOut else {
+            throw WorkspaceCommands.Failure(reason: Self.reason(outcome, line: template, doing: "making \(name)", deadline: timing.long))
+        }
+        if let made = try await list().first(where: { $0.name == name || $0.id == name }) { return made }
+        throw WorkspaceCommands.Failure(reason: "\(name) was made, but the list doesn't show it yet.")
+    }
+
+    func delete(_ id: String) async throws {
+        guard let template = config.making.delete else { throw WorkspaceCommands.Failure(reason: "It can't delete workspaces.") }
+        let workspace = try await find(id)
+        log("workspace-commands: delete \(workspace.name): \(template)")
+        let outcome = await run(Template.fill(template, workspace.values, quoted: true), timing.long)
+        guard outcome.status == 0, !outcome.timedOut else {
+            throw WorkspaceCommands.Failure(reason: Self.reason(outcome, line: template, doing: "deleting \(workspace.name)",
+                                                                deadline: timing.long))
+        }
+        left[id] = nil
     }
 
     // MARK: Words

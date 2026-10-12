@@ -225,6 +225,11 @@ kept request to it in order, as the client that sent it, with the same id the cl
 have retried with, so it is done once. Nothing else is kept: any other request for a stopped
 host is refused, and says it is stopped.
 
+A host also tells the control plane, on its own channel, whether it is idle: no turns, no
+questions waiting and no shells open. The control plane counts down each linked host's
+**stop when idle** from that, and stops the workspace through its provider when the time
+is up. The host's own clock isn't used.
+
 For now only a control plane with one copy runs providers, as only one holds ssh tunnels.
 
 ## When the store is down

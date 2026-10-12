@@ -29,6 +29,12 @@ public struct ToolMapping: Sendable, Equatable {
     public var list: Call
     public var start: Call
     public var stop: Call
+    /// Making and deleting (US5), when the provider can.
+    public var options: Call?
+    public var create: Call?
+    public var delete: Call?
+    /// A map's create: whether the server runs `{firstBoot}` on the new workspace.
+    public var firstBootRuns = false
     public var listing: Listing
     /// The contract's own tools, read as the contract says; false for a map.
     public var native: Bool
@@ -37,6 +43,9 @@ public struct ToolMapping: Sendable, Equatable {
     public static let contract = ToolMapping(
         list: Call(tool: "workspaces_list"), start: Call(tool: "workspace_start", arguments: ["id": "{id}"]),
         stop: Call(tool: "workspace_stop", arguments: ["id": "{id}"]),
+        options: Call(tool: "workspace_options"),
+        create: Call(tool: "workspace_create", arguments: ["name": "{name}", "options": "{options}", "firstBoot": "{firstBoot}"]),
+        delete: Call(tool: "workspace_delete", arguments: ["id": "{id}"]),
         listing: Listing(items: "workspaces", id: "id", name: "name", state: "state", ssh: "ssh", tunnel: "tunnel",
                          cost: "cost", states: [:]),
         native: true)
@@ -65,8 +74,11 @@ public struct ToolMapping: Sendable, Equatable {
             }
             states[word.lowercased()] = state
         }
+        func optional(_ key: String) throws -> Call? { json[key] == nil ? nil : try call(key) }
         return ToolMapping(
             list: try call("list"), start: try call("start"), stop: try call("stop"),
+            options: try optional("options"), create: try optional("create"), delete: try optional("delete"),
+            firstBootRuns: json["create"]?["firstBootRuns"]?.boolValue ?? false,
             listing: Listing(items: try path("items", required: false) ?? "", id: try path("id", required: true)!,
                              name: try path("name", required: true)!, state: try path("state", required: true)!,
                              ssh: try path("ssh", required: false), tunnel: try path("tunnel", required: false),
@@ -76,17 +88,29 @@ public struct ToolMapping: Sendable, Equatable {
 
     public static let states = ["running", "starting", "stopping", "stopped", "unknown"]
 
-    /// The tool its server lacks, by its own name, first in the order list, start, stop.
+    /// The tool its server lacks, by its own name, first in the order list, start, stop, and
+    /// then the optional ones it names.
     public func missing(from tools: [String]) -> String? {
-        [list.tool, start.tool, stop.tool].first { !tools.contains($0) }
+        ([list.tool, start.tool, stop.tool] + [options, create, delete].compactMap { $0?.tool }).first { !tools.contains($0) }
+    }
+
+    /// What a map can do besides list, start and stop, as `ProviderSummary.capabilities` says it.
+    public var capabilities: [String] {
+        [("options", options), ("create", create), ("delete", delete)].filter { $0.1 != nil }.map(\.0)
     }
 
     // MARK: Calls and results
 
     /// A call's arguments, with `{id}` filled in.
     public func arguments(_ call: Call, id: String?) -> JSONValue {
+        arguments(call, values: ["id": .string(id ?? "")])
+    }
+
+    /// A call's arguments, with each `{key}` filled in. A string that is only `{key}` becomes
+    /// the value itself, an object for `{options}`; a key with no value leaves it out.
+    public func arguments(_ call: Call, values: [String: JSONValue]) -> JSONValue {
         guard let template = call.arguments else { return [:] }
-        return Self.fill(template, ["id": id ?? ""])
+        return Self.fill(template, values) ?? [:]
     }
 
     /// What a tool answered, as JSON: `structuredContent`, or its first text parsed. A result
@@ -174,15 +198,22 @@ public struct ToolMapping: Sendable, Equatable {
     }
 
     /// A JSON template with each `{key}` in its strings filled in. A string that is only
-    /// `{id}` stays a string.
-    static func fill(_ template: JSONValue, _ values: [String: String]) -> JSONValue {
+    /// `{key}` is the value as it is, so `{id}` stays a string and `{options}` an object; one
+    /// whose key has no value is nil, and left out of the object it is in.
+    static func fill(_ template: JSONValue, _ values: [String: JSONValue]) -> JSONValue? {
         switch template {
         case .string(let s):
+            if s.hasPrefix("{"), s.hasSuffix("}"), !s.dropFirst().contains("{") {
+                return values[String(s.dropFirst().dropLast())]
+            }
             var out = s
-            for (key, value) in values { out = out.replacingOccurrences(of: "{\(key)}", with: value) }
+            for (key, value) in values {
+                guard let text = value.stringValue ?? scalar(value) else { continue }
+                out = out.replacingOccurrences(of: "{\(key)}", with: text)
+            }
             return .string(out)
-        case .array(let a): return .array(a.map { fill($0, values) })
-        case .object(let o): return .object(o.mapValues { fill($0, values) })
+        case .array(let a): return .array(a.compactMap { fill($0, values) })
+        case .object(let o): return .object(o.compactMapValues { fill($0, values) })
         default: return template
         }
     }

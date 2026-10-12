@@ -9,6 +9,8 @@ struct ControlProvidersPage: View {
     @State private var adding = false
     @State private var removing: DaemonAPI.ProviderSummary?
     @State private var addingHost: ControlAddServerSheet.Prefill?
+    /// New Workspace… (US5, L9).
+    @State private var making: DaemonAPI.ProviderSummary?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -30,6 +32,13 @@ struct ControlProvidersPage: View {
         .task { await control.listWorkspacesAgain() }
         .sheet(isPresented: $adding) { AddProviderSheet(control: control).paperSheet() }
         .sheet(item: $addingHost) { prefill in ControlAddServerSheet(control: control, prefill: prefill).paperSheet() }
+        .sheet(item: $making) { provider in
+            NewWorkspaceSheet(control: control, provider: provider) { prefill in
+                // After this sheet has gone, so the next can come up.
+                Task { @MainActor in addingHost = prefill }
+            }
+            .paperSheet()
+        }
         .confirmationDialog(removing.map { "Remove \($0.name)?" } ?? "",
                             isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
                             titleVisibility: .visible, presenting: removing) { provider in
@@ -43,6 +52,10 @@ struct ControlProvidersPage: View {
     private func providerCard(_ provider: DaemonAPI.ProviderSummary) -> some View {
         ControlCard {
             ControlRow(dot: .none, title: provider.name, chip: kindChip(provider), detail: providerLine(provider)) {
+                HStack(spacing: 8) {
+                if provider.capabilities.contains("create") {
+                    Button("New Workspace…") { making = provider }.buttonStyle(.paper)
+                }
                 Menu {
                     Button("List Again") { Task { await control.listWorkspacesAgain(provider.id) } }
                     Divider()
@@ -54,11 +67,19 @@ struct ControlProvidersPage: View {
                 .menuIndicator(.hidden)
                 .fixedSize()
                 .accessibilityLabel("More for \(provider.name)")
+                }
+                .fixedSize()
             }
             ForEach(provider.workspaces) { workspace in
                 Divider()
-                ControlRow(dot: dot(workspace), title: workspace.name, detail: workspaceLine(workspace)) {
-                    if workspace.host == nil {
+                ControlRow(dot: dot(workspace), title: workspace.name, detail: workspaceLine(workspace, of: provider)) {
+                    if control.isJoining(provider.id, workspace) {
+                        // Made here, installing on its first boot (US5).
+                        HStack(spacing: 6) {
+                            ProgressView().controlSize(.small)
+                            Text("Joining…").appText(.supporting).foregroundStyle(.secondary)
+                        }
+                    } else if workspace.host == nil {
                         Button("Add as Host…") {
                             addingHost = .init(destination: workspace.ssh ?? "", name: workspace.name,
                                                tunnel: workspace.tunnel ?? false, provider: provider.id,
@@ -104,7 +125,7 @@ struct ControlProvidersPage: View {
         }
     }
 
-    private func workspaceLine(_ workspace: DaemonAPI.WorkspaceInfo) -> String {
+    private func workspaceLine(_ workspace: DaemonAPI.WorkspaceInfo, of provider: DaemonAPI.ProviderSummary) -> String {
         var parts = [workspace.state.capitalized]
         if let host = workspace.host {
             parts.append("linked to \(control.hosts.first { $0.id == host }?.name ?? "a host")")

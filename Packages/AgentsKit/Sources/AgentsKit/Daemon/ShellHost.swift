@@ -226,6 +226,13 @@ public final class ShellHost: @unchecked Sendable {
 
     // MARK: Lifetime
 
+    /// Shells open now, busy or not: a host with one open isn't idle (#691 US4).
+    public var openCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return sessions.count
+    }
+
     /// Shells with something running in them. The daemon counts these as work it is
     /// holding and will not exit under them (FR-027).
     public var busyCount: Int {

@@ -687,6 +687,8 @@ extension DaemonCore {
         // hold from `changed(_:)`, in the same call that records the ending. Nothing
         // here waits fifteen seconds for that (024 T033).
         reviseWakefulness(readingPower: true)
+        // Whether this host is idle, for its workspace's stop when idle (#691 US4).
+        reviseHostStatus()
 
         // Blocked agents whose time to check again has come (039). Here, above the
         // guard below, for the same reason as the battery: the first tick after a start

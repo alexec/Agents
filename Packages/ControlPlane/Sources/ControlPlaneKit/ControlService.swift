@@ -325,6 +325,12 @@ public final class ControlService: @unchecked Sendable {
                         try await ServerInstaller(ssh: ssh).startDaemon(extra: ["--control-network", "--host-name", record.name])
                     },
                     openTunnel: { _ in await tunnels?.reconcile() },
+                    hostCommand: { [codes] in
+                        guard let command = try await codes.issue(.host).command else {
+                            throw ProviderFailure("This control plane gave no install command with its host code.")
+                        }
+                        return command
+                    },
                     connect: { [weak self, timing = configuration.providerTiming] record, secrets in
                         try ProviderConnection(record: record, secrets: secrets, cwd: home, timing: timing.calls,
                                                commandProvider: commandProvider,

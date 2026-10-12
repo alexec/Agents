@@ -313,6 +313,7 @@ public final class Daemon: @unchecked Sendable {
                                    dial: { [dialer] in try await dialer.dial() })
         self.uplink = uplink
         await core.deliverNeeds { [uplink] params in uplink.tell(DaemonAPI.Method.attentionNeed, params) }
+        await core.deliverStatus { [uplink] params in uplink.tell(DaemonAPI.Method.hostStatus, params) }
         await lendAndBorrowSignIns(through: uplink)
         uplink.start()
         let nudge: @Sendable (ReconnectTriggers.Reason) -> Void = { [uplink] reason in

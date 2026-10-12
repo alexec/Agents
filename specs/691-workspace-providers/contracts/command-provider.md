@@ -54,6 +54,10 @@ WORKSPACE_COMMANDS_CONFIG='{"preset":"docker","containers":["agents-devbox"],"ss
   [tool map](tool-map.md), within each item. An empty `items` means the output is the array.
 - `${column}` in a template is the value from the workspace's row. It is shell-quoted before
   the command runs.
+- `create`, `delete` and `options` (US5) need `list`, which finds what `create` made by its
+  name. `create` fills in `${name}`, `${firstBoot}` and each option's key; with `${firstBoot}`
+  it answers `firstBootRuns: true`. `delete` fills in `${id}` and the workspace's columns.
+  `options` is the New Workspace form's JSON Schema. No preset has them.
 - `states` maps the CLI's words to contract states. A status output is matched
   case-insensitively after trimming whitespace.
 
