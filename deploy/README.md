@@ -9,7 +9,7 @@ it out:
 
 | File | What it is |
 |---|---|
-| `Containerfile` | One static `agents-control`, a user of its own, no shell. |
+| `Containerfile` | Static `agents-control` and `workspace-commands` on Alpine, a user of their own. |
 | `compose.yaml` | MinIO (the bucket), three copies, and Caddy in front of them. |
 | `Caddyfile` | TLS, round robin, and `/readyz` health checks, so a copy that can't reach the store gets no new connections. |
 | `make-secrets.sh` | The control plane's key, shared by every copy, plus Caddy's certificate and its pin. With `--public`, the key only. |
