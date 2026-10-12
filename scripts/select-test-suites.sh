@@ -13,7 +13,10 @@
 # on every run. A change to App/Sources, Remote/Sources or Shared/UI runs the suites that
 # scan those views (ConsistencyTests, OneGroupingTests), and one to App/Resources/toolsets
 # the two that read the bundled toolsets. MCPServers (#700), the MCP servers Agents ships,
-# runs on any change to it, on Linux: it depends on nothing else here.
+# runs on any change to it, on Linux: it depends on nothing else here. `linux` builds the
+# Linux agentsd and ci-watcher (#805) on any change to what they are built from (Daemon/,
+# AgentsKit, MCPServers) or to the script and job that build them: AgentsKit code behind
+# a Mac-only guard used from unguarded code breaks only that build (#788, #799).
 #
 # CI's macOS jobs are chosen here as well (#594): `apps` is skip only when every changed
 # path is prose or agent config that no build reads, and `packages` (the job that runs
@@ -28,6 +31,7 @@ codetext=skip
 webtypes=skip
 controlplane=skip
 mcpservers=skip
+linux=skip
 agentskit_filter=
 codetext_filter=
 apps=build
@@ -38,6 +42,7 @@ full_both() {
 	webtypes=run
 	controlplane=run
 	mcpservers=run
+	linux=build
 	agentskit_filter=
 	codetext_filter=
 }
@@ -92,16 +97,19 @@ else
 					;;
 				Daemon/Package.swift)
 					agentskit_touched=true
+					linux=build
 					agentskit_full_required=true
 					;;
 				Packages/AgentsKit/Sources/*|Daemon/*)
 					agentskit_touched=true
+					linux=build
 					agentskit_source_touched=true
 					controlplane=run
 					[[ "$path" == Packages/AgentsKit/Sources/AgentsKitCore/* ]] && webtypes=run
 					;;
 				Packages/AgentsKit/*)
 					agentskit_touched=true
+					linux=build
 					agentskit_full_required=true
 					controlplane=run
 					;;
@@ -113,6 +121,7 @@ else
 					;;
 				Packages/MCPServers/*)
 					mcpservers=run
+					linux=build
 					;;
 				Web/*)
 					webtypes=run
@@ -159,6 +168,9 @@ else
 				Packages/CodeText/*)
 					codetext_touched=true
 					codetext_full_required=true
+					;;
+				scripts/build-linux-agentsd.sh|.github/workflows/ci.yml)
+					linux=build
 					;;
 				# These areas cannot affect either SwiftPM package's tests.
 				App/*|Host/*|Remote/*|RemoteNotify/*|RemoteWidget/*|docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|.github/workflows/*|scripts/select-test-suites.sh|scripts/check-test-indexing.py|scripts/check-agentsd-links-no-parsers.sh|scripts/web.sh|scripts/slow-tests.sh|scripts/flaky-tests.sh|scripts/normalize-metaltoolchain-cache.py)
@@ -232,6 +244,7 @@ fi
 	printf 'webtypes=%s\n' "$webtypes"
 	printf 'controlplane=%s\n' "$controlplane"
 	printf 'mcpservers=%s\n' "$mcpservers"
+	printf 'linux=%s\n' "$linux"
 	printf 'agentsd=%s\n' "$agentsd"
 	printf 'apps=%s\n' "$apps"
 	if [[ "$webtypes" == skip && "$controlplane" == skip ]]; then
