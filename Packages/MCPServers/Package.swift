@@ -13,6 +13,8 @@ let package = Package(
     platforms: [.macOS("27.0")],
     products: [
         .library(name: "MCPServerKit", targets: ["MCPServerKit"]),
+        // For project.yml's ci-watcher tool, which Agents Host carries (#700).
+        .library(name: "CIWatcher", targets: ["CIWatcher"]),
         .executable(name: "ci-watcher", targets: ["ci-watcher"]),
     ],
     targets: [

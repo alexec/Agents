@@ -49,6 +49,11 @@ let toolsetsFolder: URL? = {
     return FileManager.default.fileExists(atPath: folder.path) ? folder : nil
 }()
 
+// The MCP servers Agents ships (#700) sit beside this agentsd: Contents/Helpers in Agents
+// Host, ~/.agents-server/bin on a Linux host. `.agents/mcp.json` names them by bare name.
+RuntimeEnvironment.shippedServersFolder =
+    URL(filePath: Bundle.main.executablePath ?? CommandLine.arguments[0]).resolvingSymlinksInPath().deletingLastPathComponent()
+
 let daemon: Daemon
 do {
     let control: Daemon.Control? = if commandLine.controlNetwork {

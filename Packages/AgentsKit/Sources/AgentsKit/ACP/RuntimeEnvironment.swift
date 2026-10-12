@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// The environment a runtime is started with: the daemon's own, minus anything that
 /// would make the runtime believe it is somebody else's child.
@@ -21,5 +22,36 @@ public enum RuntimeEnvironment {
         environment.filter { key, _ in
             !parentSessionPrefixes.contains { key.hasPrefix($0) }
         }
+    }
+
+    /// The folder of the MCP servers Agents ships (#700), such as `ci-watcher`: agentsd's
+    /// own, Contents/Helpers in Agents Host and ~/.agents-server/bin on a Linux host. agentsd
+    /// sets it as it starts; nil anywhere else, where it changes nothing.
+    public static var shippedServersFolder: URL? {
+        get { shippedServers.withLock { $0 } }
+        set { shippedServers.withLock { $0 = newValue } }
+    }
+
+    private static let shippedServers = Mutex<URL?>(nil)
+
+    /// What an MCP server the daemon starts runs with: a runtime's environment, with the
+    /// shipped servers' folder first on PATH, so `.agents/mcp.json` names one by its bare
+    /// name (`"command": "ci-watcher"`) and the same entry, and its approval, holds on a Mac
+    /// and on a Linux host. Ours come first, so a stale copy elsewhere on PATH never answers
+    /// for them.
+    public static func forMCPServers(_ environment: [String: String] = ProcessInfo.processInfo.environment) -> [String: String] {
+        withShippedServers(forRuntimes(environment), first: true)
+    }
+
+    /// `environment` with the shipped servers' folder on PATH: first, or last, where it
+    /// shadows nothing the person has (a runtime's own, which starts the servers that are
+    /// not hosted).
+    public static func withShippedServers(_ environment: [String: String], first: Bool,
+                                          folder: URL? = shippedServersFolder) -> [String: String] {
+        guard let folder = folder?.path else { return environment }
+        let rest = (environment["PATH"] ?? "").split(separator: ":").map(String.init).filter { $0 != folder }
+        var out = environment
+        out["PATH"] = (first ? [folder] + rest : rest + [folder]).joined(separator: ":")
+        return out
     }
 }

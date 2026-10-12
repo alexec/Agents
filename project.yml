@@ -73,6 +73,9 @@ packages:
   # The control plane as a service (058): Agents Host carries its agents-control.
   ControlPlane:
     path: Packages/ControlPlane
+  # The MCP servers Agents ships (#700): Agents Host carries ci-watcher beside agentsd.
+  MCPServers:
+    path: Packages/MCPServers
   swift-nio-ssl:
     url: https://github.com/apple/swift-nio-ssl.git
     from: 2.29.0
@@ -457,6 +460,12 @@ targets:
         copy:
           destination: wrapper
           subpath: Contents/Helpers
+      # The MCP servers Agents ships (#700), beside agentsd, which puts this folder first
+      # on their PATH: `.agents/mcp.json` names them by bare name on a Mac and on Linux.
+      - target: ci-watcher
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
     info:
       path: Host/Info.plist
       properties:
@@ -511,6 +520,33 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.control
         PRODUCT_NAME: agents-control
+        SDKROOT: macosx
+        SUPPORTED_PLATFORMS: macosx
+        SKIP_INSTALL: YES
+        ENABLE_HARDENED_RUNTIME: YES
+      # The GitHub release (#669): Release signs it with Developer ID, outside the App Store.
+      configs:
+        Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: Developer ID Application
+          OTHER_CODE_SIGN_FLAGS: --timestamp
+
+  # The CI watcher (#383, #700), an MCP server built here for Agents Host's bundle; Linux
+  # builds it with `swift build` in Packages/MCPServers (scripts/build-linux-agentsd.sh).
+  ci-watcher:
+    type: tool
+    supportedDestinations: [macOS]
+    sources:
+      - path: Packages/MCPServers/Sources/ci-watcher
+    dependencies:
+      - package: MCPServers
+        product: CIWatcher
+      - package: MCPServers
+        product: MCPServerKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.ci-watcher
+        PRODUCT_NAME: ci-watcher
         SDKROOT: macosx
         SUPPORTED_PLATFORMS: macosx
         SKIP_INSTALL: YES

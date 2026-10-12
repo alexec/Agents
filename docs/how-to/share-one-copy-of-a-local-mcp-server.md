@@ -17,8 +17,13 @@ In the project's `.agents/mcp.json`, or your own `~/.agents/mcp.json`, add
 
 ```json
 { "mcpServers": {
-    "ci": { "command": "node", "args": ["Integrations/ci-watcher/server.ts"], "hosted": true } } }
+    "ci": { "command": "ci-watcher", "hosted": true } } }
 ```
+
+`ci-watcher` is one of the MCP servers Agents ships: a single binary beside the app's own
+`agentsd`, in Agents Host on a Mac and in `~/.agents-server/bin` on a Linux host, which the
+app puts first on the PATH of every server it starts. Named by its bare name, the same entry
+runs on any host, with nothing else installed there.
 
 Only a local server can be hosted: `"hosted"` on an entry with a `url` is a problem with
 the file, and the Shared tab says so. A project's entry with `"hosted"` added or changed is

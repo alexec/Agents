@@ -18,8 +18,9 @@ is shown as not supported yet.
 
 ## Before you start
 
-- A project with an MCP server that offers events. For the CI watcher you need Node 26 and a
-  signed-in `gh` (`gh auth status`). See `Integrations/ci-watcher/README.md` in the repo.
+- A project with an MCP server that offers events. The CI watcher ships with Agents Host and
+  the Linux host, and needs a signed-in `gh` (`gh auth status`) on the host. See
+  `Packages/MCPServers/README.md` in the repo.
 - For every setting, see [Workflow triggers and actions](../reference/workflows.md), and for
   what the event carries, [Events from MCP servers](../reference/events.md#events-from-mcp-servers).
 
@@ -30,7 +31,7 @@ Server events come from servers the project can already use: the project's
 project's `.agents/mcp.json` as `ci`, a local server the app hosts:
 
 ```json
-{ "mcpServers": { "ci": { "command": "node", "args": ["Integrations/ci-watcher/server.ts"], "hosted": true } } }
+{ "mcpServers": { "ci": { "command": "ci-watcher", "hosted": true } } }
 ```
 
 1. In the project's **MCP servers** section, `ci` arrived with the project, so it is
@@ -109,7 +110,8 @@ started.
 ## Turn it off
 
 Turn the workflow off with its **Enabled** switch, and the app stops asking the server for
-its events. To stop the CI watcher itself, run `Integrations/ci-watcher/run.sh stop`.
+its events. The CI watcher itself stops once nothing uses it: no agent's session has it open
+and no workflow listens for its events.
 
 ## See also
 

@@ -7,6 +7,7 @@ import Foundation
 ///
 ///     bin/agentsd-<sha>   one per version ever installed, until the next good connect
 ///     bin/current         which of them runs
+///     bin/ci-watcher      an MCP server Agents ships (#700), one copy, replaced in place
 ///     install.json        the version and checksum `current` points at
 ///     root/               an ordinary daemon root
 ///
@@ -154,6 +155,27 @@ public struct ServerInstaller: Sendable {
             }
             throw SSHCommand.classify(status: out.status, stderr: out.stderr, agentHasKeys: true)
                 ?? .installFailed(out.stderr)
+        }
+    }
+
+    /// Put an MCP server Agents ships (#700) at `bin/<name>`, beside agentsd, which puts its
+    /// own folder first on their PATH. A copy already there with this checksum is left; a new
+    /// one arrives as a `.part` and replaces it only once its checksum matches. A copy that is
+    /// running keeps its file until it stops.
+    public func installServer(named name: String, binary: URL, sha256: String) async throws {
+        let target = "$HOME/.agents-server/bin/\(name)"
+        let present = try await run("sha256sum \"\(target)\" 2>/dev/null | cut -d' ' -f1")
+        if present.status == 0, present.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == sha256 { return }
+        let script = """
+            set -e; umask 077; d="$HOME/.agents-server/bin"; mkdir -p "$d"; \
+            f="$d/.\(name).part"; cat > "$f"; \
+            echo "\(sha256)  $f" | sha256sum -c - >/dev/null || { rm -f "$f"; exit 1; }; \
+            chmod 700 "$f"; mv "$f" "$d/\(name)"
+            """
+        let out = try await ssh.run(ssh.runArguments(script), stdin: binary)
+        guard out.status == 0 else {
+            throw SSHCommand.classify(status: out.status, stderr: out.stderr, agentHasKeys: true)
+                ?? .installFailed("\(name) did not copy: \(out.stderr)")
         }
     }
 

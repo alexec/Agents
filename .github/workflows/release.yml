@@ -5,7 +5,8 @@
 # The release carries:
 #   Agents-Host-<version>.dmg              signed with Developer ID, notarized, stapled
 #   Agents-Host-<version>.zip              the same app, stapled, for Macs that can't mount a .dmg
-#   agentsd-linux-<arch>-<version>.tar.gz  the static Linux agentsd, for a Linux host
+#   agentsd-linux-<arch>-<version>.tar.gz  the static Linux agentsd, for a Linux host, with the
+#                                          MCP servers Agents ships beside it (#700)
 #   SHA256SUMS
 #
 # The signing material is in the `release` environment's secrets, which only a tag on main

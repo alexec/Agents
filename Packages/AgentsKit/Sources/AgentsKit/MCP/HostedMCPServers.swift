@@ -288,7 +288,7 @@ actor HostedMCPServers {
         do {
             process = try RuntimeProcess(
                 executable: URL(filePath: "/usr/bin/env"), arguments: [command] + args, cwd: held.cwd,
-                environment: RuntimeEnvironment.forRuntimes(runtimeEnvironment()).merging(env) { $1 },
+                environment: RuntimeEnvironment.forMCPServers(runtimeEnvironment()).merging(env) { $1 },
                 onStandardError: { [weak self] text in
                     stderr?.write(text.trimmingCharacters(in: .newlines))
                     Task { await self?.heard(stderr: text, key: key) }

@@ -95,7 +95,8 @@ public struct FakeGitHub: GitHub {
     public func listPRs(repo: String) async throws -> [BoardPR] {
         list(try load(), repo, "prs").filter { $0["state"]?.string == "open" }.map { p in
             let checks = Checks(rawValue: p["checks"]?.string ?? "") ?? .none
-            return BoardPR(pr: Self.toPR(p), checks: checks, failedRunId: checks == .failing ? p["failedRunId"]?.int : nil)
+            return BoardPR(pr: Self.toPR(p), checks: checks, failedRunId: checks == .failing ? p["failedRunId"]?.int : nil,
+                           conflicts: p["conflicts"]?.bool)
         }
     }
 

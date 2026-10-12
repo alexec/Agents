@@ -17,12 +17,13 @@ public enum CIWatcher {
         let poller = EventPoll()
         return MCPServer(
             info: .init(name: "ci-watcher", title: "CI watcher", version: version),
-            instructions: "This repo's pull requests, their CI, and its issues. Events: checks.failed, pr.merged, pr.closed, issue.opened, issue.labelled, issue.commented, issue.closed. Tools list pull requests and issues, read logs, rerun failed jobs and comment, as the signed-in gh user.",
+            instructions: "This repo's pull requests, their CI, and its issues. Events: checks.failed, pr.merged, pr.conflicted, pr.closed, issue.opened, issue.labelled, issue.commented, issue.closed. Tools list pull requests and issues, read logs, rerun failed jobs and comment, as the signed-in gh user.",
             tools: tools, resources: resources, events: events,
             extensions: ["io.modelcontextprotocol/ui": [:]],
             callTool: { tool, arguments in await callTool(gh, tool, arguments) },
             poll: { event, params in
                 let args = try await withRepo(gh, try event.inputSchema.check(params["arguments"]))
+                if event.name == "pr.conflicted" { return try await pollConflicts(gh, args, params) }
                 return try await poller.poll(event: event, params: params,
                                              candidates: { since in try await candidates(gh, event.name, args, since) },
                                              mapError: eventsError)
@@ -83,6 +84,10 @@ public enum CIWatcher {
         Event(name: "pr.closed", title: "Pull request closed", description: "A pull request was closed without being merged.",
               inputSchema: Schema(["repo": repoProperty, "branch": .string("Only the PR from this branch."), "pr": prProperty]),
               payloadSchema: ["type": "object", "properties": ["pr": prSchema, "closedAt": ["type": "string"]]]),
+        Event(name: "pr.conflicted", title: "Pull request in conflict",
+              description: "An open pull request began to conflict with its base, so it cannot merge and its CI may not run until it is rebased. Once per conflict: it is raised again only after the PR merges cleanly and then conflicts anew.",
+              inputSchema: Schema(["repo": repoProperty, "branch": .string("Only the PR from this branch."), "pr": prProperty]),
+              payloadSchema: ["type": "object", "properties": ["pr": prSchema, "conflictedAt": ["type": "string"]]]),
     ] + issueEvents()
 
     static func issueEvents() -> [Event] {
@@ -169,11 +174,38 @@ public enum CIWatcher {
         return (list, truncated)
     }
 
+    /// A conflict has no time on GitHub, only a state, so `pr.conflicted` diffs it (#712): the
+    /// cursor's ids are the PRs that were in conflict at the last poll, and one that is now and
+    /// was not then is raised. A first poll takes those already in conflict as known. A PR
+    /// GitHub has not worked out yet keeps the state it had.
+    static func pollConflicts(_ gh: some GitHub, _ args: [String: JSON], _ params: JSON) async throws(RPCError) -> JSON {
+        let first = params["cursor"] == nil || params["cursor"] == .null
+        let cursor = first ? PollCursor(since: "") : try PollCursor.decode(params["cursor"])
+        let limit = first ? 100 : min(100, max(1, params["maxEvents"]?.int ?? 50))
+        let prs: [BoardPR]
+        do { prs = try await gh.listPRs(repo: args["repo"]?.string ?? "") } catch { throw eventsError(error) }
+        let repo = args["repo"]?.string ?? "", pr = args["pr"]?.int, branch = args["branch"]?.string
+        let was = Set(cursor.ids)
+        let id = { (number: Int) in "pr.conflicted:\(repo):\(number)" }
+        let wanted = prs.filter { (pr == nil || $0.pr.number == pr) && (branch == nil || $0.pr.branch == branch) }
+        let now = wanted.filter { $0.conflicts == true || ($0.conflicts == nil && was.contains(id($0.pr.number))) }
+        let fresh = now.filter { !was.contains(id($0.pr.number)) }.sorted { $0.pr.number < $1.pr.number }
+        let taken = fresh.prefix(limit)
+        let time = Time.string(Date())
+        let ids = (now.filter { was.contains(id($0.pr.number)) } + taken).map { id($0.pr.number) }
+        let events: [JSON] = first ? [] : taken.map {
+            ["eventId": .string("\(id($0.pr.number)):\(time)"), "name": "pr.conflicted", "timestamp": .string(time),
+             "data": ["pr": $0.pr.json, "conflictedAt": .string(time)]]
+        }
+        return ["events": .array(events), "cursor": .string(PollCursor(since: time, ids: ids).encoded), "truncated": false,
+                "hasMore": .bool(!first && fresh.count > taken.count), "nextPollMs": 30000]
+    }
+
     // MARK: Tools
 
     static let tools: [Tool] = [
         Tool(name: "list_prs", title: "List pull requests",
-             description: "The repo's open pull requests, each with its checks: passing, failing, running or none. A failing one has the failed run's id for failed_log and rerun_failed.",
+             description: "The repo's open pull requests, each with its checks: passing, failing, running or none. A failing one has the failed run's id for failed_log and rerun_failed. conflicts says whether it conflicts with its base (left out while GitHub works it out); one in conflict may get no CI until it is rebased.",
              inputSchema: Schema(["repo": repoProperty]),
              annotations: ["readOnlyHint": true],
              meta: ["ui": ["resourceUri": "ui://ci/board", "visibility": ["model", "app"]], "ui/resourceUri": "ui://ci/board"]),

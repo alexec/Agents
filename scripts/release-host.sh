@@ -28,8 +28,8 @@ servers=$root/App/Resources/servers
 cd $root
 
 for arch in x86_64 aarch64; do
-    [[ -f $servers/agentsd-linux-$arch ]] || {
-        print -u2 "No $servers/agentsd-linux-$arch: run scripts/build-linux-agentsd.sh first."
+    [[ -f $servers/agentsd-linux-$arch && -f $servers/ci-watcher-linux-$arch ]] || {
+        print -u2 "No $servers/agentsd-linux-$arch or ci-watcher-linux-$arch: run scripts/build-linux-agentsd.sh first."
         exit 1
     }
 done
@@ -80,8 +80,9 @@ EOF
     }
 fi
 
-# What the bundle must hold, signed: the three helpers and the Linux agentsd.
-for helper in agentsd agents-control agents-relay.app; do
+# What the bundle must hold, signed: the helpers, the MCP servers it ships (#700) and the
+# Linux agentsd.
+for helper in agentsd agents-control agents-relay.app ci-watcher; do
     [[ -e "$app/Contents/Helpers/$helper" ]] || { print -u2 "Agents Host has no Helpers/$helper"; exit 1 }
 done
 codesign --verify --deep --strict "$app"
@@ -109,8 +110,9 @@ fi
 ditto -c -k --keepParent "$app" $out/Agents-Host-$version.zip
 
 for arch in x86_64 aarch64; do
+    # The MCP servers Agents ships (#700) go beside it: a Linux host puts them in its bin/.
     tar -czf $out/agentsd-linux-$arch-$version.tar.gz -C $servers agentsd-linux-$arch \
-        agentsd-linux-$arch.sha256 VERSION
+        agentsd-linux-$arch.sha256 ci-watcher-linux-$arch ci-watcher-linux-$arch.sha256 VERSION
 done
 (cd $out && shasum -a 256 *.dmg *.zip *.tar.gz > SHA256SUMS)
 print "\n$out:"
