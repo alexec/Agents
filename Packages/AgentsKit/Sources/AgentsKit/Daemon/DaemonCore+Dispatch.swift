@@ -300,6 +300,14 @@ extension DaemonCore {
                 return .success(try JSONValue.encoding(sharedSnapshot()))
                 #endif
 
+            // Every MCP server's health (#753), on every host.
+            case DaemonAPI.Method.mcpHealth:
+                return .success(try JSONValue.encoding(await mcpHealthSnapshot()))
+
+            case DaemonAPI.Method.mcpHealthCheck:
+                let request = try require(params, as: DaemonAPI.MCPHealthCheckRequest.self)
+                return .success(try JSONValue.encoding(await mcpHealthCheck(request)))
+
             #if canImport(CryptoKit)
             case DaemonAPI.Method.catalogSearch:
                 let request = try require(params, as: DaemonAPI.CatalogSearchRequest.self)
@@ -358,7 +366,9 @@ extension DaemonCore {
 
             case DaemonAPI.Method.mcpAdd:
                 let request = try require(params, as: DaemonAPI.MCPAddRequest.self)
-                return .success(try JSONValue.encoding(try await mcpAdd(request)))
+                let answer = try await mcpAdd(request)
+                scheduleMCPHealthReconcile()
+                return .success(try JSONValue.encoding(answer))
 
             case DaemonAPI.Method.mcpList:
                 let request = try require(params, as: DaemonAPI.MCPListRequest.self)
@@ -369,7 +379,9 @@ extension DaemonCore {
 
             case DaemonAPI.Method.mcpApprove:
                 let request = try require(params, as: DaemonAPI.MCPApproveRequest.self)
-                return .success(try JSONValue.encoding(try await mcpApprove(request)))
+                let answer = try await mcpApprove(request)
+                scheduleMCPHealthReconcile()
+                return .success(try JSONValue.encoding(answer))
 
             case DaemonAPI.Method.mcpForgetViews:
                 let request = try require(params, as: DaemonAPI.MCPViewsForgetRequest.self)
@@ -378,11 +390,15 @@ extension DaemonCore {
 
             case DaemonAPI.Method.mcpSetSecret:
                 let request = try require(params, as: DaemonAPI.MCPSetSecretRequest.self)
-                return .success(try JSONValue.encoding(try mcpSetSecret(request)))
+                let answer = try mcpSetSecret(request)
+                scheduleMCPHealthReconcile()
+                return .success(try JSONValue.encoding(answer))
 
             case DaemonAPI.Method.mcpRemove:
                 let request = try require(params, as: DaemonAPI.MCPRemoveRequest.self)
-                return .success(try JSONValue.encoding(try mcpRemove(request)))
+                let answer = try mcpRemove(request)
+                scheduleMCPHealthReconcile()
+                return .success(try JSONValue.encoding(answer))
 
             case DaemonAPI.Method.mcpVerify:
                 let request = try require(params, as: DaemonAPI.MCPVerifyRequest.self)
@@ -390,7 +406,9 @@ extension DaemonCore {
 
             case DaemonAPI.Method.mcpAddByHand:
                 let request = try require(params, as: DaemonAPI.MCPAddByHandRequest.self)
-                return .success(try JSONValue.encoding(try await mcpAddByHand(request)))
+                let answer = try await mcpAddByHand(request)
+                scheduleMCPHealthReconcile()
+                return .success(try JSONValue.encoding(answer))
 
             case DaemonAPI.Method.mcpSignIn:
                 let request = try require(params, as: DaemonAPI.MCPSignInRequest.self)
@@ -398,7 +416,9 @@ extension DaemonCore {
 
             case DaemonAPI.Method.mcpSignInWait:
                 let request = try require(params, as: DaemonAPI.MCPSignInFlowRequest.self)
-                return .success(try JSONValue.encoding(await mcpSignInWait(request)))
+                let answer = await mcpSignInWait(request)
+                scheduleMCPHealthReconcile()
+                return .success(try JSONValue.encoding(answer))
 
             case DaemonAPI.Method.mcpSignInCancel:
                 let request = try require(params, as: DaemonAPI.MCPSignInFlowRequest.self)
@@ -406,7 +426,9 @@ extension DaemonCore {
 
             case DaemonAPI.Method.mcpSignOut:
                 let request = try require(params, as: DaemonAPI.MCPSignOutRequest.self)
-                return .success(try JSONValue.encoding(await mcpSignOut(request)))
+                let answer = await mcpSignOut(request)
+                scheduleMCPHealthReconcile()
+                return .success(try JSONValue.encoding(answer))
             #endif
 
             case DaemonAPI.Method.runtimesInstall:

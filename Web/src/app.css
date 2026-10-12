@@ -1102,3 +1102,11 @@ button.plain:hover { opacity: 1; }
 .new-heading h1.project-switch { position: relative; cursor: pointer; }
 .new-heading h1.project-switch .caret { font-size: 13px; opacity: 0.5; }
 .new-heading h1.project-switch select { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; font: inherit; }
+
+/* A server's dot on an MCP Servers page (#753): filled when it answers or runs, the failure tint
+   when it does not, hollow otherwise, as the window's. */
+.mcp-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; vertical-align: 1px;
+  border: 1.5px solid currentColor; box-sizing: border-box; opacity: 0.7; }
+.mcp-dot.good { background: currentColor; border-color: currentColor; opacity: 0.55; }
+.mcp-dot.failing { background: var(--tint-failure); border-color: var(--tint-failure); opacity: 1; }
+.mcp-servers button { margin-top: 8px; }

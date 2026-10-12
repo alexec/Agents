@@ -319,6 +319,7 @@ final class AppModel {
             guard let key = selectedProjectKey else { return nil }
             if let id = openWorkflow { return .workflow(id, in: key) }
             if projectPage == .archive { return .archive(key) }
+            if projectPage == .mcpServers { return .projectMCPServers(key) }
             if let openPin { return .pin(openPin, in: key) }
             if let selection { return .session(selection) }
             return composing ? .project(key) : nil
@@ -339,6 +340,8 @@ final class AppModel {
                 showPin(path, in: key)
             case .archive(let key):
                 showProjectPage(.archive, of: key)
+            case .projectMCPServers(let key):
+                showProjectPage(.mcpServers, of: key)
             case .spending:
                 showsSpending = true
             case .resources:
@@ -543,6 +546,8 @@ final class AppModel {
 
     enum ProjectPage: Equatable {
         case archive
+        /// Its MCP servers and how each is doing (#753).
+        case mcpServers
     }
 
     /// The selected project's pinned page (#159) open in the chat's place, by its path in
@@ -1460,6 +1465,23 @@ final class AppModel {
         guard let snapshot = try? await client.call(DaemonAPI.Method.mcpHosted, Optional<String>.none,
                                                     returning: DaemonAPI.HostedMCPSnapshot.self) else { return }
         work.replaceHostedMCP(snapshot)
+    }
+
+    /// Every MCP server on a host and how each is doing (#753). A daemon too old to know
+    /// the method leaves it to the hosted servers alone.
+    func refreshMCPHealth(_ host: HostID = .mac) async {
+        guard let snapshot = try? await client(for: host).call(DaemonAPI.Method.mcpHealth, Optional<String>.none,
+                                                               returning: DaemonAPI.MCPHealthSnapshot.self) else { return }
+        work.replaceMCPHealth(snapshot, from: host)
+    }
+
+    /// Check Now on the person's own servers (no project) or a project's (#753).
+    func checkMCPHealth(project: ProjectKey?) async {
+        let host = project?.host ?? .mac
+        let request = DaemonAPI.MCPHealthCheckRequest(project: project?.folder.path)
+        guard let snapshot = try? await client(for: host).call(DaemonAPI.Method.mcpHealthCheck, request,
+                                                               returning: DaemonAPI.MCPHealthSnapshot.self) else { return }
+        work.replaceMCPHealth(snapshot, from: host)
     }
 
     /// Every volume low on space (#195). A daemon too old to know the method leaves it
@@ -2878,6 +2900,11 @@ final class AppModel {
             hosts.noteProjects(host, listed: listed)
             settleProjectSelection()
         }
+        // Its projects' MCP servers, for their rows in the sidebar (#753).
+        if let health = try? await server.call(DaemonAPI.Method.mcpHealth, Optional<String>.none,
+                                               returning: DaemonAPI.MCPHealthSnapshot.self) {
+            work.replaceMCPHealth(health, from: host)
+        }
         let theirs = Set(work.agents.filter { $0.host == host }.map(\.id))
         if let listed = try? await server.call(DaemonAPI.Method.permissionsPending,
                                                returning: [PermissionRequest].self) {
@@ -2917,13 +2944,14 @@ final class AppModel {
         async let storeNotes: Void = refreshStoreNotes()
         async let leases: Void = refreshLeases()
         async let hostedMCP: Void = refreshHostedMCP()
+        async let mcpHealth: Void = refreshMCPHealth()
         async let disk: Void = refreshDisk()
         async let events: Void = refreshEvents()
         async let modes: Void = refreshModes()
         async let transcript: Void = loadTranscript()
         _ = await (runtimes, accounts, workflows, pinned, permissions,
                    elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
-                   transcript, runtimeStates, sandbox, person, disk, storeNotes, hostedMCP)
+                   transcript, runtimeStates, sandbox, person, disk, storeNotes, hostedMCP, mcpHealth)
         #if DEBUG
         openFromLaunchArguments()
         #endif

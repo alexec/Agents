@@ -1047,10 +1047,27 @@ export interface ListRequest {
   query?: string;
 }
 
+export type MCPCheckState = "unchecked" | "checking" | "answered" | "failed" | "waiting" | "missingSecret" | "signIn" | "oldTransport";
+
 export interface MCPEventTrigger {
   event: string;
   servers?: string[];
   arguments: Record<string, JSONValue>;
+}
+
+export interface MCPHealthCheckRequest {
+  project?: string;
+}
+
+export interface MCPHealthFileProblem {
+  project?: string;
+  message: string;
+}
+
+export interface MCPHealthSnapshot {
+  servers: MCPServerHealth[];
+  problems: MCPHealthFileProblem[];
+  at: WireDate;
 }
 
 export interface MCPServer {
@@ -1058,10 +1075,24 @@ export interface MCPServer {
   transport: MCPServerTransport;
 }
 
+export interface MCPServerHealth {
+  name: string;
+  project?: string;
+  transport: MCPTransportName;
+  hosted: boolean;
+  live?: HostedMCPStatus;
+  check: MCPCheckState;
+  checkedAt?: WireDate;
+  lastError?: string;
+  tools?: number;
+}
+
 export type MCPServerTransport =
   | { stdio: { command: string; args: string[]; env: Record<string, string> } }
   | { http: { url: string; headers: Record<string, string> } }
   | { sse: { url: string; headers: Record<string, string> } };
+
+export type MCPTransportName = "stdio" | "http" | "sse";
 
 export interface MCPTriggerFailure {
   code: MCPTriggerFailureCode;
@@ -2164,6 +2195,8 @@ export interface Methods {
   "hosts/start": { params: HostRequest; result: ControlHost };
   "hosts/stop": { params: HostStop; result: ControlHost };
   "leases/snapshot": { params: Empty; result: LeaseSnapshot };
+  "mcp/health": { params: Empty; result: MCPHealthSnapshot };
+  "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
   "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
   "modes/remembered": { params: Empty; result: Record<string, JSONValue> };
   "options/remembered": { params: RememberedOptionsRequest; result: ConfigOption[] };
@@ -2277,6 +2310,8 @@ export const MethodTarget = {
   "hosts/start": "control",
   "hosts/stop": "control",
   "leases/snapshot": "host",
+  "mcp/health": "host",
+  "mcp/health/check": "host",
   "mcp/hosted": "host",
   "modes/remembered": "host",
   "options/remembered": "host",
@@ -2350,6 +2385,7 @@ export interface Notifications {
   "disk/changed": DiskState;
   "files/changed": FilesChangedNotification;
   "leases/changed": LeaseSnapshot;
+  "mcp/healthChanged": MCPHealthSnapshot;
   "mcp/hostedChanged": HostedMCPSnapshot;
   "modes/changed": Record<string, JSONValue>;
   "pages/changed": PagesChangedNotification;
@@ -2470,7 +2506,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ListCursor: { required: ["lastActivityAt", "id"], optional: [] },
   ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query"] },
   MCPEventTrigger: { required: ["event", "arguments"], optional: ["servers"] },
+  MCPHealthCheckRequest: { required: [], optional: ["project"] },
+  MCPHealthFileProblem: { required: ["message"], optional: ["project"] },
+  MCPHealthSnapshot: { required: ["servers", "problems", "at"], optional: [] },
   MCPServer: { required: ["name", "transport"], optional: [] },
+  MCPServerHealth: { required: ["name", "transport", "hosted", "check"], optional: ["project", "live", "checkedAt", "lastError", "tools"] },
   MCPTriggerFailure: { required: ["code", "message", "since"], optional: [] },
   MCPTriggerStatus: { required: ["name", "state"], optional: ["server", "lastPolledAt", "lastEventAt", "missedSince", "failure", "retryAt"] },
   MarkRuntimeAvailable: { required: ["credentialKey"], optional: [] },

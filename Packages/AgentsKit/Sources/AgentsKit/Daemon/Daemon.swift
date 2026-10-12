@@ -210,6 +210,8 @@ public final class Daemon: @unchecked Sendable {
         // must not wait on it.
         await core.startHostedServers()
         Task { await core.startMCPEvents() }
+        // Every server's health (#753), off the start for the same reason.
+        Task { await core.startMCPHealth() }
         try server.start()
         DaemonLog.shared.write("listening on \(locations.socket.path)")
         if let control {

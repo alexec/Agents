@@ -47,7 +47,16 @@ approved again, in the project's **MCP servers** section, as any changed entry i
 
 ## See what it is doing
 
-**Resources** (under Activity) has a **Hosted MCP servers** group, on the Mac, the Remote
-and in a browser: each server, whose file names it, whether it is running, idle or
-starting again, and why it last stopped. The server's stderr goes to
-`mcp-logs/<name>-<digest>.log` in the app's data folder, rolled at 1 MB.
+**MCP Servers** under Activity lists every server in your own `~/.agents/mcp.json`, and a
+project's own **MCP Servers** row, under it in the sidebar, lists the servers in its
+`.agents/mcp.json`; a project with none has no row. Both are on the Mac, the Remote and in
+a browser (#753). A hosted server's row says whether it is running, idle or starting
+again, and why it last stopped. Any other server is checked by the host as a session
+would reach it (`initialize`, then `tools/list`) when the app starts, when its entry
+changes, every four hours, and on **Check Now**; its row says whether it answered, when,
+and why not. A project's server waiting for approval, and one missing a secret, are never
+started to check them. The row's icon in the sidebar turns red when a server does not
+answer, or a hosted one stopped while in use.
+
+A hosted server's stderr goes to `mcp-logs/<name>-<digest>.log` in the app's data folder,
+rolled at 1 MB.

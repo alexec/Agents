@@ -89,6 +89,7 @@
 .row.page-row .pick { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; column-gap: 8px; align-items: center;
   border: none; background: none; padding: 5px 8px; text-align: left; font: inherit; color: inherit; min-width: 0; }
 .row.page-row .pin-mark { color: var(--accent); text-align: center; }
+.row.page-row .pin-mark.warns { color: var(--tint-failure); }
 .row.page-row .title { font-weight: 400; }
 
 /* A project's archive, in the chat's place (#499). */

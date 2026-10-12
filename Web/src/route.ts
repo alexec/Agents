@@ -25,6 +25,8 @@ export interface Route {
   compose?: boolean | undefined;
   /** The project's archived sessions and workflows (#495, #499), a page opened from one row of the sidebar. */
   archive?: boolean | undefined;
+  /** The project's MCP servers and how each is doing (#753), a page opened from its row in the sidebar. */
+  mcp?: boolean | undefined;
 }
 
 export function parseRoute(hash: string): Route {
@@ -41,6 +43,7 @@ export function parseRoute(hash: string): Route {
       case "f": route.files = value === "1"; break;
       case "n": route.compose = value === "1"; break;
       case "ar": route.archive = value === "1"; break;
+      case "m": route.mcp = value === "1"; break;
       case "a": if ((activityPages as readonly string[]).includes(value)) route.activity = value as ActivityPage; break;
     }
   }
@@ -58,6 +61,7 @@ export function routeHash(route: Route): string {
   if (route.session && route.files) parts.push("f", "1");
   if (route.host && route.project && !route.session && !route.workflow && !route.page && route.compose) parts.push("n", "1");
   else if (route.host && route.project && !route.session && !route.workflow && !route.page && route.archive) parts.push("ar", "1");
+  else if (route.host && route.project && !route.session && !route.workflow && !route.page && route.mcp) parts.push("m", "1");
   return "#/" + parts.map(encodeURIComponent).join("/");
 }
 

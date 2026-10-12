@@ -11,6 +11,7 @@
 // One list for the keys: ↑ and ↓ move through every row shown, opening what they land on, as the
 // window's selection does; → unfolds a project or group and ← folds it, or steps out to its project
 // from a row under it. The menu key, Shift-F10 or a right click opens a row's menu.
+import { healthTally, projectServers } from "../model/hostedMCP";
 import { signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import { actDoing, type Store } from "../model/store";
@@ -108,12 +109,12 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
   // What is open, from anywhere (a link, Back), unfolds its project so its row is there to light,
   // unless an open group at the top already shows it.
   useEffect(() => {
-    if (!r.host || !r.project || !(r.session || r.workflow || r.page || r.archive)) return;
+    if (!r.host || !r.project || !(r.session || r.workflow || r.page || r.archive || r.mcp)) return;
     const agent = r.session ? store.agent(r.host, r.session) : undefined;
     if (agent && inOpenSmartRow(store, r.host, agent)) return;
     if (r.workflow && folds.isSmartOpen("pinned") && store.workflowPinsIn(r.host, r.project).includes(r.workflow)) return;
     folds.set(r.host, r.project, true);
-  }, [r.host, r.project, r.session, r.workflow, r.page, r.archive]);
+  }, [r.host, r.project, r.session, r.workflow, r.page, r.archive, r.mcp]);
   // The next New Session at the top starts here too (#495).
   useEffect(() => {
     if (r.host && r.project && r.compose) rememberProject(storage, { host: r.host, folder: r.project });
@@ -436,6 +437,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
 
   const here = r.host === host.id && r.project !== undefined && folderKey(r.project) === folderKey(folder);
   const archiveCount = (project.counts.archived ?? 0) + archivedWorkflows.length;
+  const mcpTally = healthTally(projectServers(store.mcpHealthOf(host.id), folder));
   const fold = (open: boolean) => folds.set(host.id, folder, open);
   const projectPinned = project.project.pinned === true;
   const projectMenu: MenuItem[] = [
@@ -505,7 +507,20 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
             {!showsAllMatches.value && archived.length > matchesShown && (
               <button class="link show-all" onClick={() => (showsAllMatches.value = true)}>Show all {archived.length}</button>
             )}
-          </> : archiveCount > 0 && (
+          </> : <>
+          {mcpTally && (
+            // Its MCP servers (#753), when its .agents/mcp.json has any: a page, red when one does not answer.
+            <div class="nav-item">
+              <div class={`row page-row${here && r.mcp ? " chosen" : ""}`}>
+                <button class="pick" aria-current={here && !!r.mcp} aria-label={`MCP Servers, ${mcpTally.words}`}
+                  title={mcpTally.words} onClick={() => go({ host: host.id, project: folder, mcp: true })}>
+                  <span class={`pin-mark${mcpTally.failing ? " warns" : ""}`} aria-hidden="true">▤</span>
+                  <span class="title">MCP Servers</span>
+                </button>
+              </div>
+            </div>
+          )}
+          {archiveCount > 0 && (
             // The archive, one row opening a page (#495): never a fold inside the group.
             <div class="nav-item">
               <div class={`row page-row${here && r.archive ? " chosen" : ""}`}>
@@ -518,6 +533,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
               </div>
             </div>
           )}
+          </>}
         </div>
       )}
     </div>

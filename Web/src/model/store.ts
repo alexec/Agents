@@ -1,12 +1,13 @@
 // What the page holds and what each notification means: AgentsModel (Client/AgentsModel.swift),
 // ported by hand for the notifications the web remote hears and held to Fixtures/web/reducer
 // (research R7). Nothing here decides anything; the hosts do.
+import { projectPath } from "./hostedMCP";
 import { batch, computed, signal, type ReadonlySignal, type Signal } from "@preact/signals";
 import type {
   Agent, AgentRemovedNotification, ResumingNotification, ControlHost, HostID, HostWorkspace, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, ProjectRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
-  StartRequest, UUID, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, DiskState, StoreNotes,
+  StartRequest, UUID, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
   ChatProjectState, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, HostJoinStatus, KeptDelivered, KeptList, KeptRequest,
@@ -306,6 +307,9 @@ export class Work {
   readonly leases = signal<Record<string, LeaseSnapshot>>({});
   /** The MCP servers each host runs for every agent (#488), replaced whole by `mcp/hostedChanged`. */
   readonly hostedMCP = signal<Record<string, HostedMCPSnapshot>>({});
+  /** Every MCP server each host's mcp.json files name, and how each is doing (#753), replaced whole
+   * by `mcp/healthChanged`. */
+  readonly mcpHealth = signal<Record<string, MCPHealthSnapshot>>({});
   /** Each host's chats it is bringing back by itself after a restart: Coming back (#251). */
   readonly resuming = signal<Record<string, readonly string[]>>({});
   /** Each host's volumes low on space (#196), replaced whole by each disk/changed, never merged. */
@@ -468,6 +472,9 @@ export class Work {
         return true;
       case "mcp/hostedChanged":
         this.hostedMCP.value = { ...this.hostedMCP.value, [host]: params as HostedMCPSnapshot };
+        return true;
+      case "mcp/healthChanged":
+        this.mcpHealth.value = { ...this.mcpHealth.value, [host]: params as MCPHealthSnapshot };
         return true;
       case "disk/changed":
         this.disk.value = { ...this.disk.value, [host]: params as DiskState };
@@ -1092,6 +1099,7 @@ export class Store extends Work {
       this.workflowPins.value = notOf(this.workflowPins.value);
       this.leases.value = without(this.leases.value);
       this.hostedMCP.value = without(this.hostedMCP.value);
+      this.mcpHealth.value = without(this.mcpHealth.value);
       this.runtimes.value = without(this.runtimes.value);
       this.accounts.value = without(this.accounts.value);
       this.sandboxDefaults.value = without(this.sandboxDefaults.value);
@@ -1166,6 +1174,10 @@ export class Store extends Work {
     void this.link.call("mcp/hosted", {}, host).then((snapshot) => {
       this.hostedMCP.value = { ...this.hostedMCP.value, [host]: snapshot };
     }).catch(failed("mcp/hosted"));
+    // A host from before #753 doesn't know it: its page shows the hosted servers alone.
+    void this.link.call("mcp/health", {}, host).then((snapshot) => {
+      this.mcpHealth.value = { ...this.mcpHealth.value, [host]: snapshot };
+    }).catch(failed("mcp/health"));
     // A host too old to know disk/state says nothing, and no strip is drawn.
     void this.link.call("disk/state", {}, host).then((state) => {
       this.disk.value = { ...this.disk.value, [host]: state };
@@ -1602,6 +1614,29 @@ export class Store extends Work {
       if (accounts) this.accounts.value = { ...this.accounts.value, [host]: accounts };
       if (modes) this.rememberedModes.value = { ...this.rememberedModes.value, [host]: modes };
     });
+  }
+
+  /** A host's MCP servers (#753); from a host too old to say, its hosted servers alone, as the page
+   * showed them before. */
+  mcpHealthOf(host: string): MCPHealthSnapshot | undefined {
+    const health = this.mcpHealth.value[host];
+    if (health) return health;
+    const hosted = this.hostedMCP.value[host];
+    if (!hosted) return undefined;
+    return {
+      servers: hosted.servers.map((live) => ({
+        name: live.name, ...(live.project != null ? { project: live.project } : {}),
+        transport: "stdio" as const, hosted: true, live, check: "unchecked" as const,
+      })),
+      problems: [], at: hosted.at,
+    };
+  }
+
+  /** Check Now on the person's own servers (no folder) or a project's (#753). */
+  async checkMCPHealth(host: string, folder?: string): Promise<void> {
+    const request = folder === undefined ? {} : { project: projectPath(folder) };
+    const snapshot = await this.link.call("mcp/health/check", request, host).catch(() => null);
+    if (snapshot) this.mcpHealth.value = { ...this.mcpHealth.value, [host]: snapshot };
   }
 
   async markRuntimeAvailable(host: string, credentialKey: string): Promise<void> {

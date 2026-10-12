@@ -1,29 +1,60 @@
 import AgentsKitCore
 import SwiftUI
 
-/// The MCP servers this Mac runs once for every agent (#488), a page of its own under
-/// Activity (#589): what each is doing, and why it last stopped. It was a group on
-/// Resources, which is about leases.
+/// Every MCP server in one `mcp.json` and how each is doing (#753): under Activity, the
+/// person's own `~/.agents/mcp.json` (#589); under a project, its `.agents/mcp.json`.
 ///
-/// Read-only: a server is hosted by `"hosted": true` on a stdio entry in its `mcp.json`.
-/// An http server is already one copy for every client, so the key does nothing there.
+/// A hosted server (#488) says what its one copy is doing; any other, what the host found
+/// when it last checked it, and Check Now checks them again. Read-only otherwise: Settings
+/// is where servers are edited.
 struct MCPServersView: View {
     @Environment(AppModel.self) private var model
+    /// Nil for the person's own servers, on this Mac.
+    var project: ProjectKey?
+    @State private var checking = false
 
-    private var servers: [DaemonAPI.HostedMCPStatus] { model.hostedMCP?.servers ?? [] }
+    private var host: HostID { project?.host ?? .mac }
+    private var snapshot: DaemonAPI.MCPHealthSnapshot? { model.work.mcpHealthSnapshot(host) }
+
+    private var servers: [DaemonAPI.MCPServerHealth] {
+        guard let project else { return snapshot?.personal ?? [] }
+        return model.work.mcpServers(in: project)
+    }
+
+    private var problem: String? { snapshot?.problem(in: project?.folder.path) }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text("MCP servers this Mac runs once and shares with every agent, rather than one "
-                     + "copy in each session. A stdio entry in mcp.json is hosted with \"hosted\": true.")
-                    .appText(.supporting)
-                    .foregroundStyle(.secondary)
+                HStack(alignment: .firstTextBaseline, spacing: 16) {
+                    Text(project == nil ? MCPHealthWords.personalIntro : MCPHealthWords.projectIntro)
+                        .appText(.supporting)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                    Button("Check Now") {
+                        checking = true
+                        Task {
+                            await model.checkMCPHealth(project: project)
+                            checking = false
+                        }
+                    }
+                    .disabled(checking || !servers.contains { !$0.hosted })
+                    .help("Check every server that is not hosted again now")
+                }
+                if let problem {
+                    Text(problem)
+                        .appText(.fine)
+                        .foregroundStyle(StateTint.failure.style(or: .secondary))
+                        .textSelection(.enabled)
+                }
                 if !servers.isEmpty {
                     VStack(spacing: 0) {
-                        ForEach(Array(servers.enumerated()), id: \.element.id) { index, status in
+                        ForEach(Array(servers.enumerated()), id: \.element.id) { index, server in
                             if index > 0 { Divider().padding(.leading, 32) }
-                            HostedMCPRow(status: status)
+                            MCPHealthRow(server: server)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
                         }
                     }
                     .padding(.vertical, 4)
@@ -33,56 +64,17 @@ struct MCPServersView: View {
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .navigationTitle("MCP Servers")
+        .navigationTitle(project.flatMap { model.work.project($0)?.name }.map { "\($0) \u{2014} MCP Servers" }
+                         ?? "MCP Servers")
         .overlay {
-            if servers.isEmpty {
-                Text("No hosted servers. Every MCP server runs in each session that uses it.")
+            if servers.isEmpty && problem == nil {
+                Text(project == nil ? MCPHealthWords.personalEmpty : MCPHealthWords.projectEmpty)
                     .foregroundStyle(.secondary)
             }
         }
-        .task { await model.refreshHostedMCP() }
-    }
-}
-
-/// One hosted server: its state's dot, its name and whose file, its line, and why it last
-/// stopped, in the failure tint while it is starting again.
-private struct HostedMCPRow: View {
-    let status: DaemonAPI.HostedMCPStatus
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            dot.padding(.top, 5)
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    Text(status.name).appText(.reading).fontWeight(.semibold)
-                    Text(HostedMCPWords.place(status)).appText(.fine).foregroundStyle(.secondary)
-                }
-                Text(HostedMCPWords.line(status)).appText(.fine).foregroundStyle(.secondary)
-                if let error = HostedMCPWords.lastError(status) {
-                    Text(error)
-                        .appText(.fine)
-                        .foregroundStyle(status.state == .restarting
-                                         ? StateTint.failure.style(or: .secondary) : AnyShapeStyle(.secondary))
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            Spacer(minLength: 12)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .accessibilityElement(children: .combine)
-    }
-
-    @ViewBuilder
-    private var dot: some View {
-        switch status.state {
-        case .running, .starting:
-            Circle().fill(.secondary).frame(width: 10, height: 10)
-        case .restarting:
-            Circle().fill(StateTint.failure.style(or: .secondary)).frame(width: 10, height: 10)
-        case .idle:
-            Circle().strokeBorder(.secondary, lineWidth: 1.5).frame(width: 10, height: 10)
+        .task(id: host) {
+            await model.refreshHostedMCP()
+            await model.refreshMCPHealth(host)
         }
     }
 }
@@ -92,15 +84,15 @@ struct MCPServersRow: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        // The title alone (#587): how many run is the tooltip's, and one stopped turns the
-        // row's icon red (`activityIcon(_:warns:)`).
-        let words = HostedMCPWords.tally(model.hostedMCP?.servers ?? [])?.words
+        // The title alone (#587): the count is the tooltip's, and one not answering turns
+        // the row's icon red (`activityIcon(_:warns:)`).
+        let words = MCPHealthWords.tally(model.work.mcpHealthSnapshot()?.personal ?? [])?.words
         HStack(alignment: .firstTextBaseline) {
             Text("MCP Servers").foregroundStyle(.primary)
             Spacer()
         }
-        .help(words.map { "\($0). The MCP servers this Mac runs once for every agent, and why each last stopped" }
-              ?? "The MCP servers this Mac runs once for every agent, and why each last stopped")
+        .help(words.map { "\($0). Every server in your own mcp.json, and how each is doing" }
+              ?? "Every server in your own mcp.json, and how each is doing")
         .accessibilityValue(words ?? "")
     }
 }

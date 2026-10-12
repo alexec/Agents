@@ -8,12 +8,13 @@ import type { Store } from "../model/store";
 import type { AllowanceState, Consequence, ControlHost, CostState, Event, ProjectSummary, RuntimeAvailability, RuntimeStatus } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import type { ActivityPage } from "../route";
-import { HostedMCP, Resources } from "./Resources";
+import { Resources } from "./Resources";
+import { MCPServersList } from "./MCPServers";
 import { BackToList } from "./BackToList";
 import { Modal } from "./Modal";
 import { folderKey, projectFolder } from "../model/groups";
 import { runtimeTally } from "../model/runtimes";
-import { hostedTally } from "../model/hostedMCP";
+import { healthTally, personalEmpty, personalIntro, personalServers } from "../model/hostedMCP";
 import { refusalMessage } from "../model/workflows";
 
 function navigate(destination: { host: string; project: string; session?: string; workflow?: string }): void {
@@ -153,7 +154,7 @@ export function ActivityRows({ store, chosen, onPick }: {
   const held = resources.reduce((n, r) => n + (r.holds ?? (r.lease ? [r.lease] : [])).length, 0);
   const waiting = resources.reduce((n, r) => n + r.line.length, 0);
   const tally = runtimeTally(Object.values(store.runtimes.value).flat());
-  const hosted = hostedTally(Object.values(store.hostedMCP.value).flatMap((s) => s.servers));
+  const mcp = healthTally(store.hosts.value.flatMap((host) => personalServers(store.mcpHealthOf(host.id))));
   const costs = store.costs.value;
   const today = totalWords(todayTotals(costs));
   const mac = costs["mac"];
@@ -177,8 +178,8 @@ export function ActivityRows({ store, chosen, onPick }: {
       {row("runtimes", "Runtimes", "What each runtime can be started on right now",
         tally ? (tally.working === 0 ? `None of ${tally.total} working` : `${tally.working} of ${tally.total} working`) : null,
         tally?.working === 0)}
-      {row("mcp", "MCP Servers", "The MCP servers each host runs once for every agent, and why each last stopped",
-        hosted?.words ?? null, hosted?.stopped ?? false)}
+      {row("mcp", "MCP Servers", "Every server in your own mcp.json, and how each is doing",
+        mcp?.words ?? null, mcp?.failing ?? false)}
       {row("spending", "Cost", "What all of the work has cost, and what it cost today", spent || null,
         closeToFull(mac))}
     </>
@@ -240,15 +241,15 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
           ))}
           {page === "mcp" && (
             <>
-              <p class="hint">MCP servers each host runs once and shares with every agent, rather than one copy in each session. A stdio entry in mcp.json is hosted with "hosted": true.</p>
+              <p class="hint">{personalIntro}</p>
               {store.hosts.value.map((host) => (
                 <section key={host.id}>
                   {several && <h2 class="section-head">{hostName(host.id)}</h2>}
-                  <HostedMCP store={store} host={host.id} />
+                  <MCPServersList store={store} host={host.id} />
                 </section>
               ))}
-              {Object.values(store.hostedMCP.value).every((s) => s.servers.length === 0) && (
-                <p class="hint">No hosted servers. Every MCP server runs in each session that uses it.</p>
+              {store.hosts.value.every((host) => personalServers(store.mcpHealthOf(host.id)).length === 0) && (
+                <p class="hint">{personalEmpty}</p>
               )}
             </>
           )}

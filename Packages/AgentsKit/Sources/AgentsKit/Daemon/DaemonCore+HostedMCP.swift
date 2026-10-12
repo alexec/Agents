@@ -19,6 +19,8 @@ extension DaemonCore {
 
     private func hostedServersChanged() async {
         broadcast(DaemonAPI.Notification.mcpHostedChanged, await hostedServers.snapshot())
+        // The MCP Servers pages draw a hosted server's state from the health snapshot (#753).
+        scheduleMCPHealthReconcile()
     }
 
     /// `server`, hosted, as `user` is handed it: an http server on the app's endpoint with

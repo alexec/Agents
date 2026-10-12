@@ -485,6 +485,8 @@ public actor DaemonCore {
     /// Servers' events as workflow triggers (#383): the subscriptions, their polls and
     /// what each has got to.
     var mcpEvents = MCPEventsState()
+    /// Every MCP server's health, as last checked (#753).
+    var mcpHealth = MCPHealthBook()
     /// Events raised before the workflows were read, held for their triggers until
     /// `startWorkflows`, with the run each ended, kept in the order they happened.
     ///
