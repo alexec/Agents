@@ -28,6 +28,8 @@ WORKSPACE_COMMANDS_CONFIG='{"preset":"docker","containers":["agents-devbox"],"ss
 ```
 
 - `id` defaults to `name`.
+- `${…}` with no value of its own (`${TOKEN}`) is left for the shell, so a secret in the
+  environment can be used either way.
 - `status` is optional. Without it, the state is the last start's or stop's result while the
   server runs, and `unknown` before that.
 
@@ -45,8 +47,11 @@ WORKSPACE_COMMANDS_CONFIG='{"preset":"docker","containers":["agents-devbox"],"ss
 }
 ```
 
-- `list` prints one workspace per line, split on whitespace into `columns`. If `list` starts
-  with `json:`, it is read as JSON instead, with the paths of the [tool map](tool-map.md).
+- `list` prints one workspace per line, split on whitespace into `columns`. The last column
+  takes the rest of the line.
+- Or, instead of `columns`, `"json": {"items": "<path to the array>", "id": "<path>", "name":
+  "<path>", "state": "<path>", …}` reads the output as JSON. The paths are those of the
+  [tool map](tool-map.md), within each item. An empty `items` means the output is the array.
 - `${column}` in a template is the value from the workspace's row. It is shell-quoted before
   the command runs.
 - `states` maps the CLI's words to contract states. A status output is matched
@@ -62,8 +67,8 @@ Its parameters fill them in.
 | `docker` | `containers` (names), `ssh` | `docker inspect -f '{{.State.Status}}' ${id}` / `docker start ${id}` / `docker stop ${id}`. States: running→running, exited/created→stopped, restarting→starting. | as given |
 | `doctl` | `tag` | `doctl compute droplet list --tag-name ${tag} …` / `droplet-action power-on --wait` / `power-off --wait`. States: active/new/off. | `root@${ip}` or `user` param |
 | `codespaces` | `repo` (optional) | `gh codespace list --json name,displayName,state` / `gh codespace ssh -c ${id} -- true` (a codespace starts when used) / `gh codespace stop -c ${id}`. States: Available→running, Shutdown→stopped, Starting→starting. | `gh codespace ssh --config` alias, `tunnel: true` |
-| `coder` | none | `coder list -o json` / `coder start -y ${id}` / `coder stop -y ${id}`. Read with `json:` paths. | `coder.${name}` (from `coder config-ssh`) |
-| `gcloud-workstations` | `cluster`, `config`, `region` | `gcloud workstations list --format=json …` / `start` / `stop`. | `tunnel: true`; `gcloud workstations ssh` alias is noted in docs |
+| `coder` | none | `coder list -o json` / `coder start -y ${id}` / `coder stop -y ${id}`. Read as JSON (`latest_build.status`). | `coder.${name}` (from `coder config-ssh`) |
+| `gcloud-workstations` | `cluster`, `config`, `region` | `gcloud workstations list … --format='value(name.basename(),state)'` / `start` / `stop`. States: STATE_RUNNING and so on. | `tunnel: true`; `gcloud workstations ssh` alias is noted in docs |
 
 Each preset's exact command lines are fixed by unit tests that check the strings (no CLI is
 run). A preset needs its CLI installed and signed in where the control plane runs. If the CLI
