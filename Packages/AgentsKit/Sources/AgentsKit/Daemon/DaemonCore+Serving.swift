@@ -156,7 +156,9 @@ extension DaemonCore {
         let addressed = addressed
         let showing = showing
         let service = TerminalService(scope: scope,
-                                      defaultCWD: agent?.cwd ?? locations.root) { terminalID, chunk in
+                                      defaultCWD: agent?.cwd ?? locations.root,
+                                      // What the agent's runtime is given, no more (#727).
+                                      environment: ProcessSessionLauncher.runtimeEnvironment(agent?.runtimeID ?? "", locations: locations)) { terminalID, chunk in
             // Output goes straight to the windows as it arrives, so a long command
             // reads like a terminal rather than appearing all at once at the end. Only
             // to those showing the agent (#203); one that opens it later is sent what the

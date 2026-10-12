@@ -101,7 +101,8 @@ public struct RuntimeDiscovery: Sendable {
                                                 arguments: runtime.arguments,
                                                 cwd: cwd,
                                                 environment: RuntimeLaunchCatalog.launch(for: runtime.id)
-                                                    .environment(over: LoginShellPath.environment(), root: root))
+                                                    .environment(over: RuntimeEnvironment.forRuntime(runtime.id, LoginShellPath.environment()),
+                                                                 root: root))
             let result = try await session.initialize()
             await session.end(gracePeriod: .seconds(2))
             return .available(path: path, supportsResume: result.supportsResume)
