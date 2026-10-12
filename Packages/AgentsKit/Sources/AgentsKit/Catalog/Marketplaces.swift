@@ -18,6 +18,7 @@ import AgentsKitCore
 /// of their secrets to any host it names, as an MCP server from a pull waits for an OK.
 enum Marketplaces {
     static let fileName = "marketplaces.json"
+    static let skillsShID = "provided:skills-sh"
 
     /// The app's own list, in the order the sheet offers them: GitHub's registry first,
     /// because it is curated and ranked, where the official one is neither (060 R1).
@@ -32,7 +33,7 @@ enum Marketplaces {
             .init(id: "provided:official-mcp", name: "MCP Registry", format: .mcpRegistry,
                   url: registry ?? "https://registry.modelcontextprotocol.io", origin: .provided,
                   about: "The open registry: everything published, in its own order."),
-            .init(id: "provided:skills-sh", name: "skills.sh", format: .skillsSh,
+            .init(id: skillsShID, name: "skills.sh", format: .skillsSh,
                   url: catalog ?? "https://skills.sh", origin: .provided,
                   about: "Skills on GitHub, most installed first."),
             .init(id: "provided:anthropic-skills", name: "Anthropic skills", format: .gitHubSkills,

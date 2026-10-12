@@ -151,16 +151,17 @@ struct SkillInstaller: Sendable {
         // 4. The project's Claude link, if the project has none (research R7).
         if let folder = place.folder { Self.linkClaudeSkills(in: folder) }
         // 5. The sidecar: worth having, not worth failing for.
+        let catalogue = preview.result.marketplace ?? Marketplaces.skillsShID
         var side = CatalogSidecar.load(from: sidecar)
         side.skills[CatalogSidecar.key(place.destination, name: preview.name)] = .init(
             commit: preview.commit, committedAt: preview.committedAt, treeSHA: preview.treeSHA,
-            catalogue: "skills.sh", addedAt: now, folderHash: try? SkillHashes.computedHash(folder: target))
+            catalogue: catalogue, addedAt: now, folderHash: try? SkillHashes.computedHash(folder: target))
         try? side.save(to: sidecar) { _ in true }
 
         return DaemonAPI.ManagedSkill(
             destination: place.destination, name: preview.name, source: preview.result.source,
             skillPath: preview.skillPath, recordedHash: place.lockKind == .personal ? preview.treeSHA : preview.computedHash,
-            commit: preview.commit, committedAt: preview.committedAt, catalogue: "skills.sh", edited: false, update: .current)
+            commit: preview.commit, committedAt: preview.committedAt, catalogue: catalogue, edited: false, update: .current)
     }
 
     // MARK: Reading what is managed

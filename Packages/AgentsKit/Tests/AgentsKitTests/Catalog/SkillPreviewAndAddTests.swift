@@ -159,6 +159,21 @@ struct SkillPreviewAndAddTests {
         #expect(w.installer.managed(at: w.personal)["nested"]?.edited == false)
     }
 
+    /// Where it came from is the marketplace the result was found in, not always skills.sh (#746).
+    @Test func anAddedSkillRecordsItsMarketplace() async throws {
+        let w = try world()
+        var staged = try await stage(w, "nested")
+        staged.preview.result.marketplace = "personal:acme"
+        let managed = try w.installer.add(staged, to: w.personal, replace: false)
+        #expect(managed.catalogue == "personal:acme")
+        #expect(CatalogSidecar.load(from: w.installer.sidecar).skills["personal/nested"]?.catalogue == "personal:acme")
+        #expect(w.installer.managed(at: w.personal)["nested"]?.catalogue == "personal:acme")
+
+        let other = try world()
+        let fromSkillsSh = try other.installer.add(try await stage(other, "nested"), to: other.personal, replace: false)
+        #expect(fromSkillsSh.catalogue == Marketplaces.skillsShID)
+    }
+
     @Test func aFolderNoLockNamesIsNeverTouched() async throws {
         let w = try world()
         let mine = w.home.appending(path: ".agents/skills/nested")
