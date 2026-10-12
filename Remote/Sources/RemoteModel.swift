@@ -1266,6 +1266,47 @@ final class RemoteModel {
         }
     }
 
+    /// What a waiting item in Needs You is (#773), for the person deciding.
+    func readApproval(_ approval: Approval, for key: ProjectKey) async -> GuardedChangeReading? {
+        let request = ApprovalReadRequest(folder: key.folder, kind: approval.kind, key: approval.key)
+        do {
+            return try await client(for: request).call(DaemonAPI.Method.approvalsRead, request,
+                                                       returning: GuardedChangeReading.self)
+        } catch {
+            problem = sentence(for: error)
+            return nil
+        }
+    }
+
+    /// Approve, Deny or Request changes on a waiting item (#773), of the version shown;
+    /// nil when it went, else why not, for the sheet to say.
+    func answerApproval(_ approval: Approval, _ action: Approval.Action, digest: String?, note: String?,
+                        for key: ProjectKey) async -> String? {
+        var answer = ApprovalAnswer(approval, in: key.folder, action: action, note: note)
+        answer.digest = digest ?? approval.digest
+        do {
+            var summary: DaemonAPI.ProjectSummary = try await client(for: answer).call(
+                DaemonAPI.Method.approvalsAnswer, answer, returning: DaemonAPI.ProjectSummary.self)
+            summary.host = key.host
+            work.upsert(summary)
+            return nil
+        } catch {
+            return sentence(for: error)
+        }
+    }
+
+    /// Approve or Deny from a row's long press, of the version the row shows.
+    func settleApproval(_ approval: Approval, _ action: Approval.Action, for key: ProjectKey) async {
+        if let why = await answerApproval(approval, action, digest: approval.digest, note: nil, for: key) { problem = why }
+    }
+
+    /// Deny a session's ask to be archived (#773): the mark goes and the session stays.
+    func keepSession(_ agent: Agent) async {
+        let ask = Approval(kind: .archive, key: agent.id.uuidString, title: agent.title ?? "", digest: nil,
+                           line: "", actions: [.deny], agentID: agent.id)
+        await settleApproval(ask, .deny, for: ProjectKey(host: agent.host, folder: agent.projectFolder))
+    }
+
     /// A file being read, by path, or nothing.
     ///
     /// On the model rather than in a view's `@State` because the tap that opens one is

@@ -6,6 +6,8 @@ import { asksToArchive } from "./groups";
 export const archiveMark = "Archiving needs approval";
 export const archiveLabel = "Approve";
 export const archiveHelp = "The agent is done with this session: approve archiving it";
+/** Deny (#773): the request goes, and the session stays where it is. */
+export const keepLabel = "Keep Session";
 
 /** ArchiveRequestWords.line: "Archiving needs approval", or null for a session that does not. */
 export function archiveLine(agent: Agent): string | null {

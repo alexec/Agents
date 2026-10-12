@@ -31,7 +31,7 @@ struct GuardedChangeCard: View {
                 .fixedSize(horizontal: false, vertical: true)
             if let reading {
                 ScrollView {
-                    diff(reading)
+                    GuardedDiffView(reading: reading)
                 }
                 .frame(maxHeight: 220)
                 .fixedSize(horizontal: false, vertical: true)
@@ -58,7 +58,22 @@ struct GuardedChangeCard: View {
         }
     }
 
-    private func diff(_ reading: GuardedChangeReading) -> some View {
+    private func answer(keep: Bool) {
+        guard let reading else { return }
+        busy = true
+        Task {
+            await settle(reading, keep)
+            busy = false
+        }
+    }
+}
+
+/// A guarded change's lines against the approved copy, marked kept, removed or added: the
+/// card's (#502) and the approval sheet's (#773).
+struct GuardedDiffView: View {
+    let reading: GuardedChangeReading
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(reading.lines.enumerated()), id: \.offset) { _, line in
                 Text(Self.mark(line.kind) + line.text)
@@ -87,15 +102,6 @@ struct GuardedChangeCard: View {
         case .same: "  "
         case .removed: "− "
         case .added: "+ "
-        }
-    }
-
-    private func answer(keep: Bool) {
-        guard let reading else { return }
-        busy = true
-        Task {
-            await settle(reading, keep)
-            busy = false
         }
     }
 }

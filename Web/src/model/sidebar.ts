@@ -1,19 +1,22 @@
 // What the Things-style sidebar (#495, #499) gathers and in what order, as the window's and the
 // Remote's `SidebarSmartRow` and `SidebarProjectFold` (AgentsKitCore/Sidebar) work it out: the
-// smart groups at the top across every project (Pinned, Needs You, Working, Unread, Approve Archiving), and
-// each project's sessions as one list, newest started first, the state the row's mark. Each session
-// is listed once, in its first group (#587).
-import type { Agent, WorkflowSummary } from "../protocol/generated";
+// smart groups at the top across every project (Pinned, Needs You, Working, Unread), and each
+// project's sessions as one list, newest started first, the state the row's mark. Each session is
+// listed once, in its first group (#587). Needs You holds everything waiting for the person (#773):
+// sessions asking or blocked, sessions asking to be archived (#584, #649, once a group of their own),
+// and each project's approvals as rows of their own.
+import type { Agent, Approval, WorkflowSummary } from "../protocol/generated";
 import { asksToArchive, byStart, folderKey, groupOf, showsUnread } from "./groups";
 import { queryMatches, type LabelQuery } from "./labels";
+import { isSessionApproval, kindWords } from "./approvals";
 
-export type SmartRow = "pinned" | "needsYou" | "working" | "unread" | "toArchive";
+export type SmartRow = "pinned" | "needsYou" | "working" | "unread";
 
-/** In the sidebar's order: Pinned first, then by what they want, then what waits for archive approval (#584, #649). */
-export const smartRows: readonly SmartRow[] = ["pinned", "needsYou", "working", "unread", "toArchive"];
+/** In the sidebar's order: Pinned first, then by what they want. */
+export const smartRows: readonly SmartRow[] = ["pinned", "needsYou", "working", "unread"];
 
 export const smartTitles: Record<SmartRow, string> = {
-  pinned: "Pinned", needsYou: "Needs You", working: "Working", unread: "Unread", toArchive: "Approve Archiving",
+  pinned: "Pinned", needsYou: "Needs You", working: "Working", unread: "Unread",
 };
 
 /** Pinned and Needs You start open, so the first thing the page says is who is waiting; the others start folded. */
@@ -23,9 +26,8 @@ export function smartStartsOpen(row: SmartRow): boolean {
 
 /**
  * Where a live session is listed (#587), as `SidebarSmartRow.home`: once, in the first of the smart
- * groups it belongs to (Pinned, Needs You, Working, Approve Archiving (#584), Unread), or, in none of them,
- * under its project (null). Approve Archiving comes before Unread though it is drawn after it, so Archive
- * All reaches every session that asks.
+ * groups it belongs to (Pinned, Needs You (asking, blocked, or asking to be archived, #773), Working,
+ * Unread), or, in none of them, under its project (null).
  */
 export function home(agent: Agent, isPinned: boolean): SmartRow | null {
   if (isPinned) return "pinned";
@@ -33,11 +35,11 @@ export function home(agent: Agent, isPinned: boolean): SmartRow | null {
     case "needsAttention": case "blocked": return "needsYou";
     case "running": return "working";
     case "archived": return null;
-    default: return asksToArchive(agent) ? "toArchive" : showsUnread(agent) ? "unread" : null;
+    default: return asksToArchive(agent) ? "needsYou" : showsUnread(agent) ? "unread" : null;
   }
 }
 
-/** Whether a live session, not pinned, is listed under Needs You, Working, Unread or Approve Archiving. */
+/** Whether a live session, not pinned, is listed under Needs You, Working or Unread. */
 export function inSmartRow(row: Exclude<SmartRow, "pinned">, agent: Agent): boolean {
   return home(agent, false) === row;
 }
@@ -118,6 +120,27 @@ export function withKept(agents: readonly Agent[], kept: Agent | undefined): Age
   const shown = [...agents];
   shown.splice(at < 0 ? shown.length : at, 0, kept);
   return shown;
+}
+
+/**
+ * What waits for an OK across the projects named, each with its project (#773), as
+ * `SidebarSmartRow.approvals`: only Needs You lists them, after its sessions, oldest waiting first
+ * (one with no time first of all). A session's archive request is its own row, not one of these. A
+ * search matches the title, the kind and the grey line.
+ */
+export function smartApprovals<P>(projects: readonly { project: P; approvals?: readonly Approval[] | undefined }[],
+  query = ""): { project: P; approval: Approval }[] {
+  const words = query.trim().toLowerCase();
+  return projects.flatMap(({ project, approvals }) => (approvals ?? [])
+    .filter((a) => !isSessionApproval(a)
+      && (!words || `${a.title} ${kindWords[a.kind]} ${a.line}`.toLowerCase().includes(words)))
+    .map((approval) => ({ project, approval })))
+    .sort((a, b) => sinceOf(a.approval) - sinceOf(b.approval));
+}
+
+/** When it began waiting, the unknown first: a stable sort keeps those in their projects' order. */
+function sinceOf(approval: Approval): number {
+  return approval.since ?? Number.MIN_SAFE_INTEGER;
 }
 
 export interface ProjectKey { host: string; folder: string }

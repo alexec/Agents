@@ -272,6 +272,39 @@ struct SidebarModelTests {
         #expect(SidebarSmartRow.needsYou.agents(in: model, projects: projects, query: "web").map(\.id) == [askingWeb.id])
     }
 
+    /// Needs You holds everything waiting for an OK (#773): a session asking to be archived
+    /// as its own row (Approve Archiving is gone), and every other kind of approval as a row
+    /// of its own, counted with the sessions and found by a search.
+    @Test func needsYouListsEveryApproval() {
+        let model = AgentsModel()
+        let asking = started(api, .waitingOnUser, "asking", at: 1)
+        var done = started(api, .finished, "done", at: 2)
+        done.archiveRequest = .requested(at: t0)
+        model.replaceAgents([asking, done])
+        var api = summary(self.api)
+        api.approvals = [
+            Approval(kind: .mcpServer, key: "ci", title: "ci", digest: "d1", line: "New MCP server",
+                     since: t0.addingTimeInterval(5), actions: [.approve, .deny]),
+            Approval(kind: .workflow, key: "nightly", title: "Nightly", digest: "d2", line: "Changed with the last pull",
+                     since: t0.addingTimeInterval(1), actions: [.approve, .deny]),
+            Approval(kind: .archive, key: done.id.uuidString, title: "done", digest: nil, line: "Asks to be archived",
+                     actions: [.approve, .deny], agentID: done.id),
+        ]
+        model.replaceProjects([api, summary(web)])
+        let projects = [key, ProjectKey(host: .mac, folder: web)]
+
+        #expect(!SidebarSmartRow.allCases.map(\.title).contains("Approve Archiving"))
+        #expect(SidebarSmartRow.home(of: done, in: model.group(of: done), isPinned: false) == .needsYou)
+        #expect(Set(SidebarSmartRow.needsYou.agents(in: model, projects: projects).map(\.id)) == [asking.id, done.id])
+        // The archive request is the session's row, not one of its own; oldest first.
+        #expect(SidebarSmartRow.needsYou.approvals(in: model, projects: projects).map(\.approval.key) == ["nightly", "ci"])
+        #expect(SidebarSmartRow.needsYou.count(in: model, projects: projects) == 4)
+        #expect(SidebarSmartRow.working.approvals(in: model, projects: projects).isEmpty)
+        #expect(SidebarSmartRow.needsYou.approvals(in: model, projects: projects, query: "mcp").map(\.approval.key) == ["ci"])
+        #expect(SidebarSmartRow.needsYou.isShown(in: model, projects: projects, query: "pull"))
+        #expect(SidebarSmartRow.unread.agents(in: model, projects: projects).isEmpty)
+    }
+
     /// Pinned gathers every project's pinned sessions in pin order, never an archived one
     /// (#495), and they are not among their project's own sessions.
     @Test func pinnedGathersEveryProjectsPinsInTheirOrder() {

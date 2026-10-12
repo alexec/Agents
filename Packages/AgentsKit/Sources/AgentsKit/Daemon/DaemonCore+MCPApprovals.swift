@@ -21,5 +21,6 @@ extension DaemonCore {
         } catch {
             DaemonLog.shared.write("mcp: could not begin approvals")
         }
+        approvalKitCache.removeAll()
     }
 }

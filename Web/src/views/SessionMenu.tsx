@@ -1,17 +1,19 @@
 // A session's actions (071 FR-027): Carry on while it sits in an open block (#250), Stop while it
-// holds a runtime or a block, Branch (#342), and Archive, or Bring Back and Delete (#398). In the chat
-// header's ··· menu, and the sidebar row's menu. The chat's has Open File… first, as the Remote's
-// ··· menu does (#543), for a page with no keyboard to press ⌘P on.
+// holds a runtime or a block, Branch (#342), and Archive, with Keep Session while an agent asks to
+// have it archived (#773), or Bring Back and Delete (#398). In the chat header's ··· menu, and the
+// sidebar row's menu. The chat's has Open File… first, as the Remote's ··· menu does (#543), for a
+// page with no keyboard to press ⌘P on.
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
-import { isOpenBlock, projectFolder } from "../model/groups";
+import { asksToArchive, isOpenBlock, projectFolder } from "../model/groups";
+import { keepLabel } from "../model/archiveWords";
 import { carryOnHelp, carryOnLabel, carryOnPrompt, openBlock } from "../model/block";
 import { go } from "../route";
 
 export type Action = "carryOn" | "agents/stop" | "agents/archive" | "agents/unarchive"
-  | "markRead" | "markUnread" | "rename" | "pin" | "unpin" | "fork" | "delete";
+  | "markRead" | "markUnread" | "rename" | "pin" | "unpin" | "fork" | "delete" | "keep";
 
 /**
  * What the menu offers, in order, with the window's words (AgentRow's menu). Given
@@ -53,6 +55,10 @@ export function sessionActions(agent: Agent, pinned?: boolean): { action: Action
     found.push({ action: "delete", label: "Delete…", help: "Delete this session and its conversation for good" });
   } else {
     found.push({ action: "agents/archive", label: "Archive", help: "Archive this session" });
+    // An agent asked to have it archived (#584): the request denied, as Needs You's (#773).
+    if (asksToArchive(agent)) {
+      found.push({ action: "keep", label: keepLabel, help: "Take the request to archive it away, and leave the session where it is" });
+    }
   }
   return found;
 }
@@ -145,6 +151,7 @@ export function runSessionAction(store: Store, host: string, agent: Agent, actio
   else if (action === "markRead" || action === "markUnread") void store.setUnread(host, agent.id, action === "markUnread");
   else if (action === "pin" || action === "unpin") void store.setPinned(host, projectFolder(agent), agent.id, action === "pin");
   else if (action === "fork") void branch(store, host, agent);
+  else if (action === "keep") void store.keepSession(host, agent);
   else if (action === "delete") { if (confirm(`${deleteTitle(agent.title)}\n\n${deleteMessage}`)) void remove(store, host, agent); }
   else void store.perform(host, agent.id, action);
 }

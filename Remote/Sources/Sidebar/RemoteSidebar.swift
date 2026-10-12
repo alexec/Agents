@@ -237,6 +237,10 @@ private struct RemoteSmartFold: View {
                     ForEach(shown(keys)) { agent in
                         SidebarSessionRow(agent: agent, place: place(of: agent))
                     }
+                    // Then everything else waiting for an OK (#773), as the window lists it.
+                    ForEach(row.approvals(in: model.work, projects: keys, query: query), id: \.approval.id) { item in
+                        RemoteApprovalRow(approval: item.approval, project: item.project, place: place(of: item.project))
+                    }
                 }
             }
         } header: {
@@ -295,9 +299,56 @@ private struct RemoteSmartFold: View {
 
     /// The project's name as its group in the sidebar says it: `server:Project` on a server.
     private func place(of agent: Agent) -> String? {
-        guard let summary = projects.first(where: { $0.host == agent.host && $0.folder == agent.projectFolder })
-        else { return nil }
+        place(of: ProjectKey(host: agent.host, folder: agent.projectFolder))
+    }
+
+    private func place(of key: ProjectKey) -> String? {
+        guard let summary = projects.first(where: { $0.host == key.host && $0.folder == key.folder }) else { return nil }
         return SidebarOrder.label(summary) { model.hostLabel($0) }
+    }
+}
+
+/// One thing waiting for an OK under Needs You (#773), the window's `ApprovalListRow`: a
+/// tap opens what it is with its buttons, a long press answers at once.
+private struct RemoteApprovalRow: View {
+    @Environment(RemoteModel.self) private var model
+    let approval: Approval
+    let project: ProjectKey
+    let place: String?
+    @State private var open = false
+
+    var body: some View {
+        Button { open = true } label: {
+            ApprovalRowLabel(approval: approval, place: place)
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            if approval.actions.contains(.approve) {
+                Button(approval.word(for: .approve)) { answerNow(.approve) }
+            }
+            if approval.actions.contains(.deny) {
+                Button(approval.word(for: .deny)) { answerNow(.deny) }
+            }
+            if approval.actions.contains(.requestChanges) {
+                Button(approval.word(for: .requestChanges) + "…") { open = true }
+            }
+        }
+        .sheet(isPresented: $open) {
+            ScrollView {
+                ApprovalSheet(approval: approval, place: place,
+                              read: { await model.readApproval(approval, for: project) },
+                              answer: { action, digest, note in
+                                  await model.answerApproval(approval, action, digest: digest, note: note, for: project)
+                              },
+                              isOffline: !model.isConnected)
+            }
+            .presentationDetents([.medium, .large])
+            .paperGround()
+        }
+    }
+
+    private func answerNow(_ action: Approval.Action) {
+        Task { await model.settleApproval(approval, action, for: project) }
     }
 }
 

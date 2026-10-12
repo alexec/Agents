@@ -62,6 +62,11 @@ export function guardedHeadline(change: GuardedChange): string {
   return `Something outside the app ${what}`;
 }
 
+/** A reading's lines as the diff draws them, the same lines as context; also Needs You's approvals' (#773). */
+export function readingLines(reading: GuardedChangeReading | null): DiffLine[] {
+  return (reading?.lines ?? []).map((line) => ({ kind: line.kind === "same" ? "context" : line.kind, text: line.text }));
+}
+
 function GuardedChangeCard({ store, host, folder, change, down }: {
   store: Store; host: string; folder: string; change: GuardedChange; down: boolean;
 }) {
@@ -79,9 +84,7 @@ function GuardedChangeCard({ store, host, folder, change, down }: {
     busy.value = true;
     void store.settleGuardedChange(host, folder, read, keep).finally(() => (busy.value = false));
   };
-  const lines: DiffLine[] = (reading.value?.lines ?? []).map((line) => ({
-    kind: line.kind === "same" ? "context" : line.kind, text: line.text,
-  }));
+  const lines = readingLines(reading.value);
   const held = !reading.value || busy.value || down;
   return (
     <div class="card guarded-change" role="alert" aria-label={`Keep the change to ${change.path}?`}>

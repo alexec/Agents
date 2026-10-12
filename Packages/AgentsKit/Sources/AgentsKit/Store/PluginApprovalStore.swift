@@ -5,11 +5,14 @@ import Foundation
 struct PluginApprovals: Codable, Equatable, Sendable {
     var approvalsBegan: Date?
     var approved: [String: String] = [:]
+    /// The person's Deny (#773), by plugin key: the digest denied. The plugin stays out, as
+    /// one waiting does, and is not asked about again until its folder changes.
+    var denied: [String: String]?
     /// Read from a file that is there and could not be read (#169): approval has begun
     /// and nothing is approved. Not written.
     var unreadable = false
 
-    enum CodingKeys: String, CodingKey { case approvalsBegan, approved }
+    enum CodingKeys: String, CodingKey { case approvalsBegan, approved, denied }
 }
 
 struct PluginApprovalStore: Sendable {

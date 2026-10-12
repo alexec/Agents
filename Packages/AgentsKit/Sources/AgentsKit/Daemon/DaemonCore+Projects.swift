@@ -88,6 +88,7 @@ extension DaemonCore {
             unmeasuredAgents: tally?.unmeasured ?? 0)
         if isChatProject(folder) { summary.isChat = true }
         summary.guardedChanges = guardedChanges(in: folder)
+        summary.approvals = approvals(in: folder, guarded: summary.guardedChanges)
         summary.project.pinned = Self.isPinned(project, chat: summary.isChat == true) ? true : nil
         return summary
     }

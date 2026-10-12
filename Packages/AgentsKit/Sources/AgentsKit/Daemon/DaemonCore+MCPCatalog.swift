@@ -244,6 +244,7 @@ extension DaemonCore {
             throw Self.mcpRefusal(error)
         }
         DaemonLog.shared.write("mcp: approve \(request.name) in project")
+        approvalKitMoved(in: Project.standardize(folder))
         return try await mcpList(.init(destination: request.destination))
     }
 

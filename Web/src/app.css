@@ -1015,6 +1015,13 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / 0.25); }
 .sheet-body .sheet-note { margin: 0; }
 .sheet-note.failure { color: var(--tint-failure); opacity: 1; }
 .sheet-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+/* Approve, Deny or Request Changes of something in Needs You (#773): what it is, its lines, the note. */
+.approval-sheet p { margin: 0; }
+.approval-head { display: flex; align-items: flex-start; gap: 8px; }
+.approval-lines .diff-lines { max-height: 320px; overflow: auto; }
+.approval-sheet textarea { font: inherit; color: inherit; padding: 5px 8px; resize: vertical;
+  border: 1px solid var(--paper-rule); border-radius: var(--radius-control); background: var(--paper-ground); }
+.approval-sheet .sheet-actions .spacer { flex: 1; }
 .folder-list {
   display: flex;
   flex-direction: column;

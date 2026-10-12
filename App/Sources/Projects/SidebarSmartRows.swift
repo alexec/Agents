@@ -1,8 +1,9 @@
 import AgentsKitCore
 import SwiftUI
 
-/// One of the groups at the top of the sidebar (#495): Pinned, Needs You, Working,
-/// Unread or Approve Archiving (#584), across every project and host. A section headed and folding as a project's
+/// One of the groups at the top of the sidebar (#495): Pinned, Needs You, Working or
+/// Unread, across every project and host. Needs You lists, after its sessions, everything
+/// else waiting for an OK (#773). A section headed and folding as a project's
 /// is, so its heading and rows line up with theirs. Folded, it reads its count off each
 /// project's shelf and lists nothing (#356). Empty, it is not drawn (#507).
 struct SmartFold: View {
@@ -32,14 +33,19 @@ struct SmartFold: View {
                 ForEach(FoldedRow.rows(agents, in: .smart(row))) { item in
                     SessionSidebarRow(agent: item.item, place: place(of: item.item))
                 }
+                if isOpen {
+                    ForEach(row.approvals(in: model.work, projects: projects, query: query), id: \.approval.id) { item in
+                        ApprovalListRow(approval: item.approval, project: item.project,
+                                        place: place(of: item.project))
+                    }
+                }
             }
         } header: {
             heading(open)
         }
     }
 
-    /// The group's heading. Approve Archiving has no Approve All (#704): a row's swipe or
-    /// Approve archives each.
+    /// The group's heading. No Approve All (#704): each is approved from its own row.
     private func heading(_ open: Binding<Bool>) -> some View {
         SmartRowLabel(row: row, count: row.count(in: model.work, projects: projects)) {
             open.wrappedValue.toggle()
@@ -98,8 +104,55 @@ struct SmartFold: View {
 
     /// The project's name as its row in the sidebar says it: `server:Project` on a server.
     private func place(of agent: Agent) -> String? {
-        guard let summary = model.work.project(ProjectKey(host: agent.host, folder: agent.projectFolder)) else { return nil }
+        place(of: ProjectKey(host: agent.host, folder: agent.projectFolder))
+    }
+
+    private func place(of key: ProjectKey) -> String? {
+        guard let summary = model.work.project(key) else { return nil }
         return SidebarOrder.label(summary) { model.hosts.label($0) }
+    }
+}
+
+/// One thing waiting for an OK under Needs You (#773): an MCP server, a workflow, a plugin
+/// or a guarded file. A click opens what it is, with Approve, Deny and, where an agent
+/// made it, Request Changes; the menu answers at once.
+private struct ApprovalListRow: View {
+    @Environment(AppModel.self) private var model
+    let approval: Approval
+    let project: ProjectKey
+    let place: String?
+    @State private var open = false
+
+    var body: some View {
+        ApprovalRowLabel(approval: approval, place: place)
+            .onTapGesture { open = true }
+            .help("\(approval.kindWord) · \(approval.line)")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { open = true }
+            .contextMenu {
+                Button("Open…") { open = true }
+                if approval.actions.contains(.approve) {
+                    Button(approval.word(for: .approve)) { answerNow(.approve) }
+                }
+                if approval.actions.contains(.deny) {
+                    Button(approval.word(for: .deny)) { answerNow(.deny) }
+                }
+                if approval.actions.contains(.requestChanges) {
+                    Button(approval.word(for: .requestChanges) + "…") { open = true }
+                }
+            }
+            .sheet(isPresented: $open) {
+                ApprovalSheet(approval: approval, place: place,
+                              read: { await model.readApproval(approval, for: project) },
+                              answer: { action, digest, note in
+                                  await model.answerApproval(approval, action, digest: digest, note: note, for: project)
+                              })
+            }
+    }
+
+    /// From the menu, of the version the row was drawn from: a later change is refused.
+    private func answerNow(_ action: Approval.Action) {
+        Task { await model.settleApproval(approval, action, for: project) }
     }
 }
 

@@ -15,11 +15,14 @@ struct MCPApprovals: Codable, Equatable, Sendable {
     /// answered asks again. Personal servers too (Q6): it is about drawing their HTML, not
     /// about running them.
     var views: [String: String]?
+    /// The person's Deny (#773), by the same key: the digest denied. The server stays off,
+    /// as one waiting does, and is not asked about again until its entry changes.
+    var denied: [String: String]?
     /// Read from a file that is there and could not be read (#169): approval has begun
     /// and nothing is approved. Not written.
     var unreadable = false
 
-    enum CodingKeys: String, CodingKey { case approvalsBegan, approved, views }
+    enum CodingKeys: String, CodingKey { case approvalsBegan, approved, views, denied }
 
     init(approvalsBegan: Date? = nil, approved: [String: String] = [:], views: [String: String]? = nil,
          unreadable: Bool = false) {

@@ -265,6 +265,12 @@ extension DaemonCore {
         guard !own.isEmpty else { return }
         // A change to an app-owned file made outside the app waits for the person (#502).
         checkGuardedFiles(in: folder)
+        // And a project MCP server or plugin, in Needs You (#773).
+        let mcp = MCPJSONFile.projectURL(folder: folder).path
+        let plugins = folder.appending(path: "\(DotAgents.folder)/\(DotAgents.plugins)").path
+        if own.contains(where: { $0.path == agents || $0.path == mcp || $0.path.hasPrefix(plugins) }) {
+            approvalKitMoved(in: folder)
+        }
         let workflowsFolder = WorkflowFile.folder(in: folder).path
         if own.contains(where: { $0.path == agents || $0.path.hasPrefix(workflowsFolder) }) {
             scheduleWorkflowRescan(in: folder)

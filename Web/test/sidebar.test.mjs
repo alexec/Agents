@@ -64,21 +64,72 @@ test("smart groups gather by what a session wants, newest started first (#495)",
   assert.equal(sessionMark(agent("gone", 1, { state: "archived" })), null, "its own status mark");
 });
 
-test("Approve Archiving gathers what an agent asked to have archived, each listed once (#584, #587)", async () => {
-  const { smartAgents, smartRows, smartTitles } = await load("src/model/sidebar.ts");
+test("Needs You gathers what an agent asked to have archived, each listed once (#584, #587, #773)", async () => {
+  const { smartAgents, smartRows, smartTitles, home, sessionMark } = await load("src/model/sidebar.ts");
   const asked = { requested: { at: 1 } };
   const live = [
     agent("done", 1, { archiveRequest: asked }),
     agent("partly", 2, { archiveRequest: asked, report: { outcome: "partly_done", message: "m", at: 1 } }),
     agent("later", 3, { state: "running", archiveRequest: { whenTurnEnds: { since: 1 } } }),
-    agent("none", 4),
+    agent("asked-unread", 4, { archiveRequest: asked, isUnread: true }),
+    agent("none", 5),
   ];
-  assert.deepEqual(smartAgents("toArchive", live).map((a) => a.id), ["done"], "asked, not set to ask");
-  assert.deepEqual(smartAgents("needsYou", live).map((a) => a.id), ["partly"], "partly done is listed once, under Needs You");
-  assert.equal(smartRows.at(-1), "toArchive");
-  assert.equal(smartTitles.toArchive, "Approve Archiving");
-  const { sessionMark } = await load("src/model/sidebar.ts");
-  assert.deepEqual(live.map(sessionMark), ["asksToArchive", "needsYou", "working", "read"], "partly done still needs you");
+  assert.deepEqual(smartAgents("needsYou", live).map((a) => a.id), ["asked-unread", "partly", "done"],
+    "asked, and partly done, once each; not set to ask");
+  assert.deepEqual(smartAgents("unread", live).map((a) => a.id), [], "asking unread is in Needs You alone");
+  assert.deepEqual(smartAgents("working", live).map((a) => a.id), ["later"]);
+  assert.deepEqual(live.map((a) => home(a, false)), ["needsYou", "needsYou", "working", "needsYou", null]);
+  assert.deepEqual(smartRows, ["pinned", "needsYou", "working", "unread"], "no Approve Archiving");
+  assert.deepEqual(Object.keys(smartTitles), ["pinned", "needsYou", "working", "unread"]);
+  assert.deepEqual(live.map(sessionMark), ["asksToArchive", "needsYou", "working", "asksToArchive", "read"], "partly done still needs you");
+});
+
+const approval = (kind, key, fields = {}) => ({ kind, key, title: key, line: "New with the last pull",
+  actions: ["approve", "deny"], ...fields });
+
+test("Needs You lists every project's approvals, oldest first, but a session's archive request (#773)", async () => {
+  const { smartApprovals } = await load("src/model/sidebar.ts");
+  const projects = [
+    { project: "a", approvals: [approval("workflow", "nightly", { since: 30 }), approval("archive", "s1", { since: 1 })] },
+    { project: "b", approvals: [approval("mcpServer", "github", { since: 10 }), approval("plugin", "lint")] },
+    { project: "c" },
+    { project: "d", approvals: [approval("file", ".agents/pins.json", { since: 20, line: "Changed by Claude" })] },
+  ];
+  const listed = smartApprovals(projects);
+  assert.deepEqual(listed.map(({ project, approval }) => `${project}:${approval.key}`),
+    ["b:lint", "b:github", "d:.agents/pins.json", "a:nightly"], "no time first, then oldest; the archive request is its session's row");
+  assert.equal(smartApprovals([{ project: "c" }]).length, 0);
+});
+
+test("a search matches an approval's title, kind and grey line (#773)", async () => {
+  const { smartApprovals } = await load("src/model/sidebar.ts");
+  const projects = [{ project: "a", approvals: [
+    approval("mcpServer", "github"),
+    approval("workflow", "nightly", { line: "Changed since you approved it" }),
+    approval("archive", "s1"),
+  ] }];
+  const keys = (query) => smartApprovals(projects, query).map(({ approval }) => approval.key);
+  assert.deepEqual(keys("GitHub"), ["github"], "the title, in any case");
+  assert.deepEqual(keys("mcp server"), ["github"], "the kind in words");
+  assert.deepEqual(keys(" since you "), ["nightly"], "the grey line, trimmed");
+  assert.deepEqual(keys("archive"), [], "never the session's archive request");
+  assert.deepEqual(keys(""), ["github", "nightly"]);
+});
+
+test("an approval's words are the window's, per kind (#773)", async () => {
+  const { actionWord, approvalID, approvalLine, explanations, kindWords } = await load("src/model/approvals.ts");
+  assert.deepEqual(["mcpServer", "workflow", "plugin", "file", "archive"].map((k) => kindWords[k]),
+    ["MCP server", "Workflow", "Plugin", "File", "Archive"]);
+  const words = (kind) => ["approve", "deny", "requestChanges"].map((a) => actionWord(kind, a));
+  assert.deepEqual(words("mcpServer"), ["Approve", "Deny", "Request Changes"]);
+  assert.deepEqual(words("workflow"), ["Approve", "Deny", "Request Changes"]);
+  assert.deepEqual(words("plugin"), ["Approve", "Deny", "Request Changes"]);
+  assert.deepEqual(words("file"), ["Keep", "Undo", "Request Changes"]);
+  assert.deepEqual(words("archive"), ["Archive", "Keep Session", "Request Changes"]);
+  assert.equal(approvalLine(approval("mcpServer", "github")), "MCP server · New with the last pull");
+  assert.equal(approvalID(approval("file", ".agents/mcp.json")), "file:.agents/mcp.json");
+  assert.equal(explanations.archive, "The session asked to be archived. Keep Session takes the request away and leaves it where it is.");
+  assert.ok(explanations.mcpServer.endsWith(".agents/mcp.json changes again."));
 });
 
 test("a project's sessions are one list, the pinned out of it; Pinned keeps pin order (#495)", async () => {

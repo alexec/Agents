@@ -217,6 +217,14 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.GuardedChangeRequest.self)
                 return .success(try JSONValue.encoding(try readGuardedChange(request)))
 
+            case DaemonAPI.Method.approvalsRead:
+                let request = try require(params, as: ApprovalReadRequest.self)
+                return .success(try JSONValue.encoding(try readApproval(request)))
+
+            case DaemonAPI.Method.approvalsAnswer:
+                let request = try require(params, as: ApprovalAnswer.self)
+                return .success(try JSONValue.encoding(try await answerApproval(request)))
+
             case DaemonAPI.Method.projectsKeepGuardedChange:
                 let request = try require(params, as: DaemonAPI.GuardedChangeRequest.self)
                 return .success(try JSONValue.encoding(try keepGuardedChange(request)))

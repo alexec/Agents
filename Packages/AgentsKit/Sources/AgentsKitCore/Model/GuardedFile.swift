@@ -102,7 +102,7 @@ public struct GuardedChange: Codable, Hashable, Sendable, Identifiable {
         return "Something outside the app " + what
     }
 
-    static func names(_ names: [String]) -> String {
+    public static func names(_ names: [String]) -> String {
         switch names.count {
         case 0: ""
         case 1: names[0]

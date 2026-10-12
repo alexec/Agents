@@ -19,6 +19,9 @@ enum ArchiveRequestWords {
     /// The tooltip and the accessibility hint for Approve beside the mark.
     static let archiveHelp = "The agent is done with this session: approve archiving it"
 
+    /// Deny (#773): the request goes, and the session stays where it is.
+    static let keep = "Keep Session"
+
     /// "Archiving needs approval", or nil for a session that does not.
     static func line(_ agent: Agent?) -> String? {
         agent?.asksToArchive == true ? mark : nil
