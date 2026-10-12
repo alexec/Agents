@@ -240,6 +240,13 @@ struct AgentMenuItems: View {
             }
             .disabled(isActing)
         }
+        // The sessions it started too (#835).
+        if agent.state != .archived, model.work.liveDescendants(of: agent.id).contains(where: model.canStop) {
+            Button("Stop All", systemImage: "stop.circle") {
+                Task { await model.stopAll(agent.id) }
+            }
+            .disabled(isActing)
+        }
         if model.isBlocked(agent) {
             Button {
                 Task { await model.carryOn(agent.id) }

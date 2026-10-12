@@ -22,13 +22,34 @@ public final class SidebarFolds {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let key: String
     @ObservationIgnored private let closedKey: String
+    /// The sessions whose children are shown (#835), the last opened last. They start
+    /// folded; only the last `sessionsKept` opened are kept, so the list stays small.
+    public private(set) var openSessions: [UUID]
+    @ObservationIgnored private let sessionsKey: String
+    nonisolated public static let sessionsKept = 200
 
     public init(defaults: UserDefaults = .standard, scope: String) {
         self.defaults = defaults
         key = "sidebar.folds" + scope
         closedKey = "sidebar.folded" + scope
+        sessionsKey = "sidebar.openSessions" + scope
         open = Set(defaults.stringArray(forKey: key) ?? [])
         closed = Set(defaults.stringArray(forKey: closedKey) ?? [])
+        openSessions = (defaults.stringArray(forKey: sessionsKey) ?? []).compactMap(UUID.init(uuidString:))
+    }
+
+    /// Whether a session's children are shown under it (#835). Folded by default.
+    public func isOpen(session id: UUID) -> Bool { openSessions.contains(id) }
+
+    public func set(session id: UUID, open isOpen: Bool) {
+        guard openSessions.contains(id) != isOpen else { return }
+        if isOpen {
+            openSessions.append(id)
+            if openSessions.count > Self.sessionsKept { openSessions.removeFirst(openSessions.count - Self.sessionsKept) }
+        } else {
+            openSessions.removeAll { $0 == id }
+        }
+        defaults.set(openSessions.map(\.uuidString), forKey: sessionsKey)
     }
 
     /// What can be folded: a project; one of its Archived folds; one of its session

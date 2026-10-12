@@ -4,6 +4,7 @@
 import type { Agent, Attachment } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { go } from "../route";
+import { archiveWithChildren } from "./SessionMenu";
 import {
   continueInProjectLabel, folderIsMissing, folderPath, mayRecreateWorktree, missingFolderLabel, recreateWorktreeLabel,
 } from "../model/missingFolder";
@@ -22,7 +23,7 @@ function WaysOn({ store, host, agent, text, attachments, then }: {
       {mayRecreateWorktree(agent) && (
         <button onClick={() => { then?.(); void store.recreateWorktree(host, agent.id); }}>{recreateWorktreeLabel}</button>
       )}
-      <button onClick={() => { then?.(); void store.perform(host, agent.id, "agents/archive"); }}>Archive</button>
+      <button onClick={() => { then?.(); void archiveWithChildren(store, host, agent); }}>Archive</button>
     </span>
   );
 }

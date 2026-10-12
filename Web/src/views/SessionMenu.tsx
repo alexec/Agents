@@ -11,15 +11,18 @@ import { asksToArchive, isOpenBlock, projectFolder } from "../model/groups";
 import { keepLabel } from "../model/archiveWords";
 import { carryOnHelp, carryOnLabel, carryOnPrompt, openBlock } from "../model/block";
 import { go } from "../route";
+import { canStop, liveDescendants } from "../model/tree";
 
-export type Action = "carryOn" | "agents/stop" | "agents/archive" | "agents/unarchive"
+export type Action = "carryOn" | "agents/stop" | "stopAll" | "agents/archive" | "agents/unarchive"
   | "markRead" | "markUnread" | "rename" | "pin" | "unpin" | "fork" | "delete" | "keep";
 
 /**
  * What the menu offers, in order, with the window's words (AgentRow's menu). Given
- * whether it is pinned, Pin or Unpin too (#180).
+ * whether it is pinned, Pin or Unpin too (#180); given the sessions it started, Stop All
+ * while one of them can stop (#835).
  */
-export function sessionActions(agent: Agent, pinned?: boolean): { action: Action; label: string; help: string }[] {
+export function sessionActions(agent: Agent, pinned?: boolean, started: readonly Agent[] = [])
+  : { action: Action; label: string; help: string }[] {
   const found: { action: Action; label: string; help: string }[] = [];
   const holds = agent.state === "starting" || agent.state === "running" || agent.state === "waitingOnUser";
   // First, as the window's row menu has it (AgentRow's contextMenu); the strip in the chat has it too.
@@ -29,6 +32,10 @@ export function sessionActions(agent: Agent, pinned?: boolean): { action: Action
   } else if (agent.state === "queued") {
     // AgentsModel.canStop: Stop takes a queued helper off the queue (#362).
     found.push({ action: "agents/stop", label: "Stop", help: "Take this agent off the queue" });
+  }
+  // The sessions it started too (#835).
+  if (agent.state !== "archived" && started.some(canStop)) {
+    found.push({ action: "stopAll", label: "Stop All", help: "Stop this session and every session it started" });
   }
   // The person's own mark (#70): leave something to come back to, or clear it without opening it.
   if (agent.state === "finished") {
@@ -54,7 +61,8 @@ export function sessionActions(agent: Agent, pinned?: boolean): { action: Action
     found.push({ action: "agents/unarchive", label: "Bring Back", help: "Bring this session back from the archive" });
     found.push({ action: "delete", label: "Delete…", help: "Delete this session and its conversation for good" });
   } else {
-    found.push({ action: "agents/archive", label: "Archive", help: "Archive this session" });
+    found.push({ action: "agents/archive", label: "Archive", help: started.length > 0
+      ? "Archive this session and the sessions it started" : "Archive this session" });
     // An agent asked to have it archived (#584): the request denied, as Needs You's (#773).
     if (asksToArchive(agent)) {
       found.push({ action: "keep", label: keepLabel, help: "Take the request to archive it away, and leave the session where it is" });
@@ -101,7 +109,33 @@ export function SessionButtons({ store, host, agent, disabled }: { store: Store;
 
 /** Archive, then the session's project: the chat it was open in has nothing left to show. */
 function archiveAndLeave(store: Store, host: string, agent: Agent) {
-  void store.perform(host, agent.id, "agents/archive").then((done) => { if (done) go({ host, project: projectFolder(agent) }); });
+  void archiveWithChildren(store, host, agent).then((done) => { if (done) go({ host, project: projectFolder(agent) }); });
+}
+
+/** The live sessions this one started, at every level, as the host's list has them (#835). */
+export function startedBy(store: Store, host: string, agent: Agent): Agent[] {
+  return liveDescendants(store.agents.value[host] ?? [], agent.id);
+}
+
+/**
+ * Archive, and the sessions it started with it (Alex, #835), named before it goes; one archived
+ * meanwhile is left as it is.
+ */
+export async function archiveWithChildren(store: Store, host: string, agent: Agent): Promise<boolean> {
+  const children = startedBy(store, host, agent).map((a) => a.id);
+  const done = await store.perform(host, agent.id, "agents/archive");
+  if (!done) return false;
+  for (const id of children) {
+    if (store.agent(host, id)?.state !== "archived") await store.perform(host, id, "agents/archive");
+  }
+  return true;
+}
+
+/** Stop it and every session it started that can stop (#835). */
+async function stopAll(store: Store, host: string, agent: Agent) {
+  for (const one of [agent, ...startedBy(store, host, agent)]) {
+    if (canStop(one)) await store.perform(host, one.id, "agents/stop");
+  }
 }
 
 /** `inChat`: the chat header's, whose Archive leaves the chat as the header's button does. */
@@ -130,7 +164,7 @@ export function SessionMenu({ store, host, agent, disabled, openFile, inChat }:
                 openFile();
               }}>Open File…</button>
           )}
-          {sessionActions(agent, store.sessionPinsIn(host, projectFolder(agent)).includes(agent.id)).map(({ action, label, help }) => (
+          {sessionActions(agent, store.sessionPinsIn(host, projectFolder(agent)).includes(agent.id), startedBy(store, host, agent)).map(({ action, label, help }) => (
             <button key={action} role="menuitem" title={help}
               onClick={() => {
                 open.value = false;
@@ -152,6 +186,8 @@ export function runSessionAction(store: Store, host: string, agent: Agent, actio
   else if (action === "pin" || action === "unpin") void store.setPinned(host, projectFolder(agent), agent.id, action === "pin");
   else if (action === "fork") void branch(store, host, agent);
   else if (action === "keep") void store.keepSession(host, agent);
+  else if (action === "agents/archive") void archiveWithChildren(store, host, agent);
+  else if (action === "stopAll") void stopAll(store, host, agent);
   else if (action === "delete") { if (confirm(`${deleteTitle(agent.title)}\n\n${deleteMessage}`)) void remove(store, host, agent); }
   else void store.perform(host, agent.id, action);
 }

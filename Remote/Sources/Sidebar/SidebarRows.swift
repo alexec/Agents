@@ -11,10 +11,28 @@ struct SidebarSessionRow: View {
     /// Which project it is in, after the title: under a smart group of the sidebar
     /// (#495, #498), which gathers sessions from every project, and nowhere else.
     private let place: String?
+    /// Where it sits in its list's tree (#835): a parent with its count and fold, or a
+    /// child one indent in, as on the Mac.
+    private let tree: SidebarTree.Row?
+    private let folds: SidebarFolds?
 
-    init(agent: Agent, place: String? = nil) {
+    init(agent: Agent, place: String? = nil, tree: SidebarTree.Row? = nil, folds: SidebarFolds? = nil) {
         given = agent
         self.place = place
+        self.tree = tree
+        self.folds = folds
+    }
+
+    /// The session whose mark the row shows: its own, or for a folded parent the most
+    /// urgent of it and the sessions it started (#835).
+    private var markAgent: Agent {
+        guard let tree, tree.children > 0, !tree.isUnfolded else { return agent }
+        return SidebarTree.markAgent(of: agent, in: model.work)
+    }
+
+    private func toggleFold() {
+        guard let tree else { return }
+        folds?.set(session: agent.id, open: !tree.isUnfolded)
     }
 
     /// The agent as the phone has it now, read from the model rather than kept: see the
@@ -31,7 +49,7 @@ struct SidebarSessionRow: View {
         HStack(alignment: .top, spacing: 10) {
             // What it wants, as the window's sidebar says it (#495): the state is the
             // row's mark, unread among them. Archived keeps its icon.
-            if let mark = SessionMark(agent: agent, group: model.work.group(of: agent)) {
+            if let mark = SessionMark(agent: markAgent, group: model.work.group(of: markAgent)) {
                 mark
             } else {
                 StatusIcon(state: agent.state, isComingBack: model.isComingBack(agent),
@@ -91,13 +109,33 @@ struct SidebarSessionRow: View {
                 // row's long press.
             }
             Spacer(minLength: 0)
+            // How many it started, and their fold (#835), as on the Mac.
+            if let tree, tree.children > 0 {
+                Button(action: toggleFold) {
+                    HStack(spacing: 3) {
+                        Text("\(tree.children)")
+                        Image(systemName: "chevron.right")
+                            .rotationEffect(.degrees(tree.isUnfolded ? 90 : 0))
+                    }
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 6)
+                    .frame(minHeight: 28)
+                    .contentShape(Rectangle())
+                }
+                // Only the count folds; the rest of the row opens the chat.
+                .buttonStyle(.borderless)
+            }
             // When it last did anything, as the page's row has it (#341).
             ActivityTime(date: agent.lastActivityAt)
         }
+        // A child one indent in, under the mark's column (#835).
+        .padding(.leading, tree?.isChild == true ? 26 : 0)
         // Last known, not current: its host is not answering.
         .opacity(model.isStale(agent) ? 0.55 : 1)
         .accessibilityElement(children: .combine)
         .accessibilityValue(agent.showsUnread ? "unread" : "")
+        .modifier(FoldAction(tree: tree, toggle: toggleFold))
         .tag(SidebarItem.session(agent.id))
         .contextMenu { AgentMenuItems(agent: agent) }
         // Pin or Unpin (#180), from the leading edge, as on the Mac.
@@ -117,6 +155,21 @@ struct SidebarSessionRow: View {
                     MarkReadButton(agent: agent).tint(Paper.accent)
                 }
             }
+        }
+    }
+}
+
+/// A parent's fold as an action of the row, which reads as one element (#835).
+private struct FoldAction: ViewModifier {
+    let tree: SidebarTree.Row?
+    let toggle: () -> Void
+
+    func body(content: Content) -> some View {
+        if let tree, tree.children > 0 {
+            content.accessibilityAction(named: tree.isUnfolded ? "Hide started sessions"
+                                                               : "Show \(tree.children) started sessions", toggle)
+        } else {
+            content
         }
     }
 }

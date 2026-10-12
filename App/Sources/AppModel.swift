@@ -4133,7 +4133,26 @@ final class AppModel {
         }
     }
 
+    /// Stop a session and every session it started that is running (#835).
+    func stopAll(_ id: UUID) async {
+        for agent in [work.agent(id)].compactMap({ $0 }) + work.liveDescendants(of: id) where work.canStop(agent) {
+            await stop(agent.id)
+        }
+    }
+
     func archive(_ id: UUID, andLeave: Bool = false) async {
+        // The sessions it started go with it (Alex, #835), named before it goes.
+        let children = work.liveDescendants(of: id).map(\.id)
+        let archived = await archiveOne(id, andLeave: andLeave)
+        guard archived else { return }
+        // One archived meanwhile (a ⌫ over parent and child together) is left as it is.
+        for child in children where work.agent(child)?.state != .archived {
+            await archiveOne(child, andLeave: andLeave)
+        }
+    }
+
+    @discardableResult
+    private func archiveOne(_ id: UUID, andLeave: Bool) async -> Bool {
         let archived = await act(.archive, on: id) {
             try await self.client(forAgent: id).call(DaemonAPI.Method.agentsArchive, DaemonAPI.AgentRequest(agentID: id))
         }
@@ -4141,6 +4160,7 @@ final class AppModel {
         // so Archive always means the same thing wherever it is pressed. Not when it
         // failed: the chat stays in front, under the reason why (073).
         if archived, andLeave, selection == id { selection = nil }
+        return archived
     }
 
     func unarchive(_ id: UUID) async {

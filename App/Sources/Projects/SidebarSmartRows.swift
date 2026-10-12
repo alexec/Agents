@@ -30,8 +30,10 @@ struct SmartFold: View {
             if row == .pinned {
                 if isOpen { pinnedRows }
             } else {
-                ForEach(FoldedRow.rows(agents, in: .smart(row))) { item in
-                    SessionSidebarRow(agent: item.item, place: place(of: item.item))
+                // Each under the session that started it when this group lists that too (#835).
+                ForEach(FoldedRow.rows(SidebarTree.rows(agents, in: model.work, folds: folds), in: .smart(row))) { item in
+                    SessionSidebarRow(agent: item.item.agent, place: place(of: item.item.agent),
+                                      tree: item.item, folds: folds)
                 }
                 if isOpen {
                     ForEach(row.approvals(in: model.work, projects: projects, query: query), id: \.approval.id) { item in

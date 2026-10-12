@@ -200,10 +200,22 @@
 .event-detail dd { margin: 0; overflow-wrap: anywhere; user-select: text; }
 .event-detail .event-name { font-family: var(--font-mono); margin: 0; }
 
+/* Sessions under the session that started them (#835): a child one indent in, under the mark's
+   column; a parent's count and fold at its end, after the time. */
+.with-sidebar .nav-item.child > .row.session { padding-left: calc(10px + 26px); }
+.with-sidebar .nav-item.parent { display: flex; align-items: flex-start; }
+.with-sidebar .nav-item.parent > .row { flex: 1; min-width: 0; }
+.with-sidebar .fold-count { border: none; background: none; padding: 8px 6px; font: inherit; color: inherit; cursor: pointer;
+  font-size: calc(11px * var(--text-scale)); opacity: 0.6; white-space: nowrap; border-radius: var(--radius-card); }
+.with-sidebar .fold-count:hover { background: var(--paper-wash); opacity: 0.9; }
+.with-sidebar .fold-count .chevron { display: inline-block; margin-left: 3px; transition: transform 0.1s; }
+.with-sidebar .fold-count .chevron.open { transform: rotate(90deg); }
+
 /* A finger's rows (#663): at least 44 px tall, and held without the page selecting their words or
    calling up its own sheet, since a held finger opens the row's menu. */
 @media (pointer: coarse) {
   .with-sidebar .sidebar .row { min-height: 44px; align-content: center; }
+  .with-sidebar .fold-count { min-height: 44px; min-width: 44px; }
   .with-sidebar .sidebar .row.project .pick { align-self: stretch; justify-content: center; }
   .with-sidebar .sidebar .row, .with-sidebar .sidebar .nav-item {
     -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;

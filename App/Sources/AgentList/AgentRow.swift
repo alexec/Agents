@@ -16,11 +16,19 @@ struct AgentRow: View {
     /// Which project it is in, after the title: under a smart row of the sidebar (#495),
     /// which gathers sessions from every project, and nowhere else.
     private let place: String?
+    /// Where it sits in the sidebar's tree (#835): a parent with its count and fold, or a
+    /// child one indent in. Nil off the sidebar.
+    private let tree: SidebarTree.Row?
+    /// Folds or unfolds a parent's children.
+    private let toggleFold: () -> Void
 
-    init(agent: Agent, isCompact: Bool = false, place: String? = nil) {
+    init(agent: Agent, isCompact: Bool = false, place: String? = nil,
+         tree: SidebarTree.Row? = nil, toggleFold: @escaping () -> Void = {}) {
         given = agent
         self.isCompact = isCompact
         self.place = place
+        self.tree = tree
+        self.toggleFold = toggleFold
     }
 
     /// The agent as the window has it now, read from the model rather than kept.
@@ -62,7 +70,7 @@ struct AgentRow: View {
     private var rowContent: some View {
         // In the sidebar, the icon column every row there has (#495): 16 wide, 6 to the title.
         HStack(alignment: .top, spacing: isCompact ? 6 : 12) {
-            if isCompact, let mark = SessionMark(agent: agent, group: model.work.group(of: agent)) {
+            if isCompact, let mark = SessionMark(agent: markAgent, group: model.work.group(of: markAgent)) {
                 mark.padding(.top, 1)
             } else {
             StatusIcon(state: agent.state, isComingBack: isComingBack,
@@ -232,10 +240,16 @@ struct AgentRow: View {
                 }
             }
             Spacer(minLength: 0)
+            if let tree, tree.children > 0 {
+                FoldCount(count: tree.children, isUnfolded: tree.isUnfolded, toggle: toggleFold)
+                    .padding(.top, 1)
+            }
             // When it last did anything, as the page's row has it (#341).
             ActivityTime(date: agent.lastActivityAt)
                 .padding(.top, 1)
         }
+        // A child one indent in, under the mark's column (#835).
+        .padding(.leading, tree?.isChild == true ? 22 : 0)
         .fixedSize(horizontal: false, vertical: true)
         .contextMenu {
             if model.isBlocked(agent) {
@@ -243,6 +257,11 @@ struct AgentRow: View {
             }
             if model.canStop(agent) {
                 Button("Stop") { Task { await model.stop(agent.id) } }
+                    .disabled(isActing)
+            }
+            // The sessions it started too (#835).
+            if agent.state != .archived, model.work.liveDescendants(of: agent.id).contains(where: model.canStop) {
+                Button("Stop All") { Task { await model.stopAll(agent.id) } }
                     .disabled(isActing)
             }
             if agent.state == .archived {
@@ -287,6 +306,13 @@ struct AgentRow: View {
         }
     }
 
+    /// The session whose mark the row shows: its own, or for a folded parent the most
+    /// urgent of it and the sessions it started (#835).
+    private var markAgent: Agent {
+        guard let tree, tree.children > 0, !tree.isUnfolded else { return agent }
+        return SidebarTree.markAgent(of: agent, in: model.work)
+    }
+
     /// Something is on its way to this agent; its menu holds until it is back (#87).
     private var isActing: Bool { model.acting(agent.id) != nil }
 
@@ -300,6 +326,34 @@ struct AgentRow: View {
     private var startedByWorkflowName: String? {
         guard let id = agent.startedByWorkflow else { return nil }
         return model.workflows(in: agent.projectFolder).first { $0.workflow.workflowID == id }?.workflow.name ?? id
+    }
+}
+
+/// A parent's count of the sessions under it and its fold (#835), at the row's end before
+/// the time.
+private struct FoldCount: View {
+    let count: Int
+    let isUnfolded: Bool
+    let toggle: () -> Void
+
+    var body: some View {
+        Button(action: toggle) {
+            HStack(spacing: 3) {
+                Text("\(count)")
+                Image(systemName: "chevron.right")
+                    .rotationEffect(.degrees(isUnfolded ? 90 : 0))
+            }
+            .appText(.fine)
+            .foregroundStyle(.secondary)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(isUnfolded ? "Hide the sessions it started" : "Show the \(count) sessions it started")
+        // One element with one label: a label over the Text's own crashes AppKit.
+        .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { toggle() }
+        .accessibilityLabel(isUnfolded ? "Hide \(count) started sessions" : "Show \(count) started sessions")
     }
 }
 
