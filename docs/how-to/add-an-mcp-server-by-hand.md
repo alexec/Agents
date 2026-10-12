@@ -19,7 +19,7 @@ the sheet shows the tools it listed.
 
 ## Add it
 
-1. Open **Settings ▸ Shared ▸ MCP servers**, or a project's **MCP servers** section, and
+1. Open **Settings ▸ Agent Configuration ▸ MCP servers**, or **Project Settings ▸ Agent Configuration ▸ MCP servers**, and
    choose **Add server…**.
 2. Choose **Add by hand…**.
 3. Give it a **Name**: letters, digits, dots, dashes and underscores. Agents see its tools

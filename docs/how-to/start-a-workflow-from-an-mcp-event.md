@@ -34,7 +34,7 @@ project's `.agents/mcp.json` as `ci`, a local server the app hosts:
 { "mcpServers": { "ci": { "command": "ci-watcher", "hosted": true } } }
 ```
 
-1. In the project's **MCP servers** section, `ci` arrived with the project, so it is
+1. In **Project Settings ▸ Agent Configuration ▸ MCP servers**, `ci` arrived with the project, so it is
    **waiting for your OK**: choose **Approve**. Until you do, it is asked for nothing, and
    the workflow's page says it is waiting for approval. See
    [Add an MCP server from the registry](add-an-mcp-server-from-the-registry.md).

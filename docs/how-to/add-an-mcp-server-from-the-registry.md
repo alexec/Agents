@@ -20,7 +20,7 @@ never committed and never shown again.
 
 ## Add a server for yourself
 
-1. Open **Settings ▸ Shared ▸ MCP servers** and choose **Add server…**.
+1. Open **Settings ▸ Agent Configuration ▸ MCP servers** and choose **Add server…**.
 2. Type what you are looking for. Results come from the marketplace chosen in the
    **Marketplace** menu, in its own order (GitHub's puts the most starred first). Each
    shows the publisher it has checked (a GitHub org, or a domain), the description, the
@@ -55,7 +55,7 @@ the project's. A project on a server does not show this section.
 
 ## A secret that is not set
 
-The row names it, as **NAME not set**, and offers **Set…**. **Settings ▸ Shared** strikes
+The row names it, as **NAME not set**, and offers **Set…**. **Settings ▸ Agent Configuration** strikes
 that server's reach and lists it under **Needs a look**. Agents start without the server,
 rather than with an empty key. **Replace…** changes a value that is already set. Either way
 the new value is not shown again.

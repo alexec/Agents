@@ -211,7 +211,7 @@ extension DaemonCore {
         }
     }
 
-    /// Settings ▸ Shared's personal skills, each with where a lock says it came from.
+    /// Settings ▸ Agent Configuration's personal skills, each with where a lock says it came from.
     func withManagedSkills(_ snapshot: DaemonAPI.SharedSnapshot) -> DaemonAPI.SharedSnapshot {
         guard let place = try? skillPlace(.personal) else { return snapshot }
         let managed = catalogInstaller.managed(at: place)

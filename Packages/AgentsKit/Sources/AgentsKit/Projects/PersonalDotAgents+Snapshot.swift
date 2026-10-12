@@ -1,7 +1,7 @@
 import AgentsKitCore
 import Foundation
 
-/// Settings ▸ Shared's one read of `~/.agents` (054, research R13,
+/// Settings ▸ Agent Configuration's one read of `~/.agents` (054, research R13,
 /// contracts/personal-shared.md). Reach comes from the rule table and what R9 measured,
 /// plus what is on disk now: the links, the record, the names in each runtime's own
 /// config. Nothing here holds or returns a value from `mcp.json` (FR-023).
@@ -50,6 +50,41 @@ extension PersonalDotAgents {
         snapshot.needsALook = looks
         return snapshot
     }
+
+    /// A project's `.agents`, for the same pages in Project Settings (#754): what is there,
+    /// with no runtimes, so no reach. Its instructions are the project's own `AGENTS.md`,
+    /// at the top of the project, the file agents read first.
+    public static func projectSnapshot(folder project: URL) -> DaemonAPI.SharedSnapshot {
+        let shared = project.appending(path: folder, directoryHint: .isDirectory)
+        var snapshot = Snapshot(home: shared.path, laidOut: true)
+        let router = project.appending(path: DotAgents.router)
+        snapshot.instructions = DaemonAPI.Instructions(path: router.path, exists: DotAgents.exists(router), reach: [:])
+        var looks: [DaemonAPI.Look] = []
+        let plugins = DotAgents.pluginFolders(in: shared.appending(path: Self.plugins, directoryHint: .isDirectory))
+        snapshot.skills = skills(home: project, present: [], plugins: plugins, record: Record(home: project.path),
+                                 appHomes: [:], looks: &looks)
+        var mcp = DaemonAPI.MCP(file: MCPJSONFile.projectURL(folder: project).path)
+        switch projectServers(in: project) {
+        case .success(let servers):
+            mcp.servers = servers.map { serverRow($0, clash: [:], reach: [:]) }
+        case .failure(let problem):
+            mcp.problem = .init(message: problem.message, line: problem.line)
+            looks.append(.init(kind: .problem, page: .mcp, item: mcpFile,
+                               text: problem.message + (problem.line.map { " Line \($0)." } ?? "")
+                                   + " Agents here start without the project's servers until it is fixed."))
+        }
+        snapshot.mcp = mcp
+        snapshot.plugins = plugins.map { plugin(home: project, $0, present: [], record: Record(home: project.path)) }
+        snapshot.otherFiles = otherFiles(shared, appOwned: projectAppFiles)
+        snapshot.needsALook = looks
+        return snapshot
+    }
+
+    /// What the app keeps in a project's `.agents`: its settings, pins, workflows and the
+    /// folders it makes as it works.
+    static let projectAppFiles: Set<String> = [
+        "project.json", "pins.json", "workflows", "worktrees", "dropbox", "attachments", "chat",
+    ]
 
     private static func names(_ ids: [String]) -> String {
         ids.map { RuntimeCatalog.runtime(id: $0)?.name ?? $0 }.joined(separator: ", ")
@@ -380,8 +415,9 @@ extension PersonalDotAgents {
 
     // MARK: Other files
 
-    /// Everything in `~/.agents` the other pages do not cover.
-    private static func otherFiles(_ shared: URL) -> [DaemonAPI.OtherFile] {
+    /// Everything in `~/.agents` the other pages do not cover, or in a project's `.agents`,
+    /// where the app keeps files of its own too.
+    private static func otherFiles(_ shared: URL, appOwned: Set<String> = []) -> [DaemonAPI.OtherFile] {
         let covered: Set<String> = [router, skills, plugins, mcpFile, ".DS_Store"]
         let entries = ((try? FileManager.default.contentsOfDirectory(atPath: shared.path)) ?? []).sorted()
         var files: [DaemonAPI.OtherFile] = []
@@ -395,6 +431,8 @@ extension PersonalDotAgents {
                 files.append(.init(path: name, kind: .git))
             case ".skill-lock.json", MCPSignInFile.fileName:
                 files.append(.init(path: name, kind: .managed))
+            case _ where appOwned.contains(name):
+                files.append(.init(path: name, kind: .app))
             default:
                 files.append(.init(path: name, kind: .unused))
             }

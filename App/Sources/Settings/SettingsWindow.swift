@@ -4,16 +4,16 @@ import SwiftUI
 
 /// The Settings window (055, look/ frames A–G): one rail down the left and the chosen pane
 /// beside it. It opens at one size for every pane, so choosing another never makes the
-/// window jump, and it can be resized larger than that. Shared's pages are listed in the
+/// window jump, and it can be resized larger than that. Agent Configuration's pages are listed in the
 /// rail under a heading of their own rather than in a column of their own, so there is
 /// one place to choose from.
 struct SettingsWindow: View {
     @Environment(AppModel.self) private var model
     @AppStorage("settingsPane") private var paneRaw = SettingsPane.general.rawValue
-    @AppStorage("settingsSharedPage") private var sharedPageRaw = SharedPage.overview.rawValue
+    @AppStorage("settingsSharedPage") private var sharedPageRaw = AgentConfigurationPage.overview.rawValue
     @AppStorage("settingsRuntimeID") private var runtimeIDRaw = RuntimeCatalog.claude.id
-    /// Shared's snapshot lives here, not in its pane, because the rail shows its counts.
-    /// Asked for when the window appears, when Shared is chosen, and whenever the app comes
+    /// Agent Configuration's snapshot lives here, not in its pane, because the rail shows its
+    /// counts. Asked for when the window appears, when it is chosen, and whenever the app comes
     /// back to the front, which is when an edit made elsewhere shows.
     @State private var sharedSnapshot: DaemonAPI.SharedSnapshot?
     @State private var controlPage: ControlPage = .overview
@@ -22,7 +22,7 @@ struct SettingsWindow: View {
     @State private var control: ControlSettingsModel? = ControlConfig.endpoint.flatMap { ControlSettingsModel(endpoint: $0) }
 
     /// The size it opens at, and the smallest it will go. A larger window gives the extra
-    /// room to the detail on Shared, and to the empty space beside a form pane, which
+    /// room to the detail on Agent Configuration, and to the empty space beside a form pane, which
     /// stays one column.
     static let size = CGSize(width: 1_000, height: 640)
 
@@ -32,9 +32,9 @@ struct SettingsWindow: View {
             set: { paneRaw = $0.rawValue })
     }
 
-    private var sharedPage: Binding<SharedPage> {
+    private var sharedPage: Binding<AgentConfigurationPage> {
         Binding(
-            get: { SharedPage(rawValue: sharedPageRaw) ?? .overview },
+            get: { AgentConfigurationPage(rawValue: sharedPageRaw) ?? .overview },
             set: { sharedPageRaw = $0.rawValue })
     }
 
@@ -89,7 +89,7 @@ struct SettingsWindow: View {
             model.settingsPaneAsked = nil
         }
         .onChange(of: pane.wrappedValue) { _, chosen in
-            if chosen == .shared { Task { await refreshShared() } }
+            if chosen == .agentConfiguration { Task { await refreshShared() } }
             if chosen == .runtimes { Task { await model.refreshRuntimes() } }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
@@ -111,7 +111,7 @@ struct SettingsWindow: View {
         switch pane.wrappedValue {
         case .general: FormColumn { GeneralSettingsView() }
         case .runtimes: FormColumn { AgentRuntimesSettingsView(runtimeID: runtimeID.wrappedValue) }
-        case .shared: SharedSettingsView(snapshot: sharedSnapshot, page: sharedPage, refresh: { await refreshShared() })
+        case .agentConfiguration: AgentConfigurationView(place: .you, snapshot: sharedSnapshot, page: sharedPage, refresh: { await refreshShared() })
         case .spending: FormColumn { CostSettingsView() }
         case .resources: FormColumn { ResourcesSettingsView() }
         case .controlPlane:
@@ -125,13 +125,15 @@ struct SettingsWindow: View {
 }
 
 enum SettingsPane: String, Hashable, CaseIterable {
-    case general, runtimes, shared, spending, resources, controlPlane
+    case general, runtimes, spending, resources, controlPlane
+    /// Was Shared (#754): the raw value is what a window left open on it kept.
+    case agentConfiguration = "shared"
 
     var title: String {
         switch self {
         case .general: "General"
         case .runtimes: "Agent Runtimes"
-        case .shared: "Shared"
+        case .agentConfiguration: "Agent Configuration"
         case .spending: "Cost"
         case .resources: "Resources"
         case .controlPlane: "Control plane"
@@ -142,18 +144,18 @@ enum SettingsPane: String, Hashable, CaseIterable {
         switch self {
         case .general: "gearshape"
         case .runtimes: "cpu"
-        case .shared: "square.on.square"
+        case .agentConfiguration: "square.on.square"
         case .spending: "dollarsign.circle"
         case .resources: "lock"
         case .controlPlane: "point.3.connected.trianglepath.dotted"
         }
     }
 
-    /// General on its own; the panes about agents; Shared, drawn as a heading over its
+    /// General on its own; the panes about agents; Agent Configuration, drawn as a heading over its
     /// pages; the control plane, whose hosts are the servers and whose clients are the
     /// devices (058, frame D).
     static var groups: [[SettingsPane]] {
-        [[.general], [.runtimes, .spending, .resources], [.shared], [.controlPlane]]
+        [[.general], [.runtimes, .spending, .resources], [.agentConfiguration], [.controlPlane]]
     }
 }
 
@@ -209,7 +211,7 @@ private final class SettingsGrowView: NSView {
 }
 
 /// A form pane: one column, left-aligned, never stretched past 560, so a pane with one
-/// picker keeps it beside its label in a window sized for Shared's list and detail.
+/// picker keeps it beside its label in a window sized for Agent Configuration's list and detail.
 private struct FormColumn<Content: View>: View {
     @ViewBuilder var content: Content
 
@@ -225,7 +227,7 @@ private struct FormColumn<Content: View>: View {
 private struct SettingsRail: View {
     @Environment(AppModel.self) private var model
     @Binding var pane: SettingsPane
-    @Binding var sharedPage: SharedPage
+    @Binding var sharedPage: AgentConfigurationPage
     @Binding var runtimeID: String
     let snapshot: DaemonAPI.SharedSnapshot?
     @Binding var controlPage: ControlPage
@@ -237,7 +239,9 @@ private struct SettingsRail: View {
                 if index > 0 { Spacer().frame(height: 10) }
                 ForEach(group, id: \.self) { each in
                     switch each {
-                    case .shared: sharedGroup
+                    case .agentConfiguration:
+                        AgentConfigurationRailGroup(snapshot: snapshot, chosen: pane == .agentConfiguration ? sharedPage : nil,
+                                                    choose: { pane = .agentConfiguration; sharedPage = $0 })
                     case .runtimes: runtimesGroup
                     case .controlPlane: controlGroup
                     default: paneItem(each)
@@ -245,8 +249,8 @@ private struct SettingsRail: View {
                 }
             }
             Spacer()
-            if pane == .shared {
-                Text("Your own set, for every project. A project’s own .agents folder is in its Project Settings.")
+            if pane == .agentConfiguration {
+                Text("Your own set, for every project. A project’s own .agents folder is under Agent Configuration in its Project Settings.")
                     .appText(.fine).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(10)
@@ -290,7 +294,7 @@ private struct SettingsRail: View {
         }
     }
 
-    /// The control plane, drawn as Shared is: a heading always open over its pages (058).
+    /// The control plane, drawn as Agent Configuration is: a heading always open over its pages (058).
     @ViewBuilder
     private var controlGroup: some View {
         heading(.controlPlane)
@@ -345,56 +349,10 @@ private struct SettingsRail: View {
             }
         }
     }
-
-    /// Shared is a heading, not a button: its pages are always listed under it, so none is
-    /// hidden behind a click. Which page is lit only shows while Shared is the pane.
-    @ViewBuilder
-    private var sharedGroup: some View {
-        HStack(spacing: 8) {
-            Image(systemName: SettingsPane.shared.symbol)
-                .frame(width: 20)
-                .accessibilityHidden(true)
-            Text(SettingsPane.shared.title)
-        }
-        .appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 2)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
-        page("Overview", .overview, count: nil, warns: false)
-        if let snapshot, snapshot.laidOut, !snapshot.isEmpty {
-            page("Instructions", .instructions, count: snapshot.instructions?.exists == true ? 1 : 0,
-                 warns: snapshot.warns(.instructions))
-            page("Skills", .skills, count: snapshot.skills.count, warns: snapshot.warns(.skills))
-            page("MCP servers", .mcp, count: snapshot.mcp.problem == nil ? snapshot.mcp.servers.count : nil,
-                 warns: snapshot.warns(.mcp))
-            page("Plugins", .plugins, count: snapshot.plugins.count, warns: snapshot.warns(.plugins))
-            page("Other files", .other, count: snapshot.otherFiles.count, warns: false)
-        }
-    }
-
-    private func page(_ title: String, _ target: SharedPage, count: Int?, warns: Bool) -> some View {
-        let chosen = pane == .shared && sharedPage == target
-        return RailButton(lit: chosen,
-                          label: title + (count.map { ", \($0)" } ?? "") + (warns ? ", needs a look" : ""),
-                          selected: chosen, action: { pane = .shared; sharedPage = target }) {
-            HStack(spacing: 6) {
-                Text(title)
-                Spacer()
-                if warns {
-                    Image(systemName: "exclamationmark.triangle")
-                        .foregroundStyle(chosen ? .white : SharedInk.attention)
-                }
-                if let count { Text("\(count)").monospacedDigit()
-                        .foregroundStyle(chosen ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary)) }
-            }
-            .padding(.leading, 28)
-        }
-    }
 }
 
 /// One line of the rail. The whole line is the button (memory: a tap on a card never fires),
-/// lit in the accent when chosen, as Shared's own column was.
+/// lit in the accent when chosen, as Agent Configuration's own column was.
 struct RailButton<Content: View>: View {
     let lit: Bool
     let label: String

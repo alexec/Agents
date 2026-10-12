@@ -167,12 +167,21 @@ extension DaemonCore {
 }
 
 extension DaemonCore {
-    /// Settings ▸ Shared's read of `~/.agents` (054, R13). A window's only: a phone or a
+    /// Settings ▸ Agent Configuration's read of `~/.agents` (054, R13). A window's only: a phone or a
     /// helper is refused before it gets here, by its role.
     func sharedSnapshot() -> DaemonAPI.SharedSnapshot {
         guard let home = locations.personalHome else { return PersonalDotAgents.snapshot(home: nil, installed: [], record: .init(home: "")) }
         return PersonalDotAgents.snapshot(home: home, installed: installedRuntimeIDs(),
                                           record: .load(from: locations.personalLayout, home: home),
                                           appHomes: appHomes())
+    }
+
+    /// A project's `.agents`, for its Project Settings pages (#754). Only a project's, or a
+    /// worktree's: the read names what is in the folder, so not any folder on the disk.
+    func projectShared(_ path: String) throws -> DaemonAPI.SharedSnapshot {
+        let folder = Project.standardize(URL(filePath: path))
+        guard Self.isProjectFolder(folder, records: projectRecords(), agentFolders: Set(agents.values.map(\.projectFolder)))
+        else { throw JSONRPCError(code: JSONRPCError.invalidParams, message: "\(path) is not a project here.") }
+        return PersonalDotAgents.projectSnapshot(folder: folder)
     }
 }

@@ -1,28 +1,83 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Frame A: what every agent gets, in one grid of kinds by runtimes, and under it every
-/// exception, each opening its own page.
-struct SharedOverviewPage: View {
+/// Frame A: what every agent gets and under it every exception, each opening its own page.
+/// Yours is a grid of kinds by runtimes. A project's has no runtimes to draw (#754), so it
+/// is a line per kind with how many, each opening its page.
+struct AgentConfigurationOverview: View {
+    let place: AgentsPlace
     let snapshot: DaemonAPI.SharedSnapshot
-    @Binding var page: SharedPage
+    @Binding var page: AgentConfigurationPage
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                SharedPageHeader(title: "Shared by every agent", path: snapshot.home) {
+                SharedPageHeader(title: title, path: snapshot.home) {
                     Button("Reveal in Finder") { SharedFiles.reveal(snapshot.home) }.buttonStyle(.paper)
                 }
-                grid
-                legend
+                switch place {
+                case .you:
+                    grid
+                    legend
+                case .project:
+                    Text(place.explainer)
+                        .appText(.fine).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    kinds
+                }
                 if !snapshot.needsALook.isEmpty {
                     SharedSectionLabel("Needs a look")
                     ForEach(snapshot.needsALook) { look in
-                        LookRow(look: look) { page = SharedPage(look.page) }
+                        LookRow(look: look) { page = AgentConfigurationPage(look.page) }
                     }
                 }
             }
             .padding(20)
+        }
+    }
+
+    private var title: String {
+        switch place {
+        case .you: "Shared by every agent"
+        case .project: "Shared by every agent in this project"
+        }
+    }
+
+    // MARK: A project's kinds
+
+    private var kinds: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(AgentConfigurationPage.allCases.filter { $0 != .overview }, id: \.self) { kind in
+                let what = summary(kind)
+                SharedRow(chosen: false, label: "\(kind.title): \(what). Show.", action: { page = kind }) {
+                    HStack(spacing: 10) {
+                        Text(kind.title).fontWeight(.semibold).frame(minWidth: 120, alignment: .leading)
+                        Text(what).foregroundStyle(kind.warns(in: snapshot) ? AnyShapeStyle(SharedInk.attention)
+                                                                             : AnyShapeStyle(.secondary))
+                            .lineLimit(1)
+                        Spacer(minLength: 8)
+                        Image(systemName: "chevron.right").foregroundStyle(.secondary).accessibilityHidden(true)
+                    }
+                }
+            }
+        }
+    }
+
+    private func summary(_ kind: AgentConfigurationPage) -> String {
+        switch kind {
+        case .overview: return ""
+        case .instructions: return snapshot.instructions?.exists == true ? "AGENTS.md" : "No AGENTS.md yet"
+        case .mcp where snapshot.mcp.problem != nil: return "mcp.json can't be read"
+        default:
+            let count = kind.count(in: snapshot) ?? 0
+            if count == 0 { return "None" }
+            let noun: (String, String) = switch kind {
+            case .skills: ("skill", "skills")
+            case .mcp: ("server", "servers")
+            case .plugins: ("plugin", "plugins")
+            default: ("file", "files")
+            }
+            return "\(count) \(count == 1 ? noun.0 : noun.1)"
         }
     }
 
@@ -134,7 +189,7 @@ struct SharedOverviewPage: View {
     }
 }
 
-extension SharedOverviewPage.Cell: View {
+extension AgentConfigurationOverview.Cell: View {
     var body: some View {
         Text(text)
             .fontWeight(tone == .gets ? .semibold : .regular)

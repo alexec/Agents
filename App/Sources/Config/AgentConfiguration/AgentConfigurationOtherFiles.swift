@@ -1,9 +1,10 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Frame G: everything else in `~/.agents`, with what (if anything) uses it. Nothing is
-/// hidden, so the tab is the whole folder.
-struct SharedOtherFilesPage: View {
+/// Frame G: everything else in `~/.agents` or a project's `.agents`, with what (if
+/// anything) uses it. Nothing is hidden, so the pages are the whole folder.
+struct AgentConfigurationOtherFiles: View {
+    let place: AgentsPlace
     let snapshot: DaemonAPI.SharedSnapshot
 
     var body: some View {
@@ -13,14 +14,14 @@ struct SharedOtherFilesPage: View {
                     Button("Reveal in Finder") { SharedFiles.reveal(snapshot.home) }.buttonStyle(.paper)
                 }
                 if snapshot.otherFiles.isEmpty {
-                    Text("Nothing else in ~/.agents.").appText(.fine).foregroundStyle(.secondary)
+                    Text("Nothing else in \(place.folderName).").appText(.fine).foregroundStyle(.secondary)
                 }
                 ForEach(snapshot.otherFiles) { file in
                     let path = snapshot.home + "/" + file.path
                     HStack(spacing: 10) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(file.path + (file.kind == .git ? "/" : "")).appText(.code)
-                            Text(Self.use(file.kind)).appText(.fine).foregroundStyle(.secondary)
+                            Text(Self.use(file.kind, in: place)).appText(.fine).foregroundStyle(.secondary)
                         }
                         Spacer()
                         SharedChip(text: file.kind.rawValue)
@@ -38,12 +39,17 @@ struct SharedOtherFilesPage: View {
         }
     }
 
-    static func use(_ kind: DaemonAPI.OtherFile.Kind) -> String {
+    static func use(_ kind: DaemonAPI.OtherFile.Kind, in place: AgentsPlace) -> String {
         switch kind {
         case .persona: "A persona: picked when an agent starts"
-        case .git: "~/.agents is a git repository"
+        case .git: "\(place.folderName) is a git repository"
         case .managed: "Kept by the skills installer; the app leaves it alone"
-        case .unused: "Not read by any agent"
+        case .app: "The app’s own: the project’s settings, pins and workflows, and what it keeps as it works"
+        case .unused:
+            switch place {
+            case .you: "Not read by any agent"
+            case .project: "Not read by the app; an agent here can still open it"
+            }
         }
     }
 }

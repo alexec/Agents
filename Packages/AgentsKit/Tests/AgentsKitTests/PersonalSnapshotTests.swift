@@ -205,4 +205,60 @@ struct PersonalSnapshotTests {
         #expect(shot.laidOut)
         #expect(shot.skills.contains { $0.name == "dataviz" })
     }
+
+    // #754: a project's .agents, read for the same pages in Project Settings.
+    @Test func aProjectsFolderIsReadWithNoReach() throws {
+        let project = try home()
+        try write("# Here\n", "AGENTS.md", in: project)
+        try skill("lint", at: ".agents/skills", in: project)
+        try write("{\"mcpServers\": {\"docs\": {\"url\": \"https://docs.example/mcp?key=\(secret)\"}}}", ".agents/mcp.json", in: project)
+        try write("{\"name\":\"kite\"}", ".agents/plugins/kite/.claude-plugin/plugin.json", in: project)
+        try write("{}", ".agents/project.json", in: project)
+        try write("[]", ".agents/pins.json", in: project)
+        try write("x", ".agents/workflows/nightly.md", in: project)
+        try write("A reviewer.", ".agents/personas/reviewer.md", in: project)
+        try write("Notes.", ".agents/reviews/one.md", in: project)
+
+        let shot = PersonalDotAgents.projectSnapshot(folder: project)
+
+        #expect(shot.laidOut)
+        #expect(shot.home == project.appending(path: ".agents").path)
+        #expect(shot.runtimes.isEmpty)
+        #expect(shot.instructions?.path == project.appending(path: "AGENTS.md").path)
+        #expect(shot.instructions?.exists == true)
+        #expect(shot.skills.map(\.name) == ["lint"])
+        #expect(shot.mcp.servers.map(\.name) == ["docs"])
+        #expect(shot.mcp.app.isEmpty)
+        #expect(shot.plugins.map(\.name) == ["kite"])
+        let kinds = Dictionary(uniqueKeysWithValues: shot.otherFiles.map { ($0.path, $0.kind) })
+        #expect(kinds == ["personas/reviewer.md": .persona, "pins.json": .app, "project.json": .app,
+                          "reviews": .unused, "workflows": .app])
+        #expect(!String(decoding: try JSONEncoder().encode(shot), as: UTF8.self).contains(secret))
+    }
+
+    @Test func aProjectsUnreadableMCPFileNeedsALook() throws {
+        let project = try home()
+        try write("{", ".agents/mcp.json", in: project)
+        let shot = PersonalDotAgents.projectSnapshot(folder: project)
+        #expect(shot.mcp.problem != nil)
+        #expect(shot.needsALook.map(\.page) == [.mcp])
+        #expect(shot.instructions?.exists == false)
+    }
+
+    @Test func onlyAProjectsFolderIsRead() async throws {
+        let root = try home()
+        let project = try home()
+        try skill("lint", at: ".agents/skills", in: project)
+        let locations = StoreLocations(root: root.appending(path: "root"))
+        let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
+                              discovery: .findsEverything, launcher: FakeLauncher())
+        let stranger = await core.handle(method: DaemonAPI.Method.personalShared,
+                                         params: try JSONValue.encoding(DaemonAPI.SharedRequest(folder: project.path)))
+        #expect((try? stranger.get()) == nil)
+        _ = try await core.addProject(project)
+        let answer = await core.handle(method: DaemonAPI.Method.personalShared,
+                                       params: try JSONValue.encoding(DaemonAPI.SharedRequest(folder: project.path)))
+        let shot = try answer.get().decode(DaemonAPI.SharedSnapshot.self)
+        #expect(shot.skills.map(\.name) == ["lint"])
+    }
 }

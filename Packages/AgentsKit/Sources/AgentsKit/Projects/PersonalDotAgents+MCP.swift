@@ -16,7 +16,7 @@ extension PersonalDotAgents {
     public static let mcpFile = "mcp.json"
 
     /// Why the file was skipped. Every personal server is then left out of every session
-    /// until it is fixed, and the Shared tab says so.
+    /// until it is fixed, and the Agent Configuration page says so.
     public struct MCPFileProblem: Error, Codable, Equatable, Sendable {
         public var message: String
         public var line: Int?

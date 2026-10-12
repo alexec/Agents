@@ -21,7 +21,7 @@ written, and it takes the skill at a fixed commit.
 
 ## Add a skill for yourself
 
-1. Open **Settings ▸ Shared ▸ Skills** and choose **Add skill…**.
+1. Open **Settings ▸ Agent Configuration ▸ Skills** and choose **Add skill…**.
 2. Type what you are looking for. Results come from the marketplace chosen in the
    **Marketplace** menu: skills.sh lists the most installed first; a repository lists every
    skill before you type. Each shows
@@ -55,7 +55,7 @@ fetched again.
 ## Keep a skill up to date
 
 When a skill's source has changed since it was added, it is marked **update** in
-**Settings ▸ Shared ▸ Skills** or in Project Settings. The app asks GitHub at most once an hour
+**Settings ▸ Agent Configuration ▸ Skills** or in Project Settings. The app asks GitHub at most once an hour
 for each repository.
 
 1. Choose **Update…**. The sheet lists what changes, file by file, and shows the new
