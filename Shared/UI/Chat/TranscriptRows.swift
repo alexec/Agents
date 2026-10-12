@@ -134,27 +134,17 @@ private struct StepsControl: View {
     var body: some View {
         Button(action: toggle) {
             // The words alone, with no chevron in front of them (#148).
+            // Plain text you click, flush with the turn's edge: no capsule, no padding (#758).
             Text(words)
                 .appText(.fine)
                 .foregroundStyle(isHovering ? .primary : .secondary)
-                .padding(.horizontal, 8)
-                #if os(iOS)
-                .frame(minHeight: 32)
-                #else
-                .padding(.vertical, 3)
-                #endif
-                .background {
-                    // A finger has no hover, so on the phone the edge is always there.
-                    #if os(iOS)
-                    Capsule().strokeBorder(.quaternary)
-                    #else
-                    Capsule().strokeBorder(.quaternary).opacity(isHovering ? 1 : 0)
-                    #endif
-                }
-                .contentShape(Capsule())
+                .stepsControlFrame()
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
+        #if os(macOS)
+        .pointerStyle(.link)
+        #endif
         .help(isOpen ? "Hide this turn's steps" : "Show every step of this turn")
         .accessibilityLabel(words)
     }
@@ -165,6 +155,7 @@ private struct StepsControl: View {
 private struct EarlierStepsControl: View {
     let fetch: () async -> Void
     @State private var isFetching = false
+    @State private var isHovering = false
 
     var body: some View {
         Button {
@@ -177,19 +168,27 @@ private struct EarlierStepsControl: View {
         } label: {
             Text("Earlier steps")
                 .appText(.fine)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                #if os(iOS)
-                .frame(minHeight: 32)
-                #else
-                .padding(.vertical, 3)
-                #endif
-                .background { Capsule().strokeBorder(.quaternary) }
-                .contentShape(Capsule())
+                .foregroundStyle(isHovering ? .primary : .secondary)
+                .stepsControlFrame()
         }
         .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+        #if os(macOS)
+        .pointerStyle(.link)
+        #endif
         .disabled(isFetching)
         .help("Show the steps of this turn before these")
+    }
+}
+
+private extension View {
+    /// A finger still gets 32pt to aim at on the phone, with no outline to show it.
+    func stepsControlFrame() -> some View {
+        #if os(iOS)
+        frame(minHeight: 32).contentShape(Rectangle())
+        #else
+        contentShape(Rectangle())
+        #endif
     }
 }
 
