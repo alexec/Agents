@@ -113,7 +113,7 @@ struct HelperAgentTests {
         @Sendable func briefings() async -> [String] {
             var texts: [String] = []
             for agent in launcher.allAgents {
-                if let text = await agent.promptContent?.arrayValue?.last?["text"]?.stringValue { texts.append(text) }
+                if let text = await agent.promptContent?.arrayValue?.first?["text"]?.stringValue { texts.append(text) }
             }
             return texts
         }

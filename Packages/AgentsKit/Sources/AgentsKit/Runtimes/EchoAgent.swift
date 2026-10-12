@@ -51,9 +51,9 @@ public enum EchoAgent {
             case "session/new":
                 return .success(["sessionId": .string(session)])
             case "session/prompt":
-                // What the person typed: the first text block's first paragraph. The rest is
-                // the host's own briefing, which is not theirs to be told back.
-                let first = (params?["prompt"]?.arrayValue ?? []).compactMap { $0["text"]?.stringValue }.first ?? ""
+                // What the person typed: the last text block's first paragraph. The host's
+                // own words go before it (#763) and are not theirs to be told back.
+                let first = (params?["prompt"]?.arrayValue ?? []).compactMap { $0["text"]?.stringValue }.last ?? ""
                 let said = first.components(separatedBy: "\n").first?.trimmingCharacters(in: .whitespaces) ?? ""
                 let answer = said.isEmpty ? "(nothing to say back)" : "You said: \(said)"
                 try? connection?.notify("session/update", [

@@ -267,9 +267,11 @@ struct SuggestedPromptTests {
         // The first runtime's, not the last one's: a turn that ends without saying how
         // it went is asked, and that question starts a runtime of its own.
         let sent = await launcher.allAgents.first?.promptContent?.arrayValue ?? []
+        // Ours first and the person's words last (#763), so their words are what the
+        // agent answers.
         #expect(sent.count == 2)
-        #expect(sent.first?["text"]?.stringValue == "do the thing")
-        #expect(sent.last?["text"]?.stringValue == Briefing.asSent(to: "cursor"))
+        #expect(sent.first?["text"]?.stringValue == Briefing.asSent(to: "cursor"))
+        #expect(sent.last?["text"]?.stringValue == "do the thing")
     }
 
     /// Asked once. The runtime keeps it in its own history and replays that history
@@ -286,7 +288,7 @@ struct SuggestedPromptTests {
         try await settle(core, id)
 
         let sent = await prompts(launcher)
-        #expect(sent == [["do the thing", Briefing.asSent(to: "cursor")],
+        #expect(sent == [[Briefing.asSent(to: "cursor"), "do the thing"],
                          ["and the next thing"]])
     }
 
@@ -345,8 +347,8 @@ struct SuggestedPromptTests {
         // Two prompts, and the ask on both: the second runtime is a conversation
         // starting again, however much of it the app still has on its own record.
         let sent = await prompts(launcher)
-        #expect(sent == [["do the thing", Briefing.asSent(to: "cursor")],
-                         ["carry on", Briefing.asSent(to: "cursor")]])
+        #expect(sent == [[Briefing.asSent(to: "cursor"), "do the thing"],
+                         [Briefing.asSent(to: "cursor"), "carry on"]])
     }
 
     /// The other way a conversation comes back, and the one the two tests above leave
@@ -360,7 +362,7 @@ struct SuggestedPromptTests {
 
         let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "do the thing"))
         try await settle(core, id)
-        #expect(await prompts(first) == [["do the thing", Briefing.asSent(to: "cursor")]])
+        #expect(await prompts(first) == [[Briefing.asSent(to: "cursor"), "do the thing"]])
 
         // Wait for the record on disk, not the one in memory. `settle` watches the
         // daemon's own copy, and the file is written a moment behind it — the same gap
@@ -438,8 +440,8 @@ struct SuggestedPromptTests {
         try await settle(core, started.id)
         #expect(started.startedByWorkflow == "check-build")
         let sent = await prompts(launcher)
-        #expect(sent == [["Check the build.",
-                          Briefing.asSent(to: started.runtimeID)]])
+        #expect(sent == [[Briefing.asSent(to: started.runtimeID),
+                          "Check the build."]])
     }
 
     /// Ours is a block of its own and not part of what was said. The transcript is a

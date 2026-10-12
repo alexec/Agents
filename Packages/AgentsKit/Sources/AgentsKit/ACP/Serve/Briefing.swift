@@ -16,8 +16,10 @@ import Foundation
 /// repeating it would be paying again for something already said. It goes a second time
 /// only where a runtime has lost the conversation and a new one has to be begun.
 ///
-/// It goes as a block of its own, after the person's words, and is not what the
+/// It goes as a block of its own, before the person's words, and is not what the
 /// transcript records: the conversation still shows what the person actually said.
+/// Before, not after (#763): it is standing context, and at the end it read as the
+/// newest instruction, so an agent could answer it rather than the person.
 /// Delete its use in `beginTurn` and every feature here still works — each one just
 /// stops happening on its own.
 ///
@@ -258,7 +260,7 @@ public enum Briefing {
 
     /// The document changed under you, and here is how (022 FR-016).
     ///
-    /// Sent as a block after the person's next words, the way the briefing is, and
+    /// Sent as a block before the person's next words, the way the briefing is, and
     /// not recorded in the transcript. It quotes each changed passage rather than
     /// naming it, because an agent told "lines 12–15 changed" has to go and read
     /// them, and one that reads its own last version instead will put it back — the
