@@ -112,23 +112,26 @@ struct MessageAgentTests {
         #expect(sent.sender == MessageSender(agentID: lead, title: "Lead"))
     }
 
-    @Test func aSessionThePersonStartedIsQueuedNotWoken() async throws {
+    /// Whoever started it (#766): a finished chat of the person's is woken too.
+    @Test func aSessionThePersonStartedIsWoken() async throws {
         let (locations, root) = try temporary()
         let api = try project(root)
         let core = try await makeCore(locations)
         let mine = try await session(core, in: api, title: "Mine")
         let lead = try await session(core, in: api, title: "Lead", prompt: "Lead")
         let other = try await helper(core, of: lead, title: "Other")
-        let before = try await entries(core, mine).count
 
         let note = try await send(core, from: other, to: mine.uuidString, "Done with the API half.")
-        #expect(note.contains("which the person started"))
-        let agent = try #require(await core.agent(mine))
-        #expect(agent.queuedPrompts.count == 1)
-        #expect(agent.queuedPrompts.first?.from == .agent)
-        #expect(agent.queuedPrompts.first?.sender?.title == "Other")
-        #expect(!agent.state.hasTurnInFlight)
-        #expect(try await entries(core, mine).count == before)
+        #expect(note.contains("working on it now"))
+        await settle(core, mine)
+
+        let message = try await entries(core, mine).last { entry in
+            if case .userMessage(_, _, .agent) = entry.kind { return true }
+            return false
+        }
+        let sent = try #require(message)
+        #expect(sent.sender == MessageSender(agentID: other, title: "Other"))
+        #expect(try #require(await core.agent(mine)).queuedPrompts.isEmpty)
     }
 
     @Test func aStoppedHelperIsQueuedNotWoken() async throws {
