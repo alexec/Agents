@@ -144,6 +144,10 @@ struct KeptRequestsTests {
         #expect(host.requests.first?.params?.objectValue?["sendID"]?.stringValue != nil)
         for _ in 0..<300 where await !kept.all().isEmpty { try await Task.sleep(for: .milliseconds(10)) }
         #expect(await kept.all().isEmpty)
+        // Said after the record goes, so it can trail the empty list.
+        for _ in 0..<300 where !phone.heardNotification(DaemonAPI.Notification.controlKeptDelivered) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
         #expect(phone.heardNotification(DaemonAPI.Notification.controlKeptDelivered))
     }
 
