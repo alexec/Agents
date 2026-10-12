@@ -385,7 +385,8 @@ private struct ChatMenu: View {
             Button("Open File…", systemImage: "magnifyingglass", action: openFile)
             Button("Exchanged", systemImage: "doc") { model.panes.state(for: agent.id).show(.exchanged) }
             if agent.state != .archived {
-                // As the Mac's Session menu has it (#342).
+                // As the Mac's Session menu has them (#342, #751).
+                RenameAgentButton(agent: agent)
                 BranchAgentButton(agent: agent)
                 if sizeClass != .regular {
                     Divider()

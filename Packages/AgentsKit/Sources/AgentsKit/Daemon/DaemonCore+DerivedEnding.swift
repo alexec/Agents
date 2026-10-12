@@ -21,9 +21,9 @@ extension DaemonCore {
             agent.report = report
             if isWatched(agentID) { agent.reportSeenAt = report.at }
         }
-        if agent.title == nil, let first = lastPrompts[agentID], first.from == .person,
+        if agent.titleFromRuntime == nil, let first = lastPrompts[agentID], first.from == .person,
            let title = DerivedEnding.title(fromPrompt: first.text) {
-            agent.title = title
+            agent.takeRuntimeTitle(title)
         }
         changed(agent)
     }

@@ -13,6 +13,12 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     public var runtimeID: String
     public var cwd: URL
     public var title: String?
+    /// The person renamed this session (#751): `title` is theirs, and the runtime's titles
+    /// and a derived one land in `runtimeTitle` instead. Clearing the rename puts that back.
+    public var titleIsPersons: Bool = false
+    /// What the runtime, or a title derived at a turn's end, last named the session while
+    /// the person's title stood. Nil when the title is not the person's.
+    public var runtimeTitle: String?
     /// The names attached to this conversation, with person or agent ownership.
     /// Empty for records written before session labels existed.
     public var labels: [SessionLabel]
@@ -368,6 +374,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         pendingSandboxFailure = (try? c.decodeIfPresent(SandboxFailureRecord.self, forKey: .pendingSandboxFailure)) ?? nil
         missingFolder = (try? c.decodeIfPresent(MissingFolder.self, forKey: .missingFolder)) ?? nil
         listsLeftOut = try c.decodeIfPresent(Bool.self, forKey: .listsLeftOut) ?? false
+        // New in #751. Absent on everything written before it and on any never renamed.
+        titleIsPersons = try c.decodeIfPresent(Bool.self, forKey: .titleIsPersons) ?? false
+        runtimeTitle = (try? c.decodeIfPresent(String.self, forKey: .runtimeTitle)) ?? nil
         madeInRoot = (try? c.decodeIfPresent(String.self, forKey: .madeInRoot)) ?? nil
         queuedStart = (try? c.decodeIfPresent(QueuedStart.self, forKey: .queuedStart)) ?? nil
         // Only the keys this build does not know are read as open-ended values.
@@ -439,6 +448,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(pendingSandboxFailure, forKey: .pendingSandboxFailure)
         try c.encodeIfPresent(missingFolder, forKey: .missingFolder)
         if listsLeftOut { try c.encode(listsLeftOut, forKey: .listsLeftOut) }
+        if titleIsPersons { try c.encode(titleIsPersons, forKey: .titleIsPersons) }
+        try c.encodeIfPresent(runtimeTitle, forKey: .runtimeTitle)
         try c.encodeIfPresent(madeInRoot, forKey: .madeInRoot)
         try c.encodeIfPresent(queuedStart, forKey: .queuedStart)
         // Whatever a newer version wrote, written back out beside our own fields.
@@ -476,6 +487,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case sandboxOverride, effectiveSandbox, pendingSandboxFailure
         case missingFolder
         case listsLeftOut
+        case titleIsPersons, runtimeTitle
         case madeInRoot
         case queuedStart
     }
@@ -593,6 +605,29 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         let oneLine = raw.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         guard !oneLine.isEmpty else { return nil }
         return oneLine.count > 80 ? String(oneLine.prefix(79)) + "…" : oneLine
+    }
+
+    /// The runtime, or a turn's end, names the session (#492, #479). Under a person's
+    /// rename it is kept aside, for when they clear theirs, and the title stays.
+    public mutating func takeRuntimeTitle(_ new: String) {
+        if titleIsPersons { runtimeTitle = new } else { title = new }
+    }
+
+    /// What the runtime would call it now: its own title, under a rename or not.
+    public var titleFromRuntime: String? { titleIsPersons ? runtimeTitle : title }
+
+    /// The person renames the session (#751), or with nil hands naming back to the
+    /// runtime, whose last title comes back.
+    public mutating func rename(to new: String?) {
+        if let new {
+            if !titleIsPersons { runtimeTitle = title }
+            title = new
+            titleIsPersons = true
+        } else if titleIsPersons {
+            title = runtimeTitle
+            runtimeTitle = nil
+            titleIsPersons = false
+        }
     }
 
     /// Whether a restarting daemon may bring this chat back by itself: it was working

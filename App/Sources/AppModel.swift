@@ -501,6 +501,10 @@ final class AppModel {
     /// with the sidebar shut, whatever the last one had open (#358).
     @ObservationIgnored var justStarted: UUID?
 
+    /// The session whose title is being edited (#751): in its sidebar row, from the row's
+    /// menu or Return, or in the toolbar, from Rename… there or in the Session menu.
+    var renaming: Renaming?
+
     /// The chat being opened and since when, until its transcript is on screen (073).
     @ObservationIgnored private var chatOpening: (agent: UUID, timing: Perf.Interval)?
 
@@ -3899,6 +3903,14 @@ final class AppModel {
         if prewarmed.count > 64 { prewarmed = prewarmed.filter { Date().timeIntervalSince($0.value) < 15 } }
         _ = try? await client(forAgent: id).call(DaemonAPI.Method.agentsPrewarm,
                                                  DaemonAPI.PrewarmRequest(agentID: id, why: why))
+    }
+
+    /// The person's title for a session (#751), or with an empty one the runtime's again.
+    func rename(_ id: UUID, to title: String) async {
+        await attempt(on: work.agent(id)?.host ?? .mac) {
+            try await self.client(forAgent: id).call(DaemonAPI.Method.agentsRename,
+                                                     DaemonAPI.RenameRequest(agentID: id, title: title))
+        }
     }
 
     func setUnread(_ id: UUID, _ unread: Bool) async {

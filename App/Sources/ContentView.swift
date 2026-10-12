@@ -178,6 +178,23 @@ struct ContentView: View {
                 .disabled(agent.state == .archived)
                 .help(pinned ? "Take this session out of Pinned in the sidebar"
                              : "Keep this session in Pinned, at the top of the sidebar")
+                // The title, edited where the window shows it (#751).
+                Button {
+                    model.renaming = Renaming(id: agent.id, inToolbar: true)
+                } label: {
+                    Label("Rename", systemImage: "pencil")
+                }
+                .disabled(agent.state == .archived)
+                .help("Give this session a title of your own, which the runtime's no longer replaces")
+                .popover(isPresented: Binding(
+                    get: { model.renaming == Renaming(id: agent.id, inToolbar: true) },
+                    set: { if !$0, model.renaming?.inToolbar == true { model.renaming = nil } }),
+                         arrowEdge: .bottom) {
+                    RenameField(agent: agent)
+                        .appText(.reading)
+                        .frame(width: 320)
+                        .padding(10)
+                }
                 if agent.state == .archived {
                     Button {
                         Task { await model.unarchive(agent.id) }

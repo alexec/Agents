@@ -77,6 +77,7 @@ extension DaemonCore {
         // The same name, so the person finds the work where they left it.
         if let title = agent.title, var successor = agents[id] {
             successor.title = title
+            successor.titleIsPersons = agent.titleIsPersons
             changed(successor)
         }
         return id

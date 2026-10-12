@@ -11,7 +11,7 @@ import { carryOnHelp, carryOnLabel, carryOnPrompt, openBlock } from "../model/bl
 import { go } from "../route";
 
 export type Action = "carryOn" | "agents/stop" | "agents/archive" | "agents/unarchive"
-  | "markRead" | "markUnread" | "pin" | "unpin" | "fork" | "delete";
+  | "markRead" | "markUnread" | "rename" | "pin" | "unpin" | "fork" | "delete";
 
 /**
  * What the menu offers, in order, with the window's words (AgentRow's menu). Given
@@ -33,6 +33,10 @@ export function sessionActions(agent: Agent, pinned?: boolean): { action: Action
     found.push(agent.isUnread === true
       ? { action: "markRead", label: "Mark as Read", help: "Clear the unread mark" }
       : { action: "markUnread", label: "Mark as Unread", help: "Leave this to come back to" });
+  }
+  // The person's title, which the runtime's no longer replaces (#751), edited where it is shown.
+  if (agent.state !== "archived") {
+    found.push({ action: "rename", label: "Rename…", help: "Give this session a title of your own" });
   }
   // At the top of its project whatever its state, or back among the rest (#180).
   if (pinned !== undefined && agent.state !== "archived") {
@@ -125,7 +129,7 @@ export function SessionMenu({ store, host, agent, disabled, openFile, inChat }:
               onClick={() => {
                 open.value = false;
                 if (inChat && action === "agents/archive") archiveAndLeave(store, host, agent);
-                else runSessionAction(store, host, agent, action);
+                else runSessionAction(store, host, agent, action, inChat);
               }}>{label}</button>
           ))}
         </div>
@@ -134,9 +138,10 @@ export function SessionMenu({ store, host, agent, disabled, openFile, inChat }:
   );
 }
 
-/** One of `sessionActions`, done. */
-export function runSessionAction(store: Store, host: string, agent: Agent, action: Action): void {
-  if (action === "carryOn") void store.prompt(host, agent.id, carryOnPrompt, []);
+/** One of `sessionActions`, done. Rename edits the title where the menu was: the chat's header, or the row. */
+export function runSessionAction(store: Store, host: string, agent: Agent, action: Action, inChat = false): void {
+  if (action === "rename") store.renaming.value = { id: agent.id, inChat };
+  else if (action === "carryOn") void store.prompt(host, agent.id, carryOnPrompt, []);
   else if (action === "markRead" || action === "markUnread") void store.setUnread(host, agent.id, action === "markUnread");
   else if (action === "pin" || action === "unpin") void store.setPinned(host, projectFolder(agent), agent.id, action === "pin");
   else if (action === "fork") void branch(store, host, agent);
@@ -162,4 +167,37 @@ async function remove(store: Store, host: string, agent: Agent) {
 async function branch(store: Store, host: string, agent: Agent) {
   const id = await store.fork(host, agent.id);
   if (id) go({ host, project: projectFolder(agent), session: id });
+}
+
+/**
+ * The title as a field, in place of the text (#751): Enter keeps it, Escape or leaving it puts
+ * it back. Emptied, the runtime names the session again.
+ */
+export function RenameInput({ store, host, agent }: { store: Store; host: string; agent: Agent }) {
+  const field = useRef<HTMLInputElement>(null);
+  useEffect(() => { field.current?.focus(); field.current?.select(); }, []);
+  const done = () => { store.renaming.value = null; };
+  return (
+    <input ref={field} class="rename" aria-label="Title" defaultValue={agent.title ?? ""}
+      placeholder={(agent.titleIsPersons ? agent.runtimeTitle : agent.title) ?? "Untitled"}
+      title="Enter renames it; an empty title gives the runtime's back. Escape cancels."
+      onClick={(e) => e.stopPropagation()}
+      onBlur={done}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === "Escape") { e.preventDefault(); done(); }
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        const title = e.currentTarget.value;
+        done();
+        if (cleanedTitle(title) !== (agent.title ?? null)) void store.rename(host, agent.id, title);
+      }} />
+  );
+}
+
+/** Agent.cleanedTitle: one line, spaces collapsed, 80 at most; null when nothing is left. */
+export function cleanedTitle(raw: string): string | null {
+  const line = raw.split(/\s+/).filter(Boolean).join(" ");
+  if (!line) return null;
+  return [...line].length > 80 ? [...line].slice(0, 79).join("") + "\u2026" : line;
 }

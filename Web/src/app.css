@@ -167,6 +167,15 @@ a[href] { cursor: pointer; }
 
 .column-head .actions { display: flex; gap: 6px; }
 
+/* A session's title edited in place (#751): in the chat's header, or its sidebar row. */
+input.rename {
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+}
+.row.session.renaming { display: flex; align-items: center; }
+
 .host h2 {
   font-size: 10.5px;
   text-transform: uppercase;

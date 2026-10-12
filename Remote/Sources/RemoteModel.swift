@@ -3367,6 +3367,33 @@ final class RemoteModel {
     /// The archived session a menu's Delete… is asking about, until it is answered (#398).
     var askingToDelete: Agent?
 
+    /// The session a menu's Rename… is asking a title for, until it is answered (#751),
+    /// and what has been typed.
+    var renaming: Agent?
+    var renameText = ""
+
+    /// Rename… from a row's menu or the chat's ···: the field starts on the title it has.
+    func askToRename(_ agent: Agent) {
+        renameText = agent.title ?? ""
+        renaming = agent
+    }
+
+    /// The person's title for a session (#751), kept by its host and told to every client.
+    /// Empty, the runtime names it again.
+    func rename(_ agentID: UUID, to title: String) async {
+        let host = work.agent(agentID)?.host ?? .mac
+        guard !isStale(on: host) else {
+            problem = notAnswering(host, "that could not be sent.")
+            return
+        }
+        do {
+            let request = DaemonAPI.RenameRequest(agentID: agentID, title: title)
+            try await client(for: request).call(DaemonAPI.Method.agentsRename, request)
+        } catch {
+            problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
+        }
+    }
+
     /// Delete an archived session (#398), once asked. A refusal says why it cannot go yet.
     func delete(_ agentID: UUID) async {
         guard !isStale(on: work.agent(agentID)?.host ?? .mac) else {

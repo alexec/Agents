@@ -169,6 +169,20 @@ struct RemoteView: View {
         } message: { _ in
             Text(DeletionWords.confirmMessage)
         }
+        // Rename… from a session's menu or the chat's ··· (#751), asked here as Delete… is.
+        .alert("Rename Session",
+               isPresented: Binding(get: { model.renaming != nil }, set: { if !$0 { model.renaming = nil } }),
+               presenting: model.renaming) { agent in
+            TextField(agent.titleFromRuntime ?? "Title", text: $model.renameText)
+            Button("Rename") {
+                let title = model.renameText
+                guard Agent.cleanedTitle(title) != agent.title else { return }
+                Task { await model.rename(agent.id, to: title) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("An empty title gives the session the runtime's name again.")
+        }
         // Archive… on a project's long press (#668), named as its row is.
         .confirmationDialog(ProjectArchiveWords.confirmTitle(model.askingToArchiveProject.map { summary in
                                 SidebarOrder.label(summary) { model.hostLabel($0) } } ?? ""),

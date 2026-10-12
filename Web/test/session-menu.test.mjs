@@ -7,30 +7,30 @@ import { cases } from "./fixtures.mjs";
 // Branch opens the new session (#342), so the menu reads the page's address as it loads.
 globalThis.location = { hash: "" };
 globalThis.addEventListener = () => {};
-const { sessionActions, headerActions, deleteTitle, deleteMessage } = await load("src/views/SessionMenu.tsx");
+const { sessionActions, headerActions, deleteTitle, deleteMessage, cleanedTitle } = await load("src/views/SessionMenu.tsx");
 delete globalThis.location;
 delete globalThis.addEventListener;
 const agents = Object.fromEntries(cases("groups/agents.json").map((c) => [c.name, c.input.agent]));
 const labels = (name) => sessionActions(agents[name]).map((a) => a.label);
 
 test("a running session can be stopped, branched and archived", () => {
-  assert.deepEqual(labels("running"), ["Stop", "Branch", "Archive"]);
-  assert.deepEqual(labels("waiting on the person"), ["Stop", "Branch", "Archive"]);
+  assert.deepEqual(labels("running"), ["Stop", "Rename…", "Branch", "Archive"]);
+  assert.deepEqual(labels("waiting on the person"), ["Stop", "Rename…", "Branch", "Archive"]);
 });
 
 test("a finished one can't be stopped, unless it sits in an open block, which Carry on leads (#250)", () => {
-  assert.deepEqual(labels("done"), ["Mark as Unread", "Branch", "Archive"]);
-  assert.deepEqual(labels("blocked on agents"), ["Carry on", "Stop", "Mark as Unread", "Branch", "Archive"]);
+  assert.deepEqual(labels("done"), ["Mark as Unread", "Rename…", "Branch", "Archive"]);
+  assert.deepEqual(labels("blocked on agents"), ["Carry on", "Stop", "Mark as Unread", "Rename…", "Branch", "Archive"]);
 });
 
 test("an unread finish offers Mark as Read; nothing else offers either (#70)", () => {
-  assert.deepEqual(labels("done, unread"), ["Mark as Read", "Branch", "Archive"]);
-  assert.deepEqual(labels("stopped by the person"), ["Branch", "Archive"]);
+  assert.deepEqual(labels("done, unread"), ["Mark as Read", "Rename…", "Branch", "Archive"]);
+  assert.deepEqual(labels("stopped by the person"), ["Rename…", "Branch", "Archive"]);
 });
 
 test("a session that asks to be archived offers Archive as any other does; there is no Park (#584)", () => {
-  assert.deepEqual(labels("asks to archive, done"), ["Mark as Unread", "Branch", "Archive"]);
-  assert.deepEqual(labels("asks to archive when the turn ends, running"), ["Stop", "Branch", "Archive"]);
+  assert.deepEqual(labels("asks to archive, done"), ["Mark as Unread", "Rename…", "Branch", "Archive"]);
+  assert.deepEqual(labels("asks to archive when the turn ends, running"), ["Stop", "Rename…", "Branch", "Archive"]);
 });
 
 test("archived offers Bring Back and Delete, and no Branch (#398)", () => {
@@ -44,8 +44,8 @@ test("Delete asks with the window's words", () => {
 });
 
 test("given whether it is pinned, Pin or Unpin before Branch and Archive; never on archived (#180, #342)", () => {
-  assert.deepEqual(sessionActions(agents["running"], false).map((a) => a.label), ["Stop", "Pin", "Branch", "Archive"]);
-  assert.deepEqual(sessionActions(agents["done"], true).map((a) => a.label), ["Mark as Unread", "Unpin", "Branch", "Archive"]);
+  assert.deepEqual(sessionActions(agents["running"], false).map((a) => a.label), ["Stop", "Rename…", "Pin", "Branch", "Archive"]);
+  assert.deepEqual(sessionActions(agents["done"], true).map((a) => a.label), ["Mark as Unread", "Rename…", "Unpin", "Branch", "Archive"]);
   assert.deepEqual(sessionActions(agents["archived"], true).map((a) => a.label), ["Bring Back", "Delete…"]);
 });
 
@@ -56,4 +56,16 @@ test("the chat's header has Pin and Archive, or Unpin, or only Bring Back when a
   const archived = Object.keys(agents).find((name) => agents[name].state === "archived");
   assert.ok(archived);
   assert.deepEqual(header(archived, true), ["Bring Back"]);
+});
+
+test("Rename… is offered on every session but an archived one (#751)", () => {
+  assert.ok(!labels("archived").includes("Rename…"));
+  assert.ok(labels("running").includes("Rename…"));
+});
+
+test("a typed title is cleaned as the host cleans it (#751)", () => {
+  assert.equal(cleanedTitle("  Login   work \n"), "Login work");
+  assert.equal(cleanedTitle("   "), null);
+  assert.equal(cleanedTitle("x".repeat(81)), "x".repeat(79) + "\u2026");
+  assert.equal(cleanedTitle("x".repeat(80)), "x".repeat(80));
 });

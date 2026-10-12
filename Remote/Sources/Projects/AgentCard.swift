@@ -254,6 +254,7 @@ struct AgentMenuItems: View {
         }
         // At the top of its project whatever its state (#180), and where among the pinned.
         if agent.state != .archived {
+            RenameAgentButton(agent: agent)
             PinAgentButton(agent: agent)
             if model.isPinned(agent) {
                 let ids = model.pinnedSessions(in: agent.projectFolder)
@@ -278,6 +279,17 @@ struct AgentMenuItems: View {
         guard let index = ids.firstIndex(of: agent.id), ids.indices.contains(index + by) else { return }
         ids.swapAt(index, index + by)
         Task { await model.arrangeSessionPins(ids, in: agent.projectFolder) }
+    }
+}
+
+/// Rename… (#751): in a row's menu, and the chat's ···.
+struct RenameAgentButton: View {
+    @Environment(RemoteModel.self) private var model
+    let agent: Agent
+
+    var body: some View {
+        Button("Rename…", systemImage: "pencil") { model.askToRename(agent) }
+            .disabled(model.isStale(agent))
     }
 }
 

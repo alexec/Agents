@@ -86,12 +86,18 @@ struct AgentRow: View {
                     if agent.showsUnread, !isCompact {
                         UnreadDot()
                     }
+                    if model.renaming == Renaming(id: agent.id) {
+                        // Edited in place (#751), as Finder renames a file.
+                        RenameField(agent: agent)
+                            .appText(isCompact ? .supporting : .reading)
+                    } else {
                     Text(agent.title ?? "Untitled")
                         .appText(isCompact ? .supporting : .reading)
                         .fontWeight(agent.showsUnread ? .semibold : .regular)
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                         .accessibilityValue(agent.showsUnread ? "unread" : "")
+                    }
                     if let place {
                         // Whole, the title giving way first (#587): cut to "p" it said nothing.
                         Text(place)
@@ -257,6 +263,8 @@ struct AgentRow: View {
                         }
                     }
                 }
+                // The person's title, which the runtime's no longer replaces (#751).
+                Button("Rename…") { model.renaming = Renaming(id: agent.id) }
                 // At the top of its project whatever its state, or back among the rest (#180).
                 PinSessionButton(agent: agent)
                 // Branching leaves the original alone and carries the history so far.
