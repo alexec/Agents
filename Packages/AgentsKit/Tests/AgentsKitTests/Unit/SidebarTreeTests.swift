@@ -22,29 +22,29 @@ struct SidebarTreeTests {
 
     /// One indent whatever the depth: a lane's helper sits under the lead with the lane,
     /// oldest first, and the list's own order holds for the rows at the top.
-    @Test func everyDescendantSitsOneIndentUnderTheTopSession() {
+    @Test func everyDescendantSitsOneIndentUnderTheTopSession() throws {
         let lead = session(.finished, "lead", at: 1)
         let lane = session(.finished, "lane", at: 2, by: lead)
         let helper = session(.finished, "helper", at: 3, by: lane)
         let other = session(.finished, "other", at: 4)
         let list = [other, helper, lane, lead]
         let nested = SidebarTree.nest(list) { _ in nil }
-        #expect(nested.map(\.agent.id) == [other.id, lead.id])
+        try #require(nested.map(\.agent.id) == [other.id, lead.id])
         #expect(nested[1].children.map(\.id) == [lane.id, helper.id])
     }
 
     /// A tree in each list (#587): a child stands on its own where its parent is not
     /// listed, and is found under a listed grandparent through a starter listed elsewhere.
-    @Test func aChildWithoutItsParentInTheListStandsAlone() {
+    @Test func aChildWithoutItsParentInTheListStandsAlone() throws {
         let lead = session(.finished, "lead", at: 1)
         let lane = session(.running, "lane", at: 2, by: lead)
         let helper = session(.finished, "helper", at: 3, by: lane)
         let alone = SidebarTree.nest([helper]) { _ in nil }
-        #expect(alone.map(\.agent.id) == [helper.id])
+        try #require(alone.map(\.agent.id) == [helper.id])
         #expect(alone[0].children.isEmpty)
         let starters = [lane.id: lead.id]
         let through = SidebarTree.nest([helper, lead]) { starters[$0] }
-        #expect(through.map(\.agent.id) == [lead.id])
+        try #require(through.map(\.agent.id) == [lead.id])
         #expect(through[0].children.map(\.id) == [helper.id])
     }
 
@@ -67,7 +67,7 @@ struct SidebarTreeTests {
         model.replaceAgents([lead, lane])
 
         let folded = SidebarTree.rows([lane, lead], in: model, folds: folds)
-        #expect(folded.map(\.id) == [lead.id])
+        try #require(folded.map(\.id) == [lead.id])
         #expect(folded[0].children == 1 && !folded[0].isUnfolded)
 
         folds.set(session: lead.id, open: true)
@@ -80,7 +80,7 @@ struct SidebarTreeTests {
     @Test func openSessionsAreBounded() throws {
         let defaults = try #require(UserDefaults(suiteName: "SidebarTreeTests.\(UUID())"))
         let folds = SidebarFolds(defaults: defaults, scope: "")
-        let ids = (0...SidebarFolds.sessionsKept).map { _ in UUID() }
+        let ids = (0...SidebarFolds.sessionsKept).map { _ in UUID() }  // index-ok: one more than is kept, never none
         for id in ids { folds.set(session: id, open: true) }
         #expect(folds.openSessions.count == SidebarFolds.sessionsKept)
         #expect(!folds.isOpen(session: ids[0]))
