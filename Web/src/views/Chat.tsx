@@ -25,7 +25,7 @@ import { ContextMeter, CostLimitBanner, SandboxCapsule } from "./PromptStatus";
 import { SessionButtons, SessionMenu } from "./SessionMenu";
 import { drawable } from "../model/options";
 import { projectFolder } from "../model/groups";
-import { CallActionsContext, detailSummaries, detailTitles, fromLine, ItemRow, TurnView, type CallActions, type TurnDetail } from "./chat/Rows";
+import { CallActionsContext, detailSummaries, detailTitles, fromLine, ItemRow, turnDetails, TurnView, type CallActions, type TurnDetail } from "./chat/Rows";
 import { Modal } from "./Modal";
 import { nameOf, pathOf, setPane } from "./files/paneState";
 import { FileSearch, isOpenFileKey } from "./files/FileSearch";
@@ -58,7 +58,7 @@ function shown(entries: TranscriptEntry[]): Item[] {
 
 function savedDetail(): TurnDetail {
   const saved = localStorage.getItem(detailKey);
-  return saved === "steps" || saved === "details" ? saved : "outcome";
+  return turnDetails.find((d) => d === saved) ?? "outcome";
 }
 
 /** The level every turn starts at, the page's one setting (View ▸ Turns in the window). */
@@ -359,7 +359,10 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       return;
     }
     const turn = rows.find((item) => item.ask?.id === focus || item.items.some((part) => part.id === focus));
-    if (turn && (chosen.value[turn.id] ?? level.value) === "outcome") {
+    const now = turn && (chosen.value[turn.id] ?? level.value);
+    // Messages folds a run of calls, so a call is only on screen at Steps (#759).
+    const isCall = turn?.items.some((part) => part.id === focus && part.kind === "run");
+    if (turn && (now === "outcome" || (now === "messages" && isCall))) {
       follow(false);
       chosen.value = { ...chosen.value, [turn.id]: "steps" };
     }
@@ -391,7 +394,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
 
   const toggle = (turn: ChatTurn) => {
     const now = chosen.value[turn.id] ?? level.value;
-    const open = level.value !== "outcome" ? level.value : "steps";
+    const open = level.value !== "outcome" ? level.value : "messages";
     chosen.value = { ...chosen.value, [turn.id]: now !== "outcome" ? "outcome" : open };
   };
 
@@ -488,7 +491,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         <span class="actions">
           <select class="detail" aria-label="Turns" title={detailSummaries[level.value]} value={level.value}
             onChange={(e) => choose((e.currentTarget as HTMLSelectElement).value as TurnDetail)}>
-            {(["outcome", "steps", "details"] as const).map((d) => (
+            {turnDetails.map((d) => (
               <option key={d} value={d} title={detailSummaries[d]}>{detailTitles[d]}</option>
             ))}
           </select>

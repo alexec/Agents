@@ -23,10 +23,12 @@ import { continueWithout, keepStopped, sandboxCard } from "../../model/sandboxWo
 import { memo } from "../../render/memo";
 
 /** How much of a turn is drawn (TurnDetail). */
-export type TurnDetail = "outcome" | "steps" | "details";
-export const detailTitles: Record<TurnDetail, string> = { outcome: "Outcome", steps: "Steps", details: "Details" };
+export type TurnDetail = "outcome" | "messages" | "steps" | "details";
+export const turnDetails: readonly TurnDetail[] = ["outcome", "messages", "steps", "details"];
+export const detailTitles: Record<TurnDetail, string> = { outcome: "Outcome", messages: "Messages", steps: "Steps", details: "Details" };
 export const detailSummaries: Record<TurnDetail, string> = {
   outcome: "What was asked and how it went",
+  messages: "Every step but tools, rolled up",
   steps: "Every step, one line each",
   details: "Every call opened, and thinking",
 };
@@ -430,7 +432,13 @@ export function elicitationTitle(request: { message?: string; mode: { form: { _0
 }
 
 /** An item of a turn: a call a line of its own, anything else as it is drawn (StepRow). */
-function StepRow({ item, open, background }: { item: Item; open: boolean; background: readonly BackgroundItem[] }) {
+function StepRow({ item, open, rollsUp = false, background }: { item: Item; open: boolean; rollsUp?: boolean; background: readonly BackgroundItem[] }) {
+  // At Messages, a run of calls is its last until it is clicked (#759).
+  const unrolled = useSignal(false);
+  if (item.kind === "run" && rollsUp && !unrolled.value && item.calls.length > 1) {
+    const last = item.calls[item.calls.length - 1]!;
+    return <div class="run"><ToolCallLine call={last} text={turnLine(last)} background={background} onClick={() => (unrolled.value = true)} /></div>;
+  }
   if (item.kind === "run") {
     return <div class="run">{item.calls.map((call, i) => <ToolCallLine key={i} call={call} text={turnLine(call)} open={open} background={background} />)}</div>;
   }
@@ -510,7 +518,7 @@ export const TurnView = memo(function TurnView({ turn, detail, fetched, fetchFai
           : <button class="steps-control" onClick={ask}>Load steps</button>) : (
           <>
             {hasEarlier && <button class="steps-control" onClick={() => void loadEarlier(turn)}>Earlier steps</button>}
-            <div class="steps">{steps.map((item) => <StepRow key={item.id} item={item} open={detail === "details"} background={background} />)}</div>
+            <div class="steps">{steps.map((item) => <StepRow key={item.id} item={item} open={detail === "details"} rollsUp={detail === "messages"} background={background} />)}</div>
             {outcome.map((item) => <StepRow key={item.id} item={item} open={false} background={background} />)}
           </>
         )

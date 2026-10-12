@@ -5,6 +5,9 @@ import Foundation
 public enum TurnDetail: String, CaseIterable, Codable, Hashable, Sendable {
     /// The ask, the answers, the reply and how it went.
     case outcome
+    /// And every step between them but the tool calls: a run of calls is drawn as its
+    /// last, and opens to the rest (#759).
+    case messages
     /// And every step between them, one line each.
     case steps
     /// And every call opened, and the agent's thinking.
@@ -13,15 +16,17 @@ public enum TurnDetail: String, CaseIterable, Codable, Hashable, Sendable {
     public var title: String {
         switch self {
         case .outcome: return "Outcome"
+        case .messages: return "Messages"
         case .steps: return "Steps"
         case .details: return "Details"
         }
     }
 
-    /// What the level shows, said beside it in the menu so nobody has to try all three.
+    /// What the level shows, said beside it in the menu so nobody has to try them all.
     public var summary: String {
         switch self {
         case .outcome: return "What was asked and how it went"
+        case .messages: return "Every step but tools, rolled up"
         case .steps: return "Every step, one line each"
         case .details: return "Every call opened, and thinking"
         }
@@ -29,13 +34,16 @@ public enum TurnDetail: String, CaseIterable, Codable, Hashable, Sendable {
 
     public var showsSteps: Bool { self != .outcome }
 
+    /// Whether a run of tool calls is drawn as its last call until it is opened.
+    public var rollsUpCalls: Bool { self == .messages }
+
     /// Where the phone keeps its choice. The Mac scopes its own by root.
     public static let phoneDefaultsKey = "turnDetail"
 }
 
 /// One turn of a conversation: what the person asked, and everything up to the next ask.
 ///
-/// Drawn at one of three levels (069). Its outcome — the answers, the reply and how it
+/// Drawn at one of four levels (069, #759). Its outcome — the answers, the reply and how it
 /// went — is drawn at every one; the steps between are a click away.
 public struct ChatTurn: Identifiable, Hashable, Sendable {
     /// The ask's id, or the first item's for what came before any ask.
