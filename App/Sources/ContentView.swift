@@ -116,6 +116,8 @@ struct ContentView: View {
             MCPServersView().paperGround()
         } else if model.showsSpending {
             SpendingView().paperGround()
+        } else if model.showsTime {
+            TimeView().paperGround()
         } else if let id = model.openWorkflow {
             // No files pane and no sidebar toggle: a workflow has no agent to have
             // asked about a file, so there would be nothing for either to show.
@@ -159,7 +161,7 @@ struct ContentView: View {
     private var projectForTerminal: DaemonAPI.ProjectSummary? {
         guard terminal.isOpen, !model.showsEvents, !model.showsResources, !model.showsRuntimes,
               !model.showsMCPServers,
-              !model.showsSpending, let project = model.selectedProjectSummary, project.exists else { return nil }
+              !model.showsSpending, !model.showsTime, let project = model.selectedProjectSummary, project.exists else { return nil }
         return project
     }
 

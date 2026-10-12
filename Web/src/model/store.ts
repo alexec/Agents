@@ -10,7 +10,7 @@ import type {
   StartRequest, UUID, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
   ChatProjectState, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
-  GuardedChange, GuardedChangeReading, HostJoinStatus, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory } from "../protocol/generated";
+  GuardedChange, GuardedChangeReading, HostJoinStatus, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
@@ -2227,6 +2227,8 @@ export class Store extends Work {
   readonly costs = signal<Record<string, CostState>>({});
   /** Each host's use by hour and by day (#823), for the charts on Cost. */
   readonly usage = signal<Record<string, UsageHistory>>({});
+  /** Where the time of running chats went, by host (#852), for the Time page. */
+  readonly time = signal<Record<string, TimeHistory>>({});
 
   /** Finds a consequence's session by id when it is not already among the loaded rows. */
   async loadEventAgent(host: string, agentID: string): Promise<Agent | undefined> {
@@ -2283,5 +2285,11 @@ export class Store extends Work {
   async loadUsage(host: string): Promise<void> {
     const history = await this.link.call("usage/history", {}, host).catch(() => null);
     if (history) this.usage.value = { ...this.usage.value, [host]: history };
+  }
+
+  /** A host too old to know the method leaves the Time page loading. */
+  async loadTime(host: string): Promise<void> {
+    const history = await this.link.call("time/history", {}, host).catch(() => null);
+    if (history) this.time.value = { ...this.time.value, [host]: history };
   }
 }

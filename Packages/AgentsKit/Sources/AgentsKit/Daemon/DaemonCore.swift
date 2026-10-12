@@ -380,6 +380,8 @@ public actor DaemonCore {
     lazy var spendLedger = SpendLedger(locations: locations)
     /// What the work used by hour and by day, per runtime (#823): the usage charts.
     let usageLedger: UsageLedger
+    /// Where the time of running chats went, per runtime (#852): the Time page.
+    let timeLedger: TimeLedger
 
     // MARK: Leases (036)
 
@@ -965,6 +967,9 @@ public actor DaemonCore {
         self.usageLedger = usageLedger
         // A first run reads what is on disk to start the charts with, off the actor.
         Task.detached(priority: .utility) { usageLedger.seedIfNeeded() }
+        let timeLedger = TimeLedger(locations: locations, now: self.now())
+        self.timeLedger = timeLedger
+        Task.detached(priority: .utility) { timeLedger.seedIfNeeded() }
     }
 
     /// Record what a handshake said about a runtime, and tell the windows if it moved.
@@ -1163,6 +1168,10 @@ public actor DaemonCore {
         if var agent = agents[agentID] {
             agent.lastActivityAt = entry.at
             agents[agentID] = agent
+            // Where the turn's time went (#852), banked when it ends.
+            if timeLedger.note(entry, agentID: agentID, runtime: agent.runtimeID) {
+                keepQuietly("the time history") { try timeLedger.flush() }
+            }
         }
         // Only to the connections showing it (#203): every other one draws the row, which
         // `agent/changed` keeps, and an unwatched agent's tool output went to all of them.

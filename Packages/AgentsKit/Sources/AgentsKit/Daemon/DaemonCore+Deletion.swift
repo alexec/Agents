@@ -343,6 +343,7 @@ extension DaemonCore {
         archiveIndex.removeValue(forKey: id)
         lastWhole.removeValue(forKey: id)
         stops.removeValue(forKey: id)
+        timeLedger.forget(id)
         broadcast(DaemonAPI.Notification.agentRemoved, DaemonAPI.AgentRemovedNotification(agentID: id))
         projectChanged(forAgentIn: agent.projectFolder)
     }

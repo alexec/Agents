@@ -17,6 +17,7 @@ import { runtimeTally } from "../model/runtimes";
 import { healthTally, personalEmpty, personalIntro, personalServers } from "../model/hostedMCP";
 import { refusalMessage } from "../model/workflows";
 import { UsageCharts } from "./UsageCharts";
+import { TimeCharts } from "./TimeCharts";
 
 function navigate(destination: { host: string; project: string; session?: string; workflow?: string }): void {
   const parts = ["h", destination.host, "p", destination.project];
@@ -144,7 +145,7 @@ function useActivity(store: Store): void {
 }
 
 /** Each Activity page's icon, the window's SF Symbol as near as text has it (#495). */
-const activityIcons: Record<ActivityPage, string> = { events: "☰\uFE0E", resources: "◫", runtimes: "⚙\uFE0E", mcp: "▤", spending: "$" };
+const activityIcons: Record<ActivityPage, string> = { events: "☰\uFE0E", resources: "◫", runtimes: "⚙\uFE0E", mcp: "▤", spending: "$", time: "◷" };
 
 export function ActivityRows({ store, chosen, onPick }: {
   store: Store; chosen: ActivityPage | undefined; onPick: (page: ActivityPage) => void;
@@ -183,11 +184,12 @@ export function ActivityRows({ store, chosen, onPick }: {
         mcp?.words ?? null, mcp?.failing ?? false)}
       {row("spending", "Cost", "What all of the work has cost, and what it cost today", spent || null,
         closeToFull(mac))}
+      {row("time", "Time", "Where the time of running chats went: the agent, its tools, and waiting", null)}
     </>
   );
 }
 
-const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", mcp: "MCP Servers", spending: "Cost" };
+const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", mcp: "MCP Servers", spending: "Cost", time: "Time" };
 
 /** An Activity page in the chat's place. */
 export function ActivityPageView({ store, page }: { store: Store; page: ActivityPage }) {
@@ -257,6 +259,7 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
           )}
           {page === "runtimes" && <p class="hint">Installing and signing in are managed on the Mac, in Settings ▸ Agent Runtimes.</p>}
           {page === "spending" && <SpendingPage store={store} hostName={hostName} />}
+          {page === "time" && <TimePage store={store} />}
         </div>
       </div>
     </section>
@@ -407,6 +410,20 @@ function ConsequenceLine({ consequence, host, store, openAgent }: {
   // Put off, not refused (#422): what comes of it later takes this line's place.
   const verb = "queued" in item.reason ? "Queued for" : "Refused by";
   return <span class="quiet small event-consequence">↳ {verb} <button class="link" onClick={openWorkflow}>{item.workflowID}</button> — {refusalMessage(item.reason)}</span>;
+}
+
+/** Where the time of running chats went (#852): This Mac's, as on the window and the Remote. */
+function TimePage({ store }: { store: Store }) {
+  const host = store.hosts.value.some((h) => h.id === "mac") ? "mac" : store.hosts.value[0]?.id;
+  useEffect(() => {
+    if (!host) return;
+    void store.loadTime(host);
+    void store.loadRuntimes(host);
+    const every = setInterval(() => { if (document.visibilityState === "visible") void store.loadTime(host); }, 60_000);
+    return () => clearInterval(every);
+  }, [host]);
+  const runtimeName = (id: string) => (host && store.runtimes.value[host]?.find((s) => s.runtime.id === id)?.runtime.name) || id;
+  return host ? <TimeCharts history={store.time.value[host]} runtimeName={runtimeName} /> : <p class="quiet">No host is connected.</p>;
 }
 
 function SpendingPage({ store, hostName }: { store: Store; hostName: (host: string) => string }) {

@@ -681,6 +681,8 @@ extension DaemonCore {
                 return .success(try JSONValue.encoding(await costState()))
             case DaemonAPI.Method.usageHistory:
                 return .success(try JSONValue.encoding(usageHistory()))
+            case DaemonAPI.Method.timeHistory:
+                return .success(try JSONValue.encoding(timeHistory()))
 
             // Asked once by a window on connecting. A window opened while a hold was
             // already in place heard no broadcast, and would otherwise say nothing

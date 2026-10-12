@@ -235,6 +235,9 @@ public struct StoreLocations: Sendable {
     /// What the work used by hour and by day, per runtime (#823), for the usage charts.
     /// Bounded: 168 hours and 90 days (`UsageHistory`).
     public var usageHistory: URL { root.appendingPathComponent("usage-history.json") }
+    /// Where the time of running chats went by hour and by day, per runtime (#852), for
+    /// the Time page. Bounded as the usage history is (`TimeHistory`).
+    public var timeHistory: URL { root.appendingPathComponent("time-history.json") }
 
     public func agent(_ id: UUID) -> URL {
         agents.appendingPathComponent(id.uuidString, isDirectory: true)

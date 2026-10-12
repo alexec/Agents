@@ -75,6 +75,8 @@ public extension DaemonAPI {
                 Row(Method.costState, params: Empty.self, result: CostState.self, kind: .hostRequest),
                 // The usage charts on Cost (#823).
                 Row(Method.usageHistory, params: Empty.self, result: UsageHistory.self, kind: .hostRequest),
+                // The Time page (#852).
+                Row(Method.timeHistory, params: Empty.self, result: TimeHistory.self, kind: .hostRequest),
                 Row(Method.eventsList, params: EventsListRequest.self, result: EventsPage.self, kind: .hostRequest),
                 Row(Method.leasesSnapshot, params: Empty.self, result: LeaseSnapshot.self, kind: .hostRequest),
                 // The MCP servers the host runs for every agent (#488), for the Resources page.

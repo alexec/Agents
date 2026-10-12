@@ -159,6 +159,7 @@ final class AppModel {
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
+            showsTime = false
             // The same rule as picking a project: what you picked is what you see,
             // and a conversation or a workflow left open underneath would be waiting
             // to reappear when the bill is closed, which is a place nobody chose to
@@ -180,6 +181,7 @@ final class AppModel {
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
+            showsTime = false
             selection = nil
             openWorkflow = nil
             projectPage = nil
@@ -196,6 +198,7 @@ final class AppModel {
             showsResources = false
             showsRuntimes = false
             showsMCPServers = false
+            showsTime = false
             selection = nil
             openWorkflow = nil
             projectPage = nil
@@ -215,6 +218,7 @@ final class AppModel {
             showsResources = false
             showsEvents = false
             showsMCPServers = false
+            showsTime = false
             selection = nil
             openWorkflow = nil
             projectPage = nil
@@ -232,6 +236,24 @@ final class AppModel {
             showsResources = false
             showsEvents = false
             showsRuntimes = false
+            showsTime = false
+            selection = nil
+            openWorkflow = nil
+            projectPage = nil
+            composing = false
+        }
+    }
+
+    /// Whether the window is showing Time: where the time of running chats went (#852). A
+    /// page like Cost, and not persisted for the same reason.
+    var showsTime = false {
+        didSet {
+            guard showsTime, showsTime != oldValue else { return }
+            showsSpending = false
+            showsResources = false
+            showsEvents = false
+            showsRuntimes = false
+            showsMCPServers = false
             selection = nil
             openWorkflow = nil
             projectPage = nil
@@ -282,6 +304,7 @@ final class AppModel {
         showsEvents = false
         showsRuntimes = false
         showsMCPServers = false
+        showsTime = false
         if let agent = agents.first(where: { $0.id == agentID }) {
             select(ProjectKey(host: agent.host, folder: agent.projectFolder))
         }
@@ -296,6 +319,8 @@ final class AppModel {
         showsResources = false
         showsEvents = false
         showsRuntimes = false
+        showsMCPServers = false
+        showsTime = false
         select(key)
         openWorkflow = nil
         projectPage = nil
@@ -316,6 +341,7 @@ final class AppModel {
             if showsRuntimes { return .runtimes }
             if showsMCPServers { return .mcpServers }
             if showsSpending { return .spending }
+            if showsTime { return .time }
             guard let key = selectedProjectKey else { return nil }
             if let id = openWorkflow { return .workflow(id, in: key) }
             if projectPage == .archive { return .archive(key) }
@@ -334,6 +360,7 @@ final class AppModel {
                 showsEvents = false
                 showsRuntimes = false
                 showsMCPServers = false
+                showsTime = false
                 select(key)
                 openWorkflow = id
             case .pin(let path, let key):
@@ -344,6 +371,8 @@ final class AppModel {
                 showProjectPage(.mcpServers, of: key)
             case .spending:
                 showsSpending = true
+            case .time:
+                showsTime = true
             case .resources:
                 showResources()
             case .events:
@@ -358,6 +387,7 @@ final class AppModel {
                 showsEvents = false
                 showsRuntimes = false
                 showsMCPServers = false
+                showsTime = false
                 showProject(key)
             case nil:
                 // A list that clears its own selection — which macOS does while rows
@@ -375,6 +405,7 @@ final class AppModel {
         showsEvents = false
         showsRuntimes = false
         showsMCPServers = false
+        showsTime = false
         select(key)
         projectPage = page
     }
@@ -400,6 +431,7 @@ final class AppModel {
         showsEvents = false
         showsRuntimes = false
         showsMCPServers = false
+        showsTime = false
         select(key)
         // A new session in it (#366): the project's own page is where a session starts,
         // as New Session has it. The project's row in the sidebar only folds (#375).
@@ -569,6 +601,7 @@ final class AppModel {
         showsEvents = false
         showsRuntimes = false
         showsMCPServers = false
+        showsTime = false
         select(key)
         openPin = path
     }
@@ -1506,6 +1539,12 @@ final class AppModel {
     /// from a daemon too old to know the method, and the charts stay out.
     func usageHistory() async -> UsageHistory? {
         try? await client.call(DaemonAPI.Method.usageHistory, Optional<String>.none, returning: UsageHistory.self)
+    }
+
+    /// Where the time of this Mac's running chats went (#852), for the Time page. Nil from
+    /// a daemon too old to know the method.
+    func timeHistory() async -> TimeHistory? {
+        try? await client.call(DaemonAPI.Method.timeHistory, Optional<String>.none, returning: TimeHistory.self)
     }
 
     /// Every volume low on space (#195). A daemon too old to know the method leaves it

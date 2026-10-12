@@ -143,6 +143,7 @@ struct AgentsCommands: Commands {
             Button("MCP Servers") { model.showsMCPServers = true }
             Button("Cost") { model.showsSpending = true }
                 .keyboardShortcut("s", modifiers: [.command, .option])
+            Button("Time") { model.showsTime = true }
             // Agents as a web page on this Mac, found from here (#109).
             Button("Open in Browser") { openInBrowser() }
                 .disabled(model.controlPlaneHosts == nil)

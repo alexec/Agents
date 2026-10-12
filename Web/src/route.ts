@@ -4,9 +4,9 @@
 // Every step is a history entry, so the browser's own Back moves between columns (US6).
 import { signal } from "@preact/signals";
 
-export type ActivityPage = "events" | "resources" | "runtimes" | "mcp" | "spending";
+export type ActivityPage = "events" | "resources" | "runtimes" | "mcp" | "spending" | "time";
 
-export const activityPages: readonly ActivityPage[] = ["events", "resources", "runtimes", "mcp", "spending"];
+export const activityPages: readonly ActivityPage[] = ["events", "resources", "runtimes", "mcp", "spending", "time"];
 
 export interface Route {
   /** An Activity page (#151): about all the work rather than one project. */
