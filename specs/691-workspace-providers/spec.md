@@ -35,6 +35,20 @@ The command provider is the only MCP server we build. Because providers are ordi
 servers, agents can use them too, so an agent can later start a workspace for a branch, or make
 a new one.
 
+## Clarifications
+
+### Session 2026-10-12 (US3–US5, Alex)
+
+- A kept prompt is drawn as a queued bubble with "Waiting for ‹host› to start · ×", under the
+  Starting strip, on all three clients (layouts L6).
+- A new agent started on a stopped host opens its chat at once with its first prompt kept; the
+  agent is made when the host connects, and × drops it with its empty chat (L6a).
+- The warning that scheduled workflows don't run while a host is stopped is a line on its Hosts
+  row, shown only when it has scheduled workflows and Stop when idle is on (L8).
+- New Workspace… is a button on a provider card that can create, opening a sheet drawn from
+  `workspace_options` and then a confirmation naming what is made and its cost. Delete
+  Workspace… is in the Hosts row's `···` menu, with a destructive confirmation (L9).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Start a stopped workspace (Priority: P1)
