@@ -67,9 +67,6 @@ Agents' ◐ cells, and why:
   `issue.opened`, and only for GitHub.
 - **Spending limits:** only for runtimes that report a price. See
   [Limit spending](../how-to/limit-spending.md).
-- **A second agent reviews:** only as a workflow, such as the weekly review-and-fix. The
-  `ci` server has no `pr.opened` event yet, so a review cannot start when a pull request
-  opens.
 - **Rich cards in replies:** a tool's ui:// view is drawn in the conversation where the
   tool was called, but an agent can show only a view some server already has, and the
   `agents` server has no general table or chart view yet. Views from local (stdio)
@@ -263,12 +260,12 @@ Agents has none of these at all:
 | Agentastic | ● | ● | ◐ | ● | ● | 90% |
 | Codeg | ● | ● | ● | ● | ◐ | 90% |
 | Paseo | ● | ● | ● | ● | ◐ | 90% |
+| **Agents** | ● | ◐ | ◐ | ● | ● | 80% |
 | Claude Code | ● | ● | ◐ | ● | ◐ | 80% |
 | Conductor | ● | ● | ?⃝ | ● | ● | 80% |
 | Roamgate | ● | ● | ● | ● | ?⃝ | 80% |
 | Sculptor | ● | ● | ?⃝ | ● | ● | 80% |
 | T3 Code | ● | ● | ● | ● | ?⃝ | 80% |
-| **Agents** | ● | ◐ | ◐ | ● | ◐ | 70% |
 | Emdash | ● | ● | ◐ | ● | ?⃝ | 70% |
 | Nimbalyst | ● | ● | ◐ | ● | ?⃝ | 70% |
 | Nuphos | ◐ | ● | ● | ● | ?⃝ | 70% |
@@ -453,9 +450,9 @@ Each app's score in every table, and overall: its points over the 45 scored feat
 | 6 | Claude Code | 67% | 83% | 92% | 80% | 70% | 75% | 80% | 67% | **77%** |
 | 8 | OpenAI Codex | 67% | 83% | 83% | 70% | 40% | 83% | 80% | 67% | **72%** |
 | 9 | Warp | 83% | 58% | 92% | 60% | 70% | 83% | 70% | 50% | **71%** |
+| 10 | **Agents** | 92% | 50% | 58% | 80% | 50% | 75% | 70% | 83% | **70%** |
 | 10 | T3 Code | 83% | 92% | 67% | 80% | 80% | 50% | 40% | 67% | **70%** |
-| 11 | **Agents** | 92% | 50% | 58% | 70% | 50% | 75% | 70% | 83% | **69%** |
-| 11 | Superset | 75% | 42% | 67% | 70% | 70% | 100% | 40% | 83% | **69%** |
+| 12 | Superset | 75% | 42% | 67% | 70% | 70% | 100% | 40% | 83% | **69%** |
 | 13 | Pragma | 75% | 83% | 67% | 60% | 60% | 75% | 60% | 50% | **67%** |
 | 14 | Threadlines | 83% | 50% | 67% | 100% | 40% | 42% | 60% | 67% | **63%** |
 | 15 | Happy | 92% | 100% | 75% | 30% | 20% | 50% | 40% | 67% | **61%** |

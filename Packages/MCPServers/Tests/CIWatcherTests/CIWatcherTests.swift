@@ -123,7 +123,7 @@ func editIssue(_ r: inout JSON, _ number: Int, _ change: (inout JSON) -> Void) {
     @Test func eventsListGivesEveryEventPollOnlyWithTheirSchemas() async throws {
         let events = try #require(try await h.ok("events/list")["events"]?.array)
         #expect(events.compactMap { $0["name"]?.string }.sorted() ==
-            ["checks.failed", "issue.closed", "issue.commented", "issue.labelled", "issue.opened", "pr.closed", "pr.conflicted", "pr.merged"])
+            ["checks.failed", "issue.closed", "issue.commented", "issue.labelled", "issue.opened", "pr.closed", "pr.conflicted", "pr.merged", "pr.opened"])
         for e in events {
             #expect(e["delivery"] == ["poll"])
             #expect(e["description"]?.string?.isEmpty == false)
@@ -399,11 +399,11 @@ func editIssue(_ r: inout JSON, _ number: Int, _ change: (inout JSON) -> Void) {
             ["checks.failed:\(repo):9440:1", "checks.failed:\(repo):9441:1", "checks.failed:\(repo):9442:1"])
     }
 
-    @Test func anyoneIsABooleanOnIssueAndChecksEventsOnly() async throws {
+    @Test func anyoneIsABooleanOnIssueChecksAndOpenedEventsOnly() async throws {
         let events = try #require(try await h.ok("events/list")["events"]?.array)
         for e in events {
             let name = e["name"]?.string ?? ""
-            let wanted: JSON? = name.hasPrefix("issue.") || name == "checks.failed" ? "boolean" : nil
+            let wanted: JSON? = name.hasPrefix("issue.") || name == "checks.failed" || name == "pr.opened" ? "boolean" : nil
             #expect(e["inputSchema"]?["properties"]?["anyone"]?["type"] == wanted, "\(name)")
         }
         let bad = await h.rpc("events/poll", ["name": "issue.opened", "arguments": ["repo": .string(repo), "anyone": "yes"], "cursor": .null])
@@ -514,6 +514,60 @@ func editIssue(_ r: inout JSON, _ number: Int, _ change: (inout JSON) -> Void) {
         let narrowed = try await h.poll("pr.conflicted", only721, .null)
         try conflicts(720, true)
         #expect(try await h.poll("pr.conflicted", only721, narrowed["cursor"] ?? .null)["events"] == [], "pr narrows")
+    }
+
+    @Test func prOpenedRaisesAReadyPROnceAndADraftWhenMarkedReady() async throws {
+        func set(_ number: Int, _ key: String, _ value: JSON) throws {
+            try h.editRepo { r in
+                var prs = r["prs"]?.array ?? []
+                if let i = prs.firstIndex(where: { $0["number"]?.int == number }) { prs[i][key] = value }
+                r["prs"] = .array(prs)
+            }
+        }
+        let all: JSON = ["repo": .string(repo)]
+        let first = try await h.poll("pr.opened", all, .null)
+        #expect(first["events"] == [], "one already open is known, not raised")
+
+        try h.editRepo {
+            append(&$0, "prs", openPR(833, "agents/review", ["author": "alexec", "authorAssociation": "OWNER"]),
+                   openPR(834, "agents/wip", ["draft": true]))
+        }
+        let raised = try await h.poll("pr.opened", all, first["cursor"] ?? .null)
+        let events = try #require(raised["events"]?.array)
+        #expect(events.count == 1, "a draft is not raised")
+        #expect(events.first?["eventId"]?.string?.hasPrefix("pr.opened:\(repo):833:") == true)
+        #expect(events.first?["data"]?["pr"]?["author"] == "alexec")
+        #expect(events.first?["data"]?["pr"]?["branch"] == "agents/review")
+        #expect(events.first?["data"]?["openedAt"]?.string != nil)
+
+        let quiet = try await h.poll("pr.opened", all, raised["cursor"] ?? .null)
+        #expect(quiet["events"] == [], "raised once")
+
+        try set(834, "draft", false)
+        let ready = try await h.poll("pr.opened", all, quiet["cursor"] ?? .null)
+        #expect(ids(ready).map { $0.hasPrefix("pr.opened:\(repo):834:") } == [true], "a draft marked ready is raised")
+
+        try set(833, "state", "closed")
+        let closed = try await h.poll("pr.opened", all, ready["cursor"] ?? .null)
+        try set(833, "state", "open")
+        let reopened = try await h.poll("pr.opened", all, closed["cursor"] ?? .null)
+        #expect(ids(reopened).map { $0.hasPrefix("pr.opened:\(repo):833:") } == [true], "reopened is raised again")
+
+        let only = try await h.poll("pr.opened", ["repo": .string(repo), "branch": "agents/other"], .null)
+        try h.editRepo { append(&$0, "prs", openPR(835, "agents/else")) }
+        #expect(try await h.poll("pr.opened", ["repo": .string(repo), "branch": "agents/other"], only["cursor"] ?? .null)["events"] == [],
+                "branch narrows")
+    }
+
+    @Test func prOpenedByAStrangerOrABotRaisesNothingUnlessAnyone() async throws {
+        let mine: JSON = ["repo": .string(repo)], anyone: JSON = ["repo": .string(repo), "anyone": true]
+        let a = try await h.poll("pr.opened", mine, .null), b = try await h.poll("pr.opened", anyone, .null)
+        try h.editRepo {
+            append(&$0, "prs", openPR(840, "fork/main", ["author": "stranger", "authorAssociation": "FIRST_TIME_CONTRIBUTOR"]),
+                   openPR(841, "deps", ["author": "dependabot[bot]", "authorAssociation": "MEMBER"]))
+        }
+        #expect(try await h.poll("pr.opened", mine, a["cursor"] ?? .null)["events"] == [])
+        #expect(ids(try await h.poll("pr.opened", anyone, b["cursor"] ?? .null)).count == 2)
     }
 
     @Test func eachToolsResultShape() async throws {

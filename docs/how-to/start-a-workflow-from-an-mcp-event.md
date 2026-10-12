@@ -75,6 +75,12 @@ push, and use `comment_on_pr` to say what you changed.
   `pr.conflicted` (began to conflict with its base, #712) all take `repo`, `branch` (only that PR branch) and `pr` (only that pull request, by
   number). Left out, `repo` is the one the project's folder pushes to (#702). Given
   together, each must hold: `{pr: 551}` hears only PR 551's failures and merge.
+- Its `pr.opened` (#833) is raised when a pull request opens, or when a draft is marked
+  ready for review. It takes the same filters and `anyone`. Drafts never raise it. The
+  **Review pull requests** workflow in `.agents/workflows/` starts an agent on it that
+  reads the diff and leaves one comment.
+- `checks.failed`, `pr.opened` and the issue events are raised only for the repo's owner,
+  members and collaborators, never a bot (#728). `anyone: true` raises them for everyone.
 - Its issue events, `issue.opened`, `issue.labelled`, `issue.commented` and `issue.closed`,
   take `repo` (optional, as above) and `label`; all but `issue.opened` also take `issue`, by number.
   On `issue.labelled`, `label` is the label added: `{repo: alexec/Agents, label: bug}` hears

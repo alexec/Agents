@@ -255,6 +255,21 @@ public actor RealGitHub: GitHub {
         }
     }
 
+    public func openPRs(repo: String) async throws -> [OpenPR] {
+        var out = [OpenPR]()
+        for page in 1...Self.maxPages {
+            let list = try await json("repos/\(repo)/pulls?state=open&sort=created&direction=desc&per_page=\(Self.perPage)&page=\(page)").array ?? []
+            for p in list {
+                out.append(OpenPR(pr: PR(number: p["number"]?.int ?? 0, title: p["title"]?.string ?? "",
+                                         branch: p["head"]?["ref"]?.string ?? "", url: p["html_url"]?.string ?? ""),
+                                  author: p["user"]?["login"]?.string ?? "", draft: p["draft"]?.bool == true,
+                                  trusted: Self.trusted(p)))
+            }
+            if list.count < Self.perPage { break }
+        }
+        return out
+    }
+
     public func issueActivity(repo: String, kind: IssueKind, since: String) async throws -> (items: [IssueActivity], truncated: Bool) {
         switch kind {
         case .opened:
