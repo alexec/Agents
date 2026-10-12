@@ -1,4 +1,8 @@
 import Foundation
+#if canImport(FoundationNetworking)
+// URLRequest lives here on Linux, where the server's agentsd is built.
+import FoundationNetworking
+#endif
 
 /// Where an MCP Registry is (060, research R1/R2/R10): the official one, GitHub's, or a
 /// company's own (#687). Every one answers the same `/v0.1` API.
