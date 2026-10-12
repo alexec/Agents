@@ -223,6 +223,10 @@ struct ChatTranscript: View {
                             QueuedPromptRow(prompt: queued, agentID: agent.id,
                                             canSendNow: canSendNow)
                         }
+                        // Kept by the control plane for a stopped workspace (#691 US3).
+                        ForEach(actions.kept(agent.id)) { kept in
+                            KeptPromptRow(kept: kept)
+                        }
                         // Live, and so at the foot rather than in the record: the chat
                         // itself says what the row in the list says, and it stops saying
                         // it the moment the prompt lands.

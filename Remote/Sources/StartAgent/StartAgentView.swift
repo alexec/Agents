@@ -53,6 +53,18 @@ struct StartAgentView: View {
 
     private var form: some View {
         Form {
+            // Starts kept for this project's stopped workspace (#691 US3, layouts.md L6a): the
+            // agent each makes opens once the host is up.
+            if case let starts = model.keptStarts(in: project), !starts.isEmpty {
+                Section {
+                    ForEach(starts) { KeptPromptRow(kept: $0) }
+                        .listRowBackground(Color.clear)
+                }
+                .environment(\.chatActions, ChatActions(
+                    dropKept: { [model] in await model.dropKept($0) },
+                    retryKept: { [model] in await model.retryKept($0) },
+                    hostName: { [model] in model.hostName($0) }))
+            }
             // A change to the project's own files that no session can be asked about (#531).
             if let key = model.work.project(project)?.key {
                 ForEach(model.work.guardedChanges(ofProject: key)) { change in
@@ -217,7 +229,8 @@ struct StartAgentView: View {
 
     private var canSend: Bool {
         // Off while the project's host is not answering, the Mac or its server (#239).
-        !model.isStarting && !model.isStale(on: model.startHost)
+        // A stopped workspace that starts when used keeps the start until it is up (#691 US3).
+        !model.isStarting && (!model.isStale(on: model.startHost) || model.startsWhenUsed(model.startHost))
             && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 

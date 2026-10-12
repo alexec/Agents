@@ -19,6 +19,10 @@ public extension DaemonAPI.Method {
     /// (FR-020, FR-022). Both are idempotent by an id of their own (`sendID`, `requestID`),
     /// which the control plane fills in when the client left it out.
     static let keptMethods: Set<String> = [agentsPrompt, agentsStart]
+    /// `KeepRequest` → never a result: the `kept` error, or the host's refusal. For a client
+    /// whose link to a host closes while the host is offline (the window's, the Remote's),
+    /// so it can't send the request to the host itself.
+    static let hostsKeep = "hosts/keep"
     /// `{}` → `{kept: [KeptRequest]}`.
     static let hostsListKept = "hosts/listKept"
     /// `KeptRequestID` → `{}`. It isn't delivered; the workspace keeps starting (US3 AS3).
@@ -72,6 +76,18 @@ public extension DaemonAPI {
         }
 
         public var isStart: Bool { kind == "start" }
+    }
+
+    /// `hosts/keep`: a prompt or a start, as it would have gone to the host.
+    struct KeepRequest: Codable, Sendable {
+        public var host: HostID
+        public var method: String
+        public var params: JSONValue
+        public init(host: HostID, method: String, params: JSONValue) {
+            self.host = host
+            self.method = method
+            self.params = params
+        }
     }
 
     /// `hosts/dropKept`, `hosts/retryKept`.

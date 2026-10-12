@@ -176,6 +176,14 @@ public actor WorkspaceProviders: WorkspaceHandling {
         case DaemonAPI.Method.hostsStop:
             let host = try Self.require(params, as: DaemonAPI.HostStop.self).host
             return try JSONValue.encoding(try await begin(.stop, host, by: who))
+        case DaemonAPI.Method.hostsKeep:
+            let request = try Self.require(params, as: DaemonAPI.KeepRequest.self)
+            guard let kept, let answer = await kept.keep(host: request.host, method: request.method,
+                                                         params: request.params, from: caller) else {
+                throw JSONRPCError(code: DaemonAPI.Failure.hostOffline,
+                                   message: "\(await records.host(request.host)?.name ?? "That host") is offline.")
+            }
+            throw answer
         case DaemonAPI.Method.hostsListKept, DaemonAPI.Method.hostsDropKept, DaemonAPI.Method.hostsRetryKept:
             guard let kept else { return ["kept": []] }
             return try await kept.answer(method: method, params: params)

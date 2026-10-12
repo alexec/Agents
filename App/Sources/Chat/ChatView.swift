@@ -133,7 +133,11 @@ struct ChatView: View {
             reloadTranscript: { [model] in await model.loadTranscript() },
             continueWithoutSandbox: sandboxAnswer(carryOn: true),
             keepStopped: sandboxAnswer(carryOn: false),
-            waitingSandbox: agent?.pendingSandboxFailure)
+            waitingSandbox: agent?.pendingSandboxFailure,
+            kept: { [model] agentID in model.kept(for: agentID) },
+            dropKept: { [model] in await model.dropKept($0) },
+            retryKept: { [model] in await model.retryKept($0) },
+            hostName: { [model] in model.hosts.label($0) })
     }
 
     /// The sandbox card's answer for the open agent (064).

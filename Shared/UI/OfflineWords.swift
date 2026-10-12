@@ -35,6 +35,12 @@ enum OfflineWords {
         workspace.canStart && state != "online" && state != "starting" && state != "stopping"
     }
 
+    /// What the line under a kept prompt says (#691 US3, layouts.md L6): what it waits for,
+    /// or, once the start failed, why it wasn't sent.
+    static func keptLine(name: String, kept: DaemonAPI.KeptRequest) -> String {
+        kept.failed.map { "Not sent: \($0)" } ?? "Waiting for \(name) to start"
+    }
+
     /// The strip's timer while a start is under way: `0:24`.
     static func elapsed(since start: Date, now: Date) -> String {
         let seconds = max(0, Int(now.timeIntervalSince(start)))

@@ -46,6 +46,13 @@ struct ChatActions {
     /// The card those answer: the open agent's `pendingSandboxFailure`. An earlier card in
     /// the same chat is history and offers nothing.
     var waitingSandbox: SandboxFailureRecord? = nil
+    /// Prompts the control plane keeps for an agent until its stopped workspace is up
+    /// (#691 US3), by the agent's id, and what × and Try Again do to one.
+    var kept: @MainActor (UUID) -> [DaemonAPI.KeptRequest] = { _ in [] }
+    var dropKept: @MainActor (DaemonAPI.KeptRequest) async -> Void = { _ in }
+    var retryKept: @MainActor (DaemonAPI.KeptRequest) async -> Void = { _ in }
+    /// A host's name, for the line under a kept prompt.
+    var hostName: @MainActor (HostID) -> String = { $0.rawValue }
 }
 
 extension EnvironmentValues {

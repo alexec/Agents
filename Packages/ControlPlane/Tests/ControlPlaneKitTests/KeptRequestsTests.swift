@@ -288,3 +288,29 @@ struct KeptRequestsTests {
         #expect(try await h.store.list(prefix: KeptRequests.prefix).isEmpty)
     }
 }
+
+@Suite("Kept through the control plane's own method (#691 US3)")
+struct KeepMethodTests {
+    @Test func aClientWhoseHostLinkClosedKeepsThroughTheControlPlane() async throws {
+        let h = try await ProviderHarness()
+        try await h.link(try await h.add())
+        let kept = await h.keeper()
+        let keep = DaemonAPI.KeepRequest(host: h.devbox, method: DaemonAPI.Method.agentsPrompt, params: try h.prompt("hello"))
+        do {
+            _ = try await h.call(DaemonAPI.Method.hostsKeep, try JSONValue.encoding(keep))
+            Issue.record("answered")
+        } catch let error as JSONRPCError {
+            #expect(error.code == DaemonAPI.Failure.kept)
+        }
+        #expect(await kept.all().map(\.text) == ["hello"])
+
+        // Any other method is the host's own, and is refused.
+        let read = DaemonAPI.KeepRequest(host: h.devbox, method: DaemonAPI.Method.agentsTranscript, params: [:])
+        do {
+            _ = try await h.call(DaemonAPI.Method.hostsKeep, try JSONValue.encoding(read))
+            Issue.record("answered")
+        } catch let error as JSONRPCError {
+            #expect(error.code == DaemonAPI.Failure.hostOffline)
+        }
+    }
+}
