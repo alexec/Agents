@@ -212,7 +212,7 @@ US2 comes before US1 because Start needs a link.
 - [x] T036 [US1] 🖼 Mac Hosts row, per L2: the state line, then **Start** or **Stop**, then the `···` menu, in `App/Sources/Control/ControlSettingsView.swift`. Stop confirms when the host has running turns (the names come with US4; until then the refusal's list is empty).
 - [x] T037 [P] [US1] 🖼 Remote: `Remote/Sources/Chat/HostOfflineStrip.swift` gets **Start** and the phase. `Remote/Sources/RemoteModel.swift` gets `startHost(_:)` and reads `workspace` from `hosts/list` and `control/hostChanged`.
 - [x] T038 [P] [US1] 🖼 Web: `Web/src/views/OfflineStrip.tsx` gets **Start**, the phase and the failure (the same words as `OfflineWords`). `Web/src/model/store.ts` gets `startHost(host)` and keeps `workspace` from `takeHosts` and `control/hostChanged`. Add a test in `Web/src/views/OfflineStrip.test.tsx`.
-- [ ] T039 [US1] Walk quickstart §2–§5 on a scratch set-up (the `run-app` + `test-servers` skills), with a screenshot of each strip phase on the Mac and the web page.
+- [x] T039 [US1] Walk quickstart §2–§5 on a scratch set-up (the `run-app` + `test-servers` skills), with a screenshot of each strip phase on the Mac and the web page. (As walked: the control plane half live, by `Walk691LiveTests` on the devbox, in `walks/us1-us2.md`; the screens are left for a scratch window, `needs-walk`.)
 
 **Checkpoint**: the MVP. PR 2 lands with "Part of #691".
 

@@ -129,9 +129,10 @@ struct ProviderHarness {
         return try #require(rows.first { $0.id == (host ?? devbox) })
     }
 
-    /// Waits for the row to say `state`, for up to two seconds.
-    func waitFor(_ state: String, _ host: HostID? = nil, where extra: (DaemonAPI.ControlHost) -> Bool = { _ in true }) async throws -> DaemonAPI.ControlHost {
-        for _ in 0..<200 {
+    /// Waits for the row to say `state`, for up to `seconds`.
+    func waitFor(_ state: String, _ host: HostID? = nil, seconds: Int = 5,
+                 where extra: (DaemonAPI.ControlHost) -> Bool = { _ in true }) async throws -> DaemonAPI.ControlHost {
+        for _ in 0..<(seconds * 100) {
             let row = try await row(host)
             if row.state == state, extra(row) { return row }
             try await Task.sleep(for: .milliseconds(10))
@@ -278,14 +279,15 @@ struct WorkspaceProvidersTests {
     }
 
     @Test func aHostThatDoesNotConnectIsStartedOverSSHThenGivenUp() async throws {
+        // Wide apart, so a loaded machine still tries ssh before it gives up.
         let h = try await ProviderHarness(timing: .init(listEvery: .seconds(3600), sshAfter: .milliseconds(100),
-                                                        giveUp: .milliseconds(400), lookEvery: .milliseconds(20),
+                                                        giveUp: .seconds(2), lookEvery: .milliseconds(20),
                                                         calls: .standard))
         try await h.link(try await h.add())
         _ = try await h.call(DaemonAPI.Method.hostsStart, try JSONValue.encoding(DaemonAPI.HostRequest(host: h.devbox)))
-        let row = try await h.waitFor("offline") { $0.workspace?.problem != nil }
+        let row = try await h.waitFor("offline", seconds: 15) { $0.workspace?.problem != nil }
         #expect(h.sshStarts.destinations == ["alex@127.0.0.1 -p 2222"])
-        #expect(row.workspace?.problem == "devbox didn’t connect in 0 seconds.")
+        #expect(row.workspace?.problem == "devbox didn’t connect in 2 seconds.")
         #expect(row.workspace?.canStart == false, "the workspace is running: it is agentsd that is down")
     }
 
@@ -300,6 +302,33 @@ struct WorkspaceProvidersTests {
         await h.router.setState(.offline(since: Date()), of: h.devbox)
         let stopped = try await h.waitFor("stopped") { $0.workspace?.canStart == true }
         #expect(stopped.workspace?.workspaceState == "stopped")
+        #expect(await h.provider.stops == 1)
+    }
+
+    @Test func stopWhileStartingIsRefusedNotDropped() async throws {
+        let h = try await ProviderHarness()
+        try await h.link(try await h.add())
+        await h.provider.set(startTakes: .milliseconds(300))
+        _ = try await h.call(DaemonAPI.Method.hostsStart, try JSONValue.encoding(DaemonAPI.HostRequest(host: h.devbox)))
+        await #expect(throws: JSONRPCError(code: DaemonAPI.Failure.providerFailed,
+                                           message: "devbox is starting. Stop it once it has started.")) {
+            try await h.call(DaemonAPI.Method.hostsStop, try JSONValue.encoding(DaemonAPI.HostStop(host: h.devbox)))
+        }
+        #expect(await h.provider.stops == 0)
+    }
+
+    @Test func stopTheMomentAStartedHostIsOnlineIsHeard() async throws {
+        let h = try await ProviderHarness()
+        try await h.link(try await h.add())
+        _ = try await h.call(DaemonAPI.Method.hostsStart, try JSONValue.encoding(DaemonAPI.HostRequest(host: h.devbox)))
+        _ = try await h.waitFor("starting") { $0.workspace?.phase == "connecting" }
+        await h.router.setState(.online, of: h.devbox)
+        _ = try await h.waitFor("online") { $0.workspace?.phase == nil && $0.workspace?.canStop == true }
+        let stopping = try await h.call(DaemonAPI.Method.hostsStop, try JSONValue.encoding(DaemonAPI.HostStop(host: h.devbox)))
+            .decode(DaemonAPI.ControlHost.self)
+        #expect(stopping.state == "stopping")
+        await h.router.setState(.offline(since: Date()), of: h.devbox)
+        _ = try await h.waitFor("stopped") { $0.workspace?.canStart == true }
         #expect(await h.provider.stops == 1)
     }
 

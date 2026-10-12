@@ -29,7 +29,7 @@ For anything else, choose **Your commands** and give:
 - **Status** (optional): a command that prints `running` or `stopped`. Without it, Agents
   goes by what it last did.
 - **ssh**: how the control plane's Mac reaches it, such as `devstack-1.cws` or
-  `alex@10.0.0.5 -p 2222`. Agents uses it to add the workspace as a server, and to start
+  `alex@devbox.example -p 2222`. Agents uses it to add the workspace as a server, and to start
   agentsd if it doesn't start on boot.
 
 The commands run with `/bin/sh` on the Mac that runs the control plane, as you, never as

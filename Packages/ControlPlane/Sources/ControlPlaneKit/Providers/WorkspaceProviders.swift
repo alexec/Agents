@@ -362,7 +362,13 @@ public actor WorkspaceProviders: WorkspaceHandling {
         guard let link = record.workspace, providers[link.provider] != nil else {
             throw JSONRPCError(code: DaemonAPI.Failure.notLinked, message: "\(record.name) isn’t linked to a workspace.")
         }
-        // One start or stop at a time per workspace (US1 AS4): a second press joins the first.
+        // One start or stop at a time per workspace (US1 AS4): a second press of the same
+        // joins the first; the other is refused, never dropped without a word.
+        if let under = activities[host], under.kind != kind {
+            throw JSONRPCError(code: DaemonAPI.Failure.providerFailed,
+                               message: under.kind == .start ? "\(record.name) is starting. Stop it once it has started."
+                                                             : "\(record.name) is stopping. Start it once it has stopped.")
+        }
         if activities[host] == nil {
             activities[host] = Activity(kind: kind, phase: kind == .start ? "provider" : "stopping", since: Date())
             problems[host] = nil
@@ -404,8 +410,9 @@ public actor WorkspaceProviders: WorkspaceHandling {
         while ContinuousClock.now - began < timing.giveUp {
             if await router.state(of: host)?.isOnline == true {
                 log("workspace: start \(what) by \(who): ok in \(Self.seconds(since: began))")
-                await refresh(link.provider)
+                // Done as it connects, so a Stop pressed the moment it shows online is heard.
                 await finish(host, link, problem: nil)
+                await refresh(link.provider)
                 return
             }
             if !sshTried, ContinuousClock.now - began >= timing.sshAfter,
