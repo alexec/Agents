@@ -59,7 +59,9 @@ read from the JSON file on every call, and reruns and comments are written back 
 (`reruns`, `comments`). Append a failed run to `runs` with a fresh `updatedAt`, and the next
 poll raises it. Issues are under `issues`, each with its `comments` and `events` (`labeled` or
 `closed`); append one, or a comment or event with a fresh `createdAt`, and the next poll
-raises it. Set `"gh": "notSignedIn"`, or `"gh": {"rateLimitedForMs": 60000}`, to see the
+raises it. An issue, comment or PR raises an event only with an `authorAssociation` of
+`OWNER`, `MEMBER` or `COLLABORATOR` and an `author` not ending `[bot]` (#728), unless the
+poll asks for `anyone`. Set `"gh": "notSignedIn"`, or `"gh": {"rateLimitedForMs": 60000}`, to see the
 errors. Copy the fixture before writing to it; the tests start from it.
 
 ## Building for Linux

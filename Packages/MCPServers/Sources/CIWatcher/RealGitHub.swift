@@ -124,10 +124,18 @@ public actor RealGitHub: GitHub {
         do { return try JSON.parse(body) } catch { throw GhError(.failed, "gh: GitHub's answer is not JSON") }
     }
 
-    func pr(_ repo: String, _ number: Int) async throws -> PR {
+    /// The PR, and whether its author is one of the repo's own (#728).
+    func pr(_ repo: String, _ number: Int) async throws -> (pr: PR, trusted: Bool) {
         let p = try await json("repos/\(repo)/pulls/\(number)")
-        return PR(number: p["number"]?.int ?? number, title: p["title"]?.string ?? "",
-                  branch: p["head"]?["ref"]?.string ?? "", url: p["html_url"]?.string ?? "")
+        return (PR(number: p["number"]?.int ?? number, title: p["title"]?.string ?? "",
+                   branch: p["head"]?["ref"]?.string ?? "", url: p["html_url"]?.string ?? ""),
+                Self.trusted(p))
+    }
+
+    /// Whether an issue's, comment's or PR's author is one of the repo's own (#728).
+    static func trusted(_ item: JSON) -> Bool {
+        isTrusted(association: item["author_association"]?.string, login: item["user"]?["login"]?.string,
+                  type: item["user"]?["type"]?.string)
     }
 
     static func issueOf(_ i: JSON) -> Issue {
@@ -188,8 +196,10 @@ public actor RealGitHub: GitHub {
         }
         guard let number else { return nil }
         let jobs = try await failedJobs(repo, ref.id)
-        return FailedRunData(pr: try await pr(repo, number), headSha: ref.headSha, run: ref,
-                             failedJobs: jobs.map { ($0["name"]?.string ?? "", $0["html_url"]?.string ?? "") })
+        let (pr, trusted) = try await pr(repo, number)
+        return FailedRunData(pr: pr, headSha: ref.headSha, run: ref,
+                             failedJobs: jobs.map { ($0["name"]?.string ?? "", $0["html_url"]?.string ?? "") },
+                             trusted: trusted)
     }
 
     public func defaultRepo() async throws -> String {
@@ -252,7 +262,7 @@ public actor RealGitHub: GitHub {
                                                       since: since) { $0["created_at"]?.string }
             return (items.filter { $0["pull_request"] == nil }.map {
                 IssueActivity(id: String($0["number"]?.int ?? 0), at: $0["created_at"]?.string ?? "",
-                              issue: Self.issueOf($0), what: .opened)
+                              issue: Self.issueOf($0), what: .opened, trusted: Self.trusted($0))
             }, truncated)
         case .commented:
             // `since` lists comments updated since; an edited old one is dropped by its created_at.
@@ -271,7 +281,8 @@ public actor RealGitHub: GitHub {
                     id: String(c["id"]?.int ?? 0), at: c["created_at"]?.string ?? "",
                     issue: Self.issueOf(i),
                     what: .commented(author: c["user"]?["login"]?.string ?? "", url: c["html_url"]?.string ?? "",
-                                     body: clip(c["body"]?.string))))
+                                     body: clip(c["body"]?.string)),
+                    trusted: Self.trusted(c)))
             }
             return (out, truncated)
         case .labelled, .closed:
@@ -281,10 +292,14 @@ public actor RealGitHub: GitHub {
                 .map { e in
                     let issue = e["issue"] ?? [:]
                     let by = e["actor"]?["login"]?.string ?? ""
+                    let trusted = isTrustedActor(by, type: e["actor"]?["type"]?.string, closing: kind == .closed,
+                                                 issueAuthor: issue["user"]?["login"]?.string ?? "",
+                                                 authorTrusted: Self.trusted(issue))
                     return IssueActivity(
                         id: String(e["id"]?.int ?? 0), at: e["created_at"]?.string ?? "", issue: Self.issueOf(issue),
                         what: kind == .labelled ? .labelled(label: e["label"]?["name"]?.string ?? "", by: by)
-                            : .closed(reason: reasonOf(e["state_reason"]?.string ?? issue["state_reason"]?.string), by: by))
+                            : .closed(reason: reasonOf(e["state_reason"]?.string ?? issue["state_reason"]?.string), by: by),
+                        trusted: trusted)
                 }, truncated)
         }
     }

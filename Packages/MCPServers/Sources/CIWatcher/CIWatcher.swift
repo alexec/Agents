@@ -11,6 +11,9 @@ public enum CIWatcher {
         "The GitHub repo, owner/name. Left out, the repo this project's folder pushes to.",
         pattern: (#"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"#, "owner/name"))
     static let prProperty = Schema.Property.integer("Only this pull request, by number.")
+    /// Anyone's issue, comment or PR is opted into (#728); left out, only the repo's own people.
+    static let anyoneProperty = Schema.Property.boolean(
+        "true: from anyone, bots and people outside the repo too. Left out, only the repo's owner, members and collaborators, never a bot.")
 
     /// The CI watcher over `gh`.
     public static func server(_ gh: some GitHub) -> MCPServer {
@@ -67,8 +70,9 @@ public enum CIWatcher {
 
     static let events: [Event] = [
         Event(name: "checks.failed", title: "Checks failed",
-              description: "A pull request's checks finished with a failure: one event per run and attempt, so a rerun that fails again is a new one.",
-              inputSchema: Schema(["repo": repoProperty, "branch": .string("Only runs on this PR branch."), "pr": prProperty]),
+              description: "A pull request's checks finished with a failure: one event per run and attempt, so a rerun that fails again is a new one. Only PRs by the repo's owner, members and collaborators, unless anyone is true.",
+              inputSchema: Schema(["repo": repoProperty, "branch": .string("Only runs on this PR branch."), "pr": prProperty,
+                                   "anyone": anyoneProperty]),
               payloadSchema: [
                   "type": "object",
                   "properties": [
@@ -113,12 +117,19 @@ public enum CIWatcher {
             (.closed, "Issue closed", "An issue was closed, as completed or not planned.", "Only issues with this label.",
              ["reason": ["type": "string", "enum": ["completed", "not_planned"]], "by": ["type": "string"], "closedAt": ["type": "string"]]),
         ]
+        // Whose doing it must be (#728), unless anyone is true.
+        let who: [IssueKind: String] = [
+            .opened: "Only issues opened by", .labelled: "Only labels added by",
+            .commented: "Only comments by", .closed: "Only issues closed by",
+        ]
         return kinds.map { k in
             let label = Schema.Property.string(k.label)
             return Event(
-                name: "issue.\(k.kind.rawValue)", title: k.title, description: k.description,
-                inputSchema: k.kind == .opened ? Schema(["repo": repoProperty, "label": label])
-                    : Schema(["repo": repoProperty, "label": label, "issue": issue]),
+                name: "issue.\(k.kind.rawValue)", title: k.title,
+                description: k.description + " \(who[k.kind]!) the repo's owner, members and collaborators, never a bot, unless anyone is true."
+                    + (k.kind == .closed ? " Someone outside the repo closing their own issue does not count." : ""),
+                inputSchema: k.kind == .opened ? Schema(["repo": repoProperty, "label": label, "anyone": anyoneProperty])
+                    : Schema(["repo": repoProperty, "label": label, "issue": issue, "anyone": anyoneProperty]),
                 payloadSchema: ["type": "object", "properties": JSON.object(["issue": issueSchema]).merging(k.payload)])
         }
     }
@@ -128,11 +139,13 @@ public enum CIWatcher {
     {
         let repo = args["repo"]?.string ?? ""
         let pr = args["pr"]?.int, branch = args["branch"]?.string
+        let anyone = args["anyone"]?.bool == true
         if name.hasPrefix("issue."), let kind = IssueKind(rawValue: String(name.dropFirst("issue.".count))) {
             let issue = args["issue"]?.int, label = args["label"]?.string
             let (items, truncated) = try await gh.issueActivity(repo: repo, kind: kind, since: since)
             let list = items
                 .filter { issue == nil || $0.issue.number == issue }
+                .filter { anyone || $0.trusted }
                 .filter { a in
                     guard let label else { return true }
                     if case .labelled(let added, _) = a.what { return added == label }
@@ -155,6 +168,7 @@ public enum CIWatcher {
                         if let pr, let named = ref.prNumber, named != pr { return nil }
                         let details = try await gh.runDetails(repo: repo, run: ref)
                         if let pr, details?.pr.number != pr { return nil }
+                        if !anyone, details?.trusted != true { return nil }
                         return details?.json
                     }
                 }
