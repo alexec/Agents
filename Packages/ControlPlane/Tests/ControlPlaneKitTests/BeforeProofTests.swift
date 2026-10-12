@@ -69,9 +69,16 @@ struct BeforeProofTests {
         await eventually { running.service.unproven.count == UnprovenGate.defaultMost }
         #expect(running.service.unproven.count <= UnprovenGate.defaultMost)
 
-        // Past the gate, the oldest are closed to make room.
-        let closed = idle.filter { Raw.closedByPeer($0, within: 0.05) }.count
-        #expect(closed >= idle.count - UnprovenGate.defaultMost)
+        // Past the gate, the oldest are closed to make room. The gate reaches its cap while
+        // the last evictions are still closing on the event loop, and while the listener may
+        // still be accepting the last few (each of which evicts one more), so wait for them:
+        // well within the 10 s idle time, after which every one would be closed anyway (#781).
+        var open = Set(idle)
+        await eventually {
+            open = open.filter { !Raw.closedByPeer($0, within: 0.001) }
+            return open.count <= UnprovenGate.defaultMost
+        }
+        #expect(open.count <= UnprovenGate.defaultMost)
 
         // A real client gets in now, not once the strangers time out: it takes the oldest
         // one's place and proves itself before it is the oldest.
