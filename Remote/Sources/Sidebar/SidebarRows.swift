@@ -124,7 +124,9 @@ struct SidebarSessionRow: View {
 /// A session's mark in the sidebar (#495, #498), the window's: what it wants, in four
 /// shapes — an orange hand when it needs the person, a spinner while it works, two rings
 /// when it finished unread, an empty ring once read; a numbered list while queued, an
-/// hourglass while it waits and a pause mark once stopped (#630). Archived keeps its `StatusIcon`.
+/// hourglass while it waits and a pause mark once stopped (#630).
+/// An orange archive box when it asks to be archived, as it is listed under Needs You
+/// (#817). Archived keeps its `StatusIcon`.
 private struct SessionMark: View {
     private enum Kind { case needsYou, working, queued, waiting, paused, unread, read, asksToArchive }
     private let kind: Kind
@@ -167,7 +169,7 @@ private struct SessionMark: View {
             case .read:
                 Image(systemName: "circle").foregroundStyle(Paper.accent)
             case .asksToArchive:
-                Image(systemName: ArchiveRequestWords.symbol).foregroundStyle(Paper.accent)
+                Image(systemName: ArchiveRequestWords.symbol).tinted(.attention)
             }
         }
         // Decorative: a mark filling the rows' 20-point well, as `WorkflowMark` (FR-015).

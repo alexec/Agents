@@ -71,7 +71,7 @@
 
 /* A session's mark in the sidebar (#495): an orange hand, a spinner, a list when queued, an
    Zs (#765), a pause mark (#630), two rings unread, an empty ring once read; every icon in the
-   accent but the hand. */
+   accent but what lists it under Needs You (#817). */
 .sidebar-mark { width: calc(16px * var(--text-scale)); height: calc(16px * var(--text-scale)); margin-top: 1px; box-sizing: border-box; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center; color: var(--accent); }
 .sidebar-mark.needsYou { color: var(--tint-attention); font-size: calc(13px * var(--text-scale)); border-radius: 0; }
@@ -80,8 +80,9 @@
 .sidebar-mark.unread::after { content: ""; width: calc(6px * var(--text-scale)); height: calc(6px * var(--text-scale)); border-radius: 50%; background: currentColor; }
 .sidebar-mark.read { border: 1.5px solid currentColor; opacity: 0.7; }
 .sidebar-mark.queued, .sidebar-mark.waiting, .sidebar-mark.paused { font-size: calc(12px * var(--text-scale)); border-radius: 0; }
-/* Archiving needs approval (#584): the window's archive box, in the accent. */
-.sidebar-mark.asksToArchive { font-size: calc(12px * var(--text-scale)); border-radius: 0; }
+/* Archiving needs approval (#584): the window's archive box, in the attention tint, as it is
+   listed under Needs You (#817). */
+.sidebar-mark.asksToArchive { color: var(--tint-attention); font-size: calc(12px * var(--text-scale)); border-radius: 0; }
 /* Waiting for an OK (#773): a shield, in the attention tint as the hand is, whatever its kind. */
 .sidebar-mark.approval { color: var(--tint-attention); border-radius: 0; }
 @media (prefers-reduced-motion: reduce) { .sidebar-mark.working { animation-duration: 3s; } }
