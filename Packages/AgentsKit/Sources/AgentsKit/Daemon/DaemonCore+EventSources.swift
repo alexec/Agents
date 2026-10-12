@@ -61,21 +61,21 @@ extension DaemonCore {
         }
     }
 
-    /// The branches worth saying moved: the project's default branch, and each branch
-    /// an agent's worktree in it is on.
+    /// The branches worth saying moved: each branch an agent's worktree in the project is on.
+    /// Not the default branch (#702): this Mac's copy moves only on a pull, so a merge on
+    /// GitHub never moved it; a wait for one is on the ci server's `pr.merged`.
     ///
     /// The project's own agents only (#204), not every agent there is once per project.
-    func watchedBranches(in folder: URL, tips: [String: String]) async -> Set<String> {
-        var branches = Set(agents.agents(in: folder).compactMap { agent -> String? in
+    func watchedBranches(in folder: URL) -> Set<String> {
+        let branches = agents.agents(in: folder).compactMap { agent -> String? in
             guard agent.state != .archived else { return nil }
             return agent.worktree?.branch
-        })
-        branches.insert(await defaultBranch(of: folder, tips: tips))
-        return branches
+        }
+        return Set(branches)
     }
 
     /// `origin/HEAD`'s branch when there is one, otherwise `main`, otherwise `master`.
-    private func defaultBranch(of folder: URL, tips: [String: String]) async -> String {
+    func defaultBranch(of folder: URL, tips: [String: String]) async -> String {
         if let git = try? GitProcess(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], in: folder),
            let outcome = try? await git.run(), outcome.succeeded {
             let name = outcome.output.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -103,7 +103,7 @@ extension DaemonCore {
     func checkBranches(in folder: URL) async {
         loadEventsIfNeeded()
         let tips = await branchTips(in: folder)
-        let watched = await watchedBranches(in: folder, tips: tips)
+        let watched = watchedBranches(in: folder)
         let key = folder.path
         let before = eventState.branchTips[key]
         var now: [String: String] = [:]

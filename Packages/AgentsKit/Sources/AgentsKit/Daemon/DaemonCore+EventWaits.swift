@@ -54,6 +54,11 @@ extension DaemonCore {
             case .failure(let problem): throw eventRefusal(problem.message)
             }
         }
+        // The default branch is not watched (#702): a wait on it could only time out.
+        if let branch = request.where?["branch"], patterns.contains(where: { $0.name == "branch.moved" }) {
+            let main = await defaultBranch(of: caller.projectFolder, tips: branchTips(in: caller.projectFolder))
+            if branch.values.contains(main) { throw eventRefusal(EventWords.defaultBranchNotWatched(main)) }
+        }
         // A server never raises what only a Mac does (#372): a wait on nothing else
         // could only ever time out, so it is refused; one with something else is
         // kept, and told.

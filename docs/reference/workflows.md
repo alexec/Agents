@@ -35,7 +35,7 @@ Check the build and say whether it is green.
 | `on:` | One trigger, or a list of them | What makes the workflow run. With a list, any one of them runs it. |
 | `on:` `manual` | No settings | Nothing runs it but **Run now**, on its page or its row. Leaving `on:` out says the same. Its row reads "By hand, with Run now". See [Run only by hand](#run-only-by-hand). |
 | `on:` `schedule` | `at:`, and optionally `between:` and `days:` | Runs at set times. **At** is a list of minutes past the hour, `":00"` or `":30"` and nothing else. **Between** is a range of hours such as `"09:00-18:00"`; without it, every hour. **Days** is a list of `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun`; without it, every day. A time missed while the Mac slept or the app was closed is not run later; the workflow's page says it was missed. |
-| `on:` an event name, such as `branch.moved` or `agent.finished` | Optionally the event's details, as filters | Runs when that event happens. Any name on [Events](events.md) works, or a subject with `.*`, such as `agent.*`, for all of its events. Under the name, list its filters to narrow it: `branch` on `branch.moved`, such as `branch: main`, and `why` on `person.away` and `person.back`. A filter can take a list, meaning any of them, such as `branch: [main, develop]`. Any other key, or a value a filter cannot have, is an error in the file, naming the right ones; the workflow never runs until it is fixed. An event about this Mac runs matching workflows in every project. A name this version does not know is shown on the workflow's page and never runs. |
+| `on:` an event name, such as `branch.moved` or `agent.finished` | Optionally the event's details, as filters | Runs when that event happens. Any name on [Events](events.md) works, or a subject with `.*`, such as `agent.*`, for all of its events. Under the name, list its filters to narrow it: `branch` on `branch.moved`, such as `branch: agents/fix-640`, and `why` on `person.away` and `person.back`. A filter can take a list, meaning any of them, such as `branch: [main, develop]`. Any other key, or a value a filter cannot have, is an error in the file, naming the right ones; the workflow never runs until it is fixed. An event about this Mac runs matching workflows in every project. A name this version does not know is shown on the workflow's page and never runs. |
 | `on:` a server's event, such as `checks.failed` | Optionally `server:`, and the event's own filters | Runs when an MCP server reports that event. Its name is `noun.verbed`, with no prefix, as the server names it. Without `server:`, it hears every MCP server this project can use that offers the name, including one added later. `server:` narrows it to one server's name, or a list of names. Every other key is the event's own filter, sent to the server as it is: a list is a list argument, not "any of". A filter the event doesn't take, or a value of the wrong type, is an error on the workflow's page, naming the filters it takes. A name whose noun is one of the app's subjects, such as `branch.created`, is never a server's event. See [Events from MCP servers](events.md#events-from-mcp-servers). |
 | `agent:` `new` | The default | Each run starts a new agent. |
 | `agent:` `standing` | | Each run goes to the workflow's own agent, which keeps its conversation from run to run. |
@@ -52,15 +52,14 @@ Check the build and say whether it is green.
 | `hosts:` | A list of machine ids | Which computers run it. Without it, or with an empty list, every host that has the project runs it and lists it. With ids, only those hosts do, on a schedule, on an event, or from **Run now**. An id is the computer's: a Mac's hardware UUID, or on Linux the contents of `/etc/machine-id`. The host name is used only when neither of those exists. The workflow's page offers the computers it knows by the names already on screen and writes the id, so renaming a computer does not unpin the workflow. A value that is not a list of ids stops the workflow running, and its page says what is wrong. |
 | `when-done:` | `keep`, `archive-allowed` or `archive` | What a run may do with its session when it is done. Without it, `keep`: every run stays in the list. `park`, the word before #584, is read as `keep`. See [When a run is done](#when-a-run-is-done). Anything else stops the workflow running, and its page says what is wrong. |
 
-For example, to start a new agent whenever `main` moves, or an agent in the project
+For example, to start a new agent whenever a pull request merges, or an agent in the project
 finishes:
 
 ```markdown
 ---
 name: After the build
 on:
-  - branch.moved:
-      branch: main
+  - pr.merged
   - agent.finished
 agent: new
 ---
@@ -92,14 +91,15 @@ its prompt, details and all, so the agent reads the file's `path` there.
 
 Only `branch` on `branch.moved` and `why` on `person.away` and `person.back` narrow an
 event (see [Names and filters](events.md#names-and-filters)). To narrow by more than one
-value, give a list. This one runs when `main` or a `release/` branch you name moves:
+value, give a list. This one runs when either of two agents' branches moves (`branch.moved`
+is never raised for the default branch, #702):
 
 ```markdown
 ---
 name: Check the release branches
 on:
   - branch.moved:
-      branch: [main, release/2.0]
+      branch: [agents/release-2.0, agents/release-2.1]
 agent: new
 ---
 

@@ -138,7 +138,7 @@ struct EventPatternFinerTests {
 
     @Test func theSummarySaysEachFilterAsItsKeyAndValues() throws {
         #expect(try pattern("branch.moved", ["branch": any("main", "develop")]).summary
-                == "A branch moved: the default branch, or one an agent works on (branch main or develop)")
+                == "A branch an agent works on moved; never the default branch (branch main or develop)")
         #expect(try pattern("person.away", ["why": "locked"]).summary
                 == "You locked the screen or stepped away for 5 minutes (why locked)")
         #expect(try pattern("person.*", ["why": "idle"]).summary == "Anything about persons (why idle)")

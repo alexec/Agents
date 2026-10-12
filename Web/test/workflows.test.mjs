@@ -19,7 +19,7 @@ for (const { name, input, expected } of cases("workflows/summaries.json")) {
 
 test("an event trigger uses the catalogue meaning and includes its filters", () => {
   const trigger = { unrecognised: { name: "branch.moved", keys: { branch: "main" } } };
-  assert.equal(w.triggerSummary(trigger), "A branch moved: the default branch, or one an agent works on (branch main)");
+  assert.equal(w.triggerSummary(trigger), "A branch an agent works on moved; never the default branch (branch main)");
   assert.equal(w.triggerSummary({ unrecognised: { name: "agent.finished", keys: {} } }),
     "An agent in this project ended a turn having done its work");
   assert.equal(w.canFire({ triggers: [trigger], mode: "new", settings: { options: {}, labels: [] } }), true);
@@ -142,7 +142,7 @@ test("a workflow denied on this host stays listed, runs nothing here, and can be
 test("an event trigger's filters are said in the Mac's words, lists included", () => {
   const say = (name, keys) => w.triggerSummary(event(name, keys));
   assert.equal(say("branch.moved", { branch: ["main", "develop"] }),
-    "A branch moved: the default branch, or one an agent works on (branch main or develop)");
+    "A branch an agent works on moved; never the default branch (branch main or develop)");
   assert.equal(say("person.away", { why: "locked" }), "You locked the screen or stepped away for 5 minutes (why locked)");
   assert.equal(say("person.*", { why: "idle" }), "Anything about persons (why idle)");
 });

@@ -151,7 +151,7 @@ struct EventWaitTests {
         let core = try await makeCore(locations, clock: Clock())
         let (a, token) = try await agent(core, in: work, "Waiter")
         let call = Task {
-            try await wait(core, token, ["branch.moved"], where: ["branch": DetailFilter(anyOf: ["main", "develop"])!])
+            try await wait(core, token, ["branch.moved"], where: ["branch": DetailFilter(anyOf: ["agents/fix", "develop"])!])
         }
         try await eventually("held") { await isHeld(core, a) }
         await core.raise(draft("branch.moved", in: work, ["branch": "feature", "from": "a", "to": "b"]))
@@ -376,6 +376,12 @@ struct EventWaitTests {
         #expect(unknown?.message.contains("Did you mean workflow.completed?") == true)
         let filter = await refusal { _ = try await wait(core, token, ["branch.moved"], where: ["number": "x"]) }
         #expect(filter?.message == "branch.moved takes branch; \"number\" is not one of its arguments.")
+        // The default branch is not watched (#702): a wait on it could only time out.
+        let main = await refusal {
+            _ = try await wait(core, token, ["branch.moved"], where: ["branch": DetailFilter(anyOf: ["develop", "main"])!])
+        }
+        #expect(main?.code == DaemonAPI.Failure.eventRefused)
+        #expect(main?.message == EventWords.defaultBranchNotWatched("main"))
         for minutes in [0, 1441] {
             let deadline = await refusal { _ = try await wait(core, token, ["mac.wake"], until: minutes) }
             #expect(deadline?.message == EventWords.badDeadline())
@@ -515,14 +521,14 @@ struct EventWaitTests {
         let (locations, work, _) = try temporary()
         let core = try await makeCore(locations, clock: clock, hold: .milliseconds(100))
         let (a, token) = try await agent(core, in: work, "Durable")
-        _ = try await wait(core, token, ["branch.moved"], where: ["branch": "main"])
+        _ = try await wait(core, token, ["branch.moved"], where: ["branch": "develop"])
         let head = await core.eventLog.head
         for _ in 0..<20 {
             let again = try await makeCore(locations, clock: clock)
             _ = await again.recover()
             await again.resumeEventWaitsAfterRestart()
             #expect(await again.agents[a]?.eventWait?.isOpen == true)
-            #expect(await again.agents[a]?.eventWait?.patterns == [EventPattern("branch.moved", filters: ["branch": "main"])])
+            #expect(await again.agents[a]?.eventWait?.patterns == [EventPattern("branch.moved", filters: ["branch": "develop"])])
             #expect(await again.isHoldingAgents, "a wait keeps the daemon up")
         }
         let last = try await makeCore(locations, clock: clock)

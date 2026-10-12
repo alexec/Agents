@@ -51,7 +51,20 @@ function eventsError(error: unknown): RpcError {
 
 type Schema = { type: "object"; properties: Record<string, any>; required: string[]; additionalProperties: false };
 
-const repoProperty = { type: "string", pattern: REPO.source, description: "The GitHub repo, owner/name." };
+const repoProperty = {
+  type: "string", pattern: REPO.source,
+  description: "The GitHub repo, owner/name. Left out, the repo this project's folder pushes to.",
+};
+
+/** `args` with `repo` filled in from the project's folder when it was left out (#702). */
+async function withRepo(gh: GitHub, args: Record<string, any>): Promise<Record<string, any>> {
+  if (args.repo !== undefined) return args;
+  try {
+    return { ...args, repo: await gh.defaultRepo() };
+  } catch (error) {
+    throw error instanceof GhError && error.kind === "notFound" ? invalidParams(error.message) : eventsError(error);
+  }
+}
 
 /** Checks `args` against the small schemas below: required keys, no others, types and the repo's shape. */
 function check(schema: Schema, args: unknown): Record<string, any> {
@@ -90,7 +103,7 @@ const EVENTS = [
     delivery: ["poll"],
     inputSchema: schema({
       repo: repoProperty, branch: { type: "string", description: "Only runs on this PR branch." }, pr: prProperty,
-    }, ["repo"]),
+    }, []),
     payloadSchema: {
       type: "object",
       properties: {
@@ -107,11 +120,21 @@ const EVENTS = [
     delivery: ["poll"],
     inputSchema: schema({
       repo: repoProperty, branch: { type: "string", description: "Only the PR from this branch." }, pr: prProperty,
-    }, ["repo"]),
+    }, []),
     payloadSchema: {
       type: "object",
       properties: { pr: prSchema, mergedAt: { type: "string" }, mergeSha: { type: "string" } },
     },
+  },
+  {
+    name: "pr.closed",
+    title: "Pull request closed",
+    description: "A pull request was closed without being merged.",
+    delivery: ["poll"],
+    inputSchema: schema({
+      repo: repoProperty, branch: { type: "string", description: "Only the PR from this branch." }, pr: prProperty,
+    }, []),
+    payloadSchema: { type: "object", properties: { pr: prSchema, closedAt: { type: "string" } } },
   },
   ...issueEvents(),
 ];
@@ -146,7 +169,7 @@ function issueEvents() {
   return kinds.map((k) => ({
     name: `issue.${k.kind}`, title: k.title, description: k.description, delivery: ["poll"],
     inputSchema: schema(k.kind === "opened" ? { repo: repoProperty, label: label(k.label) }
-      : { repo: repoProperty, label: label(k.label), issue }, ["repo"]),
+      : { repo: repoProperty, label: label(k.label), issue }, []),
     payloadSchema: { type: "object", properties: { issue: issueSchema, ...k.payload } },
   }));
 }
@@ -200,14 +223,17 @@ async function candidates(gh: GitHub, name: string, args: Record<string, any>, s
     }));
     return { list, truncated };
   }
-  const { prs, truncated } = await gh.mergedPRs(repo, since);
-  const list = prs
-    .filter((m) => (args.pr === undefined || m.pr.number === args.pr) && (args.branch === undefined || m.pr.branch === args.branch))
-    .map((m): Candidate => ({
-    eventId: `pr.merged:${repo}:${m.pr.number}`,
-    time: new Date(m.mergedAt).toISOString(),
-    data: async () => m,
-  }));
+  const { merged, closed, truncated } = await gh.closedPRs(repo, since);
+  const wanted = (pr: { number: number; branch: string }) =>
+    (args.pr === undefined || pr.number === args.pr) && (args.branch === undefined || pr.branch === args.branch);
+  const list = name === "pr.merged"
+    ? merged.filter((m) => wanted(m.pr)).map((m): Candidate => ({
+      eventId: `pr.merged:${repo}:${m.pr.number}`, time: new Date(m.mergedAt).toISOString(), data: async () => m,
+    }))
+    // Its close time in the id: a PR reopened and closed again is a new event.
+    : closed.filter((c) => wanted(c.pr)).map((c): Candidate => ({
+      eventId: `pr.closed:${repo}:${c.pr.number}:${c.closedAt}`, time: new Date(c.closedAt).toISOString(), data: async () => c,
+    }));
   return { list, truncated };
 }
 
@@ -218,7 +244,7 @@ async function candidates(gh: GitHub, name: string, args: Record<string, any>, s
 async function poll(gh: GitHub, params: any) {
   const event = EVENTS.find((e) => e.name === params?.name);
   if (!event) throw new RpcError(-32011, `no event ${params?.name}; this server offers ${EVENTS.map((e) => e.name).join(", ")}`);
-  const args = check(event.inputSchema, params.arguments);
+  const args = await withRepo(gh, check(event.inputSchema, params.arguments));
   const maxEvents = Math.min(MAX_EVENTS, Math.max(1, Number.isInteger(params.maxEvents) ? params.maxEvents : 50));
   if (params.cursor === null || params.cursor === undefined) {
     return { events: [], cursor: encodeCursor({ since: new Date().toISOString(), ids: [] }),
@@ -267,7 +293,7 @@ const TOOLS = [
     name: "list_prs",
     title: "List pull requests",
     description: "The repo's open pull requests, each with its checks: passing, failing, running or none. A failing one has the failed run's id for failed_log and rerun_failed.",
-    inputSchema: schema({ repo: repoProperty }, ["repo"]),
+    inputSchema: schema({ repo: repoProperty }, []),
     annotations: { readOnlyHint: true },
     _meta: { ui: { resourceUri: "ui://ci/board", visibility: ["model", "app"] }, "ui/resourceUri": "ui://ci/board" },
   },
@@ -275,7 +301,7 @@ const TOOLS = [
     name: "list_issues",
     title: "List issues",
     description: "The repo's open issues (not pull requests), newest updated first, at most 100, each with its labels and comment count.",
-    inputSchema: schema({ repo: repoProperty, label: { type: "string", description: "Only issues with this label." } }, ["repo"]),
+    inputSchema: schema({ repo: repoProperty, label: { type: "string", description: "Only issues with this label." } }, []),
     annotations: { readOnlyHint: true },
     _meta: { ui: { resourceUri: "ui://ci/issues", visibility: ["model", "app"] }, "ui/resourceUri": "ui://ci/issues" },
   },
@@ -286,7 +312,7 @@ const TOOLS = [
     inputSchema: schema({
       repo: repoProperty, runId: { type: "integer", description: "The Actions run's id." },
       job: { type: "string", description: "Only the job with this name." },
-    }, ["repo", "runId"]),
+    }, ["runId"]),
     annotations: { readOnlyHint: true },
     _meta: { ui: { visibility: ["model"] } },
   },
@@ -294,7 +320,7 @@ const TOOLS = [
     name: "rerun_failed",
     title: "Rerun failed jobs",
     description: "Reruns an Actions run's failed jobs. Use it for a failure that is known to be flaky, not to hide a real one.",
-    inputSchema: schema({ repo: repoProperty, runId: { type: "integer", description: "The Actions run's id." } }, ["repo", "runId"]),
+    inputSchema: schema({ repo: repoProperty, runId: { type: "integer", description: "The Actions run's id." } }, ["runId"]),
     _meta: { ui: { visibility: ["model", "app"] } },
   },
   {
@@ -304,7 +330,7 @@ const TOOLS = [
     inputSchema: schema({
       repo: repoProperty, number: { type: "integer", description: "The pull request's number." },
       body: { type: "string", maxLength: 65536, description: "The comment, in Markdown." },
-    }, ["repo", "number", "body"]),
+    }, ["number", "body"]),
     _meta: { ui: { visibility: ["model"] } },
   },
 ];
@@ -313,7 +339,7 @@ async function callTool(gh: GitHub, params: any) {
   const tool = TOOLS.find((t) => t.name === params?.name);
   if (!tool) throw invalidParams(`no tool ${params?.name}`);
   try {
-    const a = check(tool.inputSchema, params.arguments);
+    const a = await withRepo(gh, check(tool.inputSchema, params.arguments));
     if (tool.name === "failed_log") {
       return { content: [{ type: "text", text: await gh.failedLog(a.repo, a.runId, a.job) }] };
     }
@@ -361,7 +387,7 @@ async function handle(gh: GitHub, method: string, params: any): Promise<unknown>
         capabilities: { tools: {}, resources: {}, events: { listChanged: false },
           extensions: { "io.modelcontextprotocol/ui": {} } },
         serverInfo: { name: "ci-watcher", title: "CI watcher", version: VERSION },
-        instructions: "This repo's pull requests, their CI, and its issues. Events: checks.failed, pr.merged, issue.opened, issue.labelled, issue.commented, issue.closed. Tools list pull requests and issues, read logs, rerun failed jobs and comment, as the signed-in gh user.",
+        instructions: "This repo's pull requests, their CI, and its issues. Events: checks.failed, pr.merged, pr.closed, issue.opened, issue.labelled, issue.commented, issue.closed. Tools list pull requests and issues, read logs, rerun failed jobs and comment, as the signed-in gh user.",
       };
     }
     case "ping": return {};

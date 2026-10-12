@@ -100,12 +100,12 @@ test("a notification is answered with nothing", async () => {
 test("events/list gives every event, poll only, with their schemas", async () => {
   const { events } = await ok("events/list");
   assert.deepEqual(events.map((e: any) => e.name).sort(),
-    ["checks.failed", "issue.closed", "issue.commented", "issue.labelled", "issue.opened", "pr.merged"]);
+    ["checks.failed", "issue.closed", "issue.commented", "issue.labelled", "issue.opened", "pr.closed", "pr.merged"]);
   for (const e of events) {
     assert.deepEqual(e.delivery, ["poll"]);
     assert.ok(e.description);
     assert.equal(e.inputSchema.type, "object");
-    assert.deepEqual(e.inputSchema.required, ["repo"]);
+    assert.deepEqual(e.inputSchema.required, []);
     assert.equal(e.inputSchema.properties.repo.type, "string");
     assert.equal(e.payloadSchema.type, "object");
   }
@@ -175,6 +175,35 @@ test("pr.merged", async () => {
   assert.ok(Date.parse(event.data.mergedAt));
   const quiet = await poll("pr.merged", { repo: REPO }, raised.cursor);
   assert.deepEqual(quiet.events, []);
+});
+
+test("pr.closed: closed without merging, not merged", async () => {
+  const args = { repo: REPO, pr: 408 };
+  const [first, firstMerged] = await Promise.all(["pr.closed", "pr.merged"].map((n) => poll(n, args, null)));
+  const closedAt = now(5);
+  edit((d) => repoData(d).prs.push(openPR(408, "agents/pr-408", { state: "closed", closedAt, updatedAt: closedAt })));
+  const raised = await poll("pr.closed", args, first.cursor);
+  assert.deepEqual(raised.events.map((e: any) => e.eventId), [`pr.closed:${REPO}:408:${closedAt}`]);
+  assert.equal(raised.events[0].data.pr.branch, "agents/pr-408");
+  assert.equal(raised.events[0].data.closedAt, closedAt);
+  const notMerged = await poll("pr.merged", args, firstMerged.cursor);
+  assert.deepEqual(notMerged.events, []);
+  const quiet = await poll("pr.closed", args, raised.cursor);
+  assert.deepEqual(quiet.events, []);
+});
+
+test("repo left out is the project's", async () => {
+  const first = await poll("pr.merged", {}, null);
+  edit((d) => repoData(d).prs.push(openPR(407, "agents/pr-407", { state: "merged", mergedAt: now(5), mergeSha: "abc", updatedAt: now(5) })));
+  const raised = await poll("pr.merged", { pr: 407 }, first.cursor);
+  assert.deepEqual(raised.events.map((e: any) => e.eventId), [`pr.merged:${REPO}:407`]);
+  const list = await ok("tools/call", { name: "list_prs", arguments: {} });
+  assert.ok(list.structuredContent.prs.length > 0);
+  edit((d) => { d.repos["someone/else"] = { prs: [], runs: [], issues: [] }; });
+  const none = await rpc("events/poll", { name: "checks.failed", arguments: {}, cursor: null });
+  assert.equal(none.error.code, -32602);
+  assert.match(none.error.message, /repo is needed/);
+  edit((d) => { delete d.repos["someone/else"]; });
 });
 
 test("branch narrows", async () => {
@@ -316,9 +345,6 @@ test("a cursor older than 90 days is truncated", async () => {
 });
 
 test("bad arguments are -32602, an unknown event -32011", async () => {
-  const missing = await rpc("events/poll", { name: "checks.failed", arguments: {}, cursor: null });
-  assert.equal(missing.error.code, -32602);
-  assert.match(missing.error.message, /repo/);
   const extra = await rpc("events/poll", { name: "pr.merged", arguments: { repo: REPO, sha: "x" }, cursor: null });
   assert.equal(extra.error.code, -32602);
   for (const name of ["checks.failed", "pr.merged"]) {
@@ -354,7 +380,8 @@ test("tools/list annotations and visibility", async () => {
   assert.deepEqual(byName.comment_on_pr._meta.ui.visibility, ["model"]);
   for (const t of tools) {
     assert.equal(t.inputSchema.type, "object");
-    assert.ok(t.inputSchema.required.includes("repo"));
+    assert.ok(!t.inputSchema.required.includes("repo"));
+    assert.equal(t.inputSchema.properties.repo.type, "string");
   }
 });
 

@@ -29,9 +29,17 @@ struct BranchEventTests {
         try await git(["commit", "-q", "-m", message], in: folder)
     }
 
-    private func core(_ locations: StoreLocations) async throws -> DaemonCore {
-        let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
-                              discovery: .findsEverything, launcher: FakeLauncher())
+    /// A daemon with an agent working on `agents/fix` in `work`, which is checked out there.
+    private func core(_ locations: StoreLocations, work: URL) async throws -> DaemonCore {
+        let store = try AgentStore(locations: locations)
+        if await store.loadAll().agents.isEmpty {
+            try await git(["checkout", "-q", "-b", "agents/fix"], in: work)
+            var agent = Agent(runtimeID: "claude", cwd: work, title: "Fix", state: .finished, endedReason: .endTurn)
+            agent.worktree = AgentWorktree(name: "fix", root: work, branch: "agents/fix", project: work,
+                                           base: "main", madeByApp: true)
+            try await store.save(agent)
+        }
+        let core = DaemonCore(store: store, locations: locations, discovery: .findsEverything, launcher: FakeLauncher())
         await core.loadFromDisk()
         return core
     }
@@ -40,22 +48,33 @@ struct BranchEventTests {
         await core.eventLog.events.filter { $0.name == "branch.moved" }
     }
 
-    @Test func theFirstLookSeedsAndACommitOnMainIsAMove() async throws {
+    @Test func theFirstLookSeedsAndACommitOnAnAgentsBranchIsAMove() async throws {
         let (locations, work) = try await repository()
-        let core = try await core(locations)
+        let core = try await core(locations, work: work)
         await core.checkBranches(in: work)
         #expect(await moved(core).isEmpty, "nothing is invented for before anybody looked")
         try await commit("second", in: work)
         await core.checkBranches(in: work)
         let events = await moved(core)
         #expect(events.count == 1)
-        #expect(events.first?.details["branch"] == "main")
+        #expect(events.first?.details["branch"] == "agents/fix")
         #expect(events.first?.details["from"] != events.first?.details["to"])
+    }
+
+    /// This Mac's main moves only on a pull, so it is not watched (#702).
+    @Test func theDefaultBranchIsNotWatched() async throws {
+        let (locations, work) = try await repository()
+        let core = try await core(locations, work: work)
+        await core.checkBranches(in: work)
+        try await git(["checkout", "-q", "main"], in: work)
+        try await commit("on-main", in: work)
+        await core.checkBranches(in: work)
+        #expect(await moved(core).isEmpty)
     }
 
     @Test func aBranchNobodyWorksOnIsNotWatched() async throws {
         let (locations, work) = try await repository()
-        let core = try await core(locations)
+        let core = try await core(locations, work: work)
         await core.checkBranches(in: work)
         try await git(["checkout", "-q", "-b", "feature"], in: work)
         try await commit("on-feature", in: work)
@@ -65,17 +84,17 @@ struct BranchEventTests {
 
     @Test func aMoveWhileTheDaemonWasDownIsRaisedWhenNoticed() async throws {
         let (locations, work) = try await repository()
-        let first = try await core(locations)
+        let first = try await core(locations, work: work)
         await first.checkBranches(in: work)
         try await commit("while-down", in: work)
-        let again = try await core(locations)
+        let again = try await core(locations, work: work)
         await again.checkBranches(in: work)
         #expect(await moved(again).count == 1)
     }
 
     @Test func theWatchSeesACommit() async throws {
         let (locations, work) = try await repository()
-        let core = try await core(locations)
+        let core = try await core(locations, work: work)
         await core.watchBranches(in: work)
         try await Task.sleep(for: .milliseconds(300))
         try await commit("watched", in: work)

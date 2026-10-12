@@ -22,25 +22,29 @@ and then carry on.
 1. Tell the agent, in words, what to wait for and what to do afterwards. For example:
 
    ```text
-   Wait for main to move, then rebase this branch on it and run the tests.
-   If it has not moved by 6 pm, tell me.
+   Wait for PR 640 to merge, then pull main and run the tests.
+   If it has not merged by 6 pm, tell me.
    ```
 
    You do not need to know the event's name. The agent finds it, here
-   `branch.moved` with `branch: main`, and sets a time limit: yours if you gave one,
+   `pr.merged` from the `ci` server with `pr: 640`, and sets a time limit: yours if you gave one,
    otherwise its own. Every wait has one, from 1 minute to 24 hours, so none can last
    for ever; when it runs out the agent is started again and can wait again.
 
-   Only two details narrow an event: `branch` on `branch.moved`, and `why` (`locked` or
-   `idle`) on `person.away` and `person.back`. Either can name more than one value,
-   meaning any of them, such as `{"branch": ["main", "develop"]}`. Anything else, such as
+   Only two of the app's own events can be narrowed: `branch.moved` by `branch`, and
+   `person.away` and `person.back` by `why` (`locked` or `idle`). Either can name more than
+   one value, meaning any of them, such as `{"branch": ["agents/fix-640", "agents/fix-641"]}`.
+   `branch.moved` is only raised for a branch an agent works on, never the project's default
+   branch (#702): this Mac's `main` moves only when someone pulls, so a merge on GitHub would
+   never wake it, and a wait on it is refused. Anything else, such as
    `agent.finished` with `{"labels": "deploy"}`, is refused saying what the event takes, so
    the agent fixes it rather than waiting for something that never comes. To wait for
    particular agents to finish, the agent names them in `agents` instead.
 
-   An agent can also wait on an MCP server's event, such as `pr.merged` from a `ci`
-   server. Then `where` is what the server is asked for, such as
-   `{"repo": "alexec/Agents"}`, and the wait subscribes to the server until it ends. A name
+   An agent can also wait on an MCP server's event, such as `pr.merged` or `pr.closed`
+   from a `ci` server. Then `where` is what the server is asked for, such as `{"pr": 640}`
+   (the `ci` server fills in `repo` from the project's folder), and the wait subscribes to
+   the server until it ends. A name
    no server here offers, or a filter the server doesn't take, is refused with what the
    server does take. See [Events from MCP servers](../reference/events.md#events-from-mcp-servers).
 
@@ -48,11 +52,11 @@ and then carry on.
    ask, and Copilot always does.
 
 3. Check that it is waiting. Above the prompt, the chat shows a capsule such as
-   **◷ Waiting for branch.moved branch main · since 14:02 · until 18:00**. On the
+   **◷ Waiting for pr.merged on ci (pr 640) · since 14:02 · until 18:00**. On the
    project page, the agent is under **Waiting** with the same line under its report.
 
-4. Leave it. When `main` moves, the agent is started again with a message saying what
-   happened and when, and it carries on with the rebase. If the time limit passes
+4. Leave it. When the pull request merges, the agent is started again with a message saying
+   what happened and when, and it carries on with the tests. If the time limit passes
    first, it is started again and told that the wait timed out.
 
 ## Stop a wait

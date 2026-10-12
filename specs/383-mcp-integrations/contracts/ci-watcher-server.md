@@ -20,13 +20,14 @@ It listens on no port, and holds no token: every GitHub call is `gh api` (or `gh
 
 | Name | `inputSchema` | `data` | `eventId` |
 |---|---|---|---|
-| `checks.failed` | `repo` (string, `owner/name`, required), `branch` (string, only runs on that PR branch), `pr` (positive integer, only that pull request); given filters must all hold | `{ pr: {number, title, branch, url}, headSha, run: {id, attempt, name, url}, failedJobs: [{name, url}] }` | `checks.failed:{repo}:{runId}:{attempt}` |
-| `pr.merged` | `repo` (required), `branch` (string, only the PR from that branch), `pr` (positive integer, only that pull request); given filters must all hold | `{ pr: {number, title, branch, url}, mergedAt, mergeSha }` | `pr.merged:{repo}:{number}` |
+| `checks.failed` | `repo` (string, `owner/name`; left out, the project folder's repo, #702), `branch` (string, only runs on that PR branch), `pr` (positive integer, only that pull request); given filters must all hold | `{ pr: {number, title, branch, url}, headSha, run: {id, attempt, name, url}, failedJobs: [{name, url}] }` | `checks.failed:{repo}:{runId}:{attempt}` |
+| `pr.merged` | `repo` (optional), `branch` (string, only the PR from that branch), `pr` (positive integer, only that pull request); given filters must all hold | `{ pr: {number, title, branch, url}, mergedAt, mergeSha }` | `pr.merged:{repo}:{number}` |
+| `pr.closed` (#702) | `repo` (optional), `branch` (string, only the PR from that branch), `pr` (positive integer, only that pull request); given filters must all hold | `{ pr: {number, title, branch, url}, closedAt }; closed without merging` | `pr.closed:{repo}:{number}:{closedAt}` |
 
-| `issue.opened` (#682) | `repo` (required), `label` (only issues opened with it) | `{ issue: {number, title, author, labels, url}, openedAt }` | `issue.opened:{repo}:{number}` |
-| `issue.labelled` | `repo` (required), `label` (only when it is the label added), `issue` (positive integer) | `{ issue, label, by, labelledAt }` | `issue.labelled:{repo}:{eventId}` |
-| `issue.commented` | `repo` (required), `label` (only issues with it), `issue` | `{ issue, comment: {author, url, body}, commentedAt }`; `body` is cut to 4000 characters | `issue.commented:{repo}:{commentId}` |
-| `issue.closed` | `repo` (required), `label` (only issues with it), `issue` | `{ issue, reason: "completed"\|"not_planned", by, closedAt }` | `issue.closed:{repo}:{eventId}` |
+| `issue.opened` (#682) | `repo` (optional), `label` (only issues opened with it) | `{ issue: {number, title, author, labels, url}, openedAt }` | `issue.opened:{repo}:{number}` |
+| `issue.labelled` | `repo` (optional), `label` (only when it is the label added), `issue` (positive integer) | `{ issue, label, by, labelledAt }` | `issue.labelled:{repo}:{eventId}` |
+| `issue.commented` | `repo` (optional), `label` (only issues with it), `issue` | `{ issue, comment: {author, url, body}, commentedAt }`; `body` is cut to 4000 characters | `issue.commented:{repo}:{commentId}` |
+| `issue.closed` | `repo` (optional), `label` (only issues with it), `issue` | `{ issue, reason: "completed"\|"not_planned", by, closedAt }` | `issue.closed:{repo}:{eventId}` |
 
 All have `delivery: ["poll"]`. Pull requests are never issues here, though GitHub lists them
 together. The issue events read `issues` (by created), `issues/comments` and `issues/events`
