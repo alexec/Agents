@@ -81,6 +81,21 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
         }
     }
 
+    /// The session Unread keeps (#495): opened from it, read now, and listed there until
+    /// another is opened, so it does not leave under the pointer. Until then it is not under
+    /// its project too (#689). Nil while searching, or once it belongs elsewhere: archived,
+    /// pinned, waiting, working or asking to be archived.
+    @MainActor
+    public static func keptInUnread(_ id: UUID?, in work: AgentsModel, query: String = "") -> Agent? {
+        guard query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let id,
+              let kept = work.agent(id), kept.state != .archived,
+              !work.pinnedSessions(in: kept.projectFolder).contains(id) else { return nil }
+        switch home(of: kept, in: work.group(of: kept), isPinned: false) {
+        case nil, .unread: return kept
+        default: return nil
+        }
+    }
+
     /// The groups whose sessions go to Needs You or Working whatever else they are.
     static let busyGroups: [AgentGroup] = [.needsAttention, .blocked, .running]
 

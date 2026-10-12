@@ -18,7 +18,7 @@ import { byStart, folderKey, projectFolder, showsUnread } from "../model/groups"
 import { archiveAllHelp, archiveAllLabel } from "../model/archiveWords";
 import { folds } from "../model/folds";
 import { parseQuery, queryMatches, type LabelQuery } from "../model/labels";
-import { newSessionProject, ownCount, pinnedSessions, pinnedWorkflows, projectSessions, rememberedProject, rememberProject,
+import { keepsInUnread, newSessionProject, ownCount, pinnedSessions, pinnedWorkflows, projectSessions, rememberedProject, rememberProject,
   smartAgents, smartRows, smartTitles, withKept, type ProjectKey, type SmartRow } from "../model/sidebar";
 import { namedRelative, workflowSummary } from "../model/workflows";
 import { fromWireDate } from "../protocol/dates";
@@ -341,7 +341,7 @@ function SmartFold({ row, store, projects, query, linkDown }: {
     // Unread keeps the session opened from it in its place, read now; none while searching.
     const kept = row === "unread" && !parsed ? keptInUnread.value : null;
     const keptAgent = kept ? store.agent(kept.host, kept.id) : undefined;
-    keptPlace = keptAgent && keptAgent.state !== "archived" ? projects.find(({ host, project }) =>
+    keptPlace = keptAgent && keepsInUnread(keptAgent, store.sessionPinsIn(kept!.host, projectFolder(keptAgent))) ? projects.find(({ host, project }) =>
       host.id === kept!.host && folderKey(project.project.folder) === projectFolder(keptAgent)) : undefined;
     lines = withKept([...found.keys()].sort(byStart), keptPlace ? keptAgent : undefined)
       .map((agent): SmartLine => ({ ...(found.get(agent) ?? keptPlace!), kind: "session", agent }));
@@ -420,9 +420,13 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   const live = view.headings.flatMap((h) => h.agents);
   // Those a group at the top lists are there alone (#495, #587), out of the project's list.
   const pins = store.sessionPinsIn(host.id, folder);
-  const sessions = !unfolded ? [] : projectSessions(live, pins, parsed);
+  // The one Unread keeps while it is open is listed there, not here too (#689).
+  const keptID = !parsed && keptInUnread.value?.host === host.id ? keptInUnread.value.id : undefined;
+  const keptAgent = keptID ? live.find((a) => a.id === keptID) : undefined;
+  const kept = keptAgent && keepsInUnread(keptAgent, pins) ? keptAgent.id : undefined;
+  const sessions = !unfolded ? [] : projectSessions(live, pins, parsed, kept);
   // The heading's grey count, as every group's heading has one (#587), folded or not.
-  const own = ownCount(live, pins);
+  const own = ownCount(live, pins, kept);
   const archived = !unfolded || !parsed ? [] : view.archived.filter((a) => queryMatches(parsed, a));
   const allWorkflows = (unfolded ? store.projectWorkflows(host.id, folder) : [])
     .filter(workflowMatches(store, host.id, parsed))

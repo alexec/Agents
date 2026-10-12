@@ -258,9 +258,7 @@ private struct RemoteSmartFold: View {
 
     /// The session Unread keeps, read, while it is the one open; none while searching.
     private var keptUnread: Agent? {
-        guard row == .unread, query.isEmpty, let id = model.keptInUnread,
-              let kept = model.work.agent(id), kept.state != .archived else { return nil }
-        return kept
+        row == .unread ? SidebarSmartRow.keptInUnread(model.keptInUnread, in: model.work, query: query) : nil
     }
 
     /// One project's pinned sessions (#180), then its pinned workflows (#432), each
@@ -360,7 +358,8 @@ private struct RemoteProjectFold: View {
     private var key: ProjectKey { summary.key }
 
     var body: some View {
-        let fold = SidebarProjectFold(key, label: label, in: model.work, query: query, isOpen: folds.isOpen(key))
+        let fold = SidebarProjectFold(key, label: label, in: model.work, query: query, isOpen: folds.isOpen(key),
+                                      keptInUnread: model.keptInUnread)
         let isOpen = fold.isUnfolded
         if fold.isShown {
             // A search holds every match open.

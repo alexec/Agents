@@ -70,9 +70,7 @@ struct SmartFold: View {
 
     /// The session Unread keeps, read, while it is the one open; none while searching.
     private var keptUnread: Agent? {
-        guard row == .unread, query.isEmpty, let id = model.keptInUnread,
-              let kept = model.work.agent(id), kept.state != .archived else { return nil }
-        return kept
+        row == .unread ? SidebarSmartRow.keptInUnread(model.keptInUnread, in: model.work, query: query) : nil
     }
 
     /// Every project's pinned sessions, then its pinned workflows, each dragged into the

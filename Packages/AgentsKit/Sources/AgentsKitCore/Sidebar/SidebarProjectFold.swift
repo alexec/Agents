@@ -80,15 +80,19 @@ public struct SidebarProjectFold {
 
     /// How many sessions the project's own group lists, folded or not: its live ones that
     /// no smart group lists (#587). The busy groups go to Needs You and Working whole, so
-    /// what is left is the rest, less the unread and the pinned among them.
-    public static func ownCount(_ key: ProjectKey, in work: AgentsModel) -> Int {
+    /// what is left is the rest, less the unread and the pinned among them, and less the
+    /// session Unread keeps while it is open (#689).
+    public static func ownCount(_ key: ProjectKey, in work: AgentsModel, keptInUnread: UUID? = nil) -> Int {
         let shelf = work.shelf(key)
         let rest = AgentGroup.live.filter { !SidebarSmartRow.busyGroups.contains($0) }
             .reduce(0) { $0 + (shelf.counts[$1] ?? 0) }
         let pinnedAtRest = SidebarSmartRow.pinnedSessions(in: work, key).count {
             SidebarSmartRow.home(of: $0, in: work.group(of: $0), isPinned: false) == nil
         }
-        return max(0, rest - SidebarSmartRow.unreadAtRest(in: shelf) - pinnedAtRest)
+        let kept = SidebarSmartRow.keptInUnread(keptInUnread, in: work).map {
+            ProjectKey(host: $0.host, folder: $0.projectFolder) == key && !$0.showsUnread
+        } ?? false
+        return max(0, rest - SidebarSmartRow.unreadAtRest(in: shelf) - pinnedAtRest - (kept ? 1 : 0))
     }
 
     /// How many archived sessions the fold says it holds: the host's count while there is
@@ -118,8 +122,10 @@ public struct SidebarProjectFold {
     /// One project's fold. `isOpen` is whether it is unfolded: folded, nothing under the
     /// row is drawn, so nothing is filed for it, and the row reads its own numbers off the
     /// project's shelf (#165). A search unfolds every project, and `label` is the name the
-    /// row shows, which the search also matches.
-    public init(_ key: ProjectKey, label: String, in work: AgentsModel, query: String = "", isOpen: Bool) {
+    /// row shows, which the search also matches. `keptInUnread` is the session Unread keeps
+    /// while it is open, listed there and not here (#689).
+    public init(_ key: ProjectKey, label: String, in work: AgentsModel, query: String = "", isOpen: Bool,
+                keptInUnread: UUID? = nil) {
         self.key = key
         let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
         self.query = words
@@ -154,9 +160,11 @@ public struct SidebarProjectFold {
                 groups.append(Group(group: group, heading: heading))
             }
         }
-        // Only those no smart group lists: each session is in the sidebar once (#587).
+        // Only those no smart group lists: each session is in the sidebar once (#587), the
+        // one Unread keeps too (#689).
+        let kept = SidebarSmartRow.keptInUnread(keptInUnread, in: work, query: words)?.id
         sessions = groups.flatMap { group in
-            group.agents.filter { SidebarSmartRow.home(of: $0, in: group.group, isPinned: false) == nil }
+            group.agents.filter { SidebarSmartRow.home(of: $0, in: group.group, isPinned: false) == nil && $0.id != kept }
         }.sorted { $0.createdAt > $1.createdAt }
         let archived = shelf.groups[.archived] ?? []
         self.archived = matcher.map { archived.filter($0.matches) } ?? archived

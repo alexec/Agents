@@ -119,6 +119,18 @@ test("Unread keeps the session opened from it in its place (#495)", async () => 
   assert.deepEqual(withKept(shown, undefined).map((a) => a.id), ["new", "old"]);
 });
 
+test("the session Unread keeps is not under its project too, until another is opened (#689)", async () => {
+  const { keepsInUnread, projectSessions, ownCount } = await load("src/model/sidebar.ts");
+  const live = [agent("opened", 2), agent("read", 1), agent("working", 3, { state: "running" })];
+  assert.equal(keepsInUnread(live[0], []), true, "read now, still kept");
+  assert.deepEqual(projectSessions(live, [], undefined, "opened").map((a) => a.id), ["read"]);
+  assert.equal(ownCount(live, [], "opened"), 1);
+  assert.deepEqual(projectSessions(live, []).map((a) => a.id), ["opened", "read"], "under its project once let go");
+  assert.equal(keepsInUnread(live[0], ["opened"]), false, "pinned, it is in Pinned");
+  assert.equal(keepsInUnread(live[2], []), false, "working, it is in Working");
+  assert.equal(keepsInUnread(agent("gone", 4, { state: "archived" }), []), false);
+});
+
 test("New Session starts in the project last started in, while it is live (#495)", async () => {
   const { newSessionProject, rememberedProject, rememberProject } = await load("src/model/sidebar.ts");
   const live = [{ host: "mac", folder: "file:///w/a/" }, { host: "box", folder: "file:///w/b" }];
