@@ -375,6 +375,22 @@ func freePort() async throws -> Int {
     return port
 }
 
+/// A free port for a test that stops and starts a listener on it (#848). It is below the
+/// ephemeral range (49152 on macOS, 32768 on Linux), so between a stop and the next start
+/// no port-0 bind of another test, such as `freePort()`, can be given it.
+func keptPort() async throws -> Int {
+    for _ in 0..<50 {
+        let port = Int.random(in: 20000..<32768)
+        guard let channel = try? await ServerBootstrap(group: MultiThreadedEventLoopGroup.singleton)
+            .bind(host: "127.0.0.1", port: port).get() else { continue }
+        try await channel.close()
+        return port
+    }
+    throw NoKeptPort()
+}
+
+struct NoKeptPort: Error {}
+
 func eventually(within seconds: Double = 5, _ condition: () async -> Bool) async {
     let deadline = Date().addingTimeInterval(seconds)
     while Date() < deadline {
