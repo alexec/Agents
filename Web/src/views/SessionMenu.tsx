@@ -69,25 +69,34 @@ export function headerActions(agent: Agent, pinned: boolean): { action: Action; 
   ];
 }
 
-/** `headerActions` as buttons. Archive leaves the chat for its project, once the host has it. */
+/**
+ * `headerActions` as buttons. Archive leaves the chat for its project, once the host has it.
+ * Below 760 they are left to the ···, as the iPhone has them, so the title keeps the room (#665).
+ */
 export function SessionButtons({ store, host, agent, disabled }: { store: Store; host: string; agent: Agent | undefined; disabled: boolean }) {
   if (!agent) return null;
   const pinned = store.sessionPinsIn(host, projectFolder(agent)).includes(agent.id);
   return (
     <>
       {headerActions(agent, pinned).map(({ action, label, help }) => (
-        <button key={action} title={help} disabled={disabled || !!store.onItsWay.value[agent.id]}
+        <button key={action} class="wide-only" title={help} disabled={disabled || !!store.onItsWay.value[agent.id]}
           onClick={() => {
             if (action !== "agents/archive") return runSessionAction(store, host, agent, action);
-            void store.perform(host, agent.id, action).then((done) => { if (done) go({ host, project: projectFolder(agent) }); });
+            archiveAndLeave(store, host, agent);
           }}>{label}</button>
       ))}
     </>
   );
 }
 
-export function SessionMenu({ store, host, agent, disabled, openFile }:
-  { store: Store; host: string; agent: Agent | undefined; disabled: boolean; openFile?: () => void }) {
+/** Archive, then the session's project: the chat it was open in has nothing left to show. */
+function archiveAndLeave(store: Store, host: string, agent: Agent) {
+  void store.perform(host, agent.id, "agents/archive").then((done) => { if (done) go({ host, project: projectFolder(agent) }); });
+}
+
+/** `inChat`: the chat header's, whose Archive leaves the chat as the header's button does. */
+export function SessionMenu({ store, host, agent, disabled, openFile, inChat }:
+  { store: Store; host: string; agent: Agent | undefined; disabled: boolean; openFile?: () => void; inChat?: boolean }) {
   const open = useSignal(false);
   const anchor = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -115,7 +124,8 @@ export function SessionMenu({ store, host, agent, disabled, openFile }:
             <button key={action} role="menuitem" title={help}
               onClick={() => {
                 open.value = false;
-                runSessionAction(store, host, agent, action);
+                if (inChat && action === "agents/archive") archiveAndLeave(store, host, agent);
+                else runSessionAction(store, host, agent, action);
               }}>{label}</button>
           ))}
         </div>
