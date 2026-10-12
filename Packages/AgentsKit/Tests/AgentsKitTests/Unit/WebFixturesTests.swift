@@ -742,7 +742,8 @@ struct WebFixturesTests {
         }
     }
 
-    /// The strip at the head of the chat (#341): the plan in force, and its one line.
+    /// The strip at the head of the chat (#341): the plan in force, its line, and the card's
+    /// step and count (#776).
     @Test func planStrip() throws {
         func step(_ content: String, _ status: PlanEntry.Status) -> PlanEntry {
             PlanEntry(content: content, status: status)
@@ -770,7 +771,10 @@ struct WebFixturesTests {
         try pin("plan/strip.json", cases) { input in
             var agent = Self.agent(1, .running)
             agent.plans = try (input["plans"] ?? .array([])).decode([Plan].self)
-            return agent.planInForce.map { .string($0.stripSummary) } ?? .null
+            return agent.planInForce.map { plan in
+                .object(["line": .string(plan.stripSummary), "step": .string(plan.stripStep),
+                         "done": .int(plan.stripDone), "total": .int(plan.entries.count)])
+            } ?? .null
         }
     }
 

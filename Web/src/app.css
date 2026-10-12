@@ -1075,12 +1075,21 @@ button.plain:hover { opacity: 1; }
 .archive-strip { display: flex; align-items: center; gap: 8px; margin: 0; padding: 4px 16px; font-size: 12px;
   border-bottom: 1px solid var(--paper-rule); }
 .archive-strip button { font-size: 12px; }
-/* The plan in force, one line under the chat's head, opened to every step (#341). */
-.plan-strip { padding: 4px 16px; font-size: 12px; border-bottom: 1px solid var(--paper-rule); }
-.plan-strip .plan-summary { display: flex; gap: 4px; width: 100%; text-align: left; background: none; border: none; padding: 2px 0;
-  color: inherit; font: inherit; opacity: 0.7; cursor: pointer; }
-.plan-strip .plan-summary:hover { opacity: 1; }
-.plan-strip .plan-block { padding: 4px 0 6px 16px; }
+/* The plan in force, a card under the chat's head, opened to every step (#341). On the well,
+   with a bar in the accent rather than a state colour, so it is not missed (#776). */
+.plan-strip { padding: 6px 16px; }
+.plan-card { background: var(--paper-well); border-radius: 10px; padding: 10px 14px; }
+.plan-strip .plan-summary { display: flex; flex-direction: column; gap: 8px; width: 100%; text-align: left;
+  background: none; border: none; padding: 0; color: inherit; font: inherit; font-size: 13px; cursor: pointer; }
+.plan-strip .plan-line { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.plan-strip .plan-step { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plan-strip .plan-count, .plan-strip .chevron { font-size: 12px; opacity: 0.6; white-space: nowrap;
+  font-variant-numeric: tabular-nums; }
+.plan-strip .plan-bar { display: block; height: 4px; border-radius: 2px; background: var(--paper-rule); overflow: hidden; }
+.plan-strip .plan-bar > span { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
+.plan-strip .plan-block { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--paper-rule); font-size: 13px; }
+.plan .in_progress .content { font-weight: 600; }
+.plan-block.withdrawn .plan .in_progress .content { font-weight: inherit; }
 /* Over the prompt: what the open agent holds and waits for (036, 042, #254). Untinted. */
 .capsules { display: flex; flex-direction: column; gap: 4px; margin: 0 0 8px; }
 .capsule-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }

@@ -9,7 +9,12 @@
     "name" : "no plan"
   },
   {
-    "expected" : "Fix the row — 1 of 3 done",
+    "expected" : {
+      "done" : 1,
+      "line" : "Fix the row — 1 of 3 done",
+      "step" : "Fix the row",
+      "total" : 3
+    },
     "input" : {
       "plans" : [
         {
@@ -39,7 +44,12 @@
     "name" : "a step being worked"
   },
   {
-    "expected" : "Plan — 1 of 2 done",
+    "expected" : {
+      "done" : 1,
+      "line" : "Plan — 1 of 2 done",
+      "step" : "Plan",
+      "total" : 2
+    },
     "input" : {
       "plans" : [
         {
@@ -64,7 +74,12 @@
     "name" : "no step being worked"
   },
   {
-    "expected" : "Plan — 2 of 2 done",
+    "expected" : {
+      "done" : 2,
+      "line" : "Plan — 2 of 2 done",
+      "step" : "Plan",
+      "total" : 2
+    },
     "input" : {
       "plans" : [
         {
@@ -89,7 +104,12 @@
     "name" : "every step done"
   },
   {
-    "expected" : "Plan — 1 of 2 done",
+    "expected" : {
+      "done" : 1,
+      "line" : "Plan — 1 of 2 done",
+      "step" : "Plan",
+      "total" : 2
+    },
     "input" : {
       "plans" : [
         {
@@ -136,7 +156,12 @@
     "name" : "the last of several"
   },
   {
-    "expected" : "Fix the row — 1 of 3 done",
+    "expected" : {
+      "done" : 1,
+      "line" : "Fix the row — 1 of 3 done",
+      "step" : "Fix the row",
+      "total" : 3
+    },
     "input" : {
       "plans" : [
         {
@@ -218,7 +243,12 @@
     "name" : "only a dropped plan"
   },
   {
-    "expected" : "Plan — 1 of 2 done",
+    "expected" : {
+      "done" : 1,
+      "line" : "Plan — 1 of 2 done",
+      "step" : "Plan",
+      "total" : 2
+    },
     "input" : {
       "plans" : [
         {

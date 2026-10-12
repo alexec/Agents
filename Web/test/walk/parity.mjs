@@ -85,6 +85,21 @@ for (const scene of scenes) {
       await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = "steps"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
       await shot("chat-steps");
       await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = "outcome"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+    } else if (scene === "plan") {
+      // #776: the plan strip is a card with the step, the count and a bar. Opens the session
+      // "Fix the sidebar row", so a root seeded with that one agent holding a plan is enough.
+      const pick = `[...document.querySelectorAll(".sidebar button, .sidebar .pick")]
+        .find((b) => b.textContent.includes("Fix the sidebar row") && b.offsetParent !== null)`;
+      if (!(await page.eval(`!!(${pick})`))) await page.eval(`document.querySelector(".row.project .pick, .row.project button")?.click()`);
+      await page.waitFor(`!!(${pick})`, 30_000);
+      await page.eval(`(${pick}).click()`);
+      await page.waitFor(`document.querySelector(".plan-strip .plan-card")`, 30_000);
+      say(`card: ${JSON.stringify(await visible(".plan-strip .plan-line"))}`);
+      say(`bar: ${await page.eval(`document.querySelector(".plan-strip .plan-bar > span").style.width`)}`);
+      await shot("plan");
+      await page.eval(`document.querySelector(".plan-strip .plan-summary").click()`);
+      say(`steps: ${JSON.stringify(await visible(".plan-strip .plan li"))}`);
+      await shot("plan-open");
     } else if (scene === "margin") {
       // #112: a turn's steps are a run of lines with no chevron; a step still opens. Takes the
       // first session, so a root with one finished turn is enough.
