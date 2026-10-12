@@ -9,7 +9,7 @@ import type {
   StartRequest, UUID, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, DiskState, StoreNotes,
   ChatProjectState, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
-  GuardedChange, GuardedChangeReading, HostJoinStatus,
+  GuardedChange, GuardedChangeReading, HostJoinStatus, KeptDelivered, KeptList, KeptRequest,
 } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -822,6 +822,39 @@ export class Work {
   /** The hosts whose `hosts/start` is out now, so the strip's Start waits for it (#691). */
   readonly hostsBeingStarted = signal<readonly string[]>([]);
 
+  /** Prompts and starts the control plane keeps for a stopped workspace (#691 US3), every host's. */
+  readonly kept = signal<readonly KeptRequest[]>([]);
+  /** The last kept request to reach its host, so a page showing a kept start opens the agent it made. */
+  readonly keptDelivered = signal<KeptDelivered | null>(null);
+
+  /**
+   * Whether a prompt or a start sent to `host` now is kept rather than refused: it is linked to a
+   * workspace that is stopped or starting, and starts when used (FR-020).
+   */
+  startsWhenUsed(host: string): boolean {
+    const row = this.hosts.value.find((h) => h.id === host);
+    return !!row?.workspace?.startWhenUsed && (row.state === "stopped" || row.state === "starting");
+  }
+
+  /** The prompts kept for one agent, oldest first. */
+  keptFor(host: string, agentID: string): KeptRequest[] {
+    return this.kept.value.filter((k) => k.host === host && k.kind === "prompt" && k.agentID === agentID);
+  }
+
+  /** The agent starts kept for one project. */
+  keptStarts(host: string, folder: string): KeptRequest[] {
+    return this.kept.value.filter((k) => k.host === host && k.kind === "start" && !!k.folder && folderKey(k.folder) === folderKey(folder));
+  }
+
+  /** A kept request, said by the control plane as it answered: shown at once, before `control/keptChanged`. */
+  protected noteKept(error: CallFailed): KeptRequest | null {
+    const said = error.data as KeptRequest | undefined;
+    if (!said || typeof said.id !== "string") return null;
+    if (!this.kept.value.some((k) => k.id === said.id)) this.kept.value = [...this.kept.value, said];
+    return said;
+  }
+
+
   /** One host's row, or its state and workspace, as said now, in place of what was listed. */
   protected takeHostRow(change: { id: string; state: string; workspace?: HostWorkspace | undefined }): void {
     const hosts = this.hosts.value;
@@ -902,6 +935,14 @@ export class Store extends Work {
         this.hostChanged(params);
         return;
       }
+      if (method === "control/keptChanged") {
+        this.kept.value = (params as KeptList | null)?.kept ?? [];
+        return;
+      }
+      if (method === "control/keptDelivered") {
+        this.keptDelivered.value = params as KeptDelivered;
+        return;
+      }
       if (method === "control/thisMacHostChanged") {
         const plane = this.plane.value;
         if (plane) this.plane.value = { ...plane, thisMacHost: (params as HostJoinStatus | null) ?? undefined };
@@ -932,7 +973,7 @@ export class Store extends Work {
    */
   load(): Promise<void> {
     return this.once("*", async () => {
-      const [hosts] = await Promise.all([this.link.call("hosts/list", {}), this.loadPlane()]);
+      const [hosts] = await Promise.all([this.link.call("hosts/list", {}), this.loadPlane(), this.loadKept()]);
       this.takeHosts(hosts);
       await Promise.all(this.hosts.value.filter((host) => host.state === "online").map((host) => this.onHost(host.id, async () => {
         // A removal that landed while this waited is not loaded back (#291).
@@ -942,6 +983,12 @@ export class Store extends Work {
       const watching = this.watching.value;
       if (watching) await this.loadTranscript(watching.host, watching.session);
     });
+  }
+
+  /** What the control plane keeps for stopped workspaces; one without providers keeps nothing. */
+  private async loadKept(): Promise<void> {
+    const listed = await this.link.call("hosts/listKept", {}).catch(() => null);
+    this.kept.value = listed?.kept ?? [];
   }
 
   /** The control plane's status, for this Mac's host notice; a plane that can't say leaves it as it was. */
@@ -1420,6 +1467,17 @@ export class Store extends Work {
     }
   }
 
+  /** × on a kept prompt: it isn't sent, and the workspace keeps starting (US3 AS3). */
+  async dropKept(kept: KeptRequest): Promise<void> {
+    this.kept.value = this.kept.value.filter((k) => k.id !== kept.id);
+    await this.link.call("hosts/dropKept", { host: kept.host, id: kept.id }).catch((error: unknown) => this.say(describe(error)));
+  }
+
+  /** Try Again on one that wasn't sent: kept again, and the workspace started. */
+  async retryKept(kept: KeptRequest): Promise<void> {
+    await this.link.call("hosts/retryKept", { host: kept.host, id: kept.id }).catch((error: unknown) => this.say(describe(error)));
+  }
+
   /** Calls `method`, and on failure says why in `problem` and answers null. */
   async act<M extends keyof Methods>(method: M, params: Methods[M]["params"], host: string): Promise<Methods[M]["result"] | null> {
     try {
@@ -1560,6 +1618,8 @@ export class Store extends Work {
       await this.lending("agents/prompt", { agentID: agentID as UUID, text, attachments, from: "person" }, host);
       return true;
     } catch (error) {
+      // Kept for a stopped workspace (#691 US3): its bubble says so, and it goes when the host is up.
+      if (error instanceof CallFailed && error.code === Failure.kept && this.noteKept(error)) return true;
       // Its folder has gone (#119): said with the ways on, carrying what was typed.
       if (error instanceof CallFailed && error.code === Failure.folderGone) {
         this.folderGone.value = { host, agentID, message: error.message, text, attachments };
@@ -2071,10 +2131,15 @@ export class Store extends Work {
    * Starts an agent; answers its id, or null with `problem` saying why. A runtime whose sandbox
    * will not start (064) answers what it said instead, for the form to offer Start without sandbox.
    */
-  async start(host: string, request: StartRequest): Promise<string | SandboxWillNotStart | null> {
+  async start(host: string, request: StartRequest): Promise<string | SandboxWillNotStart | { kept: KeptRequest } | null> {
     try {
       return await this.lending("agents/start", request, host);
     } catch (error) {
+      // Kept until its stopped workspace is up (#691 US3): the page shows it, then opens the agent.
+      if (error instanceof CallFailed && error.code === Failure.kept) {
+        const kept = this.noteKept(error);
+        if (kept) return { kept };
+      }
       if (error instanceof CallFailed && error.code === Failure.sandboxWillNotStart && isSandboxRefusal(error.data)) {
         return { ...error.data, message: error.message };
       }

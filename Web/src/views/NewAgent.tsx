@@ -33,6 +33,7 @@ import { PromptMenus } from "./PromptMenus";
 import { BackToList } from "./BackToList";
 import { orderedProjects, projectLabel } from "./Sidebar";
 import { GuardedChangeCards } from "./GuardedChange";
+import { KeptBubbles } from "./Kept";
 
 type Where = { kind: "project" } | { kind: "new" } | { kind: "existing"; root: string } | { kind: "branch"; name: string };
 
@@ -94,6 +95,8 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   const refusal = useSignal<SandboxWillNotStart | null>(null);
   /** What was last sent, for Start without sandbox to send again. */
   const lastSent = useRef<{ text: string; attachments: Attachment[] } | null>(null);
+  /** The kept starts this page has shown: the one that reaches its host opens here (#691 US3). */
+  const keptShown = useRef(new Set<string>());
   /** Asked again by Try again. */
   const asking = useSignal(0);
   /** The project's personas (#760), the one picked by id, and one picked before its runtime's menus came. */
@@ -224,6 +227,11 @@ export function NewAgent({ store, host, folder, projectName, down }: {
     };
     const id = await store.start(host, request);
     if (!id) return false;
+    // Kept for a stopped workspace (#691 US3): shown here until the agent it makes opens.
+    if (typeof id === "object" && "kept" in id) {
+      store.finishStartRequest(host, folder);
+      return true;
+    }
     if (typeof id === "object") {
       refusal.value = id;
       return false;
@@ -237,6 +245,16 @@ export function NewAgent({ store, host, folder, projectName, down }: {
     go({ host, project: folder, session: id });
     return true;
   };
+
+  // Starts kept for this project's stopped workspace; the one that reaches it opens (#691 US3).
+  const keptStarts = store.keptStarts(host, folder);
+  const delivered = store.keptDelivered.value;
+  useEffect(() => {
+    if (delivered?.agentID && delivered.host === host && keptShown.current.has(delivered.id)) {
+      go({ host, project: folder, session: delivered.agentID });
+    }
+  }, [delivered]);
+  useEffect(() => { for (const k of keptStarts) keptShown.current.add(k.id); }, [keptStarts]);
 
   const state = form.value.state;
   const runtimeName = listed.find((r) => r.runtime.id === chosenRuntime)?.runtime.name ?? "the runtime";
@@ -308,12 +326,13 @@ export function NewAgent({ store, host, folder, projectName, down }: {
             {brokenPersonas.map((p) => <p key={p.id} class="quiet small">{p.id}.md: {p.problem}</p>)}
           </div>
         )}
+        <KeptBubbles store={store} kept={keptStarts} />
       </div>
       <footer class="foot">
         {/* A change to the project's own files that no session can be asked about (#531). */}
         <GuardedChangeCards store={store} host={host} where={{ folder }} down={down || !store.hostIsOnline(host)} />
         <Prompt store={store} draftKey={draftKey} placeholder="What should it do?"
-          capabilities={capabilities} disabled={down || !chosenRuntime || !store.hostIsOnline(host)} send={start}
+          capabilities={capabilities} disabled={down || !chosenRuntime || (!store.hostIsOnline(host) && !store.startsWhenUsed(host))} send={start}
           recipient={store.recipient(host)} starting commands={form.value.commands}
           where={(
             <>

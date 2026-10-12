@@ -14,6 +14,7 @@ import type { Agent, AppViewCall, BackgroundItem, FileMentionDTO, TranscriptEntr
 import { replace, route } from "../route";
 import { Cards } from "./Cards";
 import { OfflineStrip } from "./OfflineStrip";
+import { KeptBubbles } from "./Kept";
 import { FolderGoneNotice, MissingFolderStrip } from "./MissingFolder";
 import { BlockStrip } from "./BlockStrip";
 import { CurrentPlanStrip } from "./PlanStrip";
@@ -79,6 +80,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   // An offline host is the link down for this chat alone: read what was last heard, send nothing.
   const hostDown = !linkDown && !store.hostIsOnline(host);
   const down = linkDown || hostDown;
+  // A stopped workspace that starts when used still takes a prompt, kept until it is up (#691 US3).
+  const keeps = hostDown && store.startsWhenUsed(host);
   const r = route.value;
   const agent = store.agent(host, session);
   // Opened: its runtime starts now, so the reply does not wait for it (#183). Once it has been
@@ -530,6 +533,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
             toggle={turnActions.toggle} loadDetail={turnActions.loadDetail} loadEarlier={turnActions.loadEarlier} />
         ))}
         {agent && <Queued store={store} host={host} agent={agent} disabled={down} />}
+        {agent && <KeptBubbles store={store} kept={store.keptFor(host, agent.id)} />}
         {/* Live, at the foot: what the row says, until the prompt lands (ChatTranscript, #251). */}
         {agent && store.isComingBack(host, agent.id) ? <p class="working coming-back" role="status">↻ {comingBackDescription}</p>
           : agent && (agent.state === "running" || agent.state === "starting") && (
@@ -562,7 +566,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       <footer class="foot">
         <BackgroundRows store={store} host={host} agent={agent} disabled={down} steps={(item) => (subagent.value = item)} />
         {agent && <Capsules store={store} host={host} agent={agent} />}
-        <Prompt store={store} draftKey={`${host}|${session}`} placeholder={promptPlaceholder(agent)} disabled={down || !agent}
+        <Prompt store={store} draftKey={`${host}|${session}`} placeholder={promptPlaceholder(agent)} disabled={(down && !keeps) || !agent}
           stop={agent && hasTurnInFlight(agent) ? () => void store.perform(host, agent.id, "agents/stop") : undefined}
           acting={agent && store.onItsWay.value[agent.id]}
           queues={willQueue(agent)} suggestion={agent?.suggestedPrompts?.[0]}
