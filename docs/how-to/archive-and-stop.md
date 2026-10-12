@@ -61,8 +61,7 @@ partly done one stays under **Needs you**. Nothing is hidden until you approve i
    row's menu and its swipe have **Archive**.
 2. Or open **Approve Archiving**, at the top of the sidebar. It gathers every chat waiting
    for approval, in every project and on every host, and is shown only when one is.
-   **Approve All** in its heading archives them all (on the Mac, it is also in the
-   heading's right-click menu).
+   Approve or swipe each row there; the group has no button that archives them all.
 3. To keep the chat instead, send it a prompt. That drops it. So does a later turn
    that ends wanting you: with a question, stuck, blocked or crashed. Bringing back an
    archived chat does not bring the mark back.

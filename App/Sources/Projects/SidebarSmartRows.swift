@@ -38,23 +38,12 @@ struct SmartFold: View {
         }
     }
 
-    /// The group's heading; Approve Archiving's carries Approve All, beside its count and in its menu.
+    /// The group's heading. Approve Archiving has no Approve All (#704): a row's swipe or
+    /// Approve archives each.
     private func heading(_ open: Binding<Bool>) -> some View {
-        let all: (() -> Void)? = row == .toArchive ? { archiveAll() } : nil
-        return SmartRowLabel(row: row, count: row.count(in: model.work, projects: projects), archiveAll: all) {
+        SmartRowLabel(row: row, count: row.count(in: model.work, projects: projects)) {
             open.wrappedValue.toggle()
         }
-        .contextMenu {
-            if let all {
-                Button(ArchiveRequestWords.archiveAll, systemImage: ArchiveRequestWords.symbol) { all() }
-            }
-        }
-    }
-
-    /// Approve Archiving's Approve All (#584): every session it gathers, whether or not a
-    /// search is narrowing what it shows.
-    private func archiveAll() {
-        Task { await model.archiveAllRequested(in: projects) }
     }
 
     /// What the row lists. Unread keeps the session opened from it (`keptInUnread`) in
@@ -120,8 +109,6 @@ struct SmartFold: View {
 private struct SmartRowLabel: View {
     let row: SidebarSmartRow
     let count: Int
-    /// Approve Archiving's Approve All (#584), drawn beside the count; nil on every other row.
-    var archiveAll: (() -> Void)?
     /// A click on the heading folds or unfolds it, as on a project's (#375).
     var onClick: () -> Void = {}
 
@@ -133,13 +120,6 @@ private struct SmartRowLabel: View {
                 .lineLimit(1)
                 .foregroundStyle(.secondary)
             Spacer(minLength: 4)
-            if let archiveAll, count > 0 {
-                // A button keeps its own click inside the heading's tap (#495's rows do).
-                Button(ArchiveRequestWords.archiveAll, action: archiveAll)
-                    .buttonStyle(.paper)
-                    .controlSize(.mini)
-                    .help(ArchiveRequestWords.archiveAllHelp(count))
-            }
             if count > 0 {
                 Text("\(count)")
                     .monospacedDigit()
@@ -156,11 +136,6 @@ private struct SmartRowLabel: View {
         .simultaneousGesture(TapGesture().onEnded { onClick() })
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(count > 0 ? "\(row.title), \(count)" : "\(row.title), none")
-        .accessibilityActions {
-            if let archiveAll, count > 0 {
-                Button(ArchiveRequestWords.archiveAll, action: archiveAll)
-            }
-        }
     }
 }
 

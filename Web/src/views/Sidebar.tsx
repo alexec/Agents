@@ -15,7 +15,6 @@ import { signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import { actDoing, type Store } from "../model/store";
 import { byStart, folderKey, projectFolder, showsUnread } from "../model/groups";
-import { archiveAllHelp, archiveAllLabel } from "../model/archiveWords";
 import { folds } from "../model/folds";
 import { parseQuery, queryMatches, type LabelQuery } from "../model/labels";
 import { keepsInUnread, newSessionProject, ownCount, pinnedSessions, pinnedWorkflows, projectSessions, rememberedProject, rememberProject,
@@ -287,7 +286,7 @@ type SmartLine = Placed & ({ kind: "session"; agent: Agent } | { kind: "workflow
 /**
  * One of the groups at the top of the sidebar (#495): Pinned, Needs You, Working, Unread or Approve
  * Archiving (#584, #649), across every project and host, each row naming its project. Approve Archiving's
- * head has Approve All, for every session it gathers, whatever a search shows. Drawn only with something in it, and while
+ * head has no Approve All (#704): each row is approved on its own. Drawn only with something in it, and while
  * searching only with a match (#507); Unread still is while it keeps the open session. Folded, it
  * lists nothing but counts.
  */
@@ -310,7 +309,6 @@ function SmartFold({ row, store, projects, query, linkDown }: {
   let count = 0;
   let lines: SmartLine[] = [];
   let keptPlace: Placed | undefined;
-  const asking: { host: string; agentID: string }[] = [];
   if (row === "pinned") {
     for (const placed of projects) {
       const host = placed.host.id;
@@ -333,9 +331,7 @@ function SmartFold({ row, store, projects, query, linkDown }: {
       const live = liveSessions(store, placed.host.id, placed.project.project.folder);
       // The pinned are in Pinned alone: each session is listed once (#587).
       const pins = store.sessionPinsIn(placed.host.id, placed.project.project.folder);
-      const gathered = smartAgents(row, live, undefined, pins);
-      count += gathered.length;
-      if (row === "toArchive") asking.push(...gathered.map((a) => ({ host: placed.host.id, agentID: a.id })));
+      count += smartAgents(row, live, undefined, pins).length;
       if (open || parsed) for (const agent of smartAgents(row, live, parsed, pins)) found.set(agent, placed);
     }
     // Unread keeps the session opened from it in its place, read now; none while searching.
@@ -356,11 +352,6 @@ function SmartFold({ row, store, projects, query, linkDown }: {
       }}>
       <summary class="sidebar-head-label" data-fold={`smart.${row}`} aria-label={count > 0 ? `${title}, ${count}` : `${title}, none`}>
         {title}
-        {row === "toArchive" && count > 0 && (
-          // Its own click, not the fold's.
-          <button class="archive-all" title={archiveAllHelp(count)} disabled={linkDown}
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); void store.archiveAll(asking); }}>{archiveAllLabel}</button>
-        )}
         {count > 0 && <span class={`count${row === "needsYou" ? " needs" : ""}`}>{count}</span>}
       </summary>
       {open && lines.map((line) => {
