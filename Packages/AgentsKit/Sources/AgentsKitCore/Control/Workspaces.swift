@@ -163,6 +163,7 @@ public extension DaemonAPI.Method {
     static let workspaceMethods: Set<String> = [
         providersList, providersAdd, providersUpdate, providersRemove, providersRefresh,
         hostsLink, hostsUnlink, hostsSetWorkspaceOptions, hostsStart, hostsStop,
+        hostsListKept, hostsDropKept, hostsRetryKept,
     ]
 }
 

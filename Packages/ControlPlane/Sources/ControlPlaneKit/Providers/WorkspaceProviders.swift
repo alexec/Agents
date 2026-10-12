@@ -87,6 +87,8 @@ public actor WorkspaceProviders: WorkspaceHandling {
     /// Why each host's last start or stop failed, until the next one.
     private var problems: [HostID: String] = [:]
     private var ticker: Task<Void, Never>?
+    /// Prompts and agent starts kept for stopped hosts (US3).
+    public private(set) var kept: KeptRequests?
 
     public init(store: any ControlStore, records: ControlRecords, methods: ControlMethods, router: ControlRouter,
                 secrets: ProviderSecrets, timing: Timing = .standard, hooks: Hooks,
@@ -101,9 +103,13 @@ public actor WorkspaceProviders: WorkspaceHandling {
         self.log = log
     }
 
+    /// Keeps prompts and starts for this control plane's stopped hosts (US3).
+    public func keep(with kept: KeptRequests) { self.kept = kept }
+
     /// Reads the providers, lists each, and lists again every `listEvery` (FR-004).
     public func start() async {
         await load()
+        await kept?.load()
         await refresh(nil)
         let every = timing.listEvery
         ticker = Task { [weak self] in
@@ -170,6 +176,9 @@ public actor WorkspaceProviders: WorkspaceHandling {
         case DaemonAPI.Method.hostsStop:
             let host = try Self.require(params, as: DaemonAPI.HostStop.self).host
             return try JSONValue.encoding(try await begin(.stop, host, by: who))
+        case DaemonAPI.Method.hostsListKept, DaemonAPI.Method.hostsDropKept, DaemonAPI.Method.hostsRetryKept:
+            guard let kept else { return ["kept": []] }
+            return try await kept.answer(method: method, params: params)
         default:
             throw JSONRPCError.methodNotFound(method)
         }
@@ -355,6 +364,21 @@ public actor WorkspaceProviders: WorkspaceHandling {
 
     // MARK: Starts and stops
 
+    /// The host's name when a prompt or start for it is to be kept (FR-020): it is linked
+    /// with start when used on, isn't online, and its workspace is stopped or starting.
+    public func keepable(_ host: HostID) async -> String? {
+        guard let record = await records.host(host), let link = record.workspace, link.startWhenUsed ?? true,
+              providers[link.provider] != nil, await router.state(of: host)?.isOnline != true else { return nil }
+        if activities[host]?.kind == .stop { return nil }
+        let shown = overlay(record)?.hostState
+        return shown == "stopped" || shown == "starting" ? record.name : nil
+    }
+
+    /// Starts a host's workspace for a kept request, or joins the start under way.
+    public func startForUse(_ host: HostID, by who: String) async {
+        _ = try? await begin(.start, host, by: who)
+    }
+
     private func begin(_ kind: Activity.Kind, _ host: HostID, by who: String) async throws -> DaemonAPI.ControlHost {
         guard let record = await records.host(host) else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchHost, message: "No host is called \(host.rawValue).")
@@ -446,9 +470,11 @@ public actor WorkspaceProviders: WorkspaceHandling {
     }
 
     private func finish(_ host: HostID, _ link: WorkspaceLink, problem: String?) async {
+        let kind = activities[host]?.kind
         activities[host] = nil
         problems[host] = problem
         await changed()
+        if kind == .start, let problem { await kept?.startFailed(host, problem) }
     }
 
     private func workspace(_ link: WorkspaceLink) -> DaemonAPI.WorkspaceInfo? {
