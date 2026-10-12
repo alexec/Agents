@@ -5,7 +5,7 @@ import { useSignal } from "@preact/signals";
 import { createContext } from "preact";
 import { useContext, useEffect, useRef } from "preact/hooks";
 import type {
-  AgentState, BackgroundItem, ContentBlock, EndedReason, JSONValue, Plan, ToolCall, ToolCallContent, ToolCallLocation,
+  AgentState, BackgroundItem, ContentBlock, EndedReason, FileReading, JSONValue, Plan, ToolCall, ToolCallContent, ToolCallLocation,
   SandboxFailureRecord, SwitchRecord, TranscriptEntry, WorkReport,
 } from "../../protocol/generated";
 import { lineDiff } from "../../model/diff";
@@ -18,6 +18,8 @@ import {
 } from "../../model/turns";
 import { fileLinkPath, Markdown } from "../../render/markdown";
 import { AppView } from "./AppView";
+import { FileCard } from "./FileCard";
+import type { Shown } from "../../model/shownFile";
 import { switchNote } from "../../model/switchNote";
 import { continueWithout, keepStopped, sandboxCard } from "../../model/sandboxWords";
 import { memo } from "../../render/memo";
@@ -142,6 +144,12 @@ export interface CallActions {
   answerSandbox?: ((carryOn: boolean) => Promise<void>) | undefined;
   /** Open a subagent's own steps (ChatActions.subagentSteps, #544). */
   subagentSteps?: ((item: BackgroundItem) => void) | undefined;
+  /** Open a file a card shows in Files at its line (ChatActions.showFile, #836). */
+  showFile?: ((file: Shown) => void) | undefined;
+  /** Hold a card's chart hint, for the pane to draw its CSV with (#836). */
+  noteChart?: ((file: Shown) => void) | undefined;
+  /** Read a file for a card's preview (ChatActions.readFile, #836). */
+  readFile?: ((path: string) => Promise<FileReading>) | undefined;
 }
 export const CallActionsContext = createContext<CallActions | null>(null);
 
@@ -403,6 +411,8 @@ function entryBody(entry: TranscriptEntry) {
     }
     case "appView":
       return <AppView call={fields(entry, "appView")!._0} />;
+    case "fileShown":
+      return <FileCard file={fields(entry, "fileShown")!._0} />;
     case "background": {
       // As the window's line: how it started or ended, a failure in the failure tint (#253).
       return <BackgroundEntryLine item={fields(entry, "background")!._0} />;

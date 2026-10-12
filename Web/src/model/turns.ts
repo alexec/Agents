@@ -140,7 +140,7 @@ function entryIsPassing(entry: TranscriptEntry): boolean {
 const knownKinds = new Set(["userMessage", "agentMessage", "agentThought", "toolCall", "toolCallUpdate", "planUpdated",
   "usageRecorded", "servedRequest", "elicitationAsked", "elicitationAnswered", "compaction", "notice", "permissionAsked",
   "permissionAnswered", "optionChanged", "stateChanged", "background", "workReported", "runtimeNote", "poolSwitch",
-  "sandboxFailure", "handoff", "settingsChanged"]);
+  "sandboxFailure", "handoff", "settingsChanged", "fileShown"]);
 
 function isDrawn(item: Item): boolean {
   return item.kind === "run" || knownKinds.has(kindOf(item.entry));
@@ -222,7 +222,7 @@ function withoutRetried(text: string, all: boolean): string | undefined {
 }
 
 /** TranscriptEntry.carriesOn: the agent going on with its work. */
-const carriesOnKinds = new Set(["agentMessage", "agentThought", "toolCall", "toolCallUpdate", "appView", "planUpdated",
+const carriesOnKinds = new Set(["agentMessage", "agentThought", "toolCall", "toolCallUpdate", "appView", "fileShown", "planUpdated",
   "permissionAsked", "elicitationAsked"]);
 
 /** TranscriptEntry.endsTheWork: the person spoke, or the agent ended. */
@@ -307,6 +307,13 @@ export class DisplayBuilder {
       this.closeRun();
       this.resolveRetried();
       this.viewAt.set(view._0.id, this.drawn.length);
+      this.drawn.push({ kind: "entry", id: entry.id, entry });
+      return;
+    }
+    if (kind === "fileShown") {
+      // The card stands on its own, after the run that called it (#836).
+      this.closeRun();
+      this.resolveRetried();
       this.drawn.push({ kind: "entry", id: entry.id, entry });
       return;
     }
@@ -460,6 +467,8 @@ export function isOutcome(item: Item): boolean {
   if (kind === "elicitationAnswered" || kind === "workReported" || kind === "sandboxFailure") return true;
   // A view is what its call is for (#187): drawn at every level, as a reply is.
   if (kind === "appView") return true;
+  // So is a file shown (#836): the chart or the page is what the work made.
+  if (kind === "fileShown") return true;
   const state = fields(item.entry, "stateChanged");
   if (state) return state._0 === "stopped";
   const notice = fields(item.entry, "notice");

@@ -116,6 +116,10 @@ public struct TranscriptEntry: Codable, Hashable, Sendable, Identifiable {
         /// Written by the daemon as the call arrives and again as it ends, under one id.
         case appView(AppViewCall)
 
+        /// A file an agent put in front of the person with `show_file` (#836): drawn as
+        /// a card where it was called, a preview for a chart or a picture, that opens it.
+        case fileShown(ShownFile)
+
         /// Something a newer version of this app wrote down, read by an older one.
         /// Kept whole and skipped when drawing, so a transcript is never lost to a
         /// kind that did not exist when this build was made.

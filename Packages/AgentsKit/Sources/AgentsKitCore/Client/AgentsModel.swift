@@ -201,6 +201,14 @@ public final class AgentsModel {
     /// winning. Held rather than acted on, because the client hearing this may be
     /// showing another conversation.
     public private(set) var filesToShow: [UUID: ShownFile] = [:]
+    /// How to draw each CSV an agent showed as a chart (#836), by path. A CSV says only
+    /// its numbers; this is what the agent said they mean, for the Files pane.
+    public private(set) var chartHints: [String: ChartHint] = [:]
+
+    /// Keep a shown file's chart hint, for the pane that opens it (#836).
+    public func rememberChart(_ file: ShownFile) {
+        if let hint = file.chart, chartHints[file.path] != hint { chartHints[file.path] = hint }
+    }
 
     /// Chats the daemon is queueing to pick back up after a restart, held only while
     /// it is doing it. Not on any record: the queue lives and dies with the daemon
@@ -622,6 +630,7 @@ public final class AgentsModel {
 
         case .showFile(let notification):
             filesToShow[notification.agentID] = notification.file
+            rememberChart(notification.file)
             // Its group can move with it: a file to look at is wanting eyes.
             if let agent = byID[notification.agentID] { file(agent) }
 

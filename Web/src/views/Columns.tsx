@@ -8,7 +8,7 @@ import { useEffect } from "preact/hooks";
 import type { Store } from "../model/store";
 import { folderKey } from "../model/groups";
 import { replace, route } from "../route";
-import { setPane } from "./files/paneState";
+import { setPane, textShownAs } from "./files/paneState";
 import type { Session } from "../session";
 import { Banner } from "./Banner";
 import { DiskStrip } from "./DiskStrip";
@@ -39,12 +39,14 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
     if (r.host && r.session) void store.openSession(r.host, r.session);
     else store.closeSession();
   }, [r.host, r.session]);
-  // A file the agent asks to be put in front of the person: the page beside the open chat,
-  // as the window does (US4 scenario 3). Shown for another session, it waits for that one.
+  // A file the agent asks to be put in front of the person, beside the open chat (US4 scenario
+  // 3): Markdown on the Page, anything else under Files at its line, as the Remote's
+  // PaneState.open does; a chart is drawn there (#836). Shown for another session, it waits for that one.
   const shown = store.shownFile.value;
   useEffect(() => {
     if (!shown || shown.host !== r.host || shown.agentID !== r.session) return;
-    setPane(shown.agentID, { tab: "page", page: shown.path, line: shown.line });
+    if (textShownAs(shown.path) === "page") setPane(shown.agentID, { tab: "page", page: shown.path, line: shown.line });
+    else setPane(shown.agentID, { tab: "files", file: shown.path, fileLine: shown.line, last: shown.path });
     if (!route.peek().files) replace({ ...route.peek(), files: true });
   }, [shown?.at, r.session]);
   return (

@@ -862,8 +862,15 @@ public actor AppService {
             it once, at the start, and then just write — a Markdown file does not \
             have to exist yet; the page opens empty and fills as you write it. A \
             line you name on a Markdown file takes them to the part of the page that \
-            holds it. For a diagram or a graph, write an SVG file beside the \
-            document and reference it as an image.
+            holds it. For a diagram, write an SVG file beside the document and \
+            reference it as an image.
+
+            For a chart, show a Vega-Lite spec (a file named *.vl.json: one mark of \
+            bar, line, point or area; encoding x, y and an optional color field; \
+            data.values inline or data.url naming a CSV beside it), or show a CSV \
+            with `chart` saying how to draw it. Either is drawn as a chart, and the \
+            conversation shows a card for every file shown here, with a preview of \
+            a chart or a picture.
 
             It shows; it does not edit, select or run anything. Any other file has \
             to exist, and every file has to be inside the folders this agent was \
@@ -885,6 +892,18 @@ public actor AppService {
                             The line to put them on, counted from one. Leave it out \
                             for the top of the file.
                             """],
+                "chart": [
+                    "type": "object",
+                    "description": "For a CSV file: draw it as a chart of column y against column x.",
+                    "properties": [
+                        "mark": ["type": "string", "enum": ["bar", "line", "point", "area"]],
+                        "x": ["type": "string", "description": "The column along the bottom."],
+                        "y": ["type": "string", "description": "The column of numbers."],
+                        "color": ["type": "string", "description": "A column that splits the rows into series."],
+                        "title": ["type": "string"],
+                    ],
+                    "required": .array(["x", "y"]),
+                ],
             ],
             "required": .array(["path"]),
         ],

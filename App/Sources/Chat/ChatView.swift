@@ -140,7 +140,30 @@ struct ChatView: View {
             kept: { [model] agentID in model.kept(for: agentID) },
             dropKept: { [model] in await model.dropKept($0) },
             retryKept: { [model] in await model.retryKept($0) },
-            hostName: { [model] in model.hosts.label($0) })
+            hostName: { [model] in model.hosts.label($0) },
+            // A card in the chat opens its file in Files, as the agent's call did (#836).
+            showFile: { [model, frame, states, agent] file in
+                guard let agent else { return }
+                model.work.rememberChart(file)
+                let state = states.state(for: agent.id)
+                state.folder = file.url.deletingLastPathComponent()
+                state.openFile = file.url
+                state.openLine = file.line
+                if HTMLPageScope.isHTML(file.url) { state.htmlShowsSource = false }
+                frame.pane = .files
+                if !frame.isOpen { frame.open() }
+            },
+            readFile: { [model, agent] path in
+                guard let agent else { return nil }
+                return try? await model.serverFiles(agent.host).read(agentID: agent.id, path: path)
+            },
+            picture: { [model, agent] file in
+                guard let agent,
+                      case .image(let bytes, _, _)? = try? await model.serverFiles(agent.host)
+                        .read(agentID: agent.id, path: file.path),
+                      let image = NSImage(data: bytes) else { return nil }
+                return Image(nsImage: image)
+            })
     }
 
     /// The sandbox card's answer for the open agent (064).

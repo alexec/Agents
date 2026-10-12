@@ -446,6 +446,16 @@ export type ChangesUnavailable =
   | { folderGone: Record<string, never> }
   | { failed: { message: string } };
 
+export interface ChartHint {
+  mark: ChartMark;
+  x: string;
+  y: string;
+  color?: string;
+  title?: string;
+}
+
+export type ChartMark = "bar" | "line" | "point" | "area";
+
 export type ChatProjectState =
   | { ready: { folder: URLString } }
   | { archived: { folder: URLString } }
@@ -1650,6 +1660,7 @@ export interface ShowFileNotification {
 export interface ShownFile {
   path: string;
   line?: number;
+  chart?: ChartHint;
 }
 
 export type SignInWantedReason = "notSignedIn" | "unreadable";
@@ -1793,7 +1804,8 @@ export type TranscriptEntryKind =
   | { sandboxFailure: { _0: SandboxFailureRecord } }
   | { handoff: { markdown: string; characters: number } }
   | { settingsChanged: { _0: SwitchRecord } }
-  | { appView: { _0: AppViewCall } };
+  | { appView: { _0: AppViewCall } }
+  | { fileShown: { _0: ShownFile } };
 
 export interface TranscriptPage {
   firstIndex: number;
@@ -2489,6 +2501,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ChangesFileRequest: { required: ["agentID", "path", "whole"], optional: [] },
   ChangesList: { required: ["files", "git", "reportsEdits"], optional: ["more"] },
   ChangesListRequest: { required: ["agentID"], optional: [] },
+  ChartHint: { required: ["mark", "x", "y"], optional: ["color", "title"] },
   CloneNotification: { required: ["clone", "finished"], optional: [] },
   CloneRequest: { required: ["url"], optional: [] },
   CloneSummary: { required: ["id", "url", "folder", "startedAt"], optional: [] },
@@ -2632,7 +2645,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SetSandboxRequest: { required: ["agentID"], optional: ["choice"] },
   SetUnreadRequest: { required: ["agentID", "unread"], optional: [] },
   ShowFileNotification: { required: ["agentID", "file"], optional: [] },
-  ShownFile: { required: ["path"], optional: ["line"] },
+  ShownFile: { required: ["path"], optional: ["line", "chart"] },
   SlashCommand: { required: ["name"], optional: ["description", "inputHint"] },
   StartOptions: { required: ["values", "extraArguments"], optional: [] },
   StartRequest: { required: ["runtimeID", "cwd", "prompt", "attachments", "startOptions", "additionalDirectories", "mcpServers", "labels"], optional: ["draftID", "worktree", "requestID", "sandbox", "persona"] },
