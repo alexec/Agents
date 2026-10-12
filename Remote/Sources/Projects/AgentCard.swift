@@ -87,7 +87,7 @@ struct AgentCard: View {
                             .fontWeight(agent.showsUnread ? .semibold : .regular)
                             .lineLimit(2)
                         if let workflowName = startedByWorkflowName {
-                            Image(systemName: "clock.arrow.circlepath")
+                            Image(systemName: "flowchart")
                                 .appText(.fine)
                                 .foregroundStyle(.tertiary)
                                 .accessibilityLabel("started by the workflow \(workflowName)")

@@ -105,7 +105,7 @@ struct AgentRow: View {
                     // an agent's origin worth a mark, because it is the difference
                     // between something you asked for and something that ran itself.
                     if let workflowName = startedByWorkflowName {
-                        Image(systemName: "clock.arrow.circlepath")
+                        Image(systemName: "flowchart")
                             .appText(.fine)
                             .foregroundStyle(.tertiary)
                             .help("Started by the workflow \(workflowName)")
@@ -332,7 +332,7 @@ private struct SessionMark: View {
             case .queued:
                 Image(systemName: "list.number").foregroundStyle(Paper.accent)
             case .waiting:
-                Image(systemName: "hourglass").foregroundStyle(Paper.accent)
+                Image(systemName: "moon.zzz").foregroundStyle(Paper.accent)
             case .paused:
                 Image(systemName: "pause.circle").foregroundStyle(Paper.accent)
             case .unread:

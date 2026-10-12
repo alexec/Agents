@@ -281,7 +281,10 @@ struct WorkflowStatusIcon: View {
         // Run only by hand (#432): nothing to wait for, and nothing wrong.
         if summary.workflow.runsOnlyByHand && summary.workflow.problem == nil { return "hand.tap" }
         if !summary.workflow.canFire { return "circle.dashed" }
-        return "clock"
+        // An alarm clock for a schedule, a flowchart otherwise (#765): a plain clock read as
+        // a session's Waiting.
+        if summary.nextFireAt != nil { return "alarm.waves.left.and.right" }
+        return "flowchart"
     }
 
     private var label: String {

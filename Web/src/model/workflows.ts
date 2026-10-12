@@ -286,7 +286,9 @@ export function workflowStatus(s: WorkflowSummary): { mark: string; words: strin
   if (s.holdsAFire) return { mark: "⧗", words: "Cooling down, then it runs once", tinted };
   if (runsOnlyByHand(s.workflow) && !s.workflow.problem) return { mark: "☝\uFE0E", words: "Runs by hand", tinted };
   if (!canFire(s.workflow)) return { mark: "◌", words: "Not yet supported", tinted };
-  return { mark: "◷", words: "Waiting for its trigger", tinted };
+  // An alarm clock for a schedule, a flowchart otherwise (#765), as the window's.
+  if (s.nextFireAt !== undefined) return { mark: "⏰\uFE0E", words: "Waiting for its trigger", tinted };
+  return { mark: "⧉", words: "Waiting for its trigger", tinted };
 }
 
 // MARK: The workflow page (#98, #100): WorkflowTriggerWords.swift, WorkflowOutcome.swift and the
@@ -423,7 +425,7 @@ export function resumedAgent(trigger: WorkflowTriggerStored): string {
 
 /** The symbol beside a trigger, as a glyph (the window's symbol(for:)). */
 export function triggerGlyph(trigger: WorkflowTriggerStored): string {
-  if ("schedule" in trigger) return "◷";
+  if ("schedule" in trigger) return "⏰\uFE0E";
   if (!("unrecognised" in trigger)) return "●";
   if (!isEvent(trigger)) return "?";
   const subject = trigger.unrecognised.name.split(".")[0];
