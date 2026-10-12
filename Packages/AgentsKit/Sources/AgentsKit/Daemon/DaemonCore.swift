@@ -1530,8 +1530,8 @@ public actor DaemonCore {
             guard var agent = agents[agentID] else { return }
             // The runtime names the conversation: Claude's adapter, Cursor, Gemini and
             // Grok each send one, mostly once per session. One that sends none keeps
-            // the title cut from the first prompt.
-            agent.title = title
+            // the title cut from the first prompt. A person's rename outlasts it (#751).
+            agent.takeRuntimeTitle(title)
             changed(agent)
 
         case .usageChanged(let usage):

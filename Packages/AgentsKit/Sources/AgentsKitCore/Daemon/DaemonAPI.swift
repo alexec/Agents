@@ -145,6 +145,10 @@ public enum DaemonAPI {
         /// Mark a finished chat unread, or read, from its row (#70). The person's word
         /// about their own attention: no agent tool reaches it.
         public static let agentsSetUnread = "agents/setUnread"
+        /// Rename a session, or with an empty title hand naming back to the runtime
+        /// (#751). The person's, from a row's menu or the chat header; one title on every
+        /// client, and no agent tool reaches it.
+        public static let agentsRename = "agents/rename"
         /// Start a finished session's runtime ahead of a prompt, because a window opened it
         /// or somebody is typing in its box (#183). Answers at once; the start goes on
         /// behind, and a runtime nobody prompts goes as the warm pool decides.
@@ -972,6 +976,17 @@ public enum DaemonAPI {
         public init(agentID: UUID, unread: Bool) {
             self.agentID = agentID
             self.unread = unread
+        }
+    }
+
+    /// `agents/rename`: the person's title for a session. Empty, or only spaces, clears
+    /// it and the runtime names the session again.
+    public struct RenameRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var title: String
+        public init(agentID: UUID, title: String) {
+            self.agentID = agentID
+            self.title = title
         }
     }
 

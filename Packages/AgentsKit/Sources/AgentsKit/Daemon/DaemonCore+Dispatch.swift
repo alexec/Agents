@@ -592,6 +592,10 @@ extension DaemonCore {
                 try prewarm(request)
                 return .success([:])
 
+            case DaemonAPI.Method.agentsRename:
+                let request = try require(params, as: DaemonAPI.RenameRequest.self)
+                return .success(try JSONValue.encoding(try renameSession(request)))
+
             case DaemonAPI.Method.agentsSetUnread:
                 let request = try require(params, as: DaemonAPI.SetUnreadRequest.self)
                 try setUnread(request.agentID, unread: request.unread)

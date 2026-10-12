@@ -341,6 +341,8 @@ extension DaemonCore {
         if let waited {
             // As the person may have left it while it waited.
             agent.title = waited.title ?? agent.title
+            agent.titleIsPersons = waited.titleIsPersons
+            agent.runtimeTitle = waited.runtimeTitle
             agent.labels = waited.labels
         }
         agent.madeInRoot = rootID

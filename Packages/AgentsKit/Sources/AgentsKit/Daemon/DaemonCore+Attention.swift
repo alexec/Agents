@@ -236,6 +236,20 @@ extension DaemonCore {
         changed(agent)
     }
 
+    /// `agents/rename` (#751): the person's title, which the runtime's later titles and a
+    /// derived one no longer replace. Cleaned as an agent's title is, so it fits a row;
+    /// an empty one hands naming back to the runtime. Only the title moves: not the
+    /// runtime's conversation, the branch or the labels.
+    public func renameSession(_ request: DaemonAPI.RenameRequest) throws -> Agent {
+        guard var agent = agents[request.agentID] else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
+        }
+        let before = agent
+        agent.rename(to: Agent.cleanedTitle(request.title))
+        if agent != before { changed(agent) }
+        return agent
+    }
+
     /// Whether some surface has this conversation in front of an active person right
     /// now — what makes a chat that finishes while it is being watched already read.
     func isWatched(_ agentID: UUID) -> Bool {
