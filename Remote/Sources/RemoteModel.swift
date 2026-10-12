@@ -3528,11 +3528,29 @@ final class RemoteModel {
     func stop(_ agentID: UUID) async {
         await act(.stop, on: agentID, DaemonAPI.Method.agentsStop, DaemonAPI.AgentRequest(agentID: agentID))
     }
+    /// Stop a session and every session it started that is running (#835).
+    func stopAll(_ agentID: UUID) async {
+        for agent in [work.agent(agentID)].compactMap({ $0 }) + work.liveDescendants(of: agentID) where canStop(agent) {
+            await stop(agent.id)
+        }
+    }
+
     func archive(_ agentID: UUID, andLeave: Bool = false) async {
+        // The sessions it started go with it (Alex, #835), named before it goes.
+        let children = work.liveDescendants(of: agentID).map(\.id)
+        guard await archiveOne(agentID, andLeave: andLeave) else { return }
+        for child in children where work.agent(child)?.state != .archived {
+            await archiveOne(child, andLeave: andLeave)
+        }
+    }
+
+    @discardableResult
+    private func archiveOne(_ agentID: UUID, andLeave: Bool) async -> Bool {
         let archived = await act(.archive, on: agentID, DaemonAPI.Method.agentsArchive,
                                  DaemonAPI.AgentRequest(agentID: agentID))
         // Not when it failed: the chat stays in front, under the reason why.
         if archived, andLeave, selection == agentID { selection = nil }
+        return archived
     }
 
     /// Continue in the project folder (#119): a successor that reads this session and

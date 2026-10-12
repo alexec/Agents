@@ -100,8 +100,10 @@ export function rowExtras(store: Store, host: string, agent: Agent): RowExtras {
   };
 }
 
-export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = false, place }: {
+export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = false, place, markAgent }: {
   agent: Agent; chosen: boolean; onPick: () => void;
+  /** A folded parent's: the most urgent of it and the sessions it started, whose mark it shows (#835). */
+  markAgent?: Agent | undefined;
   /**
    * In the sidebar (#495): the state is the row's mark, unread among them, rather than a dot, and
    * the row is its title, time and one grey line (#587).
@@ -121,7 +123,7 @@ export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = f
   const labels = agent.labels ?? [];
   return (
     <button class={`row session${chosen ? " chosen" : ""}`} aria-current={chosen} onClick={onPick}>
-      {inSidebar ? <SidebarMark agent={agent} comingBack={extras?.comingBack ?? false} />
+      {inSidebar ? <SidebarMark agent={markAgent ?? agent} comingBack={extras?.comingBack ?? false} />
         : <StatusMark agent={agent} comingBack={extras?.comingBack ?? false} />}
       <span class="body">
         {/* Unread is a mark, as in Mail (#70): a dot (two rings in the sidebar) and a heavier title, gone once opened. */}

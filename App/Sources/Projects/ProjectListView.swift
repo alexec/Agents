@@ -400,9 +400,10 @@ private struct ProjectFold: View {
                 }
                 // Its pinned sessions and workflows are in Pinned at the top (#495).
                 // Then every other live session, newest first, its state a mark on the
-                // row rather than a heading over it (#495).
-                ForEach(FoldedRow.rows(fold.sessions, in: .sessions)) { row in
-                    SessionSidebarRow(agent: row.item)
+                // row rather than a heading over it (#495). Each under the session that
+                // started it, folded (#835).
+                ForEach(FoldedRow.rows(SidebarTree.rows(fold.sessions, in: model.work, folds: folds), in: .sessions)) { row in
+                    SessionSidebarRow(agent: row.item.agent, tree: row.item, folds: folds)
                 }
                 // Then its workflows, after the sessions (Alex, #495): rows, not a page,
                 // a plain line between the two kinds when there are both (Alex, #631).
@@ -534,9 +535,15 @@ struct SessionSidebarRow: View {
     let agent: Agent
     /// Its project's name, after the title, under a smart row (#495).
     var place: String? = nil
+    /// Where it sits in its list's tree (#835), and the folds that keep a parent's.
+    var tree: SidebarTree.Row? = nil
+    var folds: SidebarFolds? = nil
 
     var body: some View {
-        AgentRow(agent: agent, isCompact: true, place: place)
+        AgentRow(agent: agent, isCompact: true, place: place, tree: tree) {
+            guard let tree else { return }
+            folds?.set(session: agent.id, open: !tree.isUnfolded)
+        }
             .padding(.vertical, 2)
             .listRowInsets(.vertical, 2)
             .sidebarInk(.session(agent.id))

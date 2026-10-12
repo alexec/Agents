@@ -32,7 +32,8 @@ import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./Contex
 import { CloningRows, EmptyProjects, NewProjectMenu } from "./NewProject";
 import { putFilesInDropbox, useDropboxDrop } from "./DropboxDialog";
 import { rowExtras, SessionRow } from "./SessionRow";
-import { RenameInput, runSessionAction, sessionActions } from "./SessionMenu";
+import { RenameInput, runSessionAction, sessionActions, startedBy } from "./SessionMenu";
+import { markAgentOf, treeRows, type TreeRow } from "../model/tree";
 import { WorkflowRow } from "./WorkflowRow";
 import { PinnedPageRows } from "./Pins";
 import { ApprovalRow } from "./Approval";
@@ -236,6 +237,15 @@ const keptInUnread = signal<{ host: string; id: string } | null>(null);
 type Placed = { host: ControlHost; project: ProjectSummary };
 
 /** One project's live sessions, every group's, as held. */
+/** Who started a session, on whichever host holds it: a smart group gathers every host's (#835). */
+function startedByOf(store: Store, id: string): string | undefined {
+  for (const agents of Object.values(store.agents.value)) {
+    const found = agents?.find((a) => a.id === id);
+    if (found) return found.startedByAgent;
+  }
+  return undefined;
+}
+
 function liveSessions(store: Store, host: string, folder: string): Agent[] {
   return store.projectView(host, folder).headings.flatMap((h) => h.agents);
 }
@@ -298,7 +308,7 @@ function NewSessionTopRow({ store, projects, linkDown }: { store: Store; project
 
 /** A row under a group at the top: a session or a pinned workflow, with the project it is in. */
 type SmartLine = Placed & ({ kind: "session"; agent: Agent } | { kind: "workflow"; summary: WorkflowSummary })
-  & { pins?: string[] | undefined };
+  & { pins?: string[] | undefined; tree?: TreeRow | undefined };
 
 /**
  * One of the groups at the top of the sidebar (#495): Pinned, Needs You, Working or Unread, across
@@ -357,8 +367,10 @@ function SmartFold({ row, store, projects, query, linkDown }: {
     const keptAgent = kept ? store.agent(kept.host, kept.id) : undefined;
     keptPlace = keptAgent && keepsInUnread(keptAgent, store.sessionPinsIn(kept!.host, projectFolder(keptAgent))) ? projects.find(({ host, project }) =>
       host.id === kept!.host && folderKey(project.project.folder) === projectFolder(keptAgent)) : undefined;
-    lines = withKept([...found.keys()].sort(byStart), keptPlace ? keptAgent : undefined)
-      .map((agent): SmartLine => ({ ...(found.get(agent) ?? keptPlace!), kind: "session", agent }));
+    // Each under the session that started it when this group lists that too (#835).
+    const listed = withKept([...found.keys()].sort(byStart), keptPlace ? keptAgent : undefined);
+    lines = treeRows(listed, (id) => startedByOf(store, id), (id) => folds.isSessionOpen(id))
+      .map((tree): SmartLine => ({ ...(found.get(tree.agent) ?? keptPlace!), kind: "session", agent: tree.agent, tree }));
   }
   // What waits for an OK, each project's, after the sessions (#773).
   const waiting = row !== "needsYou" ? [] : projects.map((placed) => ({ project: placed, approvals: placed.project.approvals }));
@@ -383,7 +395,7 @@ function SmartFold({ row, store, projects, query, linkDown }: {
         const place = projectLabel(line.host, line.project);
         return line.kind === "session" ? (
           <SidebarSession key={`${host}|${line.agent.id}`} store={store} host={host} folder={folder} agent={line.agent}
-            chosen={r.host === host && r.session === line.agent.id} down={down} pinnedAt={line.pins} place={place} />
+            chosen={r.host === host && r.session === line.agent.id} down={down} pinnedAt={line.pins} place={place} tree={line.tree} />
         ) : (
           <div class="nav-item" key={`${host}|${line.summary.workflow.workflowID}`}>
             <WorkflowRow store={store} host={host} summary={line.summary} disabled={down} place={place}
@@ -482,10 +494,12 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
         });
       } },
   ];
-  const row = (agent: Agent) => (
+  const row = (agent: Agent, tree?: TreeRow) => (
     <SidebarSession key={agent.id} store={store} host={host.id} folder={folder} agent={agent}
-      chosen={r.host === host.id && r.session === agent.id} down={down} />
+      chosen={r.host === host.id && r.session === agent.id} down={down} tree={tree} />
   );
+  // Each under the session that started it, folded (#835).
+  const sessionRows = treeRows(sessions, (id) => store.agent(host.id, id)?.startedByAgent, (id) => folds.isSessionOpen(id));
   const workflowRow = (summary: WorkflowSummary) => (
     <div class="nav-item" key={summary.workflow.workflowID}>
       <WorkflowRow store={store} host={host.id} summary={summary} disabled={down}
@@ -519,7 +533,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
         <div class="fold-body">
           {/* The project's pinned pages first (#159), not while searching: the search is for sessions. */}
           {!searching && <PinnedPageRows store={store} host={host.id} folder={folder} down={down} chosen={here ? r.page : undefined} />}
-          {sessions.map(row)}
+          {sessionRows.map((tree) => row(tree.agent, tree))}
           {/* Its workflows after the sessions (#495): rows, not a page, a plain line between the
               two kinds when there are both (#631). */}
           {sessions.length > 0 && workflows.length > 0 && <hr class="kinds" aria-hidden="true" />}
@@ -527,7 +541,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
           {searching ? <>
             {/* What matched in the archive, in the group while searching, so a match is one click away. */}
             {archivedWorkflows.map(workflowRow)}
-            {archived.slice(0, showsAllMatches.value ? archived.length : matchesShown).map(row)}
+            {archived.slice(0, showsAllMatches.value ? archived.length : matchesShown).map((agent) => row(agent))}
             {!showsAllMatches.value && archived.length > matchesShown && (
               <button class="link show-all" onClick={() => (showsAllMatches.value = true)}>Show all {archived.length}</button>
             )}
@@ -618,8 +632,10 @@ export const deleteProjectMessage = "Every session in it is deleted, with its co
  * One session's row in the sidebar, drawn again only when the agent, whether it is chosen, or its
  * host's state changes, or something is on its way to it: not when its neighbours change.
  */
-export const SidebarSession = memo(function SidebarSession({ store, host, folder, agent, chosen, down, pinnedAt, place }: {
+export const SidebarSession = memo(function SidebarSession({ store, host, folder, agent, chosen, down, pinnedAt, place, tree }: {
   store: Store; host: string; folder: string; agent: Agent; chosen: boolean; down: boolean;
+  /** Where it sits in its list's tree (#835): a parent with its count and fold, or a child one indent in. */
+  tree?: TreeRow | undefined;
   /** Under Pinned: the whole pinned order, for its Move Up and Move Down (#180). */
   pinnedAt?: string[] | undefined;
   /** Under a group at the top, which gathers every project's: its project's name (#495). */
@@ -635,7 +651,7 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
     void store.arrangeSessionPins(host, folder, ids);
   };
   const menu = (): MenuItem[] => [
-    ...sessionActions(agent, store.sessionPinsIn(host, folder).includes(agent.id)).map(({ action, label: words, help }) => ({
+    ...sessionActions(agent, store.sessionPinsIn(host, folder).includes(agent.id), startedBy(store, host, agent)).map(({ action, label: words, help }) => ({
       label: words, help, disabled: down || !!store.onItsWay.value[agent.id],
       run: () => runSessionAction(store, host, agent, action),
     })),
@@ -646,15 +662,27 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
   ];
   // Into its project's drop box, never its worktree (#231).
   const drop = useDropboxDrop(store, host, folder, down);
+  const parent = tree !== undefined && tree.children > 0;
+  // A folded parent's mark is the most urgent of it and the sessions it started (#835).
+  const markAgent = parent && !tree.isUnfolded ? markAgentOf(agent, startedBy(store, host, agent)) : undefined;
+  const treeClass = tree?.isChild ? " child" : parent ? " parent" : "";
   return (
-    <div class={`nav-item${drop.targeted ? " drop-target" : ""}`} onContextMenu={(e) => openContextMenu(e, menu())}
+    <div class={`nav-item${treeClass}${drop.targeted ? " drop-target" : ""}`} onContextMenu={(e) => openContextMenu(e, menu())}
       onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }} {...holdForMenu(menu)} {...drop.props}>
       {/* No wait lines: in the sidebar a session's row is its title and one line (#587). */}
       {store.renaming.value?.id === agent.id && !store.renaming.value.inChat
         ? <div class="row session renaming"><RenameInput store={store} host={host} agent={agent} /></div>
         : <SessionRow agent={agent} chosen={chosen} onPick={() => go({ host, project: folder, session: agent.id })} going={going}
         extras={rowExtras(store, host, agent)}
-        inSidebar place={place} />}
+        inSidebar place={place} markAgent={markAgent} />}
+      {parent && (
+        <button class="fold-count" aria-expanded={tree.isUnfolded}
+          aria-label={tree.isUnfolded ? `Hide ${tree.children} started sessions` : `Show ${tree.children} started sessions`}
+          title={tree.isUnfolded ? "Hide the sessions it started" : `Show the ${tree.children} sessions it started`}
+          onClick={() => folds.setSession(agent.id, !tree.isUnfolded)}>
+          {tree.children}<span class={`chevron${tree.isUnfolded ? " open" : ""}`} aria-hidden="true">›</span>
+        </button>
+      )}
     </div>
   );
 });

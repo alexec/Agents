@@ -15,6 +15,10 @@ const closedKey = "agents.sidebar.folded";
 const archivedProjectsKey = "agents.sidebar.archivedProjects";
 /** Whether Activity is open; open until folded. */
 const activityKey = "agents.sidebar.activity";
+/** The sessions whose children are shown (#835), the last opened last. */
+const sessionsKey = "agents.sidebar.openSessions";
+/** How many of those are kept, as `SidebarFolds.sessionsKept`, so the list stays small. */
+export const sessionsKept = 200;
 
 function read(storage: Storage | undefined, key: string): Set<string> {
   try {
@@ -38,10 +42,12 @@ export class Folds {
   readonly closed;
   readonly showsArchivedProjects;
   readonly showsActivity;
+  readonly openSessions;
 
   constructor(private readonly storage: Storage | undefined) {
     this.open = signal(read(storage, storageKey));
     this.closed = signal(read(storage, closedKey));
+    this.openSessions = signal([...read(storage, sessionsKey)]);
     let shows = false;
     let showsActivity = true;
     try {
@@ -80,6 +86,23 @@ export class Folds {
 
   set(host: string, folder: string, isOpen: boolean): void {
     this.change(this.open, storageKey, foldName(host, folder), isOpen);
+  }
+
+  /** Whether a session's children are shown under it (#835): folded until opened. */
+  isSessionOpen(id: string): boolean {
+    return this.openSessions.value.includes(id);
+  }
+
+  setSession(id: string, isOpen: boolean): void {
+    const now = this.openSessions.peek();
+    if (now.includes(id) === isOpen) return;
+    const next = isOpen ? [...now, id].slice(-sessionsKept) : now.filter((kept) => kept !== id);
+    this.openSessions.value = next;
+    try {
+      this.storage?.setItem(sessionsKey, JSON.stringify(next));
+    } catch {
+      // A private window may refuse to store; the fold still holds for this visit.
+    }
   }
 
   /** Pinned and Needs You open until folded; Working and Unread folded until opened (#495). */

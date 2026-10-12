@@ -6,6 +6,7 @@ import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { asksToArchive } from "../model/groups";
 import { archiveHelp, archiveLabel, archiveQuestion, keepLabel, noReport } from "../model/archiveWords";
+import { archiveWithChildren } from "./SessionMenu";
 
 export function ArchiveCard({ store, host, agent, disabled }: { store: Store; host: string; agent: Agent | undefined; disabled: boolean }) {
   const busy = useSignal(false);
@@ -23,7 +24,7 @@ export function ArchiveCard({ store, host, agent, disabled }: { store: Store; ho
         <p class="archive-answers">
           <button disabled={held} onClick={() => answer(() => store.keepSession(host, agent))}>{keepLabel}</button>
           <button class="prominent" disabled={held} title={archiveHelp}
-            onClick={() => answer(() => store.perform(host, agent.id, "agents/archive"))}>{archiveLabel}</button>
+            onClick={() => answer(() => archiveWithChildren(store, host, agent))}>{archiveLabel}</button>
         </p>
       </div>
     </div>

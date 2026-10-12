@@ -69,3 +69,16 @@ test("a typed title is cleaned as the host cleans it (#751)", () => {
   assert.equal(cleanedTitle("x".repeat(81)), "x".repeat(79) + "\u2026");
   assert.equal(cleanedTitle("x".repeat(80)), "x".repeat(80));
 });
+
+// Sessions under the session that started them (#835).
+test("Stop All is offered while a session it started can stop, and Archive says it takes them", () => {
+  const agent = (id, createdAt, fields = {}) => ({ id, createdAt, lastActivityAt: createdAt, state: "finished",
+    endedReason: "endTurn", cwd: "file:///w/a", title: id, ...fields });
+  const lead = agent("lead", 1);
+  const labels = (started) => sessionActions(lead, false, started).map((a) => a.label);
+  assert.ok(!labels([]).includes("Stop All"));
+  assert.ok(!labels([agent("done", 2, { startedByAgent: "lead" })]).includes("Stop All"));
+  assert.ok(labels([agent("lane", 2, { state: "running", startedByAgent: "lead" })]).includes("Stop All"));
+  const archive = sessionActions(lead, false, [agent("lane", 2)]).find((a) => a.action === "agents/archive");
+  assert.match(archive.help, /sessions it started/);
+});

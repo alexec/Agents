@@ -143,6 +143,8 @@ public final class AgentsModel {
     /// Each agent by id, and where it was filed: its folder and group as they were.
     @ObservationIgnored private var byID: [UUID: Agent] = [:]
     @ObservationIgnored private var filedAs: [UUID: (folder: URL, host: HostID, group: AgentGroup)] = [:]
+    /// The held sessions each session started (#835), by the starter's id.
+    @ObservationIgnored private var started: [UUID: Set<UUID>] = [:]
     /// Each project's agents, by folder and host, and again by folder alone (#165).
     @ObservationIgnored private var shelves: [ShelfKey: ProjectShelf] = [:]
     @ObservationIgnored private var folderShelves: [URL: ProjectShelf] = [:]
@@ -1277,6 +1279,26 @@ public final class AgentsModel {
     /// The symbol that mark is drawn with.
     public static let startedByAgentSymbol = "person.2"
 
+    /// The session that started this one, if it is held (#835). Read off the index, not
+    /// through a cell: the sidebar asks it of every row's starters.
+    public func starter(of id: UUID) -> UUID? { byID[id]?.startedByAgent }
+
+    /// The held sessions this one started, and the ones they started, at every level, not
+    /// archived (#835): what Stop All and Archive on a parent act on, and what a folded
+    /// parent's mark is rolled up from. Each is read through its cell, so a row asking is
+    /// redrawn as one of them changes.
+    public func liveDescendants(of id: UUID) -> [Agent] {
+        var found: [Agent] = []
+        var seen: Set<UUID> = [id]
+        var next = Array(started[id] ?? [])
+        while let child = next.popLast() {
+            guard seen.insert(child).inserted else { continue }
+            if let agent = agent(child), agent.state != .archived { found.append(agent) }
+            next.append(contentsOf: started[child] ?? [])
+        }
+        return found.sorted { $0.createdAt < $1.createdAt }
+    }
+
     /// Who is asking, at the head of a question or permission card (#121): the agent's
     /// title and runtime, and for a helper who started it. A card read beside others,
     /// on a phone, then has a named asker even when the question says "I" and "you".
@@ -1530,6 +1552,7 @@ public final class AgentsModel {
         let folder = agent.projectFolder
         let group = group(of: agent)
         byID[agent.id] = agent
+        if let starter = agent.startedByAgent { started[starter, default: []].insert(agent.id) }
         // The list of everything: out of its old place, into its new one, in place. A
         // copy taken to change was every agent held copied for each change (#213).
         Self.move(agent, from: old, in: &agents)
@@ -1614,6 +1637,10 @@ public final class AgentsModel {
     /// Out of its shelves and its cell. The act stays: an agent let go of and listed
     /// again is still the one a press is in flight for (#285).
     private func detach(_ old: Agent, titlesChanged: inout Bool) {
+        if let starter = old.startedByAgent {
+            started[starter]?.remove(old.id)
+            if started[starter]?.isEmpty == true { started[starter] = nil }
+        }
         if let was = filedAs.removeValue(forKey: old.id) {
             shelves[ShelfKey(folder: was.folder, host: was.host)]?.remove(old, from: was.group)
             folderShelves[was.folder]?.remove(old, from: was.group)
@@ -1637,6 +1664,10 @@ public final class AgentsModel {
         var unique: [UUID: Agent] = [:]
         for agent in held where unique[agent.id] == nil { unique[agent.id] = agent }
         byID = unique
+        started = [:]
+        for agent in unique.values {
+            if let starter = agent.startedByAgent { started[starter, default: []].insert(agent.id) }
+        }
         agents = unique.values.sorted(by: ProjectShelf.byActivity)
         agentCount = unique.count
         filedAs = [:]

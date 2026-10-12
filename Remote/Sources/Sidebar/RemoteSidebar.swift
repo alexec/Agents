@@ -234,8 +234,9 @@ private struct RemoteSmartFold: View {
                 if row == .pinned {
                     ForEach(keys, id: \.self) { key in pinnedRows(key) }
                 } else {
-                    ForEach(shown(keys)) { agent in
-                        SidebarSessionRow(agent: agent, place: place(of: agent))
+                    // Each under the session that started it when this group lists that too (#835).
+                    ForEach(SidebarTree.rows(shown(keys), in: model.work, folds: folds)) { row in
+                        SidebarSessionRow(agent: row.agent, place: place(of: row.agent), tree: row, folds: folds)
                     }
                     // Then everything else waiting for an OK (#773), as the window lists it.
                     ForEach(row.approvals(in: model.work, projects: keys, query: query), id: \.approval.id) { item in
@@ -406,8 +407,9 @@ private struct RemoteProjectFold: View {
                 if fold.showsPinnedPages {
                     PinnedPageRows(project: key)
                 }
-                ForEach(fold.sessions) { agent in
-                    SidebarSessionRow(agent: agent)
+                // Each under the session that started it, folded (#835).
+                ForEach(SidebarTree.rows(fold.sessions, in: model.work, folds: folds)) { row in
+                    SidebarSessionRow(agent: row.agent, tree: row, folds: folds)
                 }
                 // Its workflows after the sessions (Alex, #495): rows, not a page, a
                 // plain line between the two kinds when there are both (Alex, #631).
