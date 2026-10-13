@@ -42,7 +42,7 @@ struct AttachButton: View {
         .fileImporter(isPresented: $choosingFiles, allowedContentTypes: [.item],
                       allowsMultipleSelection: true) { result in
             guard case .success(let urls) = result else { return }
-            for url in urls { take(url) }
+                Task { for url in urls { await take(url) } }
         }
         .onChange(of: photos) {
             let picked = photos
@@ -72,15 +72,23 @@ struct AttachButton: View {
         add(PhoneAttachment.picture(data, name: name))
     }
 
-    private func take(_ url: URL) {
+    /// Its size is looked at first, and it is read off the main thread (#930), so a film
+    /// picked by mistake is refused at once and never stalls the phone.
+    private func take(_ url: URL) async {
+        let name = url.lastPathComponent
         let opened = url.startAccessingSecurityScopedResource()
         defer { if opened { url.stopAccessingSecurityScopedResource() } }
-        guard let data = try? Data(contentsOf: url) else {
-            refusal = "\(url.lastPathComponent) could not be read."
+        let values = try? url.resourceValues(forKeys: [.contentTypeKey, .fileSizeKey])
+        let type = values?.contentType
+        if let refused = PhoneAttachment.sizeRefusal(name: name, size: values?.fileSize ?? 0, type: type) {
+            refusal = refused.sentence
             return
         }
-        let type = (try? url.resourceValues(forKeys: [.contentTypeKey]))?.contentType
-        add(PhoneAttachment.file(data, name: url.lastPathComponent, type: type))
+        guard let data = try? await Task.detached(operation: { try Data(contentsOf: url) }).value else {
+            refusal = "\(name) could not be read."
+            return
+        }
+        add(PhoneAttachment.file(data, name: name, type: type))
     }
 
 }

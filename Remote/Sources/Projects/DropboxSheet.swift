@@ -62,8 +62,16 @@ struct DropboxSheet: View {
         for url in urls {
             let name = url.lastPathComponent
             let opened = url.startAccessingSecurityScopedResource()
-            let data = try? Data(contentsOf: url)
-            if opened { url.stopAccessingSecurityScopedResource() }
+            defer { if opened { url.stopAccessingSecurityScopedResource() } }
+            // Looked at before it is read, and read off the main thread (#930): a film
+            // chosen by mistake is refused at once, not after it is read whole.
+            let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+            guard size <= PhoneAttachment.limit else {
+                let problem = RemoteModel.dropboxTooBig(name)
+                outcome = sent.isEmpty ? problem : "Sent \(sent.formatted(.list(type: .and))). \(problem)"
+                return
+            }
+            let data = try? await Task.detached { try Data(contentsOf: url) }.value
             guard let data else {
                 outcome = "\(name) could not be read."
                 return

@@ -86,6 +86,16 @@ struct PhoneAttachmentTests {
         #expect(refusal?.contains("900 KB") == true)
     }
 
+    @Test func aFileTooBigIsRefusedBeforeItIsRead() {
+        #expect(PhoneAttachment.sizeRefusal(name: "notes.md", size: 10_000, type: .plainText) == nil)
+        let film = PhoneAttachment.sizeRefusal(name: "film.mov", size: 1_000_000_000, type: .movie)
+        #expect(film?.sentence.contains("film.mov") == true)
+        #expect(film?.sentence.contains("900 KB") == true)
+        // A picture is shrunk, so one far over the limit may still be read.
+        #expect(PhoneAttachment.sizeRefusal(name: "a.heic", size: 20_000_000, type: .heic) == nil)
+        #expect(PhoneAttachment.sizeRefusal(name: "a.heic", size: 60_000_000, type: .heic) != nil)
+    }
+
     @Test func aRuntimeThatTakesNeitherRefusesBothTheMacsWay() {
         let none = ACP.PromptCapabilities()
         let picture = Attachment.image(Data(count: 10), mimeType: "image/jpeg", name: "a.jpg")
