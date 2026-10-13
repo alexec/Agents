@@ -100,21 +100,22 @@ struct AgentRow: View {
                         RenameField(agent: agent)
                             .appText(isCompact ? .supporting : .reading)
                     } else {
-                    Text(agent.title ?? "Untitled")
-                        .appText(isCompact ? .supporting : .reading)
-                        .fontWeight(agent.showsUnread ? .semibold : .regular)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                        .accessibilityValue(agent.showsUnread ? "unread" : "")
-                    }
-                    if let place {
-                        // Whole, the title giving way first (#587): cut to "p" it said nothing.
-                        Text(place)
-                            .appText(.fine)
-                            .foregroundStyle(.tertiary)
+                    // The project's name whole up to 40% of the line, then cut, so a long
+                    // one never pushes the title out (#936).
+                    TitleAndPlace {
+                        Text(agent.title ?? "Untitled")
+                            .appText(isCompact ? .supporting : .reading)
+                            .fontWeight(agent.showsUnread ? .semibold : .regular)
+                            .foregroundStyle(.primary)
                             .lineLimit(1)
-                            .fixedSize()
-                            .layoutPriority(-1)
+                            .accessibilityValue(agent.showsUnread ? "unread" : "")
+                        if let place {
+                            Text(place)
+                                .appText(.fine)
+                                .foregroundStyle(.tertiary)
+                                .lineLimit(1)
+                        }
+                    }
                     }
                     // Started by a workflow rather than a person: the one thing about
                     // an agent's origin worth a mark, because it is the difference

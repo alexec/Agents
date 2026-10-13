@@ -60,18 +60,18 @@ struct SidebarSessionRow: View {
             }
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
-                    Text(agent.title ?? "Untitled")
-                        .appText(.supporting)
-                        .fontWeight(agent.showsUnread ? .semibold : .regular)
-                        .lineLimit(1)
-                    if let place {
-                        Text(place)
-                            .appText(.fine)
-                            .foregroundStyle(.tertiary)
+                    // The project's name whole up to 40% of the line, then cut (#936), as on the Mac.
+                    TitleAndPlace {
+                        Text(agent.title ?? "Untitled")
+                            .appText(.supporting)
+                            .fontWeight(agent.showsUnread ? .semibold : .regular)
                             .lineLimit(1)
-                            // Whole, the title giving way first (#587): cut to "p" it said nothing.
-                            .fixedSize()
-                            .layoutPriority(-1)
+                        if let place {
+                            Text(place)
+                                .appText(.fine)
+                                .foregroundStyle(.tertiary)
+                                .lineLimit(1)
+                        }
                     }
                     // Started by a workflow (the Mac row's mark), then by another agent.
                     if let workflowName = startedByWorkflowName {

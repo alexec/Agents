@@ -71,10 +71,12 @@
 
 /* Which project a row is in, after its title, under a group at the top (#495). */
 .with-sidebar .sidebar .place { font-size: calc(11px * var(--text-scale)); font-weight: 400; opacity: 0.45; }
-/* The title gives way first, the project's name whole (#587): cut to "p" it said nothing. */
+/* The project's name whole up to 40% of the line, then cut, so a long one never pushes the
+   title out (#936); cut to "p" it said nothing (#587). */
 .with-sidebar .sidebar .title.placed { display: flex; align-items: baseline; min-width: 0; }
 .with-sidebar .sidebar .title.placed .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .with-sidebar .sidebar .title.placed :is(.place, .started-by) { flex: none; white-space: pre; }
+.with-sidebar .sidebar .title.placed .place { max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
 
 /* A session's mark in the sidebar (#495): an orange hand, a spinner, a list when queued, an
    Zs (#765), a pause mark (#630), two rings unread, an empty ring once read; every icon in the
