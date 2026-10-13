@@ -50,7 +50,7 @@ extension DaemonCore {
             throw JSONRPCError(code: JSONRPCError.internalError,
                                message: Self.noHTTPRefusal(RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID))
         }
-        return [try await appServer(token: token, managesAgents: false, movesItself: false, writer: true)]
+        return [try await appServer(token: token, movesItself: false, writer: true)]
     }
 
     /// A writer's `_meta`: the writer policy and the sandbox, without the project's plugins.

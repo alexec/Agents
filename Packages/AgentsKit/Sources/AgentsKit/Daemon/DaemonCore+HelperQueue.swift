@@ -152,7 +152,7 @@ extension DaemonCore {
                                         model: saved.model)
         do {
             var start = try await startRequest(settings: settings, folder: folder, prompt: prompt,
-                                               managesAgents: false, checksDefault: true)
+                                               checksDefault: true)
             start.worktree = saved.worktree
             start.labels = saved.labels
             _ = try await self.start(start, startedBy: starter, chainDepth: agent.chainDepth, queued: id)

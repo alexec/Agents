@@ -12,7 +12,7 @@ extension AppService {
     /// This was the `agentsd mcp` helper's whole body until #185, relayed over its own
     /// `daemon.sock` connection. The daemon now serves it itself, so `relay` is a call
     /// inside the process.
-    public static func relaying(token: String, managesAgents: Bool, movesItself: Bool,
+    public static func relaying(token: String, movesItself: Bool,
                                 writer: Bool = false,
                                 transport: (any LineTransport)? = nil,
                                 relay: @escaping Relay) -> AppService {
@@ -30,7 +30,7 @@ extension AppService {
             }
         }
 
-        return AppService(transport: transport, managesAgents: managesAgents,
+        return AppService(transport: transport,
                           movesItself: movesItself, writer: writer) { file in
             await send(DaemonAPI.Method.agentsShowFile,
                        DaemonAPI.ShowFileRequest(token: token, file: file),

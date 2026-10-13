@@ -107,16 +107,16 @@ extension DaemonCore {
     /// Whether this agent is doing a `project.idle` workflow's work, or is a helper of
     /// one that is: the clean-up, whose own work must not make the project busy.
     func isIdleJob(_ agent: Agent) -> Bool {
+        // Its own work, or that of any agent above it, however far up (#940).
+        ([agent] + starters(of: agent).compactMap { agents[$0] }).contains(where: doesIdleWork)
+    }
+
+    private func doesIdleWork(_ agent: Agent) -> Bool {
         if let run = runInFlight(for: agent.id)?.run, Self.answersIdle(run.trigger) { return true }
-        if let workflowID = agent.startedByWorkflow,
-           let workflow = workflows[agent.projectFolder]?.values.first(where: { $0.workflowID == workflowID }),
-           workflow.mode != .triggering, workflow.triggers.contains(where: Self.answersIdle) { return true }
-        // One step only, as `workflowChainDepth` goes.
-        if let starter = agent.startedByAgent, starter != agent.id, let parent = agents[starter],
-           parent.startedByAgent == nil {
-            return isIdleJob(parent)
-        }
-        return false
+        guard let workflowID = agent.startedByWorkflow,
+              let workflow = workflows[agent.projectFolder]?.values.first(where: { $0.workflowID == workflowID })
+        else { return false }
+        return workflow.mode != .triggering && workflow.triggers.contains(where: Self.answersIdle)
     }
 
     private static func answersIdle(_ trigger: WorkflowTrigger) -> Bool {

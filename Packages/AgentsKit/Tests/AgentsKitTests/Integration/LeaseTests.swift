@@ -224,8 +224,7 @@ struct LeaseTests {
 
     @Test func everyAgentIsOfferedTheToolsAndBriefed() async throws {
         for policy in ToolPolicyCatalog.builtIn {
-            #expect(Briefing.lines(for: policy, managesAgents: false).contains(Briefing.leases))
-            #expect(Briefing.lines(for: policy, managesAgents: true).contains(Briefing.leases))
+            #expect(Briefing.lines(for: policy).contains(Briefing.leases))
         }
     }
 

@@ -72,11 +72,11 @@ struct AppToolsEndpointTests {
 
     @Test func theGrantDecidesTheMenu() async throws {
         let endpoint = endpoint()
-        endpoint.grant("tok", .init(managesAgents: false, movesItself: false))
+        endpoint.grant("tok", .init(movesItself: false))
         let session = try await opened(endpoint)
         let names = try toolNames(await post(endpoint, body("tools/list", id: 2), session: session))
         #expect(names.contains(AppService.showFileToolName))
-        #expect(!names.contains("start_session"))
+        #expect(!names.contains(AppTool.moveWorktree))
     }
 
     @Test func aToolCallGoesToTheDaemonWithTheToken() async throws {
@@ -250,7 +250,7 @@ struct AppToolsInSessionsTests {
         let core = try core()
         let work = URL(fileURLWithPath: NSTemporaryDirectory())
         await #expect(throws: JSONRPCError.self) {
-            _ = try await core.sessionServers(runtimeID: "claude", chosen: [], token: "t", managesAgents: true,
+            _ = try await core.sessionServers(runtimeID: "claude", chosen: [], token: "t",
                                               cwd: work, capabilities: ACP.MCPCapabilities(http: false, sse: true))
         }
         #expect(await core.appTools.granted("t") == nil)
@@ -264,8 +264,8 @@ struct AppToolsInSessionsTests {
 
     @Test func endingTheTokenEndsTheGrant() async throws {
         let core = try core()
-        _ = try await core.appServer(token: "t", managesAgents: false)
-        #expect(await core.appTools.granted("t") == .init(managesAgents: false, movesItself: true))
+        _ = try await core.appServer(token: "t", movesItself: false)
+        #expect(await core.appTools.granted("t") == .init(movesItself: false))
         await core.bindAppToken("t", to: UUID())
         let id = await core.appTokens["t"]!
         await core.dropAppTokens(for: id)

@@ -40,7 +40,9 @@ Everything these tools do shows up in the window and on your phone. The
 
 Every runtime gets them, the same way: the app serves them itself over a local http address
 on this computer, with a key only that agent's session holds. Nothing is started for them,
-and when the session ends the key stops working.
+and when the session ends the key stops working. Every agent gets the same set, including
+one that another agent started. The project's helper limits bound how many agents can be
+started, however deep the chain goes. An agent can touch only the sessions below it.
 
 ## What is kept
 

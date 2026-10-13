@@ -4,13 +4,16 @@ import Foundation
 ///
 /// The whole of the deciding is here, for the reason the other app tools give: the
 /// helper process only relays. What makes it safe is what the caller cannot say. It
-/// names no folder, because its project is its own; it can only touch agents whose
-/// `startedByAgent` is itself; and every agent another agent started, across a whole
-/// project, is weighed against the project's two `HelperLimit`s — how many may run, and
-/// how many may be there not archived — which the person sets and no agent can. An
-/// agent another agent started
-/// has none of this — it is not offered the tools, and it is refused here if it calls
-/// them anyway.
+/// names no folder, because its project is its own; it can only touch agents below it,
+/// the ones it started and the ones those started (#940); and every agent another agent
+/// started, across a whole project, is weighed against the project's two `HelperLimit`s —
+/// how many may run, and how many may be there not archived — which the person sets and
+/// no agent can. An agent another agent started has all of this too: the limits count
+/// it the same whoever started it, so they are the bound, not how deep the chain goes.
+///
+/// Archiving or stopping an agent leaves the agents below it as they are, with their
+/// work. Every agent above it can still stop or archive them, and so can the person,
+/// so none is left that nothing can stop.
 ///
 /// Nothing asks the person first, the same call the workflow tool made. What the
 /// person has instead is sight: every agent started this way is an ordinary agent in
@@ -22,7 +25,7 @@ extension DaemonCore {
         // Every check before the first `await`. On an actor that is the whole of the
         // lock: two starts arriving together are decided one after the other here, and
         // the place the first takes is already counted when the second is weighed.
-        let caller = try helperCaller(token: request.token, refusing: "Nothing was started")
+        let caller = try helperCaller(token: request.token)
         let folder = caller.projectFolder
         let prompt = request.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !prompt.isEmpty else {
@@ -63,7 +66,7 @@ extension DaemonCore {
         do {
             let worktree = try await helperWorktree(request.worktree, in: folder)
             var start = try await startRequest(settings: settings, folder: folder,
-                                               prompt: prompt, managesAgents: false, checksDefault: true)
+                                               prompt: prompt, checksDefault: true)
             start.worktree = worktree
             start.labels = request.labels
             agentID = try await self.start(start, startedBy: caller.id, chainDepth: depth)
@@ -216,21 +219,31 @@ extension DaemonCore {
     // MARK: Listing
 
     public func listHelpers(_ request: DaemonAPI.ListHelpersRequest) throws -> String {
-        let caller = try helperCaller(token: request.token, refusing: "Nothing was listed")
+        let caller = try helperCaller(token: request.token)
         let folder = caller.projectFolder
         let places = "This project has \(helperPlaces(in: folder))."
+        // Its own and every one below them (#940), so a session started by one it has
+        // since archived is still in its list to stop.
         let mine = (HelperLimit.helpers(in: folder, agents: agents.inProject(folder))
                     + HelperLimit.queue(in: folder, agents: agents.inProject(folder)))
-            .filter { $0.startedByAgent == caller.id }
+            .filter { starters(of: $0).contains(caller.id) }
         // Which runtimes it may name, last (#117): live, as a tool's description is not.
         let runtimes = runtimeChoices(in: folder)
         guard !mine.isEmpty else {
             return "You have not started any sessions that are still here. \(places)\n\(runtimes)"
         }
         let lines = mine.map { agent in
-            "- \(agent.id.uuidString): \u{201C}\(agent.title ?? "Untitled")\u{201D} — \(helperStatus(agent))\(SessionLookup.labels(of: agent))"
+            "- \(agent.id.uuidString): \u{201C}\(agent.title ?? "Untitled")\u{201D}\(startedBelow(agent, caller: caller.id)) — "
+                + "\(helperStatus(agent))\(SessionLookup.labels(of: agent))"
         }
         return ([places] + lines + [runtimes]).joined(separator: "\n")
+    }
+
+    /// Who started one below the caller that the caller did not start itself: ", started
+    /// by “Lane”". Nothing for one it started.
+    private func startedBelow(_ agent: Agent, caller: UUID) -> String {
+        guard let starter = agent.startedByAgent, starter != caller else { return "" }
+        return ", started by \(starterName(starter))"
     }
 
     /// What one of an agent's own agents is doing, in a few words the agent can repeat.
@@ -313,18 +326,25 @@ extension DaemonCore {
 
     // MARK: Who may
 
-    /// The agent a token speaks for, provided it may use these tools at all.
-    private func helperCaller(token: String, refusing lead: String) throws -> Agent {
+    /// The agents above this one, the one that started it first, then the one that
+    /// started that, and so on (#940). Stops at a starter that is gone, and at one met
+    /// twice, so a record that names itself cannot loop.
+    func starters(of agent: Agent) -> [UUID] {
+        var chain: [UUID] = []
+        var seen: Set<UUID> = [agent.id]
+        var next = agent.startedByAgent
+        while let starter = next, seen.insert(starter).inserted {
+            chain.append(starter)
+            next = agents[starter]?.startedByAgent
+        }
+        return chain
+    }
+
+    /// The agent a token speaks for. Any agent may use these tools (#940).
+    private func helperCaller(token: String) throws -> Agent {
         guard let callerID = appTokens[token], let caller = agents[callerID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent,
                                message: "That conversation is not open any more, so nothing was changed.")
-        }
-        // One level only. The helper was told to leave these tools out; this is what
-        // holds if a runtime offered them anyway.
-        guard caller.startedByAgent == nil else {
-            throw JSONRPCError(code: DaemonAPI.Failure.notYours,
-                               message: "\(lead): a session that another session started cannot start, "
-                                   + "stop, archive or list sessions of its own.")
         }
         return caller
     }
@@ -332,10 +352,10 @@ extension DaemonCore {
     /// The caller, and the agent it named — provided it is the caller's to touch.
     ///
     /// In this order, so the refusal is the most useful true one: there is such an
-    /// agent, it is not the caller, the caller started it, and it is still here.
+    /// agent, it is not the caller, it is below the caller, and it is still here.
     private func helperTarget(_ request: DaemonAPI.HelperRequest,
                               doing verb: String) throws -> (caller: Agent, target: Agent) {
-        let caller = try helperCaller(token: request.token, refusing: "Nothing changed")
+        let caller = try helperCaller(token: request.token)
         guard let id = UUID(uuidString: request.agentID.trimmingCharacters(in: .whitespacesAndNewlines)),
               let target = agents[id] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent,
@@ -347,12 +367,13 @@ extension DaemonCore {
                                    ? "Nothing changed: to ask to be archived yourself, call \(AppTool.archiveSession) with no id."
                                    : "Nothing changed: an agent cannot \(verb) itself.")
         }
-        guard target.startedByAgent == caller.id else {
+        guard starters(of: target).contains(caller.id) else {
             let whose = target.startedByAgent != nil ? "another agent started that one"
                 : target.startedByWorkflow != nil ? "a workflow started that one"
                 : "that is one of the person's own sessions"
             throw JSONRPCError(code: DaemonAPI.Failure.notYours,
-                               message: "Nothing changed: \(whose). You can only stop or archive sessions you started.")
+                               message: "Nothing changed: \(whose). You can only stop or archive sessions you started "
+                                   + "and the sessions they started.")
         }
         guard target.state != .archived else {
             throw JSONRPCError(code: DaemonAPI.Failure.notYours,

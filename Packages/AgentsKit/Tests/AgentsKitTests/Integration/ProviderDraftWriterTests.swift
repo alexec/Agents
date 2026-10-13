@@ -70,7 +70,7 @@ struct ProviderDraftWriterTests {
         #expect(called.tool == AppTool.checkDraft)
         #expect(checked["content"]?.arrayValue?.first?["text"]?.stringValue == "Passed: listed 2.")
         // And an ordinary agent's server offers none of them.
-        let ordinary = AppService.tools(managesAgents: true).compactMap { $0["name"]?.stringValue }
+        let ordinary = AppService.tools().compactMap { $0["name"]?.stringValue }
         for tool in AppTool.writerTools { #expect(!ordinary.contains(tool)) }
     }
 

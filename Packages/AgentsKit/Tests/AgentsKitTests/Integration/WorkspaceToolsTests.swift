@@ -42,10 +42,8 @@ struct WorkspaceToolsTests {
     }
 
     @Test func theFiveAreOfferedToEveryAgent() {
-        for manages in [true, false] {
-            let names = AppService.tools(managesAgents: manages).compactMap { $0["name"]?.stringValue }
-            for tool in AppTool.workspaceTools { #expect(names.contains(tool)) }
-        }
+        let names = AppService.tools().compactMap { $0["name"]?.stringValue }
+        for tool in AppTool.workspaceTools { #expect(names.contains(tool)) }
         #expect(AppTool.isServedByTheApp("mcp__agents__make_workspace"))
     }
 

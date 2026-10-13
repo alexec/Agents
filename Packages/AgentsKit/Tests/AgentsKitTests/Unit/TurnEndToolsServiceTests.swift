@@ -16,20 +16,19 @@ struct TurnEndToolsServiceTests {
         try await service.handle(method: "tools/call", params: ["name": .string(name), "arguments": arguments]).get()
     }
 
-    private func service(_ calls: Calls, managesAgents: Bool = true, movesItself: Bool = true) -> AppService {
-        AppService(transport: nil, managesAgents: managesAgents, movesItself: movesItself,
+    private func service(_ calls: Calls, movesItself: Bool = true) -> AppService {
+        AppService(transport: nil, movesItself: movesItself,
                    itself: { call in await calls.add(call); return .shown("Noted.") })
     }
 
-    @Test func archiveSessionWithNoIdIsTheCallerItselfEvenForAHelper() async throws {
+    @Test func archiveSessionWithNoIdIsTheCallerItself() async throws {
         let calls = Calls()
-        let helper = service(calls, managesAgents: false)
-        _ = try await call(helper, "mcp__agents__archive_session", [:])
-        _ = try await call(helper, "mcp__agents__archive_session", ["id": " "])
+        let tools = service(calls)
+        _ = try await call(tools, "mcp__agents__archive_session", [:])
+        _ = try await call(tools, "mcp__agents__archive_session", ["id": " "])
         #expect(await calls.made == [.afterTurn(.requestArchive), .afterTurn(.requestArchive)])
-        // With an id it is still a helper's, and refused to an agent another started.
-        let refused = try await call(helper, "archive_session", ["id": "abc"])
-        #expect(refused["isError"]?.boolValue == true)
+        // With an id it is an agent call, not one about itself.
+        _ = try await call(tools, "archive_session", ["id": "abc"])
         #expect(await calls.made.count == 2)
     }
 

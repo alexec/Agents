@@ -56,7 +56,7 @@ struct MoveToolParsingTests {
     /// Its own tool since #481, offered to every agent whose runtime can move, and the
     /// slim `finish_turn` lists none of the move arguments (it still reads them).
     @Test func moveWorktreeCarriesTheMoveForEveryAgent() {
-        let listed = AppService.tools(managesAgents: false)
+        let listed = AppService.tools()
         let names = listed.compactMap { $0["name"]?.stringValue }
         #expect(!names.contains("enter_worktree") && !names.contains("exit_worktree"))
         let move = listed.first { $0["name"]?.stringValue == AppTool.moveWorktree }
@@ -69,7 +69,7 @@ struct MoveToolParsingTests {
 
     /// Not for an agent on a runtime that would forget its conversation in another folder.
     @Test func noMoveIsOfferedWhenTheRuntimeCannotMove() {
-        let listed = AppService.tools(managesAgents: true, movesItself: false)
+        let listed = AppService.tools(movesItself: false)
         #expect(!listed.contains { $0["name"]?.stringValue == AppTool.moveWorktree })
         #expect(listed.contains { $0["name"]?.stringValue == AppTool.showFile })
     }

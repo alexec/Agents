@@ -288,8 +288,7 @@ extension DaemonCore {
                                      && $0.sandbox == sandbox.choice
                                      && $0.mcpServers == request.mcpServers
                                      && request.additionalDirectories.isEmpty
-                                     && $0.personalServers == PersonalDotAgents.mcpStamp(home: locations.personalHome)
-                                     && $0.managesAgents == (starter == nil) ? $0 : nil }
+                                     && $0.personalServers == PersonalDotAgents.mcpStamp(home: locations.personalHome) ? $0 : nil }
         if let usable {
             // The session may still be being made: a form shown from memory is quicker
             // than the runtime behind it. Waiting here is waiting for the start that
@@ -312,7 +311,6 @@ extension DaemonCore {
                 made = try await freshSession(runtimeID: request.runtimeID, cwd: cwd,
                                               additionalDirectories: request.additionalDirectories,
                                               mcpServers: request.mcpServers,
-                                              managesAgents: starter == nil,
                                               sandbox: sandbox.choice,
                                               purpose: request.purpose)
             } catch {
@@ -476,7 +474,6 @@ extension DaemonCore {
     func freshSession(runtimeID: String, cwd: URL,
                               additionalDirectories: [URL] = [],
                               mcpServers: [MCPServer] = [],
-                              managesAgents: Bool = true,
                               sandbox: SandboxChoice = .runtime,
                               purpose: AgentPurpose? = nil) async throws -> MadeSession {
         guard let runtime = RuntimeCatalog.runtime(id: runtimeID) else {
@@ -524,7 +521,7 @@ extension DaemonCore {
                 ? try await writerServers(runtimeID: runtimeID, token: token,
                                           capabilities: handshake.agentCapabilities?.mcpCapabilities)
                 : try await sessionServers(runtimeID: runtimeID, chosen: mcpServers, token: token,
-                                           managesAgents: managesAgents, cwd: cwd,
+                                           cwd: cwd,
                                            capabilities: handshake.agentCapabilities?.mcpCapabilities)
             let result = try await session.newSession(cwd: cwd,
                                                       additionalDirectories: additionalDirectories,
@@ -1261,11 +1258,11 @@ extension DaemonCore {
         // A new process is a new MCP server, so a new token. The old one stopped
         // working when the last process died.
         let token = mintAppToken()
-        // Picked back up as what it was: an agent another agent started still has no
-        // tools for starting agents (028).
+        // Every agent, whoever started it, gets the tools for starting agents (#940):
+        // the project's helper limits are the bound, not who the starter is.
         bindAppToken(token, to: agent.id)
         let servers = try await sessionServers(runtimeID: agent.runtimeID, chosen: agent.mcpServers, token: token,
-                                               managesAgents: agent.startedByAgent == nil, cwd: agent.cwd,
+                                               cwd: agent.cwd,
                                                capabilities: handshake.agentCapabilities?.mcpCapabilities)
 
         // The same scoping a new conversation gets, so an agent picked back up is not
@@ -1427,9 +1424,6 @@ extension DaemonCore {
         var briefed = false
         if let runtimeID = agents[agentID]?.runtimeID, needsBriefing.remove(agentID) != nil {
             briefed = true
-            // An agent another agent started hears nothing about starting agents: it
-            // was not given the tools (028).
-            let managesAgents = agents[agentID]?.startedByAgent == nil
             // With what the person declared on this machine, and what each is for (#116).
             loadDeclaredIfNeeded()
             // Who is who (#121): the runtime by its display name, the person by theirs,
@@ -1440,7 +1434,6 @@ extension DaemonCore {
                                          pronouns: personSettings.givenPronouns,
                                          startedBy: starter.map { $0 ?? "" })
             ours.append(.text(Briefing.text(for: ToolPolicyCatalog.policy(for: runtimeID),
-                                            managesAgents: managesAgents,
                                             movesItself: RuntimeCatalog.canMoveFolders(runtimeID: runtimeID),
                                             naming: naming, declared: declaredResources)))
         }
