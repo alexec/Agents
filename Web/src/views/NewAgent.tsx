@@ -21,7 +21,6 @@ import { folderKey } from "../model/groups";
 import { formRuntime, newSessionRuntime, runtimeRuns, unavailableReason } from "../model/runtimes";
 import { formFor, keepForm, keptForm } from "../model/startForm";
 import { personaChoices, withPersonaLabels } from "../model/personas";
-import { chatProject } from "../model/chat";
 import { sandboxCardTitle, sandboxChoiceWords, sandboxChoices, sandboxExplanation, sandboxOverrideWords, sandboxState,
   sandboxStateWords, sandboxWhy, startWithout } from "../model/sandbox";
 import { accepted } from "../model/labels";
@@ -235,8 +234,6 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   };
   const usablePersonas = personas.value.filter((p) => p.problem === undefined);
   const brokenPersonas = personas.value.filter((p) => p.problem !== undefined);
-  const chat = chatProject(store.projects.value[host]);
-  const isChatProject = chat !== undefined && folderKey(chat.project.folder) === folderKey(folder);
   const description = usablePersonas.find((p) => p.id === persona.value)?.description;
 
   const capabilities = chosenRuntime ? store.account(host, chosenRuntime)?.promptCapabilities : undefined;
@@ -337,30 +334,16 @@ export function NewAgent({ store, host, folder, projectName, down }: {
       {!down && <OfflineStrip store={store} host={host} />}
       <div class="scroll new-heading">
         <ProjectSwitch store={store} host={host} folder={folder} projectName={projectName} down={down} />
-        <p class="quiet" title={path}>{path} · {machine}</p>
         {personas.value.length > 0 && (
           <div class="persona-choice">
-            {usablePersonas.length > 0 && (isChatProject ? (
-              <label class="pill select" title="Persona">
-                <span aria-hidden="true">{usablePersonas.find((p) => p.id === persona.value)?.name ?? "No persona"} ▾</span>
-                <select aria-label="Persona" disabled={down} value={persona.value ?? ""}
-                  onChange={(e) => choosePersona((e.currentTarget as HTMLSelectElement).value)}>
-                  <option value="">No persona</option>
-                  {usablePersonas.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </label>
-            ) : (
-              <div class="segmented" role="radiogroup" aria-label="Persona">
-                {[{ id: "", name: "None" }, ...usablePersonas].map((p) => (
-                  <button key={p.id} role="radio" aria-checked={(persona.value ?? "") === p.id} disabled={down}
-                    class={(persona.value ?? "") === p.id ? "on" : ""} onClick={() => choosePersona(p.id)}>{p.name}</button>
-                ))}
-              </div>
-            ))}
+            {usablePersonas.length > 0 && (
+              <PersonaSwitch personas={usablePersonas} picked={persona.value} down={down} choose={choosePersona} />
+            )}
             {description && <p class="quiet small">{description}</p>}
             {brokenPersonas.map((p) => <p key={p.id} class="quiet small">{p.id}.md: {p.problem}</p>)}
           </div>
         )}
+        <p class="quiet" title={path}>{path} · {machine}</p>
         <KeptBubbles store={store} kept={keptStarts} />
       </div>
       <footer class="foot">
@@ -543,6 +526,24 @@ export function offerStart(store: Store, host: string, folder: string, start: St
  * The project's name, a menu of every project to start in another instead (#495, #499): the
  * sidebar has one New Session, at its top, in the project last started in.
  */
+/** The kind of session to start (#760), the same control as the project's name, a size smaller,
+    on its own line under it (#913). */
+function PersonaSwitch({ personas, picked, down, choose }: {
+  personas: Persona[]; picked: string | undefined; down: boolean; choose: (id: string) => void;
+}) {
+  const name = personas.find((p) => p.id === picked)?.name;
+  return (
+    <h2 class={`project-switch persona-switch${name ? "" : " none"}`} title="Start a kind of session: a persona sets what it names">
+      <span aria-hidden="true">{name ?? "No persona"} <span class="caret">▾</span></span>
+      <select aria-label="Persona" disabled={down} value={picked ?? ""}
+        onChange={(e) => choose((e.currentTarget as HTMLSelectElement).value)}>
+        <option value="">No persona</option>
+        {personas.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+      </select>
+    </h2>
+  );
+}
+
 function ProjectSwitch({ store, host, folder, projectName, down }: {
   store: Store; host: string; folder: string; projectName: string; down: boolean;
 }) {
