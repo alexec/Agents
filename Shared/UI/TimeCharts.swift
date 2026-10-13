@@ -52,7 +52,7 @@ extension TimeKind {
         case .agent: AnyShapeStyle(Paper.accent)
         case .tools: AnyShapeStyle(Paper.accent.opacity(0.5))
         case .others: AnyShapeStyle(Color.secondary.opacity(0.5))
-        case .person: StateTint.attention.style(or: Color.orange)
+        case .person: StateTint.attention.style(or: Color.secondary)
         }
     }
 }
