@@ -153,8 +153,9 @@ function useActivity(store: Store): void {
 /** Each Activity page's icon, the window's SF Symbol as near as text has it (#495). */
 const activityIcons: Record<ActivityPage, string> = { events: "☰\uFE0E", resources: "◫", runtimes: "⚙\uFE0E", mcp: "▤", worktrees: "⑂", spending: "$", time: "◷" };
 
-export function ActivityRows({ store, chosen, onPick }: {
-  store: Store; chosen: ActivityPage | undefined; onPick: (page: ActivityPage) => void;
+/** The rows of one of the sidebar's two groups (#915): Status, what goes on now, or Usage, the past. */
+export function ActivityRows({ group, store, chosen, onPick }: {
+  group: "status" | "usage"; store: Store; chosen: ActivityPage | undefined; onPick: (page: ActivityPage) => void;
 }) {
   useActivity(store);
   const last = lastEvent(store);
@@ -180,6 +181,13 @@ export function ActivityRows({ store, chosen, onPick }: {
     </button>
   );
   const spent = [today && `${today} today`, left].filter(Boolean).join(", ");
+  if (group === "usage") return (
+    <>
+      {row("spending", "Cost", "What all of the work has cost, and what it cost today", spent || null,
+        closeToFull(mac))}
+      {row("time", "Time", "Where the time of running chats went: the agent, its tools, and waiting", null)}
+    </>
+  );
   return (
     <>
       {row("events", "Events", "What happened, what came of it, and who is waiting", last && `Last at ${clock(last)}`)}
@@ -191,9 +199,6 @@ export function ActivityRows({ store, chosen, onPick }: {
       {row("mcp", "MCP Servers", "Every server in your own mcp.json, and how each is doing",
         mcp?.words ?? null, mcp?.failing ?? false)}
       {row("worktrees", "Worktrees", "Every project's worktrees, and how much each holds", worktrees)}
-      {row("spending", "Cost", "What all of the work has cost, and what it cost today", spent || null,
-        closeToFull(mac))}
-      {row("time", "Time", "Where the time of running chats went: the agent, its tools, and waiting", null)}
     </>
   );
 }
