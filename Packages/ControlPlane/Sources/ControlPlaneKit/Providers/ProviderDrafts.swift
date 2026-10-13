@@ -175,12 +175,16 @@ public actor ProviderDrafts {
     private let timing: Timing
     private let hooks: Hooks
     private let log: @Sendable (String) -> Void
+    /// The clock the time limits read; a test gives its own, to say when time passes (#891).
+    private let now: @Sendable () -> ContinuousClock.Instant
     private var drafts: [UUID: Draft] = [:]
 
-    public init(timing: Timing = .standard, hooks: Hooks, log: @escaping @Sendable (String) -> Void) {
+    public init(timing: Timing = .standard, hooks: Hooks, log: @escaping @Sendable (String) -> Void,
+                now: @escaping @Sendable () -> ContinuousClock.Instant = { .now }) {
         self.timing = timing
         self.hooks = hooks
         self.log = log
+        self.now = now
     }
 
     // MARK: The sheet's methods
@@ -473,10 +477,10 @@ public actor ProviderDrafts {
 
     /// Once a tick: the clock, and whether the sheet is still there.
     private func watch(_ id: UUID) async {
-        var last = ContinuousClock.now
+        var last = now()
         while !Task.isCancelled, let draft = drafts[id], !draft.ended {
             try? await Task.sleep(for: timing.tick)
-            let now = ContinuousClock.now
+            let now = self.now()
             if !draft.paused { draft.used += now - last }
             last = now
             if draft.used >= timing.total { markOver(draft) }
@@ -501,7 +505,7 @@ public actor ProviderDrafts {
     private func markOver(_ draft: Draft) {
         guard !draft.over else { return }
         draft.over = true
-        draft.overSince = .now
+        draft.overSince = now()
     }
 
     private func turnEnded(_ draft: Draft, reason: String?) async {
