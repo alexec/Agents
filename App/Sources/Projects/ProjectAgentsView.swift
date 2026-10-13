@@ -93,6 +93,7 @@ struct ProjectAgentsView: View {
     private var heading: some View {
         VStack(spacing: 6) {
             projectMenu
+            personaMenu
             if let summary {
                 Text(place(summary))
                     .appText(.supporting)
@@ -145,6 +146,68 @@ struct ProjectAgentsView: View {
         .fixedSize()
         .help("Start the session in another project")
         .accessibilityLabel("Project: \(summary?.name ?? "none")")
+    }
+
+    /// The kind of session to start (#760), the same control as the project's name, a
+    /// size smaller, on its own line under it (#913). What the picked one is for, and any
+    /// persona file that cannot be read, are under it. Not drawn where there are none.
+    @ViewBuilder private var personaMenu: some View {
+        let usable = model.draftPersonas.filter { $0.problem == nil }
+        let broken = model.draftPersonas.filter { $0.problem != nil }
+        let picked = usable.first { $0.id == model.draftPersona }
+        if !model.draftPersonas.isEmpty {
+            VStack(spacing: 4) {
+                if !usable.isEmpty {
+                    Menu {
+                        personaButton(nil, picked: picked == nil)
+                        ForEach(usable) { personaButton($0, picked: $0.id == picked?.id) }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Text(picked?.name ?? Self.noPersona)
+                                .appText(.reading).fontWeight(.semibold)
+                                .foregroundStyle(picked == nil ? .secondary : .primary)
+                                .lineLimit(1)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .imageScale(.small)
+                                .foregroundStyle(.secondary)
+                                .accessibilityHidden(true)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .menuStyle(.button)
+                    .buttonStyle(.plain)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                    .disabled(model.isStarting)
+                    .help("Start a kind of session: a persona sets what it names")
+                    .accessibilityLabel("Persona: \(picked?.name ?? Self.noPersona)")
+                }
+                if let description = picked?.description {
+                    Text(description)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(broken) { persona in
+                    Text("\(persona.id).md: \(persona.problem ?? "")")
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    static let noPersona = "No persona"
+
+    private func personaButton(_ persona: Persona?, picked: Bool) -> some View {
+        Button {
+            model.choosePersona(persona)
+        } label: {
+            if picked {
+                Label(persona?.name ?? Self.noPersona, systemImage: "checkmark")
+            } else {
+                Text(persona?.name ?? Self.noPersona)
+            }
+        }
     }
 
     private func label(_ project: DaemonAPI.ProjectSummary) -> String {

@@ -772,7 +772,7 @@ button.remove:hover { opacity: 1; }
 /* A new session: the project's name and folder in the middle, the bar at the foot (#108). */
 .new-heading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 20px; text-align: center; }
 .new-heading h1 { margin: 0; font-size: calc(22px * var(--text-scale)); font-weight: 600; }
-.new-heading .persona-choice { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 10px; max-width: 100%; }
+.new-heading .persona-choice { display: flex; flex-direction: column; align-items: center; gap: 4px; max-width: 100%; }
 .new-heading .persona-choice p { white-space: normal; }
 .segmented { display: inline-flex; background: var(--paper-raised); flex-wrap: wrap; justify-content: center; border: 1px solid var(--paper-rule); border-radius: 8px; overflow: hidden; }
 .segmented button { border: 0; border-radius: 0; background: none; padding: 4px 12px; font: inherit; font-size: calc(13px * var(--text-scale)); color: inherit; cursor: pointer; }
@@ -1110,9 +1110,12 @@ button.plain:hover { opacity: 1; }
 
 /* The new-session page's project name, a menu of every project (#495, #499): the browser's own
    menu over the name, as a pill's. */
-.new-heading h1.project-switch { position: relative; cursor: pointer; }
-.new-heading h1.project-switch .caret { font-size: calc(13px * var(--text-scale)); opacity: 0.5; }
-.new-heading h1.project-switch select { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; font: inherit; }
+.new-heading .project-switch { position: relative; cursor: pointer; }
+.new-heading .project-switch .caret { font-size: calc(13px * var(--text-scale)); opacity: 0.5; }
+.new-heading .project-switch select { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; font: inherit; }
+/* The persona (#913): the project's control, a size smaller, under it. */
+.new-heading h2.persona-switch { margin: 0; font-size: calc(15px * var(--text-scale)); font-weight: 600; }
+.new-heading h2.persona-switch.none { opacity: 0.65; }
 
 /* A server's dot on an MCP Servers page (#753): filled when it answers or runs, the failure tint
    when it does not, hollow otherwise, as the window's. */
