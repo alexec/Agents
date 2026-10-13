@@ -3,6 +3,7 @@ import AgentsKitCore
 import ControlDial
 @testable import ControlPlaneKit
 import Foundation
+import NIOCore
 import Testing
 
 /// A running control plane handed over to a copy on another "machine" (058, research R16,
@@ -239,8 +240,24 @@ extension ControlServiceTests {
             configuration.resumeForwarding = resume
             return try ControlService(configuration)
         }
-        let first = try copy()
-        try await first.start()
+        // The copy stopped just before can hold the port for a moment on a busy runner (#848):
+        // a new copy tries again, as a restarted process would.
+        func started(_ make: () throws -> ControlService) async throws -> ControlService {
+            for _ in 1..<40 {
+                let service = try make()
+                do {
+                    try await service.start()
+                    return service
+                } catch let error as IOError where error.errnoCode == EADDRINUSE {
+                    await service.stop()
+                    try await Task.sleep(for: .milliseconds(50))
+                }
+            }
+            let service = try make()
+            try await service.start()
+            return service
+        }
+        let first = try await started { try copy() }
         let handover = try await Handover.Link(url, pin: nil, privateKey: control.privateKey)
         _ = try await handover.call(Handover.Method.freeze)
         _ = try await handover.call(Handover.Method.forward, [
@@ -248,8 +265,7 @@ extension ControlServiceTests {
         await handover.close()
         await first.stop()
 
-        let again = try copy()
-        try await again.start()
+        let again = try await started { try copy() }
         #expect(again.phase.now == .forwarding)
         #expect(await again.methods.frozen)
         #expect(again.forwardingUntil.now != nil)
@@ -260,17 +276,14 @@ extension ControlServiceTests {
                                                      bind: "127.0.0.1", port: port, name: "test", machineID: "m",
                                                      receive: true)
         receiving.resumeForwarding = true
-        let cloud = try ControlService(receiving)
-        try await cloud.start()
+        let cloud = try await started { try ControlService(receiving) }
         #expect(cloud.phase.now == .forwarding)
         await cloud.stop()
 
-        let serving = try copy(resume: false)
-        try await serving.start()
+        let serving = try await started { try copy(resume: false) }
         #expect(serving.phase.now == .serving)
         await serving.stop()
-        let later = try copy()
-        try await later.start()
+        let later = try await started { try copy() }
         defer { Task { await later.stop() } }
         #expect(later.phase.now == .serving)
     }
