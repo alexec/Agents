@@ -17,6 +17,7 @@ import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
 import { describe, methodNotFound } from "./errors";
+import { artifactsIn, withArtifactsOf, type Artifact } from "./artifacts";
 import { log } from "../log";
 import { folderKey, projectFolder, projectView, type ProjectView } from "./groups";
 import { decideMacHostNotice, type MacHostNotice } from "./macHostNotice";
@@ -191,6 +192,11 @@ export class Work {
   readonly entries = signal<TranscriptEntry[]>([]);
   /** The page as the chat draws it, folded once as each entry lands. */
   readonly items = signal<Item[]>([]);
+  /**
+   * Everything exchanged in `entries`, newest first, as `artifactsIn` gives it: folded as each
+   * entry lands, and moved only when one brings something (#946).
+   */
+  readonly artifacts = signal<readonly Artifact[]>([]);
   /** The finished turns before `entries`, as stored. `entries` start at `openTurnStart`. */
   readonly turns = signal<TurnSummary[]>([]);
 
@@ -720,6 +726,7 @@ export class Work {
     this.display.add(note.entry);
     const entries = [...this.entries.value, note.entry];
     batch(() => {
+      this.artifacts.value = withArtifactsOf(this.artifacts.value, note.entry);
       if (this.isFollowingEnd && entries.length > this.nextTrimAt) return this.trimFront(entries);
       this.entries.value = entries;
       this.items.value = this.display.items;
@@ -756,6 +763,10 @@ export class Work {
       entries = entries.slice(drop);
       this.firstEntryIndex.value += drop;
       this.hasMoreBefore.value = true;
+      const artifacts = this.artifacts.value;
+      if (artifacts.some((artifact) => !this.entryIDs.has(artifact.entryID))) {
+        this.artifacts.value = artifacts.filter((artifact) => this.entryIDs.has(artifact.entryID));
+      }
     }
     this.entries.value = entries;
     this.nextTrimAt = Math.max(entriesTrimmedAt, entries.length + entriesTrimmedAt - entriesKept);
@@ -835,6 +846,7 @@ export class Work {
     for (const entry of entries) this.display.add(entry);
     this.entries.value = entries;
     this.items.value = this.display.items;
+    this.artifacts.value = artifactsIn(entries);
     this.nextTrimAt = entriesTrimmedAt;
   }
 
@@ -843,9 +855,14 @@ export class Work {
    * take it. At the history cap it waits until the reader is back at the end (#291).
    */
   get hasMoreOfTheConversation(): boolean {
+    return this.moreOfTheConversation.value;
+  }
+
+  /** Computed, so a view that reads it redraws when the answer changes, not on every entry (#946). */
+  private readonly moreOfTheConversation = computed(() => {
     if (this.hasMoreBefore.value) return this.entries.value.length < historyEntriesCap;
     return this.firstTurn.value > 0 && this.turns.value.length < historyTurnsCap;
-  }
+  });
 
   /**
    * Since when each host has not been online, as this page first heard it (#83; the window's

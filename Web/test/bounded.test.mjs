@@ -128,6 +128,38 @@ test("a repeated catch-up entry updates the held entry and the incoming page cop
   assert.equal(work.entries.value[0].kind.agentMessage.text, "newer");
 });
 
+test("the exchanged list is folded as entries land, and moves only when one brings something", async () => {
+  const { artifactsIn } = await load("src/model/artifacts.ts");
+  const work = new Work();
+  work.watch("mac", "s");
+  const handing = (n, name) => entry(n, { agentMessage: { text: "", messageID: `m${n}`,
+    blocks: [{ type: "resource_link", uri: `file:///w/${name}`, name }] } });
+  work.replaceTranscript({ entries: [asked(0), handing(1, "earlier.md")], firstIndex: 0 });
+  const reads = runs(() => work.artifacts.value);
+  for (let n = 2; n < 50; n++) work.apply("agent/entry", { agentID: "s", entry: said(n) }, "mac");
+  assert.equal(reads.count, 0, "a streamed chunk that hands nothing back leaves it alone");
+  work.apply("agent/entry", { agentID: "s", entry: handing(50, "later.md") }, "mac");
+  assert.equal(reads.count, 1);
+  assert.deepEqual(work.artifacts.value.map((a) => a.name), ["later.md", "earlier.md"]);
+  assert.deepEqual(work.artifacts.value.map((a) => a.id), artifactsIn(work.entries.value).map((a) => a.id));
+  reads.stop();
+  work.unwatch();
+  assert.equal(work.artifacts.value.length, 0);
+});
+
+test("more of the conversation is read without redrawing on every entry", () => {
+  const work = new Work();
+  work.watch("mac", "s");
+  work.replaceTranscript({ entries: [said(10)], firstIndex: 10 });
+  work.openTurnStart.value = 0;
+  work.hasMoreBefore.value = true;
+  const reads = runs(() => work.hasMoreOfTheConversation);
+  for (let n = 11; n < 40; n++) work.apply("agent/entry", { agentID: "s", entry: said(n) }, "mac");
+  assert.equal(reads.count, 0);
+  assert.equal(work.hasMoreOfTheConversation, true);
+  reads.stop();
+});
+
 test("a followed chat is trimmed at the front, and one scrolled up is not", () => {
   const work = new Work();
   work.watch("mac", "s");

@@ -82,6 +82,19 @@ export function artifactsIn(entries: readonly TranscriptEntry[]): Artifact[] {
     .map((item) => item.artifact);
 }
 
+/**
+ * `held` with what `entry` exchanged folded in, in the order `artifactsIn` gives, as the
+ * entry lands after every held one (#946). The same array when it exchanged nothing.
+ */
+export function withArtifactsOf(held: readonly Artifact[], entry: TranscriptEntry): readonly Artifact[] {
+  const found = artifactsIn([entry]);
+  if (found.length === 0) return held;
+  const at = held.findIndex((artifact) => artifact.arrivedAt < entry.at);
+  const next = [...held];
+  next.splice(at < 0 ? next.length : at, 0, ...found);
+  return next;
+}
+
 /** Where it opens: Files, a link, in place, or nowhere. */
 export function destinationOf(artifact: Artifact): Destination {
   if (artifact.embedded && artifact.text !== undefined) return { kind: "inPlace" };
