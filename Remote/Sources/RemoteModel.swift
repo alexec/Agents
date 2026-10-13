@@ -63,11 +63,17 @@ final class RemoteModel {
         }
     }
 
+    /// The sessions open in scenes of their own on an iPad (#888), each with its own page
+    /// of its transcript. See `PoppedChat`.
+    var popouts: [UUID: PoppedChat] = [:]
+    /// The one of them in the key window, if one is: what the person is watching.
+    @ObservationIgnored var popoutInFront: UUID?
+
     private let client: DaemonClient
     /// 021: this device's banner, and its report of where the person is. Neither
     /// decides anything; the Mac routes and these two obey.
     private let notifier = DeviceNotifier()
-    private var presence: PresenceReporter?
+    var presence: PresenceReporter?
     /// Which device this is, minted once and kept. Told to the Mac right after every
     /// connection (`surface/identify`), so every later request on it is this device's.
     private let deviceID = RemoteModel.deviceID
@@ -1373,6 +1379,8 @@ final class RemoteModel {
     func touchedPaths(for agentID: UUID) -> TouchedPaths {
         var touched = touchedEarlier[agentID] ?? TouchedPaths()
         if selection == agentID { for entry in work.entries { touched.absorb(entry) } }
+        // And a scene of its own's page of it (#888).
+        if let popped = popouts[agentID] { for entry in popped.work.entries { touched.absorb(entry) } }
         return touched
     }
 
@@ -1875,8 +1883,10 @@ final class RemoteModel {
                     if note.method == DaemonAPI.Notification.leasesChanged
                         || note.method == DaemonAPI.Notification.mcpHostedChanged
                         || note.method == DaemonAPI.Notification.eventsChanged { continue }
-                    guard let update = AgentsModel.read(note.method, note.params, showing: shown.id) else { continue }
+                    guard let update = AgentsModel.read(note.method, note.params, showing: shown.id,
+                                                         alsoShowing: shown.also) else { continue }
                     await self?.work.apply(update, from: id)
+                    await self?.applyToPopouts(update)
                     if case .projectRemoved = update { await self?.forgetArchived(AgentsModel.stamp(update, host: id)) }
                 }
                 // Its connection ended: its cards are stale until the watch reaches it again.
@@ -1930,7 +1940,8 @@ final class RemoteModel {
         // An entry or terminal output for another chat is not read past its agentID.
         listening = Task.detached(priority: .userInitiated) { [weak self] in
             for await notification in notifications {
-                let update = AgentsModel.read(notification.method, notification.params, showing: shown.id)
+                let update = AgentsModel.read(notification.method, notification.params, showing: shown.id,
+                                              alsoShowing: shown.also)
                 guard let self else { return }
                 await self.received(notification, update)
             }
@@ -1952,6 +1963,7 @@ final class RemoteModel {
         // terminals — and a remote has no business with it.
         if let update {
             self.work.apply(update)
+            applyToPopouts(update)
             forgetArchived(update)
         }
         // Nothing below waits on the network: one slow answer would hold every
@@ -2135,6 +2147,8 @@ final class RemoteModel {
             case .part(let part): await load(part)
             }
         }
+        // Sessions in scenes of their own (#888), as the main scene's chat.
+        for chat in popouts.values { await loadTranscript(of: chat) }
         // The low-disk strip is under the banner on every page (#196), so it is read
         // on every catch-up, not when a page asks for it.
         await refreshDisk()
@@ -2198,7 +2212,15 @@ final class RemoteModel {
 
     /// The app came to the front or went behind. `.active` is foreground and unlocked,
     /// which is what "in the person's hands" means on a device.
-    func scenePhase(_ phase: ScenePhase) {
+    ///
+    /// Each scene says its own (#888): the app is in front while any of them is.
+    func scenePhase(_ phase: ScenePhase, of scene: UUID) {
+        let wasActive = scenesActive.isEmpty == false
+        if phase == .active { scenesActive.insert(scene) } else { scenesActive.remove(scene) }
+        let isActive = !scenesActive.isEmpty
+        guard wasActive != isActive || !hasHeardAPhase else { return }
+        hasHeardAPhase = true
+        let phase: ScenePhase = isActive ? .active : phase
         presence?.scenePhase(phase)
         if phase == .active {
             attentionRefreshTask?.cancel()
@@ -2222,6 +2244,10 @@ final class RemoteModel {
             publishAttention()
         }
     }
+
+    /// The scenes in front (#888): the main one, and any session's own.
+    @ObservationIgnored private var scenesActive: Set<UUID> = []
+    @ObservationIgnored private var hasHeardAPhase = false
 
     private var kind: Device.Kind {
         switch UIDevice.current.userInterfaceIdiom {
@@ -2426,20 +2452,27 @@ final class RemoteModel {
             }
         }
         notifier.authorisationChanged = { [weak self] in self?.presence?.connected() }
-        let reporter = PresenceReporter { [weak self] watching, active, mayNotify, showing in
+        let reporter = PresenceReporter { [weak self] watching, active, mayNotify, showing, popped in
             guard let self else { return }
             // Every host hears whether the person is here; only the open chat's host hears
             // which it is, and that is where its entries and output come from (#203).
-            let owner = showing.map { self.work.agent($0)?.host ?? .mac }
+            // Sessions in scenes of their own go to their own hosts the same way (#888).
+            let hostOf = { (id: UUID) in self.work.agent(id)?.host ?? .mac }
+            let owner = showing.map(hostOf)
+            let watcher = watching.map(hostOf)
+            let poppedHosts = popped.sorted { $0.uuidString < $1.uuidString }.map { ($0, hostOf($0)) }
             func report(for host: HostID) -> DaemonAPI.PresenceReport {
-                DaemonAPI.PresenceReport(watching: owner == host ? watching : nil, active: active,
-                                         mayNotify: mayNotify, showing: owner == host ? showing : nil)
+                DaemonAPI.PresenceReport(watching: watcher == host ? watching : nil, active: active,
+                                         mayNotify: mayNotify, showing: owner == host ? showing : nil,
+                                         alsoShowing: poppedHosts.filter { $0.1 == host }.map(\.0))
             }
             _ = try? await self.client.call(DaemonAPI.Method.presenceReport, report(for: .mac))
             for (id, other) in self.otherHosts where self.reachableHosts.contains(id) {
                 _ = try? await other.call(DaemonAPI.Method.presenceReport, report(for: id))
             }
         }
+        // Scenes of their own restored at launch opened before there was a reporter (#888).
+        reporter.popped(Set(popouts.keys), inFront: popoutInFront)
         presence = reporter
     }
 
@@ -2472,7 +2505,7 @@ final class RemoteModel {
         moreLiveAgents = page.next(after: listed) != nil
         filledProjects = []
         let live = Set(listed.map(\.id))
-        let letGo = Set(ClientHolding.archivedToLetGo(work.agents, projects: archivedHeldFor, chat: selection))
+        let letGo = Set(archivedToLetGo(work.agents, projects: archivedHeldFor, chat: selection))
         // Only this host's: another host's agents come from that host (058, US4).
         let kept = work.agents.filter {
             $0.host == .mac && $0.state == .archived && !live.contains($0.id) && !letGo.contains($0.id)
@@ -2497,7 +2530,7 @@ final class RemoteModel {
     /// agents, its label suggestions, and the live agents beyond the first page that it
     /// filled in.
     private func letGoOfProjects(keeping folder: URL?) {
-        work.forget(ClientHolding.archivedToLetGo(work.agents, projects: archivedHeld(keeping: folder), chat: selection)
+        work.forget(archivedToLetGo(work.agents, projects: archivedHeld(keeping: folder), chat: selection)
             .filter { !searched.contains($0) })
         labelVocabularies = labelVocabularies.filter { $0.key == folder.map(Project.standardize) }
         if let folder { Task { await fillProject(folder) } }
@@ -2506,9 +2539,9 @@ final class RemoteModel {
     /// A chat has gone: what was read for it alone is let go (#175). Its earlier marks
     /// for Files, and an archived chat outside the open project.
     private func letGoOfChats(keeping agentID: UUID?) {
-        touchedEarlier = touchedEarlier.filter { $0.key == agentID }
-        touchedHistoryAsked = touchedHistoryAsked.filter { $0 == agentID }
-        work.forget(ClientHolding.archivedToLetGo(work.agents, projects: archivedHeldFor, chat: agentID)
+        touchedEarlier = touchedEarlier.filter { $0.key == agentID || popouts[$0.key] != nil }
+        touchedHistoryAsked = touchedHistoryAsked.filter { $0 == agentID || popouts[$0] != nil }
+        work.forget(archivedToLetGo(work.agents, projects: archivedHeldFor, chat: agentID)
             .filter { !searched.contains($0) })
     }
 
@@ -2540,7 +2573,7 @@ final class RemoteModel {
     func letGoOfArchived(in folder: URL) {
         let folder = Project.standardize(folder)
         guard openArchivedFolds.remove(folder) != nil else { return }
-        work.forget(ClientHolding.archivedToLetGo(work.agents, projects: archivedHeldFor, chat: selection)
+        work.forget(archivedToLetGo(work.agents, projects: archivedHeldFor, chat: selection)
             .filter { !searched.contains($0) })
     }
 
@@ -2561,7 +2594,7 @@ final class RemoteModel {
         searched = []
         searchNext = [:]
         if !earlier.isEmpty {
-            let unseen = Set(ClientHolding.archivedToLetGo(work.agents, projects: archivedHeldFor, chat: selection))
+            let unseen = Set(archivedToLetGo(work.agents, projects: archivedHeldFor, chat: selection))
             work.forget(earlier.filter { unseen.contains($0) })
         }
         guard !words.isEmpty else { return }
@@ -3376,6 +3409,7 @@ final class RemoteModel {
                                                               returning: TranscriptPage.self),
               let entry = page.entries.first(where: { $0.id == entryID }) else { return }
         work.fillOversized(entry, for: agentID)
+        popouts[agentID]?.work.fillOversized(entry, for: agentID)
     }
 
     /// A finished turn's entries, for the chat to open it: the last page of them when
@@ -3916,4 +3950,123 @@ struct FolderGoneAsk: Identifiable, Equatable {
     let message: String
     let text: String
     let attachments: [Attachment]
+}
+
+// MARK: Sessions in scenes of their own (#888)
+
+extension RemoteModel {
+    /// A scene of its own has opened on this session: its page of the transcript, loaded,
+    /// and its host told to send it the session's entries, as the Mac's windows (#826).
+    func openPopout(_ id: UUID) -> PoppedChat {
+        let chat = popouts[id] ?? PoppedChat(id: id)
+        chat.scenes += 1
+        guard popouts[id] == nil else { return chat }
+        chat.work.onOversized = { [weak self] agentID, entryID, index in
+            Task { await self?.loadOversized(entryID, of: agentID, at: index) }
+        }
+        popouts[id] = chat
+        popoutsChanged()
+        Task { await loadTranscript(of: chat) }
+        return chat
+    }
+
+    /// Its scene has closed. The last one lets the page go.
+    func closePopout(_ chat: PoppedChat) {
+        chat.scenes -= 1
+        guard chat.scenes <= 0, popouts[chat.id] === chat else { return }
+        popouts[chat.id] = nil
+        if popoutInFront == chat.id { popoutInFront = nil }
+        popoutsChanged()
+    }
+
+    /// Whether the scene showing this session is the key window: while it is, it is the
+    /// one being watched, and a turn finishing there is read (#70).
+    func popout(_ id: UUID, isInFront: Bool) {
+        if isInFront {
+            popoutInFront = id
+        } else if popoutInFront == id {
+            popoutInFront = nil
+        }
+        presence?.popped(Set(popouts.keys), inFront: popoutInFront)
+    }
+
+    /// Where an entry or terminal output for a session in a scene of its own goes too.
+    func applyToPopouts(_ update: AgentsModel.Update) {
+        switch update {
+        case .entry(let note): popouts[note.agentID]?.work.apply(update)
+        case .terminalOutput(let note): popouts[note.agentID]?.work.apply(update)
+        default: break
+        }
+    }
+
+    /// The page of transcript a chat draws: its scene's own, or the main scene's.
+    func page(_ popped: PoppedChat?) -> AgentsModel { popped?.work ?? work }
+
+    /// The session a chat shows: its scene's own, or the main scene's selection.
+    func chatID(_ popped: PoppedChat?) -> UUID? { popped?.id ?? selection }
+
+    private func popoutsChanged() {
+        work.shown.also = Set(popouts.keys)
+        presence?.popped(Set(popouts.keys), inFront: popoutInFront)
+    }
+
+    /// Archived sessions no screen shows any more, less those in scenes of their own.
+    fileprivate func archivedToLetGo(_ agents: [Agent], projects: Set<URL>, chat: UUID?) -> [UUID] {
+        ClientHolding.archivedToLetGo(agents, projects: projects, chat: chat).filter { popouts[$0] == nil }
+    }
+
+    /// A session's transcript in a scene of its own, loaded as the main scene's is, into
+    /// that scene's own page of it.
+    func loadTranscript(of chat: PoppedChat) async {
+        let id = chat.id
+        Task { await loadWholeAgent(id) }
+        let load = chat.work.beginTranscriptLoad()
+        let turnsRequest = DaemonAPI.TurnsRequest.opening(id)
+        let pageSize = firstPageSize
+        do {
+            let opening = try await ChatOpening.load(
+                turns: {
+                    try await client(for: turnsRequest).call(DaemonAPI.Method.agentsTurns, turnsRequest,
+                                                             returning: TurnsPage.self)
+                },
+                transcript: { from in
+                    let request = DaemonAPI.TranscriptRequest(agentID: id, limit: pageSize, from: from)
+                    return try await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
+                                                               returning: TranscriptPage.self)
+                },
+                describe: Self.describeLoadFailure)
+            // A scene closed while it loaded has nothing to put it in.
+            guard popouts[id] === chat else { return }
+            _ = chat.work.takeOpening(opening, load: load)
+        } catch {
+            note("chat: history of \(id) did not load in its own scene: \(error)")
+            guard popouts[id] === chat else { return }
+            chat.work.failOpening(Self.describeLoadFailure(error), load: load)
+        }
+        // Looked for: from here a session not in hand is one that has gone.
+        chat.looked = true
+    }
+
+    /// An earlier page of a session in a scene of its own, as `loadEarlier`.
+    func loadEarlier(of chat: PoppedChat) async {
+        let id = chat.id
+        let work = chat.work
+        guard work.hasMoreOfTheConversation, !chat.isLoadingEarlier else { return }
+        chat.isLoadingEarlier = true
+        defer { chat.isLoadingEarlier = false }
+        if !work.hasMoreBefore {
+            let turnsRequest = DaemonAPI.TurnsRequest(agentID: id, before: work.firstTurn)
+            guard let turns = try? await client(for: turnsRequest).call(
+                DaemonAPI.Method.agentsTurns, turnsRequest, returning: TurnsPage.self),
+                popouts[id] === chat else { return }
+            work.prependTurns(turns)
+            return
+        }
+        let request = DaemonAPI.TranscriptRequest(agentID: id, before: work.firstEntryIndex,
+                                                  limit: firstPageSize, from: work.openTurnStart)
+        guard let page = try? await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
+                                                              returning: TranscriptPage.self),
+              popouts[id] === chat else { return }
+        work.prepend(page)
+    }
 }

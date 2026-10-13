@@ -56,6 +56,15 @@ struct RemoteApp: App {
                     Task { await old.stop() }
                 }
         }
+
+        // A session in a scene of its own on an iPad (#888), from a row's menu or a drag
+        // out of the sidebar. One scene per session: opening one already open brings it
+        // forward. The drag is the only thing this scene handles from outside.
+        WindowGroup(id: PoppedChat.sceneID, for: UUID.self) { $id in
+            PoppedChatScene(id: $id)
+                .environment(model)
+        }
+        .handlesExternalEvents(matching: [PoppedChat.activityType])
     }
 }
 
@@ -70,10 +79,13 @@ struct RemoteView: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.openWindow) private var openWindow
     /// Which column a phone shows: the detail whenever something is picked.
     @State private var compactColumn = NavigationSplitViewColumn.sidebar
     /// The project's own shell is up (#418).
     @State private var showsProjectTerminal = false
+    /// This scene, among the app's, for where the person is (021, #888).
+    @State private var sceneID = UUID()
 
     /// What is open over the project, in the order each was opened from the one before:
     /// a pinned page, a workflow, a conversation. The first is the detail's own page, the
@@ -145,10 +157,15 @@ struct RemoteView: View {
         // A server asked for a key on a send, with no start page to ask over (#344).
         .tokenAskSheet(model, shown: model.startingIn == nil)
         // Where this device is, told to the Mac on every change (021).
-        .onChange(of: scenePhase, initial: true) { _, phase in model.scenePhase(phase) }
+        .onChange(of: scenePhase, initial: true) { _, phase in model.scenePhase(phase, of: sceneID) }
         // A tap on the Home-screen widget (068). The one place a URL is taken from
         // outside the app, so it is checked and dropped rather than acted on by shape.
         .onOpenURL { model.openedFromTheWidget($0) }
+        // A session dragged out of the sidebar that came here rather than to a scene of
+        // its own (#888): it goes on to one.
+        .onContinueUserActivity(PoppedChat.activityType) { activity in
+            if let id = PoppedChat.agentID(in: activity) { openWindow(id: PoppedChat.sceneID, value: id) }
+        }
         .task {
             await model.connect()
 #if DEBUG

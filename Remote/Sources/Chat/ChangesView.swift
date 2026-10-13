@@ -24,6 +24,8 @@ import SwiftUI
 /// does not, and this is the half that needs no new protocol).
 struct ChangesView: View {
     @Environment(RemoteModel.self) private var model
+    /// Set in a scene of its own (#888): its session, not the selection.
+    @Environment(\.poppedChat) private var popped
     let path: String
 
     private var name: String { URL(filePath: path).lastPathComponent }
@@ -52,7 +54,7 @@ struct ChangesView: View {
     /// Every change to this file in the transcript, newest first. Newest first because
     /// the newest is the file as it now stands, and that is what somebody opening a
     /// file wants first; the ones below it are how it got there.
-    private var touches: [ToolCallContent.Diff] { Self.changes(to: path, in: model.entries) }
+    private var touches: [ToolCallContent.Diff] { Self.changes(to: path, in: model.page(popped).entries) }
 
     /// The edits the conversation carries for this file, newest first.
     static func changes(to path: String, in entries: [TranscriptEntry]) -> [ToolCallContent.Diff] {

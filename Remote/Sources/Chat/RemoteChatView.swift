@@ -21,8 +21,12 @@ struct RemoteChatView: View {
     @State private var views = AppViewStore()
     /// Open File… is up over the chat (#415).
     @State private var searchingFiles = false
+    /// Set in a scene of its own (#888): this session, not the selection.
+    @Environment(\.poppedChat) private var popped
 
-    private var agent: Agent? { model.selectedAgent }
+    private var agent: Agent? { popped.map { model.work.agent($0.id) } ?? model.selectedAgent }
+    /// This chat's page of the transcript: its scene's own, or the main scene's.
+    private var page: AgentsModel { model.page(popped) }
 
     var body: some View {
         Group {
@@ -73,24 +77,27 @@ struct RemoteChatView: View {
         // last thing said can still be scrolled clear of it.
         ZStack(alignment: .bottom) {
             if let agent {
+                let page = page
                 ChatTranscript(agent: agent,
-                               items: model.transcriptItems,
-                               stored: model.work.turns,
+                               items: page.transcriptItems,
+                               stored: page.turns,
                                defaultDetail: turnDetail,
-                               hasMore: model.work.hasMoreOfTheConversation,
-                               entryCount: model.entries.count + model.work.turns.count,
+                               hasMore: page.hasMoreOfTheConversation,
+                               entryCount: page.entries.count + page.turns.count,
                                isComingBack: model.isComingBack(agent),
-                               loadFailure: model.work.transcriptLoadFailure,
-                               settleKey: model.selection,
-                               loadEarlier: { await model.loadEarlier() },
+                               loadFailure: page.transcriptLoadFailure,
+                               settleKey: model.chatID(popped),
+                               loadEarlier: { [popped] in
+                                   if let popped { await model.loadEarlier(of: popped) } else { await model.loadEarlier() }
+                               },
                                bottomInset: formHeight,
                                cards: cards,
-                               scrollToEndToken: model.scrollToEndToken,
+                               scrollToEndToken: popped?.scrollToEndToken ?? model.scrollToEndToken,
                                // The conversation is the only thing that knows how tall
                                // it is, and the page it asks for next should be sized to
                                // that (SC-007).
                                onHeight: { model.measure(transcriptHeight: $0) },
-                               onFollowing: { model.work.isFollowingEnd = $0 })
+                               onFollowing: { page.isFollowingEnd = $0 })
             }
             form
         }
@@ -146,8 +153,8 @@ struct RemoteChatView: View {
                 // the agent last said it would do is the less urgent of the two.
                 if let agent { CurrentPlanStrip(agent: agent) }
                 // The agent asked to be looked at while something was being typed: said
-                // here, to be opened when the person chooses (034 FR-005).
-                if let wanted = model.fileTheAgentWants { OfferedFileStrip(file: wanted) }
+                // here, to be opened when the person chooses (034 FR-005). The main scene's.
+                if popped == nil, let wanted = model.fileTheAgentWants { OfferedFileStrip(file: wanted) }
             }
         }
         .sheet(isPresented: Binding(get: { model.fileOnScreen != nil },
@@ -171,7 +178,7 @@ struct RemoteChatView: View {
             NavigationStack {
                 if let id = subagentOnScreen,
                    let item = agent?.background.first(where: { $0.id == id }) {
-                    SubagentStepsView(item: item, entries: model.entries)
+                    SubagentStepsView(item: item, entries: page.entries)
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
                                 Button("Done") { subagentOnScreen = nil }
@@ -184,7 +191,7 @@ struct RemoteChatView: View {
         // The agent asking to be looked at. An event, so it opens the moment it
         // arrives and is taken off the model in the same breath.
         .onChange(of: model.fileTheAgentWants) { _, wanted in
-            if wanted != nil { model.openFileTheAgentWants() }
+            if popped == nil, wanted != nil { model.openFileTheAgentWants() }
         }
         .toolbar {
             // Stop is the prompt's own button while the agent works, as on the Mac;
@@ -208,7 +215,8 @@ struct RemoteChatView: View {
                         BringBackAgentButton(agent: agent)
                     } else {
                         PinAgentButton(agent: agent)
-                        ArchiveAgentButton(agent: agent, leavesChat: true)
+                        // A scene of its own stays, saying it is archived (#888).
+                        ArchiveAgentButton(agent: agent, leavesChat: popped == nil)
                     }
                 }
             }
@@ -239,9 +247,9 @@ struct RemoteChatView: View {
     /// truncated words.
     private var cards: AnyView? {
         guard let agent else { return nil }
-        let questions = model.questionsForSelection
-        let guarded = model.guardedChangesForSelection
-        let form = model.formForSelection
+        let questions = model.work.permissions(for: agent.id)
+        let guarded = model.work.guardedChanges(askedIn: agent.id)
+        let form = model.work.elicitation(for: agent.id)
         guard !questions.isEmpty || !guarded.isEmpty || form != nil || agent.asksToArchive else { return nil }
         return AnyView(VStack(spacing: 12) {
             ForEach(questions) { request in
@@ -292,7 +300,8 @@ struct RemoteChatView: View {
     }
 
     private var isQuestionUp: Bool {
-        !model.questionsForSelection.isEmpty || model.formForSelection != nil
+        guard let agent else { return false }
+        return !model.work.permissions(for: agent.id).isEmpty || model.work.elicitation(for: agent.id) != nil
     }
 
     /// What the shared chat rows mean on a phone. A file a tool call touched opens as it
@@ -300,22 +309,25 @@ struct RemoteChatView: View {
     /// there (034 FR-014). A Mac too old to read files for the phone gets 033's sheet of
     /// the change instead.
     private var actions: ChatActions {
-        ChatActions(
+        let agentID = agent?.id
+        return ChatActions(
             open: { [model] location in
-                guard !model.macLacksPanes, let agentID = model.selection else {
+                guard !model.macLacksPanes, let agentID else {
                     model.fileOnScreen = location.path
                     return
                 }
                 model.panes.state(for: agentID).open(file: URL(filePath: location.path), line: location.line)
             },
-            terminalOutput: { [model] id in model.terminalOutput(id) },
+            terminalOutput: { [model, popped] id in
+                popped.map { $0.work.terminalOutput[id] ?? "" } ?? model.terminalOutput(id)
+            },
             unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) },
             sendNow: { [model] prompt, agentID in await model.sendNow(prompt, to: agentID) },
             canSendNow: { [model] runtimeID in model.canSteer(runtimeID) },
             acting: { [model] agentID in model.acting(agentID) },
             // Show in Changes under an edit (#242), at that file in the new pane (#245).
             showEdit: { [model] diff, _ in
-                guard let agentID = model.selection else { model.fileOnScreen = diff.path; return }
+                guard let agentID else { model.fileOnScreen = diff.path; return }
                 let panes = model.panes.state(for: agentID)
                 panes.changesPath = diff.path
                 panes.show(.changes)
@@ -324,7 +336,9 @@ struct RemoteChatView: View {
             // (057, frame E).
             subagentSteps: { id in subagentOnScreen = id },
             turnEntries: { [model] agentID, range in await model.turnEntries(agentID, range) },
-            reloadTranscript: { [model] in await model.loadTranscript() },
+            reloadTranscript: { [model, popped] in
+                if let popped { await model.loadTranscript(of: popped) } else { await model.loadTranscript() }
+            },
             continueWithoutSandbox: sandboxAnswer(carryOn: true),
             keepStopped: sandboxAnswer(carryOn: false),
             waitingSandbox: waitingSandbox,
@@ -335,11 +349,11 @@ struct RemoteChatView: View {
             // A card in the chat opens its file in Files, as the agent's call did (#836).
             showFile: { [model] file in model.openShownFile(file) },
             readFile: { [model] path in
-                guard let agentID = model.selection else { return nil }
+                guard let agentID else { return nil }
                 return try? await model.files.read(agentID: agentID, path: path)
             },
             picture: { [model] file in
-                guard let agentID = model.selection,
+                guard let agentID,
                       let image = await model.pictures.image(agentID: agentID, url: file.url) else { return nil }
                 return Image(uiImage: image)
             })
@@ -362,11 +376,11 @@ struct RemoteChatView: View {
 
     /// The open agent's sandbox card, while it waits (064).
     private var waitingSandbox: SandboxFailureRecord? {
-        model.selection.flatMap { model.agent($0) }?.pendingSandboxFailure
+        agent?.pendingSandboxFailure
     }
 
     private func sandboxAnswer(carryOn: Bool) -> (@MainActor () async -> Void)? {
-        guard waitingSandbox != nil, let id = model.selection else { return nil }
+        guard waitingSandbox != nil, let id = agent?.id else { return nil }
         let model = model
         return { await model.answerSandbox(id, carryOn: carryOn) }
     }
@@ -376,6 +390,7 @@ struct RemoteChatView: View {
 /// for them, Pin and Archive (#586).
 private struct ChatMenu: View {
     @Environment(RemoteModel.self) private var model
+    @Environment(\.poppedChat) private var popped
     @Environment(\.horizontalSizeClass) private var sizeClass
     @AppStorage(TurnDetail.phoneDefaultsKey) private var turnDetail = TurnDetail.outcome
     let agent: Agent
@@ -394,6 +409,8 @@ private struct ChatMenu: View {
             Divider()
             Button("Open File…", systemImage: "magnifyingglass", action: openFile)
             Button("Exchanged", systemImage: "doc") { model.panes.state(for: agent.id).show(.exchanged) }
+            // The main scene's chat, in a scene of its own (#888).
+            if popped == nil { OpenInNewWindowButton(agent: agent) }
             if agent.state != .archived {
                 // As the Mac's Session menu has them (#342, #751).
                 RenameAgentButton(agent: agent)
@@ -401,7 +418,7 @@ private struct ChatMenu: View {
                 if sizeClass != .regular {
                     Divider()
                     PinAgentButton(agent: agent)
-                    ArchiveAgentButton(agent: agent, leavesChat: true)
+                    ArchiveAgentButton(agent: agent, leavesChat: popped == nil)
                 }
             } else {
                 Divider()

@@ -49,6 +49,10 @@
 	<string>To turn what you say into words for your prompt.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>So this can find your Mac on the network you are both on, and show you what your agents are doing.</string>
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>com.alexecollins.agents.remote.session</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

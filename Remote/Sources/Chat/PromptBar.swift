@@ -15,6 +15,8 @@ import SwiftUI
 /// sheet. An iPad with a keyboard gets the Mac's keys.
 struct PromptBar: View {
     @Environment(RemoteModel.self) private var model
+    /// Set in a scene of its own (#888): its session, not the selection.
+    @Environment(\.poppedChat) private var popped
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.chatActions) private var chatActions
@@ -345,7 +347,7 @@ struct PromptBar: View {
         dismissedSuggestions = true
         // What you just sent is the thing you want to see, so the conversation comes
         // back to its end even if you were reading three screens up.
-        model.scrollToEnd()
+        if let popped { popped.scrollToEnd() } else { model.scrollToEnd() }
         let agentID = agent.id
         Task {
             sending += 1
