@@ -132,6 +132,7 @@ export interface Agent {
   queuedPrompts?: QueuedPrompt[];
   suggestedPrompts?: SuggestedPrompt[];
   startedByWorkflow?: string;
+  purpose?: AgentPurpose;
   startedByRun?: UUID;
   startedByAgent?: UUID;
   chainDepth?: number;
@@ -161,6 +162,9 @@ export interface Agent {
 export type AgentArchivedReason = "byUser" | "byAgent";
 
 export type AgentGroup = "needsAttention" | "blocked" | "waiting" | "running" | "finished" | "stopped" | "archived";
+
+export type AgentPurpose =
+  | { providerDraft: { id: UUID } };
 
 export interface AgentRemovedNotification {
   agentID: UUID;
@@ -1706,6 +1710,7 @@ export interface StartRequest {
   sandbox?: SandboxChoice;
   labels: string[];
   persona?: string;
+  purpose?: AgentPurpose;
 }
 
 export interface StartingPoint {
@@ -2536,7 +2541,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ACPAuthMethod: { required: ["id"], optional: ["name", "description", "_meta"] },
   ACPPromptCapabilities: { required: [], optional: ["image", "audio", "embeddedContext"] },
   ACPProviderInfo: { required: ["id"], optional: ["name", "protocol", "configured"] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart"] },
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },
   AgentWorktree: { required: ["name", "root", "project", "madeByApp"], optional: ["branch", "base"] },
@@ -2717,7 +2722,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ShownFile: { required: ["path"], optional: ["line", "chart"] },
   SlashCommand: { required: ["name"], optional: ["description", "inputHint"] },
   StartOptions: { required: ["values", "extraArguments"], optional: [] },
-  StartRequest: { required: ["runtimeID", "cwd", "prompt", "attachments", "startOptions", "additionalDirectories", "mcpServers", "labels"], optional: ["draftID", "worktree", "requestID", "sandbox", "persona"] },
+  StartRequest: { required: ["runtimeID", "cwd", "prompt", "attachments", "startOptions", "additionalDirectories", "mcpServers", "labels"], optional: ["draftID", "worktree", "requestID", "sandbox", "persona", "purpose"] },
   StartingPoint: { required: ["repository", "commit"], optional: [] },
   StopBackgroundRequest: { required: ["agentID", "itemID"], optional: [] },
   StoreNotes: { required: ["notes"], optional: [] },
