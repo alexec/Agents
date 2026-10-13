@@ -168,6 +168,14 @@ public protocol GitHub: Sendable {
     func prDetail(repo: String, number: Int, diff: Bool) async throws -> JSON
     /// Squash-merges it and deletes its branch; with `auto`, once its checks pass (#837).
     func mergePR(repo: String, number: Int, auto: Bool) async throws -> JSON
+    /// Approves it, or asks for changes with `body`, as the signed-in person (#837).
+    func reviewPR(repo: String, number: Int, event: ReviewEvent, body: String) async throws -> JSON
+}
+
+/// A person's verdict on someone else's pull request (#837). GitHub refuses either on one's own.
+public enum ReviewEvent: String, Sendable, CaseIterable {
+    case approve
+    case requestChanges = "request_changes"
 }
 
 public struct GhError: Error, Sendable, CustomStringConvertible {

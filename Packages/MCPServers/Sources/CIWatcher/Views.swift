@@ -553,7 +553,25 @@ const prPage = (ui, back) => {
       className: "primary", disabled: !!blocked,
       title: pr.conflicts ? "It conflicts with its base: rebase it first" : pr.draft ? "A draft can't be merged" : "",
     });
-    const out = [text, el("div", { className: "actions" }, [comment, fix, el("span", { className: "grow" }), merge])];
+    // Someone else's PR only: GitHub refuses a review of one's own (#837).
+    const others = pr.viewer && pr.author && pr.viewer.toLowerCase() !== pr.author.toLowerCase();
+    const review = (event, words) => {
+      const b = button(words, async () => {
+        if (event === "request_changes" && !text.value.trim()) { say("Write what is to change first.", true); return; }
+        b.disabled = true;
+        try {
+          await call("review_pr", { event, body: text.value });
+          text.value = "";
+          say(event === "approve" ? `Approved #${pr.number}.` : `Asked for changes on #${pr.number}.`);
+          log(`review #${pr.number} ${event}`);
+          refresh();
+        } catch (e) { say("Couldn't review: " + e.message, true); }
+        finally { b.disabled = false; }
+      }, { title: event === "approve" ? "Approve it, with the box's words if any" : "Ask for changes: the box says what" });
+      return b;
+    };
+    const reviews = others ? [review("approve", "Approve"), review("request_changes", "Request Changes")] : [];
+    const out = [text, el("div", { className: "actions" }, [comment, fix, ...reviews, el("span", { className: "grow" }), merge])];
     if (confirming) {
       const auto = pr.checks === "running";
       const words = auto ? `Squash and merge #${pr.number} into ${pr.base} once its checks pass, then delete ${pr.branch}?`
@@ -652,7 +670,8 @@ const prPage = (ui, back) => {
 let prHTML = #"""
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Pull request</title>
-<!-- The CI watcher's pull request page (ui://ci/pr): get_pr's result, with Comment, Merge and
+<!-- The CI watcher's pull request page (ui://ci/pr): get_pr's result, with Comment, Merge,
+     Approve and Request Changes on someone else's PR (review_pr), and
      Ask the Agent to Fix (agents/message-agent to the branch's session, which the person sends). It has no network: it speaks
      only the MCP Apps postMessage bridge to its host. -->
 <style>

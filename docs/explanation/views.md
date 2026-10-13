@@ -147,7 +147,8 @@ sandbox as the app's own views.
 The `ci` server's views are drawn as above, on all three clients alike, from its own HTML:
 **Pull requests** (`ui://ci/board`), **Issues** (`ui://ci/issues`) and, since #837, a pull
 request's page (`ui://ci/pr`, fed by `get_pr`): its description, comments, files and diff and
-checks, with **Comment**, **Merge** and **Ask the Agent to Fix**. A title on the board opens
+checks, with **Comment**, **Merge**, **Ask the Agent to Fix** and, on someone else's pull
+request, **Approve** and **Request Changes**. A title on the board opens
 the same page in place. **Merge** asks again in the page before it squash-merges and deletes the
 branch. **Ask the Agent to Fix** is an `agents/message-agent` to the session on the PR's branch, so
 you send it, from a chat or a pin; with no session on the branch, it opens the new-agent form on

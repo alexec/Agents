@@ -58,8 +58,9 @@ all. The other `pr.*` events are left as they are: their data is a PR's number, 
 | `failed_log` | `repo`, `runId`, optional `job` | The last 300 lines of each failed job's log, as text | `readOnlyHint: true` | `model` |
 | `rerun_failed` | `repo`, `runId` | `{ rerun: true, url }` | none: it changes something | `model`, `app` |
 | `comment_on_pr` | `repo`, `number`, `body` | `{ url }` | none | `model`, `app` (the PR page's **Comment**, #837) |
-| `get_pr` (#837) | `repo`, `number`, optional `diff` | `{number, title, branch, base, url, author, state: "open"\|"merged"\|"closed", draft, body, createdAt, additions, deletions, checks, failedRunId?, conflicts?, review?: "approved"\|"changes_requested"\|"review_required", autoMerge, checkRuns: [{name, state: "passing"\|"failing"\|"running"\|"skipped", url}], files: [{path, additions, deletions, patch?}], diffTruncated?, comments: [{author, body, at, url?, review?}]}`. `comments` are the PR's comments and its reviews with words or a verdict, oldest first; line comments are not in it. With `diff: true`, each file's hunks are its `patch`, at most 2000 lines in all; a file past that has none, and `diffTruncated` is true | `readOnlyHint: true` | `model`, `app`; `_meta.ui.resourceUri: "ui://ci/pr"` |
+| `get_pr` (#837) | `repo`, `number`, optional `diff` | `{number, title, branch, base, url, author, state: "open"\|"merged"\|"closed", draft, body, createdAt, additions, deletions, checks, failedRunId?, conflicts?, review?: "approved"\|"changes_requested"\|"review_required", autoMerge, checkRuns: [{name, state: "passing"\|"failing"\|"running"\|"skipped", url}], files: [{path, additions, deletions, patch?}], diffTruncated?, comments: [{author, body, at, url?, review?}], viewer?}`. `viewer` is the signed-in login, left out when gh can't say. `comments` are the PR's comments and its reviews with words or a verdict, oldest first; line comments are not in it. With `diff: true`, each file's hunks are its `patch`, at most 2000 lines in all; a file past that has none, and `diffTruncated` is true | `readOnlyHint: true` | `model`, `app`; `_meta.ui.resourceUri: "ui://ci/pr"` |
 | `merge_pr` (#837) | `repo`, `number`, optional `auto` | `{ merged, auto, url }`: `gh pr merge -R repo --squash --delete-branch` (`--auto` with `auto`). `-R` keeps gh off the server's folder, so only the branch on GitHub is deleted | none | `app` only: a person merges, never the model |
+| `review_pr` (#837) | `repo`, `number`, `event`: `approve`\|`request_changes`, `body` (needed to request changes) | `{ event, url }`: `gh pr review N -R repo --approve`\|`--request-changes [-b body]`. GitHub refuses either on the signed-in person's own PR | none | `app` only: a person reviews, never the model |
 
 ## Resources
 
@@ -103,6 +104,9 @@ same page when a title is clicked.
   "Squash and merge #n into main and delete *branch*?", before `merge_pr`; with checks still
   running it is **Auto-merge** (`auto: true`). It is off in conflict, on a draft, and while
   auto-merge is already on.
+- On an open PR whose author is not `viewer`: **Approve** and **Request Changes** (`review_pr`),
+  with the box's words as the review's body; Request Changes needs words. On one's own PR they
+  are not shown, as GitHub refuses them there.
 
 ## Errors
 

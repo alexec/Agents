@@ -455,11 +455,12 @@ func editIssue(_ r: inout JSON, _ number: Int, _ change: (inout JSON) -> Void) {
     @Test func toolsListAnnotationsAndVisibility() async throws {
         let tools = try #require(try await h.ok("tools/list")["tools"]?.array)
         let byName = Dictionary(tools.map { ($0["name"]?.string ?? "", $0) }) { a, _ in a }
-        #expect(byName.keys.sorted() == ["comment_on_pr", "failed_log", "get_pr", "list_issues", "list_prs", "merge_pr", "rerun_failed"])
+        #expect(byName.keys.sorted() == ["comment_on_pr", "failed_log", "get_pr", "list_issues", "list_prs", "merge_pr", "rerun_failed",
+                                         "review_pr"])
         for (name, readOnly, visibility) in [("list_issues", true, ["model", "app"]), ("list_prs", true, ["model", "app"]),
                                              ("failed_log", true, ["model"]), ("rerun_failed", false, ["model", "app"]),
                                              ("comment_on_pr", false, ["model", "app"]), ("get_pr", true, ["model", "app"]),
-                                             ("merge_pr", false, ["app"])] {
+                                             ("merge_pr", false, ["app"]), ("review_pr", false, ["app"])] {
             #expect(byName[name]?["annotations"]?["readOnlyHint"] == (readOnly ? true : nil), "\(name)")
             #expect(byName[name]?["_meta"]?["ui"]?["visibility"] == JSON(visibility), "\(name)")
         }
@@ -640,7 +641,8 @@ func editIssue(_ r: inout JSON, _ number: Int, _ change: (inout JSON) -> Void) {
                                                        "agents/message-agent"]),
                       ("list_issues", "ui://ci/issues", ["list_issues", "agents/start-agent", "Start Agent", "--add-assignee @me"]),
                       ("get_pr", "ui://ci/pr", ["get_pr", "merge_pr", "comment_on_pr", "ui/message", "Ask the Agent to Fix",
-                                                       "agents/message-agent", "agents/start-agent", "branch: pr.branch"])])
+                                                       "agents/message-agent", "agents/start-agent", "branch: pr.branch",
+                                                       "review_pr", "Approve", "Request Changes", "pr.viewer"])])
     func toolFeedsItsViewWhichResourcesReadServes(tool: String, uri: String, words: [String]) async throws {
         let tools = try await h.ok("tools/list")["tools"]?.array ?? []
         let fed = try #require(tools.first { $0["name"] == .string(tool) })
@@ -731,6 +733,35 @@ func editIssue(_ r: inout JSON, _ number: Int, _ change: (inout JSON) -> Void) {
         #expect(page["files"]?.array?.map { $0["patch"]?.string } == ["@@ -0,0 +1,3 @@\n+a\n+b\n+c", nil], "past 2000 lines a file's diff is left out")
         #expect(page["diffTruncated"] == true)
         #expect(page["comments"]?.array?.compactMap { $0["author"]?.string } == ["r", "b"], "oldest first, an approval with no words kept")
+    }
+
+    /// Someone else's PR: approved, or changes asked for with words. One's own is refused, as GitHub does.
+    @Test func reviewPrApprovesOrRequestsChangesOnOthersPRsOnly() async throws {
+        try h.edit { $0["viewer"] = "reviewer2" }
+        let page = try await h.call("get_pr", ["repo": .string(repo), "number": 401])["structuredContent"] ?? [:]
+        #expect(page["viewer"] == "reviewer2")
+
+        let approved = try await h.call("review_pr", ["repo": .string(repo), "number": 401, "event": "approve"])
+        #expect(approved["structuredContent"] == ["event": "approve", "url": .string("https://github.com/\(repo)/pull/401")])
+        let after = try await h.call("get_pr", ["repo": .string(repo), "number": 401])["structuredContent"] ?? [:]
+        #expect(after["comments"]?.array?.last?["review"] == "approved")
+        #expect(after["comments"]?.array?.last?["author"] == "reviewer2")
+
+        let wordless = try await h.call("review_pr", ["repo": .string(repo), "number": 401, "event": "request_changes", "body": "  "])
+        #expect(wordless["isError"] == true, "changes asked for say what")
+        let changes = try await h.call("review_pr", ["repo": .string(repo), "number": 401, "event": "request_changes", "body": "Cap it."])
+        #expect(changes["structuredContent"]?["event"] == "request_changes")
+        let asked = try await h.call("get_pr", ["repo": .string(repo), "number": 401])["structuredContent"] ?? [:]
+        #expect(asked["comments"]?.array?.last == ["author": "reviewer2", "body": "Cap it.", "at": asked["comments"]?.array?.last?["at"] ?? "",
+                                                    "review": "changes_requested"])
+
+        let wrong = try await h.call("review_pr", ["repo": .string(repo), "number": 401, "event": "comment"])
+        #expect(wrong["isError"] == true)
+
+        try h.edit { $0["viewer"] = "alexec" }
+        let own = try await h.call("review_pr", ["repo": .string(repo), "number": 401, "event": "approve"])
+        #expect(own["isError"] == true)
+        #expect(own["content"]?.array?.first?["text"]?.string?.contains("your own pull request") == true)
     }
 
     @Test func mergePrMergesAndDeletesTheBranchOrTurnsOnAutoMerge() async throws {
