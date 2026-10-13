@@ -129,7 +129,7 @@ extension DaemonCore {
 
             case DaemonAPI.Method.clientCatchUp:
                 let request = try decode(params, as: DaemonAPI.CatchUpRequest.self) ?? .init()
-                return .success(try JSONValue.encoding(catchUp(request)))
+                return .success(try JSONValue.encoding(await catchUp(request)))
 
             case DaemonAPI.Method.surfaceIdentify:
                 let who = try require(params, as: DaemonAPI.SurfaceIdentification.self)

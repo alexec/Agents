@@ -84,6 +84,8 @@ public actor FakeRelayCloud {
     public var holdsBackFetches = 0
     /// The next call throws `.slowDown(seconds)`.
     public var slowDownNext: TimeInterval?
+    /// How long each save takes, as iCloud's do: a test that times a round trip (#884).
+    public var saveTakes: Duration = .zero
 
     public init() {}
 
@@ -94,6 +96,8 @@ public actor FakeRelayCloud {
     }
 
     public func slowDown(_ seconds: TimeInterval) { slowDownNext = seconds }
+
+    public func saves(take duration: Duration) { saveTakes = duration }
 
     func check() throws {
         if let seconds = slowDownNext {
@@ -171,7 +175,11 @@ public actor FakeRelayChannel: RelayChannel {
 
     public func ensureZone(device: UUID) async throws { try await cloud.ensureZone(device) }
 
-    public func post(_ record: FrameRecord, device: UUID) async throws { try await cloud.post(record, device) }
+    public func post(_ record: FrameRecord, device: UUID) async throws {
+        let takes = await cloud.saveTakes
+        if takes > .zero { try await Task.sleep(for: takes) }
+        try await cloud.post(record, device)
+    }
 
     public func fetchChanges(device: UUID) async throws -> [FrameRecord] {
         fetches += 1

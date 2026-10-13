@@ -51,8 +51,11 @@ enum RemoteControl {
 
     static var kind: ClientRecord.Kind { UIDevice.current.userInterfaceIdiom == .pad ? .iPad : .iPhone }
 
-    /// The phone's dial: `URLSession`'s WebSocket, which checks the pin.
-    static let dial: ControlCodeUse.Dial = { url, pin in try await WebSocketLink.connect(url, pin: pin) }
+    /// The phone's dial: `URLSession`'s WebSocket, which checks the pin, given as long as
+    /// the link allows the address (#884).
+    static let dial: ControlCodeUse.Dial = { url, pin in
+        try await WebSocketLink.connect(url, pin: pin, timeout: ControlPlaneLink.patience)
+    }
 
     /// Pair with a device code: say who this is, once, and keep what the control plane said.
     @discardableResult

@@ -101,7 +101,9 @@ sealed so that only your control plane and that one device can read it. Nothing 
 through a server of ours. A device on the relay says **Away — slower, through iCloud**.
 The relay is slower, about two or three seconds for each answer, so the terminal, the live
 page, files and attaching pictures wait until the device can reach the address again.
-Through the relay, a device reaches this Mac's host; your other hosts wait until it can
+After the address has failed once, the device gives it three seconds, not ten, before it
+tries the relay. When it connects, it catches up in one request, with what the pages on
+screen show in the same answer. Through the relay, a device reaches this Mac's host; your other hosts wait until it can
 reach the control plane's address again.
 
 Notifications take the same path. When an agent on any host needs you, a short notice is

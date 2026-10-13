@@ -2137,36 +2137,43 @@ final class RemoteModel {
     private func runCatchUp() async {
         let began = ContinuousClock.now
         let plan = parts.plan(chat: selection)
+        // The snapshot carries the parts on screen, the disk and the store notes (#884):
+        // one round trip through the relay, not one a part. A host that predates that
+        // carries none of them, and each is asked for on its own.
+        var carried: DaemonAPI.CatchUpSnapshot?
         for step in plan.steps {
             switch step {
-            case .snapshot: await refreshSnapshot()
+            case .snapshot: carried = await refreshSnapshot(with: plan.parts)
             case .chat: await loadTranscript()
-            case .part(let part): await load(part)
+            case .part(let part):
+                if carried?.carried.contains(part) != true { await load(part) }
             }
         }
         // The low-disk strip is under the banner on every page (#196), so it is read
         // on every catch-up, not when a page asks for it.
-        await refreshDisk()
+        if carried?.disk == nil { await refreshDisk() }
         // What the Mac could not read (#205, #223), at the foot of the projects list.
-        await refreshStoreNotes()
+        if carried?.storeNotes == nil { await refreshStoreNotes() }
         await settleUnsettledStart()
         settleSelection()
         // Once the counts have landed, so the widget's number is this refresh's number.
         publishAttention()
         if let pendingOpen { open(pendingOpen) }
-        note("catch-up: \(plan.steps.count) steps (\(plan.parts.map(\.rawValue).sorted().joined(separator: ", "))) "
-             + "in \(ContinuousClock.now - began)")
+        note("catch-up: \(plan.steps.count) steps (\(plan.parts.map(\.rawValue).sorted().joined(separator: ", "))), "
+             + "\(carried?.carried.count ?? 0) carried, in \(ContinuousClock.now - began)")
     }
 
     /// Projects, the first page of live agents, and what waits on a person: one call to a
-    /// host that knows `client/catchUp`, one per part to one that does not.
-    private func refreshSnapshot() async {
+    /// host that knows `client/catchUp`, one per part to one that does not. With them,
+    /// `parts`, the disk and the store notes, from a host that knows to send them (#884).
+    /// The snapshot, or nil when it failed.
+    private func refreshSnapshot(with parts: Set<CatchUpPart>) async -> DaemonAPI.CatchUpSnapshot? {
         let snapshot: DaemonAPI.CatchUpSnapshot
         do {
-            snapshot = try await client.catchUp()
+            snapshot = try await client.catchUp(.init(parts: CatchUpPart.allCases.filter(parts.contains)))
         } catch {
             note("catch-up: the snapshot failed: \(error)")
-            return
+            return nil
         }
         work.replaceProjects(snapshot.projects, from: .mac)
         takeLiveAgents(snapshot.agents, page: DaemonAPI.CatchUpRequest.firstPage)
@@ -2175,7 +2182,17 @@ final class RemoteModel {
         work.replaceAttention(snapshot.attention)
         work.setResuming(snapshot.resuming)
         toNotifier { [deviceID = self.deviceID] notifier in await notifier.sweep(keeping: snapshot.attention, me: .device(deviceID)) }
+        if let disk = snapshot.disk { work.replaceDisk(disk) }
+        if let notes = snapshot.storeNotes { work.replaceStoreNotes(notes) }
+        if let workflows = snapshot.workflows { work.replaceWorkflows(workflows) }
+        if let pins = snapshot.pins { work.replacePins(pins) }
+        if let leases = snapshot.leases {
+            work.replaceLeases(leases.leases)
+            work.replaceHostedMCP(leases.hosted)
+            work.replaceMCPHealth(leases.health)
+        }
         if let selectedProject { await fillProject(selectedProject) }
+        return snapshot
     }
 
     /// A page showing `parts` appeared: read the ones not read on this connection.
