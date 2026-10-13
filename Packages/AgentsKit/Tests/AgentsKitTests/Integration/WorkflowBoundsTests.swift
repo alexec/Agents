@@ -94,6 +94,51 @@ struct WorkflowBoundsTests {
         #expect(store.writes == 2)
     }
 
+    /// An approved copy is a file of its own, not in `workflows.json` (#931): the
+    /// heartbeat leaves it alone, it reads back, and it goes when nothing keeps it.
+    @Test func approvedCopiesAreKeptBesideTheFile() throws {
+        let (locations, _) = try temporary()
+        let store = WorkflowStore(locations: locations)
+        let content = Data(String(repeating: "Run the tests.\n", count: 2_000).utf8)
+        let name = ContentDigest.sha256(content)
+        let copy = locations.workflowCopies.appendingPathComponent(name)
+        var records = WorkflowRecords()
+        records.update(folder: URL(filePath: "/tmp/somewhere/api"), workflowID: "nightly") {
+            $0.approvedDigest = name
+            $0.approvedContent = content
+        }
+        try store.save(records)
+        #expect(try Data(contentsOf: copy) == content)
+        #expect(try Data(contentsOf: locations.workflows).count < 1_000)
+        let copied = try FileManager.default.attributesOfItem(atPath: copy.path)[.modificationDate] as? Date
+
+        _ = store.noteTick(Date().addingTimeInterval(60))
+        #expect(store.writes == 2)
+        #expect(try FileManager.default.attributesOfItem(atPath: copy.path)[.modificationDate] as? Date == copied,
+                "the heartbeat does not write the copy again")
+        #expect(WorkflowStore(locations: locations).load().states.first?.approvedContent == content)
+
+        records.update(folder: URL(filePath: "/tmp/somewhere/api"), workflowID: "nightly") { $0.approvedContent = nil }
+        try store.save(records)
+        #expect(!FileManager.default.fileExists(atPath: copy.path))
+    }
+
+    /// A file written before #931, with the copy inside it, reads as it did and moves the
+    /// copy out on its next write.
+    @Test func aCopyInsideTheFileMovesOut() throws {
+        let (locations, _) = try temporary()
+        let content = Data("Run the tests.".utf8)
+        try Data("""
+            {"states": [{"folder": "file:///tmp/somewhere/api/", "workflowID": "nightly",
+              "approvedDigest": "abc", "approvedContent": "\(content.base64EncodedString())"}]}
+            """.utf8).write(to: locations.workflows)
+        let store = WorkflowStore(locations: locations)
+        #expect(store.load().states.first?.approvedContent == content)
+        _ = store.noteTick(Date())
+        #expect(try !String(contentsOf: locations.workflows, encoding: .utf8).contains("approvedContent"))
+        #expect(WorkflowStore(locations: locations).load().states.first?.approvedContent == content)
+    }
+
     /// Held in memory, but a file written by anybody else is read afresh.
     @Test func aFileWrittenByAnotherIsReadAgain() throws {
         let (locations, _) = try temporary()

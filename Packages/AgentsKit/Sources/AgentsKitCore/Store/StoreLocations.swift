@@ -137,6 +137,10 @@ public struct StoreLocations: Sendable {
     /// raise a confirmation every time and fill its history with state nobody wants to
     /// review.
     public var workflows: URL { root.appendingPathComponent("workflows.json") }
+    /// The approved copy of each workflow file (#569), one file each, named by its
+    /// SHA-256 (#931). Beside `workflows`, not in it, so the heartbeat that rewrites that
+    /// file does not rewrite every workflow with it.
+    public var workflowCopies: URL { root.appendingPathComponent("workflow-copies", isDirectory: true) }
     /// Which project plugins the person has approved, by the digest of their folders
     /// (security review, S2). Outside the project for the reason `workflows` is: a thing
     /// an agent can write to the project must not be able to approve itself.
