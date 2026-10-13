@@ -155,7 +155,7 @@ a.title { color: inherit; }
     if (!m || m.jsonrpc !== "2.0") return;
     if (m.id !== undefined && !m.method && waiting.has(m.id)) {
       const w = waiting.get(m.id); waiting.delete(m.id);
-      return m.error ? w.reject(new Error(m.error.message)) : w.resolve(m.result);
+      return m.error ? w.reject(Object.assign(new Error(m.error.message), { code: m.error.code })) : w.resolve(m.result);
     }
     switch (m.method) {
       case "ui/notifications/tool-input":
@@ -351,7 +351,7 @@ button:disabled { opacity: 0.5; cursor: default; }
     if (!m || m.jsonrpc !== "2.0") return;
     if (m.id !== undefined && !m.method && waiting.has(m.id)) {
       const w = waiting.get(m.id); waiting.delete(m.id);
-      return m.error ? w.reject(new Error(m.error.message)) : w.resolve(m.result);
+      return m.error ? w.reject(Object.assign(new Error(m.error.message), { code: m.error.code })) : w.resolve(m.result);
     }
     switch (m.method) {
       case "ui/notifications/tool-input": {
@@ -547,7 +547,7 @@ const prPage = (ui, back) => {
       catch (e) { say("Couldn't comment: " + e.message, true); }
       finally { comment.disabled = false; }
     });
-    const fix = button("Ask the Agent to Fix", () => askToFix(text.value), { title: "Send it to this chat's agent as your message; you say Send first" });
+    const fix = button("Ask the Agent to Fix", () => askToFix(text.value), { title: `Send it to the agent working on ${pr.branch}; you say Send first` });
     const blocked = pr.conflicts || pr.draft || (pr.autoMerge && pr.checks === "running");
     const merge = button(mergeWords(), () => { confirming = true; draw(); }, {
       className: "primary", disabled: !!blocked,
@@ -574,7 +574,9 @@ const prPage = (ui, back) => {
     return out;
   };
 
-  // Into this chat, as the person's own message: the host asks them first (ui/message).
+  // To the session working on the PR's branch, as the person's own message: the host asks them
+  // first (agents/message-agent, #837). With no such session, the new-agent form on the branch;
+  // with a host that doesn't know the message, into this chat (ui/message).
   const askToFix = async (note) => {
     const n = pr.number, failing = pr.checks === "failing";
     const text = `Fix pull request #${n} (\`gh pr view ${n} --comments\`) on ${pr.branch}: `
@@ -583,8 +585,20 @@ const prPage = (ui, back) => {
         .filter(Boolean).concat(note.trim() ? [] : ["its review comments"]).join(", ") + "."
       + (note.trim() ? "\n\n" + note.trim() : "") + "\n\nPush to the same branch.";
     say("Send it from under the view…");
+    try { await request("agents/message-agent", { branch: pr.branch, text }); say("Sent to the agent."); return; }
+    catch (e) {
+      if (e.code === -32001) return startToFix(n, text);
+      if (e.code !== -32601) { say(e.message, true); return; }
+    }
     try { await request("ui/message", { role: "user", content: [{ type: "text", text }] }); say("Sent to the agent."); }
     catch (e) { say(e.message, true); }
+  };
+  // No session works on the branch: a new agent's form, in a worktree on it. The person starts it.
+  const startToFix = async (n, text) => {
+    try {
+      await request("agents/start-agent", { prompt: text, labels: ["P#" + n], branch: pr.branch });
+      say(`No agent works on ${pr.branch}: a new one is ready to start.`);
+    } catch (e) { say("No agent works on " + pr.branch + ", and a new one couldn't be opened: " + e.message, true); log("start-agent refused: " + e.message, "warning"); }
   };
 
   const size = () => ui.size();
@@ -639,7 +653,7 @@ let prHTML = #"""
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Pull request</title>
 <!-- The CI watcher's pull request page (ui://ci/pr): get_pr's result, with Comment, Merge and
-     Ask the Agent to Fix (ui/message, which the person sends). It has no network: it speaks
+     Ask the Agent to Fix (agents/message-agent to the branch's session, which the person sends). It has no network: it speaks
      only the MCP Apps postMessage bridge to its host. -->
 <style>
 :root { color-scheme: light dark;
@@ -716,7 +730,7 @@ button:disabled { opacity: 0.5; cursor: default; }
     if (!m || m.jsonrpc !== "2.0") return;
     if (m.id !== undefined && !m.method && waiting.has(m.id)) {
       const w = waiting.get(m.id); waiting.delete(m.id);
-      return m.error ? w.reject(new Error(m.error.message)) : w.resolve(m.result);
+      return m.error ? w.reject(Object.assign(new Error(m.error.message), { code: m.error.code })) : w.resolve(m.result);
     }
     switch (m.method) {
       case "ui/notifications/tool-input": {

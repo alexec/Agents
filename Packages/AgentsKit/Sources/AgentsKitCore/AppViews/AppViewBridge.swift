@@ -15,6 +15,12 @@ public enum AppViewBridge {
 
     /// Our extension of MCP Apps (#834): a view asks for the new-agent form, filled in.
     public static let startAgentMethod = "agents/start-agent"
+    /// Our extension of MCP Apps (#837): a view asks to send words to the session working on
+    /// a branch. The person says Send first.
+    public static let messageAgentMethod = "agents/message-agent"
+    /// The error code of an `agents/message-agent` that no session in the view's project
+    /// works on: the view may offer a new agent instead.
+    public static let noAgentCode = -32001
 
     /// The version of MCP Apps this host speaks.
     public static let protocolVersion = "2026-01-26"
@@ -30,6 +36,8 @@ public enum AppViewBridge {
         case message(id: JSONValue, text: String)
         /// Our extension (#834): open the new-agent form, filled in. Never a start.
         case startAgent(id: JSONValue, start: AppViewStart)
+        /// Our extension (#837): send words to the session on a branch, once the person says Send.
+        case messageAgent(id: JSONValue, message: AppViewAgentMessage)
         case updateContext(id: JSONValue, content: JSONValue?, structuredContent: JSONValue?)
         case displayMode(id: JSONValue, mode: String)
         case sizeChanged(width: Double?, height: Double?)
@@ -95,6 +103,11 @@ public enum AppViewBridge {
         case startAgentMethod:
             switch AppViewStart.read(params) {
             case .success(let start): return .startAgent(id: id, start: start)
+            case .failure(let reason): return .malformed(id: id, reason: reason.words)
+            }
+        case messageAgentMethod:
+            switch AppViewAgentMessage.read(params) {
+            case .success(let message): return .messageAgent(id: id, message: message)
             case .failure(let reason): return .malformed(id: id, reason: reason.words)
             }
         case "ui/update-model-context":
@@ -182,6 +195,9 @@ public struct AppViewStart: Equatable, Sendable {
     public var labels: [String]
     /// A new worktree's name, made with `WorktreeChoice.named`; nil leaves the form's place.
     public var worktree: String?
+    /// A branch already there, for a new worktree on it (`WorktreeChoice.branch`, #837): a
+    /// pull request's. It wins over `worktree`.
+    public var branch: String?
 
     public struct Refusal: Error, Equatable {
         public var words: String
@@ -190,10 +206,17 @@ public struct AppViewStart: Equatable, Sendable {
     /// The most a view may put in the field, in characters.
     public static let promptLimit = 8000
 
-    public init(prompt: String, labels: [String] = [], worktree: String? = nil) {
+    public init(prompt: String, labels: [String] = [], worktree: String? = nil, branch: String? = nil) {
         self.prompt = prompt
         self.labels = labels
         self.worktree = worktree
+        self.branch = branch
+    }
+
+    /// Where the form puts the new agent, if the view said.
+    public var worktreeChoice: WorktreeChoice? {
+        if let branch { return .branch(branch) }
+        return worktree.map(WorktreeChoice.named)
     }
 
     /// Read from the message's parameters, or why not.
@@ -215,8 +238,64 @@ public struct AppViewStart: Equatable, Sendable {
             return .failure(Refusal(words: SessionLabelPolicy.Refusal.tooMany.localizedDescription))
         }
         let worktree = params?["worktree"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let branch = params?["branch"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard (branch ?? "").count <= AppViewAgentMessage.branchLimit else {
+            return .failure(Refusal(words: "The branch is longer than \(AppViewAgentMessage.branchLimit) characters."))
+        }
         return .success(AppViewStart(prompt: prompt, labels: labels,
-                                     worktree: worktree.flatMap { $0.isEmpty ? nil : String($0.prefix(100)) }))
+                                     worktree: worktree.flatMap { $0.isEmpty ? nil : String($0.prefix(100)) },
+                                     branch: branch.flatMap { $0.isEmpty ? nil : $0 }))
+    }
+}
+
+/// What a view asked to send to the session on a branch (#837, `agents/message-agent`): the
+/// person is asked under the view, and Send puts it in that session as their prompt.
+public struct AppViewAgentMessage: Equatable, Sendable {
+    /// The branch the session's worktree is on, such as a pull request's.
+    public var branch: String
+    /// The words, as the person will see them before Send.
+    public var text: String
+
+    public struct Refusal: Error, Equatable {
+        public var words: String
+    }
+
+    public static let textLimit = AppViewStart.promptLimit
+    public static let branchLimit = 255
+
+    public init(branch: String, text: String) {
+        self.branch = branch
+        self.text = text
+    }
+
+    /// Read from the message's parameters, or why not.
+    public static func read(_ params: JSONValue?) -> Result<AppViewAgentMessage, Refusal> {
+        let branch = (params?["branch"]?.stringValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !branch.isEmpty else { return .failure(Refusal(words: "agents/message-agent needs a branch.")) }
+        guard branch.count <= branchLimit else {
+            return .failure(Refusal(words: "The branch is longer than \(branchLimit) characters."))
+        }
+        let text = (params?["text"]?.stringValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return .failure(Refusal(words: "agents/message-agent needs text.")) }
+        guard text.count <= textLimit else {
+            return .failure(Refusal(words: "The text is longer than \(textLimit) characters."))
+        }
+        return .success(AppViewAgentMessage(branch: branch, text: text))
+    }
+
+    /// The session it goes to: one on `host` in `project` whose worktree is on the branch, not
+    /// archived, the latest active first. Nil when there is none.
+    public func recipient(among agents: [Agent], host: HostID, project: URL) -> Agent? {
+        let project = Project.standardize(project)
+        return agents
+            .filter { $0.host == host && $0.archivedAt == nil && $0.worktree?.branch == branch && $0.projectFolder == project }
+            .max { $0.lastActivityAt < $1.lastActivityAt }
+    }
+
+    /// What the person is shown the session as.
+    public static func name(of agent: Agent) -> String {
+        let title = agent.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return title.isEmpty ? (agent.worktree?.name ?? "the agent") : title
     }
 }
 

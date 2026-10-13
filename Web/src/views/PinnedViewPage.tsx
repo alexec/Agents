@@ -11,7 +11,7 @@ import { describe } from "../model/errors";
 import type { JSONValue, PinView, UUID } from "../protocol/generated";
 import { go } from "../route";
 import { BackToList } from "./BackToList";
-import { feedParams, pinnedViewCall } from "./chat/appViewBridge";
+import { feedParams, pinnedViewCall, recipient } from "./chat/appViewBridge";
 import { ViewLayer, type ViewActions } from "./chat/viewLayer";
 import { offerStart } from "./NewAgent";
 
@@ -35,6 +35,9 @@ export function PinnedViewPage({ store, host, folder, path, pin, down }: {
     send: async () => false,
     // Its agents/start-agent opens the form in this project, as it would from a chat (#834).
     startAgent: (start) => offerStart(store, host, folder, start),
+    // Its agents/message-agent goes to the session on the branch, in this project (#837).
+    recipient: (message) => recipient(store.agents.value[host] ?? [], message, folder),
+    sendTo: (agent, text) => store.prompt(host, agent, text, []),
   }), [id, host, folder, store]);
   const drawn = !!view && !pin?.missing;
 

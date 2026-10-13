@@ -107,16 +107,17 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   const personas = useSignal<Persona[]>([]);
   const persona = useSignal<string | undefined>(undefined);
   const pendingPersona = useRef<Persona | undefined>(undefined);
-  /** A new worktree a view named (#834), made the place once the folder is known to be a repository. */
-  const offeredWorktree = useRef<string | undefined>(undefined);
+  /** A new worktree a view named (#834), or a branch it named (#837), made the place once the folder is
+   *  known to be a repository. */
+  const offeredWorktree = useRef<Where | undefined>(undefined);
   /** The project whose worktrees are listed, so an offer knows whether it can be placed now. */
   const listedFor = useRef("");
   /** Counts the offers taken: the prompt field opens afresh on each, with the view's words. */
   const filled = useSignal(0);
   const placeOffered = () => {
-    const name = offeredWorktree.current;
+    const offered = offeredWorktree.current;
     offeredWorktree.current = undefined;
-    if (name && isRepository.peek()) where.value = { kind: "named", name };
+    if (offered && isRepository.peek()) where.value = offered;
   };
 
   useEffect(() => {
@@ -161,7 +162,8 @@ export function NewAgent({ store, host, folder, projectName, down }: {
     filled.value += 1;
     // Added to those on the form, held to what a session takes, as a label typed here is.
     labels.value = [...labels.value, ...accepted(offered.start.labels, labels.value)];
-    offeredWorktree.current = offered.start.worktree;
+    offeredWorktree.current = offered.start.branch ? { kind: "branch", name: offered.start.branch }
+      : offered.start.worktree ? { kind: "named", name: offered.start.worktree } : undefined;
     if (listedFor.current === `${host}|${folderKey(folder)}`) placeOffered();
   }, [offered, host, folder]);
 
@@ -386,6 +388,10 @@ export function NewAgent({ store, host, folder, projectName, down }: {
                     {/* The one a view named (#834), offered while it is the place. */}
                     {where.value.kind === "named" && (
                       <option value={whereValue(where.value)}>New worktree — {where.value.name}</option>
+                    )}
+                    {/* A pull request's branch a view named (#837), when the list has not got it. */}
+                    {where.value.kind === "branch" && !branches.value.some((b) => where.value.kind === "branch" && b.name === where.value.name) && (
+                      <option value={whereValue(where.value)}>New worktree on {where.value.name}</option>
                     )}
                     {worktrees.value.length > 0 && (
                       <optgroup label="Worktrees">

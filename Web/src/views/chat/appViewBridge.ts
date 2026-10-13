@@ -2,12 +2,17 @@
 // postMessage. The web page's copy of AgentsKitCore/AppViews/AppViewBridge.swift, which the Mac
 // and the phone use; docs/explanation/views.md says what each message does in Agents, and the
 // two are kept to it. Pure, so test/appViews.test.mjs reads every row.
-import type { AppViewCall, AppViewPolicy, JSONValue, UUID, ViewPin } from "../../protocol/generated";
+import type { Agent, AppViewCall, AppViewPolicy, JSONValue, UUID, ViewPin } from "../../protocol/generated";
+import { folderKey, projectFolder } from "../../model/groups";
 
 export const protocolVersion = "2026-01-26";
 export const displayModes = ["inline", "fullscreen"] as const;
 /** Our extension of MCP Apps (#834): a view asks for the new-agent form, filled in. */
 export const startAgentMethod = "agents/start-agent";
+/** Our extension of MCP Apps (#837): a view asks to send words to the session on a branch. */
+export const messageAgentMethod = "agents/message-agent";
+/** The error code of an agents/message-agent that no session in the view's project works on. */
+export const noAgentCode = -32001;
 
 type Id = string | number;
 type Message = { jsonrpc?: unknown; id?: unknown; method?: unknown; params?: unknown; result?: unknown; error?: unknown };
@@ -23,6 +28,8 @@ export type Ask =
   | { kind: "message"; id: Id; text: string }
   /** Our extension (#834): open the new-agent form, filled in. Never a start. */
   | { kind: "startAgent"; id: Id; start: Start }
+  /** Our extension (#837): send words to the session on a branch, once the person says Send. */
+  | { kind: "messageAgent"; id: Id; message: AgentMessage }
   | { kind: "updateContext"; id: Id; content?: JSONValue | undefined; structuredContent?: JSONValue | undefined }
   | { kind: "displayMode"; id: Id; mode: string }
   | { kind: "sizeChanged"; width?: number | undefined; height?: number | undefined }
@@ -87,6 +94,10 @@ export function read(raw: unknown): Ask {
       const read = readStart(params);
       return "refused" in read ? { kind: "malformed", id, reason: read.refused } : { kind: "startAgent", id, start: read.start };
     }
+    case messageAgentMethod: {
+      const read = readAgentMessage(params);
+      return "refused" in read ? { kind: "malformed", id, reason: read.refused } : { kind: "messageAgent", id, message: read.message };
+    }
     case "ui/update-model-context":
       return { kind: "updateContext", id, content: params.content as JSONValue, structuredContent: params.structuredContent as JSONValue };
     case "ui/request-display-mode":
@@ -105,6 +116,8 @@ export interface Start {
   labels: string[];
   /** A new worktree's name, made with WorktreeChoice's named; unset leaves the form's place. */
   worktree?: string | undefined;
+  /** A branch already there, for a new worktree on it (WorktreeChoice's branch, #837). It wins over `worktree`. */
+  branch?: string | undefined;
 }
 
 /** The most a view may put in the field, in characters. */
@@ -131,7 +144,40 @@ export function readStart(params: Record<string, unknown>): { start: Start } | {
   }
   if (labels.length > startLabelLimit) return { refused: "A session can have at most five labels." };
   const worktree = typeof params.worktree === "string" ? characters(params.worktree.trim()).slice(0, 100).join("") : "";
-  return { start: { prompt, labels, ...(worktree ? { worktree } : {}) } };
+  const branch = typeof params.branch === "string" ? params.branch.trim() : "";
+  if (characters(branch).length > branchLimit) return { refused: `The branch is longer than ${branchLimit} characters.` };
+  return { start: { prompt, labels, ...(worktree ? { worktree } : {}), ...(branch ? { branch } : {}) } };
+}
+
+/** What a view asked to send to the session on a branch (#837, `agents/message-agent`): AppViewAgentMessage. */
+export interface AgentMessage {
+  /** The branch the session's worktree is on, such as a pull request's. */
+  branch: string;
+  /** The words, as the person will see them before Send. */
+  text: string;
+}
+
+export const branchLimit = 255;
+
+/** Read from the message's parameters, or why not (AppViewAgentMessage.read). */
+export function readAgentMessage(params: Record<string, unknown>): { message: AgentMessage } | { refused: string } {
+  const branch = typeof params.branch === "string" ? params.branch.trim() : "";
+  if (!branch) return { refused: "agents/message-agent needs a branch." };
+  if (characters(branch).length > branchLimit) return { refused: `The branch is longer than ${branchLimit} characters.` };
+  const text = typeof params.text === "string" ? params.text.trim() : "";
+  if (!text) return { refused: "agents/message-agent needs text." };
+  if (characters(text).length > startPromptLimit) return { refused: `The text is longer than ${startPromptLimit} characters.` };
+  return { message: { branch, text } };
+}
+
+/** The session it goes to (AppViewAgentMessage.recipient): in `project`, on the branch, not archived,
+ *  the latest active first. Its id and what the person sees it called, or null. */
+export function recipient(agents: Agent[], message: AgentMessage, project: string): { id: string; name: string } | null {
+  const found = agents
+    .filter((a) => !a.archivedAt && a.worktree?.branch === message.branch && projectFolder(a) === folderKey(project))
+    .sort((a, b) => b.lastActivityAt - a.lastActivityAt)[0];
+  if (!found) return null;
+  return { id: found.id, name: found.title?.trim() || found.worktree?.name || "the agent" };
 }
 
 export const result = (id: Id, value: unknown = {}) => ({ jsonrpc: "2.0", id, result: value });

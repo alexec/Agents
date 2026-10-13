@@ -32,7 +32,7 @@ import { nameOf, pathOf, setPane } from "./files/paneState";
 import { FileSearch, isOpenFileKey } from "./files/FileSearch";
 import { focusedEntry } from "../model/focus";
 import { ViewLayerContext } from "./chat/AppView";
-import { type Start, viewPin } from "./chat/appViewBridge";
+import { recipient, type Start, viewPin } from "./chat/appViewBridge";
 import { ViewLayer, type ViewActions } from "./chat/viewLayer";
 import { offerStart } from "./NewAgent";
 import { BackToList } from "./BackToList";
@@ -180,6 +180,9 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       ...(pinFolder ? { pin: (call: AppViewCall) => store.pinView(host, pinFolder, viewPin(call)) } : {}),
       // A new agent, filled in by the view (#834): the form in the chat's project.
       ...(pinFolder ? { startAgent: (start: Start) => offerStart(store, host, pinFolder, start) } : {}),
+      // The session on a pull request's branch (#837), asked under the view first.
+      ...(pinFolder ? { recipient: (message) => recipient(store.agents.value[host] ?? [], message, pinFolder) } : {}),
+      sendTo: (id, text) => store.prompt(host, id, text, []),
     };
     return { layer, actions };
   }, [layer, host, session, pinFolder]);

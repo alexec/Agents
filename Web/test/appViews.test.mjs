@@ -32,6 +32,31 @@ test("the bridge reads what a view asks", () => {
   assert.deepEqual(bridge.read("not an object"), { kind: "ignored" });
 });
 
+test("agents/message-agent is read as AppViewAgentMessage reads it (#837)", () => {
+  assert.deepEqual(ask("agents/message-agent", { branch: " agents/fix-837 ", text: " Fix it \n" }),
+    { kind: "messageAgent", id: 1, message: { branch: "agents/fix-837", text: "Fix it" } });
+  const refused = (params) => ask("agents/message-agent", params);
+  assert.deepEqual(refused({ text: "Fix" }), { kind: "malformed", id: 1, reason: "agents/message-agent needs a branch." });
+  assert.deepEqual(refused({ branch: "b", text: " " }), { kind: "malformed", id: 1, reason: "agents/message-agent needs text." });
+  assert.equal(refused({ branch: "b", text: "x".repeat(8001) }).kind, "malformed");
+  assert.equal(refused({ branch: "b".repeat(256), text: "Fix" }).kind, "malformed");
+  // A start may name a branch for its worktree (#837).
+  assert.deepEqual(ask("agents/start-agent", { prompt: "Fix PR #9", labels: ["P#9"], branch: " agents/fix-9 " }),
+    { kind: "startAgent", id: 1, start: { prompt: "Fix PR #9", labels: ["P#9"], branch: "agents/fix-9" } });
+});
+
+test("the message goes to the latest session on the branch, in the project (#837)", () => {
+  const agent = (title, branch, lastActivityAt, more = {}) => ({ id: title, title, cwd: "/tmp/repo/.agents/worktrees/w", lastActivityAt,
+    worktree: { name: "fix-837", root: "/tmp/repo/.agents/worktrees/w", branch, project: "/tmp/repo" }, ...more });
+  const agents = [agent("Older", "agents/fix-837", 10), agent("Newer", "agents/fix-837", 20),
+    agent("Archived", "agents/fix-837", 30, { archivedAt: 1 }), agent("Other branch", "agents/fix-838", 40),
+    agent("Other project", "agents/fix-837", 50, { worktree: { name: "x", root: "/tmp/other/x", branch: "agents/fix-837", project: "/tmp/other" } })];
+  const message = { branch: "agents/fix-837", text: "Fix" };
+  assert.deepEqual(bridge.recipient(agents, message, "/tmp/repo/"), { id: "Newer", name: "Newer" });
+  assert.equal(bridge.recipient(agents.slice(2), message, "/tmp/repo"), null);
+  assert.deepEqual(bridge.recipient([agent("", "agents/fix-837", 1)], message, "/tmp/repo"), { id: "", name: "fix-837" });
+});
+
 test("agents/start-agent is read as AppViewStart reads it (#834)", () => {
   assert.deepEqual(ask("agents/start-agent", { prompt: "  Fix #834 \n", labels: [" #834 ", "#834", "ci"], worktree: " fix-834 " }),
     { kind: "startAgent", id: 1, start: { prompt: "Fix #834", labels: ["#834", "ci"], worktree: "fix-834" } });

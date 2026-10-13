@@ -21,6 +21,17 @@ struct AppViewActions {
     /// Open the new-agent form in the view's project, filled in (#834). Why it was not, or
     /// nil. The person starts the agent; a view never does.
     var startAgent: (@MainActor (AppViewStart) -> String?)? = nil
+    /// The session a view's `agents/message-agent` goes to (#837): the one in the view's
+    /// project on that branch, or nil when there is none.
+    var recipient: (@MainActor (AppViewAgentMessage) -> AppViewRecipient?)? = nil
+    /// An `agents/message-agent` the person said yes to, sent to that session as their prompt.
+    var sendTo: (@MainActor (UUID, String) async -> Bool)? = nil
+}
+
+/// The session a view's message goes to (#837): who it is, and what the person sees it called.
+struct AppViewRecipient: Equatable {
+    var id: UUID
+    var name: String
 }
 
 /// The views open in one chat, kept by call so a view keeps what it is showing while it is
@@ -81,6 +92,8 @@ final class AppViewHost {
     private(set) var height: CGFloat = 96
     /// A `ui/message` waiting on the person's yes or no.
     private(set) var askedMessage: String?
+    /// For an `agents/message-agent` (#837): the session it goes to, not this chat's.
+    private(set) var askedRecipient: AppViewRecipient?
     /// What the agent will be told with the person's next message, as the view last said.
     private(set) var contextLine: String?
     private(set) var title: String
@@ -244,14 +257,21 @@ final class AppViewHost {
 
     func answerMessage(send: Bool) {
         guard let text = askedMessage, let id = messageID else { return }
+        let recipient = askedRecipient
         askedMessage = nil
+        askedRecipient = nil
         messageID = nil
         guard send else {
             self.send(AppViewBridge.error(id, code: -32000, "The person did not send it."))
             return
         }
         Task {
-            let sent = await actions.send(text)
+            let sent: Bool
+            if let recipient, let sendTo = actions.sendTo {
+                sent = await sendTo(recipient.id, text)
+            } else {
+                sent = await actions.send(text)
+            }
             self.send(sent ? AppViewBridge.result(id) : AppViewBridge.error(id, code: -32000, "It could not be sent."))
         }
     }
@@ -382,6 +402,21 @@ final class AppViewHost {
             if let earlier = messageID { send(AppViewBridge.error(earlier, code: -32000, "Another message replaced it.")) }
             messageID = id
             askedMessage = text
+            askedRecipient = nil
+        case .messageAgent(let id, let message):
+            // From a pin too: the session is named by its branch, not by where the view is.
+            guard let find = actions.recipient, actions.sendTo != nil else {
+                send(AppViewBridge.error(id, code: -32000, "This app can't send to another agent from here."))
+                return
+            }
+            guard let recipient = find(message) else {
+                send(AppViewBridge.error(id, code: AppViewBridge.noAgentCode, "No agent here works on \(message.branch)."))
+                return
+            }
+            if let earlier = messageID { send(AppViewBridge.error(earlier, code: -32000, "Another message replaced it.")) }
+            messageID = id
+            askedMessage = message.text
+            askedRecipient = recipient
         case .startAgent(let id, let start):
             guard let startAgent = actions.startAgent else {
                 send(AppViewBridge.error(id, code: -32000, "This app can't open a new agent from here."))

@@ -14,7 +14,7 @@ import { encodeDomains } from "../../sandbox/policy";
 import { CallFailed } from "../../wire/link";
 import {
   canPin, type Context, needsShow, serverParam, type ViewAsk, contextChanges, error as rpcError, Feed, initializeResult, noAgentWords, notification, policyWire,
-  read, request, result, type Start, startAgentMethod, viewTitle,
+  type AgentMessage, noAgentCode, read, request, result, type Start, startAgentMethod, viewTitle,
 } from "./appViewBridge";
 
 export interface ViewActions {
@@ -29,6 +29,11 @@ export interface ViewActions {
   /** Opens the new-agent form in the view's project, filled in (#834). Why it was not, or null.
    *  The person starts the agent; a view never does. */
   startAgent?(start: Start): string | null;
+  /** The session a view's agents/message-agent goes to (#837): on the branch, in the view's
+   *  project, or null when there is none. */
+  recipient?(message: AgentMessage): { id: string; name: string } | null;
+  /** An agents/message-agent the person said yes to, sent to that session as their prompt. */
+  sendTo?(id: string, text: string): Promise<boolean>;
 }
 
 export const maxInlineHeight = 640;
@@ -45,6 +50,8 @@ export class HostedView {
   readonly ask = signal<ViewAsk | null>(null);
   readonly failure = signal("");
   readonly askedMessage = signal<string | null>(null);
+  /** For an agents/message-agent (#837): the session it goes to, not this chat's. */
+  readonly askedRecipient = signal<{ id: string; name: string } | null>(null);
   readonly contextLine = signal<string | null>(null);
   /** Pinned from here (#189): the caption says so instead of offering Pin. */
   readonly pinned = signal(false);
@@ -203,10 +210,13 @@ export class HostedView {
   answerMessage(send: boolean): void {
     const text = this.askedMessage.value, id = this.messageID;
     if (text === null || id === null) return;
+    const to = this.askedRecipient.value;
     this.askedMessage.value = null;
+    this.askedRecipient.value = null;
     this.messageID = null;
     if (!send) { this.post(rpcError(id, -32000, "The person did not send it.")); return; }
-    void this.actions.send(text).then((sent) => this.post(sent ? result(id) : rpcError(id, -32000, "It could not be sent.")));
+    const sending = to && this.actions.sendTo ? this.actions.sendTo(to.id, text) : this.actions.send(text);
+    void sending.then((sent) => this.post(sent ? result(id) : rpcError(id, -32000, "It could not be sent.")));
   }
 
   dropContext(): void {
@@ -280,7 +290,22 @@ export class HostedView {
         if (this.messageID !== null) this.post(rpcError(this.messageID, -32000, "Another message replaced it."));
         this.messageID = ask.id;
         this.askedMessage.value = ask.text;
+        this.askedRecipient.value = null;
         break;
+      case "messageAgent": {
+        // From a pin too: the session is named by its branch, not by where the view is.
+        if (!this.actions.recipient || !this.actions.sendTo) {
+          this.post(rpcError(ask.id, -32000, "This app can't send to another agent from here."));
+          break;
+        }
+        const to = this.actions.recipient(ask.message);
+        if (!to) { this.post(rpcError(ask.id, noAgentCode, `No agent here works on ${ask.message.branch}.`)); break; }
+        if (this.messageID !== null) this.post(rpcError(this.messageID, -32000, "Another message replaced it."));
+        this.messageID = ask.id;
+        this.askedMessage.value = ask.message.text;
+        this.askedRecipient.value = to;
+        break;
+      }
       case "startAgent": {
         const refused = this.actions.startAgent ? this.actions.startAgent(ask.start) : "This app can't open a new agent from here.";
         if (refused !== null) { this.post(rpcError(ask.id, -32000, refused)); break; }

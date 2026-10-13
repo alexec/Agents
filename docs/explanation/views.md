@@ -62,7 +62,8 @@ How each client enforces it:
 | `resources/read` | Reads a `ui://` resource of the same server. |
 | `ui/open-link` | Opens an `http`, `https` or `mailto` link in your browser. Any other kind of link is refused. |
 | `ui/message` | **Asks you first.** Under the view: "The view asks to send this as your message", with **Send** and **Don't Send**. Send sends it as your own prompt, exactly as if you had typed it. A view never speaks for you without you. |
-| `agents/start-agent` | **Our extension (#834).** Opens the new-agent form in the view's project, filled in with the view's `prompt`, its `labels` and, when it names one, a new `worktree` of that name. You start the agent, or don't: a view never starts one. From a pinned view, it opens the form in the pin's project. |
+| `agents/start-agent` | **Our extension (#834).** Opens the new-agent form in the view's project, filled in with the view's `prompt`, its `labels` and, when it names one, a new `worktree` of that name. You start the agent, or don't: a view never starts one. From a pinned view, it opens the form in the pin's project. A `branch` instead puts the agent in a new worktree on that branch (#837). |
+| `agents/message-agent` | **Our extension (#837). Asks you first.** Sends the view's `text` to the session whose worktree is on the view's `branch`, in the view's project (the latest active one not archived). Under the view: "The view asks to send this to "*session*" as your message", with **Send** and **Don't Send**. It works from a pinned view too. With no such session, the answer is error `-32001`, and the view can offer a new agent instead. |
 | `ui/update-model-context` | Keeps what the view said, and tells the agent with **your next message**: before your words, not in your bubble, in the same way the app tells an agent that a wait ended. Only the last context from each view is kept, and it is used once. A line under the view says what the agent will be told, with **Don't Tell** to take it back. It is kept in memory only, so a daemon restart forgets it. |
 | `ui/request-display-mode` | `inline` or `fullscreen`. Full screen draws the same view in the chat's place, as a pinned page opens, with **Back to the chat**. You can also go full screen from the button beside the view's name. |
 | `ui/notifications/size-changed` | The view's height in the chat, up to 640 points. |
@@ -148,7 +149,9 @@ The `ci` server's views are drawn as above, on all three clients alike, from its
 request's page (`ui://ci/pr`, fed by `get_pr`): its description, comments, files and diff and
 checks, with **Comment**, **Merge** and **Ask the Agent to Fix**. A title on the board opens
 the same page in place. **Merge** asks again in the page before it squash-merges and deletes the
-branch; **Ask the Agent to Fix** is a `ui/message`, so you send it, and a pin refuses it. The
+branch. **Ask the Agent to Fix** is an `agents/message-agent` to the session on the PR's branch, so
+you send it, from a chat or a pin; with no session on the branch, it opens the new-agent form on
+that branch. The
 contract is `specs/383-mcp-integrations/contracts/ci-watcher-server.md`.
 
 ## The test view

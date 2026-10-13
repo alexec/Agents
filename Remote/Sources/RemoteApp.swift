@@ -296,7 +296,11 @@ struct RemoteView: View {
                                            return "This project isn’t one the phone knows."
                                        }
                                        return model.offerStart(start, in: key)
-                                   })
+                                   },
+                                   recipient: { message in
+                                       model.work.project(folder).flatMap { model.recipient(of: message, in: $0.key) }
+                                   },
+                                   sendTo: { id, text in await model.send(text, to: id) })
                         // One page per pin, so another pin gets its own store and place (#872).
                         .id(pin.path)
                         .paperGround()
