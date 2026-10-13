@@ -112,6 +112,10 @@ targets:
       # `CODE_SIGN_ENTITLEMENTS` below is what actually signs it in.
       - path: App/Agents-Store.entitlements
         buildPhase: none
+      # The privacy manifest (#729): the required-reason APIs it uses, no data collected, no
+      # tracking.
+      - path: App/PrivacyInfo.xcprivacy
+        buildPhase: resources
     dependencies:
       - package: AgentsKit
         product: AgentsKitCore
@@ -137,6 +141,9 @@ targets:
         NSBonjourServices: [_agents-control._tcp]
         # Where "Set one up on this Mac" sends the person (frame K).
         AgentsHostDownloadURL: https://github.com/alexec/Agents/releases/latest
+        # Exempt (#729): what is encrypted (HPKE for sealed pushes and relay frames, and the
+        # P-256 agreement) is CryptoKit's, and TLS is the system's. The app's own SHA-256,
+        # HMAC and HKDF hash and authenticate; its own P-256 arithmetic runs only on Linux.
         ITSAppUsesNonExemptEncryption: false
     settings:
       base:
@@ -177,6 +184,10 @@ targets:
       # Listed, not owned. See the note on the AgentsStore target's entitlements.
       - path: Remote/Remote.entitlements
         buildPhase: none
+      # The privacy manifest (#729): the required-reason APIs it uses, no data collected, no
+      # tracking.
+      - path: Remote/PrivacyInfo.xcprivacy
+        buildPhase: resources
     dependencies:
       - package: AgentsKit
         product: AgentsKitCore
@@ -199,6 +210,7 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleShortVersionString: $(MARKETING_VERSION)
         NSHumanReadableCopyright: © 2026 Alex Collins
+        # Exempt (#729). See the note on the AgentsStore target.
         ITSAppUsesNonExemptEncryption: false
         # The scheme the Home-screen widget links into (068). One scheme, two links: the
         # body of the widget and one of its rows.
@@ -273,6 +285,10 @@ targets:
       - path: RemoteNotify/Sources
       - path: RemoteNotify/RemoteNotify.entitlements
         buildPhase: none
+      # The privacy manifest (#729): the required-reason APIs it uses, no data collected, no
+      # tracking.
+      - path: RemoteNotify/PrivacyInfo.xcprivacy
+        buildPhase: resources
     dependencies:
       - package: AgentsKit
         product: AgentsKitCore
@@ -322,6 +338,10 @@ targets:
       # Listed, not owned. See the note on the AgentsStore target's entitlements.
       - path: RemoteWidget/RemoteWidget.entitlements
         buildPhase: none
+      # The privacy manifest (#729): the required-reason APIs it uses, no data collected, no
+      # tracking.
+      - path: RemoteWidget/PrivacyInfo.xcprivacy
+        buildPhase: resources
     dependencies:
       - package: AgentsKit
         product: AgentsKitCore
@@ -425,6 +445,10 @@ targets:
       - path: App/Sources/Settings/QRCode.swift
       - path: Host/AgentsHost.entitlements
         buildPhase: none
+      # The privacy manifest (#729): the required-reason APIs it uses, no data collected, no
+      # tracking.
+      - path: Host/PrivacyInfo.xcprivacy
+        buildPhase: resources
       # The two launch agents Run it here registers (T055). SMAppService reads them from
       # here and nowhere else.
       - path: Host/LaunchAgents
