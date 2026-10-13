@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// The window's one sidebar (#145): Activity at the top, then every project, each a row
+/// The window's one sidebar (#145): Status and Usage at the top, then every project, each a row
 /// that folds open on its sessions and workflows, and at the foot what this Mac and its
 /// hosts are doing.
 ///
@@ -15,8 +15,11 @@ struct ProjectListView: View {
     @Binding var selection: SidebarItem?
 
     @AppStorage("showsArchivedProjects") private var showsArchived = false
-    /// Activity, open until folded, and kept so.
-    @AppStorage("showsActivity") private var showsActivity = true
+    /// Status, open until folded, and kept so. It keeps Activity's key (#915), so it
+    /// opens as Activity was left.
+    @AppStorage("showsActivity") private var showsStatus = true
+    /// Usage, open until folded, and kept so (#915).
+    @AppStorage("showsUsage") private var showsUsage = true
     /// The smart groups turned off in Settings ▸ Sidebar (#846).
     @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = ""
     private var smartOn: Set<SidebarSmartRow> { SidebarSmartRow.on(off: smartOff) }
@@ -78,7 +81,8 @@ struct ProjectListView: View {
             // groups (Alex, #495): rows of
             // the list, so they take its selection and keys, each with its icon in the
             // accent beside the plain title (#155), and folding as a project does.
-            Section(isExpanded: $showsActivity) {
+            // Status is what goes on now; Usage charts the past (#915).
+            Section(isExpanded: $showsStatus) {
                 EventsRow().activityIcon("list.bullet.rectangle")
                     .appText(.supporting).sidebarInk(.events).tag(SidebarItem.events)
                 ResourcesRow().activityIcon("square.stack.3d.up")
@@ -89,14 +93,19 @@ struct ProjectListView: View {
                     .appText(.supporting).sidebarInk(.mcpServers).tag(SidebarItem.mcpServers)
                 WorktreesRow().activityIcon("arrow.triangle.branch")
                     .appText(.supporting).sidebarInk(.worktrees).tag(SidebarItem.worktrees)
+            } header: {
+                // The size of every other group's heading (#495).
+                Text("Status").appText(.supporting)
+            }
+
+            Section(isExpanded: $showsUsage) {
                 SpendingRow(selection: $selection).activityIcon("dollarsign.circle",
                                                                 warns: model.costState?.dayIsCloseToFull == true)
                     .appText(.supporting).sidebarInk(.spending).tag(SidebarItem.spending)
                 TimeRow().activityIcon("clock")
                     .appText(.supporting).sidebarInk(.time).tag(SidebarItem.time)
             } header: {
-                // The size of every other group's heading (#495).
-                Text("Activity").appText(.supporting)
+                Text("Usage").appText(.supporting)
             }
 
             // Pinned, Needs You (with everything waiting for an OK, #773), Working, Unread: a group each, headed and folding as a

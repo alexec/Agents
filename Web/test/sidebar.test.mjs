@@ -459,15 +459,28 @@ test("Projects: this Mac's then each server's, oldest added first, however busy 
   }
 });
 
-test("Activity is open until folded, and kept so", async () => {
+test("Status and Usage are open until folded, and each kept so (#915)", async () => {
   const { Folds } = await load("src/model/folds.ts");
   const storage = new Memory();
   const first = new Folds(storage);
-  assert.equal(first.showsActivity.value, true, "open by default");
-  first.setShowsActivity(false);
-  assert.equal(new Folds(storage).showsActivity.value, false);
-  first.setShowsActivity(true);
-  assert.equal(new Folds(storage).showsActivity.value, true);
+  assert.equal(first.showsStatus.value, true, "open by default");
+  assert.equal(first.showsUsage.value, true, "open by default");
+  first.setShowsStatus(false);
+  assert.equal(new Folds(storage).showsStatus.value, false);
+  assert.equal(new Folds(storage).showsUsage.value, true, "folding Status leaves Usage open");
+  first.setShowsUsage(false);
+  first.setShowsStatus(true);
+  assert.equal(new Folds(storage).showsStatus.value, true);
+  assert.equal(new Folds(storage).showsUsage.value, false);
+});
+
+test("Status opens as Activity was left; Usage starts open (#915)", async () => {
+  const { Folds } = await load("src/model/folds.ts");
+  const storage = new Memory();
+  storage.setItem("agents.sidebar.activity", "false");
+  const folds = new Folds(storage);
+  assert.equal(folds.showsStatus.value, false);
+  assert.equal(folds.showsUsage.value, true);
 });
 
 test("Archived projects is closed until opened, and kept so (#343)", async () => {

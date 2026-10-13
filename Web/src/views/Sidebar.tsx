@@ -144,12 +144,17 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
       <div class="scroll" onKeyDown={(e) => moveWithKeys(e)}>
         {projects.length > 0 && <NewSessionTopRow store={store} projects={projects} linkDown={linkDown} />}
         {/* Pages about all the work rather than one project, above the smart groups, as the
-            window's (#495). It folds, as a project does, and stays while searching, as the
-            window's and the Remote's do (#547). */}
-        <details class="activity" aria-label="Activity" open={folds.showsActivity.value}
-          onToggle={(e) => folds.setShowsActivity((e.currentTarget as HTMLDetailsElement).open)}>
-          <summary class="sidebar-head-label" data-fold="activity">Activity</summary>
-          <ActivityRows store={store} chosen={r.activity} onPick={(page: ActivityPage) => go({ activity: page })} />
+            window's (#495): Status, what goes on now, and Usage, the past (#915). Each folds, as
+            a project does, and stays while searching, as the window's and the Remote's do (#547). */}
+        <details class="activity" aria-label="Status" open={folds.showsStatus.value}
+          onToggle={(e) => folds.setShowsStatus((e.currentTarget as HTMLDetailsElement).open)}>
+          <summary class="sidebar-head-label" data-fold="status">Status</summary>
+          <ActivityRows group="status" store={store} chosen={r.activity} onPick={(page: ActivityPage) => go({ activity: page })} />
+        </details>
+        <details class="activity" aria-label="Usage" open={folds.showsUsage.value}
+          onToggle={(e) => folds.setShowsUsage((e.currentTarget as HTMLDetailsElement).open)}>
+          <summary class="sidebar-head-label" data-fold="usage">Usage</summary>
+          <ActivityRows group="usage" store={store} chosen={r.activity} onPick={(page: ActivityPage) => go({ activity: page })} />
         </details>
         {/* Pinned, Needs You, Working, Unread: a group each across every project and host (#495, #773),
             each that is on in this browser's Settings (#846). */}
