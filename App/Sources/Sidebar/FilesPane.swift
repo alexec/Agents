@@ -465,6 +465,10 @@ struct FilesPane: View {
                           return text
                       })
             .id(url)
+        } else if MermaidDiagram.isMermaid(url), let probe, probe.kind.isText, !probe.isTruncated, fileProblem == nil {
+            // A Mermaid diagram (#853): drawn, its source a toggle away.
+            MermaidPage(text: probe.text ?? "", url: url, line: state.openLine)
+                .id(url)
         } else if let fileProblem {
             Gone(message: fileProblem) { reloadFile(url) }
         } else if let probe {

@@ -1,7 +1,7 @@
 // One file, read through the host (071 FR-029, FR-031, research R12): text as source to type in (#415), Markdown
 // through the renderer, pictures fitted and able to zoom, SVG only as an <img> made from its
 // bytes (which a browser draws with scripts off and nothing loaded), HTML as its source, and a
-// chart as an SVG drawn from its data (#836). Nothing a file holds can run or reach anywhere: no HTML sink, and the page's CSP besides.
+// chart as an SVG drawn from its data (#836), a Mermaid diagram as an SVG drawn from our own layout (#853). Nothing a file holds can run or reach anywhere: no HTML sink, and the page's CSP besides.
 //
 // Read again whenever the host says something under this agent changed, with the stamp held
 // so an unchanged file costs nothing (#258). A slow read of the last file does not land here.
@@ -14,8 +14,10 @@ import { openFileShouldReread } from "../../model/fileWatch";
 import { bytesOf, mediaType, pictureFromReading } from "../../model/pageImage";
 import { Markdown, type PageImages } from "../../render/markdown";
 import { isChart } from "../../model/chart";
+import { isMermaid } from "../../model/mermaid";
 import { nameOf, textShownAs } from "./paneState";
 import { ChartPage } from "./ChartView";
+import { MermaidPage } from "./MermaidPage";
 import { FileLines } from "./FileLines";
 import { SourceEditor } from "./SourceEditor";
 import { ZoomPicture } from "./ZoomPicture";
@@ -101,6 +103,8 @@ export function FileView({ store, host, agentID, path, line }: {
       if (isChart(path, hint)) {
         return <>{note}<ChartPage text={r.text} path={path} hint={hint} line={line} readText={readText} /></>;
       }
+      // A Mermaid diagram (#853), drawn from the whole file only.
+      if (isMermaid(path) && !r.isTruncated) return <MermaidPage key={path} text={r.text} line={line} />;
       if (shown === "picture") return <>{note}<ZoomPicture bytes={picture?.bytes ?? r.text} type="image/svg+xml" name={name} /></>;
       if (shown === "page") return <>{note}<div class="file-page"><Markdown text={r.text} images={images} /></div></>;
       if (shown === "source") {

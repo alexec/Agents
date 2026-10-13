@@ -12,6 +12,8 @@ import { pageImagePath } from "../model/pageImage";
 import { LocalPicture } from "./LocalPicture";
 import { memo } from "./memo";
 import { highlightCode } from "./codeHighlight";
+import { MermaidFence } from "./MermaidView";
+import { isFence } from "../model/mermaid";
 import { Fragment, h, type ComponentChildren } from "preact";
 
 /** A Markdown page's pictures: read from beside the document, never from an address. */
@@ -139,8 +141,10 @@ function build(tokens: readonly Token[], images?: PageImages, openFile?: OpenFil
       case "code_block":
       case "fence": {
         const language = token.info.trim().split(/\s+/)[0];
-        push(h("pre", language ? { "data-language": language } : null,
-          h("code", null, language ? highlightCode(token.content, language) : token.content)));
+        const code = h("pre", language ? { "data-language": language } : null,
+          h("code", null, language ? highlightCode(token.content, language) : token.content));
+        // A Mermaid fence is its diagram, drawn from our own layout (#853); its code when it does not read.
+        push(token.type === "fence" && isFence(language) ? h(MermaidFence, { text: token.content, code }) : code);
         break;
       }
       case "hr":

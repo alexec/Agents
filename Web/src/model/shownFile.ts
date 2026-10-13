@@ -1,6 +1,7 @@
 // What the chat's card for a file an agent showed is (#836): ShownFile.look and lookWords
-// (Model/ShownFile.swift). A chart and a picture show a preview; anything else is one line.
+// (Model/ShownFile.swift). A chart, a diagram (#853) and a picture show a preview; anything else is one line.
 import { isChart, markWords, type ChartHint } from "./chart";
+import { isMermaid } from "./mermaid";
 
 /** The fields of a ShownFile the card reads. */
 export interface Shown {
@@ -9,7 +10,7 @@ export interface Shown {
   chart?: ChartHint | undefined;
 }
 
-export type Look = "chart" | "picture" | "page" | "file";
+export type Look = "chart" | "diagram" | "picture" | "page" | "file";
 
 /** FileProbe.imageKinds. */
 const imageKinds = new Set(["png", "jpg", "jpeg", "gif", "heic", "heif", "webp", "tiff", "tif", "bmp", "svg", "icns"]);
@@ -24,16 +25,18 @@ function extensionOf(path: string): string {
 
 export function look(file: Shown): Look {
   if (isChart(file.path, file.chart)) return "chart";
+  if (isMermaid(file.path)) return "diagram";
   const ext = extensionOf(file.path);
   if (imageKinds.has(ext)) return "picture";
   if (pageKinds.has(ext)) return "page";
   return "file";
 }
 
-/** The card's grey line before the folder: "Bar chart", "Picture", "Page", "File". */
+/** The card's grey line before the folder: "Bar chart", "Diagram", "Picture", "Page", "File". */
 export function lookWords(file: Shown): string {
   switch (look(file)) {
     case "chart": return file.chart ? markWords(file.chart.mark) : "Chart";
+    case "diagram": return "Diagram";
     case "picture": return "Picture";
     case "page": return "Page";
     case "file": return "File";

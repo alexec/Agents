@@ -69,6 +69,16 @@ test("known fenced code is coloured as inert token spans; unknown fences stay pl
   assert.equal(md("```mystery\nlet answer\n```"), '<pre data-language="mystery"><code>let answer\n</code></pre>');
 });
 
+test("a mermaid fence is its diagram, drawn by our own SVG, never by script (#853)", () => {
+  const nodes = [renderMarkdown("```mermaid\ngraph TD\nA-->B\n```")].flat(Infinity);
+  const fence = nodes.find((node) => node?.type?.name === "MermaidFence");
+  assert.ok(fence, "a MermaidFence");
+  assert.equal(fence.props.text, "graph TD\nA-->B\n");
+  assert.match(show(fence.props.code), /^<pre data-language="mermaid">/);
+  // An indented block is code, whatever it holds.
+  assert.doesNotMatch(md("    graph TD"), /MermaidFence/);
+});
+
 test("only http, https and mailto are safe", () => {
   assert.ok(isSafeLink("https://a.b") && isSafeLink("http://a.b") && isSafeLink("mailto:a@b.c"));
   assert.ok(!isSafeLink("javascript:x") && !isSafeLink("vbscript:x") && !isSafeLink("/relative") && !isSafeLink("data:x"));

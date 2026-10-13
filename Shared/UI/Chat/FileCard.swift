@@ -2,8 +2,8 @@ import AgentsKitCore
 import SwiftUI
 
 /// A file an agent showed with `show_file`, where it showed it (#836). Layout A of
-/// specs/836-file-card/layout.svg: a chart or a picture has its preview above the
-/// name; anything else is one line. A tap opens it in the Files pane at its line.
+/// specs/836-file-card/layout.svg: a chart, a diagram (#853) or a picture has its
+/// preview above the name; anything else is one line. A tap opens it in the Files pane at its line.
 /// The page draws the same card in FileCard.tsx.
 struct FileCard: View {
     let file: ShownFile
@@ -33,7 +33,7 @@ struct FileCard: View {
 
     private var card: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if file.look == .chart || file.look == .picture {
+            if file.look == .chart || file.look == .diagram || file.look == .picture {
                 FilePreview(file: file, mark: $mark)
                     .frame(maxWidth: .infinity)
                     .frame(height: Self.previewHeight)
@@ -63,6 +63,7 @@ struct FileCard: View {
     private var symbol: String {
         switch file.look {
         case .chart: return "chart.bar"
+        case .diagram: return "point.3.connected.trianglepath.dotted"
         case .picture: return "photo"
         case .page: return "doc.richtext"
         case .file: return "doc.text"
@@ -77,7 +78,7 @@ struct FileCard: View {
     }
 }
 
-/// The card's preview: the chart drawn small, or the picture.
+/// The card's preview: the chart or the diagram drawn small, or the picture.
 private struct FilePreview: View {
     let file: ShownFile
     @Binding var mark: ChartMark?
@@ -86,6 +87,7 @@ private struct FilePreview: View {
     private enum Shown {
         case loading
         case chart(ChartSpec)
+        case diagram(MermaidDiagram)
         case picture(Image)
         case nothing(String)
     }
@@ -100,6 +102,8 @@ private struct FilePreview: View {
                 ProgressView().controlSize(.small)
             case .chart(let spec):
                 ChartView(spec: spec, compact: true).padding(10)
+            case .diagram(let diagram):
+                MermaidView(diagram: diagram).padding(10)
             case .picture(let image):
                 image.resizable().scaledToFit().padding(6)
             case .nothing(let words):
@@ -119,6 +123,12 @@ private struct FilePreview: View {
         }
         guard case .text(let text, _, _, _)? = await actions.readFile(file.path) else {
             return .nothing("Not there now")
+        }
+        if file.look == .diagram {
+            switch MermaidDiagram.read(text) {
+            case .success(let diagram): return .diagram(diagram)
+            case .failure(let problem): return .nothing(problem.words)
+            }
         }
         let read = actions.readFile
         let result = await ChartPage.read(text, url: file.url, hint: file.chart) { url in

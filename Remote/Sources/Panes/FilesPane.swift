@@ -512,6 +512,10 @@ struct FilesPane: View {
                           return text
                       })
             .id(url)
+        case .text(let text, false, _, _) where MermaidDiagram.isMermaid(url):
+            // A Mermaid diagram (#853): drawn, its source a toggle away.
+            MermaidPage(text: text, url: url, line: state.openLine)
+                .id(url)
         case .text(let text, let isTruncated, let size, _):
             VStack(spacing: 0) {
                 if isTruncated {

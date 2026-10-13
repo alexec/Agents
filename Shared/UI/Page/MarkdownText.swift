@@ -91,6 +91,25 @@ struct MarkdownText: View {
         .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .leading)
     }
 
+    /// A fenced or indented block of code, coloured by its tag.
+    private func codeBlock(language: String?, text: String, caret: CursorFlag?) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let language, !language.isEmpty {
+                Text(language).appText(.fine).foregroundStyle(.tertiary)
+            }
+            // Code keeps its own shape, so it scrolls rather than wraps.
+            Sideways {
+                // Coloured by its tag, in the same inks as files and diffs (041 US4).
+                CodeBlockText(text: text, language: CodeLanguage.fence(tag: language),
+                              caret: caret)
+                    .appText(.code)
+                    .textSelection(.enabled)
+                    .padding(10)
+            }
+            .paperWell(in: RoundedRectangle(cornerRadius: 8))
+        }
+    }
+
     @ViewBuilder
     private func view(for block: MarkdownBlock, caret: CursorFlag?) -> some View {
         switch block {
@@ -127,22 +146,13 @@ struct MarkdownText: View {
             }
             .textSelection(.enabled)
 
+        case .code(let language, let text) where MermaidDiagram.isFence(language) && caret == nil:
+            // A Mermaid fence is its diagram (#853). While an agent types into it, it is
+            // its code, with the caret, until the fence is finished.
+            MermaidFence(text: text) { codeBlock(language: language, text: text, caret: caret) }
+
         case .code(let language, let text):
-            VStack(alignment: .leading, spacing: 4) {
-                if let language, !language.isEmpty {
-                    Text(language).appText(.fine).foregroundStyle(.tertiary)
-                }
-                // Code keeps its own shape, so it scrolls rather than wraps.
-                Sideways {
-                    // Coloured by its tag, in the same inks as files and diffs (041 US4).
-                    CodeBlockText(text: text, language: CodeLanguage.fence(tag: language),
-                                  caret: caret)
-                        .appText(.code)
-                        .textSelection(.enabled)
-                        .padding(10)
-                }
-                .paperWell(in: RoundedRectangle(cornerRadius: 8))
-            }
+            codeBlock(language: language, text: text, caret: caret)
 
         case .image(let source, let alt):
             trailed(image(source: source, alt: alt), by: caret)
