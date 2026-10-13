@@ -555,6 +555,22 @@ extension DaemonCore {
         return nil
     }
 
+    /// The view's own title, as its server gives it, kept with a pin so its row says what
+    /// it holds ("Pull requests", not the "Board" of ui://ci/board) (#905). Nil when the
+    /// server gives none; the row then takes the last part of the address.
+    func viewTitle(_ view: ViewPin, project: URL) -> String? {
+        let title: String?
+        if view.server == AppTool.serverName {
+            title = AppViewCatalog.resource(view.uri)?.title
+        } else if case .success(let server) = viewServer(view.server, project: project) {
+            title = cachedViewCatalog(server)?.resource(view.uri)?.title
+        } else {
+            title = nil
+        }
+        guard let words = title?.trimmingCharacters(in: .whitespacesAndNewlines), !words.isEmpty else { return nil }
+        return String(words.prefix(PinLimits.titleLength))
+    }
+
     /// Why a pinned third-party view can't be drawn on this host, or nil.
     func thirdPartyMissingReason(_ view: ViewPin, project: URL) -> String? {
         switch viewServer(view.server, project: project) {

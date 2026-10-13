@@ -106,6 +106,9 @@
           "number": 410,
           "title": "The sidebar flickers on wake",
           "author": "alexec",
+          "assignees": [
+            "alexec"
+          ],
           "labels": [
             "bug"
           ],

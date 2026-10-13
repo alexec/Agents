@@ -286,7 +286,7 @@ a.title { color: inherit; }
 
 """#
 
-/// `ui://ci/issues`: the open issues with their labels; a label narrows the list.
+/// `ui://ci/issues`: the open issues with their assignees and labels; a label narrows the list.
 let issuesHTML = #"""
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Issues</title>
@@ -327,6 +327,7 @@ button.pill:hover, .pill.chosen { background: var(--color-background-info); colo
 button { font: inherit; font-size: 13px; color: var(--color-text-primary); background: var(--color-background-primary);
   border: 1px solid var(--color-border-primary); border-radius: var(--border-radius-sm); padding: 2px 10px; cursor: pointer; }
 button:disabled { opacity: 0.5; cursor: default; }
+.assigned { background: var(--color-background-success); color: var(--color-text-success); }
 .error { color: var(--color-text-danger); font-size: var(--font-text-sm-size); }
 </style></head>
 <body><main>
@@ -392,7 +393,8 @@ button:disabled { opacity: 0.5; cursor: default; }
     if (!Array.isArray(issues)) { say("The result has no issues in it.", true); return; }
     $("issues").replaceChildren(...issues.map(row));
     drawLabel();
-    say(issues.length ? `${issues.length} open · as of ${new Date().toLocaleTimeString()}`
+    const assigned = issues.filter((issue) => (issue.assignees || []).length).length;
+    say(issues.length ? `${issues.length} open · ${assigned} assigned · as of ${new Date().toLocaleTimeString()}`
       : label ? `No open issues labelled ${label}.` : "No open issues.");
     $("refresh").disabled = !repo;
   };
@@ -405,6 +407,9 @@ button:disabled { opacity: 0.5; cursor: default; }
       pill.onclick = () => choose(name === label ? "" : name);
       return pill;
     });
+    // Who works on it (#905): an issue is taken by assigning it.
+    const assignees = (issue.assignees || []).map((login) =>
+      el("span", { className: "pill assigned", textContent: "@" + login, title: "Assigned to " + login }));
     const comments = issue.comments ? ` · ${issue.comments} comment${issue.comments === 1 ? "" : "s"}` : "";
     const start = el("button", { type: "button", className: "start", textContent: "Start Agent",
       title: `A new agent for #${issue.number}, in a worktree of its own` });
@@ -414,6 +419,7 @@ button:disabled { opacity: 0.5; cursor: default; }
       el("span", { className: "title", textContent: issue.title, title: issue.title }),
       start,
       el("span", { className: "meta" }, [
+        ...assignees,
         el("span", { textContent: `${issue.author || "someone"}${comments}${issue.updatedAt ? " · " + ago(issue.updatedAt) : ""}` }),
         ...labels,
       ]),

@@ -192,4 +192,14 @@ struct ThirdPartyViewsTests {
             try await s.core.callFromView(.init(agentID: place, viewID: place, name: "x", project: s.project, server: "otter"))
         }?.message.contains("only its own server") == true)
     }
+
+    @Test func aViewPinnedWithoutATitleTakesItsServersTitle() async throws {
+        let s = try await setUp()
+        let view = try await codexCall(s)
+        let pinned = try await s.core.pinByPerson(.init(folder: s.project, view: view.viewPin))
+        #expect(pinned.first { $0.view?.server == "kite" }?.title == "Kite weather", "not the address's \"Weather\" (#905)")
+        _ = try await s.core.pinByPerson(.init(folder: s.project, view: view.viewPin, title: "Paris"))
+        let again = try await s.core.pinByPerson(.init(folder: s.project, view: view.viewPin))
+        #expect(again.first { $0.view?.server == "kite" }?.title == "Paris", "pinned again, it keeps its title")
+    }
 }

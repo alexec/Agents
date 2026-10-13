@@ -87,9 +87,12 @@ public struct Issue: Sendable {
     public var author: String
     public var labels: [String]
     public var url: String
+    /// Logins of the people it is assigned to: who works on it (#905).
+    public var assignees: [String] = []
 
     var json: JSON {
-        ["number": .int(number), "title": .string(title), "author": .string(author), "labels": JSON(labels), "url": .string(url)]
+        ["number": .int(number), "title": .string(title), "author": .string(author), "labels": JSON(labels), "url": .string(url),
+         "assignees": JSON(assignees)]
     }
 }
 

@@ -109,6 +109,7 @@ public enum CIWatcher {
             "properties": [
                 "number": ["type": "integer"], "title": ["type": "string"], "author": ["type": "string"],
                 "labels": ["type": "array", "items": ["type": "string"]], "url": ["type": "string"],
+                "assignees": ["type": "array", "items": ["type": "string"]],
             ],
         ]
         let issue = Schema.Property.integer("Only this issue, by number.")
@@ -251,7 +252,7 @@ public enum CIWatcher {
              annotations: ["readOnlyHint": true],
              meta: ["ui": ["resourceUri": "ui://ci/board", "visibility": ["model", "app"]], "ui/resourceUri": "ui://ci/board"]),
         Tool(name: "list_issues", title: "List issues",
-             description: "The repo's open issues (not pull requests), newest updated first, at most 100, each with its labels and comment count.",
+             description: "The repo's open issues (not pull requests), newest updated first, at most 100, each with its labels, assignees (logins) and comment count.",
              inputSchema: Schema(["repo": repoProperty, "label": .string("Only issues with this label.")]),
              annotations: ["readOnlyHint": true],
              meta: ["ui": ["resourceUri": "ui://ci/issues", "visibility": ["model", "app"]], "ui/resourceUri": "ui://ci/issues"]),
