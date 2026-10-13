@@ -67,6 +67,68 @@ public final class ControlRelay: @unchecked Sendable {
         return membership
     }
 
+    /// Switch this relay on or off at its control plane, by its own word (`relay/switch`,
+    /// #824): over its membership, as its uplink dials, so no control plane's key is
+    /// needed. Agents Host has it said under Join one elsewhere. Returns once the control
+    /// plane answers; throws what it refused, or when it could not be reached.
+    public static func switchRelay(_ on: Bool, files: Files, name: String,
+                                   within limit: Duration = .seconds(20)) async throws {
+        guard let membership = ControlMembership.load(files.membership), membership.host != nil else {
+            throw Failure("this relay has not joined a control plane")
+        }
+        let key = try ControlAgreement.loadOrMake(file: files.key)
+        let dial = try ControlJoin.hostDial(membership, privateKey: key)
+        let open = OpenTransport()
+        let timer = Task {
+            try await Task.sleep(for: limit)
+            open.close()
+        }
+        defer { timer.cancel(); open.close() }
+        let transport = try await dial()
+        open.set(transport)
+        for (id, method, params) in [(1, DaemonAPI.Method.hostHello, try JSONValue.encoding(hello(name: name))),
+                                     (2, DaemonAPI.Method.relaySwitch, try JSONValue.encoding(DaemonAPI.RelaySwitch(relay: on)))] {
+            let line = try JSONRPCCodec.encode(.request(id: .number(id), method: method, params: params))
+            try transport.write(line: ControlWire.channel(0, message: line))
+        }
+        do {
+            for try await line in transport.lines() {
+                guard case .message(0, let message)? = try? ControlWire.readHost(line) else { continue }
+                switch try? JSONRPCCodec.decode(line: message) {
+                case .success(.number(2), _)?: return
+                case .failure(.number(2)?, let error)?: throw Failure(error.message)
+                default: continue
+                }
+            }
+        } catch let failure as Failure {
+            throw failure
+        } catch {}
+        throw Failure(open.closed ? "the control plane did not answer" : "the control plane went before it answered")
+    }
+
+    /// The one-off socket `switchRelay` closes when its time is up.
+    private final class OpenTransport: @unchecked Sendable {
+        private let lock = NSLock()
+        private var transport: (any LineTransport)?
+        private var shut = false
+        var closed: Bool { lock.withLock { shut } }
+        func set(_ transport: any LineTransport) {
+            let late = lock.withLock { () -> Bool in
+                self.transport = transport
+                return shut
+            }
+            if late { transport.close() }
+        }
+        func close() {
+            let open = lock.withLock { () -> (any LineTransport)? in
+                shut = true
+                defer { transport = nil }
+                return transport
+            }
+            open?.close()
+        }
+    }
+
     static func hello(name: String) -> DaemonAPI.HostHello {
         DaemonAPI.HostHello(version: Daemon.version, platform: "macOS relay",
                             machineID: MachineID.current, name: name, relay: true)

@@ -54,6 +54,7 @@ struct HostWindow: View {
         .sheet(isPresented: $moving) { MoveSheet().environment(model) }
         .sheet(isPresented: $movingMachine) { MachineMoveSheet().environment(model) }
         .sheet(isPresented: $returning) { MachineReturnSheet().environment(model) }
+        .sheet(isPresented: $model.relayCodeAsked) { RelayCodeSheet().environment(model) }
         .confirmationDialog("Stop forwarding?", isPresented: $confirmingReturnStop) {
             Button("Stop Forwarding", role: .destructive) { Task { await model.stopReturnForwarding() } }
         } message: {
@@ -492,7 +493,8 @@ struct HostWindow: View {
 
     // MARK: Relay
 
-    /// Off until turned on, and only where the control plane runs (#809).
+    /// Off until turned on (#809): where the control plane runs, or under Join one
+    /// elsewhere with a host code from that control plane (#824).
     private var relay: some View {
         card {
             HStack(alignment: .center) {
@@ -509,7 +511,7 @@ struct HostWindow: View {
                                      set: { on in Task { await model.setRelay(on) } }))
                     .labelsHidden()
                     .toggleStyle(.switch)
-                    .disabled(model.busy != nil || (!model.settings.relaysForDevices && !(model.relayAvailable && model.controlRunning)))
+                    .disabled(model.busy != nil || (!model.settings.relaysForDevices && !model.relayAvailable))
             }
             .padding(16)
         }
@@ -531,6 +533,44 @@ struct HostWindow: View {
 }
 
 /// The code to pair a window or phone (frame L's *Pair a Window or Phone…*, and K2's Pair).
+/// The host code a relay for a control plane elsewhere joins with (#824): asked the first
+/// time it is turned on there; on again later resumes its enrolment.
+struct RelayCodeSheet: View {
+    @Environment(HostModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    @State private var code = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Relay for My Devices").font(.title3.weight(.semibold))
+            Text("Paste a host code from your control plane: in Agents, Settings ▸ Control plane ▸ Hosts ▸ Add a Mac. The relay joins it as a host that runs no agents.")
+                .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            TextField("Host code", text: $code, prompt: Text("agents-control:2:h:…"))
+                .textFieldStyle(.roundedBorder).labelsHidden()
+                .accessibilityLabel("Host code")
+                .onSubmit(start)
+            if let problem = model.problem {
+                Label(problem, systemImage: "exclamationmark.triangle").foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack {
+                Spacer()
+                Button("Cancel", role: .cancel) { model.problem = nil; dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button("Start Relay", action: start)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.busy != nil)
+            }
+        }
+        .padding(22)
+        .frame(width: 460)
+    }
+
+    private func start() {
+        Task { await model.setRelay(true, code: code) }
+    }
+}
+
 struct PairingSheet: View {
     @Environment(HostModel.self) private var model
     @Environment(\.dismiss) private var dismiss

@@ -134,7 +134,9 @@ struct ControlOverviewPage: View {
                 ControlRow(dot: .none, title: "Reachable away from home",
                            detail: control.status?.awayFromHome == true
                                ? "Through your iCloud account, sealed to each device"
-                               : "Off: devices reach it on this network only") {
+                               // A control plane with no Mac relaying for it, a server's alone
+                               // included, gets one from Agents Host on any Mac (#824).
+                               : "Off: devices reach it on this network only. Turn on Relay for my devices in Agents Host on a Mac.") {
                     Text(control.status?.awayFromHome == true ? "On" : "Off")
                         .appText(.reading)
                         .foregroundStyle(.secondary)

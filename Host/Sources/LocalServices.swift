@@ -127,6 +127,14 @@ struct LocalServices {
     /// The relay host this Mac's relay joined as, once it has.
     var relayHost: HostID? { ControlMembership.load(paths.relayFiles.membership)?.host }
 
+    /// The relay's enrolment, and any code left for it, gone: it joins again only with a
+    /// new code (#824). Its key stays.
+    func forgetRelayMembership() {
+        let files = paths.relayFiles
+        try? FileManager.default.removeItem(at: files.membership)
+        try? FileManager.default.removeItem(at: files.joinCode)
+    }
+
     private func registerWithSystem(_ job: Job) -> Outcome {
         let service = SMAppService.agent(plistName: plist(job))
         switch service.status {

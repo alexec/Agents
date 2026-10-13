@@ -113,6 +113,31 @@ struct NoticesTests {
         }
     }
 
+    /// Under Join one elsewhere (#824) Agents Host has no control plane's key: the relay
+    /// switches itself off and on by its own membership (`relay/switch`), keeping its
+    /// enrolment. A host that runs agents cannot make itself a relay that way.
+    @Test func theRelaySwitchesItselfWithoutTheControlKey() async throws {
+        let running = try await base.start()
+        defer { Task { await running.service.stop() } }
+        let files = ControlRelay.Files(folder: FileManager.default.temporaryDirectory
+            .appendingPathComponent("relay-\(UUID().uuidString)", isDirectory: true))
+        let code = try #require(ControlCode(text: try await running.service.codes.issue(.host).text))
+        let host = try #require(try await ControlRelay.enroll(code, files: files, name: "relay mac").host)
+
+        try await ControlRelay.switchRelay(false, files: files, name: "relay mac")
+        #expect(await running.service.methods.allHosts.first { $0.id == host }?.relay == false)
+        try await ControlRelay.switchRelay(true, files: files, name: "relay mac")
+        #expect(await running.service.methods.allHosts.first { $0.id == host }?.relay == true)
+
+        let (other, uplink) = try await base.host(at: running.url, code: try await running.service.codes.issue(.host).text)
+        defer { uplink.stop() }
+        await #expect(throws: JSONRPCError.self) {
+            _ = try await running.service.methods.hostSaid(other, method: DaemonAPI.Method.relaySwitch,
+                                                           params: try JSONValue.encoding(DaemonAPI.RelaySwitch(relay: true)))
+        }
+        #expect(await running.service.methods.allHosts.first { $0.id == other }?.relay == nil)
+    }
+
     @Test func aNeedIsSealedToTheDeviceAndWithdrawn() async throws {
         let running = try await base.start()
         defer { Task { await running.service.stop() } }

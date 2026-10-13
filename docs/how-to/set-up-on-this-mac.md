@@ -96,8 +96,9 @@ To go back, set **Keeps its store** to **On this Mac** and click **Switch Storeâ
 - If you used the earlier Agents app on this Mac, Agents Host offers to move your agents,
   devices and servers across. See [Move an existing set-up across](move-an-existing-set-up.md).
 - To reach your agents from your iPhone and iPad away from home, and to be notified on
-  them, turn on **Relay for my devices**. It is off until you do, and works only where
-  the control plane runs. See [Phone and iPad](../explanation/phone-and-ipad.md).
+  them, turn on **Relay for my devices**. It is off until you do. Under **Join one
+  elsewhere**, it asks for a host code from that control plane the first time. See
+  [Phone and iPad](../explanation/phone-and-ipad.md).
 
 ## Related
 
