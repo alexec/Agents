@@ -59,8 +59,9 @@ Agents' ◐ cells, and why:
 - **Notifications:** the Mac gets them. The relay takes them to the iPhone and iPad, which
   has not yet been checked away from home, and the web page gets none. See
   [Phone and iPad](../explanation/phone-and-ipad.md).
-- **Spending limits:** only for runtimes that report a price. See
-  [Limit spending](../how-to/limit-spending.md).
+- **Spending limits:** in money or in tokens (#838), so only for runtimes that report a
+  price or tokens. Cursor, Antigravity and Grok report neither, and run past every
+  limit. See [Limit spending](../how-to/limit-spending.md).
 - **Task board:** the `ci` server's issues view lists GitHub issues in the app, with who
   has each one and Start Agent on each row. It has no columns, and an issue cannot be moved
   or edited there.
