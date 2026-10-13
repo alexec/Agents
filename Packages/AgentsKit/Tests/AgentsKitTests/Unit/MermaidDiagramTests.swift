@@ -38,14 +38,14 @@ struct MermaidDiagramTests {
                 C --> D
             """)
         #expect(chart.kind == .flowchart)
-        #expect(chart.boxes.map(\.shape) == [.rectangle, .diamond, .rounded, .stadium])
+        try #require(chart.boxes.map(\.shape) == [.rectangle, .diamond, .rounded, .stadium])
         #expect(chart.lines.count == 4)
         #expect(chart.lines.allSatisfy { $0.heads.count == 1 && $0.heads[0].filled })
         #expect(Set(words(chart)) == ["Start", "Is it?", "Yes", "No", "Do it", "Stop"])
         #expect(chart.summary == "Flowchart · 4 boxes")
         // Top to bottom: each rank below the one before.
         let ys = chart.boxes.map { $0.y + $0.height / 2 }
-        #expect(ys[0] < ys[1] && ys[1] < ys[2] && ys[2] < ys[3])
+        #expect(ys == ys.sorted() && Set(ys).count == ys.count)
         #expect(chart.boxes.allSatisfy { $0.x >= 0 && $0.x + $0.width <= chart.width })
     }
 
@@ -82,13 +82,13 @@ struct MermaidDiagramTests {
     @Test func aCycleIsDrawnWithoutLoopingTheRanks() throws {
         let chart = try diagram("graph TD\nA --> B\nB --> C\nC --> A\nC --> C")
         #expect(chart.boxes.count == 3)
-        #expect(chart.lines.count == 4)
+        try #require(chart.lines.count == 4)
         #expect(chart.lines[3].points.count == 4)
     }
 
     @Test func aLinkThatWouldCrossABoxGoesRoundIt() throws {
         let chart = try diagram("graph TD\nA --> B\nB --> C\nA --> C")
-        #expect(chart.lines.map(\.points.count) == [2, 2, 4])
+        try #require(chart.lines.map(\.points.count) == [2, 2, 4])
         let lane = chart.lines[2].points[1].x
         #expect(chart.boxes.allSatisfy { $0.x + $0.width < lane })
     }
