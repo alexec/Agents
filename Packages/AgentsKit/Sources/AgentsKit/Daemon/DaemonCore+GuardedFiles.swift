@@ -31,6 +31,7 @@ extension DaemonCore {
 
     private func saveGuardedRecords(_ records: GuardedFileRecords, replacing: Bool = false) {
         var records = records
+        records.dropGoneFolders { FileManager.default.fileExists(atPath: $0.path(percentEncoded: false)) }
         keepQuietly("approved project files") { try guardedFileStore.save(records, replacing: replacing) }
         if replacing { records.unreadable = false }
         if records.approvalsBegan == nil { records.approvalsBegan = Date() }
@@ -257,6 +258,17 @@ extension DaemonCore {
         guard let data,
               let outcome = try? await GitChanges.run(["show", "HEAD:./" + path], in: project) else { return false }
         return Data(outcome.output.utf8) == data
+    }
+
+    /// Folders that are no longer projects: what was read and sent of them is let go
+    /// (#933), so a lane's worktree is not held for as long as the daemon runs.
+    func forgetFolderCaches(_ folders: Set<URL>) {
+        for folder in folders {
+            pinsCache[folder] = nil
+            pinsSent[folder] = nil
+            lastProjectSent[folder] = nil
+            for file in GuardedFile.allCases { guardedDisk[file.url(in: folder).path] = nil }
+        }
     }
 
     /// What every screen and every reader of the files knows is read again.

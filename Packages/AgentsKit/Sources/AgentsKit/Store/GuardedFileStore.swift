@@ -48,6 +48,20 @@ struct GuardedFileRecords: Codable, Equatable, Sendable {
             states.append(state)
         }
     }
+
+    /// Drops the states of folders that are gone with nothing waiting (#933): a lane's
+    /// worktree once it is removed. A folder that comes back is approved again at its
+    /// first read. Each folder is looked at once.
+    mutating func dropGoneFolders(exists: (URL) -> Bool) {
+        var there: [URL: Bool] = [:]
+        states.removeAll { state in
+            guard state.pending == nil else { return false }
+            if let known = there[state.folder] { return !known }
+            let found = exists(state.folder)
+            there[state.folder] = found
+            return !found
+        }
+    }
 }
 
 struct GuardedFileStore: Sendable {

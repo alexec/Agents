@@ -199,6 +199,51 @@ struct GuardedFilesTests {
         ])
     }
 
+    /// A lane's worktree, once removed, leaves no state behind (#933): the next save
+    /// drops it, unless a change there still waits.
+    @Test func aGoneFolderLeavesNoStateUnlessAChangeWaits() async throws {
+        let s = try await setUp()
+        let lane = Project.standardize(s.root.appendingPathComponent("lane", isDirectory: true))
+        let held = Project.standardize(s.root.appendingPathComponent("held", isDirectory: true))
+        for folder in [lane, held] {
+            try write(#"{"pins": []}"#, .pins, in: folder)
+            _ = await s.core.guardedContent(.pins, in: folder)
+        }
+        await s.core.startTurnForTesting(s.lead)
+        try write(#"{"pins": [{}]}"#, .pins, in: held)
+        await s.core.markGuardedChanges(in: held, witness: await s.core.agents[s.lead])
+        await s.core.endTurnForTesting(s.lead)
+        try FileManager.default.removeItem(at: lane)
+        try FileManager.default.removeItem(at: held)
+
+        _ = try await s.core.setHelperLimits(.init(folder: s.project, limits: HelperLimits(running: 2)))
+
+        let folders = Set(await s.core.guardedRecords().states.map(\.folder))
+        #expect(!folders.contains(lane), "gone, with nothing waiting")
+        #expect(folders.contains(held), "a waiting change is the person's to settle")
+        #expect(folders.contains(s.project))
+    }
+
+    /// A project that leaves the list lets go of what was read and sent of it (#933).
+    @Test func aProjectThatLeavesLetsGoOfItsCaches() async throws {
+        let s = try await setUp()
+        let lane = Project.standardize(s.root.appendingPathComponent("lane", isDirectory: true))
+        try FileManager.default.createDirectory(at: lane, withIntermediateDirectories: true)
+        _ = try await s.core.addProject(lane)
+        _ = await s.core.readPins(lane)
+        let pinsPath = GuardedFile.pins.url(in: lane).path
+        #expect(await s.core.pinsCache[lane] != nil)
+        #expect(await s.core.guardedDisk[pinsPath] != nil)
+
+        _ = try await s.core.archiveProject(lane)
+        try await s.core.deleteProject(lane)
+        _ = await s.core.allProjects()
+
+        #expect(await s.core.pinsCache[lane] == nil)
+        #expect(await s.core.guardedDisk[pinsPath] == nil)
+        #expect(await s.core.lastProjectSent[lane] == nil)
+    }
+
     private func waitForChange(_ s: Setup) async throws -> GuardedChange {
         for _ in 0..<200 {
             if let change = await s.core.projectSummary(for: s.project)?.guardedChanges?.first { return change }
