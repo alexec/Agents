@@ -9,6 +9,8 @@ struct Transcript: View {
     @Environment(AppModel.self) private var model
     /// The level every turn starts at: View ▸ Turns (069).
     @AppStorage(TurnDisplay.defaultsKey) private var turnDetail = TurnDisplay.initial
+    /// Set in a window of its own (#826), whose page of the transcript is its own.
+    @Environment(\.poppedChat) private var popped
     let agent: Agent
     /// How much of the foot of the pane the floating prompt covers.
     var bottomInset: CGFloat = 0
@@ -16,25 +18,28 @@ struct Transcript: View {
     var cards: AnyView? = nil
 
     var body: some View {
+        let page = popped?.work ?? model.work
         ChatTranscript(agent: agent,
-                       items: model.transcriptItems,
-                       stored: model.work.turns,
+                       items: page.transcriptItems,
+                       stored: page.turns,
                        defaultDetail: turnDetail,
-                       hasMore: model.transcriptHasMore,
+                       hasMore: page.hasMoreOfTheConversation,
                        // Turns count as growth at the front too, so an earlier page of
                        // them holds the reader's place as entries do.
-                       entryCount: model.entries.count + model.work.turns.count,
+                       entryCount: page.entries.count + page.turns.count,
                        isComingBack: model.isComingBack(agent),
-                       loadFailure: model.work.transcriptLoadFailure,
-                       settleKey: model.selection,
-                       loadEarlier: { await model.loadEarlier() },
+                       loadFailure: page.transcriptLoadFailure,
+                       settleKey: popped?.id ?? model.selection,
+                       loadEarlier: { [popped] in
+                           if let popped { await model.loadEarlier(of: popped) } else { await model.loadEarlier() }
+                       },
                        bottomInset: bottomInset,
                        cards: cards,
                        // The artifacts pane asked for the message something came
                        // from (FR-042).
-                       scrollToEndToken: model.scrollToEndToken,
-                       focusedEntry: model.focusedEntry,
-                       clearFocus: { model.clearFocus() },
-                       onFollowing: { model.work.isFollowingEnd = $0 })
+                       scrollToEndToken: popped?.scrollToEndToken ?? model.scrollToEndToken,
+                       focusedEntry: popped == nil ? model.focusedEntry : nil,
+                       clearFocus: { if popped == nil { model.clearFocus() } },
+                       onFollowing: { page.isFollowingEnd = $0 })
     }
 }

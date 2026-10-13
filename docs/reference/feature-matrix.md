@@ -76,7 +76,7 @@ Agents' ◐ cells, and why:
 Agents has none of these at all:
 
 - Android app (#810), Windows or Linux desktop (#811).
-- Sessions side by side, sessions as a tree.
+- Sessions as a tree.
 - Simulator panes, language servers.
 - Several accounts per runtime, teams.
 
@@ -222,6 +222,7 @@ Agents has none of these at all:
 | Nimbalyst | ● | ?⃝ | ● | ● | ● | ● | 83% |
 | OpenAI Codex | ● | ● | ◐ | ● | ● | ◐ | 83% |
 | Paseo | ● | ● | ◐ | ● | ● | ◐ | 83% |
+| **Agents** | ● | ● | ○ | ● | ● | ◐ | 75% |
 | Atelier (was Acepe) | ● | ● | ◐ | ● | ● | ○ | 75% |
 | Codeg | ● | ● | ◐ | ● | ?⃝ | ● | 75% |
 | Happy | ● | ?⃝ | ◐ | ● | ● | ● | 75% |
@@ -233,7 +234,6 @@ Agents has none of these at all:
 | Superset | ● | ● | ◐ | ● | ?⃝ | ◐ | 67% |
 | T3 Code | ● | ?⃝ | ◐ | ● | ◐ | ● | 67% |
 | Threadlines | ● | ?⃝ | ● | ● | ● | ?⃝ | 67% |
-| **Agents** | ● | ○ | ○ | ● | ● | ◐ | 58% |
 | DockTerm | ● | ● | ◐ | ?⃝ | ● | ?⃝ | 58% |
 | tuios | ● | ● | ◐ | ● | ?⃝ | ○ | 58% |
 | CodeAgentSwarm | ● | ● | ◐ | ?⃝ | ?⃝ | ?⃝ | 42% |
@@ -445,10 +445,10 @@ Each app's score in every table, and overall: its points over the 45 scored feat
 | 3 | Nimbalyst | 83% | 83% | 83% | 70% | 70% | 75% | 70% | 83% | **78%** |
 | 6 | Agentastic | 100% | 42% | 92% | 90% | 80% | 100% | 80% | 33% | **77%** |
 | 6 | Claude Code | 67% | 83% | 92% | 80% | 70% | 75% | 80% | 67% | **77%** |
+| 8 | **Agents** | 92% | 50% | 75% | 80% | 50% | 75% | 70% | 83% | **72%** |
 | 8 | OpenAI Codex | 67% | 83% | 83% | 70% | 40% | 83% | 80% | 67% | **72%** |
-| 9 | Warp | 83% | 58% | 92% | 60% | 70% | 83% | 70% | 50% | **71%** |
-| 10 | **Agents** | 92% | 50% | 58% | 80% | 50% | 75% | 70% | 83% | **70%** |
-| 10 | T3 Code | 83% | 92% | 67% | 80% | 80% | 50% | 40% | 67% | **70%** |
+| 10 | Warp | 83% | 58% | 92% | 60% | 70% | 83% | 70% | 50% | **71%** |
+| 11 | T3 Code | 83% | 92% | 67% | 80% | 80% | 50% | 40% | 67% | **70%** |
 | 12 | Superset | 75% | 42% | 67% | 70% | 70% | 100% | 40% | 83% | **69%** |
 | 13 | Pragma | 75% | 83% | 67% | 60% | 60% | 75% | 60% | 50% | **67%** |
 | 14 | Threadlines | 83% | 50% | 67% | 100% | 40% | 42% | 60% | 67% | **63%** |

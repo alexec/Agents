@@ -3399,12 +3399,23 @@ public enum DaemonAPI {
         /// agent's entries and terminal output go (#203). Omitted, `watching` stands in, as
         /// it did for a client from before.
         public var showing: UUID?
+        /// The other conversations this connection has open, each in a window of its own
+        /// (#826). Their entries and terminal output go to it as `showing`'s do. Omitted
+        /// means none.
+        public var alsoShowing: [UUID]?
 
-        public init(watching: UUID?, active: Bool, mayNotify: Bool? = nil, showing: UUID? = nil) {
+        public init(watching: UUID?, active: Bool, mayNotify: Bool? = nil, showing: UUID? = nil,
+                    alsoShowing: [UUID]? = nil) {
             self.watching = watching
             self.active = active
             self.mayNotify = mayNotify
             self.showing = showing
+            self.alsoShowing = alsoShowing
+        }
+
+        /// Every conversation this connection has open: `showing` and `alsoShowing`.
+        public var shownSet: Set<UUID> {
+            Set((showing ?? watching).map { [$0] } ?? []).union(alsoShowing ?? [])
         }
     }
 

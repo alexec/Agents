@@ -11,6 +11,8 @@ struct PromptBar: View {
     @Environment(AppModel.self) private var model
     @Environment(WindowRequests.self) private var requests
     @Environment(\.chatActions) private var chatActions
+    /// Set in a window of its own (#826): this bar is that session's.
+    @Environment(\.poppedChat) private var popped
     /// Whether the folder is the caller's to decide rather than this bar's.
     ///
     /// Set on a project page, where the folder is the project and changing it would
@@ -45,8 +47,13 @@ struct PromptBar: View {
     @State private var sending = 0
     @State private var sendingIsSlow = false
 
-    private var agent: Agent? { model.selectedAgent }
+    private var agent: Agent? { popped.map { model.work.agent($0.id) } ?? model.selectedAgent }
     private var isNew: Bool { agent == nil }
+
+    /// What the runtime behind this bar's agent, or the draft, says it will take.
+    private var promptCapabilities: ACP.PromptCapabilities {
+        model.promptCapabilities(for: agent?.runtimeID ?? model.draftRuntimeID)
+    }
 
     /// Which conversation the words in this bar belong to, and are kept against. A project
     /// page's bar is that project's; the chat's is its agent's.
@@ -112,7 +119,7 @@ struct PromptBar: View {
                 startingOnOut
                 if !attachments.isEmpty {
                     AttachmentStrip(attachments: attachments,
-                                    refusal: { $0.refusal(from: model.promptCapabilities) },
+                                    refusal: { $0.refusal(from: promptCapabilities) },
                                     remove: { attachment in
                                         attachments.removeAll { $0.id == attachment.id }
                                     })
@@ -635,7 +642,7 @@ struct PromptBar: View {
     /// as a reference, which every runtime takes.
     private func attach(_ url: URL) {
         let isImage = ["png", "jpg", "jpeg", "gif", "heic", "webp"].contains(url.pathExtension.lowercased())
-        if isImage, model.promptCapabilities.allows(.image), let data = try? Data(contentsOf: url) {  // store-ok: a file the person picked or dropped
+        if isImage, promptCapabilities.allows(.image), let data = try? Data(contentsOf: url) {  // store-ok: a file the person picked or dropped
             attachments.append(.image(data, mimeType: mimeType(for: url), name: url.lastPathComponent))
         } else {
             attachments.append(.file(url))
@@ -1018,7 +1025,7 @@ struct PromptBar: View {
     private func send() {
         guard canSend else { return }
         // Nothing the runtime cannot take is sent, and the prompt is not lost.
-        if let refused = attachments.compactMap({ $0.refusal(from: model.promptCapabilities) }).first {
+        if let refused = attachments.compactMap({ $0.refusal(from: promptCapabilities) }).first {
             model.show(problem: refused)
             return
         }
@@ -1047,7 +1054,8 @@ struct PromptBar: View {
         dismissedSuggestions = true
         // What you just sent is the thing you want to see, so the conversation comes
         // back to its end even if you were reading three screens up.
-        model.scrollToEnd()
+        if let popped { popped.scrollToEnd() } else { model.scrollToEnd() }
+        let agentID = agent?.id
         Task {
             if starting {
                 // Kept in the field if it did not start, with the reason over it.
@@ -1062,7 +1070,7 @@ struct PromptBar: View {
                 return
             }
             sending += 1
-            let went = await model.send(outgoing, attachments: going)
+            let went = await model.send(outgoing, attachments: going, to: agentID)
             sending -= 1
             // The field empties at once so sending feels immediate, but a prompt that
             // did not go is given back rather than lost, unless something new has been

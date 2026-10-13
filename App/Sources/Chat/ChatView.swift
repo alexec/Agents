@@ -17,11 +17,13 @@ struct ChatView: View {
     @Environment(SidebarFrame.self) private var frame
     @Environment(SidebarStates.self) private var states
     @Environment(\.openURL) private var openURL
+    /// Set in a window of its own (#826): this session, not the selection.
+    @Environment(\.poppedChat) private var popped
     @State private var formHeight: CGFloat = 0
     /// The open chat's views (#187), torn down when another chat opens.
     @State private var views = AppViewStore()
 
-    private var agent: Agent? { model.selectedAgent }
+    private var agent: Agent? { popped.map { model.work.agent($0.id) } ?? model.selectedAgent }
 
     var body: some View {
         Group {
@@ -30,6 +32,8 @@ struct ChatView: View {
                     Transcript(agent: agent, bottomInset: formHeight, cards: cards)
                         // What was exchanged, a swipe away, as on the phone.
                         .swipeToShowPane(show: {
+                            // A window of its own has no inspector (#826).
+                            guard popped == nil else { return }
                             frame.pane = .artifacts
                             if !frame.isOpen, SidebarFrame.fits(inWindowOf: frame.windowWidth) { frame.open() }
                         }, hide: { frame.isOpen = false })
@@ -72,7 +76,7 @@ struct ChatView: View {
         // chat. Not one chat changing for another: animating that faded the old rows out
         // for a quarter of a second while the new ones were built, and every frame of it
         // redrew the whole pane, which was most of the cost of opening a chat (#90).
-        .animation(.snappy(duration: 0.28), value: model.selection == nil)
+        .animation(.snappy(duration: 0.28), value: (popped?.id ?? model.selection) == nil)
         // Title stays on ContentView's detail: one owner for the window title.
         .environment(\.chatActions, chatActions)
         .environment(\.appViewStore, views)
@@ -92,7 +96,7 @@ struct ChatView: View {
         AppViewActions(
             agentID: agent.id,
             call: { [model] method, params in try await model.viewCall(agent.id, method, params) },
-            send: { [model] text in await model.send(text) },
+            send: { [model] text in await model.send(text, to: agent.id) },
             openLink: { [openURL] url in openURL(url) },
             pin: { [model] view in
                 await model.pinView(view, in: ProjectKey(host: agent.host, folder: agent.projectFolder))
@@ -106,34 +110,40 @@ struct ChatView: View {
     private var chatActions: ChatActions {
         ChatActions(
             // The editor the Mac opens that file with, which is the one the user chose.
-            open: { [model] location in model.open(URL(filePath: location.path), on: model.selectedAgent?.host ?? .mac) },
-            terminalOutput: { [model] id in model.terminalOutput[id] ?? "" },
+            open: { [model, agent] location in model.open(URL(filePath: location.path), on: agent?.host ?? .mac) },
+            terminalOutput: { [model, popped] id in (popped?.work.terminalOutput ?? model.terminalOutput)[id] ?? "" },
             unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) },
             sendNow: { [model] prompt, agentID in await model.sendNow(prompt, to: agentID) },
             canSendNow: { [model] runtimeID in runtimeID.flatMap { model.accounts[$0]?.canSteer } ?? false },
             acting: { [model] agentID in model.acting(agentID) },
             recipient: { [model] agentID in model.answerRecipient(agentID) },
             // The sidebar's Changes pane, open at that edit (035 FR-014).
-            showEdit: { [frame, states, agent] diff, toolCallID in
+            showEdit: { [model, frame, states, agent, popped] diff, toolCallID in
                 guard let agent else { return }
+                // A window of its own has no Changes pane: the file opens in the editor (#826).
+                if popped != nil { return model.open(URL(filePath: diff.path), on: agent.host) }
                 states.state(for: agent.id).changesSelection = ChangesSelection(
                     path: ReportedChanges.key(diff.path), toolCallID: toolCallID)
                 frame.pane = .changes
                 if !frame.isOpen { frame.open() }
             },
             // The sidebar's Background pane, at that subagent (057, frame C).
-            subagentSteps: { [frame, states, agent] id in
+            subagentSteps: { [model, frame, states, agent, popped] id in
                 guard let agent else { return }
+                // The Background pane is the main window's: the session opens there (#826).
+                if popped != nil { return model.showInMainWindow(agent.id) }
                 states.state(for: agent.id).subagent = id
                 frame.pane = .background
                 if !frame.isOpen { frame.open() }
             },
-            backgroundOutput: { [model] item in
-                guard let agent = model.selectedAgent else { return }
+            backgroundOutput: { [model, agent] item in
+                guard let agent else { return }
                 Task { await BackgroundOutput.open(item, of: agent, model: model) }
             },
             turnEntries: { [model] agentID, range in await model.turnEntries(agentID, range) },
-            reloadTranscript: { [model] in await model.loadTranscript() },
+            reloadTranscript: { [model, popped] in
+                if let popped { await model.loadTranscript(of: popped) } else { await model.loadTranscript() }
+            },
             continueWithoutSandbox: sandboxAnswer(carryOn: true),
             keepStopped: sandboxAnswer(carryOn: false),
             waitingSandbox: agent?.pendingSandboxFailure,
@@ -142,9 +152,11 @@ struct ChatView: View {
             retryKept: { [model] in await model.retryKept($0) },
             hostName: { [model] in model.hosts.label($0) },
             // A card in the chat opens its file in Files, as the agent's call did (#836).
-            showFile: { [model, frame, states, agent] file in
+            showFile: { [model, frame, states, agent, popped] file in
                 guard let agent else { return }
                 model.work.rememberChart(file)
+                // No Files pane in a window of its own: the file opens in the editor (#826).
+                if popped != nil { return model.open(file.url, on: agent.host) }
                 let state = states.state(for: agent.id)
                 state.folder = file.url.deletingLastPathComponent()
                 state.openFile = file.url
@@ -219,22 +231,24 @@ struct ChatView: View {
     }
 
     private var selectedHostOffline: Bool {
-        model.hosts.isOffline(model.selectedAgent?.host ?? .mac)
+        model.hosts.isOffline(agent?.host ?? .mac)
     }
 
     private var offlineHelp: String {
-        model.offlineHelp(for: model.selectedAgent?.host ?? .mac)
+        model.offlineHelp(for: agent?.host ?? .mac)
     }
 
     /// What waits on the person, at the end of the transcript (#723): nothing when
     /// nothing does, so the transcript has no way back to a question to offer.
     private var cards: AnyView? {
-        guard let agent = model.selectedAgent else { return nil }
+        guard let agent else { return nil }
         let guarded = model.work.guardedChanges(askedIn: agent.id)
-        guard !model.permissionsForSelection.isEmpty || !guarded.isEmpty
-                || model.elicitationForSelection != nil || agent.asksToArchive else { return nil }
+        let permissions = model.work.permissions(for: agent.id)
+        let elicitation = model.work.elicitation(for: agent.id)
+        guard !permissions.isEmpty || !guarded.isEmpty
+                || elicitation != nil || agent.asksToArchive else { return nil }
         return AnyView(VStack(spacing: 12) {
-            ForEach(model.permissionsForSelection) { request in
+            ForEach(permissions) { request in
                 PermissionView(request: request)
                     .disabled(selectedHostOffline)
                     .help(selectedHostOffline ? offlineHelp : "")
@@ -245,7 +259,7 @@ struct ChatView: View {
                     .chatColumn()
             }
             // A form waits the same way a permission question does, and sits with it.
-            if let request = model.elicitationForSelection {
+            if let request = elicitation {
                 // A fresh card per form, so the answers and the step reached on one
                 // are not carried into the next.
                 ElicitationView(request: request)
