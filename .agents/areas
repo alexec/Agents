@@ -1,0 +1,117 @@
+# Feature areas (#873): which paths belong to which feature, so that two lanes do not
+# work on the same feature at the same time. One area can cover App, Remote, Web,
+# packages and docs.
+#
+# Each line is a path pattern and an area. Patterns start at the repository root:
+# `*` matches inside one folder, `**` matches across folders, and a pattern that ends
+# in `/` matches everything under that folder. The last line that matches a path wins.
+# The area `-` means no area: use it for shared files that every lane touches.
+#
+# The CI step (.github/workflows/areas.yml, scripts/pr-areas.py) gives each pull request
+# an `area:<name>` label for each area its changed files are in, and warns when another
+# open pull request holds the same area. Add an area when the replay
+# (scripts/replay-conflicts.py) shows two lanes conflicting on a feature that has none.
+
+# sidebar: the list of projects, sessions and workflows, and its row grammar (#587).
+App/Sources/AgentList/                                 sidebar
+App/Sources/Projects/ProjectListView.swift             sidebar
+App/Sources/Projects/ProjectRow.swift                  sidebar
+App/Sources/Projects/ProjectWorkRows.swift             sidebar
+App/Sources/Projects/PinnedPageRows.swift              sidebar
+App/Sources/Projects/SidebarSmartRows.swift            sidebar
+App/Sources/Projects/WorkflowRow.swift                 sidebar
+App/Sources/Projects/WindowFolds.swift                 sidebar
+App/Sources/Projects/SwipeAction.swift                 sidebar
+Packages/AgentsKit/Sources/AgentsKitCore/Sidebar/      sidebar
+Packages/AgentsKit/Tests/AgentsKitTests/Unit/Sidebar*  sidebar
+Remote/Sources/Sidebar/                                sidebar
+Web/src/model/sidebar.ts                               sidebar
+Web/src/model/folds.ts                                 sidebar
+Web/src/model/groups.ts                                sidebar
+Web/src/model/rowLines.ts                              sidebar
+Web/src/sidebar.css                                    sidebar
+Web/src/views/Sidebar.tsx                              sidebar
+Web/src/views/SessionRow.tsx                           sidebar
+Web/src/views/WorkflowRow.tsx                          sidebar
+Web/src/views/Activity.tsx                             sidebar
+Web/src/views/Pins.tsx                                 sidebar
+Web/test/sidebar.test.mjs                              sidebar
+Web/test/groups.test.mjs                               sidebar
+Web/test/row-lines.test.mjs                            sidebar
+
+# events: events, wait_for_event, wait filters and event triggers (#574, #579).
+App/Sources/Events/                                    events
+Remote/Sources/Events/                                 events
+Shared/UI/Chat/Wait*.swift                             events
+Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Event*.swift  events
+Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+MCPEvents.swift  events
+Packages/AgentsKit/Sources/AgentsKit/MCP/MCPEvent*.swift  events
+Packages/AgentsKit/Sources/AgentsKit/Store/*EventStore.swift  events
+Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI+Events.swift  events
+Packages/AgentsKit/Sources/AgentsKitCore/Model/Event*.swift  events
+Packages/AgentsKit/Sources/AgentsKitCore/Model/DetailFilter.swift  events
+Packages/AgentsKit/Sources/AgentsKitCore/Model/MCPEventTrigger.swift  events
+Packages/AgentsKit/Sources/AgentsKitCore/Model/WaitStatus.swift  events
+Packages/AgentsKit/Sources/AgentsKitCore/Model/WorkflowTrigger*.swift  events
+Packages/AgentsKit/Tests/AgentsKitTests/Integration/*Event*Tests.swift  events
+Packages/AgentsKit/Tests/AgentsKitTests/Unit/*Event*Tests.swift  events
+Packages/AgentsKit/Tests/AgentsKitTests/Unit/DetailFilterTests.swift  events
+Packages/AgentsKit/Tests/AgentsKitTests/Unit/WaitStatusTests.swift  events
+Packages/AgentsKit/Tests/AgentsKitTests/Unit/WorkflowTrigger*Tests.swift  events
+Packages/MCPServers/Sources/MCPServerKit/EventPolling.swift  events
+docs/reference/events.md                               events
+docs/how-to/wait-for-something.md                      events
+docs/how-to/start-a-workflow-from-an-mcp-event.md      events
+
+# agent-tools: the tools the app serves to agents, their names and shapes (#638, #639).
+Packages/AgentsKit/Sources/AgentsKit/ACP/Serve/AppService*.swift  agent-tools
+Packages/AgentsKit/Sources/AgentsKit/ACP/Serve/AppToolPreface.swift  agent-tools
+Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+AppTools.swift  agent-tools
+Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+TurnEndTools.swift  agent-tools
+Packages/AgentsKit/Sources/AgentsKit/MCP/AppToolsEndpoint.swift  agent-tools
+Packages/AgentsKit/Sources/AgentsKitCore/Model/AppTool.swift  agent-tools
+Packages/AgentsKit/Sources/AgentsKitCore/Daemon/ConnectionRole.swift  agent-tools
+Packages/AgentsKit/Tests/AgentsKitTests/AppToolsEndpointTests.swift  agent-tools
+Packages/AgentsKit/Tests/AgentsKitTests/Unit/AgentToolsServiceTests.swift  agent-tools
+Packages/AgentsKit/Tests/AgentsKitTests/Unit/AppServiceTests.swift  agent-tools
+Packages/AgentsKit/Tests/AgentsKitTests/Unit/TurnEndToolsServiceTests.swift  agent-tools
+Packages/AgentsKit/Tests/AgentsKitTests/Integration/ConnectionRoleTests.swift  agent-tools
+Packages/AgentsKit/Tests/AgentsKitTests/Integration/ToolScopingTests.swift  agent-tools
+docs/reference/agent-tools.md                          agent-tools
+docs/explanation/scoped-tools.md                       agent-tools
+
+# brief: what every agent is told when it starts (#599, #601, #615).
+Packages/AgentsKit/Sources/AgentsKit/ACP/Serve/Briefing.swift  brief
+Packages/AgentsKit/Sources/AgentsKitCore/Model/LeaseWords.swift  brief
+Packages/AgentsKit/Tests/AgentsKitTests/Unit/BriefingTests.swift  brief
+Packages/AgentsKit/Tests/AgentsKitTests/Support/BriefingAsSent.swift  brief
+Packages/AgentsKit/Tests/AgentsKitTests/Live/BriefingLiveTests.swift  brief
+
+# workspaces: workspace providers and the tools that start them (#691).
+App/Sources/Control/ControlProvidersPage.swift         workspaces
+App/Sources/Control/NewWorkspaceSheet.swift            workspaces
+Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+WorkspaceTools.swift  workspaces
+Packages/AgentsKit/Sources/AgentsKitCore/Control/Workspace*.swift  workspaces
+Packages/AgentsKit/Sources/AgentsKitCore/Control/ShippedToolMaps.swift  workspaces
+Packages/AgentsKit/Tests/AgentsKitTests/Integration/WorkspaceToolsTests.swift  workspaces
+Packages/AgentsKit/Tests/AgentsKitTests/Control/HostWorkspaceOverlayTests.swift  workspaces
+Packages/ControlPlane/Sources/ControlPlaneKit/Providers/  workspaces
+Packages/ControlPlane/Tests/ControlPlaneKitTests/*Workspace*Tests.swift  workspaces
+Packages/ControlPlane/Tests/ControlPlaneKitTests/*Provider*Tests.swift  workspaces
+Packages/ControlPlane/Tests/ControlPlaneKitTests/KeptRequestsTests.swift  workspaces
+Packages/ControlPlane/Tests/ControlPlaneKitTests/IdleStopsTests.swift  workspaces
+Packages/MCPServers/Sources/WorkspaceCommands/         workspaces
+Packages/MCPServers/Sources/workspace-commands/        workspaces
+Packages/MCPServers/Tests/WorkspaceCommandsTests/      workspaces
+Shared/UI/Chat/KeptPromptRow.swift                     workspaces
+Web/src/views/Kept.tsx                                 workspaces
+Web/test/kept*                                         workspaces
+docs/reference/workspace-providers.md                  workspaces
+docs/how-to/add-a-workspace-provider.md                workspaces
+docs/how-to/start-workspaces-from-agents.md            workspaces
+specs/691-*/                                           workspaces
+specs/858-*/                                           workspaces
+
+# Shared files every lane touches: no area, last so that nothing above claims them.
+specs/071-web-remote/walks/parity.md                   -
+Web/src/protocol/generated.ts                          -

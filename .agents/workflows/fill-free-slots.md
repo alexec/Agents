@@ -52,6 +52,14 @@ While there are more than 5, start no enhancements: after the bugs, take the una
 `needs-walk` issues instead, oldest first, as walk lanes (step 3). See
 `docs/explanation/direction.md`.
 
+**One lane per area (#873).** An issue's area is its `area:<name>` label. If it has
+none, guess one from its text and the paths in `.agents/areas`, and add it
+(`gh issue edit <n> --add-label area:<name>`); leave it without one if none fits. An area
+is held by an open pull request with that label
+(`gh pr list --state open --json number,labels`), by the issue of a running agent (its
+`#<n>` session label), and by an issue you start in this run. Skip an issue whose area
+is held and take the next one. An issue without an area is never held.
+
 If there is nothing to start, say "No unassigned issues to start." and call
 `archive_session` (no id).
 
@@ -87,5 +95,5 @@ For each of the first (free slots) issues, in order:
 ## 4. Report
 
 One line per agent started: `#<n> <title>: started`, and one per issue that could not be
-started, with why, then a line like "Started 2 agents on #427 and #432; 4 of 4 slots
+started, with why (for a held area: `#<n> <title>: skipped, area:<name> held by #<m>`), then a line like "Started 2 agents on #427 and #432; 4 of 4 slots
 now in use." Then call `archive_session` (no id).
