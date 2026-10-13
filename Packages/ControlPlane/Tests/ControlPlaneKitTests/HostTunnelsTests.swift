@@ -86,8 +86,11 @@ struct HostTunnelsTests {
         let other = HostTunnels(store: MemoryStore(), executable: refused, environment: [:],
                                 hosts: { [HostRecord(id: host, name: "ws")] }, changed: { await failing.add($0) })
         try await other.add(Self.record(host: host))
-        try await failing.waitFor { !$0.isEmpty }
-        #expect(await other.state(for: host) == .init(up: false, problem: "remote port forwarding failed for listen port 8791"))
+        // Wait for ssh's reason, not the first change: under load an earlier state can come first (#851).
+        let refusal = DaemonAPI.HostTunnel(up: false, problem: "remote port forwarding failed for listen port 8791")
+        try await failing.waitFor { $0.contains { $0.tunnel == refusal } }
+        let refusedState = await other.state(for: host), refusedChanges = await failing.changes
+        #expect(refusedState == refusal, "\(refusedChanges)")
         await other.stop()
 
         // ssh itself gave up: its own last words.
@@ -99,8 +102,10 @@ struct HostTunnelsTests {
         let third = HostTunnels(store: MemoryStore(), executable: denied, environment: [:],
                                 hosts: { [HostRecord(id: host, name: "ws")] }, changed: { await refusing.add($0) })
         try await third.add(Self.record(host: host))
-        try await refusing.waitFor { !$0.isEmpty }
-        #expect(await third.state(for: host) == .init(up: false, problem: "agents@ws: Permission denied (publickey)."))
+        let denial = DaemonAPI.HostTunnel(up: false, problem: "agents@ws: Permission denied (publickey).")
+        try await refusing.waitFor { $0.contains { $0.tunnel == denial } }
+        let deniedState = await third.state(for: host), deniedChanges = await refusing.changes
+        #expect(deniedState == denial, "\(deniedChanges)")
         await third.stop()
     }
 
