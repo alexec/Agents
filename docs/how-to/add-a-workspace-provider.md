@@ -98,6 +98,50 @@ that isn't.
 For a server at an address, its one secret is sent as `Authorization: Bearer` and the
 secret. For a command, secrets are its environment.
 
+## Let an agent write it
+
+For **MCP server** and **Your commands**, an agent can write the map or the commands for you.
+The agent runs on the host on the Mac that runs the control plane, on a runtime that can turn
+off its own tools. For now, that runtime is Claude. The sheet shows a runtime menu when more
+than one runtime can write.
+
+1. Give the server's command or address, or the **CLI** that your commands use (`cws`).
+   Add the secrets the server or CLI needs.
+2. Click **Write It for Me**. The control plane reads the server's tools, or runs
+   `cws --help`. Then it starts the agent with what it read.
+3. Under the field, a line shows each step: "Writing… read 41 tools · checked: listed 3".
+   **Details…** shows every step. Click **×** to stop. Nothing is kept.
+4. When the agent is done, the map or the commands are in the form's own fields, with
+   the list that its last check got, and "Written by Claude. Read it before you add it."
+   Read it, change it if you want, then click **Add**. Add checks it again, as always.
+
+Some cases need no agent:
+
+- A server that follows the contract needs no map. The sheet says so.
+- A server that the DigitalOcean map fits gets that map.
+- A CLI that has a preset (`docker`, `doctl`, `gh`, `coder`, `gcloud`) gets a button for
+  that preset.
+
+What the agent can and cannot do:
+
+- It has no tools of its runtime's own. It cannot run commands, read files, or reach the
+  network. It has only seven tools, which the control plane answers for it.
+- It never sees a secret's value. Where a value would show, it sees `${NAME}`.
+- The control plane runs `cws ‹words› --help` only for subcommands that the help printed.
+  It runs a check alone only if the check is plainly a list. For any other check, the sheet
+  asks you first, with **Run Check**.
+- The agent can ask to start or stop one workspace to prove the map. The sheet asks you
+  each time, with the workspace and its cost. **Don't**, or no answer in 2 minutes, is a no.
+  A workspace that you start this way stays running until you stop it.
+- It has 5 minutes, 8 checks and 40 tool calls. Then the sheet shows its last draft.
+
+When a provider's server changes, use **Write the Map Again…** (or **Write the Commands
+Again…**) in its card's `···` menu. The agent starts from the map that the provider has
+now. **Save** keeps the server, the secrets and the linked hosts. When Add refuses a server
+that a map would fix, the refusal has **Write a Tool Map**.
+
+Start and Stop never use the agent: they use the map that you kept.
+
 ## A provider of your own
 
 Any MCP server that offers `workspaces_list`, `workspace_start` and `workspace_stop` is a

@@ -232,6 +232,13 @@ is up. The host's own clock isn't used.
 
 For now only a control plane with one copy runs providers, as only one holds ssh tunnels.
 
+**Write It for Me** puts an agent in the Add Provider sheet, at authoring time only. The
+agent runs on the host on the control plane's own machine, because the server and the CLI
+must be read there. The control plane does every call to the server or the CLI itself, with
+the secrets, and gives the agent only the results, with each secret's value replaced by its
+name. The agent has no tools of its runtime's own and is in no list. Start and Stop never
+call an agent: they use the map that was kept.
+
 ## When the store is down
 
 If the copies are running but cannot reach their store, the live connections carry on:
