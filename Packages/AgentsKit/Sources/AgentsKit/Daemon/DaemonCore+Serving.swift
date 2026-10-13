@@ -104,7 +104,8 @@ extension DaemonCore {
     }
 
     func holdElicitation(_ request: ElicitationRequest, agentID: UUID) async {
-        guard turnTasks[agentID] != nil else {
+        // A writer (#858) asks the person only through its tools, in the sheet.
+        guard turnTasks[agentID] != nil, agents[agentID]?.purpose == nil else {
             await record(.runtimeNote(RuntimeNote.questionWentUnanswered), for: agentID)
             if let session = live[agentID] {
                 await session.answerElicitation(id: request.id, outcome: .cancel)

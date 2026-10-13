@@ -472,3 +472,48 @@ public enum ToolPolicyCatalog {
     /// In the order `RuntimeCatalog` declares its runtimes, so the two read side by side.
     public static let builtIn: [ToolPolicy] = [claude, grok, copilot, cursor, codex, gemini, antigravity, opencode]
 }
+
+// MARK: The writer (#858)
+
+/// The tools of the agent that writes a provider's tool map or commands: none of its
+/// runtime's own, so nothing it reads can make it run a command, read a file such as the
+/// control plane's secrets, reach the network or start another agent. It keeps only the
+/// app's writer tools, which its MCP server is the only one to serve (FR-010).
+///
+/// Only a runtime whose tools can be taken away for one session is a writer: the policy
+/// rides on `session/new`, so the runtime's process can be shared with other agents. A
+/// launch flag or an environment variable would scope every session of that process.
+public extension ToolPolicyCatalog {
+    /// What Claude's writer is denied, besides having no built-in tools at all: a second
+    /// wall, by name, in case an adapter ignores the empty `tools`.
+    static let claudeWriterDenied = [
+        "Bash", "BashOutput", "KillShell", "Read", "Grep", "Glob", "LS", "Write", "Edit", "MultiEdit",
+        "NotebookEdit", "NotebookRead", "WebFetch", "WebSearch", "Agent", "Task", "TaskOutput", "TaskStop",
+        "ListAgents", "SendMessage", "TodoWrite", "Skill", "SlashCommand", "AskUserQuestion", "ExitPlanMode",
+        "EnterWorktree", "ExitWorktree", "Workflow", "CronCreate", "CronList", "CronDelete", "ScheduleWakeup",
+        "Monitor", "RemoteTrigger", "PushNotification", "ReportFindings", "DesignSync",
+    ]
+
+    /// The `_meta` a writer's session is made with, or nil when this runtime can't be a
+    /// writer. Not merged with the runtime's usual scoping or the project's plugins: a
+    /// plugin can bring tools and servers of its own.
+    static func writerMeta(for runtimeID: String) -> JSONValue? {
+        switch runtimeID {
+        case RuntimeCatalog.claude.id:
+            // `tools: []` is the allowlist of built-in tools, empty; `strictMcpConfig` takes
+            // only the servers the session names, which for a writer is the app's alone.
+            return ["claudeCode": ["options": [
+                "tools": [],
+                "disallowedTools": .array(claudeWriterDenied.map(JSONValue.string)),
+                "strictMcpConfig": true,
+            ]]]
+        default:
+            return nil
+        }
+    }
+
+    /// The runtimes that can write, in the catalog's order.
+    static var writerRuntimes: [String] {
+        RuntimeCatalog.builtIn.map(\.id).filter { writerMeta(for: $0) != nil }
+    }
+}

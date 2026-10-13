@@ -114,6 +114,25 @@ public enum AppTool {
     public static let deleteWorkspace = "delete_workspace"
     public static let workspaceTools = [listWorkspaces, startWorkspace, stopWorkspace, makeWorkspace, deleteWorkspace]
 
+    // Seven for the agent that writes a provider's tool map or commands (#858). Offered to
+    // that agent alone, and it is offered nothing else. None ends with another tool's name.
+
+    /// The MCP server's tools, as the control plane read them.
+    public static let readTools = "read_tools"
+    /// A CLI's help for some of its words.
+    public static let readHelp = "read_help"
+    /// Check a draft with one list.
+    public static let checkDraft = "check_draft"
+    /// Ask the person to start one workspace with the draft.
+    public static let proveStart = "prove_start"
+    /// Ask the person to stop one workspace with the draft.
+    public static let proveStop = "prove_stop"
+    /// The result.
+    public static let sendDraft = "send_draft"
+    /// End with no result.
+    public static let giveUp = "give_up"
+    public static let writerTools = [readTools, readHelp, checkDraft, proveStart, proveStop, sendDraft, giveUp]
+
     /// What agents announced `custom.` events with until #639. No longer offered or
     /// answered; kept so a conversation that called it still draws as the app's own call.
     public static let retiredPublishEvent = "publish_event"
@@ -137,7 +156,7 @@ public enum AppTool {
         leaseResource, releaseResource, listResources, waitForEvent,
         cancelWait, listSessions, readSession,
         setSessionLabels, moveWorktree, messageSession,
-    ] + workspaceTools
+    ] + workspaceTools + writerTools
 
     /// How runtimes put the server's name in front of a tool's, as measured: Claude's
     /// adapter says `mcp__agents__finish_turn`, Antigravity `agents_finish_turn` (049).

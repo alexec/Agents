@@ -20,15 +20,22 @@ import Foundation
 /// It reports; it decides nothing. Where a need goes is the daemon's (FR-012).
 @MainActor
 final class PresenceReporter {
-    /// Watching, active, and the chat this window has open whether in front or not (#203).
-    typealias Report = @MainActor (UUID?, Bool, UUID?) async -> Void
+    /// Watching, active, the chat the main window has open whether in front or not
+    /// (#203), and the chats open in windows of their own (#826).
+    typealias Report = @MainActor (UUID?, Bool, UUID?, Set<UUID>) async -> Void
 
     private let report: Report
     private let macIdle = AttentionThresholds.standard.macIdle
-    private var last: (watching: UUID?, active: Bool, showing: UUID?)?
+    private var last: (watching: UUID?, active: Bool, showing: UUID?, popped: Set<UUID>)?
     private var lastReportedAt = Date.distantPast
     private var lastCheckedAt = Date.distantPast
+    /// The main window's chat.
     private var watching: UUID?
+    /// The chats in windows of their own (#826), and the one of them in front, if one is:
+    /// that one is what the person is watching while it is.
+    private var popped: Set<UUID> = []
+    private var poppedInFront: UUID?
+    private var inFront: UUID? { poppedInFront ?? watching }
     private var observers: [any NSObjectProtocol] = []
     private var inputMonitor: Any?
     private var sampler: Timer?
@@ -76,6 +83,13 @@ final class PresenceReporter {
         send()
     }
 
+    /// The chats open in windows of their own, and which of them is the key window (#826).
+    func popped(_ ids: Set<UUID>, inFront: UUID?) {
+        popped = ids
+        poppedInFront = inFront.flatMap { ids.contains($0) ? $0 : nil }
+        send()
+    }
+
     /// A fresh connection is a fresh record on the daemon's side, so say it all again.
     func connected() {
         send(force: true)
@@ -87,21 +101,21 @@ final class PresenceReporter {
         // showing what it was showing, is looked at twice a second at most; the
         // change that matters — a Mac gone quiet coming back — is never held.
         let checkedAt = Date()
-        if !force, let last, last.active, last.watching == (NSApp.isActive ? watching : nil),
-           last.showing == watching, checkedAt.timeIntervalSince(lastCheckedAt) < 0.5 {
+        if !force, let last, last.active, last.watching == (NSApp.isActive ? inFront : nil),
+           last.showing == watching, last.popped == popped, checkedAt.timeIntervalSince(lastCheckedAt) < 0.5 {
             return
         }
         lastCheckedAt = checkedAt
         let inUse = MacActivity.isInUse(within: macIdle)
-        let now = (watching: NSApp.isActive && inUse ? watching : nil, active: inUse, showing: watching)
+        let now = (watching: NSApp.isActive && inUse ? inFront : nil, active: inUse, showing: watching, popped: popped)
         // Unchanged, and heard from recently enough: nothing to say. The daemon ages a
         // record past `macIdle`, so a Mac still in use is told again before that.
         let stale = Date().timeIntervalSince(lastReportedAt) > macIdle / 2
         if !force, !stale, let last, last.watching == now.watching, last.active == now.active,
-           last.showing == now.showing { return }
+           last.showing == now.showing, last.popped == now.popped { return }
         last = now
         lastReportedAt = Date()
-        Task { await report(now.watching, now.active, now.showing) }
+        Task { await report(now.watching, now.active, now.showing, now.popped) }
     }
 }
 

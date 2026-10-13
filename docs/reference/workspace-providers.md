@@ -92,6 +92,11 @@ A server whose tools are named otherwise can be used through a tool map: which o
 stands for each of the above, how the arguments are written, and where each field is in its
 answer. See [Add a workspace provider](../how-to/add-a-workspace-provider.md#a-tool-map-for-a-providers-own-mcp-server).
 
+An agent can write the map, or a command provider's config, at Add Provider
+([Let an agent write it](../how-to/add-a-workspace-provider.md#let-an-agent-write-it)). The
+map is then the same as a map that you wrote. The provider's record says which runtime
+wrote it, and when (`writtenBy`), until you change it.
+
 ## Related
 
 - [Start workspaces from Agents](../how-to/start-workspaces-from-agents.md)

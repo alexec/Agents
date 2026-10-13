@@ -10,8 +10,8 @@ import ControlDial
 ///
 ///     AGENTS_FAKE_DEVICE_CODE='agents-control:2:c:device:…' swift test --filter FakeDeviceLiveTests
 ///
-/// It pairs with the code; connects as the device; then says what it could and could not
-/// do, the bare way (its connection's home host) and the wrapped way (every host).
+/// It pairs with the code; connects as the device; then checks it may do what the window
+/// may (#111), the bare way (its connection's home host) and the wrapped way (every host).
 ///
 /// With `AGENTS_FAKE_DEVICE_RELAY=1` and `AGENTS_RELAY_FOLDER` (the folder a scratch
 /// `agents-relay` stands in for iCloud with), it then goes through the relay as the
@@ -47,13 +47,7 @@ struct FakeDeviceLiveTests {
             let projects = try await phone.call(DaemonAPI.Method.projectsList, DaemonAPI.ProjectsListRequest(includeArchived: false),
                                                 returning: [DaemonAPI.ProjectSummary].self)
             print("fake-device: bare projects/list → \(projects.map(\.name))")
-            do {
-                _ = try await phone.call(DaemonAPI.Method.credentialsLend)
-                Issue.record("the device lent a credential")
-            } catch let error as JSONRPCError {
-                #expect(error.code == DaemonAPI.Failure.notPermitted)
-                print("fake-device: credentials/lend refused (\(error.code))")
-            }
+            await expectNotRefused(phone, DaemonAPI.Method.credentialsLend, "bare")
         }
 
         // 4. The wrapped wire, over one more connection: every host.
@@ -68,20 +62,10 @@ struct FakeDeviceLiveTests {
             let listed = try await there.call(DaemonAPI.Method.projectsList, DaemonAPI.ProjectsListRequest(includeArchived: false),
                                               returning: [DaemonAPI.ProjectSummary].self)
             print("fake-device: \(host.name) projects → \(listed.map(\.name))")
-            do {
-                _ = try await there.call(DaemonAPI.Method.runtimesInstall, ["runtime": "claude"])
-                Issue.record("the device installed a runtime")
-            } catch let error as JSONRPCError {
-                print("fake-device: on \(host.id) an operator-only call was refused (\(error.code))")
-            }
+            await expectNotRefused(there, DaemonAPI.Method.runtimesInstall, "on \(host.id)")
         }
-        do {
-            _ = try await control.call(DaemonAPI.Method.clientsList)
-            Issue.record("the device listed clients")
-        } catch let error as JSONRPCError {
-            #expect(error.code == DaemonAPI.Failure.notPermitted)
-            print("fake-device: clients/list refused by the control plane (\(error.code))")
-        }
+        let clients = try await control.call(DaemonAPI.Method.clientsList)
+        print("fake-device: clients/list → \(clients.arrayValue?.count ?? 0) clients")
         wrapped.disconnect()
         await phone.disconnect()
         print("FAKE-DEVICE-ID \(id)")
@@ -111,13 +95,7 @@ struct FakeDeviceLiveTests {
             let projects = try await away.call(DaemonAPI.Method.projectsList, DaemonAPI.ProjectsListRequest(includeArchived: false),
                                                returning: [DaemonAPI.ProjectSummary].self)
             print("fake-device: relayed projects/list → \(projects.map(\.name))")
-            do {
-                _ = try await away.call(DaemonAPI.Method.credentialsLend)
-                Issue.record("the device lent a credential through the relay")
-            } catch let error as JSONRPCError {
-                #expect(error.code == DaemonAPI.Failure.notPermitted)
-                print("fake-device: relayed credentials/lend refused (\(error.code))")
-            }
+            await expectNotRefused(away, DaemonAPI.Method.credentialsLend, "relayed")
             // Away, and happy to be told: as the Remote says it.
             _ = try await away.call(DaemonAPI.Method.presenceReport,
                                     DaemonAPI.PresenceReport(watching: nil, active: false, mayNotify: true))
@@ -165,6 +143,21 @@ struct FakeDeviceLiveTests {
         print("fake-device: withdrawn in \(String(format: "%.1f", Date().timeIntervalSince(withdrawn))) s")
         print("FAKE-HOST-ID \(hostMembership.host?.rawValue ?? "-")")
         await hold()
+    }
+
+    /// A call only the window could make before #111, which a device may make now: asked
+    /// with no params, so it does nothing, and the answer is about the params (-32602),
+    /// never `notPermitted`.
+    func expectNotRefused(_ client: DaemonClient, _ method: String, _ how: String) async {
+        do {
+            _ = try await client.call(method)
+            print("fake-device: \(how) \(method) answered")
+        } catch let error as JSONRPCError {
+            #expect(error.code != DaemonAPI.Failure.notPermitted, "\(how) \(method) refused to a device")
+            print("fake-device: \(how) \(method) not refused (\(error.code))")
+        } catch {
+            Issue.record("\(how) \(method): \(error)")
+        }
     }
 
     /// `AGENTS_FAKE_DEVICE_HOLD=<seconds>`: stay connected through the relay that long, so a

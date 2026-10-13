@@ -78,6 +78,21 @@ The five workspace tools are given to every agent. The control plane does what t
 it would for you, and its log names the agent that asked. Agents reach providers only
 through the control plane, never directly.
 
+### The writer's tools
+
+The agent that writes a provider's map at Add Provider (#858) has these seven tools and no
+others, of the app's or of its runtime's. No other agent has them. The control plane answers
+each one, with every secret's value replaced by `${NAME}`.
+
+| Tool | What it does | Asks you first? |
+|---|---|---|
+| `read_tools` | The MCP server's tools: names, descriptions, input schemas and annotations. | No. |
+| `read_help` | `‹cli› ‹words…› --help`, for at most three subcommands that the help printed. | No. |
+| `check_draft` | Checks a map or config as Add does, with one list. | Only when the list may change something: **Run Check**. |
+| `prove_start`, `prove_stop` | Starts or stops one workspace from the last list with the draft. | **Yes, always**, in the sheet. |
+| `send_draft` | The result, with a note of up to three lines. | No. |
+| `give_up` | Ends with a reason. | No. |
+
 ## See also
 
 - [Have an agent wait for something](../how-to/wait-for-something.md)

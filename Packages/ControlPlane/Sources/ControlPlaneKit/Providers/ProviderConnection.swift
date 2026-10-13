@@ -13,6 +13,8 @@ public protocol WorkspaceProvider: Sendable {
     /// Makes one; what it made when the provider said, and whether `firstBoot` will run.
     func create(name: String, options: JSONValue, firstBoot: String?) async throws -> (DaemonAPI.WorkspaceInfo?, Bool)
     func delete(_ id: String) async throws
+    /// Every tool the server offers, as it described them (#858).
+    func tools() async throws -> [JSONValue]
     func end() async
 }
 
@@ -22,6 +24,7 @@ public extension WorkspaceProvider {
         throw ProviderFailure("It can’t make workspaces.")
     }
     func delete(_ id: String) async throws { throw ProviderFailure("It can’t delete workspaces.") }
+    func tools() async throws -> [JSONValue] { throw ProviderFailure("It can’t list its tools.") }
 }
 
 /// One provider's MCP server, reached as its record says (#691, research R1–R2, R5): the
@@ -141,6 +144,12 @@ public actor ProviderConnection: WorkspaceProvider {
         let capabilities = mapping.native ? ToolMapping.optional.filter { tools.contains($0.key) }.map(\.value).sorted()
             : mapping.capabilities
         return Checked(capabilities: capabilities, contract: contract, workspaces: mapping.workspaces(content))
+    }
+
+    /// Every tool the server offers, as it described them (#858): what a writing agent
+    /// reads, and what the safety rules read a tool's annotations from.
+    public func tools() async throws -> [JSONValue] {
+        try await connected { try await $0.describeTools() }
     }
 
     // MARK: Calls

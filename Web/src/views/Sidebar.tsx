@@ -3,10 +3,10 @@
 // Things-style since #495 (#499): New Session at the top, in the project last started in; Activity;
 // then what wants the person across every project — Pinned, Needs You, Working, Unread — each drawn
 // only with something in it (#507), Needs You with what waits for an OK after its sessions (#773); then a group per project, its sessions newest started first
-// with their state the row's mark, its workflows, and one Archived row opening a page; then the
+// with their state the row's mark, its Workflows fold (#885), and one Archived row opening a page; then the
 // archived projects; and at the foot what the hosts and this browser are doing, and Settings (#846),
-// where each smart group can be turned off. Never more than two
-// levels deep. No host headings: a server's project reads `host:Project`. A project's row only
+// where each smart group can be turned off. Never more than three
+// levels deep: a project's Workflows fold (#885) is the third. No host headings: a server's project reads `host:Project`. A project's row only
 // folds (#375).
 //
 // One list for the keys: ↑ and ↓ move through every row shown, opening what they land on, as the
@@ -33,7 +33,7 @@ import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./Contex
 import { CloningRows, EmptyProjects, NewProjectMenu } from "./NewProject";
 import { putFilesInDropbox, useDropboxDrop } from "./DropboxDialog";
 import { rowExtras, SessionRow } from "./SessionRow";
-import { RenameInput, runSessionAction, sessionActions, startedBy } from "./SessionMenu";
+import { openInNewTab, RenameInput, runSessionAction, sessionActions, startedBy } from "./SessionMenu";
 import { markAgentOf, treeRows, type TreeRow } from "../model/tree";
 import { WorkflowRow } from "./WorkflowRow";
 import { PinnedPageRows } from "./Pins";
@@ -418,8 +418,8 @@ function SmartFold({ row, store, projects, query, linkDown }: {
 
 /**
  * One project (#495): a group headed by its row, then its pinned pages, its live sessions newest
- * started first with their state the row's mark, its workflows, and one Archived row opening a
- * page. Its pinned sessions and workflows are in Pinned at the top. A search unfolds every project
+ * started first with their state the row's mark, its Workflows fold (#885), and one Archived row
+ * opening a page. Its pinned sessions and workflows are in Pinned at the top. A search unfolds every project
  * with something that matches, its archived matches inline, and hides the rest. It reads its own
  * project's agents alone, so a change to an agent draws one fold again, and a folded one reads
  * nothing of its sessions (#170). `query` is the search's words, already trimmed.
@@ -470,6 +470,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   const flowPins = on.has("pinned") ? store.workflowPinsIn(host.id, folder) : [];
   const workflows = allWorkflows.filter((w) => !w.isArchived && !flowPins.includes(w.workflow.workflowID));
   const archivedWorkflows = allWorkflows.filter((w) => w.isArchived);
+  const workflowsOpen = searching || folds.isWorkflowsOpen(host.id, folder);
   const nameMatches = label.toLowerCase().includes(query.toLowerCase());
   if (searching && sessions.length === 0 && archived.length === 0 && workflows.length === 0
     && archivedWorkflows.length === 0 && !nameMatches) return null;
@@ -537,10 +538,21 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
           {/* The project's pinned pages first (#159), not while searching: the search is for sessions. */}
           {!searching && <PinnedPageRows store={store} host={host.id} folder={folder} down={down} chosen={here ? r.page : undefined} />}
           {sessionRows.map((tree) => row(tree.agent, tree))}
-          {/* Its workflows after the sessions (#495): rows, not a page, a plain line between the
-              two kinds when there are both (#631). */}
-          {sessions.length > 0 && workflows.length > 0 && <hr class="kinds" aria-hidden="true" />}
-          {workflows.map(workflowRow)}
+          {/* Its workflows after the sessions (#495), in a Workflows fold of their own, one level in,
+              as a mailbox's sub-mailboxes in Mail (#885): folded until opened, kept per project, its
+              grey count on the right. A search holds it open. */}
+          {workflows.length > 0 && (
+            <details class="workflows" open={workflowsOpen}
+              onToggle={(e) => {
+                const now = (e.currentTarget as HTMLDetailsElement).open;
+                if (!searching && now !== workflowsOpen) folds.setWorkflows(host.id, folder, now);
+              }}>
+              <summary data-fold="workflows" aria-label={`Workflows, ${workflows.length}`}>
+                Workflows<span class="count">{workflows.length}</span>
+              </summary>
+              {workflowsOpen && workflows.map(workflowRow)}
+            </details>
+          )}
           {searching ? <>
             {/* What matched in the archive, in the group while searching, so a match is one click away. */}
             {archivedWorkflows.map(workflowRow)}
@@ -654,6 +666,8 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
     void store.arrangeSessionPins(host, folder, ids);
   };
   const menu = (): MenuItem[] => [
+    // Beside this tab or in a window of its own (#826), as the Mac's Open in New Window.
+    { label: "Open in New Tab", help: "Open this session in a new browser tab", run: () => openInNewTab(host, agent) },
     ...sessionActions(agent, store.sessionPinsIn(host, folder).includes(agent.id), startedBy(store, host, agent)).map(({ action, label: words, help }) => ({
       label: words, help, disabled: down || !!store.onItsWay.value[agent.id],
       run: () => runSessionAction(store, host, agent, action),
@@ -702,7 +716,7 @@ function folderPath(folder: string): string {
 /** Every row the keys move through, in the order shown. */
 function navRows(list: HTMLElement): HTMLElement[] {
   return [...list.querySelectorAll<HTMLElement>(
-    ".new-session-top .pick, .activity .row, details.smart > summary, .project-fold > .row.project .pick, .nav-item .row.pin .pick, .nav-item .row.session, .nav-item .row.workflow .pick, .nav-item .row.page-row .pick, details.archived > summary",
+    ".new-session-top .pick, .activity .row, details.smart > summary, details.workflows > summary, .project-fold > .row.project .pick, .nav-item .row.pin .pick, .nav-item .row.session, .nav-item .row.workflow .pick, .nav-item .row.page-row .pick, details.archived > summary",
   )].filter((el) => el.offsetParent !== null);
 }
 

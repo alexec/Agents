@@ -21,9 +21,10 @@ extension DaemonCore {
     ///
     /// And an agent on a runtime that cannot carry its conversation into another folder is
     /// not offered the tools for moving itself (053).
-    func appServer(token: String, managesAgents: Bool = true, movesItself: Bool = true) async throws -> MCPServer {
+    func appServer(token: String, managesAgents: Bool = true, movesItself: Bool = true,
+                   writer: Bool = false) async throws -> MCPServer {
         let port = try await appTools.start()
-        appTools.grant(token, .init(managesAgents: managesAgents, movesItself: movesItself))
+        appTools.grant(token, .init(managesAgents: managesAgents, movesItself: movesItself, writer: writer))
         return AppToolsEndpoint.server(port: port, token: token)
     }
 

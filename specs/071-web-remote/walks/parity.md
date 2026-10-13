@@ -15,12 +15,12 @@
 
 ## Counts
 
-Of 222 rows: **150 same**, **45 by design**, **27 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 223 rows: **150 same**, **45 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
 | Sidebar and project list | 13 | 4 | 5 |
-| Session rows and states | 16 | 2 | 5 |
+| Session rows and states | 16 | 2 | 6 |
 | Chat turns and turn detail | 24 | 4 | 2 |
 | Prompt bar and queued prompts | 20 | 3 | 0 |
 | Question and permission cards | 14 | 3 | 0 |
@@ -36,9 +36,9 @@ Of 222 rows: **150 same**, **45 by design**, **27 delta** (after #188, #189, #19
 | Hosts, connection and pairing | 3 | 3 | 0 |
 | MCP Apps views | 5 | 1 | 0 |
 
-The deltas are tracked by 29 issues:
+The deltas are tracked by 30 issues:
 - **Already open:** #226 (the Remote's one sidebar) and #235 (the page's one sidebar at phone width).
-- **Filed by this audit, the Remote to change:** #238 (with the page), #239, #240, #241, #242, #243, #244, #245, #246 (with one web row), #247, #248, #249.
+- **Filed by this audit, the Remote to change:** #238 (with the page), #239, #240, #241, #242, #243, #244, #245, #246 (with one web row), #247, #248, #249, #888.
 - **The page to change:** #250, #251, #252, #253, #254, #255, #256, #257, #260, #261, #262.
 - **The window to change, or more than one side:** #264, #265, #266.
 - **Alex to decide** (one client only, nothing says whether that is meant): #267.
@@ -69,8 +69,7 @@ The deltas are tracked by 29 issues:
 | Pinned workflows (#432) | In the Pinned group after the pinned sessions, out of Workflows; Pin / Unpin in the row's menu, a leading swipe and the page; order by drag: `A/Projects/ProjectListView.swift` (`pinnedSessions`), `A/Projects/ProjectWorkRows.swift` (`WorkflowListRow`), `A/Projects/WorkflowPage.swift` | The same group; Pin / Unpin in the long press, a leading swipe and the page's bar; Move Up / Down in the long press: `R/Sidebar/RemoteSidebar.swift`, `R/Sidebar/SidebarRows.swift` (`PinWorkflowButton`), `R/Projects/WorkflowPage.swift` | The same group; Pin / Unpin and Move Up / Down in the row's context menu (right click or the menu key, #547), Pin / Unpin on the page: `W/views/Sidebar.tsx`, `W/views/WorkflowRow.tsx`, `W/views/WorkflowPage.tsx` | **by design** (drag on the window; menus where there's no drag); unwalked |
 | "No sessions yet" | Only with no live session at all, pinned included: `A/Projects/ProjectListView.swift:319, 452` | n/a | None (#499): an empty project keeps its heading alone: `W/views/Sidebar.tsx` | **same** (#495 walk 4) |
 | Archived sessions fold | *Archived sessions*, 50, *Show all N* while searching: `A/Projects/ProjectListView.swift:401-441`; its page says *Loading…*, *Its host isn’t answering* and *The newest 50 of N* (#664): `A/Projects/ProjectWorkPage.swift` | An Archived row under the project opening a page, asked of the project's own host, a server's included (#498, #533), titled for the project, with *Loading…*, *Its host isn’t answering* and *The newest 50 of N* (#664): `R/Projects/ArchivePage.swift`, `R/RemoteModel.swift` (`loadArchivedAgents`) | An Archived row under the project opening a page, 50 newest; inline matches, *Show all N* while searching: `W/views/Sidebar.tsx`, `W/views/ArchivePage.tsx` (#499) | **delta**: Remote #226 |
-| Workflows and Archived workflows folds | Siblings: `A/Projects/ProjectWorkRows.swift:33-55` | `R/Projects/WorkflowsSection.swift` | Workflows as rows after the sessions; archived ones on the Archived page: `W/views/Sidebar.tsx`, `W/views/ArchivePage.tsx` (#499) | **same** (web, #499) |
-| A line between a project's sessions and its workflows (#631) | A plain `Divider()` row, only when the project has both: `A/Projects/ProjectListView.swift` (`ProjectFold`) | The same: `R/Sidebar/RemoteSidebar.swift` (`RemoteProjectFold`) | The same, an `hr.kinds`: `W/views/Sidebar.tsx` (`ProjectFold`), `W/sidebar.css` | **same** (#631); unwalked |
+| Workflows and Archived workflows folds | A project's live workflows in a **Workflows** fold after its sessions, one level in, as a mailbox's sub-mailboxes in Mail: a chevron, a grey count (not archived, not pinned), folded until opened, kept per project in `SidebarFolds` (`.workflows`), held open by a search; archived ones on the Archived page: `A/Projects/ProjectWorkRows.swift` (`ProjectWorkflowRows`), `A/Projects/ProjectListView.swift` (`ProjectFold`) | The same `DisclosureGroup`, kept on the device: `R/Sidebar/RemoteSidebar.swift` (`RemoteProjectFold.workflowsFold`) | The same, a `<details class="workflows">`, kept in localStorage (`Folds.isWorkflowsOpen`): `W/views/Sidebar.tsx` (`ProjectFold`), `W/sidebar.css`, `W/model/folds.ts`; archived on `W/views/ArchivePage.tsx` (#499) | **same** (#885; the line between sessions and workflows, #631, is gone with it); unwalked |
 | A workflow row's title weight (#520) | Regular, as a session's; semibold only while it waits for an OK, in every fold and Pinned: `A/Projects/ProjectWorkRows.swift` (`WorkRow`, `WorkflowListRow`) | The same: `R/Sidebar/SidebarRows.swift` (`SidebarWorkflowRow`) | The same (400, 600 with `.needs-ok`): `W/views/WorkflowRow.tsx`, `W/app.css` | **same**; unwalked |
 | A workflow row's shape and menu (#547, #605) | Mark, title, *Off*, and when it last ran at its end (#755: `lastFiredAt` as `ActivityTime`; nothing if never, a running one's from its start, archived ones too); Open, Run now (or Approve / Deny on This Host while it waits), Pin, Turn Off, Archive (or Bring Back), Delete… in its context menu; Delete confirms and removes the file: `A/Projects/ProjectWorkRows.swift` (`WorkflowListRow`) | The same row, its last ran an `ActivityTime` (#755); the actions in its long press, with Delete… and the same confirmation: `R/Sidebar/SidebarRows.swift` (`SidebarWorkflowRow`) | The same row, its last ran a `.when` as a session's (`lastRan`, `shortAgo`, #755), no inline Run Now, ··· or subtitle; the same actions (and Move Up / Down under Pinned) in its right-click / menu-key menu, as a session row's: `W/views/WorkflowRow.tsx` (`workflowActions`); Delete confirms and removes the file | **same** (#547, #605, #755); unwalked |
 | A project's Archive page order | Sessions, then Workflows: `A/Projects/ProjectWorkPage.swift` | The same: `R/Projects/ArchivePage.swift` | The same: `W/views/ArchivePage.tsx` | **same** (#547) |
@@ -107,6 +106,7 @@ The deltas are tracked by 29 issues:
 | Swipe waits for the swipe to close (#74) | Yes | Yes | n/a | **by design** (the page has no swipe) |
 | Mark Read / Unread reaches the agent's host | Per host | Per host: `R/RemoteModel.swift:2493-2507` | Per host: `W/views/SessionMenu.tsx:78` | **same** (#238) |
 | Rename | None | None | None | **same** |
+| A session in a window of its own (#826) | Session ▸ Open in New Window (⌥⌘O) and the row's menu: `A/Sessions/PoppedChatWindow.swift`, its own page of the transcript in `A/Sessions/PoppedChat.swift`, `alsoShowing` in the presence report | Not yet: a scene of its own on the iPad (#888); none on the iPhone, by design | Open in New Tab in the row's menu, the page's own address for one session: `W/views/SessionMenu.tsx` (`sessionTabURL`) | **delta**: remote #888; unwalked |
 
 ## Chat turns and turn detail
 
@@ -365,7 +365,7 @@ The deltas are tracked by 29 issues:
 | Reconnect on wake and network change (#82) | `A/WakeAndNetwork.swift` | Yes (its hangs are #208, not parity) | Yes, and the `online` event | **same** |
 | A refused write said in words (#88) | `storage/writeFailed` | `storage/writeFailed`: `R/RemoteModel.swift` | `storage/writeFailed` (unit-tested) | **same** |
 | Hosts and servers | Settings ▸ Control plane overview names not joined or not running: `A/Control/ControlSettingsView.swift:140-156`; hosts: `237-268`; Add a Server: Run a command or Over ssh, with the ssh config's hosts and an ssh tunnel (#610), then the projects to add, picked (#656): `A/Control/ControlAddServerSheet.swift`, `A/Control/HostProjectsPicker.swift` | Host headings | Names in the sidebar, the foot | **by design** (managing hosts is the Mac's) |
-| Workspace providers (#691) | Settings ▸ Control plane ▸ Providers: a provider's workspaces, Add Provider (kind first), Add as Host…, and Link to Workspace… in a host's `···` menu, New Workspace… on a provider's card and Delete Workspace… in a host's `···` menu: `A/Control/ControlProvidersPage.swift`, `A/Control/NewWorkspaceSheet.swift` | None | None | **by design** (managing hosts is the Mac's) |
+| Workspace providers (#691) | Settings ▸ Control plane ▸ Providers: a provider's workspaces, Add Provider (kind first), Add as Host…, and Link to Workspace… in a host's `···` menu, New Workspace… on a provider's card and Delete Workspace… in a host's `···` menu, Write It for Me in Add Provider and Write the Map Again… on a card (#858): `A/Control/ControlProvidersPage.swift`, `A/Control/NewWorkspaceSheet.swift`, `A/Control/ProviderDraftView.swift` | None | None | **by design** (managing hosts is the Mac's) |
 | Pairing | Shows the codes: `A/Control/ControlClientsPane.swift` | Scans: `R/Link/PairingView.swift` | Pastes, or `#code=`: `W/views/Pairing.tsx`, `W/pairLink.ts` | **by design** (#105, #109, #111) |
 
 ## MCP Apps views

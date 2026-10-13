@@ -50,6 +50,31 @@ call the map, not an agent. No agent holds cloud credentials, at authoring or at
   server, runs the help and runs the check itself, with the secrets typed in the sheet. The
   agent sees only the output, with each secret's value replaced by its name.
 
+### Session 2026-10-12 (the build, from the second review on #869)
+
+The second review found seven problems. Each was settled with the recommended fix, which is
+easy to change later:
+
+- **The writer could read the secrets file** (blocking). The writer has **no file tools**:
+  no Read, Grep or Glob, as well as no shell, write, web or subagent tools. The format pages
+  are in its prompt. Its scratch folder is under the host's own root, not the control home
+  (FR-008, FR-010).
+- **A check could send a secret out.** A check never fills a secret into what the agent wrote.
+  A check whose list arguments or command hold `$`, `${…}` or `://` is not run alone: the
+  sheet asks the person (FR-013, FR-014, FR-023).
+- **The block lists were too short.** The list tool and the list command use an **allow
+  list** of verbs (list, ls, get, describe, status, show) and a longer block list. Anything
+  else is asked (FR-013, FR-014).
+- **`read_help` was not proven read-only.** A help word must not start with `-`, must be a
+  word that the CLI's own help printed, and must not be a destructive verb. At most three
+  words (FR-014).
+- **Which draft fills the field on a timeout.** The last `send_draft`. With none, the last
+  draft that passed its check. With neither, the field stays as it was.
+- **`writtenBy` equality.** The parsed JSON is compared, not the text.
+- **Details after the draft is dropped.** Details shows every step and the agent's last words
+  while the sheet is open. It has no Open Transcript link in this build: the transcript stays
+  in the host's archived records for 7 days and is not listed.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A map for an MCP server that does not follow the contract (Priority: P1)
@@ -242,13 +267,16 @@ See the agent get the old map, and **Save** keep the new one.
 
 - **FR-007**: The agent MUST run on the host on the control plane's machine, with the runtime
   chosen in the menu. The menu MUST default to that host's default runtime.
-- **FR-008**: The agent MUST run in a scratch folder in the control plane's home, with no
-  project. The folder MUST be deleted when the draft ends.
-- **FR-009**: The agent's session MUST NOT show in any client's sidebar. Its transcript MUST be
-  kept for 7 days, and **Details** MUST open it, read-only.
-- **FR-010**: The agent MUST have only the writer's tools (contracts/writer-tools.md), and
-  `show_file` off. Its runtime's shell, file write, web and subagent tools MUST be off. A
-  runtime that can't turn them off (#015, #064) MUST NOT be offered.
+- **FR-008**: The agent MUST run in a scratch folder under its host's own root
+  (`provider-drafts/<id>/`), never in the control plane's home, with no project. The folder
+  MUST be deleted when the draft ends.
+- **FR-009**: The agent's session MUST NOT show in any client's sidebar or project list. It is
+  archived when the draft ends, and deleted after 7 days. **Details** MUST show every step and
+  the agent's last words.
+- **FR-010**: The agent MUST have only the writer's tools (contracts/writer-tools.md), and none
+  of the app's other tools. Its runtime's shell, file read and write, web, subagent and
+  connector tools MUST be off, and no MCP server but the app's is given to it. A runtime that
+  can't turn them off for one session (#015, #064) MUST NOT be offered.
 - **FR-011**: The writer's tools MUST answer only the agent started for that draft, by its
   token. Any other agent's call MUST be refused.
 
@@ -257,16 +285,20 @@ See the agent get the old map, and **Save** keep the new one.
 - **FR-012**: The control plane MUST connect to the server, read `tools/list` (names,
   descriptions, input schemas and annotations), run help, check drafts, and call start or stop.
   The agent MUST NOT reach the server or the CLI any other way.
-- **FR-013**: The check of a tool map MUST call its `list.tool` only if that tool is not named
-  by the draft's `start`, `stop`, `create` or `delete`, does not have `destructiveHint: true`
-  or `readOnlyHint: false`, and its name has none of the words create, delete, destroy, remove,
-  power, start, stop, reboot, resize, update or set. Otherwise the sheet MUST ask the person
-  first, as FR-019 asks.
+- **FR-013**: The check of a tool map MUST call its `list.tool` alone only if that tool is not
+  named by the draft's `start`, `stop`, `create` or `delete`; does not have
+  `destructiveHint: true` or `readOnlyHint: false`; its name has one of the words list, ls,
+  get, describe, status or show, and none of the block words (create, delete, destroy, remove,
+  rm, power, start, stop, restart, reboot, resize, update, set, terminate, kill, shutdown,
+  halt, reset, rebuild, restore, purge, prune, drop, wipe, suspend, down); and its arguments
+  hold no `$`, `${…}` or `://`. Otherwise the sheet MUST ask the person first, as FR-019 asks.
 - **FR-014**: The control plane MUST run a CLI on the agent's word only as `‹cli› ‹words…›
-  --help` (help), or as the draft's `list` or `status` (a check). A check command MUST start
-  with the CLI and have none of `;`, `&`, `|`, `>`, `<`, `` ` ``, `$(` or a newline, and its
-  words must not include delete, rm, destroy, create, start or stop. Otherwise the sheet MUST
-  show it with **Run Check**, for the person.
+  --help` (help), or as the draft's `list` or `status` (a check). Help words MUST be at most
+  three, none starting with `-`, each one printed by the CLI's own help, and none a block word
+  of FR-013 other than start and stop. A check command MUST start with the CLI, have none of
+  `;`, `&`, `|`, `>`, `<`, `` ` ``, `$`, `://` or a newline, have one of the allow words of
+  FR-013, and have none of its block words. Otherwise the sheet MUST show it with **Run
+  Check**, for the person.
 - **FR-015**: Help and checks MUST use the command provider's timeouts for `list` (25 s). Each
   output MUST be cut at 16 KB for the agent, with a line that says it was cut.
 - **FR-016**: A check MUST be the same code as the check at Add (#691 `ProviderConnection.check`),
@@ -290,8 +322,9 @@ See the agent get the old map, and **Save** keep the new one.
   only to the server or the CLI, as #691 does.
 - **FR-022**: Every text the agent gets MUST have each secret's value replaced with `${NAME}`.
   The agent MUST be told the secrets' names, never their values.
-- **FR-023**: The draft MAY use `${NAME}` where the map or config takes text. The check MUST
-  fill it in as #691 does.
+- **FR-023**: A check MUST NOT fill a secret into anything the agent wrote. Secrets reach the
+  server or the CLI only as #691 passes them: as environment, or in the headers the person
+  typed.
 - **FR-024**: Nothing the agent writes, and no log line, MUST hold a secret's value. A test MUST
   scan the transcript, the log and the draft for each value.
 

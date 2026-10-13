@@ -127,6 +127,29 @@ struct NotificationBoundsTests {
         #expect(wire.heard(DaemonAPI.Notification.agentEntry, by: silent).isEmpty)
     }
 
+    /// A session open in a window of its own (#826) hears its entries on the same
+    /// connection as the main window's, and stops when that window closes.
+    @Test func aSessionInAWindowOfItsOwnHearsItsEntries() async throws {
+        let wire = Wire()
+        let (core, folder) = try await core(wire)
+        let main = try await core.start(.init(runtimeID: "claude", cwd: folder, prompt: "Review"))
+        let popped = try await core.start(.init(runtimeID: "claude", cwd: folder, prompt: "Lane"))
+        try await core.reportPresence(.init(watching: nil, active: false, showing: main, alsoShowing: [popped]),
+                                      from: .mac, connection: showing)
+        wire.clear()
+
+        await core.record(.agentMessage(messageID: nil, text: "Main window."), for: main)
+        await core.record(.agentMessage(messageID: nil, text: "Its own window."), for: popped)
+        #expect(wire.heard(DaemonAPI.Notification.agentEntry, by: showing).count == 2)
+        #expect(wire.heard(DaemonAPI.Notification.agentEntry, by: elsewhere).isEmpty)
+
+        try await core.reportPresence(.init(watching: nil, active: false, showing: main, alsoShowing: []),
+                                      from: .mac, connection: showing)
+        wire.clear()
+        await core.record(.agentMessage(messageID: nil, text: "Closed."), for: popped)
+        #expect(wire.heard(DaemonAPI.Notification.agentEntry, by: showing).isEmpty)
+    }
+
     @Test func anEntryTooBigToSendGoesAsAStubSayingWhereToReadIt() async throws {
         let wire = Wire()
         let (core, folder) = try await core(wire)

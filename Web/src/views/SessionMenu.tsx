@@ -10,7 +10,7 @@ import type { Store } from "../model/store";
 import { asksToArchive, isOpenBlock, projectFolder } from "../model/groups";
 import { keepLabel } from "../model/archiveWords";
 import { carryOnHelp, carryOnLabel, carryOnPrompt, openBlock } from "../model/block";
-import { go } from "../route";
+import { go, routeHash } from "../route";
 import { canStop, liveDescendants } from "../model/tree";
 
 export type Action = "carryOn" | "agents/stop" | "stopAll" | "agents/archive" | "agents/unarchive"
@@ -176,6 +176,19 @@ export function SessionMenu({ store, host, agent, disabled, openFile, inChat }:
       )}
     </span>
   );
+}
+
+/**
+ * The address of this page open on one session (#826): what Open in New Tab opens, so a session
+ * can sit in a tab or a window of its own beside this one, as the Mac's Open in New Window.
+ */
+export function sessionTabURL(host: string, agent: Agent, page: { pathname: string; search: string } = location): string {
+  return page.pathname + page.search + routeHash({ host, project: projectFolder(agent), session: agent.id });
+}
+
+/** Open in New Tab (#826), from the sidebar row's menu. */
+export function openInNewTab(host: string, agent: Agent): void {
+  window.open(sessionTabURL(host, agent), "_blank", "noopener");
 }
 
 /** One of `sessionActions`, done. Rename edits the title where the menu was: the chat's header, or the row. */

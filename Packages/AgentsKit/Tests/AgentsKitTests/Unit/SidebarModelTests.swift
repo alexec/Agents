@@ -209,14 +209,16 @@ struct SidebarModelTests {
         #expect(!folds.isOpen(key, .archivedSessions))
         #expect(folds.isOpen(key, .group(.running)), "a group starts open")
         #expect(folds.isOpen(key, .pinned))
-        #expect(folds.isOpen(key, .workflows))
+        #expect(!folds.isOpen(key, .workflows), "a project's Workflows starts folded (#885)")
 
         folds.set(key, open: true)
         folds.set(key, .archivedSessions, open: true)
         folds.set(key, .group(.finished), open: false)
+        folds.set(key, .workflows, open: true)
         let again = SidebarFolds(defaults: defaults, scope: "")
         #expect(again.isOpen(key))
         #expect(!again.isOpen(key, .group(.finished)))
+        #expect(again.isOpen(key, .workflows), "each project's Workflows fold is kept")
         #expect(again.openArchivedFolds == [key])
         // The keys the Mac has always kept them under, so nobody's folds are lost.
         #expect(defaults.stringArray(forKey: "sidebar.folds")?.contains(key.stored) == true)

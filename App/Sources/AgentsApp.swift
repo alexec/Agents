@@ -41,6 +41,14 @@ struct AgentsApp: App {
             AgentsCommands(model: model, requests: requests, frame: frame, terminal: terminal)
         }
 
+        // A session in a window of its own (#826), from Session ▸ Open in New Window or a
+        // row's menu. One window per session: opening one already open brings it forward.
+        WindowGroup(id: MainWindow.poppedSceneID, for: UUID.self) { $id in
+            PoppedChatWindow(id: id)
+                .environment(model)
+        }
+        .defaultSize(width: 640, height: 720)
+
         // The app's first Settings scene, and what gives it ⌘, and the menu item.
         // A scene rather than a page beside Spending, which Spending itself is not:
         // that one is read-only by construction, and a limit is the one number in

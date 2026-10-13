@@ -58,6 +58,7 @@ public enum ConnectionRole: String, Sendable, Hashable {
         DaemonAPI.Method.agentsMoveSelf,
         DaemonAPI.Method.viewsToolCall,
         DaemonAPI.Method.agentsWorkspaces,
+        DaemonAPI.Method.agentsProviderDraft,
     ]).union(strangerMethods)
 
     /// Announcing, and finding out a daemon is answering.

@@ -5,6 +5,11 @@ why, and what was not chosen.
 
 ## R1. How the control plane starts the agent
 
+**Found (T001)**: the host on the control plane's machine is the host whose `machineID` is
+the control plane's own `settings.machineID`, not a relay, online, with its uplink ending
+here (`router.holds`). No new field was needed. The agent is started with
+`router.deliverKept(agents/start)`, as the sheet's client, and stopped the same way.
+
 **Decision**: over a channel of the control plane's own to the host on its machine, as
 `KeptRequests.attached` delivers a kept `agents/start` (`ControlRouter.deliverKept`). The
 `StartRequest` gains one optional field, `purpose: AgentPurpose?`, with one case,
@@ -21,6 +26,13 @@ none, Write It for Me is off (spec, edge cases).
 code, and #058 keeps agents on hosts.
 
 ## R2. The writer tool policy
+
+**Built (T002, 2026-10-12)**: only a runtime whose scoping rides on `session/new` can be a
+writer, because a launch flag or an environment variable would scope every session of a
+shared process. Of those, Claude is the one offered: its writer `_meta` is `tools: []`, a
+deny list of every built-in tool (file tools included, after the second review) and
+`strictMcpConfig: true`. Grok and Antigravity have per-session levers but were not measured
+as writers, so they are not offered. The walk (T035) checks Claude's against the real adapter.
 
 **Decision**: a second policy per runtime in `ToolPolicyCatalog`, `writer(for:)`. It removes
 every tool that runs a command, writes a file, reaches the network or starts a subagent, on
