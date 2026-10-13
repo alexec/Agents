@@ -25,7 +25,8 @@ final class RemoteModel {
     /// Whether the Mac is answering, and when it last did.
     private(set) var isConnected = false
     /// Which way the Mac is being reached (046): on its own network, or through iCloud.
-    /// The fake and the old single link are always direct.
+    /// Set from the route each connection took (#883); a link that cannot be relayed,
+    /// such as the fake, is always direct.
     private(set) var link: RemoteLink = .direct
     /// What is getting in the relay's way, when anything is (046, FR-014).
     private(set) var relayTrouble: RelayTrouble?
@@ -1506,6 +1507,13 @@ final class RemoteModel {
         }
     }
 
+    /// Which way `link` last connected: its control plane connection's route, and
+    /// direct for a link that has no relay (#883).
+    nonisolated static func route(of link: any DaemonLink) -> RemoteLink {
+        guard let control = link as? ControlPlaneLink, control.route.current != .none else { return .direct }
+        return control.route.current
+    }
+
     /// Whether a refusal is believed yet (#81).
     @ObservationIgnored private var refusals = RefusalPatience()
 
@@ -1521,6 +1529,7 @@ final class RemoteModel {
                 await client.disconnect()
                 return false
             }
+            link = Self.route(of: baseLink)
             note("link: connected \(link) after \(ContinuousClock.now - began)")
             refusals.connected()
             // A home host that is a server asks for a key as any other server does (#344).
