@@ -94,9 +94,12 @@ same page when a title is clicked.
   called again with `diff: true` and each fold holds its hunks. **Checks**: each check with its
   pill and a link to it, and **Rerun Failed** on a failing PR.
 - On an open PR: a text box, **Comment** (`comment_on_pr`), **Ask the Agent to Fix** and
-  **Merge**. **Ask the Agent to Fix** sends `ui/message` with what is to be fixed (the failing
-  checks, changes asked for, a conflict) and the box's words; the host asks the person before
-  it is sent, and refuses it on a pin, which has no agent. **Merge** asks again in the page,
+  **Merge**. **Ask the Agent to Fix** sends `agents/message-agent` (`branch`: the PR's, `text`:
+  what is to be fixed — the failing checks, changes asked for, a conflict — and the box's words)
+  to the session working on the branch; the host asks the person before it is sent, from a chat
+  or a pin. When no session works on it (error `-32001`), it sends `agents/start-agent` with the
+  same words, the label `P#n` and `branch`, so the new-agent form opens on that branch. A host
+  that does not know `agents/message-agent` (`-32601`) gets `ui/message` into its chat. **Merge** asks again in the page,
   "Squash and merge #n into main and delete *branch*?", before `merge_pr`; with checks still
   running it is **Auto-merge** (`auto: true`). It is off in conflict, on a draft, and while
   auto-merge is already on.

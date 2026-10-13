@@ -65,7 +65,9 @@ export function AppView({ call }: { call: AppViewCall }) {
       <div ref={slot} class="view-slot" style={{ height: full || view.phase.value !== "ready" ? 0 : `${view.height.value}px` }} />
       {view.askedMessage.value !== null && (
         <div class="view-ask">
-          <p class="faint">The view asks to send this as your message:</p>
+          <p class="faint">{view.askedRecipient.value
+            ? `The view asks to send this to “${view.askedRecipient.value.name}” as your message:`
+            : "The view asks to send this as your message:"}</p>
           <p>{view.askedMessage.value}</p>
           <p class="buttons">
             <button class="prominent" onClick={() => view.answerMessage(true)}>Send</button>

@@ -242,7 +242,9 @@ private struct AppViewAsks: View {
     var body: some View {
         if let message = host.askedMessage {
             VStack(alignment: .leading, spacing: 6) {
-                Text("The view asks to send this as your message:").appText(.fine).foregroundStyle(.secondary)
+                Text(host.askedRecipient.map { "The view asks to send this to “\($0.name)” as your message:" }
+                     ?? "The view asks to send this as your message:")
+                    .appText(.fine).foregroundStyle(.secondary)
                 Text(message).appText(.reading).textSelection(.enabled)
                 HStack(spacing: 8) {
                     Button("Send") { host.answerMessage(send: true) }.buttonStyle(.paperProminent)

@@ -225,7 +225,7 @@ export class Work {
   readonly shownFile = signal<{ host: string; agentID: string; path: string; line?: number | undefined; at: number } | null>(null);
   /** A new agent a view filled in (#834, agents/start-agent), for the new-agent form on that
    *  project to take: the prompt, the labels and the worktree. Starting it is still the person's move. */
-  readonly offeredStart = signal<{ host: string; folder: string; start: { prompt: string; labels: string[]; worktree?: string | undefined } } | null>(null);
+  readonly offeredStart = signal<{ host: string; folder: string; start: { prompt: string; labels: string[]; worktree?: string | undefined; branch?: string | undefined } } | null>(null);
   /**
    * How to draw each CSV an agent showed as a chart (#836), by `host|path`: from `agent/showFile`
    * and from the chat's file cards. The pane looks a CSV up here; a Vega-Lite spec says it itself.

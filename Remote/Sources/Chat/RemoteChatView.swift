@@ -371,7 +371,12 @@ struct RemoteChatView: View {
             // The project's New session page, filled in (#834).
             startAgent: { [model] start in
                 model.offerStart(start, in: ProjectKey(host: agent.host, folder: agent.projectFolder))
-            })
+            },
+            // The session on a pull request's branch (#837), asked under the view first.
+            recipient: { [model] message in
+                model.recipient(of: message, in: ProjectKey(host: agent.host, folder: agent.projectFolder))
+            },
+            sendTo: { [model] id, text in await model.send(text, to: id) })
     }
 
     /// The open agent's sandbox card, while it waits (064).

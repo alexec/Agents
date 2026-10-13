@@ -129,6 +129,60 @@ struct AppViewTests {
         }
     }
 
+    @Test func aViewAsksToMessageTheAgentOnABranch() {
+        func ask(_ params: JSONValue) -> AppViewBridge.Ask {
+            AppViewBridge.read(["jsonrpc": "2.0", "id": 8, "method": "agents/message-agent", "params": params])
+        }
+        #expect(ask(["branch": " agents/fix-837 ", "text": " Fix the review \n"])
+            == .messageAgent(id: 8, message: AppViewAgentMessage(branch: "agents/fix-837", text: "Fix the review")))
+        if case .malformed = ask(["text": "Fix"]) {} else { Issue.record("no branch") }
+        if case .malformed = ask(["branch": "b", "text": "  "]) {} else { Issue.record("no text") }
+        if case .malformed = ask(["branch": "b", "text": .string(String(repeating: "x", count: AppViewAgentMessage.textLimit + 1))]) {} else {
+            Issue.record("text too long")
+        }
+        if case .malformed = ask(["branch": .string(String(repeating: "b", count: 256)), "text": "Fix"]) {} else {
+            Issue.record("a branch too long")
+        }
+    }
+
+    /// The session on the branch, in the view's project, on its host: the latest active one
+    /// not archived.
+    @Test func theMessageGoesToTheLatestSessionOnTheBranch() {
+        let project = URL(fileURLWithPath: "/tmp/repo")
+        func agent(_ title: String?, branch: String?, host: HostID = .mac, project: URL = project,
+                   active: TimeInterval, archived: Bool = false) -> Agent {
+            var a = Agent(id: UUID(), runtimeID: "claude", cwd: project.appendingPathComponent(".agents/worktrees/w"),
+                          title: title, state: .finished)
+            a.host = host
+            a.lastActivityAt = Date(timeIntervalSince1970: active)
+            a.worktree = AgentWorktree(name: "fix-837", root: a.cwd, branch: branch, project: project, base: "main", madeByApp: true)
+            if archived { a.archivedAt = Date() }
+            return a
+        }
+        let older = agent("Older", branch: "agents/fix-837", active: 10)
+        let newer = agent("Newer", branch: "agents/fix-837", active: 20)
+        let others: [Agent] = [
+            agent("Archived", branch: "agents/fix-837", active: 30, archived: true),
+            agent("Other host", branch: "agents/fix-837", host: HostID(rawValue: "linux"), active: 40),
+            agent("Other project", branch: "agents/fix-837", project: URL(fileURLWithPath: "/tmp/other"), active: 50),
+            agent("Other branch", branch: "agents/fix-838", active: 60),
+        ]
+        let message = AppViewAgentMessage(branch: "agents/fix-837", text: "Fix")
+        #expect(message.recipient(among: [older, newer] + others, host: .mac, project: URL(fileURLWithPath: "/tmp/repo/"))?.id == newer.id)
+        #expect(message.recipient(among: others.filter { $0.title != "Other host" }, host: .mac, project: project) == nil)
+        #expect(AppViewAgentMessage.name(of: newer) == "Newer")
+        #expect(AppViewAgentMessage.name(of: agent(nil, branch: "b", active: 0)) == "fix-837")
+    }
+
+    @Test func aStartMayNameABranchForItsWorktree() {
+        let read = AppViewStart.read(["prompt": "Fix PR #9", "worktree": "w", "branch": " agents/fix-9 "])
+        let start = try? read.get()
+        #expect(start?.branch == "agents/fix-9")
+        #expect(start?.worktreeChoice == .branch("agents/fix-9"))
+        #expect(AppViewStart(prompt: "Go", worktree: "w").worktreeChoice == .named("w"))
+        #expect(AppViewStart(prompt: "Go").worktreeChoice == nil)
+    }
+
     @Test func theInitializeAnswerCarriesTheHostContext() {
         let context = AppViewContext(theme: "dark", platform: .desktop, width: 640, maxHeight: 640,
                                      locale: "en-GB", timeZone: "Europe/London", touch: false, hover: true)

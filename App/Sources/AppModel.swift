@@ -1312,6 +1312,12 @@ final class AppModel {
         return nil
     }
 
+    /// The session a view's `agents/message-agent` goes to (#837): on the branch, in this project.
+    func recipient(of message: AppViewAgentMessage, in key: ProjectKey) -> AppViewRecipient? {
+        message.recipient(among: agents, host: key.host, project: key.folder)
+            .map { AppViewRecipient(id: $0.id, name: AppViewAgentMessage.name(of: $0)) }
+    }
+
     func pinView(_ view: ViewPin, in key: ProjectKey) async -> String? {
         do {
             let pins = try await client(for: key.host).call(DaemonAPI.Method.pinsPin,

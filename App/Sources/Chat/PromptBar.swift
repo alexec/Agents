@@ -99,7 +99,7 @@ struct PromptBar: View {
             // Held to what a session takes, as a label typed here is.
             draftLabels += SessionLabelPolicy.accepted(offered.start.labels, existing: draftLabels)
             // Kept only if the folder turns out to be a repository (`loadDraftWorktrees`).
-            if let name = offered.start.worktree { model.chooseWorktree(.named(name)) }
+            if let choice = offered.start.worktreeChoice { model.chooseWorktree(choice) }
             focused = true
         }
     }

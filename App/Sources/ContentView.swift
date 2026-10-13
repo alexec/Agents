@@ -139,7 +139,9 @@ struct ContentView: View {
                     PinnedViewPage(folder: key.folder, pin: pin, view: view,
                                    call: { method, params in try await model.client(for: key.host).call(method, params) },
                                    unpin: { await model.unpin(path, in: key) },
-                                   startAgent: { model.offerStart($0, in: key) })
+                                   startAgent: { model.offerStart($0, in: key) },
+                                   recipient: { model.recipient(of: $0, in: key) },
+                                   sendTo: { id, text in await model.send(text, to: id) })
                         // One page per pin, so another pin gets its own store and place (#872).
                         .id(pin.path)
                 } else {

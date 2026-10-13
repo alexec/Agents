@@ -744,7 +744,7 @@ final class RemoteModel {
     private(set) var offeredStart: OfferedStart?
     /// The offered worktree's name, chosen once the page's repository has answered: before
     /// then the page has no Worktree row, and opening it puts the place back.
-    @ObservationIgnored private var offeredWorktree: (folder: URL, name: String)?
+    @ObservationIgnored private var offeredWorktree: (folder: URL, choice: WorktreeChoice)?
 
     /// Open the New session page in a view's project, filled in (#834), as New Session
     /// opens it. Why it did not open, or nil.
@@ -752,13 +752,19 @@ final class RemoteModel {
         guard let summary = work.project(key) else { return "This project isn’t one the phone knows." }
         guard !isStarting else { return "An agent is starting. Try again once it has." }
         offeredStart = OfferedStart(folder: summary.folder, start: start)
-        offeredWorktree = start.worktree.map { (folder: summary.folder, name: $0) }
+        offeredWorktree = start.worktreeChoice.map { (folder: summary.folder, choice: $0) }
         sidebarItem = .project(summary.key)
         // Already open in this project: its repository is asked again for the worktree.
-        if start.worktree != nil, startingIn == summary.folder {
+        if start.worktreeChoice != nil, startingIn == summary.folder {
             Task { await loadStartWorktrees(in: summary.folder) }
         }
         return nil
+    }
+
+    /// The session a view's `agents/message-agent` goes to (#837): on the branch, in this project.
+    func recipient(of message: AppViewAgentMessage, in key: ProjectKey) -> AppViewRecipient? {
+        message.recipient(among: work.agents, host: key.host, project: key.folder)
+            .map { AppViewRecipient(id: $0.id, name: AppViewAgentMessage.name(of: $0)) }
     }
 
     /// The offer for the page in `folder`, taken once.
@@ -889,7 +895,7 @@ final class RemoteModel {
         // A view's worktree (#834), when there is a repository to make it in.
         if let offered = offeredWorktree, offered.folder == folder {
             offeredWorktree = nil
-            if answer.isRepository { await chooseWorktree(.named(offered.name)) }
+            if answer.isRepository { await chooseWorktree(offered.choice) }
         }
     }
 

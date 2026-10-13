@@ -91,7 +91,8 @@ struct ChatView: View {
     }
 
     /// What a view in the chat may ask of the Mac (#187): the host the chat is on, the
-    /// person's own send, the default browser, and a new agent's form (#834).
+    /// person's own send, the default browser, a new agent's form (#834), and a send to the
+    /// session on a branch (#837).
     private func appViewActions(_ agent: Agent) -> AppViewActions {
         AppViewActions(
             agentID: agent.id,
@@ -103,7 +104,12 @@ struct ChatView: View {
             },
             startAgent: { [model] start in
                 model.offerStart(start, in: ProjectKey(host: agent.host, folder: agent.projectFolder))
-            })
+            },
+            // The session on a pull request's branch (#837), asked under the view first.
+            recipient: { [model] message in
+                model.recipient(of: message, in: ProjectKey(host: agent.host, folder: agent.projectFolder))
+            },
+            sendTo: { [model] id, text in await model.send(text, to: id) })
     }
 
     /// What the shared chat rows mean on a Mac (033).
