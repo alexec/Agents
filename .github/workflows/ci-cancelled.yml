@@ -1,0 +1,38 @@
+# A pull request's ci run that ends Cancelled with no newer run is rerun once, and a
+# second cancellation comments on the pull request and fails here (#897). A cancelled
+# required job is not a failure: no checks.failed, no red mark, and auto-merge waits for
+# it quietly. PRs #879 and #895 sat BLOCKED like that until rerun by hand.
+#
+# It runs only when ci completes Cancelled, on a small Linux runner for a few seconds, so
+# it costs nothing on a run that passes or fails. scripts/rerun-cancelled-ci.py decides,
+# and leaves alone the runs the concurrency group cancelled for a newer push.
+name: ci-cancelled
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: write
+  pull-requests: write
+
+jobs:
+  rerun:
+    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'cancelled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: scripts/rerun-cancelled-ci.py
+          sparse-checkout-cone-mode: false
+
+      - name: Rerun or report the cancelled run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        run: python3 scripts/rerun-cancelled-ci.py run "$RUN_ID" "$ATTEMPT"

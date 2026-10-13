@@ -77,7 +77,8 @@ jobs:
     # ten minutes, and a run the selector chose as `full` takes longer than that on this
     # runner: the job was cancelled at the cap with every test before it passing, on
     # main as well as on a branch (run 36642820605). The selection is what keeps this
-    # small; the cap has to fit the run it lets through.
+    # small; the cap has to fit the run it lets through. "Time left for the AgentsKit
+    # tests" below reads the same number as JOB_MINUTES; change both together.
     timeout-minutes: 30
     permissions:
       contents: read
@@ -85,6 +86,11 @@ jobs:
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
     steps:
+      # For the AgentsKit tests' budget below.
+      - name: Start the clock
+        id: clock
+        run: echo "start=$(date +%s)" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v6
         with:
           # The selector compares against the PR base or the previous push.
@@ -207,18 +213,17 @@ jobs:
         if: steps.agentskit-cache.outputs.cache-matched-key != '' && steps.agentskit-cache.outputs.cache-hit != 'true'
         env:
           AGENTSKIT: ${{ steps.keys.outputs.agentskit }}
-        run: |
-          out=Packages/AgentsKit/.build/out
-          built="$(cat Packages/AgentsKit/.build/agentskit-sources 2>/dev/null || true)"
-          if [[ "$built" != "$AGENTSKIT" ]]; then
-            echo "AgentsKit sources differ from the restored graph's (${built:-unrecorded}); dropping its own targets."
-            rm -rf "$out/Intermediates.noindex/AgentsKit.build"
-            if [[ -d "$out/Products/Debug" ]]; then
-              find "$out/Products/Debug" -maxdepth 1 \( -name 'AgentsKit*' -o -name 'libAgentsKit*' \
-                -o -name 'ControlDial*' -o -name 'libControlDial*' -o -name 'CShims*' \
-                -o -name 'accept-probe*' -o -name 'accept_probe*' \) -exec rm -rf {} +
-            fi
-          fi
+        run: bash scripts/drop-stale-agentskit.sh Packages/AgentsKit/.build "$AGENTSKIT"
+
+      # agentsd links AgentsKit as a local package, so Daemon/.build holds the same stale
+      # graph. On 2026-10-13 (#897) runs 38334579377 and 38343467490 restored it, the
+      # agentsd link failed on undefined AgentsKitCore symbols, and the clean retry took
+      # 4–6 minutes: with a slow test run after it, the job reached its 30-minute cap.
+      - name: Drop a stale AgentsKit from the SwiftPM build cache
+        if: steps.swiftpm-cache.outputs.cache-matched-key != '' && steps.swiftpm-cache.outputs.cache-hit != 'true'
+        env:
+          AGENTSKIT: ${{ steps.keys.outputs.agentskit }}
+        run: bash scripts/drop-stale-agentskit.sh Daemon/.build "$AGENTSKIT"
 
       - name: Tools
         run: |
@@ -366,6 +371,10 @@ jobs:
           clean_retry "$RESTORED" Packages/CodeText/.build -- \
             swift build --build-tests --package-path Packages/CodeText
 
+      - name: Record the AgentsKit sources agentsd was built from
+        if: ${{ always() && steps.test-selection.outputs.agentskit != 'skip' && steps.test-selection.outputs.codetext != 'skip' && steps.swiftpm-cache.outputs.cache-hit != 'true' && steps.build-agentsd.outcome == 'success' && steps.build-codetext.outcome == 'success' }}
+        run: echo "${{ steps.keys.outputs.agentskit }}" > Daemon/.build/agentskit-sources
+
       - name: Save SwiftPM build cache
         # This combined cache contains both paths below. Save it only when both
         # package builds ran, so a skipped package cannot produce a partial cache,
@@ -396,11 +405,30 @@ jobs:
             swift test --skip-build --package-path Packages/CodeText
           fi
 
+      # A job that reaches its timeout-minutes ends Cancelled, not Failed (#897): no
+      # checks.failed, no red mark, and a pull request with auto-merge on waits for a
+      # required check that will never come. A step's own timeout fails the step, so the
+      # tests get what the job has left, less two minutes for the steps after them, and a
+      # slow run ends red before the job's cap can cancel it.
+      - name: Time left for the AgentsKit tests
+        id: budget
+        if: steps.test-selection.outputs.agentskit != 'skip'
+        env:
+          START: ${{ steps.clock.outputs.start }}
+          JOB_MINUTES: 30
+        run: |
+          left=$(( JOB_MINUTES - 2 - ($(date +%s) - START) / 60 ))
+          (( left > 25 )) && left=25
+          (( left < 1 )) && left=1
+          echo "The AgentsKit tests have ${left} minutes."
+          echo "minutes=${left}" >> "$GITHUB_OUTPUT"
+
       - name: Test AgentsKit
         if: steps.test-selection.outputs.agentskit != 'skip'
-        # A filtered run is a few seconds and a full one is over ten minutes, so this is
-        # the full run's budget rather than the filtered one's.
-        timeout-minutes: 25
+        # A filtered run is a few seconds and a full one is two to fourteen minutes, so
+        # this is the full run's budget rather than the filtered one's: at most 25, and
+        # never past the job's own cap (the step above).
+        timeout-minutes: ${{ fromJSON(steps.budget.outputs.minutes) }}
         env:
           TEST_FILTER: ${{ steps.test-selection.outputs.agentskit_filter }}
           TEST_MODE: ${{ steps.test-selection.outputs.agentskit }}

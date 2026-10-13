@@ -73,7 +73,7 @@ else
 
 		while IFS= read -r -d '' path; do
 			case "$path" in
-				docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|*.md|scripts/pr-areas.py|scripts/replay-conflicts.py) ;;
+				docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|*.md|scripts/pr-areas.py|scripts/replay-conflicts.py|scripts/rerun-cancelled-ci.py) ;;
 				*) apps=build ;;
 			esac
 			case "$path" in
@@ -173,7 +173,7 @@ else
 					linux=build
 					;;
 				# These areas cannot affect either SwiftPM package's tests.
-				App/*|Host/*|Remote/*|RemoteNotify/*|RemoteWidget/*|docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|.github/workflows/*|scripts/select-test-suites.sh|scripts/check-test-indexing.py|scripts/check-agentsd-links-no-parsers.sh|scripts/web.sh|scripts/slow-tests.sh|scripts/flaky-tests.sh|scripts/normalize-metaltoolchain-cache.py|scripts/pr-areas.py|scripts/replay-conflicts.py)
+				App/*|Host/*|Remote/*|RemoteNotify/*|RemoteWidget/*|docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|.github/workflows/*|scripts/select-test-suites.sh|scripts/check-test-indexing.py|scripts/check-agentsd-links-no-parsers.sh|scripts/web.sh|scripts/slow-tests.sh|scripts/flaky-tests.sh|scripts/normalize-metaltoolchain-cache.py|scripts/pr-areas.py|scripts/replay-conflicts.py|scripts/rerun-cancelled-ci.py)
 					;;
 				*)
 					# Root config, CI, scripts, or a new area may change test behavior.
