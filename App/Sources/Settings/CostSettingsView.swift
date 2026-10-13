@@ -1,7 +1,8 @@
 import AgentsKitCore
 import SwiftUI
 
-/// The two limits, and what they have stopped; and how many workflows may run (#506).
+/// The limits, in money and in tokens (#838), and what they have stopped; and how many
+/// workflows may run (#506).
 ///
 /// The app's first preferences of any kind. Writing lives here rather than in the
 /// Spending window because that window is read-only by construction — nothing on it
@@ -22,10 +23,16 @@ struct CostSettingsView: View {
                            alreadyReachedBy: agentsAlreadyOver) { limit in
                     await model.setCostLimits(perAgent: .some(limit))
                 }
+                TokenLimitField(title: "Tokens per agent",
+                                limit: model.costLimits.perAgentTokens,
+                                alreadyReachedBy: agentsAlreadyOverTokens) { limit in
+                    await model.setCostLimits(perAgentTokens: .some(limit))
+                }
             } header: {
                 Text("The most one agent may spend")
             } footer: {
-                Text("An agent that reaches this finishes the turn it is in and then takes "
+                Text("Money, tokens or both: whichever is reached first stops it. "
+                     + "An agent that reaches this finishes the turn it is in and then takes "
                      + "no further prompt. A turn is never cut short, so the figure it ends "
                      + "on may be a little over the limit — that is the last turn, not a "
                      + "mistake.")
@@ -38,6 +45,11 @@ struct CostSettingsView: View {
                            limit: model.costLimits.daily,
                            alreadyReachedBy: dayAlreadyOver) { limit in
                     await model.setCostLimits(daily: .some(limit))
+                }
+                TokenLimitField(title: "Tokens per day",
+                                limit: model.costLimits.dailyTokens,
+                                alreadyReachedBy: dayAlreadyOverTokens) { limit in
+                    await model.setCostLimits(dailyTokens: .some(limit))
                 }
                 if let state = model.costState { today(state) }
                 // The ledger or the limits set aside as unreadable (#171).
@@ -57,9 +69,11 @@ struct CostSettingsView: View {
             .paperListRow()
 
             Section {
-                Label("A runtime that reports no price cannot be capped. An agent on one "
-                      + "runs past both limits, and while it is running the day's total is a "
-                      + "floor rather than a fact.",
+                Label("Only Claude reports a price. Codex, Gemini, OpenCode and Copilot report "
+                      + "tokens, so only a token limit stops them. Cursor, Antigravity and Grok "
+                      + "report neither, so no limit applies to them: an agent on one runs past "
+                      + "every limit, and while it is running the day's totals are a floor rather "
+                      + "than a fact.",
                       systemImage: "questionmark.circle")
                     .foregroundStyle(.secondary)
             }
@@ -121,6 +135,14 @@ struct CostSettingsView: View {
                         .foregroundStyle((state.dayIsCloseToFull ? StateTint.failure : .none)
                                             .style(or: .secondary))
                 }
+                if state.tokensToday > 0 || state.limits.dailyTokens != nil {
+                    Text(state.dayTokenHeadroom.map { "\(state.tokensToday.formatted()) tokens · \($0.formatted()) left" }
+                         ?? "\(state.tokensToday.formatted()) tokens")
+                        .appText(.fine)
+                        .monospacedDigit()
+                        .foregroundStyle((state.dayIsCloseToFull ? StateTint.failure : .none)
+                                            .style(or: .secondary))
+                }
             }
         }
     }
@@ -132,7 +154,8 @@ struct CostSettingsView: View {
         Section("What the limits have stopped") {
             ForEach(stoppedByALimit) { agent in
                 LabeledContent(agent.title ?? "Untitled") {
-                    Text(Cost.total(of: agent.costToDate) ?? "")
+                    Text(Cost.total(of: agent.costToDate)
+                         ?? (agent.tokensToDate > 0 ? "\(agent.tokensToDate.formatted()) tokens" : ""))
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                 }
@@ -154,6 +177,18 @@ struct CostSettingsView: View {
         guard !over.isEmpty else { return nil }
         let chats = over.count == 1 ? "1 chat has" : "\(over.count) chats have"
         return "\(chats) already spent this much. They are at the limit from now."
+    }
+
+    private func agentsAlreadyOverTokens(_ proposed: Int) -> String? {
+        let over = model.agents.filter { !$0.tokensAreUnmeasured && $0.tokensToDate >= proposed }
+        guard !over.isEmpty else { return nil }
+        let chats = over.count == 1 ? "1 chat has" : "\(over.count) chats have"
+        return "\(chats) already used this many tokens. They are at the limit from now."
+    }
+
+    private func dayAlreadyOverTokens(_ proposed: Int) -> String? {
+        guard let used = model.costState?.tokensToday, used >= proposed else { return nil }
+        return "Today has already used this many tokens. Nothing new starts until it rolls over."
     }
 
     private func dayAlreadyOver(_ proposed: Cost) -> String? {
@@ -239,6 +274,74 @@ private struct LimitField: View {
     private func commit() async {
         guard let parsed else { return }
         // Said at the moment it is set, not discovered when the next thing refuses.
+        warning = alreadyReachedBy(parsed)
+        await save(parsed)
+    }
+
+    private func clear() async {
+        warning = nil
+        await save(nil)
+    }
+}
+
+/// One token limit (#838): a whole number of tokens, and an explicit way back to no limit,
+/// on the same terms as `LimitField`.
+private struct TokenLimitField: View {
+    let title: String
+    let limit: Int?
+    let alreadyReachedBy: (Int) -> String?
+    let save: (Int?) async -> Void
+
+    @State private var amount = ""
+    @State private var warning: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            LabeledContent(title) {
+                HStack(spacing: 8) {
+                    TextField("No limit", text: $amount)
+                        .multilineTextAlignment(.trailing)
+                        .monospacedDigit()
+                        .frame(width: 120)
+                        .onSubmit { Task { await commit() } }
+                    Button("Set") { Task { await commit() } }
+                        .disabled(parsed == nil)
+                    Button("No limit") { Task { await clear() } }
+                        .disabled(limit == nil)
+                }
+            }
+            Text("Fresh input and output; a cache read is not counted.")
+                .appText(.fine)
+                .foregroundStyle(.secondary)
+            if let warning {
+                Label(warning, systemImage: "exclamationmark.triangle")
+                    .appText(.fine)
+                    .tinted(.failure)
+            }
+        }
+        .onAppear(perform: showWhatIsSet)
+        .onChange(of: limit) { showWhatIsSet() }
+    }
+
+    /// Digits, with any grouping a person types ("2,000,000") taken out.
+    private var parsed: Int? {
+        let digits = amount.filter { !$0.isWhitespace && $0 != "," && $0 != "_" && $0 != "." }
+        guard !digits.isEmpty, let value = Int(digits), value >= 0 else { return nil }
+        return value
+    }
+
+    private func showWhatIsSet() {
+        guard let limit else {
+            amount = ""
+            warning = nil
+            return
+        }
+        amount = limit.formatted()
+        warning = alreadyReachedBy(limit)
+    }
+
+    private func commit() async {
+        guard let parsed else { return }
         warning = alreadyReachedBy(parsed)
         await save(parsed)
     }

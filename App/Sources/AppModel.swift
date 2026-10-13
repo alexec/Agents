@@ -1891,12 +1891,15 @@ final class AppModel {
         }
     }
 
-    func setCostLimits(perAgent: Cost?? = nil, daily: Cost?? = nil) async {
+    func setCostLimits(perAgent: Cost?? = nil, daily: Cost?? = nil,
+                       perAgentTokens: Int?? = nil, dailyTokens: Int?? = nil) async {
         var set: DaemonAPI.CostState?
         // A limit that did not take is said, not left looking set (073).
         await attempt {
             set = try await self.client.call(DaemonAPI.Method.costSetLimits,
-                                             DaemonAPI.SetLimitsRequest(perAgent: perAgent, daily: daily),
+                                             DaemonAPI.SetLimitsRequest(perAgent: perAgent, daily: daily,
+                                                                        perAgentTokens: perAgentTokens,
+                                                                        dailyTokens: dailyTokens),
                                              returning: DaemonAPI.CostState.self)
         }
         guard let state = set else { return }
@@ -1905,7 +1908,7 @@ final class AppModel {
         for host in hosts.hosts.all where !hosts.isOffline(host.id) {
             serverCosts[host.id] = try? await client(for: host.id).call(
                 DaemonAPI.Method.costSetLimits,
-                DaemonAPI.SetLimitsRequest(perAgent: .some(state.limits.perAgent), daily: .some(state.limits.daily)),
+                DaemonAPI.SetLimitsRequest(copying: state.limits),
                 returning: DaemonAPI.CostState.self)
         }
     }
@@ -1922,27 +1925,22 @@ final class AppModel {
         }
     }
 
-    /// Letting one agent carry on past the per-agent limit, or giving it one of its
-    /// own. Does not resume it — continuing is the reader's second, deliberate act.
-    func setCostCeiling(_ agentID: UUID, to ceiling: Cost?) async {
-        var changed: Agent?
-        await attempt {
-            changed = try await self.client(forAgent: agentID).call(
-                DaemonAPI.Method.agentsSetCeiling,
-                DaemonAPI.SetCeilingRequest(agentID: agentID, ceiling: ceiling),
-                returning: Agent.self)
-        }
-        guard let agent = changed else { return }
-        work.upsert(agent)
-    }
-
     /// Let one agent that has reached the per-agent limit carry on.
     ///
     /// Raises that agent's own ceiling by the app-wide limit again — a concrete,
     /// bounded allowance rather than removing the cap, so an agent let go on once is
     /// still stopped eventually. Applies to that agent alone, and does not resume it.
+    /// Money or tokens, whichever it reached (#838). Does not resume it — continuing
+    /// is the reader's second, deliberate act.
     func letThisAgentGoOn(_ agent: Agent) async {
-        await setCostCeiling(agent.id, to: agent.ceilingToGoOn(under: costLimits))
+        var changed: Agent?
+        await attempt {
+            changed = try await self.client(forAgent: agent.id).call(
+                DaemonAPI.Method.agentsSetCeiling, agent.goOnRequest(under: self.costLimits),
+                returning: Agent.self)
+        }
+        guard let changed else { return }
+        work.upsert(changed)
     }
 
     func refreshProjects() async {
@@ -3040,7 +3038,7 @@ final class AppModel {
         if let limits = work.costState?.limits {
             serverCosts[host] = try? await server.call(
                 DaemonAPI.Method.costSetLimits,
-                DaemonAPI.SetLimitsRequest(perAgent: .some(limits.perAgent), daily: .some(limits.daily)),
+                DaemonAPI.SetLimitsRequest(copying: limits),
                 returning: DaemonAPI.CostState.self)
         } else {
             serverCosts[host] = try? await server.call(DaemonAPI.Method.costState, returning: DaemonAPI.CostState.self)

@@ -122,8 +122,7 @@ struct CostLimitBanner<Raise: View>: View {
             } words: {
                 Text(PromptWords.atItsCostLimit)
                     .appText(.fine).fontWeight(.medium)
-                Text("\(Cost.total(of: agent.costToDate) ?? "") spent. "
-                     + "Anything you send waits until you allow more.")
+                Text(agent.spentWords(under: limits) + " Anything you send waits until you allow more.")
                     .appText(.fine)
                     .foregroundStyle(.secondary)
             } actions: {
@@ -138,7 +137,9 @@ struct CostLimitBanner<Raise: View>: View {
                 Image(systemName: "clock")
                     .foregroundStyle(.secondary)
             } words: {
-                Text("The day's spending limit has been reached")
+                Text(costState?.limits.isDayTokenLimitReached(tokensToday: costState?.tokensToday ?? 0) == true
+                     ? "The day's token limit has been reached"
+                     : "The day's spending limit has been reached")
                     .appText(.fine).fontWeight(.medium)
                 Text("What you send waits here, and goes when the day rolls over.")
                     .appText(.fine)

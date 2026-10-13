@@ -60,6 +60,18 @@ struct TotalsView: View {
                             Text("Each agent up to \(perAgent.amount.formatted(.currency(code: perAgent.currency)))")
                                 .appText(.fine).monospacedDigit().foregroundStyle(.secondary)
                         }
+                        // Tokens (#838): the limit for runtimes that report no price.
+                        if let dailyTokens = state.limits.dailyTokens {
+                            Text("Daily token limit \(dailyTokens.formatted()) · \((state.dayTokenHeadroom ?? 0).formatted()) left")
+                                .appText(.fine).monospacedDigit().foregroundStyle(.secondary)
+                        } else if state.tokensToday > 0 {
+                            Text("\(state.tokensToday.formatted()) tokens today")
+                                .appText(.fine).monospacedDigit().foregroundStyle(.secondary)
+                        }
+                        if let perAgentTokens = state.limits.perAgentTokens {
+                            Text("Each agent up to \(perAgentTokens.formatted()) tokens")
+                                .appText(.fine).monospacedDigit().foregroundStyle(.secondary)
+                        }
                     }
                     .padding(.top, 8)
                 }

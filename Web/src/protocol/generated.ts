@@ -125,6 +125,8 @@ export interface Agent {
   lastTurnUsage?: TurnUsage;
   costToDate?: Record<string, number>;
   costCeiling?: Cost;
+  tokensToDate?: number;
+  tokenCeiling?: number;
   plans?: Plan[];
   background?: BackgroundItem[];
   additionalDirectories?: URLString[];
@@ -594,6 +596,8 @@ export interface Cost {
 export interface CostLimits {
   perAgent?: Cost;
   daily?: Cost;
+  perAgentTokens?: number;
+  dailyTokens?: number;
 }
 
 export interface CostState {
@@ -601,6 +605,7 @@ export interface CostState {
   today: Record<string, number>;
   day: string;
   note?: string;
+  tokensToday: number;
 }
 
 export type CredentialKind = "geminiAPIKey";
@@ -1644,6 +1649,7 @@ export interface SessionNotice {
 export interface SetCeilingRequest {
   agentID: UUID;
   ceiling?: Cost;
+  tokenCeiling?: number;
 }
 
 export interface SetLabelsRequest {
@@ -2542,7 +2548,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ACPAuthMethod: { required: ["id"], optional: ["name", "description", "_meta"] },
   ACPPromptCapabilities: { required: [], optional: ["image", "audio", "embeddedContext"] },
   ACPProviderInfo: { required: ["id"], optional: ["name", "protocol", "configured"] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart"] },
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },
   AgentWorktree: { required: ["name", "root", "project", "madeByApp"], optional: ["branch", "base"] },
@@ -2585,8 +2591,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "tunnel", "workspace"] },
   ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "thisMacHost", "projectDetection", "unjoinedTunnels"] },
   Cost: { required: ["amount", "currency"], optional: [] },
-  CostLimits: { required: [], optional: ["perAgent", "daily"] },
-  CostState: { required: ["limits", "today", "day"], optional: ["note"] },
+  CostLimits: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
+  CostState: { required: ["limits", "today", "day", "tokensToday"], optional: ["note"] },
   CredentialsLend: { required: ["runtime", "kind", "secret"], optional: [] },
   CredentialsOffer: { required: ["runtimes", "ownSignInOnly"], optional: ["notRelayed", "signIns"] },
   DeclaredResource: { required: ["name", "displayName", "description", "holders"], optional: ["defaultMinutes", "maximumMinutes"] },
@@ -2713,7 +2719,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ServedRequest: { required: ["kind", "outcome"], optional: [] },
   SessionLabel: { required: ["value", "owner", "addedAt"], optional: [] },
   SessionNotice: { required: ["severity", "title"], optional: ["detail"] },
-  SetCeilingRequest: { required: ["agentID"], optional: ["ceiling"] },
+  SetCeilingRequest: { required: ["agentID"], optional: ["ceiling", "tokenCeiling"] },
   SetLabelsRequest: { required: ["agentID", "add", "remove"], optional: [] },
   SetOptionRequest: { required: ["agentID", "optionID", "value"], optional: [] },
   SetPinnedRequest: { required: ["folder", "pinned"], optional: [] },
