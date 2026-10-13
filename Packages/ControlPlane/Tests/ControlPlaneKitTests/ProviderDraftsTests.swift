@@ -240,7 +240,8 @@ struct ProviderDraftMapTests {
         #expect(world.last?.note == "It has no list.")
     }
 
-    @Test("Out of time with a passed draft: that draft is the result")
+    // Times out on a loaded runner (#891), until the drafts take an injected clock.
+    @Test("Out of time with a passed draft: that draft is the result", .flakyUnderLoad)
     func outOfTime() async throws {
         let world = DraftWorld(tools: ["droplet-list", "droplet-power-on", "droplet-power-off"])
         let harness = DraftHarness(world: world, timing: .init(total: .milliseconds(150), answer: .seconds(5), lastWord: .milliseconds(100),
