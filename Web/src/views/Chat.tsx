@@ -606,7 +606,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           <PromptMenus options={drawable(agent.advertisedOptions, [])} disabled={down} runtime={runtimeNameOn(store, host, agent.runtimeID)}
               value={(o) => store.pendingOptions.value[agent.id]?.[o.id] ?? agent.startOptions.values[o.id] ?? o.currentValue}
               onChange={(o, v) => void store.setOption(host, agent.id, o.id, v)}
-              trailing={<ContextMeter agent={agent} />}
+              trailing={<ContextMeter agent={agent} costs={store.costs.value[host]} />}
               besideMode={<SandboxCapsule runtimeID={agent.runtimeID} override={agent.sandboxOverride}
                 runtimeDefault={store.sandboxDefaults.value[host]?.[agent.runtimeID] ?? "runtime"}
                 mode={typeof agent.startOptions.values.mode === "string" ? agent.startOptions.values.mode : undefined} disabled={down}

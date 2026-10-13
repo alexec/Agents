@@ -1,19 +1,29 @@
 ---
 diataxis: how-to
 devices: [mac]
-description: See what agents have cost, and set a limit on what one agent, or one day, may spend.
+description: See what agents have cost, and set a limit in money or tokens on what one agent, or one day, may use.
 ---
 
 # Limit what agents spend
 
 Agents shows what every agent has cost, as its runtime reported it, and can stop the
 spending at a limit you set: for one agent across its whole life, and for everything in
-one day.
+one day. A limit is in money, in tokens, or both. Whichever is reached first stops the
+work.
 
 ## Before you start
 
-- A runtime that reports a price. Claude does; some report tokens only, and no limit
-  applies to an agent on those. See [Runtimes](../reference/runtimes.md).
+- A runtime that reports a price or tokens. What each runtime reports decides which
+  limit can stop it:
+
+  | Runtime | Reports | Limit that applies |
+  |---|---|---|
+  | Claude | price and tokens | money and tokens |
+  | Codex, Gemini, OpenCode, Copilot | tokens | tokens |
+  | Cursor, Antigravity, Grok | neither | none |
+
+  An agent on a runtime that reports neither runs past every limit. See
+  [Runtimes](../reference/runtimes.md).
 
 ## Steps
 
@@ -35,12 +45,16 @@ one day.
 
    An agent that reaches it finishes the turn it is in and takes no further prompt, so it
    may end a little over.
-3. Under **Per day** (*The most a day may spend*), do the same.
+3. For a runtime that reports no price, type a number of tokens under **Tokens per agent**
+   and click **Set**. A token limit counts the fresh input and the output of each turn;
+   it does not count what the model reads back from a cache.
+4. Under **Per day** and **Tokens per day** (*The most a day may spend*), do the same.
 
    When a day reaches it, nothing new starts and no prompt is sent, in any project,
    including scheduled workflows. What is working finishes its turn and holds. What you
-   typed waits until the day rolls over. **Today** shows what is left.
-4. To remove a limit, click **No limit**.
+   typed waits until the day rolls over. **Today** shows what is left, in money and in
+   tokens.
+5. To remove a limit, click **No limit**.
 
 **When an agent reaches a limit**
 
@@ -55,8 +69,11 @@ Each server keeps to the per-day limit on its own. For every control in the pane
 
 - **An agent went over its limit.** A limit is checked between turns, so the turn that
   crosses it finishes.
-- **The figure stays at nothing, and a limit does not stop the agent.** Its runtime
-  reports no price; hover over the figure and it says so.
+- **The figure stays at nothing, and a money limit does not stop the agent.** Its runtime
+  reports no price; hover over the figure and it says so. Set a token limit: the figure
+  then shows the tokens used against it.
+- **The figure says *Not measured* and no limit stops the agent.** Its runtime reports
+  neither a price nor tokens (Cursor, Antigravity, Grok). No limit applies to it.
 
 ## See also
 

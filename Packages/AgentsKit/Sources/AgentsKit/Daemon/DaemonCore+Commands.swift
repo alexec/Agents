@@ -233,6 +233,15 @@ extension DaemonCore {
         if limitStore.unreadable {
             throw JSONRPCError(code: DaemonAPI.Failure.dayLimitReached, message: Self.limitsUnreadableWords)
         }
+        let tokensToday = spendLedger.tokens(on: now())
+        if limits.isDayTokenLimitReached(tokensToday: tokensToday) {
+            let ceiling = (limits.dailyTokens ?? 0).formatted()
+            throw JSONRPCError(
+                code: DaemonAPI.Failure.dayLimitReached,
+                message: "Today has used \(tokensToday.formatted()) tokens, which reaches the \(ceiling) "
+                    + "you allowed for a day. "
+                    + "Nothing new starts until the day rolls over, or until you raise the limit.")
+        }
         if limits.isDayLimitReached(spentToday: spendLedger.total(on: now())) {
             let spent = Cost.total(of: spendLedger.total(on: now())) ?? "nothing"
             let ceiling = limits.daily
@@ -249,6 +258,12 @@ extension DaemonCore {
             throw JSONRPCError(
                 code: DaemonAPI.Failure.agentLimitReached,
                 message: "The limit for each agent is set to nothing, so no agent can start. "
+                    + "Raise it to start this one.")
+        }
+        if let perAgentTokens = limits.perAgentTokens, perAgentTokens <= 0 {
+            throw JSONRPCError(
+                code: DaemonAPI.Failure.agentLimitReached,
+                message: "The token limit for each agent is set to none, so no agent can start. "
                     + "Raise it to start this one.")
         }
         // The worktree first, before any runtime: a start that cannot have the folder it
@@ -846,8 +861,10 @@ extension DaemonCore {
         if isDayLimitReached(under: limits) {
             raiseCostLimit("day", agent: nil)
             if held.insert(agentID).inserted {
+                let which = limits.isDayTokenLimitReached(tokensToday: spendLedger.tokens(on: now()))
+                    ? "token" : "spending"
                 await record(.runtimeNote(
-                    "What you sent is waiting: the day's spending limit has been reached. "
+                    "What you sent is waiting: the day's \(which) limit has been reached. "
                     + "It will go when the day rolls over, or when you raise the limit."),
                              for: agentID)
             }
@@ -932,7 +949,8 @@ extension DaemonCore {
     func isDayLimitReached(under limits: CostLimits? = nil) -> Bool {
         if limitStore.unreadable { return true }
         let limits = limits ?? limitStore.load()
-        return limits.isDayLimitReached(spentToday: spendLedger.total(on: now()))
+        return limits.isDayLimitReached(spentToday: spendLedger.total(on: now()),
+                                        tokensToday: spendLedger.tokens(on: now()))
     }
 
     static let limitsUnreadableWords = "The spending limits could not be read, so nothing new starts until "
@@ -943,7 +961,8 @@ extension DaemonCore {
         DaemonAPI.CostState(limits: limitStore.load(),
                             today: spendLedger.total(on: now()),
                             day: SpendLedger.stamp(for: now()),
-                            note: costNote)
+                            note: costNote,
+                            tokensToday: spendLedger.tokens(on: now()))
     }
 
     /// The limits' or the ledger's file set aside in this run (#171), for the limits page.
@@ -1054,6 +1073,8 @@ extension DaemonCore {
         // is never a way to turn one off.
         if case .some(let value) = request.perAgent { limits.perAgent = value }
         if case .some(let value) = request.daily { limits.daily = value }
+        if case .some(let value) = request.perAgentTokens { limits.perAgentTokens = value }
+        if case .some(let value) = request.dailyTokens { limits.dailyTokens = value }
         // Written before the reply returns and before anything is broadcast. A limit
         // lower than what is already spent is allowed and is not an error: the reply
         // carries the new state, from which the caller can see it is already reached
@@ -1075,6 +1096,7 @@ extension DaemonCore {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent, message: "That agent is not here.")
         }
         agent.costCeiling = request.ceiling
+        agent.tokenCeiling = request.tokenCeiling
         changed(agent)
         // Deliberately does not send a prompt. Raising a ceiling makes an agent
         // promptable again; continuing is the reader's second, deliberate act.
@@ -1506,6 +1528,13 @@ extension DaemonCore {
                     keepQuietly("today's spend") { try spendLedger.add(cost, on: now()) }
                     usageLedger.record(cost, runtime: agent.runtimeID, on: now())
                 }
+                // The tokens a token limit counts (#838), into the agent and the day.
+                let counted = usage.limitTokens
+                if counted > 0 {
+                    agent.tokensToDate += counted
+                    spendLedger.record(tokens: counted, on: now())
+                    keepQuietly("today's spend") { try spendLedger.flush() }
+                }
                 // The turn's tokens, and whether its runtime has ever priced this agent.
                 usageLedger.record(usage, priced: !agent.isUnmeasured, runtime: agent.runtimeID, on: now())
                 keepQuietly("the usage history") { try usageLedger.flush() }
@@ -1514,7 +1543,7 @@ extension DaemonCore {
                 changed(agent)
                 if crossedItsLimit { raiseCostLimit("agent", agent: agent) }
                 if isDayLimitReached(under: limits) { raiseCostLimit("day", agent: nil) }
-                if usage.cost != nil { broadcastCostState() }
+                if usage.cost != nil || counted > 0 { broadcastCostState() }
             }
         }
         // A warning is a retry the runtime is making: said, and the turn's own ending stands.
@@ -1588,11 +1617,19 @@ extension DaemonCore {
             reason = .costLimit
             if let agent = agents[agentID] {
                 let limits = limitStore.load()
-                let spent = Cost.total(of: agent.costToDate) ?? "nothing"
-                let ceiling = agent.ceiling(under: limits)
-                    .map { $0.amount.formatted(.currency(code: $0.currency)) } ?? "its limit"
+                let reached: String
+                if agent.isAtMoneyLimit(under: limits) {
+                    let spent = Cost.total(of: agent.costToDate) ?? "nothing"
+                    let ceiling = agent.ceiling(under: limits)
+                        .map { $0.amount.formatted(.currency(code: $0.currency)) } ?? "its limit"
+                    reached = "this agent has spent \(spent), which reaches the \(ceiling) limit you set"
+                } else {
+                    let ceiling = agent.tokenCeiling(under: limits).map { "\($0.formatted()) token" } ?? "token"
+                    reached = "this agent has used \(agent.tokensToDate.formatted()) tokens, "
+                        + "which reaches the \(ceiling) limit you set"
+                }
                 await record(.runtimeNote(
-                    "Stopped: this agent has spent \(spent), which reaches the \(ceiling) limit you set. "
+                    "Stopped: \(reached). "
                     + "The turn it was in finished first, so nothing is half-done. "
                     + "Raise the limit, or let this one agent go on, and it will take a prompt again."),
                              for: agentID)

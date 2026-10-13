@@ -32,10 +32,30 @@ public final class SpendLedger: @unchecked Sendable {
     /// not an offer of history and must not be surfaced anywhere.
     public static let daysKept = 7
 
-    /// The shape on disk: `{"days": {"2026-09-19": {"USD": 12.34}}}`.
+    /// The shape on disk: `{"days": {"2026-09-19": {"USD": 12.34}}, "tokens": {"2026-09-19": 51200}}`.
+    /// `tokens` is the day's tokens as a token limit counts them (#838), kept for the
+    /// same days as the money.
     struct Contents: Codable, Sendable {
         var days: [String: [String: Decimal]]
-        init(days: [String: [String: Decimal]] = [:]) { self.days = days }
+        var tokens: [String: Int]
+        init(days: [String: [String: Decimal]] = [:], tokens: [String: Int] = [:]) {
+            self.days = days
+            self.tokens = tokens
+        }
+
+        enum CodingKeys: String, CodingKey { case days, tokens }
+
+        init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            days = try c.decodeIfPresent([String: [String: Decimal]].self, forKey: .days) ?? [:]
+            tokens = try c.decodeIfPresent([String: Int].self, forKey: .tokens) ?? [:]
+        }
+
+        func encode(to encoder: any Encoder) throws {
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            try c.encode(days, forKey: .days)
+            if !tokens.isEmpty { try c.encode(tokens, forKey: .tokens) }
+        }
     }
 
     /// The machine's own local calendar day. Taken at the moment of banking, and the
@@ -70,6 +90,18 @@ public final class SpendLedger: @unchecked Sendable {
         }
     }
 
+    /// Add a turn's tokens into its day's bucket in memory only (#838); `flush` writes it.
+    public func record(tokens: Int, on date: Date) {
+        guard tokens > 0 else { return }
+        lock.withLock {
+            var contents = readLocked()
+            let day = Self.stamp(for: date)
+            contents.tokens[day, default: 0] += tokens
+            held = contents
+            unwritten = day
+        }
+    }
+
     /// Write what `record` added, if anything. A failed write stays unwritten, for the
     /// next flush to try again.
     public func flush() throws {
@@ -87,6 +119,11 @@ public final class SpendLedger: @unchecked Sendable {
     /// view shows nothing rather than a zero.
     public func total(on date: Date) -> [String: Decimal] {
         lock.withLock { readLocked().days[Self.stamp(for: date)] ?? [:] }
+    }
+
+    /// The tokens used on that local day (#838). Zero when none were.
+    public func tokens(on date: Date) -> Int {
+        lock.withLock { readLocked().tokens[Self.stamp(for: date)] ?? 0 }
     }
 
     /// A missing file is an empty ledger. An unreadable one is set aside and is empty
@@ -112,6 +149,8 @@ public final class SpendLedger: @unchecked Sendable {
         var contents = contents
         let keep = contents.days.keys.sorted().suffix(Self.daysKept)
         contents.days = contents.days.filter { keep.contains($0.key) || $0.key == day }
+        let keepTokens = contents.tokens.keys.sorted().suffix(Self.daysKept)
+        contents.tokens = contents.tokens.filter { keepTokens.contains($0.key) || $0.key == day }
         held = contents
         try StoreFile.write(try StoreCoding.encoder.encode(contents), to: locations.spend)
     }

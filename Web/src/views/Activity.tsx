@@ -18,6 +18,7 @@ import { folderKey, projectFolder } from "../model/groups";
 import { runtimeTally } from "../model/runtimes";
 import { healthTally, personalEmpty, personalIntro, personalServers } from "../model/hostedMCP";
 import { refusalMessage } from "../model/workflows";
+import { dayTokenLimitReached } from "../model/limits";
 import { UsageCharts } from "./UsageCharts";
 import { TimeCharts } from "./TimeCharts";
 
@@ -66,12 +67,15 @@ export function headroom(state: CostState | undefined): string | null {
 
 /** Close enough to the daily limit to say so in colour (CostState.dayIsCloseToFull). */
 export function closeToFull(state: CostState | undefined): boolean {
+  const tokens = state?.limits.dailyTokens;
+  if (state && tokens !== undefined && tokens > 0 && (state.tokensToday ?? 0) / tokens >= 0.85) return true;
   const daily = state?.limits.daily;
   if (!state || !daily || daily.amount <= 0) return false;
   return (state.today[daily.currency] ?? 0) / daily.amount >= 0.85;
 }
 
 export function dayLimitReached(state: CostState | undefined): boolean {
+  if (dayTokenLimitReached(state)) return true;
   const daily = state?.limits.daily;
   return !!daily && daily.amount > 0 && (state?.today[daily.currency] ?? 0) >= daily.amount;
 }
@@ -486,6 +490,11 @@ function SpendingPage({ store, hostName }: { store: Store; hostName: (host: stri
             Daily limit {money(state.limits.daily.amount, state.limits.daily.currency)} · {headroom(state)}{dayLimitReached(state) && " · Nothing new will start until tomorrow"}</p>}
           {state.limits.perAgent && <p class="quiet small">
             Each agent up to {money(state.limits.perAgent.amount, state.limits.perAgent.currency)}</p>}
+          {state.limits.dailyTokens !== undefined ? <p class={`quiet small${closeToFull(state) ? " close" : ""}`}>
+            Daily token limit {state.limits.dailyTokens.toLocaleString()} · {Math.max(0, state.limits.dailyTokens - (state.tokensToday ?? 0)).toLocaleString()} left{dayTokenLimitReached(state) && " · Nothing new will start until tomorrow"}</p>
+            : (state.tokensToday ?? 0) > 0 && <p class="quiet small">{state.tokensToday.toLocaleString()} tokens today</p>}
+          {state.limits.perAgentTokens !== undefined && <p class="quiet small">
+            Each agent up to {state.limits.perAgentTokens.toLocaleString()} tokens</p>}
           {state.note && <p class="quiet small">⚠︎ {state.note}</p>}
         </section>
       ))}
