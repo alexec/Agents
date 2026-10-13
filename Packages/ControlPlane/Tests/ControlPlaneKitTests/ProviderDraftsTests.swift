@@ -26,6 +26,10 @@ final class DraftWorld: @unchecked Sendable {
     private var _checks = 0, _starts = 0, _stops = 0, _helpRuns: [[String]] = [], _updates: [DaemonAPI.ProviderDraftUpdate] = []
     private var _started: [DaemonAPI.StartRequest] = [], _stopped: [UUID] = [], _logs: [String] = []
     var ownerHere = true
+    private var _ownerAsked = 0
+    /// How many ticks have asked whether the sheet is still there.
+    var ownerAsked: Int { lock.withLock { _ownerAsked } }
+    func askOwner() -> Bool { lock.withLock { _ownerAsked += 1 }; return ownerHere }
     let agent = UUID()
 
     init(tools: [String], descriptions: [String: String] = [:]) {
@@ -125,7 +129,7 @@ struct DraftHarness {
                 world.told(update)
                 return true
             },
-            ownerHere: { _ in world.ownerHere },
+            ownerHere: { _ in world.askOwner() },
             busyHost: { _, _ in busy }),
             log: { world.logged($0) },
             now: { clock?.now ?? .now })
@@ -328,14 +332,23 @@ struct ProviderDraftMapTests {
         try await eventually { world.stopped == [world.agent] }
         #expect(await harness.drafts.result(id) == nil)
 
+        // The sheet gone: on the drafts' clock, which only the test moves (#912), so a slow
+        // machine can't end it early or late. Once a tick has seen the owner gone, the clock
+        // moves past ownerGone, and the next tick cancels.
         let gone = DraftWorld(tools: ["droplet-list"])
-        let quick = DraftHarness(world: gone, timing: .init(total: .seconds(300), answer: .seconds(5), lastWord: .seconds(5),
-                                                            ownerGone: .milliseconds(50), keptAfter: .seconds(600),
-                                                            tick: .milliseconds(10), help: .seconds(25)))
+        let clock = DraftClock()
+        let quick = DraftHarness(world: gone, timing: .init(total: .seconds(300), answer: .seconds(120), lastWord: .seconds(60),
+                                                            ownerGone: .seconds(30), keptAfter: .seconds(600),
+                                                            tick: .milliseconds(10), help: .seconds(25)),
+                                 clock: clock)
         _ = try await quick.start()
         gone.ownerHere = false
-        try await Task.sleep(for: .milliseconds(400))
-        #expect(gone.last?.state == "cancelled")
+        let asked = gone.ownerAsked
+        try await eventually { gone.ownerAsked > asked }
+        #expect(gone.last?.state != "cancelled")
+        clock.advance(by: .seconds(31))
+        try await eventually { gone.last?.state == "cancelled" }
+        #expect(gone.stopped == [gone.agent])
     }
 
     @Test("A turn that ends with no draft fails, saying so")
