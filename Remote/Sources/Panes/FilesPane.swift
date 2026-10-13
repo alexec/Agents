@@ -184,7 +184,7 @@ struct FilesPane: View {
                let path = agent.pinPath(file.path) {
                 pinButton(path)
             }
-            if let file = state.openFile, !ChangesView.changes(to: file.path, in: model.page(popped).entries).isEmpty {
+            if let file = state.openFile, !model.page(popped).changes(to: file.path).isEmpty {
                 Button("What the agent did") { state.showingChanges = true }
                     .appText(.fine)
                     .buttonStyle(.paper)

@@ -1,4 +1,6 @@
 import Foundation
+import Observation
+import Synchronization
 import Testing
 @testable import AgentsKit
 @testable import AgentsKitCore
@@ -159,6 +161,45 @@ struct AgentsModelTests {
         #expect(model.entries.first?.text == "Earlier")
         #expect(model.firstEntryIndex == 0)
         #expect(!model.hasMoreBefore)
+    }
+
+    /// The edits per file and what was exchanged are folded as entries land (#929): the
+    /// same answer as a walk of the page, and a chunk of a reply moves neither.
+    @Test func editsAndArtifactsAreFoldedAsEntriesLand() throws {
+        let model = AgentsModel()
+        let agentID = UUID()
+        model.watching = agentID
+        func edit(_ path: String, _ text: String) -> TranscriptEntry {
+            TranscriptEntry(kind: .toolCall(ToolCall(
+                title: "Edit", content: [.diff(ToolCallContent.Diff(path: path, oldText: nil, newText: text))])))
+        }
+        func link(_ name: String, at: Date) -> TranscriptEntry {
+            TranscriptEntry(at: at, kind: .agentMessage(messageID: nil, text: "", blocks: [
+                .resourceLink(uri: "file:///tmp/\(name)", name: name, mimeType: nil, size: nil)]))
+        }
+        let start = Date(timeIntervalSince1970: 1_000)
+        model.replaceTranscript(with: TranscriptPage(firstIndex: 5, total: 10, entries: [
+            edit("/tmp/work/a.swift", "one"), link("later.md", at: start.addingTimeInterval(10))]))
+        model.prepend(TranscriptPage(firstIndex: 0, total: 10, entries: [link("earlier.md", at: start)]))
+        model.apply(.entry(DaemonAPI.EntryNotification(agentID: agentID, entry: edit("/tmp/work/./a.swift", "two"))))
+
+        #expect(model.changes(to: "/tmp/work/a.swift").map(\.newText) == ["two", "one"])
+        #expect(model.changes(to: "/tmp/work/b.swift").isEmpty)
+        #expect(model.artifacts == Artifact.all(in: model.entries))
+        #expect(model.artifacts.map(\.name) == ["later.md", "earlier.md"])
+
+        let moved = Mutex(false)
+        withObservationTracking {
+            _ = model.artifacts
+            _ = model.changes(to: "/tmp/work/a.swift")
+        } onChange: { moved.withLock { $0 = true } }
+        model.apply(.entry(DaemonAPI.EntryNotification(
+            agentID: agentID, entry: TranscriptEntry(kind: .agentMessage(messageID: "m", text: "chunk")))))
+        #expect(!moved.withLock { $0 })
+
+        model.watching = UUID()
+        #expect(model.artifacts.isEmpty)
+        #expect(model.changes(to: "/tmp/work/a.swift").isEmpty)
     }
 
     @Test func reconnectingTurnsKeepsOneLatestCopyOfEveryTurn() throws {

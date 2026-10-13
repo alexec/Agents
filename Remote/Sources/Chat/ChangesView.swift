@@ -54,26 +54,8 @@ struct ChangesView: View {
     /// Every change to this file in the transcript, newest first. Newest first because
     /// the newest is the file as it now stands, and that is what somebody opening a
     /// file wants first; the ones below it are how it got there.
-    private var touches: [ToolCallContent.Diff] { Self.changes(to: path, in: model.page(popped).entries) }
-
-    /// The edits the conversation carries for this file, newest first.
-    static func changes(to path: String, in entries: [TranscriptEntry]) -> [ToolCallContent.Diff] {
-        let wanted = URL(filePath: path).standardizedFileURL.path
-        var found: [ToolCallContent.Diff] = []
-        for entry in entries {
-            let call: ToolCall
-            switch entry.kind {
-            case .toolCall(let c), .toolCallUpdate(let c): call = c
-            default: continue
-            }
-            for piece in call.content {
-                guard case .diff(let diff) = piece,
-                      URL(filePath: diff.path).standardizedFileURL.path == wanted else { continue }
-                found.append(diff)
-            }
-        }
-        return found.reversed()
-    }
+    /// Folded by the model as entries land (#929), not walked here on every redraw.
+    private var touches: [ToolCallContent.Diff] { model.page(popped).changes(to: path) }
 }
 
 /// What this page is, said once at the top. Without it a reader has no way to tell a
