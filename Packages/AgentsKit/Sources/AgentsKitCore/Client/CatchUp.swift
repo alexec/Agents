@@ -3,13 +3,19 @@ import Foundation
 // MARK: The daemon's one answer (#175)
 
 public extension DaemonAPI {
-    /// `client/catchUp`: which agents to send with the snapshot.
+    /// `client/catchUp`: which agents to send with the snapshot, and which of the parts the
+    /// pages on screen show to send with it.
     struct CatchUpRequest: Codable, Sendable {
         /// The first page of live agents, lean, unless said otherwise.
         public var agents: ListRequest
+        /// Parts to send in the same answer (#884): through the relay each call is a round
+        /// trip of two or three seconds, so one answer, not one call per part. A host that
+        /// predates this sends none, and the client asks for each.
+        public var parts: [CatchUpPart]
 
-        public init(agents: ListRequest = CatchUpRequest.firstPage) {
+        public init(agents: ListRequest = CatchUpRequest.firstPage, parts: [CatchUpPart] = []) {
             self.agents = agents
+            self.parts = parts
         }
 
         /// What a list on screen draws first: live agents, lean, one page (#164).
@@ -18,6 +24,8 @@ public extension DaemonAPI {
         public init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             agents = try c.decodeIfPresent(ListRequest.self, forKey: .agents) ?? Self.firstPage
+            // A part this host does not know is left out: the client asks for it on its own.
+            parts = (try? c.decodeIfPresent([String].self, forKey: .parts))?.compactMap(CatchUpPart.init) ?? []
         }
     }
 
@@ -33,6 +41,27 @@ public extension DaemonAPI {
         public var elicitations: [ElicitationRequest]
         public var attention: AttentionPending
         public var resuming: [UUID]
+        /// The low-disk strip and what the host could not read, shown on every page (#884).
+        /// Nil from a host that predates them.
+        public var disk: DiskState?
+        public var storeNotes: StoreNotes?
+        /// The parts asked for, each nil when it was not asked for or the host predates it.
+        public var workflows: [WorkflowSummary]?
+        public var pins: [ProjectPins]?
+        public var leases: Leases?
+
+        /// The leases part: the leases, and the MCP servers read with them for their page.
+        public struct Leases: Codable, Sendable {
+            public var leases: LeaseSnapshot
+            public var hosted: HostedMCPSnapshot
+            public var health: MCPHealthSnapshot
+
+            public init(leases: LeaseSnapshot, hosted: HostedMCPSnapshot, health: MCPHealthSnapshot) {
+                self.leases = leases
+                self.hosted = hosted
+                self.health = health
+            }
+        }
 
         public init(projects: [ProjectSummary], agents: [Agent], permissions: [PermissionRequest],
                     elicitations: [ElicitationRequest], attention: AttentionPending, resuming: [UUID]) {
@@ -42,6 +71,15 @@ public extension DaemonAPI {
             self.elicitations = elicitations
             self.attention = attention
             self.resuming = resuming
+        }
+
+        /// The parts this answer carries.
+        public var carried: Set<CatchUpPart> {
+            var parts: Set<CatchUpPart> = []
+            if workflows != nil { parts.insert(.workflows) }
+            if pins != nil { parts.insert(.pins) }
+            if leases != nil { parts.insert(.leases) }
+            return parts
         }
     }
 }
@@ -79,7 +117,7 @@ public extension DaemonClient {
 
 /// What a page shows beyond the project list and the open chat, fetched when a page that
 /// shows it opens rather than on every connection (#175).
-public enum CatchUpPart: String, CaseIterable, Sendable, Hashable {
+public enum CatchUpPart: String, CaseIterable, Codable, Sendable, Hashable {
     case workflows
     case pins
     case leases

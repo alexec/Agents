@@ -33,9 +33,19 @@ public struct ControlPlaneLink: DaemonLink {
     /// How often a relayed connection looks for the address again.
     public static let lookAgain: Duration = .seconds(30)
 
+    /// How long a dial gives the address, in seconds, for the dial to read: the whole of
+    /// `addressPatience`, or `addressPatienceAfterFailing` once the address has failed and
+    /// until it answers again (#884). Each failed connection away from home waited the
+    /// whole ten seconds before trying the relay; an address that answers at all answers
+    /// in much less, and the watcher still finds it every `lookAgain` with the whole wait.
+    @TaskLocal public static var patience: TimeInterval = addressPatience
+    public static let addressPatience: TimeInterval = 10
+    public static let addressPatienceAfterFailing: TimeInterval = 3
+
     public func transport() async throws -> any LineTransport {
         do {
-            let direct = try await dial()
+            let patience = relayed != nil && route.addressFailed ? Self.addressPatienceAfterFailing : Self.addressPatience
+            let direct = try await Self.$patience.withValue(patience) { try await dial() }
             // The address answers this connection itself: nothing left to watch for (#208).
             if relayed != nil { watching.stop(keepsWatching: true) }
             route.set(.direct)
@@ -46,6 +56,7 @@ public struct ControlPlaneLink: DaemonLink {
             ControlPlaneLink.refused.set(refusal.reason)
             throw refusal
         } catch {
+            route.addressDidFail()
             guard let relayed else { throw error }
             let transport: any LineTransport
             do {
@@ -85,13 +96,22 @@ public struct ControlPlaneLink: DaemonLink {
         }
     }
 
-    /// Which way the last connection went: `.none` before the first.
+    /// Which way the last connection went: `.none` before the first. And whether the
+    /// address failed since it last answered.
     public final class Route: @unchecked Sendable {
         private let lock = NSLock()
         private var value = RemoteLink.none
+        private var failed = false
         public init() {}
         public var current: RemoteLink { lock.withLock { value } }
-        func set(_ link: RemoteLink) { lock.withLock { value = link } }
+        public var addressFailed: Bool { lock.withLock { failed } }
+        func set(_ link: RemoteLink) {
+            lock.withLock {
+                value = link
+                if link == .direct { failed = false }
+            }
+        }
+        func addressDidFail() { lock.withLock { failed = true } }
     }
 
     /// The relayed connection in use, and the watcher looking for the address on its behalf.

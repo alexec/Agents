@@ -242,6 +242,54 @@ struct RelayEndToEndTests {
         _ = try await client.call(DaemonAPI.Method.ping)
     }
 
+    /// The Remote's catch-up through the relay with each save taking a second, as
+    /// iCloud's do (#884): before, the snapshot and then a call for each part, one after
+    /// another; now, the parts on screen, the disk and the store notes in the snapshot.
+    /// The numbers are printed for the commit; the test holds the catch-up to one call.
+    @Test func theCatchUpThroughTheRelayIsOneCall() async throws {
+        let rig = try await Rig()
+        defer { rig.stop() }
+        let (client, _, _) = try await rig.phone()
+        await rig.cloud.saves(take: .seconds(1))
+        let none = Optional<String>.none
+
+        // Before: as `RemoteModel.runCatchUp` was with the Projects page on screen.
+        var posted = await rig.cloud.posts
+        var began = ContinuousClock.now
+        _ = try await client.catchUp()
+        _ = try await client.call(DaemonAPI.Method.leasesSnapshot, none)
+        _ = try await client.call(DaemonAPI.Method.mcpHosted, none)
+        _ = try await client.call(DaemonAPI.Method.mcpHealth, none)
+        _ = try await client.call(DaemonAPI.Method.pinsList, DaemonAPI.Empty())
+        _ = try await client.call(DaemonAPI.Method.workflowsList, DaemonAPI.WorkflowsListRequest())
+        _ = try await client.call(DaemonAPI.Method.diskState, none)
+        _ = try await client.call(DaemonAPI.Method.storeNotes, none)
+        let before = ContinuousClock.now - began
+        print("relay catch-up before: 8 calls, \(await rig.cloud.posts - posted) frames, \(before)")
+
+        // Now: one call.
+        posted = await rig.cloud.posts
+        began = ContinuousClock.now
+        let snapshot = try await client.catchUp(.init(parts: [.workflows, .pins, .leases]))
+        let after = ContinuousClock.now - began
+        print("relay catch-up after: 1 call, \(await rig.cloud.posts - posted) frames, \(after)")
+        #expect(snapshot.carried == [.workflows, .pins, .leases])
+        #expect(snapshot.disk != nil)
+        #expect(snapshot.storeNotes != nil)
+        #expect(after < before)
+    }
+
+    /// Parts not asked for are not sent: the answer is no bigger than the screen needs.
+    @Test func theCatchUpCarriesOnlyThePartsAskedFor() async throws {
+        let rig = try await Rig()
+        defer { rig.stop() }
+        let (client, _, _) = try await rig.phone()
+        let bare = try await client.catchUp()
+        #expect(bare.carried.isEmpty)
+        let pins = try await client.catchUp(.init(parts: [.pins, .costs]))
+        #expect(pins.carried == [.pins])
+    }
+
     private func answers(_ rig: Rig, _ agent: UUID) async throws -> Int {
         try await rig.core.transcript(.init(agentID: agent, before: nil, limit: 500)).entries.count {
             if case .permissionAnswered = $0.kind { true } else { false }

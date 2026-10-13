@@ -96,6 +96,7 @@ struct FakeDeviceLiveTests {
                                                returning: [DaemonAPI.ProjectSummary].self)
             print("fake-device: relayed projects/list → \(projects.map(\.name))")
             await expectNotRefused(away, DaemonAPI.Method.credentialsLend, "relayed")
+            try await catchUpTimed(away)
             // Away, and happy to be told: as the Remote says it.
             _ = try await away.call(DaemonAPI.Method.presenceReport,
                                     DaemonAPI.PresenceReport(watching: nil, active: false, mayNotify: true))
@@ -158,6 +159,26 @@ struct FakeDeviceLiveTests {
         } catch {
             Issue.record("\(how) \(method): \(error)")
         }
+    }
+
+    /// The Remote's catch-up through the relay, timed (#884): a call for each part, as it
+    /// was, then the parts in the snapshot, as it is.
+    func catchUpTimed(_ away: DaemonClient) async throws {
+        let none = Optional<String>.none
+        var began = ContinuousClock.now
+        _ = try await away.catchUp()
+        _ = try await away.call(DaemonAPI.Method.leasesSnapshot, none)
+        _ = try await away.call(DaemonAPI.Method.mcpHosted, none)
+        _ = try await away.call(DaemonAPI.Method.mcpHealth, none)
+        _ = try await away.call(DaemonAPI.Method.pinsList, DaemonAPI.Empty())
+        _ = try await away.call(DaemonAPI.Method.workflowsList, DaemonAPI.WorkflowsListRequest())
+        _ = try await away.call(DaemonAPI.Method.diskState, none)
+        _ = try await away.call(DaemonAPI.Method.storeNotes, none)
+        print("fake-device: relayed catch-up, a call a part (8 calls) in \(ContinuousClock.now - began)")
+        began = ContinuousClock.now
+        let snapshot = try await away.catchUp(.init(parts: [.workflows, .pins, .leases]))
+        print("fake-device: relayed catch-up, parts in the snapshot (1 call) in \(ContinuousClock.now - began)")
+        #expect(snapshot.carried == [.workflows, .pins, .leases])
     }
 
     /// `AGENTS_FAKE_DEVICE_HOLD=<seconds>`: stay connected through the relay that long, so a
