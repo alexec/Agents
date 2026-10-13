@@ -890,15 +890,19 @@ public actor AppService {
             it once, at the start, and then just write — a Markdown file does not \
             have to exist yet; the page opens empty and fills as you write it. A \
             line you name on a Markdown file takes them to the part of the page that \
-            holds it. For a diagram, write an SVG file beside the document and \
-            reference it as an image.
+            holds it. For a flowchart or a sequence diagram, write it as Mermaid: a \
+            ```mermaid fence in the document, or a file named *.mmd shown here \
+            (graph/flowchart with its node shapes and links, no subgraphs; \
+            sequenceDiagram with participants, messages, notes, loop/alt/opt). For \
+            any other diagram, write an SVG file beside the document and reference \
+            it as an image.
 
             For a chart, show a Vega-Lite spec (a file named *.vl.json: one mark of \
             bar, line, point or area; encoding x, y and an optional color field; \
             data.values inline or data.url naming a CSV beside it), or show a CSV \
             with `chart` saying how to draw it. Either is drawn as a chart, and the \
             conversation shows a card for every file shown here, with a preview of \
-            a chart or a picture.
+            a chart, a diagram or a picture.
 
             It shows; it does not edit, select or run anything. Any other file has \
             to exist, and every file has to be inside the folders this agent was \

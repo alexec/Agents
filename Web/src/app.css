@@ -1195,6 +1195,26 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .chart-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .chart-problem { margin: 0; }
 
+/* A Mermaid diagram (#853), in the Files pane, in a fence and small on the card: our own SVG,
+   in the theme's inks, fitted to the width and never larger than its own size. */
+.mermaid { display: block; margin: 0; }
+.mermaid-svg { display: block; width: 100%; height: auto; }
+.mermaid.compact { width: 100%; height: 100%; padding: 10px; box-sizing: border-box; }
+.mermaid.compact .mermaid-svg { height: 100%; }
+.mermaid-fence { padding: 10px; border-radius: 8px; background: var(--paper-well); margin: 0 0 1em; }
+.mermaid-problem { margin: 0 0 4px; }
+.mermaid-box { fill: color-mix(in srgb, var(--accent) 12%, var(--paper-ground)); stroke: currentColor; stroke-opacity: 0.7; stroke-width: 1; }
+.mermaid-note { fill: color-mix(in srgb, var(--tint-attention) 20%, var(--paper-ground)); }
+.mermaid-frame { fill: none; stroke-opacity: 0.35; }
+.mermaid-line polyline { fill: none; stroke: currentColor; stroke-opacity: 0.7; stroke-width: 1.2; stroke-linejoin: round; }
+.mermaid-dashed > polyline:first-child { stroke-dasharray: 4 3; }
+.mermaid-thick > polyline:first-child { stroke-width: 2.5; }
+.mermaid-line .mermaid-head { fill: currentColor; fill-opacity: 0.7; stroke: none; }
+.mermaid-line .mermaid-head-open { stroke-linecap: round; }
+.mermaid-backing { fill: var(--paper-ground); }
+/* Its font size is the layout's, set on each <text>: the whole diagram scales to fit, words and all. */
+.mermaid-text { fill: currentColor; }
+
 /* Activity ▸ Worktrees (#790): a project's name with Clean up beside it, each row's size at its end. */
 .worktrees .worktrees-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 14px 0 4px; }
 .worktrees .worktree p:first-child { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }

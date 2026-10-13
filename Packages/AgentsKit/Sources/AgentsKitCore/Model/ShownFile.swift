@@ -56,9 +56,11 @@ public struct ShownFile: Codable, Hashable, Sendable {
                   chart: ChartHint(wire: wire?["chart"]))
     }
 
-    /// What the chat's card for it is (#836): a chart and a picture show a preview.
+    /// What the chat's card for it is (#836): a chart, a diagram (#853) and a picture
+    /// show a preview.
     public enum Look: Hashable, Sendable {
         case chart
+        case diagram
         case picture
         case page
         case file
@@ -66,15 +68,17 @@ public struct ShownFile: Codable, Hashable, Sendable {
 
     public var look: Look {
         if ChartSpec.isChart(url, hint: chart) { return .chart }
+        if MermaidDiagram.isMermaid(url) { return .diagram }
         if FileProbe.imageKinds.contains(url.pathExtension.lowercased()) { return .picture }
         if isMarkdown || HTMLPageScope.isHTML(url) { return .page }
         return .file
     }
 
-    /// The card's grey line before the folder: "Bar chart", "Picture", "Page", "File".
+    /// The card's grey line before the folder: "Bar chart", "Diagram", "Picture", "Page", "File".
     public var lookWords: String {
         switch look {
         case .chart: return chart?.mark.words ?? "Chart"
+        case .diagram: return "Diagram"
         case .picture: return "Picture"
         case .page: return "Page"
         case .file: return "File"
