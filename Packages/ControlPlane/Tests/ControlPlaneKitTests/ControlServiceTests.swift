@@ -22,14 +22,12 @@ struct ControlServiceTests {
 
     func start(store: any ControlStore = MemoryStore(), port: Int? = nil, tls: NIOSSLContext? = nil,
                pin: String? = nil, bind: String = "127.0.0.1") async throws -> Running {
-        let chosen: Int
-        if let port { chosen = port } else { chosen = try await freePort() }
-        let port = chosen
-        let url = URL(string: "\(tls == nil ? "http" : "https")://127.0.0.1:\(port)")!
-        let service = try ControlService(.init(store: store, privateKey: control.privateKey, url: url, pin: pin, tls: tls,
-                                               bind: bind, port: port, name: "test", machineID: "m"))
-        try await service.start()
-        return Running(service: service, url: url, port: port)
+        func url(_ port: Int) -> URL { URL(string: "\(tls == nil ? "http" : "https")://127.0.0.1:\(port)")! }
+        let (service, port) = try await started(port: port) { [control] port in
+            try ControlService(.init(store: store, privateKey: control.privateKey, url: url(port), pin: pin, tls: tls,
+                                     bind: bind, port: port, name: "test", machineID: "m"))
+        }
+        return Running(service: service, url: url(port), port: port)
     }
 
     /// Dials and proves `credentials`; the socket after the exchange.
@@ -367,29 +365,60 @@ struct ControlServiceTests {
     }
 }
 
+/// A free port for a listener a test starts later (#949). A port from a port-0 bind is in
+/// the ephemeral range (49152 on macOS, 32768 on Linux), so between the probe and the
+/// listener's bind, or between a stop and the next start (#848), another test's port-0
+/// bind or outgoing connection can be given it: `Address already in use`. This one is
+/// below that range, and no other test in the process is given it again.
 func freePort() async throws -> Int {
-    let channel = try await ServerBootstrap(group: MultiThreadedEventLoopGroup.singleton)
-        .bind(host: "127.0.0.1", port: 0).get()
-    let port = channel.localAddress?.port ?? 0
-    try await channel.close()
-    return port
-}
-
-/// A free port for a test that stops and starts a listener on it (#848). It is below the
-/// ephemeral range (49152 on macOS, 32768 on Linux), so between a stop and the next start
-/// no port-0 bind of another test, such as `freePort()`, can be given it.
-func keptPort() async throws -> Int {
-    for _ in 0..<50 {
+    for _ in 0..<200 {
         let port = Int.random(in: 20000..<32768)
+        guard GivenPorts.shared.take(port) else { continue }
         guard let channel = try? await ServerBootstrap(group: MultiThreadedEventLoopGroup.singleton)
             .bind(host: "127.0.0.1", port: port).get() else { continue }
         try await channel.close()
         return port
     }
-    throw NoKeptPort()
+    throw NoFreePort()
 }
 
-struct NoKeptPort: Error {}
+/// A port for a test that stops and starts a listener on it (#848): any `freePort()` is one.
+func keptPort() async throws -> Int { try await freePort() }
+
+/// Starts the service `make` builds for a port: a `freePort()`, or `port` for a test that
+/// starts again on the one it had. Should the port be taken by the time the service binds
+/// it (#949, seen on CI with no other test holding it), it is another free port, or the
+/// same one a little later.
+func started(port: Int? = nil, _ make: (Int) throws -> ControlService) async throws -> (ControlService, Int) {
+    var attempt = 1
+    while true {
+        let chosen = if let port { port } else { try await freePort() }
+        let service = try make(chosen)
+        do {
+            try await service.start()
+            return (service, chosen)
+        } catch let error as IOError where error.errnoCode == EADDRINUSE && attempt < 10 {
+            await service.stop()
+            print("port \(chosen) was taken by the time it was bound (#949); trying again")
+            attempt += 1
+            try await Task.sleep(for: .milliseconds(100))
+        }
+    }
+}
+
+struct NoFreePort: Error {}
+
+/// The ports `freePort()` has given out in this process.
+final class GivenPorts: @unchecked Sendable {
+    static let shared = GivenPorts()
+    private let lock = NSLock()
+    private var given: Set<Int> = []
+
+    /// True if `port` was not given out before; it is given out now.
+    func take(_ port: Int) -> Bool {
+        lock.withLock { given.insert(port).inserted }
+    }
+}
 
 func eventually(within seconds: Double = 5, _ condition: () async -> Bool) async {
     let deadline = Date().addingTimeInterval(seconds)

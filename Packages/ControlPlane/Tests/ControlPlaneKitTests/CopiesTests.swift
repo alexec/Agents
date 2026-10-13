@@ -22,15 +22,15 @@ struct CopiesTests {
     func copies(_ count: Int = 3, store: any ControlStore = MemoryStore()) async throws -> [Copy] {
         var started: [Copy] = []
         for _ in 0..<count {
-            let port = try await freePort()
-            let url = URL(string: "http://127.0.0.1:\(port)")!
-            var configuration = ControlService.Configuration(store: store, privateKey: control.privateKey, url: url,
-                                                             bind: "127.0.0.1", port: port, name: "copies", machineID: "m",
-                                                             peerURL: url)
-            configuration.copyBeat = 0.2
-            let service = try ControlService(configuration)
-            try await service.start()
-            started.append(Copy(service: service, url: url))
+            let (service, port) = try await ControlPlaneKitTests.started { [control] port in
+                let url = URL(string: "http://127.0.0.1:\(port)")!
+                var configuration = ControlService.Configuration(store: store, privateKey: control.privateKey, url: url,
+                                                                 bind: "127.0.0.1", port: port, name: "copies",
+                                                                 machineID: "m", peerURL: url)
+                configuration.copyBeat = 0.2
+                return try ControlService(configuration)
+            }
+            started.append(Copy(service: service, url: URL(string: "http://127.0.0.1:\(port)")!))
         }
         // Every pair linked.
         for copy in started {

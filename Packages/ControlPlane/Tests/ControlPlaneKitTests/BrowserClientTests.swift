@@ -22,16 +22,17 @@ struct BrowserClientTests {
     }
 
     func start(log: (@Sendable (String) -> Void)? = nil) async throws -> Running {
-        let port = try await freePort()
-        let url = URL(string: "http://127.0.0.1:\(port)")!
-        var configuration = ControlService.Configuration(store: MemoryStore(), privateKey: control.privateKey, url: url,
-                                                         bind: "127.0.0.1", port: port, name: "test", machineID: "m")
-        configuration.web = .init(folder: LoopbackListenerTests.dist, port: 0)
-        configuration.log = log
-        let service = try ControlService(configuration)
-        try await service.start()
+        let (service, port) = try await started { [control] port in
+            var configuration = ControlService.Configuration(
+                store: MemoryStore(), privateKey: control.privateKey, url: URL(string: "http://127.0.0.1:\(port)")!,
+                bind: "127.0.0.1", port: port, name: "test", machineID: "m")
+            configuration.web = .init(folder: LoopbackListenerTests.dist, port: 0)
+            configuration.log = log
+            return try ControlService(configuration)
+        }
         let web = try #require(service.webPort)
-        return Running(service: service, tls: url, web: URL(string: "http://localhost:\(web)")!)
+        return Running(service: service, tls: URL(string: "http://127.0.0.1:\(port)")!,
+                       web: URL(string: "http://localhost:\(web)")!)
     }
 
     /// Dials the loopback listener as a page on it would, and proves `credentials` with the
