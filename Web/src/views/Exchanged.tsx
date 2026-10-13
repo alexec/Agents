@@ -1,13 +1,14 @@
 // What was exchanged with the agent (ArtifactsPane, DocumentView, #258): a file attached
 // to a prompt, or one handed back by name. Derived from the conversation that is read,
-// newest first. A file inside the agent's folders opens in Files, as it is now. Anything
-// else is read here: its own text, a link, or a sentence saying where it is.
+// newest first, as the store folds it while entries land (#946). A file inside the agent's
+// folders opens in Files, as it is now. Anything else is read here: its own text, a link,
+// or a sentence saying where it is.
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
 import {
-  artifactsIn, bytesInWords, destinationOf, insideScope, missingInListing, type Artifact,
+  bytesInWords, destinationOf, insideScope, missingInListing, type Artifact,
 } from "../model/artifacts";
 import { absolutePath } from "../model/fileWatch";
 import { focusedEntry } from "../model/focus";
@@ -22,7 +23,7 @@ export function Exchanged({ store, host, session }: { store: Store; host: string
   const roots = agent
     ? [absolutePath(agent.cwd), ...(agent.additionalDirectories ?? []).map(absolutePath)]
     : [];
-  const artifacts = artifactsIn(store.entries.value);
+  const artifacts = store.artifacts.value;
   const opened = useSignal<string | null>(null);
   const missing = useSignal<ReadonlySet<string>>(new Set());
   const ids = artifacts.map((artifact) => artifact.id).join("\n");
