@@ -5,7 +5,7 @@ import Foundation
 import MCPServerKit
 
 public enum CIWatcher {
-    public static let version = "0.2.0"
+    public static let version = "0.3.0"
 
     static let repoProperty = Schema.Property.string(
         "The GitHub repo, owner/name. Left out, the repo this project's folder pushes to.",
@@ -20,7 +20,7 @@ public enum CIWatcher {
         let poller = EventPoll()
         return MCPServer(
             info: .init(name: "ci-watcher", title: "CI watcher", version: version),
-            instructions: "This repo's pull requests, their CI, and its issues. Events: checks.failed, pr.opened, pr.merged, pr.conflicted, pr.closed, issue.opened, issue.labelled, issue.commented, issue.closed. Tools list pull requests and issues, read logs, rerun failed jobs and comment, as the signed-in gh user.",
+            instructions: "This repo's pull requests, their CI, and its issues. Events: checks.failed, pr.opened, pr.merged, pr.conflicted, pr.closed, issue.opened, issue.labelled, issue.commented, issue.closed. Tools list pull requests and issues, show one pull request, read logs, rerun failed jobs, comment and merge, as the signed-in gh user.",
             tools: tools, resources: resources, events: events,
             extensions: ["io.modelcontextprotocol/ui": [:]],
             callTool: { tool, arguments in await callTool(gh, tool, arguments) },
@@ -269,7 +269,18 @@ public enum CIWatcher {
              description: "Adds a comment to a pull request, as the signed-in person. Say what you changed or why it needs a person.",
              inputSchema: Schema(["repo": repoProperty, "number": .integer("The pull request's number."),
                                   "body": .string("The comment, in Markdown.", maxLength: 65536)], required: ["number", "body"]),
-             meta: ["ui": ["visibility": ["model"]]]),
+             meta: ["ui": ["visibility": ["model", "app"]]]),
+        Tool(name: "get_pr", title: "Show a pull request",
+             description: "One pull request: its description, checks, files, comments and reviews, whether it conflicts with its base, and its review decision. Its view is the PR's page, with Comment and Merge. diff: true adds each file's diff (at most 2000 lines in all).",
+             inputSchema: Schema(["repo": repoProperty, "number": .integer("The pull request's number."),
+                                  "diff": .boolean("true: each file's diff too.")], required: ["number"]),
+             annotations: ["readOnlyHint": true],
+             meta: ["ui": ["resourceUri": "ui://ci/pr", "visibility": ["model", "app"]], "ui/resourceUri": "ui://ci/pr"]),
+        Tool(name: "merge_pr", title: "Merge a pull request",
+             description: "Squash-merges a pull request and deletes its branch on GitHub, as the signed-in person; auto: true merges it once its checks pass. Only a view may call it: a person merges.",
+             inputSchema: Schema(["repo": repoProperty, "number": .integer("The pull request's number."),
+                                  "auto": .boolean("true: merge once its checks pass.")], required: ["number"]),
+             meta: ["ui": ["visibility": ["app"]]]),
     ]
 
     /// A tool's answer; anything that goes wrong, bad arguments included, is `isError` with why.
@@ -286,6 +297,10 @@ public enum CIWatcher {
                 return ToolResult.structured(["issues": .array(try await gh.listIssues(repo: repo, label: a["label"]?.string).map(\.json))])
             case "rerun_failed":
                 return ToolResult.structured(try await gh.rerunFailed(repo: repo, runId: a["runId"]?.int ?? 0))
+            case "get_pr":
+                return ToolResult.structured(try await gh.prDetail(repo: repo, number: a["number"]?.int ?? 0, diff: a["diff"]?.bool == true))
+            case "merge_pr":
+                return ToolResult.structured(try await gh.mergePR(repo: repo, number: a["number"]?.int ?? 0, auto: a["auto"]?.bool == true))
             default:
                 return ToolResult.structured(try await gh.commentOnPR(repo: repo, number: a["number"]?.int ?? 0, body: a["body"]?.string ?? ""))
             }
@@ -306,10 +321,13 @@ public enum CIWatcher {
 
     static let resources: [Resource] = [
         Resource(uri: "ui://ci/board", name: "board", title: "Pull requests",
-                 description: "The repo's open pull requests and their checks, with Rerun on a failing one. Fed by list_prs.",
+                 description: "The repo's open pull requests and their checks, with Rerun on a failing one; a PR's title opens its page. Fed by list_prs.",
                  mimeType: viewMime, meta: viewMeta, text: boardHTML),
         Resource(uri: "ui://ci/issues", name: "issues", title: "Issues",
                  description: "The repo's open issues with their labels; a label narrows the list. Fed by list_issues.",
                  mimeType: viewMime, meta: viewMeta, text: issuesHTML),
+        Resource(uri: "ui://ci/pr", name: "pr", title: "Pull request",
+                 description: "One pull request's page: description, checks, files and diff, comments, with Comment, Merge and Ask the Agent to Fix. Fed by get_pr.",
+                 mimeType: viewMime, meta: viewMeta, text: prHTML),
     ]
 }

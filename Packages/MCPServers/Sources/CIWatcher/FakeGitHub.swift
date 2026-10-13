@@ -174,6 +174,61 @@ public struct FakeGitHub: GitHub {
         return ["rerun": true, "url": .string(runURL(repo, runId))]
     }
 
+    /// A PR's page from its fixture entry as `gh pr view` would give it: its `checks` as one check
+    /// named CI, its `body`, `base`, `files`, `diff`, `reviews` (author, body, state) and the
+    /// comments made with `comment_on_pr`.
+    public func prDetail(repo: String, number: Int, diff: Bool) async throws -> JSON {
+        let data = try load()
+        guard let p = list(data, repo, "prs").first(where: { $0["number"]?.int == number }) else {
+            throw GhError(.notFound, "not found on GitHub")
+        }
+        let run: JSON = switch p["checks"]?.string {
+        case "passing": ["__typename": "CheckRun", "name": "CI", "status": "COMPLETED", "conclusion": "SUCCESS"]
+        case "failing": ["__typename": "CheckRun", "name": "CI", "status": "COMPLETED", "conclusion": "FAILURE",
+                         "detailsUrl": .string(runURL(repo, p["failedRunId"]?.int ?? 0) + "/job/1")]
+        case "running": ["__typename": "CheckRun", "name": "CI", "status": "IN_PROGRESS"]
+        default: .null
+        }
+        let comments: [JSON] = (data["comments"]?.array ?? []).filter { $0["repo"]?.string == repo && $0["number"]?.int == number }
+            .map { ["author": ["login": "alexec"], "body": $0["body"] ?? "", "createdAt": $0["at"] ?? "", "url": ""] }
+        let reviews: [JSON] = (p["reviews"]?.array ?? []).map {
+            ["author": ["login": $0["author"] ?? ""], "body": $0["body"] ?? "", "state": $0["state"] ?? "COMMENTED",
+             "submittedAt": $0["at"] ?? ""]
+        }
+        let state = p["state"]?.string ?? "open"
+        let gh: JSON = [
+            "number": .int(number), "title": p["title"] ?? "", "headRefName": p["branch"] ?? "", "baseRefName": p["base"] ?? "main",
+            "url": p["url"] ?? "", "author": ["login": p["author"] ?? ""], "state": .string(state.uppercased()),
+            "isDraft": .bool(p["draft"]?.bool == true), "body": p["body"] ?? "", "createdAt": p["updatedAt"] ?? "",
+            "additions": .int((p["files"]?.array ?? []).reduce(0) { $0 + ($1["additions"]?.int ?? 0) }),
+            "deletions": .int((p["files"]?.array ?? []).reduce(0) { $0 + ($1["deletions"]?.int ?? 0) }),
+            "mergeable": .string(p["conflicts"]?.bool == true ? "CONFLICTING" : p["conflicts"]?.bool == false ? "MERGEABLE" : "UNKNOWN"),
+            "statusCheckRollup": run == .null ? [] : [run], "files": p["files"] ?? [], "comments": .array(comments),
+            "reviews": .array(reviews), "autoMergeRequest": p["autoMerge"]?.bool == true ? ["mergeMethod": "SQUASH"] : .null,
+        ]
+        return prPage(gh: gh, diff: diff ? p["diff"]?.string ?? "" : nil)
+    }
+
+    /// Merges it at once (state merged, its branch in `deletedBranches`), or with `auto` marks it
+    /// `autoMerge`. One in conflict, merged or closed is refused, as GitHub does.
+    public func mergePR(repo: String, number: Int, auto: Bool) async throws -> JSON {
+        try change { data in
+            var prs = list(data, repo, "prs")
+            guard let i = prs.firstIndex(where: { $0["number"]?.int == number }) else { throw GhError(.notFound, "not found on GitHub") }
+            if prs[i]["state"]?.string != "open" { throw GhError(.failed, "gh: Pull request #\(number) is not open") }
+            if prs[i]["conflicts"]?.bool == true { throw GhError(.failed, "gh: Pull request #\(number) is not mergeable") }
+            if auto {
+                prs[i]["autoMerge"] = true
+            } else {
+                prs[i]["state"] = "merged"
+                prs[i]["mergedAt"] = .string(Time.string(Date()))
+                data["deletedBranches"] = .array((data["deletedBranches"]?.array ?? []) + [prs[i]["branch"] ?? ""])
+            }
+            data["repos"]?[repo]?["prs"] = .array(prs)
+            return ["merged": .bool(!auto), "auto": .bool(auto), "url": prs[i]["url"] ?? ""]
+        }
+    }
+
     public func commentOnPR(repo: String, number: Int, body: String) async throws -> JSON {
         try change { data in
             guard let p = list(data, repo, "prs").first(where: { $0["number"]?.int == number }) else {

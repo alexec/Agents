@@ -163,6 +163,11 @@ public protocol GitHub: Sendable {
     func failedLog(repo: String, runId: Int, job: String?) async throws -> String
     func rerunFailed(repo: String, runId: Int) async throws -> JSON
     func commentOnPR(repo: String, number: Int, body: String) async throws -> JSON
+    /// One pull request as its page shows it (#837): `prPage`'s shape. Each file's `patch` only
+    /// with `diff`.
+    func prDetail(repo: String, number: Int, diff: Bool) async throws -> JSON
+    /// Squash-merges it and deletes its branch; with `auto`, once its checks pass (#837).
+    func mergePR(repo: String, number: Int, auto: Bool) async throws -> JSON
 }
 
 public struct GhError: Error, Sendable, CustomStringConvertible {
@@ -237,6 +242,99 @@ func formatLogs(_ jobs: [(name: String, url: String, log: String)], runId: Int) 
     if jobs.isEmpty { return "No failed jobs in run \(runId)." }
     return jobs.map { "== \($0.name) (\($0.url)), last \(logLines) lines ==\n\(tail(plain($0.log)))" }
         .joined(separator: "\n\n")
+}
+
+// MARK: A pull request's page (#837)
+
+/// The most diff lines a page is sent, all files together; past it a file's `patch` is left out.
+let diffLines = 2000
+
+/// One check of a PR's rollup, as its page lists it: passing, failing, running or skipped.
+func checkRun(_ item: JSON) -> JSON {
+    let state: String
+    if item["__typename"]?.string == "StatusContext" {
+        switch (item["state"]?.string ?? "").uppercased() {
+        case "SUCCESS": state = "passing"
+        case "FAILURE", "ERROR": state = "failing"
+        default: state = "running"
+        }
+        return ["name": .string(item["context"]?.string ?? ""), "state": .string(state), "url": .string(item["targetUrl"]?.string ?? "")]
+    }
+    let conclusion = item["conclusion"]?.string
+    if (item["status"]?.string ?? "").uppercased() != "COMPLETED" { state = "running" }
+    else if isFailed(conclusion) || conclusion?.uppercased() == "ACTION_REQUIRED" { state = "failing" }
+    else if conclusion?.uppercased() == "SUCCESS" { state = "passing" }
+    else { state = "skipped" }
+    return ["name": .string(item["name"]?.string ?? ""), "state": .string(state), "url": .string(item["detailsUrl"]?.string ?? "")]
+}
+
+/// A unified diff as each file's hunks, from its first `@@` on, by the file's new path.
+func patches(_ diff: String) -> [(path: String, lines: [Substring])] {
+    var out = [(path: String, lines: [Substring])]()
+    var inHunks = false
+    for line in diff.split(separator: "\n", omittingEmptySubsequences: false) {
+        if line.hasPrefix("diff --git ") {
+            // `diff --git a/x b/x`: the new path is after the last " b/".
+            let path = line.range(of: " b/", options: .backwards).map { String(line[$0.upperBound...]) } ?? ""
+            out.append((path, []))
+            inHunks = false
+        } else if !out.isEmpty {
+            if line.hasPrefix("@@") { inHunks = true }
+            if inHunks { out[out.count - 1].lines.append(line) }
+        }
+    }
+    return out
+}
+
+/// `gh pr view --json …`'s answer, and `gh pr diff`'s when asked, as the page's JSON.
+public func prPage(gh p: JSON, diff: String?) -> JSON {
+    let (checks, failedRunId) = rollup(p["statusCheckRollup"]?.array)
+    let mergeable = p["mergeable"]?.string
+    let state = (p["state"]?.string ?? "").lowercased()
+    let byPath = diff.map { Dictionary(patches($0).map { ($0.path, $0.lines) }) { a, _ in a } } ?? [:]
+    var budget = diffLines, truncated = false
+    let files: [JSON] = (p["files"]?.array ?? []).map { f in
+        let path = f["path"]?.string ?? ""
+        var file: JSON = ["path": .string(path), "additions": .int(f["additions"]?.int ?? 0), "deletions": .int(f["deletions"]?.int ?? 0)]
+        if diff != nil {
+            let lines = byPath[path] ?? []
+            if lines.count <= budget {
+                file["patch"] = .string(lines.joined(separator: "\n"))
+                budget -= lines.count
+            } else { truncated = true }
+        }
+        return file
+    }
+    let comments = (p["comments"]?.array ?? []).map { c -> (at: String, json: JSON) in
+        let at = c["createdAt"]?.string ?? ""
+        return (at, ["author": .string(c["author"]?["login"]?.string ?? ""), "body": .string(c["body"]?.string ?? ""),
+                     "at": .string(at), "url": .string(c["url"]?.string ?? "")])
+    }
+    // A review with no words and only a COMMENTED state is a line comment's wrapper: not shown.
+    let reviews = (p["reviews"]?.array ?? []).compactMap { r -> (at: String, json: JSON)? in
+        let review = (r["state"]?.string ?? "").lowercased(), body = r["body"]?.string ?? ""
+        if review == "commented" && body.isEmpty || review == "pending" { return nil }
+        let at = r["submittedAt"]?.string ?? ""
+        return (at, ["author": .string(r["author"]?["login"]?.string ?? ""), "body": .string(body), "at": .string(at),
+                     "review": .string(review)])
+    }
+    var page: JSON = [
+        "number": .int(p["number"]?.int ?? 0), "title": .string(p["title"]?.string ?? ""),
+        "branch": .string(p["headRefName"]?.string ?? ""), "base": .string(p["baseRefName"]?.string ?? ""),
+        "url": .string(p["url"]?.string ?? ""), "author": .string(p["author"]?["login"]?.string ?? ""),
+        "state": .string(["merged", "closed"].contains(state) ? state : "open"), "draft": .bool(p["isDraft"]?.bool == true),
+        "body": .string(p["body"]?.string ?? ""), "createdAt": .string(p["createdAt"]?.string ?? ""),
+        "additions": .int(p["additions"]?.int ?? 0), "deletions": .int(p["deletions"]?.int ?? 0),
+        "checks": .string(checks.rawValue), "autoMerge": .bool((p["autoMergeRequest"] ?? .null) != .null),
+        "checkRuns": .array((p["statusCheckRollup"]?.array ?? []).map(checkRun)),
+        "files": .array(files),
+        "comments": .array((comments + reviews).sorted { at($0.at) < at($1.at) }.map(\.json)),
+    ]
+    if let failedRunId { page["failedRunId"] = .int(failedRunId) }
+    if mergeable == "CONFLICTING" { page["conflicts"] = true } else if mergeable == "MERGEABLE" { page["conflicts"] = false }
+    if let decision = p["reviewDecision"]?.string, !decision.isEmpty { page["review"] = .string(decision.lowercased()) }
+    if truncated { page["diffTruncated"] = true }
+    return page
 }
 
 /// The rollup of one PR's checks, as `gh pr list --json statusCheckRollup` gives them.

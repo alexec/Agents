@@ -141,6 +141,16 @@ sandbox as the app's own views.
   *connected*, *ended* or *refused*. Never its command, URL, headers, environment or any
   body.
 
+## The CI watcher's views
+
+The `ci` server's views are drawn as above, on all three clients alike, from its own HTML:
+**Pull requests** (`ui://ci/board`), **Issues** (`ui://ci/issues`) and, since #837, a pull
+request's page (`ui://ci/pr`, fed by `get_pr`): its description, comments, files and diff and
+checks, with **Comment**, **Merge** and **Ask the Agent to Fix**. A title on the board opens
+the same page in place. **Merge** asks again in the page before it squash-merges and deletes the
+branch; **Ask the Agent to Fix** is a `ui/message`, so you send it, and a pin refuses it. The
+contract is `specs/383-mcp-integrations/contracts/ci-watcher-server.md`.
+
 ## The test view
 
 The `agents` server has a test view, `ui://agents/test-view`, for proving all of this on

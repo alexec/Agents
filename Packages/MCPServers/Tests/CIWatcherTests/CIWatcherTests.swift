@@ -455,10 +455,11 @@ func editIssue(_ r: inout JSON, _ number: Int, _ change: (inout JSON) -> Void) {
     @Test func toolsListAnnotationsAndVisibility() async throws {
         let tools = try #require(try await h.ok("tools/list")["tools"]?.array)
         let byName = Dictionary(tools.map { ($0["name"]?.string ?? "", $0) }) { a, _ in a }
-        #expect(byName.keys.sorted() == ["comment_on_pr", "failed_log", "list_issues", "list_prs", "rerun_failed"])
+        #expect(byName.keys.sorted() == ["comment_on_pr", "failed_log", "get_pr", "list_issues", "list_prs", "merge_pr", "rerun_failed"])
         for (name, readOnly, visibility) in [("list_issues", true, ["model", "app"]), ("list_prs", true, ["model", "app"]),
                                              ("failed_log", true, ["model"]), ("rerun_failed", false, ["model", "app"]),
-                                             ("comment_on_pr", false, ["model"])] {
+                                             ("comment_on_pr", false, ["model", "app"]), ("get_pr", true, ["model", "app"]),
+                                             ("merge_pr", false, ["app"])] {
             #expect(byName[name]?["annotations"]?["readOnlyHint"] == (readOnly ? true : nil), "\(name)")
             #expect(byName[name]?["_meta"]?["ui"]?["visibility"] == JSON(visibility), "\(name)")
         }
@@ -635,18 +636,20 @@ func editIssue(_ r: inout JSON, _ number: Int, _ change: (inout JSON) -> Void) {
         #expect(ms > 50000 && ms <= 60000)
     }
 
-    @Test(arguments: [("list_prs", "ui://ci/board", ["rerun_failed", "list_prs"]), ("list_issues", "ui://ci/issues", ["list_issues", "agents/start-agent", "Start Agent", "--add-assignee @me"])])
+    @Test(arguments: [("list_prs", "ui://ci/board", ["rerun_failed", "list_prs", "get_pr", "merge_pr", "‹ Pull requests"]),
+                      ("list_issues", "ui://ci/issues", ["list_issues", "agents/start-agent", "Start Agent", "--add-assignee @me"]),
+                      ("get_pr", "ui://ci/pr", ["get_pr", "merge_pr", "comment_on_pr", "ui/message", "Ask the Agent to Fix"])])
     func toolFeedsItsViewWhichResourcesReadServes(tool: String, uri: String, words: [String]) async throws {
         let tools = try await h.ok("tools/list")["tools"]?.array ?? []
         let fed = try #require(tools.first { $0["name"] == .string(tool) })
         #expect(fed["_meta"]?["ui"]?["resourceUri"] == .string(uri))
         #expect(fed["_meta"]?["ui/resourceUri"] == .string(uri))
-        for t in tools where !["list_prs", "list_issues"].contains(t["name"]?.string ?? "") {
+        for t in tools where !["list_prs", "list_issues", "get_pr"].contains(t["name"]?.string ?? "") {
             #expect(t["_meta"]?["ui"]?["resourceUri"] == nil)
         }
 
         let resources = try await h.ok("resources/list")["resources"]?.array ?? []
-        #expect(resources.compactMap { $0["uri"]?.string } == ["ui://ci/board", "ui://ci/issues"])
+        #expect(resources.compactMap { $0["uri"]?.string } == ["ui://ci/board", "ui://ci/issues", "ui://ci/pr"])
         let listed = try #require(resources.first { $0["uri"] == .string(uri) })
         #expect(listed["mimeType"] == "text/html;profile=mcp-app")
         #expect(listed["text"] == nil)
@@ -663,10 +666,88 @@ func editIssue(_ r: inout JSON, _ number: Int, _ change: (inout JSON) -> Void) {
         for word in ["ui/initialize", "ui/notifications/initialized", "ui/notifications/tool-result", "ui/open-link"] + words {
             #expect(text.contains(word), "\(word)")
         }
-        #expect(text.range(of: #"fetch\(|XMLHttpRequest|WebSocket|<script src|<link "#, options: .regularExpression) == nil,
-                "the view has no network")
+        #expect(text.range(of: #"fetch\(|XMLHttpRequest|WebSocket|<script src|<link |innerHTML"#, options: .regularExpression) == nil,
+                "the view has no network, and draws GitHub's words only as text")
+        #expect(!text.contains("\\#("), "every shared piece is filled in")
 
         let missing = await h.rpc("resources/read", ["uri": "ui://ci/nope"])
         #expect(missing["error"]?["code"] == -32002)
+    }
+
+    @Test func getPrGivesThePageWithoutTheDiffUnlessAsked() async throws {
+        let page = try await h.call("get_pr", ["repo": .string(repo), "number": 402])["structuredContent"] ?? [:]
+        #expect(page["number"] == 402)
+        #expect(page["branch"] == "agents/queue-helpers")
+        #expect(page["base"] == "main")
+        #expect(page["state"] == "open")
+        #expect(page["body"]?.string?.hasPrefix("Helpers past the limit") == true)
+        #expect(page["checks"] == "failing")
+        #expect(page["failedRunId"] == 9001)
+        #expect(page["checkRuns"] == [["name": "CI", "state": "failing", "url": .string("https://github.com/\(repo)/actions/runs/9001/job/1")]])
+        #expect(page["additions"] == 3)
+        #expect(page["deletions"] == 1)
+        #expect(page["files"]?.array?.map { $0["patch"] } == [nil, nil], "no diff unless asked")
+        #expect(page["comments"] == [["author": "reviewer", "body": "The queue needs a cap.", "at": "2026-10-01T10:30:00Z",
+                                      "review": "changes_requested"]], "a review with no words is left out")
+
+        let diffed = try await h.call("get_pr", ["repo": .string(repo), "number": 402, "diff": true])["structuredContent"] ?? [:]
+        #expect(diffed["files"]?.array?.map { $0["patch"]?.string } == ["@@ -1,3 +1,4 @@\n let limit = 3\n-refuse()\n+queue()\n+wake()",
+                                                                         "@@ -0,0 +1 @@\n+Helpers queue.\n"])
+        #expect(diffed["diffTruncated"] == nil)
+
+        _ = try await h.call("comment_on_pr", ["repo": .string(repo), "number": 402, "body": "Capped."])
+        let after = try await h.call("get_pr", ["repo": .string(repo), "number": 402])["structuredContent"] ?? [:]
+        #expect(after["comments"]?.array?.last?["body"] == "Capped.", "a comment made here is on the page")
+
+        let missing = try await h.call("get_pr", ["repo": .string(repo), "number": 999])
+        #expect(missing["isError"] == true)
+    }
+
+    @Test func prPageReadsGhsAnswerAndCapsTheDiff() {
+        let lines = (0..<2100).map { "+line \($0)" }.joined(separator: "\n")
+        let diff = "diff --git a/a.txt b/a.txt\n@@ -0,0 +1,3 @@\n+a\n+b\n+c\ndiff --git a/big.txt b/big.txt\n@@ -0,0 +1,2100 @@\n" + lines
+        let gh: JSON = [
+            "number": 5, "title": "T", "headRefName": "agents/t", "baseRefName": "main", "url": "u", "author": ["login": "alexec"],
+            "state": "MERGED", "isDraft": false, "body": "", "createdAt": "2026-10-01T00:00:00Z", "additions": 2103, "deletions": 0,
+            "mergeable": "UNKNOWN", "reviewDecision": "APPROVED", "autoMergeRequest": .null,
+            "statusCheckRollup": [
+                ["__typename": "CheckRun", "name": "build", "status": "COMPLETED", "conclusion": "SUCCESS", "detailsUrl": "d"],
+                ["__typename": "CheckRun", "name": "lint", "status": "COMPLETED", "conclusion": "SKIPPED", "detailsUrl": "d"],
+                ["__typename": "StatusContext", "context": "ext", "state": "PENDING", "targetUrl": "t"],
+            ],
+            "files": [["path": "a.txt", "additions": 3, "deletions": 0], ["path": "big.txt", "additions": 2100, "deletions": 0]],
+            "comments": [["author": ["login": "b"], "body": "later", "createdAt": "2026-10-02T00:00:00Z", "url": "c"]],
+            "reviews": [["author": ["login": "r"], "body": "", "state": "APPROVED", "submittedAt": "2026-10-01T12:00:00Z"]],
+        ]
+        let page = prPage(gh: gh, diff: diff)
+        #expect(page["state"] == "merged")
+        #expect(page["checks"] == "running")
+        #expect(page["checkRuns"]?.array?.compactMap { $0["state"]?.string } == ["passing", "skipped", "running"])
+        #expect(page["conflicts"] == nil, "not worked out yet says nothing")
+        #expect(page["review"] == "approved")
+        #expect(page["autoMerge"] == false)
+        #expect(page["files"]?.array?.map { $0["patch"]?.string } == ["@@ -0,0 +1,3 @@\n+a\n+b\n+c", nil], "past 2000 lines a file's diff is left out")
+        #expect(page["diffTruncated"] == true)
+        #expect(page["comments"]?.array?.compactMap { $0["author"]?.string } == ["r", "b"], "oldest first, an approval with no words kept")
+    }
+
+    @Test func mergePrMergesAndDeletesTheBranchOrTurnsOnAutoMerge() async throws {
+        let auto = try await h.call("merge_pr", ["repo": .string(repo), "number": 402, "auto": true])
+        #expect(auto["structuredContent"] == ["merged": false, "auto": true, "url": .string("https://github.com/\(repo)/pull/402")])
+        let page = try await h.call("get_pr", ["repo": .string(repo), "number": 402])["structuredContent"] ?? [:]
+        #expect(page["autoMerge"] == true)
+
+        let merged = try await h.call("merge_pr", ["repo": .string(repo), "number": 401])
+        #expect(merged["structuredContent"]?["merged"] == true)
+        #expect(try h.read()["deletedBranches"] == ["agents/fold-faster"])
+        let prs = try await h.call("list_prs", ["repo": .string(repo)])["structuredContent"]?["prs"]?.array ?? []
+        #expect(!prs.contains { $0["number"] == 401 }, "merged, it leaves the board")
+
+        let again = try await h.call("merge_pr", ["repo": .string(repo), "number": 401])
+        #expect(again["isError"] == true)
+        try h.editRepo { append(&$0, "prs", openPR(712, "agents/stale", ["conflicts": true])) }
+        let conflicted = try await h.call("merge_pr", ["repo": .string(repo), "number": 712])
+        #expect(conflicted["isError"] == true)
+        #expect(conflicted["content"]?.array?.first?["text"]?.string?.contains("not mergeable") == true)
     }
 }

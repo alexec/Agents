@@ -57,7 +57,9 @@ all. The other `pr.*` events are left as they are: their data is a PR's number, 
 | `list_issues` | `repo`, optional `label` | `{ issues: [{number, title, author, labels, url, comments, updatedAt}] }`, open issues newest updated first, at most 100 | `readOnlyHint: true` | `model`, `app`; `_meta.ui.resourceUri: "ui://ci/issues"` |
 | `failed_log` | `repo`, `runId`, optional `job` | The last 300 lines of each failed job's log, as text | `readOnlyHint: true` | `model` |
 | `rerun_failed` | `repo`, `runId` | `{ rerun: true, url }` | none: it changes something | `model`, `app` |
-| `comment_on_pr` | `repo`, `number`, `body` | `{ url }` | none | `model` |
+| `comment_on_pr` | `repo`, `number`, `body` | `{ url }` | none | `model`, `app` (the PR page's **Comment**, #837) |
+| `get_pr` (#837) | `repo`, `number`, optional `diff` | `{number, title, branch, base, url, author, state: "open"\|"merged"\|"closed", draft, body, createdAt, additions, deletions, checks, failedRunId?, conflicts?, review?: "approved"\|"changes_requested"\|"review_required", autoMerge, checkRuns: [{name, state: "passing"\|"failing"\|"running"\|"skipped", url}], files: [{path, additions, deletions, patch?}], diffTruncated?, comments: [{author, body, at, url?, review?}]}`. `comments` are the PR's comments and its reviews with words or a verdict, oldest first; line comments are not in it. With `diff: true`, each file's hunks are its `patch`, at most 2000 lines in all; a file past that has none, and `diffTruncated` is true | `readOnlyHint: true` | `model`, `app`; `_meta.ui.resourceUri: "ui://ci/pr"` |
+| `merge_pr` (#837) | `repo`, `number`, optional `auto` | `{ merged, auto, url }`: `gh pr merge -R repo --squash --delete-branch` (`--auto` with `auto`). `-R` keeps gh off the server's folder, so only the branch on GitHub is deleted | none | `app` only: a person merges, never the model |
 
 ## Resources
 
@@ -66,6 +68,8 @@ all. The other `pr.*` events are left as they are: their data is a PR's number, 
 - It draws `list_prs`'s result as a list: number, title, branch, a check pill, and a **Conflicts** pill on a PR that conflicts with its base (#712).
 - A failing PR has **Rerun**, which calls `rerun_failed` through `tools/call`, and then
   `list_prs` again.
+- A PR's title opens its page (below) in the same view, with **‹ Pull requests** back to a
+  fresh list (#837).
 - Links open through `ui/open-link`.
 - Because `list_prs` is read-only and `app`-visible, the view can be pinned with
   `{repo: "alexec/Agents"}`.
@@ -79,6 +83,23 @@ all. The other `pr.*` events are left as they are: their data is a PR's number, 
   #n (`gh issue view n --repo R`): title", then a line telling the agent to assign the issue
   to itself (`gh issue edit n --repo R --add-assignee @me`); the label `#n`; and a new
   worktree named from "n title". The person starts the agent from the form.
+
+`ui://ci/pr` (#837): one pull request's page, drawing `get_pr`'s result. The board draws the
+same page when a title is clicked.
+- A header with **GitHub ↗** and **Refresh**; `#n` and the title; pills for the state (merged,
+  closed, draft), the checks, **Conflicts**, the review decision and **Auto-merge on**; the
+  branch, its base, the author, its age, `+a −d` and the file count.
+- Three tabs. **Conversation**: the description and the comments and reviews, as text (never
+  HTML). **Files**: one fold a file with its counts; the first time it is opened, `get_pr` is
+  called again with `diff: true` and each fold holds its hunks. **Checks**: each check with its
+  pill and a link to it, and **Rerun Failed** on a failing PR.
+- On an open PR: a text box, **Comment** (`comment_on_pr`), **Ask the Agent to Fix** and
+  **Merge**. **Ask the Agent to Fix** sends `ui/message` with what is to be fixed (the failing
+  checks, changes asked for, a conflict) and the box's words; the host asks the person before
+  it is sent, and refuses it on a pin, which has no agent. **Merge** asks again in the page,
+  "Squash and merge #n into main and delete *branch*?", before `merge_pr`; with checks still
+  running it is **Auto-merge** (`auto: true`). It is off in conflict, on a draft, and while
+  auto-merge is already on.
 
 ## Errors
 
