@@ -95,8 +95,10 @@ private struct Elsewhere: View {
 /// discovered.
 struct ArtifactsList: View {
     @Environment(RemoteModel.self) private var model
+    /// Set in a scene of its own (#888): its session, not the selection.
+    @Environment(\.poppedChat) private var popped
 
-    private var artifacts: [Artifact] { Artifact.all(in: model.entries) }
+    private var artifacts: [Artifact] { Artifact.all(in: model.page(popped).entries) }
 
     var body: some View {
         Group {
@@ -112,7 +114,7 @@ struct ArtifactsList: View {
                             // A file in the agent's folders opens as it is now, on the Page
                             // or in Files, not as the conversation carried it (034 FR-027).
                             Button {
-                                if let agentID = model.selection {
+                                if let agentID = model.chatID(popped) {
                                     model.panes.state(for: agentID).open(file: file, line: nil)
                                 }
                             } label: {
@@ -148,7 +150,7 @@ struct ArtifactsList: View {
     /// here, because the phone has no disk to resolve it against; the Mac holds the real
     /// boundary on every read.
     private func liveFile(_ artifact: Artifact) -> URL? {
-        guard !model.macLacksPanes, let agent = model.selectedAgent,
+        guard !model.macLacksPanes, let agent = model.chatID(popped).flatMap({ model.work.agent($0) }),
               case .file(let url) = artifact.destination else { return nil }
         let path = url.standardizedFileURL.path
         let inside = agent.folderScope.folders.contains { folder in

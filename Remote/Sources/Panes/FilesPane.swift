@@ -17,6 +17,8 @@ import SwiftUI
 /// in (#415). Nothing here can create, rename or delete.
 struct FilesPane: View {
     @Environment(RemoteModel.self) private var model
+    /// Set in a scene of its own (#888): its session, not the selection.
+    @Environment(\.poppedChat) private var popped
     @Environment(\.openURL) private var openURL
     @Environment(\.horizontalSizeClass) private var sizeClass
     let agent: Agent
@@ -79,7 +81,7 @@ struct FilesPane: View {
             await model.files.unwatch(agentID: agent.id, folder: agent.cwd)
         }
         // The change marks follow the conversation and the folder alike (#535).
-        .task(id: ChangeAsk(entries: model.entries.count, folderEvents: model.files.anyChange[agent.id] ?? 0)) {
+        .task(id: ChangeAsk(entries: model.page(popped).entries.count, folderEvents: model.files.anyChange[agent.id] ?? 0)) {
             // A moment's pause, so the folder events of one save are one ask.
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
@@ -182,7 +184,7 @@ struct FilesPane: View {
                let path = agent.pinPath(file.path) {
                 pinButton(path)
             }
-            if let file = state.openFile, !ChangesView.changes(to: file.path, in: model.entries).isEmpty {
+            if let file = state.openFile, !ChangesView.changes(to: file.path, in: model.page(popped).entries).isEmpty {
                 Button("What the agent did") { state.showingChanges = true }
                     .appText(.fine)
                     .buttonStyle(.paper)

@@ -138,6 +138,8 @@ struct SidebarSessionRow: View {
         .modifier(FoldAction(tree: tree, toggle: toggleFold))
         .tag(SidebarItem.session(agent.id))
         .contextMenu { AgentMenuItems(agent: agent) }
+        // Out of the sidebar into a scene of its own, on an iPad (#888).
+        .draggableToNewWindow(agent)
         // Pin or Unpin (#180), from the leading edge, as on the Mac.
         .swipeActions(edge: .leading) {
             if agent.state != .archived {

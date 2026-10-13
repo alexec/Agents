@@ -12,13 +12,20 @@ import UserNotifications
 /// screen locks. A report is sent on a change, never on a timer. It decides nothing.
 @MainActor
 final class PresenceReporter {
-    /// Watching, active, may notify, and the chat open whether in front or not (#203).
-    typealias Report = @MainActor (UUID?, Bool, Bool?, UUID?) async -> Void
+    /// Watching, active, may notify, the chat the main scene has open whether in front or
+    /// not (#203), and the sessions open in scenes of their own (#888).
+    typealias Report = @MainActor (UUID?, Bool, Bool?, UUID?, Set<UUID>) async -> Void
 
     private let report: Report
-    private var last: (watching: UUID?, active: Bool, showing: UUID?)?
+    private var last: (watching: UUID?, active: Bool, showing: UUID?, popped: Set<UUID>)?
     private var active = false
+    /// The main scene's chat.
     private var watching: UUID?
+    /// The sessions in scenes of their own (#888), and the one of them in the key window,
+    /// if one is: that one is what the person is watching while it is.
+    private var popped: Set<UUID> = []
+    private var poppedInFront: UUID?
+    private var inFront: UUID? { poppedInFront ?? watching }
     private var tail: Task<Void, Never>?
 
     init(report: @escaping Report) {
@@ -35,15 +42,22 @@ final class PresenceReporter {
         send()
     }
 
+    /// The sessions open in scenes of their own, and which of them is the key window (#888).
+    func popped(_ ids: Set<UUID>, inFront: UUID?) {
+        popped = ids
+        poppedInFront = inFront.flatMap { ids.contains($0) ? $0 : nil }
+        send()
+    }
+
     /// A fresh connection is a fresh record on the Mac's side, so say it all again.
     func connected() {
         send(force: true)
     }
 
     private func send(force: Bool = false) {
-        let now = (watching: active ? watching : nil, active: active, showing: watching)
+        let now = (watching: active ? inFront : nil, active: active, showing: watching, popped: popped)
         if !force, let last, last.watching == now.watching, last.active == now.active,
-           last.showing == now.showing { return }
+           last.showing == now.showing, last.popped == now.popped { return }
         last = now
         let previous = tail
         tail = Task {
@@ -55,7 +69,7 @@ final class PresenceReporter {
             case .denied: mayNotify = false
             default: mayNotify = nil
             }
-            await report(now.watching, now.active, mayNotify, now.showing)
+            await report(now.watching, now.active, mayNotify, now.showing, now.popped)
         }
     }
 }

@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 223 rows: **150 same**, **45 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 223 rows: **151 same**, **45 by design**, **27 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -106,7 +106,7 @@ The deltas are tracked by 30 issues:
 | Swipe waits for the swipe to close (#74) | Yes | Yes | n/a | **by design** (the page has no swipe) |
 | Mark Read / Unread reaches the agent's host | Per host | Per host: `R/RemoteModel.swift:2493-2507` | Per host: `W/views/SessionMenu.tsx:78` | **same** (#238) |
 | Rename | None | None | None | **same** |
-| A session in a window of its own (#826) | Session ▸ Open in New Window (⌥⌘O) and the row's menu: `A/Sessions/PoppedChatWindow.swift`, its own page of the transcript in `A/Sessions/PoppedChat.swift`, `alsoShowing` in the presence report | Not yet: a scene of its own on the iPad (#888); none on the iPhone, by design | Open in New Tab in the row's menu, the page's own address for one session: `W/views/SessionMenu.tsx` (`sessionTabURL`) | **delta**: remote #888; unwalked |
+| A session in a window of its own (#826) | Session ▸ Open in New Window (⌥⌘O) and the row's menu: `A/Sessions/PoppedChatWindow.swift`, its own page of the transcript in `A/Sessions/PoppedChat.swift`, `alsoShowing` in the presence report | A scene of its own on the iPad (#888): Open in New Window in the row's menu and the chat's ···, or a drag out of the sidebar; its own page of the transcript in `R/Chat/PoppedChat.swift`, `alsoShowing` in the presence report. None on the iPhone, by design | Open in New Tab in the row's menu, the page's own address for one session: `W/views/SessionMenu.tsx` (`sessionTabURL`) | **same**; iPhone **by design**; unwalked on the iPad |
 
 ## Chat turns and turn detail
 

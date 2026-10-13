@@ -255,6 +255,8 @@ struct AgentMenuItems: View {
             }
             .help(AgentsModel.carryOnHelp(for: agent))
         }
+        // In a scene of its own on an iPad (#888), as the Mac's window of its own (#826).
+        OpenInNewWindowButton(agent: agent)
         // Leave it to come back to, or clear it unopened (#70).
         if agent.state == .finished {
             MarkReadButton(agent: agent)

@@ -4,6 +4,8 @@ import SwiftUI
 /// The agent's reported edits and the repository changes, together, as on the Mac (#245).
 struct RemoteChangesPane: View {
     @Environment(RemoteModel.self) private var model
+    /// Set in a scene of its own (#888): its session, not the selection.
+    @Environment(\.poppedChat) private var popped
     let agent: Agent
 
     @State private var list: ChangesList?
@@ -55,7 +57,7 @@ struct RemoteChangesPane: View {
         }
         .onChange(of: model.files.anyChange[agent.id] ?? 0) { revision += 1 }
         .onChange(of: model.files.reconnections) { revision += 1 }
-        .onChange(of: model.entries.count) { revision += 1 }
+        .onChange(of: model.page(popped).entries.count) { revision += 1 }
         .onChange(of: agent.state) { revision += 1 }
         .onChange(of: agent.cwd) { revision += 1 }
     }
