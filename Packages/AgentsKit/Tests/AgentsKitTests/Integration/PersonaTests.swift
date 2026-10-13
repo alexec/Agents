@@ -124,4 +124,21 @@ struct PersonaTests {
         let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go", persona: "gone"))
         #expect(await core.agent(id)?.persona == nil)
     }
+
+    /// This project's own (#909): both read, each with a description, a runtime, labels and a
+    /// prompt.
+    @Test func thisProjectsPersonasAreReadWithNothingWrong() {
+        let repo = URL(filePath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let listed = PersonaFile.list(project: repo, home: nil)
+        #expect(listed.map(\.name) == ["Product Owner", "Scrum Master"])
+        for persona in listed {
+            #expect(persona.problem == nil)
+            #expect(persona.description?.isEmpty == false)
+            #expect(persona.settings.runtimeID == "claude")
+            #expect(!persona.settings.labels.isEmpty)
+            #expect(PersonaFile.find(persona.id, project: repo, home: nil)?.prompt.isEmpty == false)
+        }
+    }
 }
