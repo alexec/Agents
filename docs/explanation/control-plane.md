@@ -66,7 +66,7 @@ plane, and nothing connects in to a host.
 │ projects, agents,         │   │ projects, agents,         │   │ projects, agents,          │
 │ runtimes, files, terminals│   │ runtimes                  │   │ runtimes                   │
 └──────────────┬────────────┘   └───────────────────────────┘   └────────────────────────────┘
-               │ agents-relay, optional (not in this build yet)
+               │ agents-relay, when Relay for my devices is on
                ▼
      your iCloud mailbox ──► iPhone and iPad away from home, and notifications
 ```

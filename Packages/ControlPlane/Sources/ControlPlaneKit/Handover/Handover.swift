@@ -39,6 +39,10 @@ public enum Handover {
         public static let list = "store/list"
         public static let get = "store/get"
         public static let put = "store/put"
+        /// Not a step of a handover: Agents Host's *Relay for my devices* (#809), said over
+        /// the same session because it is the one Agents Host proves with the control
+        /// plane's key. `hosts/setRelay` as an operator would.
+        public static let setRelay = "relay/set"
     }
 
     /// What a copy says of itself, for the one driving to check before each step.
@@ -223,6 +227,13 @@ public enum Handover {
             await service.mesh?.start()
             service.log("took over the control plane at \(service.configuration.url.absoluteString)")
             return try JSONValue.encoding(await status(service))
+
+        case Method.setRelay:
+            guard phase == .serving else { throw refuse("A relay is switched on or off at a copy that is serving.") }
+            let request = try params?.decode(DaemonAPI.HostRelayRequest.self)
+            guard let request else { throw refuse("Say the relay host and whether it relays.") }
+            try await service.methods.setRelay(request, by: "agents-host")
+            return [:]
 
         default:
             throw JSONRPCError(code: JSONRPCError.methodNotFound, message: "\(method) is not part of a handover.")

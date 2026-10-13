@@ -418,6 +418,15 @@ func handover() async {
                 fail("not the same store: \(value("--with") ?? "") doesn't see what \(value("--at") ?? "") wrote")
             }
             print("the same store")
+        case "relay":
+            // Agents Host's Relay for my devices (#809): the relay host switched on or off,
+            // keeping its enrolment, over the session the control plane's key proves.
+            guard let host = value("--host"), arguments.contains("--on") != arguments.contains("--off") else {
+                fail("say --host ID and --on or --off")
+            }
+            let request = DaemonAPI.HostRelayRequest(host: HostID(rawValue: host), relay: arguments.contains("--on"))
+            _ = try await link("--at", pin: "--pin").call(Handover.Method.setRelay, try JSONValue.encoding(request))
+            print("\(host) \(request.relay ? "relays" : "is switched off")")
         case "copy":
             // Either end a copy (https://…, over its handover session) or a store this
             // machine opens (file://…, s3://…).
@@ -435,6 +444,7 @@ func handover() async {
                    agents-control handover announce|forward --at URL [--pin PIN] --endpoint URL [--endpoint-pin PIN] [--days N] [--force]
             (URL may be `self`: the copy serving this store, at the address and pin its settings say)
                    agents-control handover copy --from URL|STORE [--from-pin PIN] --to URL|STORE [--to-pin PIN]
+                   agents-control handover relay --at URL [--pin PIN] --host ID --on|--off
             """)
         }
     } catch {

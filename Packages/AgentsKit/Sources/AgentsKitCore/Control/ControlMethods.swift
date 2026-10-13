@@ -206,6 +206,23 @@ public actor ControlMethods: ControlHandling {
         settings = try await records.changeSettings { $0.homeHost = host }
     }
 
+    /// `hosts/setRelay`, from a client or from Agents Host over the control plane's own key
+    /// (#809): a relay switched on or off, keeping its enrolment.
+    public func setRelay(_ request: DaemonAPI.HostRelayRequest, by: String) async throws {
+        guard var record = await records.host(request.host) else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchHost, message: "No host is called \(request.host.rawValue).")
+        }
+        // Only `agents-relay` carries devices; a host that runs agents cannot start to.
+        guard record.relay != nil else {
+            throw JSONRPCError(code: JSONRPCError.invalidParams, message: "\(record.name) does not relay.")
+        }
+        guard record.relay != request.relay else { return }
+        record.relay = request.relay
+        try await records.save(record)
+        await hooks.relayChanged(request.host)
+        await hooks.changed(ControlEvent(kind: .hostEnrolled, subject: request.host.rawValue, at: Date(), by: by))
+    }
+
     // MARK: ControlHandling
 
     private static let own: Set<String> = [
@@ -351,18 +368,7 @@ public actor ControlMethods: ControlHandling {
             return [:]
         case DaemonAPI.Method.hostsSetRelay:
             let request = try Self.require(params, as: DaemonAPI.HostRelayRequest.self)
-            guard var record = await records.host(request.host) else {
-                throw JSONRPCError(code: DaemonAPI.Failure.noSuchHost, message: "No host is called \(request.host.rawValue).")
-            }
-            // Only `agents-relay` carries devices; a host that runs agents cannot start to.
-            guard record.relay != nil else {
-                throw JSONRPCError(code: JSONRPCError.invalidParams, message: "\(record.name) does not relay.")
-            }
-            record.relay = request.relay
-            try await records.save(record)
-            await hooks.relayChanged(request.host)
-            await hooks.changed(ControlEvent(kind: .hostEnrolled, subject: request.host.rawValue, at: Date(),
-                                             by: caller.client.uuidString))
+            try await setRelay(request, by: caller.client.uuidString)
             return [:]
         case DaemonAPI.Method.hostsRemove:
             let request = try Self.require(params, as: DaemonAPI.HostRequest.self)

@@ -53,13 +53,10 @@ Agents' ◐ cells, and why:
   pause until it wakes, and agents on servers keep working where nothing can reach them
   while the Mac that runs the control plane sleeps. See
   [The control plane](../explanation/control-plane.md).
-- **End-to-end encrypted relay:** built but not switched on. `agents-relay` seals each
-  message so only the control plane and that one device can read it, and carries it
-  through the person's own iCloud, but Agents Host does not start it yet, so its
-  **Relay for my devices** switch is greyed (#809). Until then a phone away from home
-  reaches agents only when the control plane has a public address.
-- **Notifications:** the Mac gets them. The relay that takes them to the iPhone and iPad
-  is not switched on yet (#809), and the web page gets none. See
+- **End-to-end encrypted relay:** Agents Host runs it when **Relay for my devices** is on.
+  It has not yet been checked on a phone away from home.
+- **Notifications:** the Mac gets them. The relay takes them to the iPhone and iPad, which
+  has not yet been checked away from home, and the web page gets none. See
   [Phone and iPad](../explanation/phone-and-ipad.md).
 - **Pull requests:** the ci board lists them. Nothing can be created, reviewed or merged in
   the app.

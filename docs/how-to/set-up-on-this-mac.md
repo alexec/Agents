@@ -95,8 +95,9 @@ To go back, set **Keeps its store** to **On this Mac** and click **Switch Storeâ
   [Add a server](add-a-server.md#add-another-mac).
 - If you used the earlier Agents app on this Mac, Agents Host offers to move your agents,
   devices and servers across. See [Move an existing set-up across](move-an-existing-set-up.md).
-- The **Relay for my devices** row, which lets your iPhone and iPad reach you through
-  iCloud when away, says **Not in this build yet**.
+- To reach your agents from your iPhone and iPad away from home, and to be notified on
+  them, turn on **Relay for my devices**. It is off until you do, and works only where
+  the control plane runs. See [Phone and iPad](../explanation/phone-and-ipad.md).
 
 ## Related
 
