@@ -58,6 +58,8 @@ struct MermaidView: View {
             }
             for (index, words) in label.lines.enumerated() {
                 let y = label.y + lineHeight * (Double(index) + 0.5)
+                // MermaidDiagram sizes every box for words at this size, so a scale step
+                // would spill them out of their shapes. Decorative: part of the picture.
                 context.draw(Text(words).font(.system(size: MermaidDiagram.fontSize)).foregroundStyle(.primary),
                              at: CGPoint(x: label.leading ? label.x : label.x + label.width / 2, y: y),
                              anchor: label.leading ? .leading : .center)
