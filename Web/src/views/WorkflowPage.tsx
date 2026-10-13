@@ -31,6 +31,8 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
   }, [host, folder]);
   const known = store.workflowsKnown(host, folder);
   const summary = store.projectWorkflows(host, folder).find((w) => w.workflow.workflowID === workflowID);
+  // Which half of the page is on show (#863), as the window and the Remote have it.
+  const pane = useSignal<"activity" | "configuration">("activity");
   const runLimit = useSignal(3);
   const runs = useSignal<Agent[]>([]);
   const loadingRuns = useSignal(false);
@@ -139,130 +141,144 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
           {/* The switches write the workflow's file (#125), the window's words. */}
           {!summary.isArchived && <p class="quiet small">{switchesSentence(summary)}</p>}
 
-          <h2 class="section-head">Status</h2>
-          <ul class="status-card">
-            {status.map((line) => (
-              <li key={line.glyph + line.text} class={line.tint ? `tinted ${line.tint}` : undefined}>
-                <span class="glyph" aria-hidden="true">{line.glyph}</span>
-                <span class="what">
-                  <span>{line.text}</span>
-                  {line.detail && <span class="quiet small">{line.detail}</span>}
-                </span>
-                {line.agentID && <button class="link" onClick={() => go({ host, project: folder, session: line.agentID })}>Open the agent →</button>}
-              </li>
-            ))}
-          </ul>
-
-          {workflow.problem && "unreadable" in workflow.problem && <UnreadableFile store={store} host={host} folder={folder} workflowID={workflowID} />}
-
-          <h2 class="section-head">What it does</h2>
-          <RuntimeRow store={store} host={host} summary={summary} disabled={locked} change={change} />
-          <p class="agent-mode">
-            <span>{agentModeWords(workflow.mode)}</span> <code class="quiet">agent: {workflow.mode}</code>
-            {workflow.mode === "standing" && (standing
-              ? <button class="link" onClick={() => go({ host, project: folder, session: standing.id })}>{standing.title ?? "Untitled"} →</button>
-              : <span class="quiet"> · Started on the next run</span>)}
-          </p>
-          <pre class="prompt-text">{workflow.prompt || "(no prompt)"}</pre>
-          <WorkflowSettingsForm store={store} host={host} summary={summary} disabled={locked} problem={problem.value?.workflowID === workflowID ? problem.value.text : null} change={change} />
-          <p class="quiet small">{workflow.problem ? "Its settings can be changed here once its file can be read." : labelsNote(workflow)}</p>
-
-          <h2 class="section-head">Triggers</h2>
-          {workflow.triggers.length === 0 ? <p class="hint">{workflow.problem ? "None could be read from the file." : "None: it runs only by hand, with Run Now."}</p> : (
-            <ul class="triggers">
-              {workflow.triggers.map((trigger, index) => {
-                const filters = triggerFilters(trigger);
-                const scope = scopeLine(trigger, projectName, hostName);
-                return (
-                  <li key={index} class="trigger">
-                    <span class="glyph" aria-hidden="true">{triggerGlyph(trigger)}</span>
-                    <span class="what">
-                      <span>{triggerSummary(trigger)}
-                        {!isSupportedTrigger(trigger) && (
-                          <span class="unknown" title="This version does not know this trigger, so it never runs the workflow"> Unknown</span>
-                        )}
-                      </span>
-                      {filters.length > 0 && (
-                        <span class="filters">{filters.map(([k, v]) => <code key={k}>{k}: {v}</code>)}</span>
-                      )}
-                      {scope && <span class="quiet small">{scope}</span>}
-                      {workflow.mode === "triggering" && isSupportedTrigger(trigger) && <span class="quiet small">{resumedAgent(trigger)}</span>}
-                    </span>
-                    {"schedule" in trigger && <span class="next quiet small">{nextLine(summary, index)}</span>}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-          {(summary.mcpTriggers ?? []).length > 0 && (
-            <ul class="mcp-triggers">
-              {(summary.mcpTriggers ?? []).map((status, index) => {
-                const words = mcpTriggerWords(status, now.value);
-                const missed = mcpMissedWords(status);
-                return (
-                  <li key={index}>
-                    <span class={`small ${words.tint ?? "quiet"}`}><span class="glyph" aria-hidden="true">⌁</span> {words.text}</span>
-                    {missed && (
-                      <span class="small attention">{missed}{" "}
-                        <button class="link" disabled={down}
-                          onClick={() => void store.clearMCPMissed(host, summary, status.name, status.server)}>Clear</button>
-                      </span>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-          <CooldownMenu summary={summary} disabled={locked} change={change} />
-          <p class="quiet small">{cooldown ?? "No cooldown: every trigger runs it, one run at a time."}</p>
-          {workflow.mode !== "triggering" && (
-            <>
-              <WhenDoneMenu summary={summary} disabled={locked} change={change} />
-              <p class="quiet small">{whenDoneSentence(workflow.whenDone ?? "keep")}</p>
-            </>
-          )}
-
-          <h2 class="section-head">Runs on</h2>
-          <p class="quiet small">Every host with this project runs it, unless it is pinned to some of them. The file stores each computer's id, so renaming one does not unpin it.</p>
-          <div class="host-pins">
-            <label class="switch">
-              <input type="checkbox" role="switch" aria-label="Every host" checked={pinned.length === 0} disabled={locked || pinned.length === 0}
-                onChange={() => change({ hosts: [] })} />
-              Every host
-            </label>
-            {rows.map((row) => (
-              <label class="switch" key={row.machineID}>
-                <input type="checkbox" aria-label={row.name} checked={pinned.includes(row.machineID)} disabled={locked}
-                  onChange={(event) => {
-                    const on = (event.currentTarget as HTMLInputElement).checked;
-                    const next = on ? [...pinned, row.machineID] : pinned.filter((id) => id !== row.machineID);
-                    change({ hosts: next });
-                  }} />
-                {row.name}
-              </label>
+          <div class="segmented workflow-panes" role="radiogroup" aria-label="Show">
+            {(["activity", "configuration"] as const).map((p) => (
+              <button key={p} role="radio" aria-checked={pane.value === p} class={pane.value === p ? "on" : ""}
+                onClick={() => { pane.value = p; }}>{p === "activity" ? "Activity" : "Configuration"}</button>
             ))}
           </div>
 
-          {unknown.length > 0 && (
+          {/* Two panes (#863): what it has done, and how it is set up. */}
+          {pane.value === "activity" ? (
             <>
-              <h2 class="section-head">From a later version</h2>
-              <div class="unknown-keys">
-                <p class="quiet small">This version does not understand these lines in the file. They are kept as they are when the page changes it.</p>
-                {unknown.map((line) => <code key={line}>{line}</code>)}
-              </div>
+            <h2 class="section-head">Status</h2>
+            <ul class="status-card">
+              {status.map((line) => (
+                <li key={line.glyph + line.text} class={line.tint ? `tinted ${line.tint}` : undefined}>
+                  <span class="glyph" aria-hidden="true">{line.glyph}</span>
+                  <span class="what">
+                    <span>{line.text}</span>
+                    {line.detail && <span class="quiet small">{line.detail}</span>}
+                  </span>
+                  {line.agentID && <button class="link" onClick={() => go({ host, project: folder, session: line.agentID })}>Open the agent →</button>}
+                </li>
+              ))}
+            </ul>
+
+            {workflow.problem && "unreadable" in workflow.problem && <UnreadableFile store={store} host={host} folder={folder} workflowID={workflowID} />}
+
+            <h2 class="section-head">History</h2>
+            <p class="last-ran quiet small">{lastRanLine(summary)}</p>
+
+            {!loadingRuns.value && runs.value.length === 0 && <p class="hint">Nothing has run yet.</p>}
+            {runs.value.map((agent) => (
+              <SessionRow key={agent.id} agent={agent} chosen={false} onPick={() => go({ host, project: folder, session: agent.id })}
+                extras={rowExtras(store, host, agent)} />
+            ))}
+            {runs.value.length === runLimit.value && <button class="link" disabled={loadingRuns.value}
+              onClick={() => { runLimit.value += 3; }}>Show more</button>}
+            </>
+          ) : (
+            <>
+            <h2 class="section-head">What it does</h2>
+            <RuntimeRow store={store} host={host} summary={summary} disabled={locked} change={change} />
+            <p class="agent-mode">
+              <span>{agentModeWords(workflow.mode)}</span> <code class="quiet">agent: {workflow.mode}</code>
+              {workflow.mode === "standing" && (standing
+                ? <button class="link" onClick={() => go({ host, project: folder, session: standing.id })}>{standing.title ?? "Untitled"} →</button>
+                : <span class="quiet"> · Started on the next run</span>)}
+            </p>
+            <pre class="prompt-text">{workflow.prompt || "(no prompt)"}</pre>
+            <WorkflowSettingsForm store={store} host={host} summary={summary} disabled={locked} problem={problem.value?.workflowID === workflowID ? problem.value.text : null} change={change} />
+            <p class="quiet small">{workflow.problem ? "Its settings can be changed here once its file can be read." : labelsNote(workflow)}</p>
+
+            <h2 class="section-head">Triggers</h2>
+            {workflow.triggers.length === 0 ? <p class="hint">{workflow.problem ? "None could be read from the file." : "None: it runs only by hand, with Run Now."}</p> : (
+              <ul class="triggers">
+                {workflow.triggers.map((trigger, index) => {
+                  const filters = triggerFilters(trigger);
+                  const scope = scopeLine(trigger, projectName, hostName);
+                  return (
+                    <li key={index} class="trigger">
+                      <span class="glyph" aria-hidden="true">{triggerGlyph(trigger)}</span>
+                      <span class="what">
+                        <span>{triggerSummary(trigger)}
+                          {!isSupportedTrigger(trigger) && (
+                            <span class="unknown" title="This version does not know this trigger, so it never runs the workflow"> Unknown</span>
+                          )}
+                        </span>
+                        {filters.length > 0 && (
+                          <span class="filters">{filters.map(([k, v]) => <code key={k}>{k}: {v}</code>)}</span>
+                        )}
+                        {scope && <span class="quiet small">{scope}</span>}
+                        {workflow.mode === "triggering" && isSupportedTrigger(trigger) && <span class="quiet small">{resumedAgent(trigger)}</span>}
+                      </span>
+                      {"schedule" in trigger && <span class="next quiet small">{nextLine(summary, index)}</span>}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {(summary.mcpTriggers ?? []).length > 0 && (
+              <ul class="mcp-triggers">
+                {(summary.mcpTriggers ?? []).map((status, index) => {
+                  const words = mcpTriggerWords(status, now.value);
+                  const missed = mcpMissedWords(status);
+                  return (
+                    <li key={index}>
+                      <span class={`small ${words.tint ?? "quiet"}`}><span class="glyph" aria-hidden="true">⌁</span> {words.text}</span>
+                      {missed && (
+                        <span class="small attention">{missed}{" "}
+                          <button class="link" disabled={down}
+                            onClick={() => void store.clearMCPMissed(host, summary, status.name, status.server)}>Clear</button>
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <CooldownMenu summary={summary} disabled={locked} change={change} />
+            <p class="quiet small">{cooldown ?? "No cooldown: every trigger runs it, one run at a time."}</p>
+            {workflow.mode !== "triggering" && (
+              <>
+                <WhenDoneMenu summary={summary} disabled={locked} change={change} />
+                <p class="quiet small">{whenDoneSentence(workflow.whenDone ?? "keep")}</p>
+              </>
+            )}
+
+            <h2 class="section-head">Runs on</h2>
+            <p class="quiet small">Every host with this project runs it, unless it is pinned to some of them. The file stores each computer's id, so renaming one does not unpin it.</p>
+            <div class="host-pins">
+              <label class="switch">
+                <input type="checkbox" role="switch" aria-label="Every host" checked={pinned.length === 0} disabled={locked || pinned.length === 0}
+                  onChange={() => change({ hosts: [] })} />
+                Every host
+              </label>
+              {rows.map((row) => (
+                <label class="switch" key={row.machineID}>
+                  <input type="checkbox" aria-label={row.name} checked={pinned.includes(row.machineID)} disabled={locked}
+                    onChange={(event) => {
+                      const on = (event.currentTarget as HTMLInputElement).checked;
+                      const next = on ? [...pinned, row.machineID] : pinned.filter((id) => id !== row.machineID);
+                      change({ hosts: next });
+                    }} />
+                  {row.name}
+                </label>
+              ))}
+            </div>
+
+            {unknown.length > 0 && (
+              <>
+                <h2 class="section-head">From a later version</h2>
+                <div class="unknown-keys">
+                  <p class="quiet small">This version does not understand these lines in the file. They are kept as they are when the page changes it.</p>
+                  {unknown.map((line) => <code key={line}>{line}</code>)}
+                </div>
+              </>
+            )}
             </>
           )}
-
-          <h2 class="section-head">History</h2>
-          <p class="last-ran quiet small">{lastRanLine(summary)}</p>
-
-          {!loadingRuns.value && runs.value.length === 0 && <p class="hint">Nothing has run yet.</p>}
-          {runs.value.map((agent) => (
-            <SessionRow key={agent.id} agent={agent} chosen={false} onPick={() => go({ host, project: folder, session: agent.id })}
-              extras={rowExtras(store, host, agent)} />
-          ))}
-          {runs.value.length === runLimit.value && <button class="link" disabled={loadingRuns.value}
-            onClick={() => { runLimit.value += 3; }}>Show more</button>}
         </div>
       </div>
     </section>

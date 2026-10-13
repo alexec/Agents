@@ -22,6 +22,8 @@ try {
   await page.waitFor(`document.querySelector(".row.workflow")`, 30_000);
   await page.eval(`document.querySelector(".row.workflow .pick").click()`);
   await page.waitFor(`document.querySelector(".workflow-page h1")?.textContent === "Nightly sweep"`, 10_000);
+  // The menus are on the Configuration pane (#863).
+  await page.eval(`[...document.querySelectorAll(".workflow-panes button")].find((b) => b.textContent === "Configuration").click()`);
   await page.waitFor(`document.querySelector(".workflow-page select[aria-label='Model']")`, 10_000);
   await sleep(400);
   console.log(`before:\n${front()}`);

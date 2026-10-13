@@ -238,3 +238,11 @@ extension WorkflowSummary {
         }
     }
 }
+
+/// The two halves of a workflow's page (#863): what it has done, and how it is set up.
+/// The page opens on Activity; the Mac and the Remote name them the same, as the web does.
+enum WorkflowPane: String, CaseIterable, Identifiable {
+    case activity = "Activity"
+    case configuration = "Configuration"
+    var id: Self { self }
+}
