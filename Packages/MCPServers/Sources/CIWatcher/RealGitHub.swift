@@ -2,10 +2,14 @@ import Foundation
 import MCPServerKit
 
 /// GitHub through `gh`, as the signed-in person. GET bodies are kept with their ETags, so an
-/// unchanged listing costs no rate limit (GitHub doesn't count 304s).
+/// unchanged listing costs no rate limit (GitHub doesn't count 304s). The listings that events
+/// poll are shared for `sharedFor` (#932): every wait polls on its own, and ten waits on one
+/// repo would otherwise run ten `gh` for the same page.
 public actor RealGitHub: GitHub {
     static let maxPages = 10
     static let perPage = 100
+    /// Under the 30 s poll, so each poll still sees a fresh page.
+    static let sharedFor: Duration = .seconds(25)
     /// How far back past `since` a run may have been created and still be rerun into view.
     static let rerunWindowMs = 24.0 * 3600_000
 
@@ -15,8 +19,18 @@ public actor RealGitHub: GitHub {
     private var repo: Task<String, any Error>?
     /// The signed-in login, asked once it is known: the PR page offers a review only on others' PRs.
     private var viewer: String?
+    /// The polled listings fetched in the last `sharing`, and those being fetched now.
+    private var recent: [String: (at: ContinuousClock.Instant, body: String)] = [:]
+    private var running: [String: Task<String, any Error>] = [:]
+    private let sharing: Duration
+    let gh: @Sendable ([String]) async -> Ran
 
-    public init() {}
+    public init() { self.init(sharedFor: Self.sharedFor, gh: Self.gh) }
+
+    init(sharedFor: Duration, gh: @escaping @Sendable ([String]) async -> Ran) {
+        sharing = sharedFor
+        self.gh = gh
+    }
 
     // MARK: gh
 
@@ -104,7 +118,7 @@ public actor RealGitHub: GitHub {
         for (key, value) in fields { args += ["-f", "\(key)=\(value)"] }
         let cached = cache ? etags[path] : nil
         if let cached { args += ["-H", "If-None-Match: \(cached.etag)"] }
-        let result = await Self.gh(args)
+        let result = await gh(args)
         let res = Self.parse(result.stdout)
         if let res, res.status == 304, let cached { return cached.body }
         if let res, (200..<300).contains(res.status) {
@@ -121,9 +135,25 @@ public actor RealGitHub: GitHub {
         if etagOrder.count > 200 { etags[etagOrder.removeFirst()] = nil }
     }
 
-    func json(_ path: String) async throws -> JSON {
-        let body = try await api(path, cache: true)
+    /// With `shared`, an answer fetched in the last `sharing` is used again, and a fetch already
+    /// running is waited for.
+    func json(_ path: String, shared: Bool = false) async throws -> JSON {
+        let body = shared ? try await self.shared(path) { try await self.api(path, cache: true) }
+            : try await api(path, cache: true)
         do { return try JSON.parse(body) } catch { throw GhError(.failed, "gh: GitHub's answer is not JSON") }
+    }
+
+    func shared(_ key: String, _ fetch: @escaping @Sendable () async throws -> String) async throws -> String {
+        let now = ContinuousClock.now
+        if let kept = recent[key], now - kept.at < sharing { return kept.body }
+        if let task = running[key] { return try await task.value }
+        let task = Task { try await fetch() }
+        running[key] = task
+        defer { running[key] = nil }
+        let body = try await task.value
+        recent = recent.filter { now - $0.value.at < sharing }
+        recent[key] = (ContinuousClock.now, body)
+        return body
     }
 
     /// The PR, and whether its author is one of the repo's own (#728).
@@ -151,7 +181,7 @@ public actor RealGitHub: GitHub {
     func newest(_ path: String, since: String, time: (JSON) -> String?) async throws -> (items: [JSON], truncated: Bool) {
         var items = [JSON]()
         for page in 1...Self.maxPages {
-            let list = try await json("\(path)\(path.contains("?") ? "&" : "?")per_page=\(Self.perPage)&page=\(page)").array ?? []
+            let list = try await json("\(path)\(path.contains("?") ? "&" : "?")per_page=\(Self.perPage)&page=\(page)", shared: true).array ?? []
             for item in list {
                 if at(time(item)) < at(since) { return (items, false) }
                 items.append(item)
@@ -174,7 +204,7 @@ public actor RealGitHub: GitHub {
         var query = "event=pull_request&status=failure&per_page=\(Self.perPage)"
         if let branch { query += "&branch=\(Self.encode(branch))" }
         for page in 1...Self.maxPages {
-            let list = try await json("repos/\(repo)/actions/runs?\(query)&page=\(page)")["workflow_runs"]?.array ?? []
+            let list = try await json("repos/\(repo)/actions/runs?\(query)&page=\(page)", shared: true)["workflow_runs"]?.array ?? []
             for r in list {
                 guard r["status"]?.string == "completed", isFailed(r["conclusion"]?.string),
                       at(r["updated_at"]?.string) >= at(since) else { continue }
@@ -207,8 +237,8 @@ public actor RealGitHub: GitHub {
 
     public func defaultRepo() async throws -> String {
         if let repo { return try await repo.value }
-        let task = Task<String, any Error> {
-            let result = await Self.gh(["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"])
+        let task = Task<String, any Error> { [gh] in
+            let result = await gh(["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"])
             let name = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
             if result.code != 0 || name.isEmpty {
                 throw result.missing ? GhError(.notSignedIn, "gh is not installed")
@@ -226,7 +256,7 @@ public actor RealGitHub: GitHub {
     public func closedPRs(repo: String, since: String) async throws -> (merged: [MergedPR], closed: [ClosedPR], truncated: Bool) {
         var merged = [MergedPR](), closed = [ClosedPR]()
         for page in 1...Self.maxPages {
-            let list = try await json("repos/\(repo)/pulls?state=closed&sort=updated&direction=desc&per_page=\(Self.perPage)&page=\(page)").array ?? []
+            let list = try await json("repos/\(repo)/pulls?state=closed&sort=updated&direction=desc&per_page=\(Self.perPage)&page=\(page)", shared: true).array ?? []
             for p in list {
                 if at(p["updated_at"]?.string) < at(since) { return (merged, closed, false) }
                 let pr = PR(number: p["number"]?.int ?? 0, title: p["title"]?.string ?? "",
@@ -243,10 +273,13 @@ public actor RealGitHub: GitHub {
     }
 
     public func listPRs(repo: String) async throws -> [BoardPR] {
-        let result = await Self.gh(["pr", "list", "-R", repo, "--state", "open", "--limit", "100",
-                                    "--json", "number,title,headRefName,statusCheckRollup,url,mergeable"])
-        if result.code != 0 { throw Self.failure(result.missing, result.stderr, nil) }
-        let list = (try? JSON.parse(result.stdout))?.array ?? []
+        let stdout = try await shared("pr list \(repo)") { [gh] in
+            let result = await gh(["pr", "list", "-R", repo, "--state", "open", "--limit", "100",
+                                   "--json", "number,title,headRefName,statusCheckRollup,url,mergeable"])
+            if result.code != 0 { throw Self.failure(result.missing, result.stderr, nil) }
+            return result.stdout
+        }
+        let list = (try? JSON.parse(stdout))?.array ?? []
         return list.map { p in
             let (checks, failedRunId) = rollup(p["statusCheckRollup"]?.array)
             // UNKNOWN while GitHub works it out: neither yes nor no.
@@ -261,7 +294,7 @@ public actor RealGitHub: GitHub {
     public func openPRs(repo: String) async throws -> [OpenPR] {
         var out = [OpenPR]()
         for page in 1...Self.maxPages {
-            let list = try await json("repos/\(repo)/pulls?state=open&sort=created&direction=desc&per_page=\(Self.perPage)&page=\(page)").array ?? []
+            let list = try await json("repos/\(repo)/pulls?state=open&sort=created&direction=desc&per_page=\(Self.perPage)&page=\(page)", shared: true).array ?? []
             for p in list {
                 out.append(OpenPR(pr: PR(number: p["number"]?.int ?? 0, title: p["title"]?.string ?? "",
                                          branch: p["head"]?["ref"]?.string ?? "", url: p["html_url"]?.string ?? ""),
@@ -359,14 +392,14 @@ public actor RealGitHub: GitHub {
     }
 
     public func prDetail(repo: String, number: Int, diff: Bool) async throws -> JSON {
-        let view = await Self.gh(["pr", "view", String(number), "-R", repo, "--json",
+        let view = await gh(["pr", "view", String(number), "-R", repo, "--json",
                                   "number,title,headRefName,baseRefName,url,author,state,isDraft,body,createdAt,additions,deletions,"
                                       + "mergeable,reviewDecision,statusCheckRollup,files,comments,reviews,autoMergeRequest"])
         if view.code != 0 { throw Self.failure(view.missing, view.stderr, nil) }
         guard let p = try? JSON.parse(view.stdout) else { throw GhError(.failed, "gh: GitHub's answer is not JSON") }
         var text: String?
         if diff {
-            let ran = await Self.gh(["pr", "diff", String(number), "-R", repo, "--color", "never"])
+            let ran = await gh(["pr", "diff", String(number), "-R", repo, "--color", "never"])
             if ran.code != 0 { throw Self.failure(ran.missing, ran.stderr, nil) }
             text = ran.stdout
         }
@@ -378,7 +411,7 @@ public actor RealGitHub: GitHub {
     /// `gh api user`'s login, or nil when gh can't say: the page then offers no review.
     func viewerLogin() async -> String? {
         if let viewer { return viewer }
-        let ran = await Self.gh(["api", "user", "-q", ".login"])
+        let ran = await gh(["api", "user", "-q", ".login"])
         let login = ran.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
         guard ran.code == 0, !login.isEmpty else { return nil }
         viewer = login
@@ -387,7 +420,7 @@ public actor RealGitHub: GitHub {
 
     public func reviewPR(repo: String, number: Int, event: ReviewEvent, body: String) async throws -> JSON {
         let verdict = event == .approve ? "--approve" : "--request-changes"
-        let ran = await Self.gh(["pr", "review", String(number), "-R", repo, verdict] + (body.isEmpty ? [] : ["-b", body]))
+        let ran = await gh(["pr", "review", String(number), "-R", repo, verdict] + (body.isEmpty ? [] : ["-b", body]))
         if ran.code != 0 { throw Self.failure(ran.missing, ran.stderr, nil) }
         return ["event": .string(event.rawValue), "url": .string("https://github.com/\(repo)/pull/\(number)")]
     }
@@ -395,7 +428,7 @@ public actor RealGitHub: GitHub {
     public func mergePR(repo: String, number: Int, auto: Bool) async throws -> JSON {
         // -R keeps gh off the server's own folder: it deletes the branch on GitHub only, and never
         // checks out or deletes a local branch.
-        let ran = await Self.gh(["pr", "merge", String(number), "-R", repo, "--squash", "--delete-branch"] + (auto ? ["--auto"] : []))
+        let ran = await gh(["pr", "merge", String(number), "-R", repo, "--squash", "--delete-branch"] + (auto ? ["--auto"] : []))
         if ran.code != 0 { throw Self.failure(ran.missing, ran.stderr, nil) }
         return ["merged": .bool(!auto), "auto": .bool(auto), "url": .string("https://github.com/\(repo)/pull/\(number)")]
     }
@@ -412,7 +445,7 @@ public actor RealGitHub: GitHub {
     public func branchesWithoutPR(repo: String) async throws -> (base: String, branches: [Branch]) {
         let parts = repo.split(separator: "/", maxSplits: 1).map(String.init)
         guard parts.count == 2 else { throw GhError(.notFound, "repo is owner/name") }
-        let ran = await Self.gh(["api", "graphql", "-f", "query=\(Self.branchQuery)", "-F", "owner=\(parts[0])", "-F", "name=\(parts[1])"])
+        let ran = await gh(["api", "graphql", "-f", "query=\(Self.branchQuery)", "-F", "owner=\(parts[0])", "-F", "name=\(parts[1])"])
         if ran.code != 0 { throw Self.failure(ran.missing, ran.stderr, nil) }
         guard let answer = try? JSON.parse(ran.stdout) else { throw GhError(.failed, "gh: GitHub's answer is not JSON") }
         if let error = answer["errors"]?.array?.first?["message"]?.string { throw GhError(.failed, "gh: \(error)") }
@@ -427,7 +460,7 @@ public actor RealGitHub: GitHub {
     }
 
     public func createPR(repo: String, branch: String, base: String, title: String, body: String, draft: Bool) async throws -> JSON {
-        let ran = await Self.gh(["pr", "create", "-R", repo, "--head", branch, "--base", base, "--title", title, "--body", body]
+        let ran = await gh(["pr", "create", "-R", repo, "--head", branch, "--base", base, "--title", title, "--body", body]
                                 + (draft ? ["--draft"] : []))
         if ran.code != 0 { throw Self.failure(ran.missing, ran.stderr, nil) }
         // gh says the new PR's URL last.
