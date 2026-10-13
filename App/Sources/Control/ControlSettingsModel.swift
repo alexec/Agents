@@ -15,6 +15,8 @@ final class ControlSettingsModel {
     private(set) var providers: [DaemonAPI.ProviderSummary] = []
     /// False on a control plane that can't run providers (several copies, research R4).
     private(set) var providersHere = true
+    /// Write It for Me (#858): where each draft this window started stands, by its id.
+    private(set) var drafts: [UUID: DaemonAPI.ProviderDraftUpdate] = [:]
     /// Servers added from a provider's workspace (Add as Host…), by name: linked to it once
     /// they join.
     private var linkOnJoin: [String: (provider: ProviderID, workspace: String)] = [:]
@@ -62,6 +64,12 @@ final class ControlSettingsModel {
                 for await note in self.client.notifications() where note.method.hasPrefix("control/") {
                     if note.method == DaemonAPI.Notification.controlInstallProgress {
                         self.installStep = note.params?["step"]?.stringValue
+                        continue
+                    }
+                    if note.method == DaemonAPI.Notification.controlProviderDraft {
+                        if let update = try? note.params?.decode(DaemonAPI.ProviderDraftUpdate.self) {
+                            self.drafts[update.draft] = update
+                        }
                         continue
                     }
                     if note.method == DaemonAPI.Notification.controlProvidersChanged,
@@ -139,6 +147,44 @@ final class ControlSettingsModel {
             return "The control plane can’t be reached."
         }
     }
+
+    // MARK: Write It for Me (#858)
+
+    /// The runtimes that can write here, and the host they run on; nil when the control
+    /// plane can't be reached.
+    func writerRuntimes() async -> DaemonAPI.ProviderRuntimes? {
+        try? await client.call(DaemonAPI.Method.providersRuntimes, DaemonAPI.Empty(), returning: DaemonAPI.ProviderRuntimes.self)
+    }
+
+    /// Starts a draft: answered at once when no agent is needed, or why it can't start.
+    func startDraft(_ request: DaemonAPI.ProviderDraftStart) async -> Result<DaemonAPI.ProviderDraftStarted, DraftRefusal> {
+        do {
+            let started = try await client.call(DaemonAPI.Method.providersDraftStart, request,
+                                                returning: DaemonAPI.ProviderDraftStarted.self)
+            return .success(started)
+        } catch let error as JSONRPCError {
+            return .failure(DraftRefusal(message: HostProblem.controlRefusal(error)))
+        } catch {
+            return .failure(DraftRefusal(message: "The control plane can’t be reached."))
+        }
+    }
+
+    struct DraftRefusal: Error {
+        var message: String
+    }
+
+    /// × , Back and Cancel: the agent stops and the draft goes.
+    func cancelDraft(_ id: UUID) async {
+        _ = try? await client.call(DaemonAPI.Method.providersDraftCancel, DaemonAPI.ProviderDraftRequest(draft: id))
+        drafts[id] = nil
+    }
+
+    func answerDraft(_ id: UUID, question: UUID, yes: Bool) async {
+        _ = try? await client.call(DaemonAPI.Method.providersDraftAnswer,
+                                   DaemonAPI.ProviderDraftAnswer(draft: id, question: question, yes: yes))
+    }
+
+    func forgetDraft(_ id: UUID) { drafts[id] = nil }
 
     func removeProvider(_ id: ProviderID) async {
         await perform(DaemonAPI.Method.providersRemove, DaemonAPI.ProviderRequest(id: id))

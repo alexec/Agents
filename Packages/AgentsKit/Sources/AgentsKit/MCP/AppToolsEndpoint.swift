@@ -33,10 +33,13 @@ public final class AppToolsEndpoint: @unchecked Sendable {
     public struct Grant: Equatable, Sendable {
         public var managesAgents: Bool
         public var movesItself: Bool
+        /// The agent writing a provider's map (#858): the writer's tools only.
+        public var writer: Bool
 
-        public init(managesAgents: Bool = true, movesItself: Bool = true) {
+        public init(managesAgents: Bool = true, movesItself: Bool = true, writer: Bool = false) {
             self.managesAgents = managesAgents
             self.movesItself = movesItself
+            self.writer = writer
         }
     }
 
@@ -78,7 +81,7 @@ public final class AppToolsEndpoint: @unchecked Sendable {
     /// and takes the new tools from its next `tools/list`.
     public func grant(_ token: String, _ grant: Grant) {
         let service = AppService.relaying(token: token, managesAgents: grant.managesAgents,
-                                          movesItself: grant.movesItself, relay: relay)
+                                          movesItself: grant.movesItself, writer: grant.writer, relay: relay)
         lock.withLock {
             let holder = Holder(grant: grant, service: service)
             holder.sessions = holders[token]?.sessions ?? []

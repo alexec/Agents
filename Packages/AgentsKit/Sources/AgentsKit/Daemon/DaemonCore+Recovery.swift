@@ -81,7 +81,7 @@ extension DaemonCore {
             // after the ending, not the one this loop was handed. Every chat the
             // daemon took comes back, however many builds it has been through (Alex,
             // 2026-09-21) — all but the crash loop above.
-            guard let updated = agents[id], updated.mayBePickedUpAfterRestart else { continue }
+            guard let updated = agents[id], updated.mayBePickedUpAfterRestart, updated.purpose == nil else { continue }
             // What it was doing, kept for as long as it takes to tell it: an agent cut
             // off mid-turn and one cut off holding a question open have different
             // things to be told.
@@ -100,6 +100,8 @@ extension DaemonCore {
         let leaseEvents = loadLeasesIfNeeded()
         leasesChanged()
         await settle(leaseEvents)
+        // A writer's draft did not outlive the last daemon (#858).
+        await settleWriters()
         return recovered
     }
 

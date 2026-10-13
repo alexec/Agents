@@ -73,11 +73,24 @@ public struct ProviderRecord: Codable, Hashable, Sendable, Identifiable {
     public var contract: Int
     public var rev: Int
     public var forgotten: Bool?
+    /// Set when the map or commands were kept as an agent wrote them at Add Provider (#858).
+    public var writtenBy: WrittenBy?
+
+    /// Who wrote a provider's map or commands, when it was an agent (#858).
+    public struct WrittenBy: Codable, Hashable, Sendable {
+        public var runtimeID: String
+        public var at: Date
+        public init(runtimeID: String, at: Date) {
+            self.runtimeID = runtimeID
+            self.at = at
+        }
+    }
 
     public init(id: ProviderID, name: String, kind: Kind, command: String? = nil, args: [String]? = nil,
                 url: String? = nil, headers: [String: String]? = nil, commands: JSONValue? = nil,
                 secretNames: [String] = [], map: JSONValue? = nil, capabilities: [String] = [],
-                contract: Int = 1, rev: Int = 0, forgotten: Bool? = nil) {
+                contract: Int = 1, rev: Int = 0, forgotten: Bool? = nil, writtenBy: WrittenBy? = nil) {
+        self.writtenBy = writtenBy
         self.id = id
         self.name = name
         self.kind = kind
@@ -140,6 +153,14 @@ public protocol WorkspaceHandling: Sendable {
     /// An agent on `host` asked through its workspace tools (US6): one of
     /// `agentWorkspaceMethods`, logged as that agent's.
     func agentCall(from host: HostID, agent: String, method: String, params: JSONValue) async throws -> JSONValue
+    /// A writing agent on `host` called one of the writer's tools (#858).
+    func draftCall(from host: HostID, call: DaemonAPI.HostProviderDraftCall) async throws -> JSONValue
+}
+
+public extension WorkspaceHandling {
+    func draftCall(from host: HostID, call: DaemonAPI.HostProviderDraftCall) async throws -> JSONValue {
+        throw JSONRPCError(code: DaemonAPI.Failure.notSupported, message: "This control plane has no drafts.")
+    }
 }
 
 public extension DaemonAPI.Method {
@@ -147,7 +168,8 @@ public extension DaemonAPI.Method {
     static let providersList = "providers/list"
     /// `ProviderAdd` → `ProviderSummary`, once the server has been checked and has listed.
     static let providersAdd = "providers/add"
-    /// `ProviderAdd` with `id`; secrets left out are kept.
+    /// `ProviderAdd` with `id`; secrets left out are kept, and so are its command, address,
+    /// headers, and map or commands (#858).
     static let providersUpdate = "providers/update"
     /// `ProviderRequest`. Its hosts stay, unlinked.
     static let providersRemove = "providers/remove"
@@ -176,6 +198,7 @@ public extension DaemonAPI.Method {
         hostsLink, hostsUnlink, hostsSetWorkspaceOptions, hostsStart, hostsStop,
         hostsKeep, hostsListKept, hostsDropKept, hostsRetryKept,
         providersOptions, providersCreate, hostsDeleteWorkspace,
+        providersDraftStart, providersDraftCancel, providersDraftAnswer, providersRuntimes,
     ]
 }
 
@@ -323,10 +346,18 @@ public extension DaemonAPI {
         public var map: JSONValue?
         /// Name to value. Only ever sent to the control plane; never given back.
         public var secrets: [String: String]?
+        /// Your commands: the program its commands use, for Write It for Me (#858). Not kept.
+        public var cli: String?
+        /// The draft this accepts (#858): its map or commands, unchanged, mark the record
+        /// `writtenBy`.
+        public var draft: UUID?
 
         public init(id: ProviderID? = nil, name: String, kind: ProviderRecord.Kind, command: String? = nil,
                     args: [String]? = nil, url: String? = nil, headers: [String: String]? = nil,
-                    commands: JSONValue? = nil, map: JSONValue? = nil, secrets: [String: String]? = nil) {
+                    commands: JSONValue? = nil, map: JSONValue? = nil, secrets: [String: String]? = nil,
+                    cli: String? = nil, draft: UUID? = nil) {
+            self.cli = cli
+            self.draft = draft
             self.id = id
             self.name = name
             self.kind = kind

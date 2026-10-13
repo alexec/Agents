@@ -212,6 +212,9 @@ extension DaemonCore {
                labelOwner: SessionLabel.Owner? = nil,
                workflow: (id: String, run: UUID)? = nil,
                queued queuedID: UUID? = nil) async throws -> UUID {
+        // A writer (#858) works in a folder of its own, with nothing of a project's.
+        var request = request
+        if let purpose = request.purpose { request = try writerStart(request, purpose) }
         let initialLabels: [SessionLabel]
         do {
             initialLabels = try SessionLabelPolicy.change(
@@ -295,7 +298,8 @@ extension DaemonCore {
                                               additionalDirectories: request.additionalDirectories,
                                               mcpServers: request.mcpServers,
                                               managesAgents: starter == nil,
-                                              sandbox: sandbox.choice)
+                                              sandbox: sandbox.choice,
+                                              purpose: request.purpose)
             } catch {
                 await undoWorktree(placed, for: request.worktree)
                 throw error
@@ -338,6 +342,7 @@ extension DaemonCore {
                           worktree: placed?.worktree,
                           startRequestID: request.requestID)
         agent.labels = initialLabels
+        agent.purpose = request.purpose
         if let waited {
             // As the person may have left it while it waited.
             agent.title = waited.title ?? agent.title
@@ -383,7 +388,7 @@ extension DaemonCore {
         // Where its changes will be measured from (035), asked for beside the start
         // rather than inside it: a start waits for nothing it does not need, and git
         // answers in milliseconds where a runtime takes seconds to make its first edit.
-        Task { [self] in await takeStartingPoint(for: agent.id, in: cwd) }
+        if request.purpose == nil { Task { [self] in await takeStartingPoint(for: agent.id, in: cwd) } }
         // The runtime was given this token before the agent existed. Now it means
         // something, and until this line a call carrying it is refused.
         bindAppToken(appToken, to: agent.id)
@@ -395,8 +400,9 @@ extension DaemonCore {
         if let worktree = placed?.worktree {
             await record(.runtimeNote(Self.worktreeNote(worktree)), for: agent.id)
         }
-        // The first prompt of the conversation is the one that carries the briefing.
-        needsBriefing.insert(agent.id)
+        // The first prompt of the conversation is the one that carries the briefing. A
+        // writer's prompt is its whole briefing: it has none of the tools this one names.
+        if request.purpose == nil { needsBriefing.insert(agent.id) }
         listen(to: session, agentID: agent.id)
         await prepareServing(session, agentID: agent.id)
 
@@ -456,7 +462,8 @@ extension DaemonCore {
                               additionalDirectories: [URL] = [],
                               mcpServers: [MCPServer] = [],
                               managesAgents: Bool = true,
-                              sandbox: SandboxChoice = .runtime) async throws -> MadeSession {
+                              sandbox: SandboxChoice = .runtime,
+                              purpose: AgentPurpose? = nil) async throws -> MadeSession {
         guard let runtime = RuntimeCatalog.runtime(id: runtimeID) else {
             throw JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound,
                                message: "There is no runtime called \(runtimeID).")
@@ -469,7 +476,7 @@ extension DaemonCore {
         try refuseOutsideRoot(cwd)
         // Before the runtime reads the folder, so a folder that became a project by an
         // agent running in it has the layout by the first turn.
-        layOutOnce(cwd)
+        if purpose == nil { layOutOnce(cwd) }
         // And the person's own `~/.agents`, so a skill added since the last start is here (054).
         reconcileHome()
         linkGeminiProjectPlugins(runtimeID: runtimeID, cwd: cwd)
@@ -497,13 +504,19 @@ extension DaemonCore {
             noteAccount(runtimeID: runtimeID, from: handshake)
             let token = mintAppToken()
             minted = token
-            let servers = try await sessionServers(runtimeID: runtimeID, chosen: mcpServers, token: token,
-                                                   managesAgents: managesAgents, cwd: cwd,
-                                                   capabilities: handshake.agentCapabilities?.mcpCapabilities)
+            // A writer (#858) has the app's server, offering the writer's tools, and no other.
+            let servers = purpose != nil
+                ? try await writerServers(runtimeID: runtimeID, token: token,
+                                          capabilities: handshake.agentCapabilities?.mcpCapabilities)
+                : try await sessionServers(runtimeID: runtimeID, chosen: mcpServers, token: token,
+                                           managesAgents: managesAgents, cwd: cwd,
+                                           capabilities: handshake.agentCapabilities?.mcpCapabilities)
             let result = try await session.newSession(cwd: cwd,
                                                       additionalDirectories: additionalDirectories,
                                                       mcpServers: servers,
-                                                      meta: sessionMeta(runtimeID: runtimeID, cwd: cwd,
+                                                      meta: purpose != nil
+                                                          ? writerSessionMeta(runtimeID: runtimeID, sandbox: sandbox)
+                                                          : sessionMeta(runtimeID: runtimeID, cwd: cwd,
                                                                         sandbox: sandbox))
             return MadeSession(session: session, sessionID: result.sessionId,
                                runtime: runtime, appToken: token)

@@ -339,6 +339,50 @@ public final class ControlService: @unchecked Sendable {
                 log: { [weak self] in self?.log($0) })
         }
         hooks.workspaces = providers
+        // Write It for Me (#858): an agent on this machine's own host writes a map.
+        if let providers, await providers.drafts == nil, let home = configuration.providerHome {
+            let commandProvider = configuration.commandProvider
+            let timing = configuration.providerTiming
+            let drafts = ProviderDrafts(hooks: .init(
+                connect: { [weak self] record, secrets in
+                    try ProviderConnection(record: record, secrets: secrets, cwd: home, timing: timing.calls,
+                                           commandProvider: commandProvider, log: { [weak self] in self?.log($0) })
+                },
+                help: { cli, words, secrets in await ProviderDrafts.runHelp(cli, words, secrets: secrets, in: home) },
+                localHost: { [methods, router] in
+                    let machine = await methods.controlSettings.machineID
+                    for host in await methods.allHosts where host.relay != true && host.machineID == machine {
+                        if await router.state(of: host.id)?.isOnline == true, await router.holds(host.id) {
+                            return .init(id: host.id, name: host.name)
+                        }
+                    }
+                    return nil
+                },
+                startAgent: { [router] host, request, owner in
+                    let params = try JSONValue.encoding(request)
+                    switch await router.deliverKept(DaemonAPI.Method.agentsStart, params: params, as: owner.client,
+                                                    kind: owner.kind, to: host, patience: .seconds(120)) {
+                    case .success(_, let result)?:
+                        return try result.decode(UUID.self)
+                    case .failure(_, let error)?:
+                        throw error
+                    default:
+                        throw ProviderFailure("The host on this machine didn’t answer.")
+                    }
+                },
+                stopAgent: { [router] host, agent, owner in
+                    _ = await router.deliverKept(DaemonAPI.Method.agentsStop, params: ["agentID": .string(agent.uuidString)],
+                                                 as: owner.client, kind: owner.kind, to: host, patience: .seconds(30))
+                },
+                notify: { [router] owner, update in
+                    guard let params = try? JSONValue.encoding(update) else { return false }
+                    return await router.tellControl(DaemonAPI.Notification.controlProviderDraft, params, to: owner.session)
+                },
+                ownerHere: { [router] owner in await router.hasSession(owner.session) },
+                busyHost: { [weak providers] provider, workspace in await providers?.busyHost(provider, workspace) }),
+                log: { [weak self] in self?.log($0) })
+            await providers.draft(with: drafts)
+        }
         // Prompts and starts for a stopped workspace, kept until it is up (US3).
         if let providers, await providers.kept == nil {
             let kept = KeptRequests(

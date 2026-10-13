@@ -453,6 +453,14 @@ public actor ControlMethods: ControlHandling {
                                    message: "Workspace providers need a control plane with one copy, for now.")
             }
             return try await workspaces.agentCall(from: host, agent: call.agent, method: call.method, params: call.params)
+        case DaemonAPI.Method.hostProviderDraft:
+            // A writing agent's tool (#858): the draft checks that the caller is its agent.
+            let call = try Self.require(params, as: DaemonAPI.HostProviderDraftCall.self)
+            guard let workspaces = hooks.workspaces else {
+                throw JSONRPCError(code: DaemonAPI.Failure.providersNeedOneCopy,
+                                   message: "Workspace providers need a control plane with one copy, for now.")
+            }
+            return try await workspaces.draftCall(from: host, call: call)
         case DaemonAPI.Method.hostStatus:
             // Whether it is idle, for its workspace's stop when idle (#691 US4).
             if let status = try? params?.decode(DaemonAPI.HostStatus.self) {

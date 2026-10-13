@@ -901,14 +901,19 @@ public enum DaemonAPI {
         /// The persona picked on the form (#760), by id. Its settings are already in
         /// the rest of the request; this brings its prompt.
         public var persona: String?
+        /// An agent started for something other than a person's work (#858). Its `cwd` is
+        /// not used: the daemon makes a folder of its own for it.
+        public var purpose: AgentPurpose?
 
         public init(runtimeID: String, cwd: URL, prompt: String,
                     attachments: [Attachment] = [],
                     startOptions: StartOptions = .none, draftID: UUID? = nil,
                     additionalDirectories: [URL] = [], mcpServers: [MCPServer] = [],
                     worktree: WorktreeChoice? = nil, requestID: UUID? = nil,
-                    sandbox: SandboxChoice? = nil, labels: [String] = [], persona: String? = nil) {
+                    sandbox: SandboxChoice? = nil, labels: [String] = [], persona: String? = nil,
+                    purpose: AgentPurpose? = nil) {
             self.persona = persona
+            self.purpose = purpose
             self.sandbox = sandbox
             self.worktree = worktree
             self.runtimeID = runtimeID
@@ -941,6 +946,7 @@ public enum DaemonAPI {
             sandbox = try c.decodeIfPresent(SandboxChoice.self, forKey: .sandbox)
             labels = try c.decodeIfPresent([String].self, forKey: .labels) ?? []
             persona = try c.decodeIfPresent(String.self, forKey: .persona)
+            purpose = try c.decodeIfPresent(AgentPurpose.self, forKey: .purpose)
         }
 
         /// What goes to the runtime: the words, then whatever was attached.

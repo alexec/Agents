@@ -154,6 +154,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// The workflow that started or resumed this agent, if one did. What lets the agent
     /// list say where an agent nobody typed for came from.
     public var startedByWorkflow: String?
+    /// Why it was started, when not for a person's work (#858): such an agent is in no list a
+    /// client sees, and has only its purpose's tools.
+    public var purpose: AgentPurpose?
     /// The workflow run that caused this agent, if one did. Read to work out how deep a
     /// chain is when this agent's own events fire something further.
     public var startedByRun: UUID?
@@ -329,6 +332,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // New in 008, and optional, so every record written before workflows existed
         // opens unchanged and needs nothing migrating.
         startedByWorkflow = try c.decodeIfPresent(String.self, forKey: .startedByWorkflow)
+        purpose = try c.decodeIfPresent(AgentPurpose.self, forKey: .purpose)
         startedByRun = try c.decodeIfPresent(UUID.self, forKey: .startedByRun)
         startedByAgent = try c.decodeIfPresent(UUID.self, forKey: .startedByAgent)
         chainDepth = try c.decodeIfPresent(Int.self, forKey: .chainDepth)
@@ -430,6 +434,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         if !queuedPrompts.isEmpty { try c.encode(queuedPrompts, forKey: .queuedPrompts) }
         if !suggestedPrompts.isEmpty { try c.encode(suggestedPrompts, forKey: .suggestedPrompts) }
         try c.encodeIfPresent(startedByWorkflow, forKey: .startedByWorkflow)
+        try c.encodeIfPresent(purpose, forKey: .purpose)
         try c.encodeIfPresent(startedByRun, forKey: .startedByRun)
         try c.encodeIfPresent(startedByAgent, forKey: .startedByAgent)
         try c.encodeIfPresent(chainDepth, forKey: .chainDepth)
@@ -473,6 +478,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case usage, lastTurnUsage, costToDate, costCeiling, plans, additionalDirectories, mcpServers
         case queuedPrompts, suggestedPrompts
         case startedByWorkflow, startedByRun, startedByAgent, chainDepth, eventWait, startRequestID
+        case purpose
         case persona
         case worktree
         case pendingMove

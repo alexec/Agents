@@ -53,7 +53,8 @@ extension DaemonCore {
             return projectIndexCache
         }
         projectIndexBuilds += 1
-        var folders = Set(agents.tallies.keys)
+        // A writer's folder (#858) is never a project.
+        var folders = Set(agents.tallies.keys.filter { !isProviderDraftFolder($0) })
         folders.formUnion(records.keys)
         let names: [URL: String]
         if let projectIndexCache, projectIndexCache.folders == folders {
@@ -129,7 +130,7 @@ extension DaemonCore {
         let agentsByFolder = Dictionary(grouping: agents.values) { $0.projectFolder }
 
         // The union: every folder an agent is in, and every folder we kept a record for.
-        var folders = Set(agentsByFolder.keys)
+        var folders = Set(agentsByFolder.keys.filter { !isProviderDraftFolder($0) })
         folders.formUnion(records.keys)
 
         var projects: [Project] = folders.map { folder in
@@ -221,7 +222,7 @@ extension DaemonCore {
     /// nothing in its project's row.
     func projectChanged(forAgentIn folder: URL) {
         let folder = Project.standardize(folder)
-        guard let summary = projectSummary(for: folder) else { return }
+        guard !isProviderDraftFolder(folder), let summary = projectSummary(for: folder) else { return }
         guard lastProjectSent[folder] != summary else { return }
         sendProject(summary)
     }

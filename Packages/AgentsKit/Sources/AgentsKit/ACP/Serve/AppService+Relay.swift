@@ -13,6 +13,7 @@ extension AppService {
     /// `daemon.sock` connection. The daemon now serves it itself, so `relay` is a call
     /// inside the process.
     public static func relaying(token: String, managesAgents: Bool, movesItself: Bool,
+                                writer: Bool = false,
                                 transport: (any LineTransport)? = nil,
                                 relay: @escaping Relay) -> AppService {
         @Sendable func send(_ method: String, _ request: some Encodable & Sendable,
@@ -30,7 +31,7 @@ extension AppService {
         }
 
         return AppService(transport: transport, managesAgents: managesAgents,
-                          movesItself: movesItself) { file in
+                          movesItself: movesItself, writer: writer) { file in
             await send(DaemonAPI.Method.agentsShowFile,
                        DaemonAPI.ShowFileRequest(token: token, file: file),
                        fallback: "Open in the files pane.")
@@ -147,6 +148,11 @@ extension AppService {
             var request = call
             request.token = token
             return await send(DaemonAPI.Method.agentsWorkspaces, request, fallback: "Done.")
+        } draft: { tool, arguments in
+            // The writer's tools (#858): the daemon relays them to the control plane.
+            await send(DaemonAPI.Method.agentsProviderDraft,
+                       DaemonAPI.ProviderDraftToolRequest(token: token, tool: tool, arguments: arguments),
+                       fallback: "Done.")
         } viewTool: { name, arguments in
             // The whole result back, not a note: the view is drawn from it (#187).
             let params: JSONValue
