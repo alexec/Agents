@@ -144,7 +144,8 @@ In the review worktree:
 - For each **high** or **medium** finding not already an issue, file one GitHub issue:
   title in plain words, the body with the finding's fields (no screenshots of anything
   but the scratch set-up), label `bug` for high and for a parity delta, `enhancement`
-  otherwise. One issue per finding; a parity delta names the client to change.
+  otherwise, and `priority:high` or `priority:medium` from its severity (the Release
+  workflow waits for these, #914). One issue per finding; a parity delta names the client to change.
 - **At most 5 issues a run**, highest severity first. The rest stay `open` in
   `findings.md` and are filed next run.
 - Put each issue's number in the finding's status (`filed #NNN`) and in the parity

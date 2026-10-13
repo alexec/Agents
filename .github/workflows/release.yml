@@ -9,11 +9,26 @@
 #                                          MCP servers Agents ships beside it (#700)
 #   SHA256SUMS
 #
+# Beside it, the testflight job (#914) uploads the Universal app to TestFlight: the Mac window
+# as a .pkg and the Remote as an .ipa, version <tag> and build <run number>, and waits until App
+# Store Connect has processed both. Nothing is submitted to App Review.
+#
+# The release notes are the tag's message when it has one (the release skill writes them,
+# .agents/skills/release); otherwise GitHub makes them from the merged pull requests.
+#
 # The signing material is in the `release` environment's secrets, which only a tag on main
 # can reach (its deployment rule). How to make each is in docs/how-to/release-agents-host.md:
 #   DEVELOPER_ID_P12, DEVELOPER_ID_P12_PASSWORD   the Developer ID Application identity
 #   RELAY_PROFILE                                 the "Agents Relay Developer ID" profile
 #   ASC_KEY_P8, ASC_KEY_ID, ASC_ISSUER_ID         the App Store Connect key, for notarytool
+#                                                 and altool
+# and for the testflight job (scripts/release-secrets.sh --store sets them):
+#   APPLE_DISTRIBUTION_P12, APPLE_DISTRIBUTION_P12_PASSWORD   the Apple Distribution identity
+#   MAC_INSTALLER_P12, MAC_INSTALLER_P12_PASSWORD             3rd Party Mac Developer Installer
+#   PROFILE_UNIVERSAL_MAC   "Agents Universal Mac App Store"
+#   PROFILE_REMOTE          "Agents Remote App Store"
+#   PROFILE_REMOTE_NOTIFY   "Agents Remote Notify App Store"
+#   PROFILE_REMOTE_WIDGET   "Agents Remote Widget App Store"
 name: release
 
 on:
@@ -144,14 +159,134 @@ jobs:
           name: release-logs
           path: build/release/*.log
 
+      # The tag's message is the notes when it has one: checkout leaves the tag lightweight,
+      # so it is fetched again as the annotated tag it is.
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          git fetch --quiet --force origin "refs/tags/$TAG:refs/tags/$TAG"
+          git tag -l --format='%(contents)' "$TAG" | sed '/^-----BEGIN PGP/,$d' > "$RUNNER_TEMP/notes.md"
+          notes=(--generate-notes)
+          [[ "$(git cat-file -t "$TAG")" == tag && -n "$(tr -d '[:space:]' < "$RUNNER_TEMP/notes.md")" ]] &&
+            notes=(--notes-file "$RUNNER_TEMP/notes.md")
           cd build/release
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" *.dmg *.zip *.tar.gz SHA256SUMS --clobber
           else
             gh release create "$TAG" *.dmg *.zip *.tar.gz SHA256SUMS --title "Agents Host ${TAG#v}" \
-              --generate-notes --verify-tag
+              "${notes[@]}" --verify-tag
           fi
+
+  # The Universal app on TestFlight (#914). It needs nothing from the other jobs, and a
+  # failure here leaves the GitHub release as it is.
+  testflight:
+    runs-on: xcode-27
+    timeout-minutes: 90
+    environment: release
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+    steps:
+      # First, so a missing secret is one clear line rather than a signing error later.
+      - name: The App Store secrets are there
+        env:
+          APPLE_DISTRIBUTION_P12: ${{ secrets.APPLE_DISTRIBUTION_P12 }}
+          APPLE_DISTRIBUTION_P12_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_P12_PASSWORD }}
+          MAC_INSTALLER_P12: ${{ secrets.MAC_INSTALLER_P12 }}
+          MAC_INSTALLER_P12_PASSWORD: ${{ secrets.MAC_INSTALLER_P12_PASSWORD }}
+          PROFILE_UNIVERSAL_MAC: ${{ secrets.PROFILE_UNIVERSAL_MAC }}
+          PROFILE_REMOTE: ${{ secrets.PROFILE_REMOTE }}
+          PROFILE_REMOTE_NOTIFY: ${{ secrets.PROFILE_REMOTE_NOTIFY }}
+          PROFILE_REMOTE_WIDGET: ${{ secrets.PROFILE_REMOTE_WIDGET }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          missing=()
+          for name in APPLE_DISTRIBUTION_P12 APPLE_DISTRIBUTION_P12_PASSWORD MAC_INSTALLER_P12 \
+            MAC_INSTALLER_P12_PASSWORD PROFILE_UNIVERSAL_MAC PROFILE_REMOTE PROFILE_REMOTE_NOTIFY \
+            PROFILE_REMOTE_WIDGET ASC_KEY_P8 ASC_KEY_ID ASC_ISSUER_ID; do
+            [[ -n "${!name}" ]] || missing+=("$name")
+          done
+          if (( ${#missing[@]} )); then
+            echo "::error::The release environment has no ${missing[*]}. Set them with scripts/release-secrets.sh --store (docs/how-to/release-agents-host.md). Nothing was uploaded to TestFlight."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: The tag is on main
+        run: |
+          git fetch --quiet origin main
+          git merge-base --is-ancestor HEAD origin/main || {
+            echo "::error::$TAG is not on main"; exit 1; }
+
+      - name: Tools
+        run: |
+          brew install xcodegen &
+          xcodegen_pid=$!
+          xcodebuild -downloadComponent MetalToolchain
+          wait "$xcodegen_pid"
+
+      - name: Signing
+        env:
+          APPLE_DISTRIBUTION_P12: ${{ secrets.APPLE_DISTRIBUTION_P12 }}
+          APPLE_DISTRIBUTION_P12_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_P12_PASSWORD }}
+          MAC_INSTALLER_P12: ${{ secrets.MAC_INSTALLER_P12 }}
+          MAC_INSTALLER_P12_PASSWORD: ${{ secrets.MAC_INSTALLER_P12_PASSWORD }}
+          PROFILE_UNIVERSAL_MAC: ${{ secrets.PROFILE_UNIVERSAL_MAC }}
+          PROFILE_REMOTE: ${{ secrets.PROFILE_REMOTE }}
+          PROFILE_REMOTE_NOTIFY: ${{ secrets.PROFILE_REMOTE_NOTIFY }}
+          PROFILE_REMOTE_WIDGET: ${{ secrets.PROFILE_REMOTE_WIDGET }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          keychain="$RUNNER_TEMP/store.keychain-db"
+          password="$(uuidgen)"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 5400 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          for identity in APPLE_DISTRIBUTION MAC_INSTALLER; do
+            p12="${identity}_P12" pass="${identity}_P12_PASSWORD"
+            echo "${!p12}" | base64 --decode > "$RUNNER_TEMP/identity.p12"
+            security import "$RUNNER_TEMP/identity.p12" -k "$keychain" -P "${!pass}" \
+              -T /usr/bin/codesign -T /usr/bin/productbuild -T /usr/bin/xcodebuild
+            rm "$RUNNER_TEMP/identity.p12"
+          done
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          profiles="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+          mkdir -p "$profiles"
+          echo "$PROFILE_UNIVERSAL_MAC" | base64 --decode > "$profiles/agents-universal-mac.provisionprofile"
+          echo "$PROFILE_REMOTE" | base64 --decode > "$profiles/agents-remote.mobileprovision"
+          echo "$PROFILE_REMOTE_NOTIFY" | base64 --decode > "$profiles/agents-remote-notify.mobileprovision"
+          echo "$PROFILE_REMOTE_WIDGET" | base64 --decode > "$profiles/agents-remote-widget.mobileprovision"
+          echo "$ASC_KEY_P8" > "$RUNNER_TEMP/asc.p8"
+          security find-identity -v "$keychain" | grep -q "Apple Distribution" || {
+            echo "::error::APPLE_DISTRIBUTION_P12 holds no Apple Distribution identity, or its password is wrong"; exit 1; }
+          security find-identity -v "$keychain" | grep -q "3rd Party Mac Developer Installer" || {
+            echo "::error::MAC_INSTALLER_P12 holds no 3rd Party Mac Developer Installer identity, or its password is wrong"; exit 1; }
+
+      - name: Archive, check, export and upload
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          export ASC_KEY_PATH="$RUNNER_TEMP/asc.p8"
+          scripts/release-store.sh "${TAG#v}" "${{ github.run_number }}"
+
+      - name: Processed by App Store Connect
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          export ASC_KEY_PATH="$RUNNER_TEMP/asc.p8"
+          swift scripts/asc-builds.swift "${TAG#v}" "${{ github.run_number }}" --wait 45
+
+      - name: Logs
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: testflight-logs
+          path: build/store/*.log

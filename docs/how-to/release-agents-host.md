@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac]
-description: Publish Agents Host on GitHub by tagging main, and set up the signing secrets the release needs once.
+description: Publish Agents Host on GitHub and the app on TestFlight by tagging main, and set up the signing secrets the release needs once.
 ---
 
 # Release Agents Host
@@ -15,7 +15,15 @@ publishes a release. The tag starts the `release` workflow, which:
 - staples the same app and zips it as `Agents-Host-<version>.zip`, for Macs that may not
   mount a disk image;
 - builds the static Linux agentsd as `agentsd-linux-<arch>-<version>.tar.gz`;
-- creates the release with these files and a `SHA256SUMS`.
+- creates the release with these files and a `SHA256SUMS`;
+- in its `testflight` job, archives the Mac window and the Remote (one Universal app),
+  checks both archives with `scripts/check-store-archive.sh`, uploads them to TestFlight
+  and waits until App Store Connect has processed both. Nothing goes to App Review.
+
+The **Release** workflow (`.agents/workflows/release.md`, the `release` skill) does all of
+this with nobody watching, every two weeks or when you press **Run now**: it has the
+high and medium findings fixed first, chooses the version and writes the notes. The steps
+below are the same thing by hand.
 
 ## Before you start
 
@@ -42,21 +50,44 @@ You set this up once, as the Apple Developer account's Account Holder.
    | `ASC_KEY_P8` | the App Store Connect API key's `.p8`, as text |
    | `ASC_KEY_ID`, `ASC_ISSUER_ID` | that key's ID and its issuer ID |
 
+4. **The TestFlight secrets.** Export **Apple Distribution: …** and **3rd Party Mac
+   Developer Installer: …** from Keychain Access as two `.p12` files. Install the four App
+   Store profiles: **Agents Universal Mac App Store**, **Agents Remote App Store**,
+   **Agents Remote Notify App Store** and **Agents Remote Widget App Store**. Then run
+   `scripts/release-secrets.sh --store Distribution.p12 Installer.p12` and delete both
+   `.p12` files. It sets:
+
+   | Secret | Value |
+   |---|---|
+   | `APPLE_DISTRIBUTION_P12`, `APPLE_DISTRIBUTION_P12_PASSWORD` | the Apple Distribution identity and its password |
+   | `MAC_INSTALLER_P12`, `MAC_INSTALLER_P12_PASSWORD` | the 3rd Party Mac Developer Installer identity and its password |
+   | `PROFILE_UNIVERSAL_MAC` | `base64` of "Agents Universal Mac App Store" |
+   | `PROFILE_REMOTE` | `base64` of "Agents Remote App Store" |
+   | `PROFILE_REMOTE_NOTIFY` | `base64` of "Agents Remote Notify App Store" |
+   | `PROFILE_REMOTE_WIDGET` | `base64` of "Agents Remote Widget App Store" |
+
+   Without them the GitHub release still goes out, and the `testflight` job fails at its
+   first step, naming the secrets that are missing.
+
 ## Steps
 
-1. Choose the version, for example `0.2.0`. The build number is the workflow's run number,
-   so it always goes up.
-2. Tag main and push the tag:
+1. Choose the version, for example `0.2.0`: minor when an enhancement merged since the
+   last tag, otherwise patch. `.agents/skills/release/scripts/release-plan.py` says which,
+   and lists the merged pull requests. The build number is the workflow's run number, so
+   it always goes up.
+2. Tag main and push the tag. The tag's message becomes the release notes; a tag without
+   one gets notes made from the merged pull requests:
 
    ```sh
-   git tag v0.2.0 origin/main
+   git tag -a --cleanup=verbatim v0.2.0 origin/main -F notes.md
    git push origin v0.2.0
    ```
 
 3. Follow the **release** run in the repository's Actions. The Linux job takes about ten
    minutes. The Mac job takes longer, mostly waiting for Apple's notary.
-4. When it finishes, the release is on the Releases page as **Agents Host 0.2.0**, with notes
-   made from the merged pull requests.
+4. When it finishes, the release is on the Releases page as **Agents Host 0.2.0**, and
+   0.2.0 (the run number) is on TestFlight for iOS and macOS.
+   `swift scripts/asc-builds.swift 0.2.0 <run number>` says each build's state.
 
 To make a release again from a tag that is already there (after fixing a secret, say), run
 the **release** workflow by hand and give it the tag. It replaces the release's files.
@@ -71,6 +102,11 @@ from `scripts/build-linux-agentsd.sh`.
 `scripts/release-host.sh --dry-run 0.2.0` needs none of that. It signs ad hoc and doesn't
 notarize, which proves the build and the packaging. Gatekeeper refuses the result.
 
+`scripts/release-store.sh 0.2.0 <build>` does what the `testflight` job does. It needs the
+two identities and the four profiles, and the App Store Connect key in `~/.private_keys`.
+`--no-upload` stops before the upload. `--dry-run` needs no certificate: it proves both
+archives build and pass `check-store-archive.sh`.
+
 ## If something goes wrong
 
 - **"is not on main":** the tag points at a commit main doesn't have. Delete the tag
@@ -78,3 +114,7 @@ notarize, which proves the build and the packaging. Gatekeeper refuses the resul
 - **No "Developer ID Application" identity:** `DEVELOPER_ID_P12` or its password is wrong.
 - **The notary refuses it:** the run's log has the submission ID. Run
   `xcrun notarytool log <id> --key … --key-id … --issuer …` to see why.
+- **"The release environment has no …":** a TestFlight secret is missing. Run
+  `scripts/release-secrets.sh --store …`, then run the **release** workflow again with the tag.
+- **An upload is refused as a duplicate:** that build number is taken for the version. Run
+  the workflow again: the new run number is a new build.
