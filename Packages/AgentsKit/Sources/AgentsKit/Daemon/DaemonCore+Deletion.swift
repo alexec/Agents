@@ -184,8 +184,22 @@ extension DaemonCore {
         pendingPermissions = pendingPermissions.filter { $0.value.agentID != id }
         elicitations = elicitations.filter { $0.value.agentID != id }
         appTokens = appTokens.filter { $0.value != id }
+        dropPromptState(for: id)
         // Nothing writes to it now until it is unarchived (#209).
         Task { [store] in await store.closeTranscript(for: id) }
+    }
+
+    /// What was kept of the agent's last turns for sending again (P20261011-1): the last
+    /// prompt with its pictures, the plan window, the loop guard's count, views' context
+    /// and their calls. Only a live turn reads them. An unarchived agent whose sandbox
+    /// card is answered sends the person's words from the record, as after a restart; a
+    /// rate-limit retry waiting on it is already refused by the stop archiving made.
+    func dropPromptState(for id: UUID) {
+        lastPrompts.removeValue(forKey: id)
+        latestRateLimit.removeValue(forKey: id)
+        messageHops.removeValue(forKey: id)
+        viewContexts.removeValue(forKey: id)
+        thirdPartyCalls.removeValue(forKey: id)
     }
 
     /// Which of those maps still hold something for this agent. For the test that keeps
@@ -217,6 +231,11 @@ extension DaemonCore {
         if pendingPermissions.values.contains(where: { $0.agentID == id }) { held.append("pendingPermissions") }
         if elicitations.values.contains(where: { $0.agentID == id }) { held.append("elicitations") }
         if appTokens.values.contains(id) { held.append("appTokens") }
+        if lastPrompts[id] != nil { held.append("lastPrompts") }
+        if latestRateLimit[id] != nil { held.append("latestRateLimit") }
+        if messageHops[id] != nil { held.append("messageHops") }
+        if viewContexts[id] != nil { held.append("viewContexts") }
+        if thirdPartyCalls[id] != nil { held.append("thirdPartyCalls") }
         return held
     }
 
@@ -344,6 +363,8 @@ extension DaemonCore {
         lastWhole.removeValue(forKey: id)
         stops.removeValue(forKey: id)
         timeLedger.forget(id)
+        // Work still unwinding after the archive may have put some back.
+        dropPromptState(for: id)
         broadcast(DaemonAPI.Notification.agentRemoved, DaemonAPI.AgentRemovedNotification(agentID: id))
         projectChanged(forAgentIn: agent.projectFolder)
     }
