@@ -143,7 +143,8 @@ public actor RealGitHub: GitHub {
     static func issueOf(_ i: JSON) -> Issue {
         Issue(number: i["number"]?.int ?? 0, title: i["title"]?.string ?? "", author: i["user"]?["login"]?.string ?? "",
               labels: (i["labels"]?.array ?? []).map { $0.string ?? $0["name"]?.string ?? "" },
-              url: i["html_url"]?.string ?? "")
+              url: i["html_url"]?.string ?? "",
+              assignees: (i["assignees"]?.array ?? []).compactMap { $0["login"]?.string })
     }
 
     /// Pages of `path` (newest first), until an item older than `since` by `time`.

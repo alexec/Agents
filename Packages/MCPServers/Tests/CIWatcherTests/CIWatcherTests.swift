@@ -289,7 +289,7 @@ func editIssue(_ r: inout JSON, _ number: Int, _ change: (inout JSON) -> Void) {
         #expect(ids(raised) == ["issue.opened:\(repo):420", "issue.opened:\(repo):421"])
         let data = raised["events"]?.array?.first?["data"]
         #expect(data?["issue"] == ["number": 420, "title": "Issue 420", "author": "someone", "labels": ["bug"],
-                                   "url": .string("https://github.com/\(repo)/issues/420")])
+                                   "url": .string("https://github.com/\(repo)/issues/420"), "assignees": []])
         #expect(Time.parse(data?["openedAt"]?.string ?? "") != nil)
         let bugged = try await h.poll("issue.opened", bugs, firstBug["cursor"] ?? .null)
         #expect((bugged["events"]?.array ?? []).compactMap { $0["data"]?["issue"]?["number"]?.int } == [420])
@@ -612,7 +612,9 @@ func editIssue(_ r: inout JSON, _ number: Int, _ change: (inout JSON) -> Void) {
         #expect(!open.contains { $0["number"] == 409 }, "a closed issue is not open")
         let flicker = try #require(open.first { $0["number"] == 410 })
         #expect(flicker == ["number": 410, "title": "The sidebar flickers on wake", "author": "alexec", "labels": ["bug"],
-                            "url": .string("https://github.com/\(repo)/issues/410"), "comments": 1, "updatedAt": "2026-10-01T11:00:00Z"])
+                            "url": .string("https://github.com/\(repo)/issues/410"), "assignees": ["alexec"],
+                            "comments": 1, "updatedAt": "2026-10-01T11:00:00Z"])
+        #expect(open.first { $0["number"] != 410 }?["assignees"] == [], "an issue nobody has has no assignees")
         let bugs = try await h.call("list_issues", ["repo": .string(repo), "label": "bug"])
         #expect((bugs["structuredContent"]?["issues"]?.array ?? []).allSatisfy { $0["labels"]?.array?.contains("bug") == true })
 
@@ -641,7 +643,8 @@ func editIssue(_ r: inout JSON, _ number: Int, _ change: (inout JSON) -> Void) {
     @Test(arguments: [("list_prs", "ui://ci/board", ["rerun_failed", "list_prs", "get_pr", "merge_pr", "‹ Pull requests",
                                                        "agents/message-agent", "list_branches", "fill_pr", "create_pr",
                                                        "Branches without a pull request", "Create Pull Request", "Open it as a draft"]),
-                      ("list_issues", "ui://ci/issues", ["list_issues", "agents/start-agent", "Start Agent", "--add-assignee @me"]),
+                      ("list_issues", "ui://ci/issues", ["list_issues", "agents/start-agent", "Start Agent", "--add-assignee @me",
+                                                         "issue.assignees", "Assigned to "]),
                       ("get_pr", "ui://ci/pr", ["get_pr", "merge_pr", "comment_on_pr", "ui/message", "Ask the Agent to Fix",
                                                        "agents/message-agent", "agents/start-agent", "branch: pr.branch",
                                                        "review_pr", "Approve", "Request Changes", "pr.viewer"])])

@@ -45,7 +45,8 @@ public struct FakeGitHub: GitHub {
 
     static func toIssue(_ i: JSON) -> Issue {
         Issue(number: i["number"]?.int ?? 0, title: i["title"]?.string ?? "", author: i["author"]?.string ?? "",
-              labels: (i["labels"]?.array ?? []).compactMap(\.string), url: i["url"]?.string ?? "")
+              labels: (i["labels"]?.array ?? []).compactMap(\.string), url: i["url"]?.string ?? "",
+              assignees: (i["assignees"]?.array ?? []).compactMap(\.string))
     }
 
     func findRun(_ data: JSON, _ repo: String, _ runId: Int) throws -> JSON {

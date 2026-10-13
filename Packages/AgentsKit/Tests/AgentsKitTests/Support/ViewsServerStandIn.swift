@@ -59,7 +59,7 @@ final class ViewsServerStandIn: @unchecked Sendable {
             return try reply(200, ["tools": Self.tools])
         case "resources/list":
             return try reply(200, ["resources": [["uri": "ui://kite/weather", "name": "Weather",
-                                                  "mimeType": "text/html;profile=mcp-app"]]])
+                                                  "title": "Kite weather", "mimeType": "text/html;profile=mcp-app"]]])
         case "resources/read":
             return try reply(200, ["contents": [[
                 "uri": "ui://kite/weather", "mimeType": "text/html;profile=mcp-app", "text": .string(html),

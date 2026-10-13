@@ -27,7 +27,11 @@ struct ServerViewCatalog: Codable, Equatable, Sendable {
         var uri: String
         var name: String?
         var mimeType: String?
+        /// The server's words for it, such as "Pull requests": a pin's row when pinned (#905).
+        var title: String?
     }
+
+    func resource(_ uri: String) -> Resource? { resources.first { $0.uri == uri } }
 
     /// The server's name where it was read, for the log and the caption.
     var server: String
@@ -62,7 +66,7 @@ struct ServerViewCatalog: Codable, Equatable, Sendable {
         let listed = resources.compactMap { raw -> Resource? in
             guard let uri = raw["uri"]?.stringValue, uri.hasPrefix("ui://") else { return nil }
             return Resource(uri: uri, name: raw["name"]?.stringValue ?? raw["title"]?.stringValue,
-                            mimeType: raw["mimeType"]?.stringValue)
+                            mimeType: raw["mimeType"]?.stringValue, title: raw["title"]?.stringValue)
         }
         return ServerViewCatalog(server: server, madeAt: now, tools: withViews, appTools: appOnly, resources: listed)
     }

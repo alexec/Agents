@@ -29,7 +29,10 @@ extension DaemonCore {
         let lead = "Nothing was pinned: "
         if let view = request.view {
             if let refusal = viewPinRefusal(view, project: project) { throw pinRefusal(lead + refusal) }
-            try pin(PinEntry(view: view, title: request.title, pinnedBy: .thePerson), in: project, lead: lead)
+            // A pin made anew takes the view's own title; pinned again, it keeps the one it has.
+            let pinned = readPins(project).pins.contains { $0.path == view.uri }
+            let title = request.title ?? (pinned ? nil : viewTitle(view, project: project))
+            try pin(PinEntry(view: view, title: title, pinnedBy: .thePerson), in: project, lead: lead)
             return pinViews(project)
         }
         guard let path = personPinPath(request.path, in: project) else {

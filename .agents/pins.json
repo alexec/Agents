@@ -4,6 +4,7 @@
       "pinned_by" : {
         "person" : true
       },
+      "title" : "Pull requests",
       "view" : {
         "arguments" : {
 
@@ -17,6 +18,7 @@
       "pinned_by" : {
         "person" : true
       },
+      "title" : "Issues",
       "view" : {
         "arguments" : {
 
