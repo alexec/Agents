@@ -121,8 +121,9 @@
 - [x] T033 [P] Parity: the Workspace providers row in `specs/071-web-remote/walks/parity.md` names
   Write It for Me; commit line `remote: by design, web: by design`.
 - [x] T034 Test of FR-025 and SC-005: Start and Stop of a provider with `writtenBy` start no agent.
-- [ ] T035 (open: not walked yet; needs the real runtime on a scratch app) Walk quickstart.md on a scratch app with the real default runtime; record SC-001 and
-  SC-002 (5 tries each) in `specs/858-provider-map-writer/walks/`.
+- [x] T035 Walk quickstart.md on a scratch app with the real default runtime; record SC-001 and
+  SC-002 (5 tries each) in `specs/858-provider-map-writer/walks/`. Done 2026-10-13 by socket:
+  5 of 5 each ([walks/sc-001-sc-002.md](walks/sc-001-sc-002.md)); the sheet itself is not walked yet.
 
 ## Dependencies & Execution Order
 

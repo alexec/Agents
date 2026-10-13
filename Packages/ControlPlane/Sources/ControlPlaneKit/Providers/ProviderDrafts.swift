@@ -389,7 +389,12 @@ public actor ProviderDrafts {
             draft.workspaces = checked.workspaces
             draft.check = .init(passed: true, workspaces: checked.workspaces)
             await step(draft, .check, "checked: listed \(checked.workspaces.count)")
-            return "Passed: listed \(checked.workspaces.count).\n" + checked.workspaces.map(Self.line).joined(separator: "\n")
+            var answer = "Passed: listed \(checked.workspaces.count).\n" + checked.workspaces.map(Self.line).joined(separator: "\n")
+            if let items = checked.items, items > checked.workspaces.count, let first = checked.firstItem {
+                answer += "\n\(items - checked.workspaces.count) of the \(items) items at list.items have no id or name by this map. The first item:\n"
+                    + draft.redact(Self.sample(first))
+            }
+            return answer
         case .failure(let error):
             let words = draft.redact(Self.words(error))
             draft.check = .init(passed: false, problem: words)
@@ -634,6 +639,15 @@ public actor ProviderDrafts {
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         let text = (try? encoder.encode(JSONValue.array(kept))).map { String(decoding: $0, as: UTF8.self) } ?? "[]"
         return cut(redact(text))
+    }
+
+    /// One item of a list, as JSON, at most 2 KB: what a check shows of what a map missed.
+    static func sample(_ item: JSONValue) -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        let text = (try? encoder.encode(item)).map { String(decoding: $0, as: UTF8.self) } ?? "{}"
+        guard text.utf8.count > 2048 else { return text }
+        return String(decoding: Array(text.utf8.prefix(2048)), as: UTF8.self) + " [cut at 2 KB]"
     }
 
     static func line(_ workspace: DaemonAPI.WorkspaceInfo) -> String {

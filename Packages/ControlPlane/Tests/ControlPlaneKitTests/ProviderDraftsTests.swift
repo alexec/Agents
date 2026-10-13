@@ -20,10 +20,16 @@ final class DraftWorld: @unchecked Sendable {
     var checkFails: String?
     var helps: [String: String] = [:]
     var notInstalled = false
+    /// When set, the list's items as the server gave them, none of which the map reads.
+    var unread: [JSONValue]?
 
     private var _checks = 0, _starts = 0, _stops = 0, _helpRuns: [[String]] = [], _updates: [DaemonAPI.ProviderDraftUpdate] = []
     private var _started: [DaemonAPI.StartRequest] = [], _stopped: [UUID] = [], _logs: [String] = []
     var ownerHere = true
+    private var _ownerAsked = 0
+    /// How many ticks have asked whether the sheet is still there.
+    var ownerAsked: Int { lock.withLock { _ownerAsked } }
+    func askOwner() -> Bool { lock.withLock { _ownerAsked += 1 }; return ownerHere }
     let agent = UUID()
 
     init(tools: [String], descriptions: [String: String] = [:]) {
@@ -78,6 +84,7 @@ struct DraftServer: WorkspaceProvider {
                 throw ProviderFailure("The tool map names \(missing), which the server doesn’t have.")
             }
         }
+        if let unread = world.unread { return .init(workspaces: [], items: unread.count, firstItem: unread.first) }
         return .init(workspaces: world.workspaces)
     }
 
@@ -122,7 +129,7 @@ struct DraftHarness {
                 world.told(update)
                 return true
             },
-            ownerHere: { _ in world.ownerHere },
+            ownerHere: { _ in world.askOwner() },
             busyHost: { _, _ in busy }),
             log: { world.logged($0) },
             now: { clock?.now ?? .now })
@@ -223,6 +230,52 @@ struct ProviderDraftMapTests {
         #expect(try await harness.tool(id, AppTool.readTools) == "This draft has ended.")
     }
 
+    @Test("A check that reads none of the items says so and shows the first, redacted")
+    func checkShowsAnItemTheMapMissed() async throws {
+        let secret = "dop_v1_supersecretvalue"
+        let world = DraftWorld(tools: ["droplet-list", "droplet-power-on", "droplet-power-off"])
+        world.unread = [["uid": "m-101", "label": "devbox", "token": .string(secret)], ["uid": "m-102", "label": "scratch-1"]]
+        let harness = DraftHarness(world: world)
+        let id = try await harness.start(secrets: ["DIGITALOCEAN_API_TOKEN": secret]).draft
+        let answer = try await harness.tool(id, AppTool.checkDraft, ["draft": DraftHarness.goodMap])
+        #expect(answer.hasPrefix("Passed: listed 0."))
+        #expect(answer.contains("2 of the 2 items at list.items have no id or name by this map. The first item:"))
+        #expect(answer.contains(#""label":"devbox""#))
+        #expect(!answer.contains(secret))
+        #expect(answer.contains("${DIGITALOCEAN_API_TOKEN}"))
+    }
+
+    @Test("A map's check against a real server counts the items it missed, and names the keys when it finds no list")
+    func checkAgainstTheWalkServer() async throws {
+        let script = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Fixtures/walk858-mcp.py").path
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("w858-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        func connection(items: String, name: String) throws -> ProviderConnection {
+            let map: JSONValue = ["list": ["tool": "machines-get", "items": .string(items), "id": "uid", "name": .string(name), "state": "power"],
+                                  "start": ["tool": "machine-on", "arguments": ["uid": "{id}"]],
+                                  "stop": ["tool": "machine-off", "arguments": ["uid": "{id}"]]]
+            return try ProviderConnection(record: ProviderRecord(id: .init(rawValue: "w858"), name: "Machines", kind: .stdio,
+                                                                 command: "/usr/bin/env", args: ["python3", script], map: map),
+                                          secrets: ["TEST_TOKEN": "t0k"], cwd: folder, log: { _ in })
+        }
+        let missed = try connection(items: "machines", name: "name")
+        let checked = try await missed.check()
+        await missed.end()
+        #expect(checked.workspaces.isEmpty)
+        #expect(checked.items == 2)
+        #expect(checked.firstItem?["label"]?.stringValue == "devbox")
+        let read = try connection(items: "machines", name: "label")
+        #expect(try await read.check().workspaces.map(\.name) == ["devbox", "scratch-1"])
+        await read.end()
+        let none = try connection(items: "nodes", name: "label")
+        await #expect(throws: ProviderFailure("The tool map’s list.items finds no list in what machines-get answered. Its answer has the keys machines.")) {
+            try await none.check()
+        }
+        await none.end()
+    }
+
     @Test("Another agent's call is refused (FR-011)")
     func onlyItsAgent() async throws {
         let world = DraftWorld(tools: ["droplet-list"])
@@ -279,14 +332,23 @@ struct ProviderDraftMapTests {
         try await eventually { world.stopped == [world.agent] }
         #expect(await harness.drafts.result(id) == nil)
 
+        // The sheet gone: on the drafts' clock, which only the test moves (#912), so a slow
+        // machine can't end it early or late. Once a tick has seen the owner gone, the clock
+        // moves past ownerGone, and the next tick cancels.
         let gone = DraftWorld(tools: ["droplet-list"])
-        let quick = DraftHarness(world: gone, timing: .init(total: .seconds(300), answer: .seconds(5), lastWord: .seconds(5),
-                                                            ownerGone: .milliseconds(50), keptAfter: .seconds(600),
-                                                            tick: .milliseconds(10), help: .seconds(25)))
+        let clock = DraftClock()
+        let quick = DraftHarness(world: gone, timing: .init(total: .seconds(300), answer: .seconds(120), lastWord: .seconds(60),
+                                                            ownerGone: .seconds(30), keptAfter: .seconds(600),
+                                                            tick: .milliseconds(10), help: .seconds(25)),
+                                 clock: clock)
         _ = try await quick.start()
         gone.ownerHere = false
-        try await Task.sleep(for: .milliseconds(400))
-        #expect(gone.last?.state == "cancelled")
+        let asked = gone.ownerAsked
+        try await eventually { gone.ownerAsked > asked }
+        #expect(gone.last?.state != "cancelled")
+        clock.advance(by: .seconds(31))
+        try await eventually { gone.last?.state == "cancelled" }
+        #expect(gone.stopped == [gone.agent])
     }
 
     @Test("A turn that ends with no draft fails, saying so")

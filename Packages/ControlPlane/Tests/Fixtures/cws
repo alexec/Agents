@@ -1,0 +1,25 @@
+#!/bin/sh
+# A stand-in workspace CLI for the #858 walk (Your commands). Each run is a line in $WALK858_LOG.
+[ -n "$WALK858_LOG" ] && echo "cws $*" >> "$WALK858_LOG"
+case "$*" in
+  --help|"")
+    echo "cws: cloud workspaces"
+    echo
+    echo "Usage: cws <command> [flags]"
+    echo
+    echo "Commands:"
+    echo "  list     List your workspaces"
+    echo "  start    Start a workspace"
+    echo "  stop     Stop a workspace"
+    echo
+    echo "Run 'cws <command> --help' for a command's flags." ;;
+  "list --help")
+    echo "Usage: cws list [--json]"
+    echo "  --json   Print a JSON array of {slug, title, status}; status is up, down or booting." ;;
+  "start --help") echo "Usage: cws start <slug>   Boot a workspace. Waits until it is up." ;;
+  "stop --help") echo "Usage: cws stop <slug>    Shut a workspace down. Waits until it is down." ;;
+  "list --json") echo '[{"slug":"ws-1","title":"devstack","status":"up"},{"slug":"ws-2","title":"scratch","status":"down"}]' ;;
+  list) printf 'ws-1  devstack  up\nws-2  scratch   down\n' ;;
+  start\ *|stop\ *) echo "ok" ;;
+  *) echo "cws: unknown command: $*" >&2; exit 2 ;;
+esac
