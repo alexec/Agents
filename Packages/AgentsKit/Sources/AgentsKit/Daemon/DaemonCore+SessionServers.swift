@@ -109,7 +109,7 @@ extension DaemonCore {
     /// (or draft, or workflow start) and an agent picked back up. `mcp.json` is read
     /// here, every time, so an edit reaches the next session without a restart, and
     /// nothing read from it is kept (R10, FR-023).
-    func sessionServers(runtimeID: String, chosen: [MCPServer], token: String, managesAgents: Bool,
+    func sessionServers(runtimeID: String, chosen: [MCPServer], token: String,
                         cwd: URL, capabilities: ACP.MCPCapabilities?) async throws -> [MCPServer] {
         // The app's tools are served over http and nothing else (#185). A runtime that does
         // not take it would run with none of them, which is worse than not running.
@@ -158,7 +158,7 @@ extension DaemonCore {
         }
         // Without the tools for moving folders for a runtime that forgets its conversation
         // in another folder (053).
-        let app = try await appServer(token: token, managesAgents: managesAgents,
+        let app = try await appServer(token: token,
                                       movesItself: RuntimeCatalog.canMoveFolders(runtimeID: runtimeID))
         let plan = SessionServers.plan(app: app, chosen: chosen, project: contribution.servers,
                                        personal: personal, pluginServers: pluginServers,

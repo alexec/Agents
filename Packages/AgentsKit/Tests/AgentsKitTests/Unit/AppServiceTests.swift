@@ -85,7 +85,7 @@ struct AppServiceTests {
 
         // Every app tool takes an optional `description`, the reason the chat draws the
         // call by (#708), and none requires it.
-        for tool in AppService.tools(managesAgents: true) {
+        for tool in AppService.tools() {
             let name = tool["name"]?.stringValue ?? "?"
             #expect(tool["inputSchema"]?["properties"]?["description"] == AppService.callDescriptionProperty, "\(name)")
             #expect(tool["inputSchema"]?["required"]?.arrayValue?.contains("description") != true, "\(name)")

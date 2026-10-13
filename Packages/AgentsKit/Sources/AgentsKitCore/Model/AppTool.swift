@@ -40,8 +40,7 @@ public enum AppTool {
     public static let suggestNextPrompt = "suggest_next_prompt"
 
     // The session tools (#638): one family for every session, a helper an agent
-    // started included. Starting and stopping are never offered to a session another
-    // session started; the rest are offered to every agent.
+    // started included (#940). The project's helper limits bound how many there are.
 
     /// Start a session in the caller's own project (028).
     public static let startSession = "start_session"

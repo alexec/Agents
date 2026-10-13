@@ -237,11 +237,9 @@ struct SessionToolsTests {
     }
 
     @Test func bothToolsAreOfferedToEveryAgentIncludingAHelper() {
-        for managesAgents in [true, false] {
-            let names = AppService.tools(managesAgents: managesAgents).compactMap { $0["name"]?.stringValue }
-            #expect(names.contains(AppTool.listSessions))
-            #expect(names.contains(AppTool.readSession))
-        }
+        let names = AppService.tools().compactMap { $0["name"]?.stringValue }
+        #expect(names.contains(AppTool.listSessions))
+        #expect(names.contains(AppTool.readSession))
     }
 }
 

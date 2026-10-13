@@ -14,7 +14,6 @@ struct BriefingTests {
     @Test func everyAgentIsToldHowToContinueAnotherSession() {
         for policy in ToolPolicyCatalog.builtIn {
             #expect(Briefing.lines(for: policy).contains(Briefing.sessions))
-            #expect(Briefing.lines(for: policy, managesAgents: false).contains(Briefing.sessions))
         }
     }
 
@@ -260,8 +259,6 @@ struct BriefingTests {
             let text = Briefing.text(for: policy, naming: naming)
             #expect(text.count < 2_700, "\(policy.runtimeID): \(text.count)")
             #expect(Briefing.lines(for: policy, naming: naming).count <= 10, "\(policy.runtimeID)")
-            #expect(Briefing.text(for: policy, managesAgents: false, naming: naming).count < 2_450,
-                    "\(policy.runtimeID), for an agent another agent started")
         }
     }
 
@@ -384,7 +381,8 @@ struct BriefingTests {
 
     /// Told there are limits the person set, and never a number: the numbers are the
     /// project's and can change mid-conversation (#64).
-    @Test func anAgentThatMayStartAgentsIsToldSoAndThatThePersonSetsTheLimits() {
+    /// Every agent, a helper included (#940).
+    @Test func everyAgentIsToldItMayStartAgentsAndThatThePersonSetsTheLimits() {
         for policy in ToolPolicyCatalog.builtIn {
             let text = Briefing.text(for: policy)
             #expect(text.contains(Briefing.helpers), "\(policy.runtimeID)")
@@ -396,15 +394,6 @@ struct BriefingTests {
         }
     }
 
-    @Test func anAgentAnotherAgentStartedIsNotToldAboutToolsItDoesNotHave() {
-        for policy in ToolPolicyCatalog.builtIn {
-            let text = Briefing.text(for: policy, managesAgents: false)
-            #expect(!text.contains(Briefing.helpers), "\(policy.runtimeID)")
-            #expect(!text.contains(AppTool.startSession))
-            #expect(text.contains(Briefing.leases), "and is told everything else")
-        }
-    }
-
     // MARK: Worktrees through the app (#615)
 
     /// Agents that only had the tool description made worktrees with git, and the app
@@ -412,7 +401,6 @@ struct BriefingTests {
     @Test func anAgentThatCanMoveIsToldToMoveThroughTheApp() {
         for policy in ToolPolicyCatalog.builtIn {
             #expect(Briefing.lines(for: policy).contains(Briefing.worktrees), "\(policy.runtimeID)")
-            #expect(Briefing.text(for: policy, managesAgents: false).contains(Briefing.worktrees))
         }
         #expect(Briefing.worktrees.contains(AppTool.moveWorktree))
         #expect(Briefing.worktrees.contains("git worktree add"))

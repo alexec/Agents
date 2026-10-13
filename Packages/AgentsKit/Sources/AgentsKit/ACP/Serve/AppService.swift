@@ -171,16 +171,12 @@ public actor AppService {
     private let viewToolSink: ViewToolSink
     /// Whether the test view and its tools are offered (#187).
     private let offersTestView: Bool
-    /// Whether the agent tools are offered. False for an agent another agent
-    /// started (028), which the daemon says by starting this with `--no-agent-tools`.
-    private let managesAgents: Bool
     /// Whether `move_worktree` is offered. False for an agent on a runtime that cannot
     /// carry its conversation into another folder (053).
     private let movesItself: Bool
     private let box = ServiceBox()
 
     public init(transport: (any LineTransport)?,
-                managesAgents: Bool = true,
                 movesItself: Bool = true,
                 writer: Bool = false,
                 showFile: @escaping FileSink = { _ in .refused("This app cannot show a file.") },
@@ -233,7 +229,6 @@ public actor AppService {
         self.draftSink = draft
         self.viewToolSink = viewTool
         self.offersTestView = offersTestView
-        self.managesAgents = managesAgents
         self.movesItself = movesItself
         self.connection = transport.map { transport in
             JSONRPCConnection(transport: transport) { method, params in
@@ -297,7 +292,7 @@ public actor AppService {
             // A view's tools too (#187), but never one only a view may call: no runtime
             // filters by `visibility`, so what the model is not to see is not listed.
             let views = AppViewCatalog.tools(testView: offersTestView).filter(\.forModel).map(\.definition)
-            return .success(["tools": .array(Self.tools(managesAgents: managesAgents, movesItself: movesItself) + views)])
+            return .success(["tools": .array(Self.tools(movesItself: movesItself) + views)])
 
         case "resources/list":
             return .success(["resources": .array(AppViewCatalog.resources(testView: offersTestView).map(Self.listed))])
@@ -405,12 +400,6 @@ public actor AppService {
             }
 
             if let call = Self.agentCall(named: name, arguments) {
-                guard managesAgents else {
-                    return .success(Self.reply("""
-                        Nothing was done: a session that another session started cannot \
-                        start, stop, archive or list sessions of its own.
-                        """, isError: true))
-                }
                 switch call {
                 case .failure(let problem): return .success(Self.reply(problem.message, isError: true))
                 case .success(let call): return .success(Self.reply(await agentsSink(call)))
@@ -646,15 +635,12 @@ public actor AppService {
     }
 
     /// Every tool this server offers, in the order they are listed.
-    static func tools(managesAgents: Bool, movesItself: Bool = true) -> [JSONValue] {
+    static func tools(movesItself: Bool = true) -> [JSONValue] {
         // `finish_turn` is gone (#479, #481, then removed): the app works out how a turn
         // ended, and an agent that needs the person asks them.
-        // Starting and stopping sessions after the workflow tool, and only for an agent
-        // that may use them (028). `archive_session` for every agent, since with no id it
-        // asks for the caller (#481, #584, #638).
-        let agentTools = managesAgents
-            ? [Self.startSessionTool, Self.stopSessionTool, Self.archiveSessionTool]
-            : [Self.archiveSessionTool]
+        // Starting, stopping and archiving sessions after the workflow tool, for every
+        // agent, whoever started it (028, #940): the project's helper limits are the bound.
+        let agentTools = [Self.startSessionTool, Self.stopSessionTool, Self.archiveSessionTool]
         // The three lease tools after those, for every agent: waiting for the
         // simulator is not managing anyone (036).
         let leaseTools = [Self.leaseResourceTool, Self.releaseResourceTool, Self.listResourcesTool]
@@ -1268,7 +1254,8 @@ public actor AppService {
             It stays in the list with its conversation. Stopping frees its running \
             place; it keeps its not-archived place until it is archived. Stopping a \
             queued one takes it off the queue, and it never starts. Only sessions you \
-            started can be stopped this way; not yourself, and not anyone else's.
+            started, and the ones they started, can be stopped this way; not yourself, \
+            and not anyone else's.
             """,
         "inputSchema": sessionIDSchema,
     ]
@@ -1297,8 +1284,8 @@ public actor AppService {
             leaves it. Goes with move_worktree: you move, and stay there waiting for \
             approval.
 
-            With an id: the same for a session you started with start_session, once its \
-            work is merged or abandoned. Where this project lets you archive the sessions \
+            With an id: the same for a session you started with start_session, or one it \
+            started, once its work is merged or abandoned. Where this project lets you archive the sessions \
             you started (a Project Settings switch) it is archived now, or once its turn \
             ends; otherwise the person approves it. Either way its running place is freed \
             once it is done; it keeps its not-archived place until it is archived. Archive \
@@ -1321,8 +1308,8 @@ public actor AppService {
             what to pass as `after` for the next. Use it to find a session \
             the person asks you to continue, then read it with read_session.
 
-            With started_by me: only the sessions you started with start_session that \
-            have not been archived, each one's id, what it is doing, what it last said, \
+            With started_by me: only the sessions you started with start_session, and \
+            the ones they started, that have not been archived, each one's id, what it is doing, what it last said, \
             and its labels with owners; first, how many of this project's running and \
             not-archived places are in use out of the limits the person set, and which \
             of yours are queued and where; last, which runtimes start_session can start \

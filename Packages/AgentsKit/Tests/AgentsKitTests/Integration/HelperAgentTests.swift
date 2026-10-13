@@ -617,24 +617,92 @@ struct HelperAgentTests {
         #expect(await core.projectSummary(for: work)?.project.helperLimits == nil)
     }
 
-    @Test func anAgentAnotherAgentStartedCannotStartOne() async throws {
+    /// A token that speaks for a helper, as its own session's would.
+    private func helperToken(_ core: DaemonCore, _ helper: UUID) async -> String {
+        let token = UUID().uuidString
+        callers[token] = helper
+        await core.bindAppToken(token, to: helper)
+        return token
+    }
+
+    /// One a helper starts is marked as the helper's and counts in the same project
+    /// places as any other (#940): the limits are the bound, not how deep it goes.
+    @Test func anAgentAnotherAgentStartedMayStartOneAndItCountsInTheProjectsPlaces() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
         let core = try await makeCore(locations, FakeLauncher())
         let (_, token) = try await caller(core, in: work)
-        let helper = try await start(core, token)
-        let helperToken = UUID().uuidString
-        callers[helperToken] = helper
-        await core.bindAppToken(helperToken, to: helper)
+        _ = try await core.setHelperLimits(.init(folder: work, limits: HelperLimits(running: 2, notArchived: 2)))
+        let helper = try await start(core, token, "Middle")
+        let fromHelper = await helperToken(core, helper)
 
-        let error = await refusal { _ = try await start(core, helperToken) }
-        #expect(error?.code == DaemonAPI.Failure.notYours)
-        #expect(error?.message.contains("a session that another session started cannot") == true)
+        let below = try await start(core, fromHelper, "Below")
+        #expect(await core.agent(below)?.startedByAgent == helper, "its starter is the helper, not the lead")
+        #expect(HelperLimit.placesInUse(in: work, agents: await core.allAgents()) == 2)
+
+        let queued = try await calling(core, fromHelper) { t in
+            try await core.startHelper(.init(token: t, prompt: "One too many"))
+        }
+        #expect(queued.note.contains("This project already has 2 of 2 sessions started by sessions not yet archived"))
+        #expect(await core.agent(queued.agentID)?.state == .queued)
+    }
+
+    /// Archiving the agent in the middle leaves the one it started working, and the
+    /// lead can still list, stop and archive it (#940): nothing is left that no agent
+    /// can stop.
+    @Test func anAgentReachesTheOnesItsHelpersStartedAfterTheyAreArchived() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let gate = TurnGate()
+        defer { gate.open() }
+        let core = try await makeCore(locations, heldTurns(gate))
+        let (_, token) = try await caller(core, in: work, title: "Lead")
+        let middle = try await start(core, token, "Middle")
+        let below = try await start(core, await helperToken(core, middle), "Below")
+        _ = await eventually("Below is working") { await core.agent(below)?.state == .running }
+
+        try await core.archive(middle)   // by the person
+        #expect(await core.agent(below)?.state == .running, "archiving its starter leaves it working")
+
+        let list = try await calling(core, token) { t in try await core.listHelpers(.init(token: t)) }
+        #expect(list.contains("- \(below.uuidString): \u{201C}Below\u{201D}, started by \u{201C}Middle\u{201D} — working"))
+        let note = try await calling(core, token) { t in try await core.stopHelper(.init(token: t, agentID: below.uuidString)) }
+        #expect(note.hasPrefix("Stopped \u{201C}Below\u{201D}"))
+        #expect(await core.agent(below)?.endedReason == .stoppedByAgent)
+        #expect(try await notes(core, below).contains("\u{201C}Lead\u{201D} stopped this agent."))
+    }
+
+    /// Down the chain only: not up it, and not across to another agent's.
+    @Test func aHelperCannotStopItsStarterOrItsStartersOtherHelpers() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        let gate = TurnGate()
+        defer { gate.open() }
+        let core = try await makeCore(locations, heldTurns(gate))
+        let (lead, token) = try await caller(core, in: work)
+        let helper = try await start(core, token, "Alpha")
+        let sibling = try await start(core, token, "Beta")
+        let fromHelper = await helperToken(core, helper)
+        let before = await core.allAgents().map { "\($0.id) \($0.state) \(String(describing: $0.endedReason))" }.sorted()
+
+        let up = await refusal { _ = try await calling(core, fromHelper) { t in
+            try await core.stopHelper(.init(token: t, agentID: lead.uuidString)) } }
+        #expect(up?.message == "Nothing changed: that is one of the person's own sessions. "
+            + "You can only stop or archive sessions you started and the sessions they started.")
+        let across = await refusal { _ = try await calling(core, fromHelper) { t in
+            try await core.stopHelper(.init(token: t, agentID: sibling.uuidString)) } }
+        #expect(across?.message == "Nothing changed: another agent started that one. "
+            + "You can only stop or archive sessions you started and the sessions they started.")
+        let list = try await calling(core, fromHelper) { t in try await core.listHelpers(.init(token: t)) }
+        #expect(!list.contains(sibling.uuidString))
+
+        let after = await core.allAgents().map { "\($0.id) \($0.state) \(String(describing: $0.endedReason))" }.sorted()
+        #expect(before == after)
     }
 
     /// Checked on what the runtime was actually handed, both when it was made and when
     /// it was picked back up, rather than on anything the daemon says about itself.
-    @Test func anAgentAnotherAgentStartedIsNeverOfferedTheTools() async throws {
+    @Test func anAgentAnotherAgentStartedIsOfferedTheTools() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)
         let launcher = FakeLauncher()
@@ -655,7 +723,7 @@ struct HelperAgentTests {
             return nil
         } ?? []
         #expect(madeTools.contains(AppTool.showFile))
-        #expect(!madeTools.contains(AppTool.startSession))
+        #expect(madeTools.contains(AppTool.startSession), "and the tools for starting agents (#940)")
 
         _ = await eventually("the helper's turn ended and its runtime went") {
             let settled = await core.agent(helper)?.state.holdsRuntime == false
@@ -676,7 +744,7 @@ struct HelperAgentTests {
             return nil
         } ?? []
         #expect(resumedTools.contains(AppTool.showFile), "\(resumedTools)")
-        #expect(!resumedTools.contains(AppTool.startSession), "\(resumedTools)")
+        #expect(resumedTools.contains(AppTool.startSession), "\(resumedTools)")
     }
 
     @Test func aWorkflowsAgentMayStartOne() async throws {
@@ -930,11 +998,11 @@ struct HelperAgentTests {
         let cases: [(String, String)] = [
             (lead.uuidString, "Nothing changed: an agent cannot stop itself."),
             (persons.uuidString, "Nothing changed: that is one of the person's own sessions. "
-                + "You can only stop or archive sessions you started."),
+                + "You can only stop or archive sessions you started and the sessions they started."),
             (workflows.uuidString, "Nothing changed: a workflow started that one. "
-                + "You can only stop or archive sessions you started."),
+                + "You can only stop or archive sessions you started and the sessions they started."),
             (othersHelper.uuidString, "Nothing changed: another agent started that one. "
-                + "You can only stop or archive sessions you started."),
+                + "You can only stop or archive sessions you started and the sessions they started."),
             ("not-an-id", "Nothing changed: there is no agent with that id."),
             (UUID().uuidString, "Nothing changed: there is no agent with that id."),
         ]

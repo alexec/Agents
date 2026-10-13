@@ -238,10 +238,8 @@ struct MessageAgentTests {
         #expect(AppTool.isServedByTheApp("mcp__agents__message_agent"))
         #expect(AppTool.isServedByTheApp("mcp__agents__message_session"))
         #expect(ConnectionRole.agentMethods.contains(DaemonAPI.Method.agentsMessageAgent))
-        for managesAgents in [true, false] {
-            let names = AppService.tools(managesAgents: managesAgents).compactMap { $0["name"]?.stringValue }
-            #expect(names.contains(AppTool.messageSession))
-        }
+        let names = AppService.tools().compactMap { $0["name"]?.stringValue }
+        #expect(names.contains(AppTool.messageSession))
     }
 
     @Test func aMessageWithoutWordsOrATargetIsRefusedBeforeItReachesTheDaemon() {

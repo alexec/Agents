@@ -16,10 +16,10 @@ struct AgentToolsServiceTests {
         func record(_ call: AppService.AgentCall) { seen.append(call) }
     }
 
-    private func pair(managesAgents: Bool = true, calls: Calls = Calls())
+    private func pair(calls: Calls = Calls())
         async -> (client: JSONRPCConnection, service: AppService) {
         let (mine, theirs) = PairedTransport.pair()
-        let service = AppService(transport: theirs, managesAgents: managesAgents,
+        let service = AppService(transport: theirs,
                                  agents: { call in
                                      await calls.record(call)
                                      return .shown("done")
@@ -37,34 +37,11 @@ struct AgentToolsServiceTests {
     private let agentTools = [AppService.startSessionToolName, AppService.stopSessionToolName,
                               AppService.archiveSessionToolName]
 
-    @Test func anAgentThePersonStartedIsOfferedThem() async throws {
+    /// Every agent, whoever started it (#940): the daemon decides what each may touch.
+    @Test func everyAgentIsOfferedThem() async throws {
         let (client, service) = await pair()
         let listed = try await names(client)
         for tool in agentTools { #expect(listed.contains(tool), "\(tool)") }
-        await service.close()
-    }
-
-    /// All but archive_session, which with no id asks for the caller itself (#481).
-    @Test func anAgentAnotherAgentStartedIsNotOfferedThem() async throws {
-        let (client, service) = await pair(managesAgents: false)
-        let listed = try await names(client)
-        for tool in agentTools where tool != AppService.archiveSessionToolName { #expect(!listed.contains(tool), "\(tool)") }
-        #expect(listed.contains(AppService.archiveSessionToolName))
-        #expect(listed.contains(AppService.showFileToolName), "and keeps the rest")
-        await service.close()
-    }
-
-    @Test func andIsRefusedIfItCallsOneAnyway() async throws {
-        let calls = Calls()
-        let (client, service) = await pair(managesAgents: false, calls: calls)
-        let result = try await client.call("tools/call", [
-            "name": .string("mcp__agents__" + AppService.startSessionToolName),
-            "arguments": ["prompt": "Go"],
-        ])
-        #expect(result["isError"]?.boolValue == true)
-        #expect(result["content"]?.arrayValue?.first?["text"]?.stringValue?
-            .contains("a session that another session started cannot") == true)
-        #expect(await calls.seen.isEmpty)
         await service.close()
     }
 
@@ -98,15 +75,10 @@ struct AgentToolsServiceTests {
         await service.close()
     }
 
-    /// list_sessions is every agent's, but only one that may start sessions lists the
-    /// ones it started (#638); anything but `me` is refused.
-    @Test func listingTheSessionsItStartedNeedsTheTools() async throws {
+    /// Anything but `me` for started_by is refused before it reaches the daemon (#638).
+    @Test func listingByAnyoneButMeIsRefused() async throws {
         let calls = Calls()
-        let (client, service) = await pair(managesAgents: false, calls: calls)
-        let mine = try await client.call("tools/call", [
-            "name": .string(AppService.listSessionsToolName), "arguments": ["started_by": "me"],
-        ])
-        #expect(mine["isError"]?.boolValue == true)
+        let (client, service) = await pair(calls: calls)
         let other = try await client.call("tools/call", [
             "name": .string(AppService.listSessionsToolName), "arguments": ["started_by": "them"],
         ])

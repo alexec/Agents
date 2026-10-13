@@ -74,12 +74,12 @@ public enum Briefing {
 
     /// Agents of its own (028), and when not to.
     ///
-    /// Only for an agent that has the tools: one another agent started is not told
-    /// about tools it was never given. The restraint is the second sentence, for the
-    /// reason the workflow line gives — an agent told it can start agents will start
-    /// agents — and the limits are said here as well as in the tool's description so
-    /// they are known before the first call rather than learned from a refusal. Without
-    /// their numbers, which are the project's and can change mid-conversation (#64).
+    /// Every agent is told, including one another agent started (#940). The restraint
+    /// is the second sentence, for the reason the workflow line gives — an agent told it
+    /// can start agents will start agents — and the limits are said here as well as in
+    /// the tool's description so they are known before the first call rather than learned
+    /// from a refusal. Without their numbers, which are the project's and can change
+    /// mid-conversation (#64).
     public static let helpers = """
         For work that can run alongside yours, use \(AppTool.startSession) within my \
         limits on how many may run and be kept. Stop the sessions you started when they are done, \
@@ -296,9 +296,6 @@ public enum Briefing {
     /// and the residue line exists only where something conflicting could not be
     /// removed. A tool the app does not serve yet still gets no line at all.
     ///
-    /// `managesAgents` is false for an agent another agent started, which gets no line
-    /// about starting agents because it has no tools for it (028).
-    ///
     /// `movesItself` is false for a runtime that cannot move folders, which gets no
     /// line about worktrees because it has no `move_worktree` (#615).
     ///
@@ -308,7 +305,7 @@ public enum Briefing {
     ///
     /// `declared` is what the person declared on this machine (#116), said inside the
     /// lease line rather than after everything else (#599).
-    public static func lines(for policy: ToolPolicy, managesAgents: Bool = true,
+    public static func lines(for policy: ToolPolicy,
                              movesItself: Bool = true, naming: Naming? = nil,
                              declared: [DeclaredResource] = []) -> [String] {
         let schedulingRemoved = policy.removed.contains { $0.category == .standingArrangements }
@@ -316,17 +313,17 @@ public enum Briefing {
             + [liveDocument,
                 escalation(named: policy.escalationTool),
                 workflows(scheduling: schedulingRemoved)]
-            + (managesAgents ? [helpers] : [])
+            + [helpers]
             + [leases(declared: declared), events, sessions]
             + (movesItself ? [worktrees] : [])
             + [residue(policy.residue)].compactMap { $0 }
     }
 
     /// The whole of it, as the one block the daemon appends to a first prompt.
-    public static func text(for policy: ToolPolicy, managesAgents: Bool = true,
+    public static func text(for policy: ToolPolicy,
                             movesItself: Bool = true, naming: Naming? = nil,
                             declared: [DeclaredResource] = []) -> String {
-        var blocks = lines(for: policy, managesAgents: managesAgents, movesItself: movesItself,
+        var blocks = lines(for: policy, movesItself: movesItself,
                            naming: naming, declared: declared)
         if policy.appToolSchemaDelivery == .firstPrompt {
             blocks.append(AppToolPreface.firstPrompt)

@@ -31,13 +31,11 @@ public final class AppToolsEndpoint: @unchecked Sendable {
     /// What a token may be offered. The daemon refuses the calls as well; this only keeps
     /// the menu honest (028, 053).
     public struct Grant: Equatable, Sendable {
-        public var managesAgents: Bool
         public var movesItself: Bool
         /// The agent writing a provider's map (#858): the writer's tools only.
         public var writer: Bool
 
-        public init(managesAgents: Bool = true, movesItself: Bool = true, writer: Bool = false) {
-            self.managesAgents = managesAgents
+        public init(movesItself: Bool = true, writer: Bool = false) {
             self.movesItself = movesItself
             self.writer = writer
         }
@@ -80,7 +78,7 @@ public final class AppToolsEndpoint: @unchecked Sendable {
     /// Let `token`'s runtime in, with these tools. A token granted again keeps its sessions
     /// and takes the new tools from its next `tools/list`.
     public func grant(_ token: String, _ grant: Grant) {
-        let service = AppService.relaying(token: token, managesAgents: grant.managesAgents,
+        let service = AppService.relaying(token: token,
                                           movesItself: grant.movesItself, writer: grant.writer, relay: relay)
         lock.withLock {
             let holder = Holder(grant: grant, service: service)

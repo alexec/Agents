@@ -308,16 +308,13 @@ extension DaemonCore {
     ///
     /// Only the plugins the person has approved (security review, S2): one waiting is in
     /// neither the `_meta` nor the index until they do.
-    /// `managesAgents` is false for an agent another agent started. Grok's rules name
-    /// only the tools that session's server will offer, so a helper is not told how to
-    /// call `start_session`.
-    func sessionMeta(runtimeID: String, cwd: URL, managesAgents: Bool = true,
+    func sessionMeta(runtimeID: String, cwd: URL,
                      sandbox: SandboxChoice = .runtime) -> JSONValue? {
-        Self.merging(scopingMeta(runtimeID: runtimeID, cwd: cwd, managesAgents: managesAgents),
+        Self.merging(scopingMeta(runtimeID: runtimeID, cwd: cwd),
                      LaunchSandbox.meta(runtimeID: runtimeID, choice: sandbox))
     }
 
-    private func scopingMeta(runtimeID: String, cwd: URL, managesAgents: Bool) -> JSONValue? {
+    private func scopingMeta(runtimeID: String, cwd: URL) -> JSONValue? {
         let plugins = approvedPluginFolders(for: cwd)
         DotAgents.refreshPlugins(for: cwd, approved: plugins)
         // The person's own plugins after the project's (054, R12), for the runtimes that
@@ -327,7 +324,7 @@ extension DaemonCore {
         let meta = Self.merging(policy.sessionMeta,
                                 DotAgents.sessionMeta(runtimeID: runtimeID, plugins: plugins + personal))
         guard policy.appToolSchemaDelivery == .sessionRules else { return meta }
-        return Self.merging(meta, ["rules": .string(AppToolPreface.rules(managesAgents: managesAgents))])
+        return Self.merging(meta, ["rules": .string(AppToolPreface.rules())])
     }
 
     /// Two `_meta` objects as one, key by key and all the way down, because Claude's

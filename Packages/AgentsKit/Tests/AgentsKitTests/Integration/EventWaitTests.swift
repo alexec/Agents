@@ -121,8 +121,7 @@ struct EventWaitTests {
 
     @Test func everyAgentIsBriefedAboutWaiting() {
         for policy in ToolPolicyCatalog.builtIn {
-            #expect(Briefing.lines(for: policy, managesAgents: false).contains(Briefing.events))
-            #expect(Briefing.lines(for: policy, managesAgents: true).contains(Briefing.events))
+            #expect(Briefing.lines(for: policy).contains(Briefing.events))
         }
     }
 

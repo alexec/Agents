@@ -20,8 +20,8 @@ struct ToolCostTests {
     }
 
     /// The tools a session is listed, as `tools/list` answers.
-    private func listed(managesAgents: Bool) -> [JSONValue] {
-        AppService.tools(managesAgents: managesAgents)
+    private func listed() -> [JSONValue] {
+        AppService.tools()
             + AppViewCatalog.tools(testView: false).filter(\.forModel).map(\.definition)
     }
 
@@ -30,24 +30,21 @@ struct ToolCostTests {
     static let leadCeiling = 45_000
 
     @Test func everyToolIsMeasuredAndTheWholeIsUnderItsCeiling() throws {
-        let lead = listed(managesAgents: true)
+        let lead = listed()
         var rows: [(String, Int)] = []
         for tool in lead {
             rows.append((tool["name"]?.stringValue ?? "?", try bytes(tool)))
         }
         let total = rows.reduce(0) { $0 + $1.1 }
-        let helper = try listed(managesAgents: false).reduce(0) { $0 + (try bytes($1)) }
-        let grok = GrokToolPreface.rules(managesAgents: true).utf8.count
+        let grok = GrokToolPreface.rules().utf8.count
         let briefing = Briefing.text(for: ToolPolicyCatalog.policy(for: "claude")).utf8.count
         // The table the doc is written from: `swift test --filter ToolCostTests`.
         for (name, size) in rows.sorted(by: { $0.1 > $1.1 }) {
             print("tool-cost \(name) \(size) bytes ~\(size / 4) tokens")
         }
         print("tool-cost total lead \(total) bytes ~\(total / 4) tokens, \(rows.count) tools")
-        print("tool-cost total helper \(helper) bytes ~\(helper / 4) tokens")
         print("tool-cost grok rules \(grok) bytes ~\(grok / 4) tokens")
         print("tool-cost claude briefing \(briefing) bytes ~\(briefing / 4) tokens")
         #expect(total <= Self.leadCeiling, "the app's tools grew to \(total) bytes")
-        #expect(helper < total)
     }
 }

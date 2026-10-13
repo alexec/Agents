@@ -11,10 +11,9 @@ import Foundation
 /// text: each tool the server will actually offer this session, under the catalog name
 /// Grok calls (`agents__show_file`), with the arguments it takes.
 enum AppToolPreface {
-    /// What a Grok session is told, for an agent that may or may not start others.
-    static func rules(managesAgents: Bool) -> String {
+    /// What a Grok session is told.
+    static func rules() -> String {
         let offered = AppService.tools(
-            managesAgents: managesAgents,
             movesItself: RuntimeCatalog.canMoveFolders(runtimeID: RuntimeCatalog.grok.id))
         let cards = offered.compactMap { card($0) }.joined(separator: "\n\n")
         return """

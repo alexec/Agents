@@ -20,7 +20,7 @@ struct AppToolPermissionTests {
     /// still draws the call as the app's own.
     @Test func aRetiredPublishEventStillReadsAsTheApps() {
         #expect(!AppTool.all.contains(AppTool.retiredPublishEvent))
-        #expect(!AppService.tools(managesAgents: true).contains { $0["name"]?.stringValue == AppTool.retiredPublishEvent })
+        #expect(!AppService.tools().contains { $0["name"]?.stringValue == AppTool.retiredPublishEvent })
         #expect(AppTool.isServedByTheApp("mcp__agents__publish_event"))
         #expect(AppTool.isServedByTheApp("agents_publish_event"))
     }

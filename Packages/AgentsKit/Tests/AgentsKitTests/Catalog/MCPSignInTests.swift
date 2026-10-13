@@ -145,7 +145,7 @@ struct MCPSignInTests {
         #expect(try String(contentsOf: w.signIns, encoding: .utf8).contains(FakeOAuth.access(1)))
 
         // The next agent starts with it, and its bearer.
-        let servers = try await w.core.sessionServers(runtimeID: "claude", chosen: [], token: "t", managesAgents: true,
+        let servers = try await w.core.sessionServers(runtimeID: "claude", chosen: [], token: "t",
                                                       cwd: w.home, capabilities: ACP.MCPCapabilities(http: true, sse: false))
         #expect(servers.map(\.name) == ["agents", "gh"])
         #expect(servers.last?.transport == .http(url: "https://MCP.example/mcp",
@@ -160,7 +160,7 @@ struct MCPSignInTests {
     @Test func aServerThatStillNeedsSignInIsLeftOutAtSessionStart() async throws {
         let w = try await world()
         _ = try await w.core.mcpList(.init(destination: .personal))
-        let servers = try await w.core.sessionServers(runtimeID: "claude", chosen: [], token: "t", managesAgents: true,
+        let servers = try await w.core.sessionServers(runtimeID: "claude", chosen: [], token: "t",
                                                       cwd: w.home, capabilities: ACP.MCPCapabilities(http: true, sse: false))
         #expect(servers.map(\.name) == ["agents"])
         let snapshot = PersonalDotAgents.snapshot(home: w.home, installed: ["claude"], record: .init(home: w.home.path))
@@ -173,7 +173,7 @@ struct MCPSignInTests {
         // An hour on: the token has ended.
         let later = Date().addingTimeInterval(3600)
         await w.core.setMCPSignIn(http: w.fake.send, now: { later })
-        let servers = try await w.core.sessionServers(runtimeID: "claude", chosen: [], token: "t", managesAgents: true,
+        let servers = try await w.core.sessionServers(runtimeID: "claude", chosen: [], token: "t",
                                                       cwd: w.home, capabilities: ACP.MCPCapabilities(http: true, sse: false))
         #expect(servers.last?.transport == .http(url: "https://MCP.example/mcp",
                                                  headers: ["Authorization": "Bearer \(FakeOAuth.access(2))"]))
@@ -194,7 +194,7 @@ struct MCPSignInTests {
         w.fake.refuseRefresh = true
         let later3 = later2.addingTimeInterval(3600)
         await w.core.setMCPSignIn(http: w.fake.send, now: { later3 })
-        let left = try await w.core.sessionServers(runtimeID: "claude", chosen: [], token: "t", managesAgents: true,
+        let left = try await w.core.sessionServers(runtimeID: "claude", chosen: [], token: "t",
                                                    cwd: w.home, capabilities: ACP.MCPCapabilities(http: true, sse: false))
         #expect(left.map(\.name) == ["agents"])
         #expect(try await w.core.mcpList(.init(destination: .personal)).servers.first?.signIn == .needsSignIn)
@@ -268,7 +268,7 @@ struct MCPSignInTests {
         _ = await w.core.mcpSignInWait(.init(flowID: try #require(started.flowID)))
         let later = Date().addingTimeInterval(3600)
         await w.core.setMCPSignIn(http: w.fake.send, now: { later }, log: lines.add)
-        _ = try await w.core.sessionServers(runtimeID: "claude", chosen: [], token: "t", managesAgents: true,
+        _ = try await w.core.sessionServers(runtimeID: "claude", chosen: [], token: "t",
                                             cwd: w.home, capabilities: ACP.MCPCapabilities(http: true, sse: false))
         _ = await w.core.mcpSignOut(.init(target: .entry(destination: .personal, name: "gh")))
         DaemonLog.shared.setDestination(nil)

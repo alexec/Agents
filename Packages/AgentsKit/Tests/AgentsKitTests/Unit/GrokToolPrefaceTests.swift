@@ -8,10 +8,10 @@ import Testing
 @Suite("Grok tool preface", .timeLimit(.minutes(1)))
 struct GrokToolPrefaceTests {
     @Test func theSchemasNameEveryOfferedToolAndNotTheOlderNames() {
-        let rules = GrokToolPreface.rules(managesAgents: true)
+        let rules = GrokToolPreface.rules()
         #expect(rules.contains("Do not call search_tool"))
         #expect(rules.contains("use_tool"))
-        let offered = AppService.tools(managesAgents: true, movesItself: false)
+        let offered = AppService.tools(movesItself: false)
             .compactMap { $0["name"]?.stringValue }
         for name in offered {
             #expect(rules.contains(GrokToolPreface.catalogName(name)), "\(name)")
@@ -22,11 +22,12 @@ struct GrokToolPrefaceTests {
         #expect(!rules.contains("leave_worktree"))
     }
 
-    @Test func aHelperIsNotToldHowToStartAnAgent() {
-        let rules = GrokToolPreface.rules(managesAgents: false)
+    /// The same rules for every agent, a helper included (#940).
+    @Test func everyAgentIsToldHowToStartAnAgent() {
+        let rules = GrokToolPreface.rules()
         #expect(rules.contains(GrokToolPreface.catalogName(AppTool.showFile)))
-        #expect(!rules.contains(GrokToolPreface.catalogName(AppTool.startSession)))
-        #expect(!rules.contains(GrokToolPreface.catalogName(AppTool.stopSession)))
+        #expect(rules.contains(GrokToolPreface.catalogName(AppTool.startSession)))
+        #expect(rules.contains(GrokToolPreface.catalogName(AppTool.stopSession)))
         #expect(rules.contains(GrokToolPreface.catalogName(AppTool.leaseResource)))
         // Grok's own question tool never reaches us, so this is its only way to ask.
         #expect(rules.contains(GrokToolPreface.catalogName(AppTool.askForm)))
@@ -41,14 +42,12 @@ struct GrokToolPrefaceTests {
         let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
                               discovery: .findsEverything, launcher: FakeLauncher())
 
-        let full = await core.sessionMeta(runtimeID: "grok", cwd: work, managesAgents: true)
-        let helper = await core.sessionMeta(runtimeID: "grok", cwd: work, managesAgents: false)
+        let full = await core.sessionMeta(runtimeID: "grok", cwd: work)
         let claude = await core.sessionMeta(runtimeID: "claude", cwd: work)
 
         let fullRules = try #require(full?["rules"]?.stringValue)
-        #expect(fullRules == GrokToolPreface.rules(managesAgents: true))
+        #expect(fullRules == GrokToolPreface.rules())
         #expect(full?["agentProfile"]?["tools"] != nil, "the allow list is still there")
-        #expect(helper?["rules"]?.stringValue == GrokToolPreface.rules(managesAgents: false))
         #expect(claude?["rules"] == nil)
     }
 }

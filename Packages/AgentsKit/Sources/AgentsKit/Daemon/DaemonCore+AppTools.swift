@@ -16,15 +16,12 @@ import Foundation
 extension DaemonCore {
     /// The MCP server every agent is given, beside whatever the user attached.
     ///
-    /// An agent another agent started is not offered the tools for starting, stopping
-    /// and archiving agents (028), so it is never offered what the daemon would refuse it.
-    ///
-    /// And an agent on a runtime that cannot carry its conversation into another folder is
+    /// An agent on a runtime that cannot carry its conversation into another folder is
     /// not offered the tools for moving itself (053).
-    func appServer(token: String, managesAgents: Bool = true, movesItself: Bool = true,
+    func appServer(token: String, movesItself: Bool = true,
                    writer: Bool = false) async throws -> MCPServer {
         let port = try await appTools.start()
-        appTools.grant(token, .init(managesAgents: managesAgents, movesItself: movesItself, writer: writer))
+        appTools.grant(token, .init(movesItself: movesItself, writer: writer))
         return AppToolsEndpoint.server(port: port, token: token)
     }
 

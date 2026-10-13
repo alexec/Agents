@@ -209,7 +209,7 @@ extension DaemonCore {
         let sandbox = resolveSandbox(for: agent).choice
         hasher.combine(sandbox)
         hasher.combine(sessionMeta(runtimeID: agent.runtimeID, cwd: agent.cwd,
-                                   managesAgents: agent.startedByAgent == nil, sandbox: sandbox))
+                                   sandbox: sandbox))
         hasher.combine(agent.cwd)
         hasher.combine(agent.additionalDirectories)
         hasher.combine(agent.mcpServers)
