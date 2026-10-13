@@ -31,6 +31,8 @@ struct WorkflowPage: View {
     /// phone's list until this page asks for them, so it cannot count them itself.
     @State private var moreRuns = false
     @State private var confirmsDelete = false
+    /// Which half of the page is on show (#863), as on the Mac.
+    @State private var pane = WorkflowPane.activity
 
     private static let runsAtFirst = 3
     private static let runsPerMore = 6
@@ -110,15 +112,25 @@ struct WorkflowPage: View {
         return VStack(alignment: .leading, spacing: 22) {
             heading(summary)
             runButton(summary)
-            status(summary)
-            if workflow.problem?.needsAPerson == true { unreadableFile() }
-            prompt(summary)
-            triggers(summary)
-            settings(summary)
-            labels(summary)
-            hostsSection(summary)
-            unknownKeys(workflow)
-            runs(workflow)
+            Picker("Show", selection: $pane) {
+                ForEach(WorkflowPane.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            // Two panes (#863): what it has done, and how it is set up.
+            switch pane {
+            case .activity:
+                status(summary)
+                if workflow.problem?.needsAPerson == true { unreadableFile() }
+                runs(workflow)
+            case .configuration:
+                prompt(summary)
+                triggers(summary)
+                settings(summary)
+                labels(summary)
+                hostsSection(summary)
+                unknownKeys(workflow)
+            }
         }
         .padding(.horizontal, 16)
         .padding(.top, 12)

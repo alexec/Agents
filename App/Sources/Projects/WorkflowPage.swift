@@ -43,6 +43,9 @@ struct WorkflowPage: View {
     /// same workflow is not a leaving.
     @State private var runsHeld: RunsHeld?
     @State private var confirmsDelete = false
+    /// Which half of the page is on show (#863). Kept when another workflow is opened,
+    /// so someone reading runs goes on reading runs.
+    @State private var pane = WorkflowPane.activity
 
     private static let runsAtFirst = 3
     private static let runsPerMore = 6
@@ -137,17 +140,22 @@ struct WorkflowPage: View {
         let workflow = summary.workflow
         VStack(alignment: .leading, spacing: 22) {
             heading(summary)
-            // The page answers four questions in this order (#142): is it running and
-            // why not, what it does, when it runs, and what it has done.
-            status(summary)
-            if workflow.problem != nil {
-                broken(workflow)
+            panePicker
+            // Two panes (#863): Activity answers whether it is running and why not, and
+            // what it has done; Configuration answers what it does, when, and where.
+            switch pane {
+            case .activity:
+                status(summary)
+                if workflow.problem != nil {
+                    broken(workflow)
+                }
+                history(summary)
+            case .configuration:
+                form(summary)
+                triggers(summary)
+                hostsSection(summary)
+                unknownKeys(workflow)
             }
-            form(summary)
-            triggers(summary)
-            hostsSection(summary)
-            unknownKeys(workflow)
-            history(summary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         // The column the transcript, the prompt bar and the project page all use, so
@@ -155,6 +163,17 @@ struct WorkflowPage: View {
         .chatColumn()
         .padding(.top, 28)
         .padding(.bottom, 40)
+    }
+
+    /// Activity | Configuration, under the title, as the files pane's Changes | All is.
+    private var panePicker: some View {
+        Picker("Show", selection: $pane) {
+            ForEach(WorkflowPane.allCases) { Text($0.rawValue).tag($0) }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize()
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: The title line

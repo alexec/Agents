@@ -911,6 +911,7 @@ button.remove:hover { opacity: 1; }
 .workflow-page .run-now { padding: 5px 16px; border-radius: 999px; }
 .workflow-page .switch { display: inline-flex; align-items: center; gap: 6px; }
 .workflow-page .section-head { margin: 14px 0 2px; font-size: calc(13px * var(--text-scale)); }
+.workflow-page .workflow-panes { align-self: center; margin: 10px 0 4px; }
 .triggers { list-style: none; margin: 0; padding: 0; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }
 .trigger { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; column-gap: 10px; padding: 10px 14px; align-items: start; }
 .trigger + .trigger { border-top: 1px solid var(--paper-rule); }

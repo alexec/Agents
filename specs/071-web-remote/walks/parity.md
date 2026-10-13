@@ -266,6 +266,7 @@ The deltas are tracked by 29 issues:
 
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
+| Activity and Configuration panes (#863) | A segmented Activity / Configuration under the title, opening on Activity: status, an unreadable file and runs on Activity; the prompt and its settings, triggers, cooldown, when done, hosts and unknown keys on Configuration; the actions stay in the toolbar: `A/Projects/WorkflowPage.swift` (`panePicker`), `S/WorkflowStatus.swift` (`WorkflowPane`) | The same, under Run Now: `R/Projects/WorkflowPage.swift` | The same, a `.segmented` under the actions: `W/views/WorkflowPage.tsx` | **same** (#863); unwalked |
 | Status card and page actions (#142, #605) | `A/Projects/WorkflowPage.swift:225-273`; toolbar includes Delete… with a confirmation stating the file is removed from disk and can be restored from git | `R/Projects/WorkflowPage.swift:120-165`; toolbar includes the same confirmed Delete… action | `W/views/WorkflowPage.tsx:83-95`; page includes the same confirmed Delete… action | **same** |
 | An unreadable workflow file | Its text under *The file is below*: `A/Projects/WorkflowPage.swift:211-218` | Its text under *The file is below*: `R/Projects/WorkflowPage.swift` | Its text under *The file is below*, read with `pins/read`: `W/views/WorkflowPage.tsx` (`UnreadableFile`) | **same** (#540) |
 | Triggers, next runs, last ran (#98, #99) | `A/Projects/WorkflowPage.swift:285-452` | `R/Projects/WorkflowPage.swift` | `W/views/WorkflowPage.tsx` | **same** |
