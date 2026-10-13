@@ -1,0 +1,39 @@
+# Labels each pull request with the feature areas its files are in, from .agents/areas,
+# and warns when another open pull request holds the same area (#873). Two lanes on one
+# feature at a time caused most rebases; the warning names the other pull request so one
+# lands first. A warning, never a failure: scripts/pr-areas.py exits 0.
+name: areas
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  # Labels are added through the issues API; a fork's token cannot, and the script
+  # then only warns.
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: areas-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            .agents/areas
+            scripts/pr-areas.py
+          sparse-checkout-cone-mode: false
+
+      - name: Label areas and warn on held ones
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: python3 scripts/pr-areas.py pr "$PR" --apply
