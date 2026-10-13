@@ -254,6 +254,29 @@ struct SidebarModelTests {
         #expect(SidebarProjectFold(key, label: "api", in: model, isOpen: false).sessions.isEmpty)
     }
 
+    /// The Mac's four columns (#866) list a session in every group it fits: its project
+    /// lists all its live ones, pinned or waiting too, and a pinned session that asks is
+    /// in Needs You as well as Pinned.
+    @Test func withoutListedOnceASessionIsInEveryGroupItFits() {
+        let model = AgentsModel()
+        let asking = started(api, .waitingOnUser, "asking", at: 1)
+        let working = started(api, .running, "working", at: 3)
+        let done = started(api, .finished, "done", at: 2)
+        let pinned = started(api, .waitingOnUser, "pinned", at: 4)
+        let gone = started(api, .archived, "gone", at: 5)
+        model.replaceAgents([asking, working, done, pinned, gone])
+        model.replacePins([ProjectPins(folder: api, pins: [], sessions: [pinned.id])])
+
+        let fold = SidebarProjectFold(key, label: "api", in: model, isOpen: true, listedOnce: false)
+        #expect(fold.sessions.map(\.id) == [pinned.id, working.id, done.id, asking.id])
+        #expect(SidebarProjectFold.ownCount(key, in: model, listedOnce: false) == 4)
+        #expect(SidebarSmartRow.needsYou.agents(in: model, projects: [key], listedOnce: false).map(\.id)
+                == [pinned.id, asking.id])
+        #expect(SidebarSmartRow.needsYou.count(in: model, projects: [key], listedOnce: false) == 2)
+        #expect(SidebarSmartRow.needsYou.agents(in: model, projects: [key]).map(\.id) == [asking.id],
+                "the Remote still lists it once")
+    }
+
     /// The smart rows gather across every project (#495), by what each session wants.
     @Test func smartRowsGatherAcrossProjects() {
         let model = AgentsModel()
