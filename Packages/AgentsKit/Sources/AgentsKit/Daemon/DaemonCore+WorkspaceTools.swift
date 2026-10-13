@@ -51,8 +51,21 @@ extension DaemonCore {
             _ = try await call(DaemonAPI.Method.hostsStop, .object(params))
             return "Stopping \(host)."
         case .make:
-            let provider = try named(request.provider, "provider")
+            let given = try named(request.provider, "provider")
             let name = try named(request.name, "name for the new workspace")
+            // Checked before the card: the person is never asked about what can't be done (#855).
+            let listed = try await call(DaemonAPI.Method.workspacesForAgent, [:]).decode(DaemonAPI.AgentWorkspaces.self)
+            guard let found = Self.provider(given, in: listed) else {
+                throw JSONRPCError(code: JSONRPCError.invalidParams, message: "Nothing was made: \(Self.noProvider(given, in: listed))")
+            }
+            guard found.canMake else {
+                throw JSONRPCError(code: JSONRPCError.invalidParams, message: "Nothing was made: \(found.name) can’t make workspaces.")
+            }
+            if found.workspaces.contains(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) {
+                throw JSONRPCError(code: JSONRPCError.invalidParams,
+                                   message: "Nothing was made: \(found.name) has a workspace called \(name) already.")
+            }
+            let provider = found.name
             let choices = (request.options?.objectValue ?? [:]).sorted { $0.key < $1.key }
                 .map { "\($0.key) \($0.value.stringValue ?? "\($0.value)")" }.joined(separator: ", ")
             let question = "Make a new workspace, \(name), at \(provider)\(choices.isEmpty ? "" : " (\(choices))")?"
@@ -60,14 +73,26 @@ extension DaemonCore {
                                           yes: "Make it") else {
                 return "Nothing was made: the person said no, or didn’t answer."
             }
-            var params: [String: JSONValue] = ["id": .string(provider), "name": .string(name)]
+            var params: [String: JSONValue] = ["id": .string(found.id.rawValue), "name": .string(name)]
             if let options = request.options { params["options"] = options }
             let made = try await call(DaemonAPI.Method.providersCreate, .object(params)).decode(DaemonAPI.ProviderCreated.self)
             return made.joining
                 ? "Made \(made.workspace.name). It joins as the host \(made.workspace.name) on its first boot: wait for server.online."
                 : "Made \(made.workspace.name). It can’t install Agents on its first boot, so the person adds it from Settings ▸ Control plane ▸ Providers with Add as Host…."
         case .delete:
-            let host = try named(request.host, "host")
+            let given = try named(request.host, "host")
+            let listed = try await call(DaemonAPI.Method.workspacesForAgent, [:]).decode(DaemonAPI.AgentWorkspaces.self)
+            let linked = listed.providers.lazy.compactMap { provider in
+                provider.workspaces.first { $0.host?.caseInsensitiveCompare(given) == .orderedSame }.map { (provider, $0) }
+            }.first
+            guard let (provider, workspace) = linked, let host = workspace.host else {
+                throw JSONRPCError(code: DaemonAPI.Failure.noSuchHost,
+                                   message: "Nothing was deleted: no workspace runs a host called \(given). list_workspaces names the ones that do.")
+            }
+            guard provider.canDelete else {
+                throw JSONRPCError(code: JSONRPCError.invalidParams,
+                                   message: "Nothing was deleted: \(host) runs on \(provider.name), which can’t delete workspaces.")
+            }
             guard try await personSaysYes(request.token, title: "\(who) wants to delete a workspace",
                                           question: "Delete the workspace \(host) runs on, with everything on its disk, and remove the host \(host) with its agents?",
                                           yes: "Delete it") else {
@@ -76,6 +101,18 @@ extension DaemonCore {
             _ = try await call(DaemonAPI.Method.hostsDeleteWorkspace, ["host": .string(host)])
             return "Deleted the workspace \(host) ran on, and removed the host."
         }
+    }
+
+    /// The provider an agent named, by id or by name.
+    static func provider(_ given: String, in listed: DaemonAPI.AgentWorkspaces) -> DaemonAPI.AgentWorkspaces.Provider? {
+        listed.providers.first { $0.id.rawValue == given }
+            ?? listed.providers.first { $0.name.caseInsensitiveCompare(given) == .orderedSame }
+    }
+
+    static func noProvider(_ given: String, in listed: DaemonAPI.AgentWorkspaces) -> String {
+        listed.providers.isEmpty
+            ? "this control plane has no workspace providers. The person adds them in Settings ▸ Control plane ▸ Providers."
+            : "no provider is called \(given). There are \(listed.providers.map(\.name).joined(separator: ", "))."
     }
 
     /// One yes-or-no question on the agent's card; true only for the yes.
