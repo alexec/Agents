@@ -399,6 +399,44 @@ public actor RealGitHub: GitHub {
         return ["merged": .bool(!auto), "auto": .bool(auto), "url": .string("https://github.com/\(repo)/pull/\(number)")]
     }
 
+    /// The default branch, and the newest 100 branches with how many open or merged PRs each has.
+    static let branchQuery = """
+        query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) {
+          defaultBranchRef { name }
+          refs(refPrefix: "refs/heads/", first: 100, orderBy: {field: TAG_COMMIT_DATE, direction: DESC}) { nodes {
+            name target { ... on Commit { committedDate messageHeadline } }
+            associatedPullRequests(first: 1, states: [OPEN, MERGED]) { totalCount } } } } }
+        """
+
+    public func branchesWithoutPR(repo: String) async throws -> (base: String, branches: [Branch]) {
+        let parts = repo.split(separator: "/", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else { throw GhError(.notFound, "repo is owner/name") }
+        let ran = await Self.gh(["api", "graphql", "-f", "query=\(Self.branchQuery)", "-F", "owner=\(parts[0])", "-F", "name=\(parts[1])"])
+        if ran.code != 0 { throw Self.failure(ran.missing, ran.stderr, nil) }
+        guard let answer = try? JSON.parse(ran.stdout) else { throw GhError(.failed, "gh: GitHub's answer is not JSON") }
+        if let error = answer["errors"]?.array?.first?["message"]?.string { throw GhError(.failed, "gh: \(error)") }
+        return branchesFrom(graphQL: answer, now: Date())
+    }
+
+    public func prFill(repo: String, branch: String) async throws -> (base: String, commits: [String]) {
+        let base = try await json("repos/\(repo)")["default_branch"]?.string ?? "main"
+        let compare = try await json("repos/\(repo)/compare/\(Self.encode(base))...\(Self.encode(branch))")
+        let commits = (compare["commits"]?.array ?? []).compactMap { $0["commit"]?["message"]?.string }
+        return (base, commits)
+    }
+
+    public func createPR(repo: String, branch: String, base: String, title: String, body: String, draft: Bool) async throws -> JSON {
+        let ran = await Self.gh(["pr", "create", "-R", repo, "--head", branch, "--base", base, "--title", title, "--body", body]
+                                + (draft ? ["--draft"] : []))
+        if ran.code != 0 { throw Self.failure(ran.missing, ran.stderr, nil) }
+        // gh says the new PR's URL last.
+        let url = ran.stdout.split(whereSeparator: \.isNewline).last.map(String.init)?.trimmingCharacters(in: .whitespaces) ?? ""
+        guard let number = url.split(separator: "/").last.flatMap({ Int($0) }) else {
+            throw GhError(.failed, "gh: the new pull request's URL is not in its answer")
+        }
+        return ["number": .int(number), "url": .string(url)]
+    }
+
     /// As `encodeURIComponent` does it.
     static func encode(_ text: String) -> String {
         let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.!~*'()")

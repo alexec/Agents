@@ -170,6 +170,58 @@ public protocol GitHub: Sendable {
     func mergePR(repo: String, number: Int, auto: Bool) async throws -> JSON
     /// Approves it, or asks for changes with `body`, as the signed-in person (#837).
     func reviewPR(repo: String, number: Int, event: ReviewEvent, body: String) async throws -> JSON
+    /// Branches pushed in the last `branchDays` days with no open or merged PR, newest first,
+    /// and the base a PR would go into (#837).
+    func branchesWithoutPR(repo: String) async throws -> (base: String, branches: [Branch])
+    /// What `gh pr create --fill` would write for `branch`: its commits ahead of the base (#837).
+    func prFill(repo: String, branch: String) async throws -> (base: String, commits: [String])
+    /// Opens a PR from `branch` into `base`, as the signed-in person (#837).
+    func createPR(repo: String, branch: String, base: String, title: String, body: String, draft: Bool) async throws -> JSON
+}
+
+/// A branch with no pull request, as the board offers it (#837).
+public struct Branch: Sendable, Equatable {
+    public var name: String
+    public var updatedAt: String
+    /// Its last commit's first line.
+    public var headline: String
+
+    var json: JSON { ["name": .string(name), "updatedAt": .string(updatedAt), "headline": .string(headline)] }
+}
+
+/// How far back the board looks for a branch without a pull request.
+let branchDays = 14
+
+/// The repository's branches as one GraphQL answer gives them (`RealGitHub.branchQuery`): the
+/// ones pushed in the last `branchDays` days before `now` with no open or merged PR, not the
+/// base itself, newest first.
+public func branchesFrom(graphQL: JSON, now: Date) -> (base: String, branches: [Branch]) {
+    let repository = graphQL["data"]?["repository"]
+    let base = repository?["defaultBranchRef"]?["name"]?.string ?? "main"
+    let since = now.addingTimeInterval(-Double(branchDays) * 86400).timeIntervalSince1970 * 1000
+    let branches = (repository?["refs"]?["nodes"]?.array ?? []).compactMap { node -> Branch? in
+        let name = node["name"]?.string ?? ""
+        let date = node["target"]?["committedDate"]?.string ?? ""
+        guard !name.isEmpty, name != base, (node["associatedPullRequests"]?["totalCount"]?.int ?? 0) == 0,
+              at(date) >= since else { return nil }
+        return Branch(name: name, updatedAt: date, headline: node["target"]?["messageHeadline"]?.string ?? "")
+    }
+    return (base, branches.sorted { at($0.updatedAt) > at($1.updatedAt) })
+}
+
+/// A new PR's title and body from its commits' messages, oldest first, as `gh pr create --fill`
+/// writes them: one commit gives its first line and the rest; more give the branch's name, and
+/// each commit's first line as a list.
+public func fillPR(branch: String, messages: [String]) -> (title: String, body: String) {
+    if messages.count == 1, let message = messages.first {
+        let lines = message.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
+        let body = lines.count > 1 ? String(lines[1]).trimmingCharacters(in: .whitespacesAndNewlines) : ""
+        return (String(lines.first ?? "").trimmingCharacters(in: .whitespaces), body)
+    }
+    let leaf = branch.split(separator: "/").last.map(String.init) ?? branch
+    let title = leaf.replacingOccurrences(of: "-", with: " ").replacingOccurrences(of: "_", with: " ")
+    let body = messages.map { "- " + (($0.split(separator: "\n").first).map(String.init) ?? "") }.joined(separator: "\n")
+    return (title.prefix(1).uppercased() + title.dropFirst(), body)
 }
 
 /// A person's verdict on someone else's pull request (#837). GitHub refuses either on one's own.
