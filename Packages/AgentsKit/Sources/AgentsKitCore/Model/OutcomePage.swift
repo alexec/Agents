@@ -319,6 +319,9 @@ extension TranscriptItem {
         // A view is what the call is for (#187): drawn at every level, as a reply is.
         case .appView:
             return true
+        // So is a file shown (#836): the chart or the page is what the work made.
+        case .fileShown:
+            return true
         case .stateChanged(let state, _):
             return state == .stopped
         case .notice(let notice):

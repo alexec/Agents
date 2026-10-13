@@ -498,6 +498,18 @@ struct FilesPane: View {
                      folderEvent: files.anyChange[agent.id] ?? 0,
                      read: { try await files.read(agentID: agentID, path: $0) },
                      follow: follow)
+        case .text(let text, false, _, _) where ChartSpec.isChart(url, hint: model.work.chartHints[url.path]):
+            // A Vega-Lite spec, or a CSV an agent said how to draw (#836): the chart,
+            // its source a toggle away.
+            let files = model.files
+            let agentID = agent.id
+            ChartPage(text: text, url: url, hint: model.work.chartHints[url.path], line: state.openLine,
+                      neighbour: { named in
+                          guard case .text(let text, _, _, _)? = try? await files.read(agentID: agentID, path: named.path)
+                          else { return nil }
+                          return text
+                      })
+            .id(url)
         case .text(let text, let isTruncated, let size, _):
             VStack(spacing: 0) {
                 if isTruncated {

@@ -331,7 +331,18 @@ struct RemoteChatView: View {
             kept: { [model] agentID in model.kept(for: agentID) },
             dropKept: { [model] in await model.dropKept($0) },
             retryKept: { [model] in await model.retryKept($0) },
-            hostName: { [model] in model.hostName($0) })
+            hostName: { [model] in model.hostName($0) },
+            // A card in the chat opens its file in Files, as the agent's call did (#836).
+            showFile: { [model] file in model.openShownFile(file) },
+            readFile: { [model] path in
+                guard let agentID = model.selection else { return nil }
+                return try? await model.files.read(agentID: agentID, path: path)
+            },
+            picture: { [model] file in
+                guard let agentID = model.selection,
+                      let image = await model.pictures.image(agentID: agentID, url: file.url) else { return nil }
+                return Image(uiImage: image)
+            })
     }
 
     /// What a view in the chat may ask of the phone (#187): the Mac it is on, the person's

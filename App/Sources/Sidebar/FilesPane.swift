@@ -451,6 +451,20 @@ struct FilesPane: View {
                      folderEvent: folderEvents,
                      read: { try await server.read(agentID: agentID, path: $0) },
                      follow: follow)
+        } else if ChartSpec.isChart(url, hint: model.chartHints[url.path(percentEncoded: false)]),
+                  let probe, probe.kind.isText, !probe.isTruncated, fileProblem == nil {
+            // A Vega-Lite spec, or a CSV an agent said how to draw (#836): the chart,
+            // its source a toggle away.
+            let server = server
+            let agentID = agent.id
+            ChartPage(text: probe.text ?? "", url: url,
+                      hint: model.chartHints[url.path(percentEncoded: false)], line: state.openLine,
+                      neighbour: { named in
+                          guard case .text(let text, _, _, _)? = try? await server.read(
+                              agentID: agentID, path: named.path(percentEncoded: false)) else { return nil }
+                          return text
+                      })
+            .id(url)
         } else if let fileProblem {
             Gone(message: fileProblem) { reloadFile(url) }
         } else if let probe {

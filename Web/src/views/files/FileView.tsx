@@ -1,7 +1,7 @@
 // One file, read through the host (071 FR-029, FR-031, research R12): text as source to type in (#415), Markdown
 // through the renderer, pictures fitted and able to zoom, SVG only as an <img> made from its
-// bytes (which a browser draws with scripts off and nothing loaded), and HTML as its source.
-// Nothing a file holds can run or reach anywhere: no HTML sink, and the page's CSP besides.
+// bytes (which a browser draws with scripts off and nothing loaded), HTML as its source, and a
+// chart as an SVG drawn from its data (#836). Nothing a file holds can run or reach anywhere: no HTML sink, and the page's CSP besides.
 //
 // Read again whenever the host says something under this agent changed, with the stamp held
 // so an unchanged file costs nothing (#258). A slow read of the last file does not land here.
@@ -13,7 +13,9 @@ import { describe } from "../../model/errors";
 import { openFileShouldReread } from "../../model/fileWatch";
 import { bytesOf, mediaType, pictureFromReading } from "../../model/pageImage";
 import { Markdown, type PageImages } from "../../render/markdown";
+import { isChart } from "../../model/chart";
 import { nameOf, textShownAs } from "./paneState";
+import { ChartPage } from "./ChartView";
 import { FileLines } from "./FileLines";
 import { SourceEditor } from "./SourceEditor";
 import { ZoomPicture } from "./ZoomPicture";
@@ -72,6 +74,12 @@ export function FileView({ store, host, agentID, path, line }: {
       ?? (current.kind === "image" ? { bytes: bytesOf(current.bytes), type: mediaType(path) ?? "image/png" } : null);
   }, [reading.value, path]);
 
+  // A file a chart's `data.url` names, read as text, or null.
+  const readText = useMemo(() => (file: string) => store.readFile(host, agentID, file).then(
+    (r) => (r.kind === "text" ? r.text : null),
+    () => null,
+  ), [host, agentID, store, changedAt]);
+
   const name = nameOf(path);
   if (failed.value) return <p class="hint">{failed.value}</p>;
   const r = reading.value;
@@ -88,6 +96,11 @@ export function FileView({ store, host, agentID, path, line }: {
     case "text": {
       const note = r.isTruncated ? <p class="quiet small">Only the start of {name} is shown.</p> : null;
       const shown = textShownAs(path);
+      // A chart (#836): a Vega-Lite spec by its name, or a CSV an agent said how to draw.
+      const hint = store.chartHint(host, path);
+      if (isChart(path, hint)) {
+        return <>{note}<ChartPage text={r.text} path={path} hint={hint} line={line} readText={readText} /></>;
+      }
       if (shown === "picture") return <>{note}<ZoomPicture bytes={picture?.bytes ?? r.text} type="image/svg+xml" name={name} /></>;
       if (shown === "page") return <>{note}<div class="file-page"><Markdown text={r.text} images={images} /></div></>;
       if (shown === "source") {

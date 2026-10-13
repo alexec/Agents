@@ -1419,6 +1419,13 @@ final class RemoteModel {
         _ = work.takeFileToShow(for: selection)
     }
 
+    /// A file shown in the chat, opened again from its card (#836).
+    func openShownFile(_ file: ShownFile) {
+        guard let selection else { return }
+        work.rememberChart(file)
+        open(file, for: selection)
+    }
+
     /// A plan being approved, reopened from its question card: the same page the
     /// daemon opened when it was asked.
     func openPlan(_ file: ShownFile) {

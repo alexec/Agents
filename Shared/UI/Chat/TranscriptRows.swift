@@ -397,6 +397,9 @@ private struct EntryRow: View {
         case .appView(let call):
             AppViewRow(call: call)
 
+        case .fileShown(let file):
+            FileCard(file: file)
+
         case .unrecognised:
             // Written by a newer version of this app. Kept in the record, skipped here.
             EmptyView()

@@ -15,17 +15,17 @@
 
 ## Counts
 
-Of 219 rows: **146 same**, **46 by design**, **27 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 221 rows: **148 same**, **46 by design**, **27 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #836). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
 | Sidebar and project list | 13 | 4 | 5 |
 | Session rows and states | 16 | 2 | 5 |
-| Chat turns and turn detail | 23 | 4 | 2 |
+| Chat turns and turn detail | 24 | 4 | 2 |
 | Prompt bar and queued prompts | 20 | 3 | 0 |
 | Question and permission cards | 14 | 3 | 0 |
 | Start sheet and new project | 18 | 5 | 0 |
-| Worktrees and Files | 9 | 6 | 6 |
+| Worktrees and Files | 10 | 6 | 6 |
 | Pins | 4 | 1 | 0 |
 | Workflows page | 15 | 1 | 2 |
 | Settings and Project Settings | 1 | 8 | 0 |
@@ -142,6 +142,7 @@ The deltas are tracked by 29 issues:
 | Who is asking, on a card (#121) | `askerLine` | `askerLine` | `W/model/asker.ts`, held to `Fixtures/web/asker/line.json` | **same** |
 | Crowd mark on an empty chat | `A/Chat/CrowdMark.swift` | None | None | **by design** (decoration of the window's empty chat) |
 | Context meter | `A/Chat/ContextMeter.swift:15` | Its own copy: `R/Chat/RemoteChatView.swift:289-343` | `W/views/PromptStatus.tsx` | **same** |
+| A file card where `show_file` was called (#836): drawn at every level, after the run that called it (`fileShown` on the record); a chart or a picture has a preview at most 150 tall above its name, any other file one line (icon, name, *kind · folder · line N*); a tap opens it in Files at its line | `S/Chat/FileCard.swift`, actions from `A/Chat/ChatView.swift`, `K/Model/ShownFile.swift` (`look`), `K/Model/TranscriptDisplay.swift` | The same card, from `R/Chat/RemoteChatView.swift`; an SVG preview rasterised by `R/Panes/PhonePictures.swift` | `W/views/chat/FileCard.tsx`, `W/model/shownFile.ts`, `W/views/chat/Rows.tsx`, `W/model/turns.ts` | **same** (#836); unwalked on all three |
 
 ## Prompt bar and queued prompts
 
@@ -239,6 +240,7 @@ The deltas are tracked by 29 issues:
 | Pictures, zoom | `A/Sidebar/ImageFile.swift:68-84` | Pinch: `R/Panes/FilesPane.swift:378-474` | No zoom: `W/views/files/FileView.tsx:26-34` | **delta**: web #258 |
 | Pictures inside a Markdown page | `S/Page/MarkdownText.swift:144, 214` | Shared | *[image: alt]*: `W/render/markdown.ts:98-101` | **delta**: web #258 |
 | HTML file (#67) | Page / Source, scripts off: `A/Sidebar/FilesPane.swift:232-261` | The same: `R/Panes/FilesPane.swift:140-165` | Source: `W/views/files/FileView.tsx:83-90` | **by design** (071 FR-031, Trusted Types) |
+| Charts (#836): a Vega-Lite spec (`*.vl.json`: bar, line, point or area; x, y, color; inline data or a CSV beside it), or a CSV an agent showed with a `chart` hint, drawn natively with Chart / Source; outside the subset, the source and why | Swift Charts: `S/ChartView.swift` (`ChartPage`), from `A/Sidebar/FilesPane.swift`; parsed in `K/Model/ChartSpec.swift`; hints kept in `K/Client/AgentsModel.swift` (`chartHints`) | The same, from `R/Panes/FilesPane.swift` | An SVG: `W/views/files/ChartView.tsx`, `W/model/chart.ts`, from `W/views/files/FileView.tsx` | **same** (#836); Mermaid is #853; unwalked on all three |
 | Back finds where it was (#66) | `A/Sidebar/FilesPane.swift:76-86` | `R/Panes/FilesPane.swift:47-57` | `W/views/FilesPane.tsx:36, 60-65` | **same** |
 | A folder ends on its contents or a sentence (#62); stale reads dropped (#89) | Yes | Yes | Yes | **same** |
 | Writing a file: the live Markdown page, and any other text file as its source (#415) | The page in place; other text as an editable source view, saved after a pause and on leaving it; a partly read file stays numbered and read-only: `A/Sidebar/FilesPane.swift`, `S/Page/SourceEditor.swift` | The Page; other text in Files as the same shared source view: `R/Panes/PagePane.swift`, `R/Panes/FilesPane.swift` | `W/views/LiveDocument.tsx`; other text, HTML source included, as a textarea: `W/views/files/SourceEditor.tsx` | **same** (#415). Source is plain while typed in, not coloured |

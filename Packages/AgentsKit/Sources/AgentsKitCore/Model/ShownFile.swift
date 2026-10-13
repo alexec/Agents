@@ -17,10 +17,13 @@ public struct ShownFile: Codable, Hashable, Sendable {
     public var path: String
     /// Where to put the reader, counted from one. Nil means the top of the file.
     public var line: Int?
+    /// How to draw a CSV as a chart (#836). A Vega-Lite spec says it itself.
+    public var chart: ChartHint?
 
-    public init(path: String, line: Int? = nil) {
+    public init(path: String, line: Int? = nil, chart: ChartHint? = nil) {
         self.path = path
         self.line = line
+        self.chart = chart
     }
 
     public var url: URL { URL(filePath: path) }
@@ -49,7 +52,33 @@ public struct ShownFile: Codable, Hashable, Sendable {
         guard path.hasPrefix("/") else { return nil }
         let line = wire?["line"]?.intValue
         self.init(path: URL(filePath: path).standardizedFileURL.path,
-                  line: line.flatMap { $0 >= 1 && $0 <= Self.lineLimit ? $0 : nil })
+                  line: line.flatMap { $0 >= 1 && $0 <= Self.lineLimit ? $0 : nil },
+                  chart: ChartHint(wire: wire?["chart"]))
+    }
+
+    /// What the chat's card for it is (#836): a chart and a picture show a preview.
+    public enum Look: Hashable, Sendable {
+        case chart
+        case picture
+        case page
+        case file
+    }
+
+    public var look: Look {
+        if ChartSpec.isChart(url, hint: chart) { return .chart }
+        if FileProbe.imageKinds.contains(url.pathExtension.lowercased()) { return .picture }
+        if isMarkdown || HTMLPageScope.isHTML(url) { return .page }
+        return .file
+    }
+
+    /// The card's grey line before the folder: "Bar chart", "Picture", "Page", "File".
+    public var lookWords: String {
+        switch look {
+        case .chart: return chart?.mark.words ?? "Chart"
+        case .picture: return "Picture"
+        case .page: return "Page"
+        case .file: return "File"
+        }
     }
 
     /// Past this, a line number is a mistake rather than a place. The pane shows the

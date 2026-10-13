@@ -349,9 +349,8 @@ extension DaemonCore {
     /// Three things are checked here rather than in the window, because the window is
     /// not the only thing that could be listening and because the agent deserves a
     /// straight answer either way: the token still speaks for an agent, the path is
-    /// inside that agent's folders, and the file is there to be read. Nothing is
-    /// stored: a file worth looking at now is not worth reopening a week from now, so
-    /// this goes out as an event and is gone.
+    /// inside that agent's folders, and the file is there to be read. It goes out as an
+    /// event, and onto the record as a `fileShown` entry the chat draws as a card (#836).
     public func showFile(_ request: DaemonAPI.ShowFileRequest) async throws -> String {
         guard let agentID = appTokens[request.token], let agent = agents[agentID] else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchAgent,
@@ -393,6 +392,9 @@ extension DaemonCore {
         }
         broadcast(DaemonAPI.Notification.agentShowFile,
                   DaemonAPI.ShowFileNotification(agentID: agentID, file: request.file))
+        // And on the record, as a card where it was called (#836): the pane is
+        // a moment's, the card is there to open it again later.
+        await record(.fileShown(request.file), for: agentID)
         let place = request.file.line.map { " at line \($0)" } ?? ""
         guard exists else {
             return """

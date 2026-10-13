@@ -28,6 +28,7 @@ import type { WhenDone } from "./workflowSettings";
 import { keyKind, takesKey, wantedRuntime } from "./credentials";
 import type { Method, Params, Result } from "../protocol/methods";
 import { dropboxRefusal, dropboxRequest } from "./dropbox";
+import type { ChartHint } from "./chart";
 
 export { folderKey } from "./groups";
 
@@ -223,6 +224,25 @@ export class Work {
   /** A new agent a view filled in (#834, agents/start-agent), for the new-agent form on that
    *  project to take: the prompt, the labels and the worktree. Starting it is still the person's move. */
   readonly offeredStart = signal<{ host: string; folder: string; start: { prompt: string; labels: string[]; worktree?: string | undefined } } | null>(null);
+  /**
+   * How to draw each CSV an agent showed as a chart (#836), by `host|path`: from `agent/showFile`
+   * and from the chat's file cards. The pane looks a CSV up here; a Vega-Lite spec says it itself.
+   */
+  readonly chartHints = signal<Record<string, ChartHint>>({});
+
+  /** Hold how to draw a CSV as a chart (#836); the same hint again changes nothing. */
+  noteChartHint(host: string, path: string, hint: ChartHint | undefined): void {
+    if (!hint) return;
+    const key = `${host}|${path}`;
+    const held = this.chartHints.peek()[key];
+    if (held && JSON.stringify(held) === JSON.stringify(hint)) return;
+    this.chartHints.value = { ...this.chartHints.peek(), [key]: hint };
+  }
+
+  chartHint(host: string, path: string): ChartHint | undefined {
+    return this.chartHints.value[`${host}|${path}`];
+  }
+
   /** The last folders said to have changed, for a pane watching them (`files/changed`). */
   readonly filesChanged = signal<{ host: string; agentID: string; folders: string[]; many: boolean; at: number } | null>(null);
 
@@ -440,6 +460,7 @@ export class Work {
       }
       case "agent/showFile": {
         const note = params as ShowFileNotification;
+        this.noteChartHint(host, note.file.path, note.file.chart);
         this.shownFile.value = { host, agentID: note.agentID, path: note.file.path, line: note.file.line, at: Date.now() };
         return true;
       }

@@ -84,6 +84,7 @@ final class AppModel {
     var transcriptItems: [TranscriptItem] { work.transcriptItems }
     var transcriptHasMore: Bool { work.hasMoreOfTheConversation }
     var filesToShow: [UUID: ShownFile] { work.filesToShow }
+    var chartHints: [String: ChartHint] { work.chartHints }
     /// What the reader will allow and what today has cost. Nil until the daemon has
     /// said, which is how every surface knows to show nothing rather than a zero.
     var costState: DaemonAPI.CostState? { work.costState }

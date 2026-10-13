@@ -82,6 +82,22 @@ struct ShowFileTests {
         #expect(note.contains("line 2"))
     }
 
+    /// And on the record, so the chat draws a card for it where it was called (#836).
+    @Test func aFileShownIsKeptOnTheRecordWithItsChartHint() async throws {
+        let (locations, work) = try temporary()
+        let launcher = midTurn()
+        let heard = Broadcasts()
+        let core = try await core(launcher, locations: locations, watching: heard)
+        let id = try await core.start(.init(runtimeID: "cursor", cwd: work, prompt: "go"))
+        let file = try write("turns.csv", in: work)
+        let shown = ShownFile(path: file.path, chart: ChartHint(mark: .line, x: "day", y: "turns"))
+
+        _ = try await core.showFile(.init(token: await mintedToken(launcher), file: shown))
+
+        let entries = try await core.transcript(.init(agentID: id)).entries
+        #expect(entries.contains { $0.kind == .fileShown(shown) })
+    }
+
     /// The rule the whole feature rests on: `show_file` is not a way to read a file
     /// the agent was never given, nor to put one in front of the user.
     @Test func aPathOutsideTheAgentsFoldersIsRefusedAndNothingIsSent() async throws {

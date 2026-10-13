@@ -53,6 +53,14 @@ struct ChatActions {
     var retryKept: @MainActor (DaemonAPI.KeptRequest) async -> Void = { _ in }
     /// A host's name, for the line under a kept prompt.
     var hostName: @MainActor (HostID) -> String = { $0.rawValue }
+    /// A file shown with `show_file`, opened again from its card in the chat (#836): the
+    /// Files pane, at its line. Nil draws the card without the tap.
+    var showFile: (@MainActor (ShownFile) -> Void)? = nil
+    /// The open agent's file as it is now, for a card's chart preview (#836).
+    var readFile: @MainActor (String) async -> FileReading? = { _ in nil }
+    /// The open agent's picture, drawn, for a card's preview (#836): each app decodes
+    /// its own way, the phone rasterising an SVG.
+    var picture: @MainActor (ShownFile) async -> Image? = { _ in nil }
 }
 
 extension EnvironmentValues {

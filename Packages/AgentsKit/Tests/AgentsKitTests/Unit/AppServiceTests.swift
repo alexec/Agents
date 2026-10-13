@@ -80,8 +80,8 @@ struct AppServiceTests {
         // to grow. An argument added here is a contract change, and this is what
         // says so.
         // Plus the optional `description` every app tool takes (#708), which the contract
-        // now names.
-        #expect(showFile?["properties"]?.objectValue?.keys.sorted() == ["description", "line", "path"])
+        // now names. And `chart`, how to draw a CSV (#836).
+        #expect(showFile?["properties"]?.objectValue?.keys.sorted() == ["chart", "description", "line", "path"])
 
         // Every app tool takes an optional `description`, the reason the chat draws the
         // call by (#708), and none requires it.

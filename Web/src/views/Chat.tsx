@@ -155,8 +155,15 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       waitingSandbox: agent?.pendingSandboxFailure,
       answerSandbox: agent?.pendingSandboxFailure && !down ? (carryOn) => store.answerSandbox(host, session, carryOn) : undefined,
       subagentSteps: (item) => (subagent.value = item),
+      // A card opens its file as the agent's call did: the same path as `agent/showFile` (#836).
+      showFile: (file) => {
+        store.noteChartHint(host, file.path, file.chart);
+        store.shownFile.value = { host, agentID: session, path: file.path, line: file.line, at: Date.now() };
+      },
+      noteChart: (file) => store.noteChartHint(host, file.path, file.chart),
+      readFile: (path) => store.readFile(host, session, path),
     };
-  }, [session, agent?.pendingSandboxFailure, down]);
+  }, [host, session, agent?.pendingSandboxFailure, down]);
 
   const scroller = useRef<HTMLDivElement>(null);
   const chatColumn = useRef<HTMLElement>(null);

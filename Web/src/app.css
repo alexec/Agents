@@ -1135,3 +1135,51 @@ button.plain:hover { opacity: 1; }
 .usage-average { stroke: currentColor; opacity: 0.5; stroke-width: 1; stroke-dasharray: 4 3; }
 .usage-share { display: flex; justify-content: space-between; gap: 24px; margin: 4px 0; font-variant-numeric: tabular-nums; }
 .usage-axis { fill: currentColor; opacity: 0.6; font-size: calc(11px * var(--text-scale)); font-variant-numeric: tabular-nums; }
+
+/* A file an agent showed (#836), on its card where it was shown: Layout A of
+   specs/836-file-card/layout.svg. At most 340 wide; a chart or a picture shows a preview, at most
+   150 tall, above the name; anything else is one line. The whole card is the button. */
+.file-card { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 340px; box-sizing: border-box;
+  padding: 12px; margin: 2px 0; text-align: left; font: inherit; color: inherit;
+  background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }
+button.file-card { cursor: pointer; }
+button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, transparent); }
+.file-card-preview { display: flex; align-items: center; justify-content: center; height: 150px; overflow: hidden;
+  border-radius: 6px; background: var(--paper-well); }
+.file-card-preview img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
+.file-card-preview > .quiet { padding: 10px; text-align: center; }
+.file-card-preview .chart.compact { width: 100%; height: 100%; padding: 10px; box-sizing: border-box; }
+.file-card-line { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.file-card-symbol { flex: none; width: 18px; text-align: center; opacity: 0.7; }
+.file-card-words { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.file-card-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-card-detail { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-card-chevron { flex: none; opacity: 0.4; font-size: calc(16px * var(--text-scale)); }
+
+/* A chart from a file (#836), in the Files pane and small on the card: one colour per series,
+   the theme's own tints, in turn. */
+.chart { display: block; margin: 0; }
+.chart-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart.compact .chart-svg { height: 100%; }
+.chart-title { font-weight: 600; margin: 0 0 6px; }
+.chart-axis { fill: currentColor; opacity: 0.6; font-size: calc(11px * var(--text-scale)); font-variant-numeric: tabular-nums; }
+.chart-field { opacity: 0.8; }
+.chart-grid { stroke: var(--paper-rule); stroke-width: 1; }
+.chart-baseline { stroke: currentColor; opacity: 0.35; stroke-width: 1; }
+.chart-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart-area { stroke: none; opacity: 0.25; }
+.chart-series-0 { --series: var(--accent); }
+.chart-series-1 { --series: var(--tint-vouched); }
+.chart-series-2 { --series: var(--tint-attention); }
+.chart-series-3 { --series: var(--tint-failure); }
+.chart-series-4 { --series: color-mix(in srgb, var(--accent) 50%, var(--tint-failure)); }
+.chart-series-5 { --series: color-mix(in srgb, var(--paper-ink) 55%, transparent); }
+.chart-bar, .chart-point, .chart-area, .chart-swatch { fill: var(--series); }
+.chart-line { stroke: var(--series); }
+.chart-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px;
+  background: var(--series); }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; list-style: none; margin: 8px 0 0; padding: 0;
+  font-size: calc(12px * var(--text-scale)); }
+.chart-page { display: flex; flex-direction: column; gap: 10px; }
+.chart-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.chart-problem { margin: 0; }
