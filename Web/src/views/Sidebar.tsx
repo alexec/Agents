@@ -93,6 +93,8 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
   // field and not a pass over every project (#176, #193).
   const searched = useSignal("");
   const confirming = useSignal(false);
+  // Why Forget This Browser did not forget it, under the confirm, as the Remote's (#935).
+  const forgetProblem = useSignal<string | null>(null);
   const r = route.value;
   // After a pause in the typing: the folds filter what is held, and the archived sessions that
   // match are the hosts' to find, a capped page each (#165).
@@ -216,14 +218,22 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
           {/* This browser's Settings (#846): its text size (#750) and which smart groups are on,
               as the window's Settings ▸ Appearance and ▸ Sidebar. */}
           <button class="link" aria-current={!!r.settings} onClick={() => go({ settings: true })}>Settings</button>
+          {/* What forgetting does, beside the confirm, in the Remote's words (#935). */}
           {confirming.value ? (
-            <span class="confirm">
-              <button onClick={() => void session.forgetThisBrowser()}>Forget</button>
-              <button onClick={() => (confirming.value = false)}>Cancel</button>
-            </span>
+            <div class="forget" role="group" aria-label="Forget This Browser">
+              <p class="small">This browser is cut off at once, at home and away, until it is paired again.</p>
+              <span class="confirm">
+                <button onClick={() => {
+                  forgetProblem.value = null;
+                  void session.forgetThisBrowser().then((problem) => (forgetProblem.value = problem));
+                }}>Forget</button>
+                <button onClick={() => { confirming.value = false; forgetProblem.value = null; }}>Cancel</button>
+              </span>
+            </div>
           ) : (
             <button class="link" onClick={() => (confirming.value = true)}>Forget This Browser…</button>
           )}
+          {forgetProblem.value && <p class="failure small" role="alert">{forgetProblem.value}</p>}
         </div>
       </footer>
     </nav>
