@@ -24,6 +24,8 @@
 #                   per set of Package.resolved files, so lanes on the same pins share
 #                   one and a lane on other pins never changes it under them
 #   swiftpm/        `swift build` and `swift test`'s cache (--cache-path)
+#   linux/<k>/      the Linux agentsd and MCP servers scripts/build-linux-agentsd.sh built,
+#                   one folder per set of git trees they were built from (#856)
 #
 # What is not shared: DerivedData and .build. Their contents name the worktree's own
 # paths, and SwiftPM locks .build for one process at a time, so a shared one would make
@@ -116,7 +118,7 @@ gb() { du -sk "$1" 2>/dev/null | awk '{printf "%.1f", $1 / 1048576}'; }
 usage_report() {
 	local d
 	echo "$CACHE"
-	for d in cas packages checkouts swiftpm; do
+	for d in cas packages checkouts swiftpm linux; do
 		[ -d "$CACHE/$d" ] && echo "  $d $(gb "$CACHE/$d") GB"
 	done
 	echo "  total $(gb "$CACHE") GB"
@@ -144,14 +146,16 @@ prune() {
 	# Checkouts nobody built with in a week go regardless; they are small, but they add up.
 	find "$CACHE/checkouts" -mindepth 1 -maxdepth 1 -type d ! -name '*.lock' -mtime +7 -print 2>/dev/null |
 		while IFS= read -r d; do echo "removing $d (unused a week)"; rm -rf "$d"; done
+	find "$CACHE/linux" -mindepth 1 -maxdepth 1 -type d -mtime +7 -print 2>/dev/null |
+		while IFS= read -r d; do echo "removing $d (unused a week)"; rm -rf "$d"; done
 	if [ "$(size)" -gt "$kb" ]; then
 		if building; then
 			echo "over the bound, but a build is running: left as it is"
 		else
 			# Oldest first; the newest checkouts folder is the one main builds with.
-			for d in $(ls -1t "$CACHE/checkouts" 2>/dev/null | grep -v '\.lock$' | tail -n +2 | tail -r) packages swiftpm cas; do
+			for d in $(ls -1t "$CACHE/checkouts" 2>/dev/null | grep -v '\.lock$' | tail -n +2 | tail -r) packages swiftpm linux cas; do
 				[ "$(size)" -gt "$kb" ] || break
-				case $d in packages | swiftpm | cas) d=$CACHE/$d ;; *) d=$CACHE/checkouts/$d ;; esac
+				case $d in packages | swiftpm | linux | cas) d=$CACHE/$d ;; *) d=$CACHE/checkouts/$d ;; esac
 				[ -e "$d" ] || continue
 				echo "removing $d ($(gb "$d") GB)"
 				rm -rf "$d"

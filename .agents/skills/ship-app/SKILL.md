@@ -23,7 +23,9 @@ login-item jobs. A development run, a test, and a merge wave never pass it.
 
 `--no-linux` skips rebuilding the Linux hosts (`scripts/build-linux-agentsd.sh`, into
 `App/Resources/servers`), which the build otherwise does first, since Agents Host
-carries them and a stale one cannot join. `--no-devices` skips the iPhone and iPad.
+carries them and a stale one cannot join. That build takes seconds when the shared build
+cache already has binaries from the same git trees (#856), and about 8 minutes when it does not.
+`--no-devices` skips the iPhone and iPad.
 `--device <UDID>` (repeatable) picks one device. `--now` relaunches the Mac after 3s
 instead of 20s, and only with `--install-mac`. `--build-only` builds in the checkout
 the script is in (run a worktree's copy to build that worktree), checks the products,

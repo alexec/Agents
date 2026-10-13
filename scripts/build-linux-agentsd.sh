@@ -17,6 +17,11 @@
 # and once:
 #   VERSION                       MARKETING_VERSION+CURRENT_PROJECT_VERSION from project.yml,
 #                                 used only to refuse a server running a newer app's build
+#
+# The two architectures build side by side, each in a scratch folder of its own (#856). What
+# one built is kept in the shared build cache (scripts/build-cache.sh), under the git trees
+# it was built from, so a ship from a fresh worktree copies it rather than spending minutes
+# on the same build. Only with nothing uncommitted under those trees; --check always builds.
 set -euo pipefail
 
 root=${0:A:h:h}
@@ -47,33 +52,67 @@ out=$root/App/Resources/servers
 
 sha256() { if (( $+commands[shasum] )); then shasum -a 256 $1; else sha256sum $1; fi | cut -d' ' -f1 }
 
-for arch in $arches; do
-    print "building agentsd for $arch-linux…"
-    $swift build --package-path $root/Daemon -c release \
-        --swift-sdk $arch-swift-linux-musl --product agentsd \
-        -Xswiftc -gnone -Xlinker -s
-    bin=$($swift build --package-path $root/Daemon -c release --swift-sdk $arch-swift-linux-musl --show-bin-path)/agentsd
-    file $bin | grep -q "statically linked" || { print -u2 "$bin is not static"; exit 1; }
-    size=$(wc -c < $bin)
-    print "  $bin ($((size / 1048576)) MB)"
-    if (( ! check )); then
-        mkdir -p $out
-        cp $bin $out/agentsd-linux-$arch
-        sha256 $out/agentsd-linux-$arch > $out/agentsd-linux-$arch.sha256
-    fi
+# The cache key: everything the binaries are built from, or nothing when that is not all
+# committed. AGENTS_BUILD_CACHE=off turns the cache off, as for build-cache.sh.
+cache=${AGENTS_BUILD_CACHE:-$HOME/Library/Caches/Agents-build}
+inputs=(Daemon Packages/AgentsKit Packages/MCPServers)
+key=
+if (( ! check )) && [[ $cache != off ]] && git -C $root rev-parse -q --verify HEAD >/dev/null 2>&1 \
+    && [[ -z $(git -C $root status --porcelain -- $inputs) ]]; then
+    key=$( { $swift --version 2>&1; print $marketing+$build; git -C $root rev-parse ${inputs/#/HEAD:} } \
+        | { if (( $+commands[shasum] )); then shasum; else sha256sum; fi } | cut -c1-16)
+fi
 
-    for server in ci-watcher; do
-        print "building $server for $arch-linux…"
-        $swift build --package-path $root/Packages/MCPServers -c release \
-            --swift-sdk $arch-swift-linux-musl --product $server \
+# One architecture: agentsd and the MCP servers, into $1, in a .build folder of its own so the
+# two can build at once (SwiftPM locks a .build for one process).
+build_arch() {
+    local arch=$1 dest=$2 pkg product bin
+    for pkg product in Daemon agentsd Packages/MCPServers ci-watcher; do
+        print "building $product for $arch-linux…"
+        $swift build --package-path $root/$pkg --scratch-path $root/$pkg/.build/linux-$arch -c release \
+            --swift-sdk $arch-swift-linux-musl --product $product \
             -Xswiftc -gnone -Xlinker -s
-        bin=$($swift build --package-path $root/Packages/MCPServers -c release --swift-sdk $arch-swift-linux-musl --show-bin-path)/$server
-        file $bin | grep -q "statically linked" || { print -u2 "$bin is not static"; exit 1; }
+        bin=$($swift build --package-path $root/$pkg --scratch-path $root/$pkg/.build/linux-$arch -c release \
+            --swift-sdk $arch-swift-linux-musl --show-bin-path)/$product
+        file $bin | grep -q "statically linked" || { print -u2 "$bin is not static"; return 1 }
         print "  $bin ($(( $(wc -c < $bin) / 1048576 )) MB)"
-        if (( ! check )); then
-            cp $bin $out/$server-linux-$arch
-            sha256 $out/$server-linux-$arch > $out/$server-linux-$arch.sha256
-        fi
+        cp $bin $dest/$product-linux-$arch
+    done
+}
+
+work=$(mktemp -d)
+trap 'rm -rf $work' EXIT
+built=()
+for arch in $arches; do
+    if [[ -n $key && -e $cache/linux/$key/$arch/done ]]; then
+        print "agentsd for $arch-linux: unchanged since $cache/linux/$key, not rebuilt"
+        continue
+    fi
+    mkdir -p $work/$arch
+    { build_arch $arch $work/$arch; print $? > $work/$arch.status } > $work/$arch.log 2>&1 &
+    built+=($arch)
+done
+wait
+for arch in $built; do
+    cat $work/$arch.log
+    [[ $(<$work/$arch.status) == 0 ]] || { print -u2 "the $arch-linux build failed"; exit 1 }
+    if [[ -n $key ]]; then
+        # Into the cache whole or not at all: a folder renamed into place, marked done last.
+        mkdir -p $cache/linux/$key
+        rm -rf $cache/linux/$key/$arch
+        mv $work/$arch $cache/linux/$key/$arch
+        touch $cache/linux/$key/$arch/done
+    fi
+done
+
+for arch in $arches; do
+    from=$work/$arch
+    [[ -n $key ]] && from=$cache/linux/$key/$arch && touch $cache/linux/$key
+    (( check )) && continue
+    mkdir -p $out
+    for product in agentsd ci-watcher; do
+        cp $from/$product-linux-$arch $out/$product-linux-$arch
+        sha256 $out/$product-linux-$arch > $out/$product-linux-$arch.sha256
     done
 done
 
