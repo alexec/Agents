@@ -87,6 +87,8 @@ struct ProjectListView: View {
                 SpendingRow(selection: $selection).activityIcon("dollarsign.circle",
                                                                 warns: model.costState?.dayIsCloseToFull == true)
                     .appText(.supporting).sidebarInk(.spending).tag(SidebarItem.spending)
+                TimeRow().activityIcon("clock")
+                    .appText(.supporting).sidebarInk(.time).tag(SidebarItem.time)
             } header: {
                 // The size of every other group's heading (#495).
                 Text("Activity").appText(.supporting)

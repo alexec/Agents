@@ -232,6 +232,7 @@ test("an Activity page is in the address on its own, and an unknown one is ignor
     const { parseRoute, routeHash } = await load("src/route.ts");
     assert.equal(routeHash({ activity: "events", host: "mac", project: "file:///w/a" }), "#/a/events");
     assert.deepEqual(parseRoute("#/a/spending"), { activity: "spending" });
+    assert.deepEqual(parseRoute("#/a/time"), { activity: "time" });
     assert.deepEqual(parseRoute("#/a/mcp"), { activity: "mcp" }, "MCP Servers has a page of its own (#589)");
     assert.deepEqual(parseRoute("#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/m/1"), { host: "mac", project: "file:///w/a", mcp: true },
       "a project's MCP Servers has a page of its own (#753)");

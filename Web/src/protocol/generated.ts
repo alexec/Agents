@@ -1744,6 +1744,20 @@ export interface SwitchRecordSide {
   mode?: JSONValue;
 }
 
+export interface TimeBucket {
+  agent: number;
+  tools: number;
+  others: number;
+  person: number;
+  turns: number;
+}
+
+export interface TimeHistory {
+  hours: Record<string, Record<string, TimeBucket>>;
+  days: Record<string, Record<string, TimeBucket>>;
+  now: string;
+}
+
 export interface ToolCall {
   toolCallID?: string;
   title: string;
@@ -2298,6 +2312,7 @@ export interface Methods {
   "sandbox/state": { params: Empty; result: SandboxSettings };
   "store/notes": { params: Empty; result: StoreNotes };
   "surface/identify": { params: SurfaceIdentification; result: Empty };
+  "time/history": { params: Empty; result: TimeHistory };
   "usage/history": { params: Empty; result: UsageHistory };
   "views/call": { params: ViewCallRequest; result: JSONValue };
   "views/context": { params: ViewContextRequest; result: Empty };
@@ -2416,6 +2431,7 @@ export const MethodTarget = {
   "sandbox/state": "host",
   "store/notes": "host",
   "surface/identify": "host",
+  "time/history": "host",
   "usage/history": "host",
   "views/call": "host",
   "views/context": "host",
@@ -2656,6 +2672,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SurfaceIdentification: { required: ["id", "name", "kind"], optional: [] },
   SwitchRecord: { required: ["id", "at", "agentID", "from", "to", "reason", "carried", "dropped", "billing"], optional: ["shortened", "fromReturnsAt"] },
   SwitchRecordSide: { required: ["runtimeID"], optional: ["entryID", "model", "mode"] },
+  TimeBucket: { required: ["agent", "tools", "others", "person", "turns"], optional: [] },
+  TimeHistory: { required: ["hours", "days", "now"], optional: [] },
   ToolCall: { required: ["title", "content", "locations"], optional: ["toolCallID", "name", "kind", "status", "rawInput", "rawOutput", "raw"] },
   ToolCallLocation: { required: ["path"], optional: ["line"] },
   TranscriptEntry: { required: ["id", "at", "kind"], optional: ["subagentID", "sender"] },

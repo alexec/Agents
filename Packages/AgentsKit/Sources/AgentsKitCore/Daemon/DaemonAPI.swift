@@ -388,6 +388,9 @@ public enum DaemonAPI {
         public static let costState = "cost/state"
         /// What the work used by hour and by day, per runtime (#823). No params.
         public static let usageHistory = "usage/history"
+        /// Where the time of running chats went by hour and by day, per runtime (#852).
+        /// No params.
+        public static let timeHistory = "time/history"
         public static let costSetLimits = "cost/setLimits"
         /// Cursor and Grok permission mode (061). Control only.
         public static let clientPermissionsState = "clientPermissions/state"

@@ -1031,6 +1031,9 @@ extension DaemonCore {
     /// What the work used by hour and by day, per runtime (#823), for the usage charts.
     public func usageHistory() -> UsageHistory { usageLedger.history(at: now()) }
 
+    /// Where the time of running chats went by hour and by day, per runtime (#852).
+    public func timeHistory() -> TimeHistory { timeLedger.history(at: now()) }
+
     public func setLimits(_ request: DaemonAPI.SetLimitsRequest) async throws -> DaemonAPI.CostState {
         var limits = limitStore.load()
         let dayWasReached = isDayLimitReached(under: limits)

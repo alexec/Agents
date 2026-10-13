@@ -625,7 +625,7 @@ final class RemoteModel {
                 openArchive = false
                 openMCPServers = false
                 openPin = path
-            case .spending, .resources, .events, .runtimes, .mcpServers:
+            case .spending, .time, .resources, .events, .runtimes, .mcpServers:
                 openActivity = newValue
             case .archive(let key):
                 // The project's archive page (#495, #498), with what is opened from it
@@ -2765,6 +2765,12 @@ final class RemoteModel {
     /// from a daemon too old to know the method.
     func usageHistory() async -> UsageHistory? {
         try? await client.call(DaemonAPI.Method.usageHistory, Optional<String>.none, returning: UsageHistory.self)
+    }
+
+    /// Where the time of the Mac's running chats went (#852), for the Time page. Nil from
+    /// a daemon too old to know the method.
+    func timeHistory() async -> TimeHistory? {
+        try? await client.call(DaemonAPI.Method.timeHistory, Optional<String>.none, returning: TimeHistory.self)
     }
 
     private func refreshServerCost(_ host: HostID) async {

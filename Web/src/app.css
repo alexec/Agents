@@ -1134,6 +1134,17 @@ button.plain:hover { opacity: 1; }
 .usage-grid { stroke: var(--paper-rule); stroke-width: 1; }
 .usage-average { stroke: currentColor; opacity: 0.5; stroke-width: 1; stroke-dasharray: 4 3; }
 .usage-share { display: flex; justify-content: space-between; gap: 24px; margin: 4px 0; font-variant-numeric: tabular-nums; }
+/* The Time page (#852): each bar stacked by kind, in the accent, then waiting in grey and orange. */
+.time-bar.agent { fill: var(--accent); }
+.time-bar.tools { fill: color-mix(in srgb, var(--accent) 50%, transparent); }
+.time-bar.others { fill: color-mix(in srgb, currentColor 35%, transparent); }
+.time-bar.person { fill: var(--tint-attention); }
+.time-charts g.dim { opacity: 0.35; }
+.time-swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 8px; vertical-align: baseline; }
+.time-swatch.agent { background: var(--accent); }
+.time-swatch.tools { background: color-mix(in srgb, var(--accent) 50%, transparent); }
+.time-swatch.others { background: color-mix(in srgb, currentColor 35%, transparent); }
+.time-swatch.person { background: var(--tint-attention); }
 .usage-axis { fill: currentColor; opacity: 0.6; font-size: calc(11px * var(--text-scale)); font-variant-numeric: tabular-nums; }
 
 /* A file an agent showed (#836), on its card where it was shown: Layout A of

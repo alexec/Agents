@@ -76,6 +76,7 @@ struct RemoteSidebar: View {
                         .appText(.supporting).tag(SidebarItem.mcpServers)
                     SpendingRow().activityIcon("dollarsign.circle", warns: model.costState?.dayIsCloseToFull == true)
                         .appText(.supporting).tag(SidebarItem.spending)
+                    TimeRow().activityIcon("clock").appText(.supporting).tag(SidebarItem.time)
                 } header: {
                     Text("Activity")
                 }
