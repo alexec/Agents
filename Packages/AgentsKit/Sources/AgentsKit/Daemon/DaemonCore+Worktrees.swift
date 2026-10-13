@@ -257,6 +257,10 @@ extension DaemonCore {
                 agents: own.sorted { $0.createdAt < $1.createdAt }.map(\.id))
         }
         if withStatus {
+            for index in summaries.indices where summaries[index].exists && !summaries[index].isProjectFolder {
+                summaries[index].size = worktreeSizes[summaries[index].root.path]?.size
+            }
+            wantSizes(of: summaries.filter { $0.exists && !$0.isProjectFolder }.map(\.root))
             let base: String? = if let mine, hasCommit { mine.branch ?? mine.head }
                 else { await GitWorktrees.base(in: project) }
             let statuses = await Self.statuses(of: summaries, base: base, commonDir: repository.commonDir)
@@ -410,6 +414,7 @@ extension DaemonCore {
     /// Only that project's agents are looked at.
     func noteFolders(in root: URL, of project: URL) async {
         let path = Self.canonicalPath(root)
+        worktreeSizes[path] = nil
         let members = agents.byFolder[Project.standardize(project)] ?? []
         let inIt = members.filter { id in
             guard let worktree = agents[id]?.worktree, worktree.root.lastPathComponent == root.lastPathComponent

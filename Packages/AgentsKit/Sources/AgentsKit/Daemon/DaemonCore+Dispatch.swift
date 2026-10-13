@@ -945,6 +945,13 @@ extension DaemonCore {
                 let request = try require(params, as: DaemonAPI.WorktreesListRequest.self)
                 return .success(try JSONValue.encoding(await listWorktrees(for: request.folder)))
 
+            case DaemonAPI.Method.worktreesAll:
+                return .success(try JSONValue.encoding(await allWorktrees()))
+
+            case DaemonAPI.Method.worktreesRemoveBuildOutput:
+                let request = try require(params, as: DaemonAPI.WorktreeRemovalRequest.self)
+                return .success(try JSONValue.encoding(try await removeBuildOutput(request)))
+
             case DaemonAPI.Method.worktreesCheck:
                 let request = try require(params, as: DaemonAPI.WorktreeRemovalRequest.self)
                 return .success(try JSONValue.encoding(try await checkWorktreeRemoval(request)))

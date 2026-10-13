@@ -1,5 +1,5 @@
 // Activity at the top of the sidebar (#151), as the window's (#145): Events, Resources, Runtimes,
-// MCP Servers (#589) and Spending, each a row whose tooltip says what it has at a glance (#587)
+// MCP Servers (#589), Worktrees (#790) and Spending, each a row whose tooltip says what it has at a glance (#587)
 // and that opens its page in the chat's place. What each page lets you change is the Mac's, but
 // for marking a runtime available and stopping a wait (#541).
 import { useEffect } from "preact/hooks";
@@ -10,6 +10,8 @@ import { fromWireDate } from "../protocol/dates";
 import type { ActivityPage } from "../route";
 import { Resources } from "./Resources";
 import { MCPServersList } from "./MCPServers";
+import { WorktreesList } from "./Worktrees";
+import { forCleanup, pageLine, rowWords, tally as worktreeTally, worktreesIntro } from "../model/worktrees";
 import { BackToList } from "./BackToList";
 import { Modal } from "./Modal";
 import { folderKey, projectFolder } from "../model/groups";
@@ -145,7 +147,7 @@ function useActivity(store: Store): void {
 }
 
 /** Each Activity page's icon, the window's SF Symbol as near as text has it (#495). */
-const activityIcons: Record<ActivityPage, string> = { events: "☰\uFE0E", resources: "◫", runtimes: "⚙\uFE0E", mcp: "▤", spending: "$", time: "◷" };
+const activityIcons: Record<ActivityPage, string> = { events: "☰\uFE0E", resources: "◫", runtimes: "⚙\uFE0E", mcp: "▤", worktrees: "⑂", spending: "$", time: "◷" };
 
 export function ActivityRows({ store, chosen, onPick }: {
   store: Store; chosen: ActivityPage | undefined; onPick: (page: ActivityPage) => void;
@@ -157,6 +159,8 @@ export function ActivityRows({ store, chosen, onPick }: {
   const waiting = resources.reduce((n, r) => n + r.line.length, 0);
   const tally = runtimeTally(Object.values(store.runtimes.value).flat());
   const mcp = healthTally(store.hosts.value.flatMap((host) => personalServers(store.mcpHealthOf(host.id))));
+  const worktrees = rowWords(worktreeTally(store.hosts.value.flatMap((host) =>
+    forCleanup(store.worktreeLists.value[host.id] ?? [], store.worktreeSizes.value[host.id]).flatMap((g) => g.worktrees))));
   const costs = store.costs.value;
   const today = totalWords(todayTotals(costs));
   const mac = costs["mac"];
@@ -182,6 +186,7 @@ export function ActivityRows({ store, chosen, onPick }: {
         tally?.working === 0)}
       {row("mcp", "MCP Servers", "Every server in your own mcp.json, and how each is doing",
         mcp?.words ?? null, mcp?.failing ?? false)}
+      {row("worktrees", "Worktrees", "Every project's worktrees, and how much each holds", worktrees)}
       {row("spending", "Cost", "What all of the work has cost, and what it cost today", spent || null,
         closeToFull(mac))}
       {row("time", "Time", "Where the time of running chats went: the agent, its tools, and waiting", null)}
@@ -189,7 +194,7 @@ export function ActivityRows({ store, chosen, onPick }: {
   );
 }
 
-const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", mcp: "MCP Servers", spending: "Cost", time: "Time" };
+const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", mcp: "MCP Servers", worktrees: "Worktrees", spending: "Cost", time: "Time" };
 
 /** An Activity page in the chat's place. */
 export function ActivityPageView({ store, page }: { store: Store; page: ActivityPage }) {
@@ -255,6 +260,20 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
               {store.hosts.value.every((host) => personalServers(store.mcpHealthOf(host.id)).length === 0) && (
                 <p class="hint">{personalEmpty}</p>
               )}
+            </>
+          )}
+          {page === "worktrees" && (
+            <>
+              <p class="hint">{worktreesIntro}</p>
+              {store.hosts.value.map((host) => (
+                <section key={host.id}>
+                  {several && <h2 class="section-head">{hostName(host.id)}</h2>}
+                  <p>{pageLine(worktreeTally(forCleanup(store.worktreeLists.value[host.id] ?? [],
+                    store.worktreeSizes.value[host.id]).flatMap((g) => g.worktrees)))}</p>
+                  <WorktreesList store={store} host={host.id} />
+                </section>
+              ))}
+              <button onClick={() => { for (const host of hosts) void store.loadWorktrees(host.id); }}>Refresh</button>
             </>
           )}
           {page === "runtimes" && <p class="hint">Installing and signing in are managed on the Mac, in Settings ▸ Agent Runtimes.</p>}

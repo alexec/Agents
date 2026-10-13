@@ -610,6 +610,111 @@ struct WorktreeStartTests {
         #expect(!(try await git(["worktree", "list"], in: repo.top)).contains("fix-login"))
     }
 
+    // MARK: #790 — how much each holds, and its build output
+
+    /// The size the daemon holds for a worktree, once its walk in the background is done.
+    private func measuredSize(_ core: DaemonCore, _ root: URL) async throws -> DaemonAPI.WorktreeSize {
+        for _ in 0..<200 {
+            if let held = await core.worktreeSizes[root.path] { return held.size }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        throw GitWorktrees.Failure(message: "\(root.lastPathComponent) was never measured")
+    }
+
+    @Test func aListGivesEachWorktreesSizeOnceMeasuredWithoutWaitingForIt() async throws {
+        let repo = try await repository()
+        let core = try await makeCore(repo, FakeLauncher())
+        let (_, root) = try await finishedInWorktree(core, repo)
+        try Data(count: 2_000_000).write(to: root.appending(path: "big.bin"))
+
+        _ = await core.listWorktrees(for: repo.project)
+        let size = try await measuredSize(core, root)
+        #expect(size.bytes >= 2_000_000)
+        #expect(!size.partial)
+
+        let listed = await core.listWorktrees(for: repo.project).worktrees
+        #expect(listed.first { $0.root.path == root.path }?.size == size)
+        #expect(listed.first(where: \.isProjectFolder)?.size == nil, "the project folder holds every worktree")
+        let everywhere = await core.allWorktrees()
+        #expect(everywhere.map(\.project) == [repo.project])
+        #expect(everywhere.first?.worktrees.map(\.root.path) == [root.path])
+    }
+
+    @Test func aWalkThatRunsOutSaysOver() async throws {
+        let repo = try await repository()
+        let core = try await makeCore(repo, FakeLauncher())
+        let (_, root) = try await finishedInWorktree(core, repo)
+        await core.setWorktreeMeasureBudget(files: 1, time: .seconds(10))
+        _ = await core.listWorktrees(for: repo.project)
+        let size = try await measuredSize(core, root)
+        #expect(size.partial)
+        #expect(size.words.hasPrefix("over "))
+    }
+
+    /// Archived, with an untracked file keeping it, and build output git ignores beside
+    /// a `dist` that is checked in.
+    private func idleWithBuildOutput(_ core: DaemonCore, _ repo: Repo) async throws -> URL {
+        let (id, root) = try await finishedInWorktree(core, repo)
+        // `dist` is ignored, yet what is in it was added anyway: it is somebody's work.
+        try "build/\nnode_modules\ndist/\n".write(to: root.appending(path: ".gitignore"), atomically: true, encoding: .utf8)
+        try FileManager.default.createDirectory(at: root.appending(path: "dist"), withIntermediateDirectories: true)
+        try "shipped\n".write(to: root.appending(path: "dist/app.js"), atomically: true, encoding: .utf8)
+        _ = try await git(["add", "-f", "dist/app.js"], in: root)
+        _ = try await git(["commit", "-q", "-m", "dist"], in: root)
+        for folder in ["build", "Web/node_modules/left-pad"] {
+            try FileManager.default.createDirectory(at: root.appending(path: folder), withIntermediateDirectories: true)
+            try Data(count: 1_000_000).write(to: root.appending(path: "\(folder)/out.bin"))
+        }
+        try await core.archive(id)
+        #expect(FileManager.default.fileExists(atPath: root.path), "the untracked .gitignore keeps it")
+        return root
+    }
+
+    @Test func buildOutputGitIgnoresGoesAndNothingElse() async throws {
+        let repo = try await repository()
+        let core = try await makeCore(repo, FakeLauncher())
+        let root = try await idleWithBuildOutput(core, repo)
+
+        let removed = try await core.removeBuildOutput(removal(repo, root))
+        #expect(removed.removed == ["build", "Web/node_modules"])
+        #expect(removed.freed.bytes >= 2_000_000)
+        #expect(!FileManager.default.fileExists(atPath: root.appending(path: "build").path))
+        #expect(!FileManager.default.fileExists(atPath: root.appending(path: "Web/node_modules").path))
+        #expect(FileManager.default.fileExists(atPath: root.appending(path: "dist/app.js").path))
+        #expect(FileManager.default.fileExists(atPath: root.appending(path: ".gitignore").path))
+        #expect(try await git(["status", "--porcelain"], in: root) == "?? .gitignore")
+        // Measured again, without what went.
+        #expect(try await measuredSize(core, root).bytes < 2_000_000)
+    }
+
+    @Test func buildOutputStaysWhileAnAgentWorksThere() async throws {
+        let repo = try await repository()
+        let core = try await makeCore(repo, FakeLauncher())
+        let (_, root) = try await finishedInWorktree(core, repo)
+        try FileManager.default.createDirectory(at: root.appending(path: "build"), withIntermediateDirectories: true)
+        let error = await failure { try await core.removeBuildOutput(removal(repo, root)) }
+        #expect(error?.code == DaemonAPI.Failure.worktreeInUse)
+        #expect(FileManager.default.fileExists(atPath: root.appending(path: "build").path))
+    }
+
+    @Test func buildOutputInAWorktreeTheAppDidNotMakeIsNotItsToClean() async throws {
+        let repo = try await repository()
+        let core = try await makeCore(repo, FakeLauncher())
+        let byHand = try await addByHand(repo, "by-hand")
+        let error = await failure { try await core.removeBuildOutput(removal(repo, byHand)) }
+        #expect(error?.code == DaemonAPI.Failure.notAWorktree)
+    }
+
+    @Test func removingAWorktreeForgetsItsSize() async throws {
+        let repo = try await repository()
+        let core = try await makeCore(repo, FakeLauncher())
+        let root = try await idleWithBuildOutput(core, repo)
+        _ = await core.listWorktrees(for: repo.project)
+        _ = try await measuredSize(core, root)
+        _ = try await core.removeWorktree(removal(repo, root, confirmed: true))
+        #expect(await core.worktreeSizes[root.path] == nil)
+    }
+
     // MARK: US4 — an agent's helpers in worktrees
 
     /// A helper start, made with the caller's token bound again first — a fake agent's

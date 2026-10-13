@@ -1374,15 +1374,17 @@ struct PromptBar: View {
         return nil
     }
 
-    /// Its branch and who is in it, so a worktree someone is already working in is
-    /// chosen knowing that.
+    /// Its branch, who is in it and how much it holds (#790), so a worktree someone is
+    /// already working in is chosen knowing that.
     private func worktreeDescription(_ worktree: DaemonAPI.WorktreeSummary) -> String {
         guard worktree.exists else { return "Missing" }
         let branch = worktree.branch ?? "detached"
+        let size = model.work.size(of: worktree, on: model.selectedProjectKey?.host ?? .mac)
+            .map { " · \($0.words)" } ?? ""
         switch worktree.agents.count {
-        case 0: return branch
-        case 1: return "\(branch) · 1 agent working"
-        case let count: return "\(branch) · \(count) agents working"
+        case 0: return branch + size
+        case 1: return "\(branch) · 1 agent working\(size)"
+        case let count: return "\(branch) · \(count) agents working\(size)"
         }
     }
 

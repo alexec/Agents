@@ -167,7 +167,8 @@ struct ChoiceRows: View {
                         Task { await model.chooseWorktree(.existing(worktree.root)) }
                     } label: {
                         choiceLabel(worktree.name, chosen: model.startWorktree == .existing(worktree.root))
-                        Text(Self.worktreeDetail(worktree))
+                        Text(Self.worktreeDetail(worktree, size: model.work.size(of: worktree,
+                                                                                 on: model.selectedSummary?.host ?? .mac)))
                     }
                     .disabled(!worktree.exists)
                 }
@@ -258,7 +259,8 @@ struct ChoiceRows: View {
     }
 
     /// Its branch, its git status and who is in it, as the Mac says it.
-    static func worktreeDetail(_ worktree: DaemonAPI.WorktreeSummary) -> String {
+    /// Its branch, git status, who is in it, and with `size` how much it holds (#790).
+    static func worktreeDetail(_ worktree: DaemonAPI.WorktreeSummary, size: DaemonAPI.WorktreeSize? = nil) -> String {
         guard worktree.exists else { return "Missing" }
         var parts = [worktree.branch ?? "detached"]
         if let status = worktree.status { parts.append(status.summary) }
@@ -267,6 +269,7 @@ struct ChoiceRows: View {
         case 1: parts.append("1 agent working")
         case let count: parts.append("\(count) agents working")
         }
+        if let size { parts.append(size.words) }
         return parts.joined(separator: " · ")
     }
 

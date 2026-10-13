@@ -13,7 +13,7 @@
 // again; and the form's runtime, choices and reach are kept between starts.
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import type { Attachment, BranchSummary, ConfigOption, JSONValue, Persona, RuntimeStatus, SandboxChoice, SlashCommand, StartRequest, UUID,
+import type { Attachment, BranchSummary, ConfigOption, JSONValue, Persona, RuntimeStatus, SandboxChoice, SlashCommand, StartRequest, UUID, WorktreeSize,
   WorktreeSummary } from "../protocol/generated";
 import type { SandboxWillNotStart, Store } from "../model/store";
 import { drawable, modeOption, modeStartsOn, choices, same } from "../model/options";
@@ -27,6 +27,7 @@ import { sandboxCardTitle, sandboxChoiceWords, sandboxChoices, sandboxExplanatio
 import { accepted } from "../model/labels";
 import type { Start } from "./chat/appViewBridge";
 import { go } from "../route";
+import { sizeWords } from "../model/worktrees";
 import { LabelField } from "./Labels";
 import { Reach } from "./Reach";
 import { Prompt } from "./Prompt";
@@ -389,7 +390,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
                     {worktrees.value.length > 0 && (
                       <optgroup label="Worktrees">
                         {worktrees.value.map((w) => (
-                          <option key={w.root} value={`existing:${w.root}`} disabled={!w.exists}>{w.name} — {worktreeDescription(w)}</option>
+                          <option key={w.root} value={`existing:${w.root}`} disabled={!w.exists}>{w.name} — {worktreeDescription(w, store.worktreeSize(host, w))}</option>
                         ))}
                       </optgroup>
                     )}
@@ -485,12 +486,13 @@ function whereValue(where: Where): string {
   return where.kind;
 }
 
-/** Its branch and who is in it, as the window's worktreeDescription. */
-function worktreeDescription(worktree: WorktreeSummary): string {
+/** Its branch, who is in it and how much it holds (#790), as the window's worktreeDescription. */
+function worktreeDescription(worktree: WorktreeSummary, size?: WorktreeSize): string {
   if (!worktree.exists) return "Missing";
   const branch = worktree.branch ?? "detached";
   const n = worktree.agents.length;
-  return n === 0 ? branch : `${branch} · ${n} agent${n === 1 ? "" : "s"} working`;
+  const held = size ? ` · ${sizeWords(size)}` : "";
+  return (n === 0 ? branch : `${branch} · ${n} agent${n === 1 ? "" : "s"} working`) + held;
 }
 
 /**

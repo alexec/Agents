@@ -33,6 +33,9 @@ public enum SidebarItem: Hashable, Sendable {
     /// The person's own MCP servers (#488, #589, #753): every one in `~/.agents/mcp.json`,
     /// and how each is doing.
     case mcpServers
+    /// Every project's worktrees and how much each holds on disk (#790), with Remove and
+    /// Remove build output. Changing, so here rather than in Project Settings.
+    case worktrees
     /// A project's MCP servers (#753), under its project when its `.agents/mcp.json` has any.
     case projectMCPServers(ProjectKey)
 }

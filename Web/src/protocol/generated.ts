@@ -375,6 +375,11 @@ export interface BranchSummary {
   remote?: string;
 }
 
+export interface BuildOutputRemoved {
+  removed: string[];
+  freed: WorktreeSize;
+}
+
 export interface CancelWaitRequest {
   agentID: UUID;
 }
@@ -1411,6 +1416,11 @@ export interface ProjectSummary {
   approvals?: Approval[];
 }
 
+export interface ProjectWorktrees {
+  project: URLString;
+  worktrees: WorktreeSummary[];
+}
+
 export interface ProjectsListRequest {
   includeArchived: boolean;
 }
@@ -1461,6 +1471,12 @@ export interface RateLimitInfo {
 export interface RememberedOptionsRequest {
   runtimeID: string;
   cwd: URLString;
+}
+
+export interface RemovalCheck {
+  blockedBy: UUID[];
+  uncommitted: number;
+  unmerged: boolean;
 }
 
 export interface RenameRequest {
@@ -2173,6 +2189,26 @@ export type WorktreeChoice =
   | { named: { _0: string } }
   | { branch: { _0: string } };
 
+export interface WorktreeRemovalRequest {
+  project: URLString;
+  root: URLString;
+  confirmed: boolean;
+}
+
+export interface WorktreeRemoved {
+  removedBranch: boolean;
+}
+
+export interface WorktreeSize {
+  bytes: number;
+  partial: boolean;
+}
+
+export interface WorktreeSizeNote {
+  root: URLString;
+  size: WorktreeSize;
+}
+
 export interface WorktreeStatus {
   uncommitted: number;
   ahead?: number;
@@ -2189,6 +2225,7 @@ export interface WorktreeSummary {
   madeByApp: boolean;
   agents: UUID[];
   status?: WorktreeStatus;
+  size?: WorktreeSize;
 }
 
 export interface WorktreesListRequest {
@@ -2201,6 +2238,10 @@ export interface WorktreesListResponse {
   whyNot?: string;
   worktrees: WorktreeSummary[];
   branches: BranchSummary[];
+}
+
+export interface WorktreesSized {
+  sizes: WorktreeSizeNote[];
 }
 
 export interface WriteFailure {
@@ -2328,7 +2369,11 @@ export interface Methods {
   "workflows/mcpTrigger/clearMissed": { params: WorkflowMCPClearMissedRequest; result: WorkflowSummary };
   "workflows/run": { params: WorkflowRequest; result: WorkflowSummary };
   "workflows/settings": { params: WorkflowSettingsRequest; result: WorkflowSummary };
+  "worktrees/all": { params: Empty; result: ProjectWorktrees[] };
+  "worktrees/check": { params: WorktreeRemovalRequest; result: RemovalCheck };
   "worktrees/list": { params: WorktreesListRequest; result: WorktreesListResponse };
+  "worktrees/remove": { params: WorktreeRemovalRequest; result: WorktreeRemoved };
+  "worktrees/removeBuildOutput": { params: WorktreeRemovalRequest; result: BuildOutputRemoved };
 }
 
 /** Whether a method goes to a host (with `h`) or to the control plane itself. */
@@ -2447,7 +2492,11 @@ export const MethodTarget = {
   "workflows/mcpTrigger/clearMissed": "host",
   "workflows/run": "host",
   "workflows/settings": "host",
+  "worktrees/all": "host",
+  "worktrees/check": "host",
   "worktrees/list": "host",
+  "worktrees/remove": "host",
+  "worktrees/removeBuildOutput": "host",
 } as const;
 
 /** Every notification the web remote hears, and its params. */
@@ -2479,6 +2528,7 @@ export interface Notifications {
   "store/notesChanged": StoreNotes;
   "workflow/changed": WorkflowSummary;
   "workflow/removed": WorkflowRemovedNotification;
+  "worktrees/sized": WorktreesSized;
 }
 
 /** Each interface's keys, for checking Swift-encoded fixtures against these types. */
@@ -2510,6 +2560,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BackgroundItem: { required: ["id", "kind", "name", "state", "canStop", "isStopping", "startedAt"], optional: ["taskType", "detail", "command", "parentID", "toolCallID", "outputFilePath", "summary", "lastToolName", "endedAt"] },
   Block: { required: ["waits"], optional: ["checkAgainAt", "wakeOn", "clearedAt", "clearedBy"] },
   BranchSummary: { required: ["name"], optional: ["remote"] },
+  BuildOutputRemoved: { required: ["removed", "freed"], optional: [] },
   CancelWaitRequest: { required: ["agentID"], optional: [] },
   CarriedSetting: { required: ["optionID", "name", "source"], optional: ["from", "to"] },
   ChangedFile: { required: ["path", "source", "state", "editCount", "beyondReported", "inProgress", "outsideFolder"], optional: ["relativePath", "added", "removed", "firstLine", "oldPath"] },
@@ -2634,12 +2685,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProjectRemovedNotification: { required: ["folder"], optional: [] },
   ProjectRequest: { required: ["folder"], optional: [] },
   ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: ["isChat", "guardedChanges", "approvals"] },
+  ProjectWorktrees: { required: ["project", "worktrees"], optional: [] },
   ProjectsListRequest: { required: ["includeArchived"], optional: [] },
   PromptRequest: { required: ["agentID", "text", "attachments", "from"], optional: ["sendID"] },
   QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface", "sender", "hops"] },
   QueuedStart: { required: ["labels"], optional: ["runtimeID", "permissionMode", "model", "worktree"] },
   RateLimitInfo: { required: [], optional: ["status", "resetsAt", "rateLimitType", "utilization", "overageStatus", "overageResetsAt", "isUsingOverage", "overageInUse", "overageDisabledReason"] },
   RememberedOptionsRequest: { required: ["runtimeID", "cwd"], optional: [] },
+  RemovalCheck: { required: ["blockedBy", "uncommitted", "unmerged"], optional: [] },
   RenameRequest: { required: ["agentID", "title"], optional: [] },
   ReportedEdit: { required: ["path", "newText", "toolCallID", "index", "entryIndex", "replaceAll", "at"], optional: ["oldText"] },
   ResumingNotification: { required: ["agentID", "isResuming"], optional: [] },
@@ -2714,9 +2767,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "hosts", "whenDone"] },
   WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
   WorkflowsListRequest: { required: [], optional: ["folder"] },
+  WorktreeRemovalRequest: { required: ["project", "root", "confirmed"], optional: [] },
+  WorktreeRemoved: { required: ["removedBranch"], optional: [] },
+  WorktreeSize: { required: ["bytes", "partial"], optional: [] },
+  WorktreeSizeNote: { required: ["root", "size"], optional: [] },
   WorktreeStatus: { required: ["uncommitted"], optional: ["ahead", "behind", "unmerged"] },
-  WorktreeSummary: { required: ["name", "root", "isProjectFolder", "exists", "madeByApp", "agents"], optional: ["branch", "status"] },
+  WorktreeSummary: { required: ["name", "root", "isProjectFolder", "exists", "madeByApp", "agents"], optional: ["branch", "status", "size"] },
   WorktreesListRequest: { required: ["folder"], optional: [] },
   WorktreesListResponse: { required: ["isRepository", "canMakeNew", "worktrees", "branches"], optional: ["whyNot"] },
+  WorktreesSized: { required: ["sizes"], optional: [] },
   WriteFailure: { required: ["cause", "what", "message"], optional: ["path"] },
 };

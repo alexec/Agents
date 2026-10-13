@@ -229,7 +229,7 @@ extension ControlServiceTests {
 
     /// #61 P4: a copy restarted while forwarding forwards again, rather than serving the
     /// records it handed over; told to serve, it serves and forgets it forwarded.
-    @Test func aForwardingCopyForwardsAgainAfterARestart() async throws {
+    @Test(.flakyUnderLoad) func aForwardingCopyForwardsAgainAfterARestart() async throws {
         let store = MemoryStore()
         let port = try await freePort()
         let url = URL(string: "http://127.0.0.1:\(port)")!

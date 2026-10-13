@@ -114,6 +114,8 @@ struct ContentView: View {
             RuntimesView().paperGround()
         } else if model.showsMCPServers {
             MCPServersView().paperGround()
+        } else if model.showsWorktrees {
+            WorktreesView().paperGround()
         } else if model.showsSpending {
             SpendingView().paperGround()
         } else if model.showsTime {
@@ -160,7 +162,7 @@ struct ContentView: View {
     /// about all the work, which are no project's.
     private var projectForTerminal: DaemonAPI.ProjectSummary? {
         guard terminal.isOpen, !model.showsEvents, !model.showsResources, !model.showsRuntimes,
-              !model.showsMCPServers,
+              !model.showsMCPServers, !model.showsWorktrees,
               !model.showsSpending, !model.showsTime, let project = model.selectedProjectSummary, project.exists else { return nil }
         return project
     }

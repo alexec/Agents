@@ -351,6 +351,13 @@ public actor DaemonCore {
     var diskAlarms: [String: DiskAlarm] = [:]
     /// How much a crossing may walk to measure the worktrees on the volume.
     var diskMeasureBudget: (files: Int, time: Duration) = (200_000, .seconds(5))
+    /// Each worktree's size as last measured (#790), by its canonical path, and when.
+    var worktreeSizes: [String: (size: DaemonAPI.WorktreeSize, at: Date)] = [:]
+    /// Worktrees waiting to be measured, one at a time, by `worktreeSizeTask`.
+    var worktreeSizeQueue: [URL] = []
+    var worktreeSizeTask: Task<Void, Never>?
+    /// How much one worktree's walk may take before it says "over".
+    var worktreeMeasureBudget: (files: Int, time: Duration) = (1_000_000, .seconds(10))
     /// Clones under way, by id (027). Memory only: a clone the daemon did not live to
     /// finish is not resumed, and its staging folder is removed on the next start.
     var clones: [UUID: RunningClone] = [:]

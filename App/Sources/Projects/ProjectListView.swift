@@ -84,6 +84,8 @@ struct ProjectListView: View {
                     .appText(.supporting).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
                 MCPServersRow().activityIcon("server.rack", warns: mcpServersStopped)
                     .appText(.supporting).sidebarInk(.mcpServers).tag(SidebarItem.mcpServers)
+                WorktreesRow().activityIcon("arrow.triangle.branch")
+                    .appText(.supporting).sidebarInk(.worktrees).tag(SidebarItem.worktrees)
                 SpendingRow(selection: $selection).activityIcon("dollarsign.circle",
                                                                 warns: model.costState?.dayIsCloseToFull == true)
                     .appText(.supporting).sidebarInk(.spending).tag(SidebarItem.spending)

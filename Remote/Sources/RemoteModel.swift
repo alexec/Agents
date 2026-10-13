@@ -625,7 +625,7 @@ final class RemoteModel {
                 openArchive = false
                 openMCPServers = false
                 openPin = path
-            case .spending, .time, .resources, .events, .runtimes, .mcpServers:
+            case .spending, .time, .resources, .events, .runtimes, .mcpServers, .worktrees:
                 openActivity = newValue
             case .archive(let key):
                 // The project's archive page (#495, #498), with what is opened from it
@@ -2851,6 +2851,62 @@ final class RemoteModel {
                                                     DaemonAPI.MCPHealthCheckRequest(project: project?.folder.path),
                                                     returning: DaemonAPI.MCPHealthSnapshot.self) else { return }
         work.replaceMCPHealth(snapshot, from: host)
+    }
+
+    /// Every project's worktrees on the Mac, for Activity ▸ Worktrees (#790). Sizes not
+    /// measured yet come later, on `worktrees/sized`.
+    func loadWorktrees() async {
+        guard let listed = try? await client.call(DaemonAPI.Method.worktreesAll, DaemonAPI.Empty(),
+                                                  returning: [DaemonAPI.ProjectWorktrees].self) else { return }
+        work.replaceWorktrees(listed)
+    }
+
+    /// What removing one of a project's worktrees would lose; nil when it could not be
+    /// asked, and `problem` says why.
+    func checkWorktreeRemoval(_ root: URL, in project: URL) async -> DaemonAPI.RemovalCheck? {
+        do {
+            return try await client.call(DaemonAPI.Method.worktreesCheck,
+                                         DaemonAPI.WorktreeRemovalRequest(project: project, root: root),
+                                         returning: DaemonAPI.RemovalCheck.self)
+        } catch {
+            problem = sentence(for: error)
+            return nil
+        }
+    }
+
+    /// Remove one of a project's worktrees; the Mac checks again either way.
+    func removeWorktree(_ root: URL, in project: URL, confirmed: Bool) async {
+        do {
+            _ = try await client.call(DaemonAPI.Method.worktreesRemove,
+                                      DaemonAPI.WorktreeRemovalRequest(project: project, root: root, confirmed: confirmed),
+                                      returning: DaemonAPI.WorktreeRemoved.self)
+        } catch {
+            problem = sentence(for: error)
+        }
+        await loadWorktrees()
+    }
+
+    /// Delete an idle worktree's build output, and say what it freed; nil when it could not.
+    func removeBuildOutput(_ root: URL, in project: URL) async -> String? {
+        defer { Task { await loadWorktrees() } }
+        do {
+            let removed = try await client.call(DaemonAPI.Method.worktreesRemoveBuildOutput,
+                                                DaemonAPI.WorktreeRemovalRequest(project: project, root: root),
+                                                returning: DaemonAPI.BuildOutputRemoved.self)
+            return WorktreeTally.freedWords(removed)
+        } catch {
+            problem = sentence(for: error)
+            return nil
+        }
+    }
+
+    /// Clean up worktrees (030): the project's new session, its prompt offered the words,
+    /// as the window's does.
+    func offerCleanUp(in project: URL) {
+        StartDraftKeeper.shared.note(WorktreeTally.cleanUpPrompt, [], in: project)
+        StartDraftKeeper.shared.flush()
+        openActivity = nil
+        sidebarItem = .project(ProjectKey(host: .mac, folder: project))
     }
 
     /// Every volume on the Mac low on space (#196), for the strip under the banner. A Mac
