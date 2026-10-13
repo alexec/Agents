@@ -71,7 +71,7 @@ struct MCPRecordWritesMeasure {
             var waits: [Duration] = []
             while !Task.isCancelled {
                 let at = ContinuousClock.now
-                _ = await core.mcpEventsHeard(in: project)
+                _ = await core.mcpRecords()
                 waits.append(ContinuousClock.now - at)
                 try? await Task.sleep(for: .microseconds(200))
             }
