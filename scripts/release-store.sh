@@ -74,7 +74,7 @@ archive AgentsStore 'generic/platform=macOS' mac $mac_signing
 archive Remote 'generic/platform=iOS' ios $ios_signing
 (( dry )) && { print "dry run: both archives pass check-store-archive.sh; nothing exported"; exit 0 }
 
-# export NAME PROFILES-DICT [EXTRA-KEYS]
+# export NAME PROFILES-DICT [EXTRA-KEYS]: the ios call passes no EXTRA-KEYS, hence ${3:-} under -u (#954)
 export_archive() {
     cat > $out/$1-export.plist <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -86,7 +86,7 @@ export_archive() {
   <key>signingStyle</key><string>manual</string>
   <key>signingCertificate</key><string>Apple Distribution</string>
   <key>uploadSymbols</key><true/>
-  <key>provisioningProfiles</key><dict>$2</dict>$3
+  <key>provisioningProfiles</key><dict>$2</dict>${3:-}
 </dict></plist>
 EOF
     print "exporting $1…"
