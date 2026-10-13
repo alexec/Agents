@@ -1,7 +1,9 @@
 // Put Files in Drop Box… (#231), from a project row's menu: a folder inside the project's
 // `.agents/dropbox/`, if any, then files chosen from this computer. A file dropped on a project's
-// or a session's row goes to the drop box's top without asking, as the window's drop does.
+// or a session's row goes to the drop box's top without asking, as the window's drop does, and
+// a note under the row says where it went (#934).
 import { signal, useSignal } from "@preact/signals";
+import { useEffect, useRef } from "preact/hooks";
 import type { Store } from "../model/store";
 import { Modal } from "./Modal";
 
@@ -19,14 +21,37 @@ export function carriesFiles(event: DragEvent): boolean {
   return Array.from(event.dataTransfer?.types ?? []).includes("Files");
 }
 
+/** The project's name as its folder says it, for the note under a row a drop went in by. */
+export function dropboxName(folder: string): string {
+  let path = folder;
+  try {
+    path = decodeURIComponent(new URL(folder).pathname);
+  } catch { /* a plain path already */ }
+  return path.replace(/\/+$/, "").split("/").pop() || path;
+}
+
+/** The note a drop leaves (#934), as the window's: "Put 2 files in work’s drop box". */
+export function dropboxNote(count: number, name: string): string {
+  return `Put ${count === 1 ? "1 file" : `${count} files`} in ${name}\u2019s drop box`;
+}
+
+/** How long that note stays under the row. */
+const noteSeconds = 4;
+
 /**
  * A row taking files dragged onto it (#231): into the project's drop box, at its top. Anything
- * else dragged over the row is left alone. `targeted` lights the row while files are over it.
+ * else dragged over the row is left alone. `targeted` lights the row while files are over it;
+ * `note` says for a moment where the files went once they are in (#934), as a session's row
+ * sends them to its project and not to the chat.
  */
 export function useDropboxDrop(store: Store, host: string, folder: string, down: boolean) {
   const over = useSignal(false);
+  const note = useSignal<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
   return {
     targeted: over.value,
+    note: note.value,
     props: {
       onDragOver: (e: DragEvent) => {
         if (down || !carriesFiles(e)) return;
@@ -39,7 +64,14 @@ export function useDropboxDrop(store: Store, host: string, folder: string, down:
         over.value = false;
         if (down || !carriesFiles(e)) return;
         e.preventDefault();
-        void store.putInDropbox(host, folder, "", Array.from(e.dataTransfer?.files ?? []));
+        const files = Array.from(e.dataTransfer?.files ?? []);
+        void store.putInDropbox(host, folder, "", files).then((sent) => {
+          // One that could not go is the store's problem, said already.
+          if (sent.length === 0 || sent.length < files.length) return;
+          note.value = dropboxNote(sent.length, dropboxName(folder));
+          clearTimeout(timer.current);
+          timer.current = setTimeout(() => (note.value = null), noteSeconds * 1000);
+        });
       },
     },
   };

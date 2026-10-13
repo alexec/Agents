@@ -589,15 +589,33 @@ struct SessionSidebarRow: View {
 /// A project's or a session's row taking files dragged from Finder (#231): each file
 /// goes into the top of the project's drop box, where a workflow can pick it up; the
 /// project's *Put Files in Drop Box…* names a folder inside it. A folder dropped here is
-/// added as a project, as one dropped on the list around the rows is.
+/// added as a project, as one dropped on the list around the rows is. Once the files are
+/// in, a note under the row says where for a moment (#934): a session's row sends them
+/// to its project, not to the chat.
 private struct DropboxDrop: ViewModifier {
     @Environment(AppModel.self) private var model
     let project: ProjectKey
     @State private var isTargeted = false
+    /// "Put 2 files in work’s drop box", while it shows.
+    @State private var note: String?
+    @State private var clearing: Task<Void, Never>?
 
     func body(content: Content) -> some View {
         content
-            .background(isTargeted ? Paper.accent.opacity(0.18) : .clear, in: .rect(cornerRadius: 5))
+            // Room under the row for the note, by padding and not a stack: a stack would
+            // hide the row's tag from the List.
+            .padding(.bottom, note == nil ? 0 : 16)
+            .overlay(alignment: .bottomLeading) {
+                if let note {
+                    Text(note)
+                        .appText(.fine)
+                        .foregroundStyle(Paper.accent)
+                        .lineLimit(1)
+                        .padding(.leading, 4)
+                        .transition(.opacity)
+                }
+            }
+            .background(isTargeted || note != nil ? Paper.accent.opacity(0.18) : .clear, in: .rect(cornerRadius: 5))
             .dropDestination(for: URL.self) { urls, _ in
                 let isFolder: (URL) -> Bool = {
                     $0.hasDirectoryPath || (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
@@ -607,10 +625,23 @@ private struct DropboxDrop: ViewModifier {
                 guard !urls.isEmpty else { return false }
                 Task {
                     for folder in folders { await model.addProject(folder) }
-                    if !files.isEmpty { await model.putInDropbox(files, project: project) }
+                    // One that could not go is the window's alert, said already.
+                    if !files.isEmpty, await model.putInDropbox(files, project: project) { show(files.count) }
                 }
                 return true
             } isTargeted: { isTargeted = $0 }
+    }
+
+    private func show(_ count: Int) {
+        let said = "Put \(count == 1 ? "1 file" : "\(count) files") in \(project.folder.lastPathComponent)\u{2019}s drop box"
+        withAnimation { note = said }
+        AccessibilityNotification.Announcement(said).post()
+        clearing?.cancel()
+        clearing = Task {
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            withAnimation { note = nil }
+        }
     }
 }
 

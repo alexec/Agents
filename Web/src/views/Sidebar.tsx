@@ -538,6 +538,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
         </button>
         {own > 0 && <span class="count" aria-label={`${own} sessions`}>{own}</span>}
       </div>
+      <DropNote note={drop.note} />
       {unfolded && (
         <div class="fold-body">
           {/* The project's pinned pages first (#159), not while searching: the search is for sessions. */}
@@ -689,6 +690,7 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
   const markAgent = parent && !tree.isUnfolded ? markAgentOf(agent, startedBy(store, host, agent)) : undefined;
   const treeClass = tree?.isChild ? " child" : parent ? " parent" : "";
   return (
+    <>
     <div class={`nav-item${treeClass}${drop.targeted ? " drop-target" : ""}`} onContextMenu={(e) => openContextMenu(e, menu())}
       onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }} {...holdForMenu(menu)} {...drop.props}>
       {/* No wait lines: in the sidebar a session's row is its title and one line (#587). */}
@@ -706,8 +708,15 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
         </button>
       )}
     </div>
+    <DropNote note={drop.note} />
+    </>
   );
 });
+
+/** Where files dropped on the row above went (#934), for a moment; read out as it comes. */
+function DropNote({ note }: { note: string | null }) {
+  return <div class="drop-note" role="status">{note}</div>;
+}
 
 /** The folder as a person reads it, for the row's tooltip. */
 function folderPath(folder: string): string {
