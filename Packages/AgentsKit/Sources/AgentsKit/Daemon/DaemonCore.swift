@@ -315,6 +315,9 @@ public actor DaemonCore {
     /// its last agent or a record (#204). Every project-wide call used to
     /// make the set again for each project it summarised.
     var projectIndexCache: ProjectIndex?
+    /// The folders of the index last made, so the caches of a folder that leaves it are
+    /// let go (#933).
+    var indexedFolders: Set<URL> = []
     /// Why the chat project could not be made at start (#229), in a sentence; nil when it
     /// was, or when there was nothing to make. See `DaemonCore+ChatProject`.
     var chatProjectFailure: String?

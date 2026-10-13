@@ -64,6 +64,9 @@ extension DaemonCore {
         }
         let index = ProjectIndex(folders: folders, names: names, agentFolders: agents.foldersVersion)
         projectIndexCache = index
+        let gone = indexedFolders.subtracting(folders)
+        indexedFolders = folders
+        if !gone.isEmpty { forgetFolderCaches(gone) }
         return index
     }
 
