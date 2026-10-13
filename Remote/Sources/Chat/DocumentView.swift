@@ -88,8 +88,9 @@ private struct Elsewhere: View {
 /// Everything named in the conversation, in one list, away from the messages it
 /// arrived in: what was attached to a prompt, and what an agent handed back.
 ///
-/// Derived on read from the transcript, exactly as the Mac's pane derives it, so it
-/// lasts as long as the transcript does and needs no notification of its own. The
+/// Derived from the transcript, exactly as the Mac's pane derives it, so it lasts as
+/// long as the transcript does and needs no notification of its own. The model folds
+/// it as entries land (#929): read here, it is not a walk of the page per chunk. The
 /// iPad holds a page of transcript rather than all of it, so this is what was
 /// exchanged *in what has been read* — said at the foot rather than left to be
 /// discovered.
@@ -98,7 +99,7 @@ struct ArtifactsList: View {
     /// Set in a scene of its own (#888): its session, not the selection.
     @Environment(\.poppedChat) private var popped
 
-    private var artifacts: [Artifact] { Artifact.all(in: model.page(popped).entries) }
+    private var artifacts: [Artifact] { model.page(popped).artifacts }
 
     var body: some View {
         Group {

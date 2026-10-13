@@ -81,6 +81,12 @@ public final class AgentsModel {
     /// for every word.
     public private(set) var transcriptItems: [TranscriptItem] = []
     @ObservationIgnored private var display = TranscriptDisplayBuilder()
+    /// Everything exchanged in the page, newest first: `Artifact.all(in: entries)`,
+    /// folded as each entry lands and moved only when one brings something (#929).
+    public private(set) var artifacts: [Artifact] = []
+    /// Each path's edits in the page, oldest first: what `changes(to:)` reads.
+    private var fileChanges: [String: [ToolCallContent.Diff]] = [:]
+    @ObservationIgnored private var fileIndex = TranscriptFileIndex()
     /// Every entry in hand, by id, so one that reaches us twice is kept once.
     @ObservationIgnored private var entryIDs: Set<UUID> = []
     /// Entries heard as they happened since the last page arrived.
@@ -540,6 +546,9 @@ public final class AgentsModel {
             entryIDs.insert(notification.entry.id)
             entries.append(notification.entry)
             display.add(notification.entry)
+            let indexed = fileIndex.add(notification.entry)
+            if indexed.changes { fileChanges = fileIndex.changes }
+            if indexed.artifacts { artifacts = fileIndex.artifacts }
             if isFollowingEnd, entries.count > nextTrimAt {
                 trimFront()
             } else {
@@ -1271,7 +1280,16 @@ public final class AgentsModel {
         display = TranscriptDisplayBuilder()
         for entry in entries { display.add(entry) }
         transcriptItems = display.items
+        fileIndex = TranscriptFileIndex(entries: entries)
+        fileChanges = fileIndex.changes
+        artifacts = fileIndex.artifacts
         nextTrimAt = Self.entriesTrimmedAt
+    }
+
+    /// The edits the page carries for this file, newest first. Read from the fold, so
+    /// a view asking in its `body` costs a lookup, not a walk of the page (#929).
+    public func changes(to path: String) -> [ToolCallContent.Diff] {
+        (fileChanges[TranscriptFileIndex.key(path)] ?? []).reversed()
     }
 
     /// The oldest entries let go, down to `entriesKept`, while the chat follows the end.
