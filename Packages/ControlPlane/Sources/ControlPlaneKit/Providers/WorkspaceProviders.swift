@@ -99,6 +99,8 @@ public actor WorkspaceProviders: WorkspaceHandling {
     private var ticker: Task<Void, Never>?
     /// Prompts and agent starts kept for stopped hosts (US3).
     public private(set) var kept: KeptRequests?
+    /// Write It for Me's drafts (#858).
+    public private(set) var drafts: ProviderDrafts?
     /// What each host last said about whether it is idle (US4). A host that never says is
     /// never stopped as idle.
     private var statuses: [HostID: DaemonAPI.HostStatus] = [:]
@@ -124,6 +126,24 @@ public actor WorkspaceProviders: WorkspaceHandling {
 
     /// Keeps prompts and starts for this control plane's stopped hosts (US3).
     public func keep(with kept: KeptRequests) { self.kept = kept }
+
+    /// Lets an agent write a provider's map or commands at Add Provider (#858).
+    public func draft(with drafts: ProviderDrafts) { self.drafts = drafts }
+
+    /// The host linked to a provider's workspace, by name, when agents are working there:
+    /// a writer can't ask to stop it (#858, FR-020).
+    public func busyHost(_ provider: ProviderID?, _ workspace: String) async -> String? {
+        guard let provider else { return nil }
+        for record in await records.hosts where record.workspace?.provider == provider && record.workspace?.workspace == workspace {
+            if let running = statuses[record.id]?.running, !running.isEmpty { return record.name }
+        }
+        return nil
+    }
+
+    public func draftCall(from host: HostID, call: DaemonAPI.HostProviderDraftCall) async throws -> JSONValue {
+        guard let drafts else { throw JSONRPCError(code: DaemonAPI.Failure.notPermitted, message: ProviderDrafts.notYoursWords) }
+        return try await drafts.call(from: host, call)
+    }
 
     /// Reads the providers, lists each, and lists again every `listEvery` (FR-004).
     public func start() async {
@@ -276,6 +296,28 @@ public actor WorkspaceProviders: WorkspaceHandling {
                                    message: "\(await records.host(request.host)?.name ?? "That host") is offline.")
             }
             throw answer
+        case DaemonAPI.Method.providersRuntimes:
+            guard let drafts else { return try JSONValue.encoding(DaemonAPI.ProviderRuntimes(runtimes: [], why: "This control plane can’t start a writing agent.")) }
+            return try JSONValue.encoding(await drafts.runtimes())
+        case DaemonAPI.Method.providersDraftStart:
+            guard let drafts else { throw JSONRPCError(code: DaemonAPI.Failure.notSupported, message: "This control plane can’t start a writing agent.") }
+            let request = try Self.require(params, as: DaemonAPI.ProviderDraftStart.self)
+            var existing: (record: ProviderRecord, secrets: [String: String], problem: String?)?
+            if let id = request.provider {
+                guard let held = providers[id]?.record else {
+                    throw JSONRPCError(code: JSONRPCError.invalidParams, message: "There is no such provider.")
+                }
+                existing = (held, await secrets.values(id), listed[id]?.problem)
+            }
+            return try JSONValue.encoding(try await drafts.start(request, from: caller, existing: existing))
+        case DaemonAPI.Method.providersDraftCancel:
+            let request = try Self.require(params, as: DaemonAPI.ProviderDraftRequest.self)
+            await drafts?.cancel(request.draft, from: caller)
+            return [:]
+        case DaemonAPI.Method.providersDraftAnswer:
+            guard let drafts else { throw JSONRPCError(code: JSONRPCError.invalidParams, message: "That draft has ended.") }
+            try await drafts.answer(try Self.require(params, as: DaemonAPI.ProviderDraftAnswer.self), from: caller)
+            return [:]
         case DaemonAPI.Method.hostsListKept, DaemonAPI.Method.hostsDropKept, DaemonAPI.Method.hostsRetryKept:
             guard let kept else { return ["kept": []] }
             return try await kept.answer(method: method, params: params)
@@ -346,6 +388,7 @@ public actor WorkspaceProviders: WorkspaceHandling {
         }
         record.capabilities = checked.capabilities
         record.contract = checked.contract
+        record.writtenBy = await writtenBy(request, before: updating ? providers[id]?.record : nil)
         record.rev = (updating ? providers[id]?.record.rev ?? 0 : 0) + 1
         do {
             let newTag = try await store.put(Self.key(id), try ControlRecords.encoder.encode(record),
@@ -362,6 +405,18 @@ public actor WorkspaceProviders: WorkspaceHandling {
         log("provider: \(updating ? "changed" : "added") \(id) (\(record.kind.rawValue)\(record.commands?["preset"]?.stringValue.map { ", preset \($0)" } ?? "")\(record.map != nil ? ", mapped" : "")), \(checked.workspaces.count) workspaces")
         await changed()
         return await summaries().first { $0.id == id }!
+    }
+
+    /// Who wrote what is kept (#858): an agent, when the request accepts a done draft and its
+    /// map or commands are the draft's, compared as JSON; otherwise it stays as it was when
+    /// they are unchanged, and goes when the person changed them.
+    private func writtenBy(_ request: DaemonAPI.ProviderAdd, before: ProviderRecord?) async -> ProviderRecord.WrittenBy? {
+        let given = request.kind == .commands ? request.commands : request.map
+        if let draft = request.draft, let result = await drafts?.result(draft), result.json == given {
+            return .init(runtimeID: result.runtimeID, at: Date())
+        }
+        guard let before else { return nil }
+        return (before.kind == .commands ? before.commands : before.map) == given ? before.writtenBy : nil
     }
 
     /// A provider goes; its hosts stay, unlinked (US2 AS5).

@@ -1129,6 +1129,8 @@ public actor DaemonCore {
     /// the agent are sent it whole, and only when those lists are what moved; they keep the
     /// lists they hold otherwise (`Agent.keepingLists`). A slim record has no lists to send.
     func tellChanged(_ agent: Agent, from before: Agent?) {
+        // A writer (#858) is in no client's list.
+        guard agent.purpose == nil else { return }
         let lean = agent.leaned()
         let showers = showing.connections(showing: agent.id)
         guard addressed.isSet, !agent.isSlim, !showers.isEmpty,
@@ -1489,7 +1491,8 @@ public actor DaemonCore {
             pool = request.archivedOnly ? [] : Array(agents.live.values)
         }
         var listed = pool.filter { agent in
-            (archived || agent.state != .archived)
+            (agent.purpose == nil || agent.id == request.agentID)
+                && (archived || agent.state != .archived)
                 && (!request.archivedOnly || agent.state == .archived)
                 && (request.startedByWorkflow == nil || agent.startedByWorkflow == request.startedByWorkflow)
                 && (matcher?.matches(agent) ?? true)
@@ -1631,6 +1634,15 @@ public actor DaemonCore {
 
         case .permissionRequested(var request):
             request.agentID = agentID
+            // A writer (#858) has nobody to ask: its own tools yes, anything else no.
+            if agents[agentID]?.purpose != nil {
+                let yes = AppTool.writerTools.contains(where: (request.toolCall.name ?? request.toolCall.title).hasSuffix)
+                let option = yes
+                    ? request.options.first(where: { $0.kind == .allowOnce }) ?? request.options.first(where: { $0.kind == .allowAlways })
+                    : request.options.first(where: { $0.kind == .rejectOnce }) ?? request.options.first(where: { $0.kind == .rejectAlways })
+                await live[agentID]?.answerPermission(id: request.id, optionID: option?.optionID)
+                return
+            }
             let runtimeID = agents[agentID]?.runtimeID
             let reviewsClientSide = runtimeID.map(ClientPermissionSettings.supports) == true
             // Our own tool, answered by us. Nobody is asked whether the app may show

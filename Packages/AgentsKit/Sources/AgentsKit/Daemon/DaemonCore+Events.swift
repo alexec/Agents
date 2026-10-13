@@ -65,7 +65,8 @@ extension DaemonCore {
     func raiseAgentEvent(_ name: String, _ agentID: UUID, sentence: String,
                          details extra: [String: String] = [:], depth: Int? = nil,
                          endingRun: String? = nil) -> EventPosition? {
-        guard let agent = agents[agentID] else { return nil }
+        // A writer (#858) is the control plane's, not a project's: it raises nothing.
+        guard let agent = agents[agentID], agent.purpose == nil else { return nil }
         return raise(EventDraft(name: name, at: now(), scope: .project(folder: agent.projectFolder),
                          sentence: "\(LeaseWords.agentName(agent.title)) \(sentence)",
                          details: agentDetails(agent).merging(extra) { $1 },
@@ -93,6 +94,10 @@ extension DaemonCore {
     func raiseAgentEnding(_ agentID: UUID, next: AgentState, reason: EndedReason?, depth: Int,
                           afterwards: String = "stay", endingRun: String? = nil) -> EventPosition? {
         guard let agent = agents[agentID] else { return nil }
+        if agent.purpose != nil {
+            writerEnded(agentID, reason: next == .finished ? nil : reason)
+            return nil
+        }
         if next == .finished {
             let outcome = agent.report?.outcome
             var details = ["afterwards": afterwards]

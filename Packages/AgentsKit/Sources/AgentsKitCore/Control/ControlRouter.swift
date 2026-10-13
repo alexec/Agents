@@ -988,6 +988,18 @@ public actor ControlRouter {
         }
     }
 
+    /// Tells one client session that speaks the wrapped wire (#858); false when it has gone.
+    @discardableResult
+    public func tellControl(_ method: String, _ params: JSONValue, to sessionID: UUID) -> Bool {
+        guard let session = clients[sessionID], session.wrapped,
+              let line = try? JSONRPCCodec.encode(.notification(method: method, params: params)) else { return false }
+        write(ControlWire.wrap(host: nil, message: line), to: sessionID)
+        return clients[sessionID] != nil
+    }
+
+    /// Whether a client session is still here.
+    public func hasSession(_ sessionID: UUID) -> Bool { clients[sessionID] != nil }
+
     public static func describe(_ host: HostID, _ state: HostState) -> JSONValue {
         var params: [String: JSONValue] = ["host": .string(host.rawValue)]
         switch state {

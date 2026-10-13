@@ -151,6 +151,9 @@ public actor AppService {
     /// A workspace tool (#691 US6), as the agent made it.
     public typealias WorkspacesSink = @Sendable (DaemonAPI.WorkspaceToolRequest) async -> Outcome
 
+    /// A writer's tool (#858), by its name, with its arguments as the agent gave them.
+    public typealias DraftSink = @Sendable (String, JSONValue?) async -> Outcome
+
     private let connection: JSONRPCConnection?
     private let fileSink: FileSink
     private let askFormSink: AskFormSink
@@ -162,6 +165,9 @@ public actor AppService {
     private let sessionsSink: SessionsSink
     private let selfSink: SelfSink
     private let workspacesSink: WorkspacesSink
+    private let draftSink: DraftSink
+    /// The agent writing a provider's map (#858): offered the writer's tools, and nothing else.
+    private let writer: Bool
     private let viewToolSink: ViewToolSink
     /// Whether the test view and its tools are offered (#187).
     private let offersTestView: Bool
@@ -176,6 +182,7 @@ public actor AppService {
     public init(transport: (any LineTransport)?,
                 managesAgents: Bool = true,
                 movesItself: Bool = true,
+                writer: Bool = false,
                 showFile: @escaping FileSink = { _ in .refused("This app cannot show a file.") },
                 askForm: @escaping AskFormSink = { _, _ in
                     .refused("This app cannot ask the person.")
@@ -204,6 +211,9 @@ public actor AppService {
                 workspaces: @escaping WorkspacesSink = { _ in
                     .refused("This app has no workspaces.")
                 },
+                draft: @escaping DraftSink = { _, _ in
+                    .refused("This session isn't writing a provider's map.")
+                },
                 viewTool: @escaping ViewToolSink = { _, _ in
                     .failure("This app draws no views.")
                 },
@@ -219,6 +229,8 @@ public actor AppService {
         self.sessionsSink = sessions
         self.selfSink = itself
         self.workspacesSink = workspaces
+        self.writer = writer
+        self.draftSink = draft
         self.viewToolSink = viewTool
         self.offersTestView = offersTestView
         self.managesAgents = managesAgents
@@ -264,6 +276,22 @@ public actor AppService {
 
         case "ping":
             return .success([:])
+
+        case "tools/list" where writer:
+            return .success(["tools": .array(Self.writerTools)])
+
+        case "resources/list" where writer:
+            return .success(["resources": []])
+
+        case "tools/call" where writer:
+            // The writer's tools and no other (FR-010): the agent writing a provider's map
+            // has nothing else of the app's, as it has nothing of its runtime's.
+            let name = params?["name"]?.stringValue ?? ""
+            guard let tool = AppTool.writerTools.first(where: { name.hasSuffix($0) }) else {
+                return .failure(JSONRPCError(code: JSONRPCError.invalidParams,
+                                             message: "No tool called \(name.isEmpty ? "that" : name)."))
+            }
+            return .success(Self.reply(await draftSink(tool, params?["arguments"])))
 
         case "tools/list":
             // A view's tools too (#187), but never one only a view may call: no runtime

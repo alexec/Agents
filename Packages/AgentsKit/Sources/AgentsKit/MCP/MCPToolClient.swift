@@ -37,6 +37,12 @@ public actor MCPToolClient {
         do { return try await client.listTools().map(\.name) } catch { throw Self.failure(error) }
     }
 
+    /// Every tool, as the server described it: name, description, input schema and
+    /// annotations (#858).
+    public func describeTools() async throws(Failure) -> [JSONValue] {
+        do { return try await client.listTools().map(\.raw) } catch { throw Self.failure(error) }
+    }
+
     /// `tools/call`'s whole result.
     public func callTool(_ name: String, arguments: JSONValue = [:], timeout: Duration? = nil) async throws(Failure) -> JSONValue {
         do { return try await client.callTool(name, arguments: arguments, timeout: timeout) } catch { throw Self.failure(error) }
