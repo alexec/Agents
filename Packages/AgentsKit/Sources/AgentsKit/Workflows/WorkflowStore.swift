@@ -81,6 +81,10 @@ public struct WorkflowState: Codable, Hashable, Sendable {
     /// The approved file itself (#569), so Undo can write it back without git. nil for
     /// one approved before copies were kept, until its file is seen as approved again.
     public var approvedContent: Data?
+    /// Where `approvedContent` is on disk (#931): the name of its file in
+    /// `StoreLocations.workflowCopies`. Only in what `workflows.json` holds; the store
+    /// reads the copy back into `approvedContent` and clears this.
+    var approvedCopy: String?
     /// Who changed the file since it was approved (#569): the agents whose turns were
     /// running when the change was seen, or a merge or pull. Held against its digest, so
     /// a later change is named afresh.
@@ -122,7 +126,7 @@ public struct WorkflowState: Codable, Hashable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case folder, workflowID, offBy, offDigest, standingAgentID, lastFiredAt, lastFiredBy
-        case lastOutcome, lastCausingEvent, approvedDigest, approvedContent, waitingChange, deniedDigest
+        case lastOutcome, lastCausingEvent, approvedDigest, approvedContent, approvedCopy, waitingChange, deniedDigest
         case heldFire, queuedFires, goneSince
         // Before #125.
         case isArchived, isDisabled, disabledByAgent, enabledChosen, writtenOffByAgent
@@ -153,6 +157,7 @@ public struct WorkflowState: Codable, Hashable, Sendable {
         lastCausingEvent = try c.decodeIfPresent(EventPosition.self, forKey: .lastCausingEvent)
         approvedDigest = try c.decodeIfPresent(String.self, forKey: .approvedDigest)
         approvedContent = try? c.decodeIfPresent(Data.self, forKey: .approvedContent)
+        approvedCopy = try? c.decodeIfPresent(String.self, forKey: .approvedCopy)
         waitingChange = try? c.decodeIfPresent(GuardedFileState.Pending.self, forKey: .waitingChange)
         deniedDigest = try c.decodeIfPresent(String.self, forKey: .deniedDigest)
         heldFire = try? c.decodeIfPresent(HeldWorkflowFire.self, forKey: .heldFire)
@@ -182,6 +187,7 @@ public struct WorkflowState: Codable, Hashable, Sendable {
         try c.encodeIfPresent(lastCausingEvent, forKey: .lastCausingEvent)
         try c.encodeIfPresent(approvedDigest, forKey: .approvedDigest)
         try c.encodeIfPresent(approvedContent, forKey: .approvedContent)
+        try c.encodeIfPresent(approvedCopy, forKey: .approvedCopy)
         try c.encodeIfPresent(waitingChange, forKey: .waitingChange)
         try c.encodeIfPresent(deniedDigest, forKey: .deniedDigest)
         try c.encodeIfPresent(heldFire, forKey: .heldFire)
@@ -266,6 +272,11 @@ extension WorkflowRecords {
 /// scheduler's heartbeat (`noteTick`) is written at most once a minute, or with the
 /// next real change, rather than every fifteen seconds for ever.
 ///
+/// The approved copy of each workflow file is not in it (#931): each is a file of its
+/// own in `StoreLocations.workflowCopies`, named by its SHA-256, written once when it is
+/// first kept and removed when no workflow keeps it. The file names it, so the heartbeat
+/// rewrites a few kilobytes rather than every workflow file in every project.
+///
 /// A missing file is empty state, approval not yet begun. A file that is there and
 /// cannot be read approves nothing and is left as it is (#169, `ApprovalFile`): every
 /// workflow waits for the person, and only their Approve replaces the file, keeping a
@@ -280,6 +291,11 @@ public final class WorkflowStore: @unchecked Sendable {
     private var tickAt: Date?
     /// How many times the file has been written, for the tests and the measurements.
     private(set) var writes = 0
+    /// The approved copies on disk, by name, as last read or written.
+    private var copies: [String: Data] = [:]
+    /// Whether the copies folder has been cleared of copies nothing names since this
+    /// store began, so one left by a daemon that went mid-write does not stay.
+    private var swept = false
 
     /// How stale the heartbeat on disk may be. After a restart the first tick measures
     /// from it, so with the 15 s tick a stop of 75 s or more can count as the daemon
@@ -345,23 +361,75 @@ public final class WorkflowStore: @unchecked Sendable {
     private func write(_ records: WorkflowRecords, replacing: Bool) throws {
         let onDisk = current()
         if records == onDisk, !replacing || !records.unreadable { return }
-        let data = try StoreCoding.encoder.encode(records)
+        // The copies first, so the file never names one that is not there.
+        let (stored, kept) = try storingCopies(records)
+        let data = try StoreCoding.encoder.encode(stored)
         try ApprovalFile.write(data, to: locations.workflows, overUnreadable: records.unreadable,
                                replacing: replacing, began: records.approvalsBegan != nil)
         // A write over an unreadable file that is not the person's own leaves the file,
         // so what is held stays what was read.
         guard !records.unreadable || replacing else { return }
         writes += 1
+        sweepCopies(keeping: kept)
         var written = records
         written.unreadable = false
         held = (written, FileStamp(locations.workflows))
         if let tickAt, let at = written.lastTickAt, at >= tickAt { self.tickAt = nil }
     }
 
+    /// Under the lock. `records` as the file holds them: each approved copy written to a
+    /// file of its own unless it is there already, and named in its state in its place.
+    private func storingCopies(_ records: WorkflowRecords) throws -> (WorkflowRecords, [String: Data]) {
+        var stored = records
+        var kept: [String: Data] = [:]
+        for index in stored.states.indices {
+            guard let content = stored.states[index].approvedContent else { continue }
+            // A copy already kept is found by its bytes, so it is not hashed again.
+            let name = copies.first { $0.value == content }?.key ?? ContentDigest.sha256(content)
+            let url = locations.workflowCopies.appendingPathComponent(name)
+            if copies[name] == nil || !FileManager.default.fileExists(atPath: url.path) {
+                try StoreCoding.writeAtomically(content, to: url)
+            }
+            copies[name] = content
+            kept[name] = content
+            stored.states[index].approvedContent = nil
+            stored.states[index].approvedCopy = name
+        }
+        return (stored, kept)
+    }
+
+    /// Under the lock, after the file is written: the copies it no longer names go.
+    private func sweepCopies(keeping kept: [String: Data]) {
+        defer { copies = kept }
+        guard !swept || Set(copies.keys) != Set(kept.keys) else { return }
+        swept = true
+        let folder = locations.workflowCopies
+        for name in (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+        where kept[name] == nil {
+            try? FileManager.default.removeItem(at: folder.appendingPathComponent(name))
+        }
+    }
+
+    /// The approved copies the file names, read back into their states. One that is not
+    /// there is no copy, as for a workflow approved before copies were kept.
+    private func readingCopies(_ records: WorkflowRecords) -> WorkflowRecords {
+        var records = records
+        for index in records.states.indices {
+            guard let name = records.states[index].approvedCopy else { continue }
+            records.states[index].approvedCopy = nil
+            guard records.states[index].approvedContent == nil else { continue }
+            let content = copies[name]
+                ?? (try? Data(contentsOf: locations.workflowCopies.appendingPathComponent(name)))
+            copies[name] = content
+            records.states[index].approvedContent = content
+        }
+        return records
+    }
+
     private func read() -> WorkflowRecords {
         switch ApprovalFile.read(WorkflowRecords.self, at: locations.workflows, began: \.approvalsBegan) {
         case .missing: return WorkflowRecords()
-        case .read(let records): return records
+        case .read(let records): return readingCopies(records)
         case .unreadable(let salvage):
             // What decoded is kept, so the person's Approve does not drop standing
             // agents, switches, held fires or runs in flight (#205); never an approval.
@@ -369,6 +437,7 @@ public final class WorkflowStore: @unchecked Sendable {
             for index in records.states.indices {
                 records.states[index].approvedDigest = nil
                 records.states[index].approvedContent = nil
+                records.states[index].approvedCopy = nil
             }
             records.approvalsBegan = Date()
             records.unreadable = true
