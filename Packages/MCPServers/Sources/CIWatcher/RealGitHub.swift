@@ -13,6 +13,8 @@ public actor RealGitHub: GitHub {
     private var etagOrder: [String] = []
     /// Asked of gh once; a failure is asked again next time.
     private var repo: Task<String, any Error>?
+    /// The signed-in login, asked once it is known: the PR page offers a review only on others' PRs.
+    private var viewer: String?
 
     public init() {}
 
@@ -367,7 +369,26 @@ public actor RealGitHub: GitHub {
             if ran.code != 0 { throw Self.failure(ran.missing, ran.stderr, nil) }
             text = ran.stdout
         }
-        return prPage(gh: p, diff: text)
+        var page = prPage(gh: p, diff: text)
+        if let login = await viewerLogin() { page["viewer"] = .string(login) }
+        return page
+    }
+
+    /// `gh api user`'s login, or nil when gh can't say: the page then offers no review.
+    func viewerLogin() async -> String? {
+        if let viewer { return viewer }
+        let ran = await Self.gh(["api", "user", "-q", ".login"])
+        let login = ran.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard ran.code == 0, !login.isEmpty else { return nil }
+        viewer = login
+        return login
+    }
+
+    public func reviewPR(repo: String, number: Int, event: ReviewEvent, body: String) async throws -> JSON {
+        let verdict = event == .approve ? "--approve" : "--request-changes"
+        let ran = await Self.gh(["pr", "review", String(number), "-R", repo, verdict] + (body.isEmpty ? [] : ["-b", body]))
+        if ran.code != 0 { throw Self.failure(ran.missing, ran.stderr, nil) }
+        return ["event": .string(event.rawValue), "url": .string("https://github.com/\(repo)/pull/\(number)")]
     }
 
     public func mergePR(repo: String, number: Int, auto: Bool) async throws -> JSON {

@@ -271,7 +271,7 @@ public enum CIWatcher {
                                   "body": .string("The comment, in Markdown.", maxLength: 65536)], required: ["number", "body"]),
              meta: ["ui": ["visibility": ["model", "app"]]]),
         Tool(name: "get_pr", title: "Show a pull request",
-             description: "One pull request: its description, checks, files, comments and reviews, whether it conflicts with its base, and its review decision. Its view is the PR's page, with Comment and Merge. diff: true adds each file's diff (at most 2000 lines in all).",
+             description: "One pull request: its description, checks, files, comments and reviews, whether it conflicts with its base, its review decision, and the signed-in login (viewer). Its view is the PR's page, with Comment, Approve, Request Changes and Merge. diff: true adds each file's diff (at most 2000 lines in all).",
              inputSchema: Schema(["repo": repoProperty, "number": .integer("The pull request's number."),
                                   "diff": .boolean("true: each file's diff too.")], required: ["number"]),
              annotations: ["readOnlyHint": true],
@@ -280,6 +280,13 @@ public enum CIWatcher {
              description: "Squash-merges a pull request and deletes its branch on GitHub, as the signed-in person; auto: true merges it once its checks pass. Only a view may call it: a person merges.",
              inputSchema: Schema(["repo": repoProperty, "number": .integer("The pull request's number."),
                                   "auto": .boolean("true: merge once its checks pass.")], required: ["number"]),
+             meta: ["ui": ["visibility": ["app"]]]),
+        Tool(name: "review_pr", title: "Review a pull request",
+             description: "Approves a pull request, or requests changes with a body saying what, as the signed-in person. GitHub refuses either on the person's own pull request. Only a view may call it: a person reviews.",
+             inputSchema: Schema(["repo": repoProperty, "number": .integer("The pull request's number."),
+                                  "event": .string("approve or request_changes.", extra: ["enum": ["approve", "request_changes"]]),
+                                  "body": .string("The review's words, in Markdown; needed to request changes.", maxLength: 65536)],
+                                 required: ["number", "event"]),
              meta: ["ui": ["visibility": ["app"]]]),
     ]
 
@@ -301,6 +308,13 @@ public enum CIWatcher {
                 return ToolResult.structured(try await gh.prDetail(repo: repo, number: a["number"]?.int ?? 0, diff: a["diff"]?.bool == true))
             case "merge_pr":
                 return ToolResult.structured(try await gh.mergePR(repo: repo, number: a["number"]?.int ?? 0, auto: a["auto"]?.bool == true))
+            case "review_pr":
+                guard let event = ReviewEvent(rawValue: a["event"]?.string ?? "") else {
+                    return ToolResult.error("event is approve or request_changes")
+                }
+                let body = (a["body"]?.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                if event == .requestChanges && body.isEmpty { return ToolResult.error("Say what is to change: body is needed to request changes") }
+                return ToolResult.structured(try await gh.reviewPR(repo: repo, number: a["number"]?.int ?? 0, event: event, body: body))
             default:
                 return ToolResult.structured(try await gh.commentOnPR(repo: repo, number: a["number"]?.int ?? 0, body: a["body"]?.string ?? ""))
             }
@@ -327,7 +341,7 @@ public enum CIWatcher {
                  description: "The repo's open issues with their labels; a label narrows the list. Fed by list_issues.",
                  mimeType: viewMime, meta: viewMeta, text: issuesHTML),
         Resource(uri: "ui://ci/pr", name: "pr", title: "Pull request",
-                 description: "One pull request's page: description, checks, files and diff, comments, with Comment, Merge and Ask the Agent to Fix. Fed by get_pr.",
+                 description: "One pull request's page: description, checks, files and diff, comments, with Comment, Ask the Agent to Fix, Approve, Request Changes and Merge. Fed by get_pr.",
                  mimeType: viewMime, meta: viewMeta, text: prHTML),
     ]
 }

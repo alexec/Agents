@@ -6,6 +6,7 @@ import MCPServerKit
 /// A PR's `draft` is false when left out. An issue's, comment's or PR's `authorAssociation` is GitHub's (`OWNER`, `NONE`…); left out,
 /// it is `NONE`, as a stranger. A login ending `[bot]` is a bot.
 /// `"gh": "notSignedIn"` or `"gh": {"rateLimitedForMs": n}` makes every call fail that way.
+/// `viewer` is the signed-in login; left out, it is `alexec`.
 public struct FakeGitHub: GitHub {
     public let file: URL
     /// Writes one at a time, so two at once don't lose one.
@@ -206,7 +207,30 @@ public struct FakeGitHub: GitHub {
             "statusCheckRollup": run == .null ? [] : [run], "files": p["files"] ?? [], "comments": .array(comments),
             "reviews": .array(reviews), "autoMergeRequest": p["autoMerge"]?.bool == true ? ["mergeMethod": "SQUASH"] : .null,
         ]
-        return prPage(gh: gh, diff: diff ? p["diff"]?.string ?? "" : nil)
+        var page = prPage(gh: gh, diff: diff ? p["diff"]?.string ?? "" : nil)
+        page["viewer"] = .string(Self.viewer(data))
+        return page
+    }
+
+    static func viewer(_ data: JSON) -> String { data["viewer"]?.string ?? "alexec" }
+
+    /// Adds the viewer's review to it. Refused on one's own PR and on one not open, as GitHub does.
+    public func reviewPR(repo: String, number: Int, event: ReviewEvent, body: String) async throws -> JSON {
+        try change { data in
+            var prs = list(data, repo, "prs")
+            guard let i = prs.firstIndex(where: { $0["number"]?.int == number }) else { throw GhError(.notFound, "not found on GitHub") }
+            if prs[i]["state"]?.string != "open" { throw GhError(.failed, "gh: Pull request #\(number) is not open") }
+            let viewer = Self.viewer(data)
+            if prs[i]["author"]?.string == viewer {
+                throw GhError(.failed, "gh: Can not \(event == .approve ? "approve" : "request changes on") your own pull request")
+            }
+            let state = event == .approve ? "APPROVED" : "CHANGES_REQUESTED"
+            prs[i]["reviews"] = .array((prs[i]["reviews"]?.array ?? []) + [
+                ["author": .string(viewer), "body": .string(body), "state": .string(state), "at": .string(Time.string(Date()))],
+            ])
+            data["repos"]?[repo]?["prs"] = .array(prs)
+            return ["event": .string(event.rawValue), "url": prs[i]["url"] ?? ""]
+        }
     }
 
     /// Merges it at once (state merged, its branch in `deletedBranches`), or with `auto` marks it
