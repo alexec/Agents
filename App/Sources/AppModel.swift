@@ -519,6 +519,18 @@ final class AppModel {
         composing = false
     }
 
+    /// Away from a page about all the work, back to what was open under it: a smart group
+    /// picked in the source list (#866) lists its sessions beside it.
+    func leaveActivity() {
+        showsSpending = false
+        showsResources = false
+        showsEvents = false
+        showsRuntimes = false
+        showsMCPServers = false
+        showsTime = false
+        showsWorktrees = false
+    }
+
     /// Pick a project on a host. The host goes first, so the folder's `didSet` stores
     /// and compares the pair rather than a folder paired with the last host (037).
     func select(_ key: ProjectKey?) {

@@ -31,13 +31,27 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
     public var startsOpen: Bool { self == .pinned || self == .needsYou }
 
     /// How many sessions it gathers across the projects named, and for Needs You the
-    /// approvals besides.
+    /// approvals besides. `listedOnce` false (the Mac's four columns, #866) counts every
+    /// session the group fits, pinned or listed in another group too.
     @MainActor
-    public func count(in work: AgentsModel, projects: [ProjectKey]) -> Int {
+    public func count(in work: AgentsModel, projects: [ProjectKey], listedOnce: Bool = true) -> Int {
         projects.reduce(0) { total, key in
             let shelf = work.shelf(key)
             if self == .pinned {
                 return total + Self.pinnedSessions(in: work, key).count + Self.pinnedWorkflows(in: work, key).count
+            }
+            if !listedOnce {
+                switch self {
+                case .needsYou:
+                    return total + (shelf.counts[.needsAttention] ?? 0) + (shelf.counts[.blocked] ?? 0)
+                        + Self.askingAtRest(in: shelf) + Self.ownApprovals(in: work, key).count
+                case .working:
+                    return total + (shelf.counts[.running] ?? 0)
+                case .unread:
+                    return total + shelf.unread - (shelf.groups[.archived] ?? []).count(where: \.showsUnread)
+                case .pinned:
+                    return total
+                }
             }
             // Less the pinned that would be here: they are listed once, in Pinned (#587).
             let pinnedHere = Self.pinnedSessions(in: work, key).count {
@@ -110,18 +124,22 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
     /// searching only with a match. Its count is a sum of counts; a search, already
     /// filtering every list, filters this one too.
     @MainActor
-    public func isShown(in work: AgentsModel, projects: [ProjectKey], query: String = "") -> Bool {
+    public func isShown(in work: AgentsModel, projects: [ProjectKey], query: String = "",
+                        listedOnce: Bool = true) -> Bool {
         if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return count(in: work, projects: projects) > 0
+            return count(in: work, projects: projects, listedOnce: listedOnce) > 0
         }
-        return !agents(in: work, projects: projects, query: query).isEmpty
+        return !agents(in: work, projects: projects, query: query, listedOnce: listedOnce).isEmpty
             || !workflows(in: work, projects: projects, query: query).isEmpty
             || !approvals(in: work, projects: projects, query: query).isEmpty
     }
 
-    /// The sessions it gathers, newest started first, as a search leaves them.
+    /// The sessions it gathers, newest started first, as a search leaves them. With
+    /// `listedOnce` false (#866), each session it fits: pinned or not, and Unread's
+    /// unread whether working or waiting too.
     @MainActor
-    public func agents(in work: AgentsModel, projects: [ProjectKey], query: String = "") -> [Agent] {
+    public func agents(in work: AgentsModel, projects: [ProjectKey], query: String = "",
+                       listedOnce: Bool = true) -> [Agent] {
         let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let matcher = words.isEmpty ? nil : SessionLabelQuery(words)
         if self == .pinned {
@@ -131,6 +149,17 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
         }
         let gathered = projects.flatMap { key -> [Agent] in
             let shelf = work.shelf(key)
+            if !listedOnce {
+                let held: [Agent] = switch self {
+                case .pinned: []
+                case .needsYou: (shelf.groups[.needsAttention] ?? []) + (shelf.groups[.blocked] ?? [])
+                    + AgentGroup.live.filter { !Self.busyGroups.contains($0) }
+                    .flatMap { shelf.groups[$0] ?? [] }.filter(\.asksToArchive)
+                case .working: shelf.groups[.running] ?? []
+                case .unread: AgentGroup.live.flatMap { shelf.groups[$0] ?? [] }.filter(\.showsUnread)
+                }
+                return held
+            }
             let held: [Agent] = switch self {
             case .pinned: []
             case .needsYou: (shelf.groups[.needsAttention] ?? []) + (shelf.groups[.blocked] ?? [])

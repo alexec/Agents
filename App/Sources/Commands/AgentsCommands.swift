@@ -55,6 +55,7 @@ struct AgentsCommands: Commands {
     let requests: WindowRequests
     let frame: SidebarFrame
     let terminal: ProjectTerminalFrame
+    let listColumn: ListColumn
 
     /// Off unless asked for. The session draws thinking only while this is on.
     @AppStorage(TurnDisplay.defaultsKey) private var turnDetail = TurnDisplay.initial
@@ -62,7 +63,7 @@ struct AgentsCommands: Commands {
     static let helpURL = URL(string: "https://alexec.github.io/Agents/")!
 
     var body: some Commands {
-        // The standard Show/Hide Sidebar (⌃⌘S) for the projects column.
+        // The standard Show/Hide Sidebar (⌃⌘S) for the source list.
         SidebarCommands()
 
         CommandGroup(replacing: .newItem) {
@@ -118,6 +119,11 @@ struct AgentsCommands: Commands {
         }
 
         CommandGroup(after: .sidebar) {
+            // The list column (#866): hidden, the session and the inspector have the
+            // window between them. ⌥⌘S is Cost's.
+            Button(listColumn.isShown ? "Hide Session List" : "Show Session List") { listColumn.isShown.toggle() }
+                .keyboardShortcut("s", modifiers: [.command, .option, .control])
+                .disabled(!listColumn.hasList)
             Button(frame.isOpen ? "Hide Inspector" : "Show Inspector") { toggleInspector() }
                 .keyboardShortcut("i", modifiers: [.command, .option])
                 .disabled(model.selectedAgent == nil || (!frame.isOpen && !inspectorFits))

@@ -10,11 +10,12 @@ struct ContentView: View {
     let frame: SidebarFrame
     /// The project's own shell under the page (#418).
     let terminal: ProjectTerminalFrame
+    /// The list column (#866): what it lists, whether it shows, how wide.
+    let listColumn: ListColumn
     @State private var sidebarStates = SidebarStates()
     @State private var webHolders = WebHolders()
-    /// Which columns are showing. The projects stay put: moving between them is the
-    /// ordinary thing to do here, and a list that hides itself when used is a list you
-    /// have to keep fetching back.
+    /// Whether the source list shows: ⌃⌘S and the toolbar's button hide it, and a window
+    /// too narrow for it folds it first (#866).
     @State private var columns = NavigationSplitViewVisibility.all
     @State private var offeringMove = false
 
@@ -78,12 +79,12 @@ struct ContentView: View {
         // Its toggle is in the detail's toolbar.
     }
 
-    /// The one sidebar (#145): Activity, the projects folded open on their sessions, and
-    /// at its foot what this Mac and its hosts are doing.
+    /// The source list (#866): New Session, Activity, the smart groups and the projects,
+    /// and at its foot what this Mac and its hosts are doing.
     private var projects: some View {
         @Bindable var model = model
-        return ProjectListView(selection: $model.sidebarItem)
-            .navigationSplitViewColumnWidth(min: 240, ideal: 300, max: 420)
+        return ProjectListView(column: listColumn, selection: $model.sidebarItem)
+            .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
             // A server asked for a credential there is none of (043).
             .sheet(item: $model.tokenAsk) { ask in
                 TokenAskCard(ask: ask, save: { secret in
@@ -229,6 +230,53 @@ struct ContentView: View {
         }
     }
 
+    /// The list column's own button (#866), beside the source list's, while there is a
+    /// list to show.
+    @ToolbarContentBuilder
+    private var listToolbar: some ToolbarContent {
+        if listColumn.hasList {
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    listColumn.isShown.toggle()
+                } label: {
+                    Label(listColumn.isShown ? "Hide Session List" : "Show Session List",
+                          systemImage: "list.bullet.rectangle.portrait")
+                }
+                .help(listColumn.isShown ? "Hide the session list (⌃⌥⌘S)" : "Show the session list (⌃⌥⌘S)")
+            }
+        }
+    }
+
+    /// The list column follows what is open, from anywhere — a menu, Go, a banner, a link:
+    /// it keeps its list while that lists it, and otherwise lists the open thing's
+    /// project (#866). An Activity page is its own source.
+    private func followSelection(_ item: SidebarItem?) {
+        guard let item else { return }
+        switch item {
+        case .events, .resources, .runtimes, .mcpServers, .worktrees, .spending, .time:
+            listColumn.source = .activity(item)
+        case .project(let key), .pin(_, let key), .archive(let key), .projectMCPServers(let key):
+            if listColumn.source != .project(key) { listColumn.source = .project(key) }
+        case .workflow(_, let key):
+            if listColumn.source != .smart(.pinned), listColumn.source != .project(key) {
+                listColumn.source = .project(key)
+            }
+        case .session(let id):
+            guard let agent = model.work.agent(id) else { return }
+            let key = ProjectKey(host: agent.host, folder: agent.projectFolder)
+            switch listColumn.source {
+            case .project(let listed) where listed == key:
+                return
+            case .smart(let row) where agent.state != .archived:
+                let projects = SidebarOrder.projects(model.liveProjects, servers: model.hosts.servers).map(\.key)
+                if row.agents(in: model.work, projects: projects, listedOnce: false).contains(where: { $0.id == id }) { return }
+            default:
+                break
+            }
+            listColumn.source = .project(key)
+        }
+    }
+
     /// The window's title: the worktree this build came from, then whatever the detail
     /// is reading. The primary checkout is "main".
     private var title: String {
@@ -252,24 +300,34 @@ struct ContentView: View {
                 // sidebar or toolbar until it is answered (058, frame A).
                 FirstRunView()
             } else {
-                // Two columns (#145): the one sidebar, then what is being read, with the
-                // inspector beside a chat.
+                // Four columns (#866), as in Mail: the source list, the list of what it
+                // picked, what is being read, and the inspector beside a chat. The list
+                // is in the detail rather than a split view's content column, so an
+                // Activity page can fill both.
                 NavigationSplitView(columnVisibility: $columns) {
                     projects
                 } detail: {
-                    GeometryReader { pane in
-                        VStack(spacing: 0) {
-                            detail(inPaneOf: pane.size.width)
-                                .frame(maxHeight: .infinity)
-                            if let project = projectForTerminal {
-                                ProjectTerminalPanel(project: project, pageHeight: pane.size.height)
+                    HStack(spacing: 0) {
+                        if listColumn.isDrawn {
+                            ListColumnView(column: listColumn, selection: $model.sidebarItem)
+                                .frame(width: listColumn.width)
+                            ListColumnHandle(column: listColumn)
+                        }
+                        GeometryReader { pane in
+                            VStack(spacing: 0) {
+                                detail(inPaneOf: pane.size.width)
+                                    .frame(maxHeight: .infinity)
+                                if let project = projectForTerminal {
+                                    ProjectTerminalPanel(project: project, pageHeight: pane.size.height)
+                                }
                             }
                         }
+                        // The chat and the inspector share this column, not the window, so
+                        // this is the width the inspector measures itself against.
+                        .onGeometryChange(for: Double.self) { $0.size.width } action: { frame.windowWidth = $0 }
+                        .overlay { fileSearch }
                     }
-                    // The chat and the inspector share this column, not the window, so
-                    // this is the width the inspector measures itself against.
-                    .onGeometryChange(for: Double.self) { $0.size.width } action: { frame.windowWidth = $0 }
-                    .overlay { fileSearch }
+                    .toolbar { listToolbar }
                     .toolbar { detailToolbar }
                     .navigationTitle(title)
                     .navigationSubtitle(model.selectedAgent == nil ? "" : (model.selectedProjectSummary?.name ?? ""))
@@ -300,6 +358,7 @@ struct ContentView: View {
         // itself. Here rather than in the sidebar, because the sidebar may be shut,
         // and shut means gone: there would be nothing listening.
         .onChange(of: model.filesToShow) { showWhatWasAskedFor() }
+        .onChange(of: model.sidebarItem, initial: true) { _, item in followSelection(item) }
         .onChange(of: model.selection) {
             // Open File… searches the session it was opened over.
             requests.showsFileSearch = false
@@ -369,11 +428,10 @@ private struct NothingPickedPage: View {
             Label("Nothing selected", systemImage: "sidebar.left")
         } description: {
             Text("""
-            Pick a session on the left to read it, or New Session at the top to \
-            start one. ⌘N does the same.
+            Pick a group or a project on the left, then a session in the list beside \
+            it, or New Session at the top to start one. ⌘N does the same.
 
-            ↑ and ↓ move through the list, → and ← unfold and fold a project, \
-            and ⌘F finds a session.
+            ↑ and ↓ move through a list, and ⌘F finds a session in the list.
             """)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

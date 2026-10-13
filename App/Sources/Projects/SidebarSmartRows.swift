@@ -1,124 +1,10 @@
 import AgentsKitCore
 import SwiftUI
 
-/// One of the groups at the top of the sidebar (#495): Pinned, Needs You, Working or
-/// Unread, across every project and host. Needs You lists, after its sessions, everything
-/// else waiting for an OK (#773). A section headed and folding as a project's
-/// is, so its heading and rows line up with theirs. Folded, it reads its count off each
-/// project's shelf and lists nothing (#356). Empty, it is not drawn (#507).
-struct SmartFold: View {
-    @Environment(AppModel.self) private var model
-    let row: SidebarSmartRow
-    /// The projects in the sidebar, in its order.
-    let projects: [ProjectKey]
-    let folds: SidebarFolds
-    /// The search's words, already trimmed; empty when there is no search.
-    let query: String
-
-    var body: some View {
-        // Unread with nothing unread is still drawn while it keeps the open session.
-        if row.isShown(in: model.work, projects: projects, query: query) || keptUnread != nil {
-            fold
-        }
-    }
-
-    private var fold: some View {
-        let isOpen = folds.isOpen(row)
-        let open = Binding(get: { isOpen }, set: { folds.set(row, open: $0) })
-        let agents = isOpen ? shown : []
-        return Section(isExpanded: open) {
-            if row == .pinned {
-                if isOpen { pinnedRows }
-            } else {
-                // Each under the session that started it when this group lists that too (#835).
-                ForEach(FoldedRow.rows(SidebarTree.rows(agents, in: model.work, folds: folds), in: .smart(row))) { item in
-                    SessionSidebarRow(agent: item.item.agent, place: place(of: item.item.agent),
-                                      tree: item.item, folds: folds)
-                }
-                if isOpen {
-                    ForEach(row.approvals(in: model.work, projects: projects, query: query), id: \.approval.id) { item in
-                        ApprovalListRow(approval: item.approval, project: item.project,
-                                        place: place(of: item.project))
-                    }
-                }
-            }
-        } header: {
-            heading(open)
-        }
-    }
-
-    /// The group's heading. No Approve All (#704): each is approved from its own row.
-    private func heading(_ open: Binding<Bool>) -> some View {
-        SmartRowLabel(row: row, count: row.count(in: model.work, projects: projects)) {
-            open.wrappedValue.toggle()
-        }
-    }
-
-    /// What the row lists. Unread keeps the session opened from it (`keptInUnread`) in
-    /// its place, read now, until another is opened: its count has already dropped.
-    private var shown: [Agent] {
-        var agents = row.agents(in: model.work, projects: projects, query: query)
-        if let kept = keptUnread, !agents.contains(where: { $0.id == kept.id }) {
-            let at = agents.firstIndex { $0.createdAt < kept.createdAt } ?? agents.endIndex
-            agents.insert(kept, at: at)
-        }
-        return agents
-    }
-
-    /// The session Unread keeps, read, while it is the one open; none while searching.
-    private var keptUnread: Agent? {
-        row == .unread ? SidebarSmartRow.keptInUnread(model.keptInUnread, in: model.work, query: query) : nil
-    }
-
-    /// Every project's pinned sessions, then its pinned workflows, each dragged into the
-    /// order wanted among its own project's and its own kind (#180, #432).
-    @ViewBuilder
-    private var pinnedRows: some View {
-        let searching = !query.isEmpty
-        ForEach(projects, id: \.self) { key in
-            let sessions = SidebarSmartRow.pinned.agents(in: model.work, projects: [key], query: query)
-            ForEach(FoldedRow.rows(sessions, in: .smart(.pinned))) { item in
-                SessionSidebarRow(agent: item.item, place: place(of: item.item))
-            }
-            // The whole order, which a search shows only some of.
-            .onMove { from, to in
-                guard !searching else { return }
-                var ids = sessions.map(\.id)
-                ids.move(fromOffsets: from, toOffset: to)
-                let shown = Set(ids)
-                let rest = model.pinnedSessions(in: key.folder).filter { !shown.contains($0) }
-                Task { await model.arrangeSessionPins(ids + rest, in: key) }
-            }
-            let flows = SidebarSmartRow.pinned.workflows(in: model.work, projects: [key], query: query).map(\.workflow)
-            ForEach(FoldedRow.rows(flows, in: .smart(.pinned))) { item in
-                WorkflowListRow(summary: item.item, project: key)
-            }
-            .onMove { from, to in
-                guard !searching else { return }
-                var ids = flows.map(\.workflowID)
-                ids.move(fromOffsets: from, toOffset: to)
-                let shown = Set(ids)
-                let rest = model.pinnedWorkflows(in: key.folder).filter { !shown.contains($0) }
-                Task { await model.arrangeWorkflowPins(ids + rest, in: key) }
-            }
-        }
-    }
-
-    /// The project's name as its row in the sidebar says it: `server:Project` on a server.
-    private func place(of agent: Agent) -> String? {
-        place(of: ProjectKey(host: agent.host, folder: agent.projectFolder))
-    }
-
-    private func place(of key: ProjectKey) -> String? {
-        guard let summary = model.work.project(key) else { return nil }
-        return SidebarOrder.label(summary) { model.hosts.label($0) }
-    }
-}
-
 /// One thing waiting for an OK under Needs You (#773): an MCP server, a workflow, a plugin
 /// or a guarded file. A click opens what it is, with Approve, Deny and, where an agent
 /// made it, Request Changes; the menu answers at once.
-private struct ApprovalListRow: View {
+struct ApprovalListRow: View {
     @Environment(AppModel.self) private var model
     let approval: Approval
     let project: ProjectKey
@@ -158,22 +44,31 @@ private struct ApprovalListRow: View {
     }
 }
 
-/// A smart row's own line: its symbol, its name, and how many, the count in the
-/// attention tint when somebody is waiting; absent at none, which only Unread keeping
-/// the open session is drawn at.
-private struct SmartRowLabel: View {
+/// A smart group in the source list (#866): its symbol, its name, and how many it
+/// lists, the count in the attention tint when somebody is waiting. Picked, the list
+/// column lists it.
+struct SmartSourceRow: View {
     let row: SidebarSmartRow
     let count: Int
-    /// A click on the heading folds or unfolds it, as on a project's (#375).
-    var onClick: () -> Void = {}
+
+    private var systemImage: String {
+        switch row {
+        case .pinned: "pin"
+        case .needsYou: "exclamationmark.bubble"
+        case .working: "gearshape.2"
+        case .unread: "circle.inset.filled"
+        }
+    }
 
     var body: some View {
-        // No icon (Alex, #495): the sessions under it carry the marks. Grey, as every
-        // group's heading is.
         HStack(spacing: 6) {
+            Image(systemName: systemImage)
+                .foregroundStyle(Paper.accent)
+                .frame(width: 16)
+                .accessibilityHidden(true)
             Text(row.title)
                 .lineLimit(1)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
             Spacer(minLength: 4)
             if count > 0 {
                 Text("\(count)")
@@ -183,12 +78,8 @@ private struct SmartRowLabel: View {
                                                       : AnyShapeStyle(.secondary))
             }
         }
-        // A heading runs to the list's edge, its rows stop short of it: this keeps the
-        // count over the rows' counts and times (#495).
-        .padding(.trailing, SidebarHeading.trailingInset)
         .appText(.supporting)
         .contentShape(Rectangle())
-        .simultaneousGesture(TapGesture().onEnded { onClick() })
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(count > 0 ? "\(row.title), \(count)" : "\(row.title), none")
     }

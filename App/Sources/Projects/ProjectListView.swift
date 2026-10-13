@@ -1,38 +1,27 @@
 import AgentsKitCore
 import SwiftUI
 
-/// The window's one sidebar (#145): Activity at the top, then every project, each a row
-/// that folds open on its sessions and workflows, and at the foot what this Mac and its
-/// hosts are doing.
+/// The window's source list (#866), its first column: New Session, Activity, the smart
+/// groups and the projects, and at its foot what this Mac and its hosts are doing. What
+/// is picked here, the list column beside it lists — Mail's mailboxes.
 ///
-/// It used to be two columns, the projects and the sessions of the one picked. The
-/// projects column was mostly closed, and closing it hid what it said at a glance: what
-/// Spending has left, which projects have something going on, that the Mac is being kept
-/// awake, that a host is not answering. One list keeps all of that in sight.
+/// It was the one sidebar of #145, every project folded open on its sessions. Now that
+/// it holds only sources it is narrow, and stays open: Activity, the awake line and the
+/// hosts' state stay in sight, which is what #145 joined the columns for.
 struct ProjectListView: View {
     @Environment(AppModel.self) private var model
     @Environment(WindowRequests.self) private var requests
+    let column: ListColumn
     @Binding var selection: SidebarItem?
 
     @AppStorage("showsArchivedProjects") private var showsArchived = false
     /// Activity, open until folded, and kept so.
     @AppStorage("showsActivity") private var showsActivity = true
-    @State private var folds = SidebarFolds()
-    /// What the list has highlighted — one or several (⌘-click), sessions and workflows
-    /// alike. Drives bulk Archive; `selection` is still the one thing the detail reads.
-    @State private var picked: Set<SidebarItem> = []
-    @State private var query = ""
-    /// What the folds filter by: the field's words once typing pauses, so a keystroke
-    /// costs the field and not a pass over every project (#176).
-    @State private var searched = ""
     /// Bumped to make the list again when its outline has drifted from the model (#237).
     @State private var outlineRebuilds = 0
     /// The archived project Delete… is asking about, and why one could not go (#677).
     @State private var deletingProject: DaemonAPI.ProjectSummary?
     @State private var cannotDeleteProject: String?
-    /// Projects whose every match is on show, past the first few (#176).
-    @State private var showingAllMatches: Set<ProjectKey> = []
-    @FocusState private var searchFocused: Bool
     /// Whether the list itself has the keyboard: only then is a picked row filled with
     /// the accent rather than a grey wash (see `SidebarInk`).
     @FocusState private var listFocused: Bool
@@ -60,64 +49,72 @@ struct ProjectListView: View {
         MCPHealthWords.tally(model.work.mcpHealthSnapshot()?.personal ?? [])?.failing == true
     }
 
+    /// What the list has picked. Set by a click, it opens what the source opens; set by
+    /// the window following what is open (`ListColumn.follow`), it only lights the row.
+    private var picked: Binding<ListSource?> {
+        Binding(get: { column.source }, set: { source in
+            // macOS clears a list's selection by itself while rows come and go.
+            guard let source else { return }
+            pick(source)
+        })
+    }
+
     var body: some View {
-        List(selection: $picked) {
-            // What wants the person, across every project and host (#495): Things'
-            // Inbox and Today, Mail's smart mailboxes, each drawn only with something in
-            // it (#507).
+        let projectKeys = orderedProjects.map(\.key)
+        List(selection: picked) {
             Section {
                 // One way to start a session (#495), in the project last started in; the
                 // page it opens can switch project.
-                NewSessionTopRow()
+                NewSessionTopRow(column: column)
             }
 
-            // The pages about all the work, a group like a project's, above the smart
-            // groups (Alex, #495): rows of
-            // the list, so they take its selection and keys, each with its icon in the
-            // accent beside the plain title (#155), and folding as a project does.
+            // The pages about all the work (#495). Each fills the list column and the
+            // session's (#866): there is no list beside a page.
             Section(isExpanded: $showsActivity) {
                 EventsRow().activityIcon("list.bullet.rectangle")
-                    .appText(.supporting).sidebarInk(.events).tag(SidebarItem.events)
+                    .appText(.supporting).sourceInk(.activity(.events)).tag(ListSource.activity(.events))
                 ResourcesRow().activityIcon("square.stack.3d.up")
-                    .appText(.supporting).sidebarInk(.resources).tag(SidebarItem.resources)
+                    .appText(.supporting).sourceInk(.activity(.resources)).tag(ListSource.activity(.resources))
                 RuntimesRow().activityIcon("cpu", warns: runtimesFailing)
-                    .appText(.supporting).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
+                    .appText(.supporting).sourceInk(.activity(.runtimes)).tag(ListSource.activity(.runtimes))
                 MCPServersRow().activityIcon("server.rack", warns: mcpServersStopped)
-                    .appText(.supporting).sidebarInk(.mcpServers).tag(SidebarItem.mcpServers)
+                    .appText(.supporting).sourceInk(.activity(.mcpServers)).tag(ListSource.activity(.mcpServers))
                 WorktreesRow().activityIcon("arrow.triangle.branch")
-                    .appText(.supporting).sidebarInk(.worktrees).tag(SidebarItem.worktrees)
+                    .appText(.supporting).sourceInk(.activity(.worktrees)).tag(ListSource.activity(.worktrees))
                 SpendingRow(selection: $selection).activityIcon("dollarsign.circle",
                                                                 warns: model.costState?.dayIsCloseToFull == true)
-                    .appText(.supporting).sidebarInk(.spending).tag(SidebarItem.spending)
+                    .appText(.supporting).sourceInk(.activity(.spending)).tag(ListSource.activity(.spending))
                 TimeRow().activityIcon("clock")
-                    .appText(.supporting).sidebarInk(.time).tag(SidebarItem.time)
+                    .appText(.supporting).sourceInk(.activity(.time)).tag(ListSource.activity(.time))
             } header: {
-                // The size of every other group's heading (#495).
                 Text("Activity").appText(.supporting)
             }
 
-            // Pinned, Needs You (with everything waiting for an OK, #773), Working, Unread: a group each, headed and folding as a
-            // project's is, so every group in the list lines up alike (#495). Empty, or
-            // with no match for a search, a group is not drawn (#507).
-            ForEach(SidebarSmartRow.allCases, id: \.self) { row in
-                SmartFold(row: row, projects: orderedProjects.map(\.key), folds: folds, query: searched)
-            }
-
-            // One group per project (#495), its name the group's heading, its sessions the
-            // rows: Mail's accounts rather than a Projects heading with folds under it.
-            ForEach(orderedProjects, id: \.key) { summary in
-                ProjectFold(summary: summary, folds: folds, query: searched,
-                            showsAllMatches: showingAllMatches.contains(summary.key),
-                            showAllMatches: { showingAllMatches.insert(summary.key) })
-            }
-
+            // Pinned, Needs You, Working, Unread (#495): a row each, listed in the list
+            // column. Empty, a group is not drawn (#507), unless it is the one picked.
             Section {
-                // A host had more matches than its page: the next page, on asking (#176).
-                if !searched.isEmpty, model.searchHasMore {
-                    Button("More matches…") { Task { await model.searchMore() } }
-                        .buttonStyle(.plain)
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
+                ForEach(SidebarSmartRow.allCases, id: \.self) { row in
+                    let count = row.count(in: model.work, projects: projectKeys, listedOnce: false)
+                    if count > 0 || column.source == .smart(row) {
+                        SmartSourceRow(row: row, count: count)
+                            .sourceInk(.smart(row))
+                            .tag(ListSource.smart(row))
+                    }
+                }
+            }
+
+            // Every project, a row each (#866): its sessions are the list column's.
+            Section {
+                ForEach(orderedProjects, id: \.key) { summary in
+                    ProjectRow(summary: summary, label: label(summary), asSource: true)
+                        .appText(.supporting)
+                        // Last known, not current: the server is not answering (037).
+                        .foregroundStyle(model.hostUnreachable(summary.host) ? .secondary : .primary)
+                        .contextMenu { ProjectMenu(summary: summary) }
+                        // A file dropped here goes into the project's drop box (#231).
+                        .dropsIntoDropbox(of: summary.key)
+                        .sourceInk(.project(summary.key))
+                        .tag(ListSource.project(summary.key))
                 }
                 ForEach(model.hosts.servers, id: \.self) { host in
                     GoneProjectRows(host: host)
@@ -130,9 +127,11 @@ struct ProjectListView: View {
                     EmptyProjectList(isChoosingFolder: $isChoosingFolder, isCloning: $isCloning)
                         .appText(.supporting)
                 }
+            } header: {
+                Text("Projects").appText(.supporting)
             }
 
-            if !model.archivedProjects.isEmpty, searched.isEmpty {
+            if !model.archivedProjects.isEmpty {
                 Section(isExpanded: $showsArchived) {
                     // None while folded, as under a folded project (#356).
                     ForEach(showsArchived ? model.archivedProjects : [], id: \.key) { summary in
@@ -147,37 +146,18 @@ struct ProjectListView: View {
             }
         }
         // AppKit swallows the exception a drifted outline throws, and the rows stay wrong
-        // until the list is made again (#237): once per drift, keeping folds, selection
-        // and search, which live outside it. The scroll goes back to the top.
+        // until the list is made again (#237).
         .id(outlineRebuilds)
         .onReceive(NotificationCenter.default.publisher(for: .outlineListDrifted)) { _ in
             outlineRebuilds &+= 1
         }
         .listStyle(.sidebar)
         .focused($listFocused)
-        .environment(\.sidebarPicks, SidebarPicks(items: picked, listFocused: listFocused))
-        // Rows as tall as their lines (#104). Small also makes the sidebar's own text
-        // small, so each row says `.appText(.supporting)` to keep the size it was read at,
-        // the size of the session titles beside it.
+        .environment(\.sidebarPicks, SidebarPicks(source: column.source, listFocused: listFocused))
+        // Rows as tall as their lines (#104).
         .environment(\.sidebarRowSize, .small)
         .scrollContentBackground(.hidden)
         .background(Paper.sidebar)
-        .searchable(text: $query, placement: .sidebar, prompt: "Search")
-        // After a pause in the typing (#176): the folds filter what is held, and the
-        // archived sessions that match are the hosts' to find, a capped page each (#165).
-        .task(id: query) {
-            let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !words.isEmpty { try? await Task.sleep(for: .milliseconds(150)) }
-            guard !Task.isCancelled else { return }
-            if words != searched {
-                let timing = Perf.begin("search")
-                searched = words
-                showingAllMatches = []
-                Perf.endWhenDrawn(timing, "\(words.count) characters")
-            }
-            await model.searchSessions(words)
-        }
-        .searchFocused($searchFocused)
         .confirmationDialog(DeletionWords.projectConfirmTitle(deletingProject.map(label) ?? ""),
                             isPresented: Binding(get: { deletingProject != nil },
                                                  set: { if !$0 { deletingProject = nil } }),
@@ -204,17 +184,6 @@ struct ProjectListView: View {
         // nothing to say, which is most of the time (024 FR-015).
         .safeAreaInset(edge: .bottom, spacing: 0) {
             SidebarFoot()
-        }
-        // ⌫ archives everything highlighted that is not already archived (one or many).
-        .onDeleteCommand { archivePicked() }
-        // Return renames the one session highlighted, as Finder renames a file (#751).
-        .onKeyPress(.return, action: renamePicked)
-        .onChange(of: picked) { _, picks in applyPicked(picks) }
-        .onChange(of: selection, initial: true) { _, item in applySelection(item) }
-        .onChange(of: requests.wantsSessionSearchFocus) { _, wants in
-            guard wants else { return }
-            searchFocused = true
-            requests.wantsSessionSearchFocus = false
         }
         // A folder dragged in from Finder becomes a project, as File ▸ Add Project
         // Folder… does. Folders only: a file is not somewhere to work. A file dropped on
@@ -280,84 +249,17 @@ struct ProjectListView: View {
         }
     }
 
-    /// One pick opens that page; several keep what is open only if it is among them.
-    /// None changes nothing: macOS clears a list's selection by itself while rows come
-    /// and go, and that must not empty the detail.
-    private func applyPicked(_ picks: Set<SidebarItem>) {
-        switch picks.count {
-        case 0:
-            break
-        case 1:
-            if let pick = picks.first, selection != pick { selection = pick }
-        default:
-            if let current = selection, !picks.contains(current) { model.showNothing() }
-        }
-    }
-
-    /// What is open, from anywhere — a menu, Go, a banner, a link — lights its row, and
-    /// unfolds its project so the row is there to light.
-    private func applySelection(_ item: SidebarItem?) {
-        guard let item else {
-            if picked.count == 1 { picked = [] }
-            return
-        }
-        if case .session(let id) = item, let agent = model.work.agent(id) {
-            folds.set(ProjectKey(host: agent.host, folder: agent.projectFolder), open: true)
-        } else if case .workflow(_, let key) = item {
-            folds.set(key, open: true)
-        } else if case .pin(_, let key) = item {
-            folds.set(key, open: true)
-        } else if case .archive(let key) = item {
-            folds.set(key, open: true)
-        } else if case .projectMCPServers(let key) = item {
-            folds.set(key, open: true)
-        } else if case .project(let key) = item {
-            // A new session, from ⌘N or a menu: its row is in the fold.
-            folds.set(key, open: true)
-        }
-        if picked.count <= 1 || !picked.contains(item) { picked = [item] }
-    }
-
-    /// Return on one highlighted session edits its title in its row (#751).
-    private func renamePicked() -> KeyPress.Result {
-        guard model.renaming == nil, picked.count == 1, case .session(let id)? = picked.first,
-              let agent = model.work.agent(id), agent.state != .archived else { return .ignored }
-        model.renaming = Renaming(id: id)
-        return .handled
-    }
-
-    private func archivePicked() {
-        var sessions: [UUID] = []
-        var flows: [WorkflowSummary] = []
-        for pick in picked.isEmpty ? Set(selection.map { [$0] } ?? []) : picked {
-            switch pick {
-            case .session(let id):
-                if model.work.agent(id)?.state != .archived { sessions.append(id) }
-            case .workflow(let id, let key):
-                if let summary = model.workflows(in: key.folder).first(where: { $0.id == id }), !summary.isArchived {
-                    flows.append(summary)
-                }
-            default:
-                break
-            }
-        }
-        guard !sessions.isEmpty || !flows.isEmpty else { return }
-        Task {
-            for id in sessions {
-                await model.archive(id, andLeave: false)
-            }
-            for summary in flows {
-                await model.setWorkflowArchived(summary, true)
-            }
-            if case .session(let open) = selection, sessions.contains(open) { model.showNothing() }
-            if case .workflow(let open, _) = selection, flows.contains(where: { $0.id == open }) { model.showNothing() }
-            picked = picked.filter { pick in
-                switch pick {
-                case .session(let id): !sessions.contains(id)
-                case .workflow(let id, _): !flows.contains { $0.id == id }
-                default: true
-                }
-            }
+    /// A source picked by a click: an Activity page opens, a project opens its new
+    /// session (#866, Alex), and a smart group leaves the session open beside it.
+    private func pick(_ source: ListSource) {
+        column.source = source
+        switch source {
+        case .activity(let item):
+            selection = item
+        case .project(let key):
+            selection = .project(key)
+        case .smart:
+            model.leaveActivity()
         }
     }
 
@@ -367,130 +269,13 @@ struct ProjectListView: View {
     }
 }
 
-/// One project in the sidebar: its row, and folded under it its sessions — Needs you
-/// first, the way the project page groups them — then its workflows, each kind's
-/// archived ones folded once more at its foot.
-///
-/// A search unfolds every project with something that matches and hides the rest.
-private struct ProjectFold: View {
-    @Environment(AppModel.self) private var model
-    @Environment(WindowRequests.self) private var requests
-    let summary: DaemonAPI.ProjectSummary
-    let folds: SidebarFolds
-    /// The search's words, already trimmed; empty when there is no search.
-    let query: String
-    var showsAllMatches = false
-    var showAllMatches: () -> Void = {}
-
-    private var key: ProjectKey { summary.key }
-
-    var body: some View {
-        // Folded, nothing under the row is drawn, so nothing is filed for it: the row
-        // reads its own numbers off the project's shelf (#165). What goes under which
-        // heading is the shared model's, which the Remote draws too (#226).
-        let fold = SidebarProjectFold(key, label: label, in: model.work, query: query,
-                                      isOpen: folds.isOpen(key), keptInUnread: model.keptInUnread)
-        let isOpen = fold.isUnfolded
-        if fold.isShown {
-            Section(isExpanded: Binding(
-                get: { isOpen },
-                set: { folds.set(key, open: $0) })) {
-                // Folded, nothing at all is under the heading (#356): see `isUnfolded`.
-                // A session starts from New Session at the top (#495), or the menu.
-                // The project's pinned pages (#159), before its sessions. Not while
-                // searching: the search is for sessions.
-                if fold.showsPinnedPages {
-                    PinnedPageRows(project: key)
-                }
-                // Its pinned sessions and workflows are in Pinned at the top (#495).
-                // Then every other live session, newest first, its state a mark on the
-                // row rather than a heading over it (#495). Each under the session that
-                // started it, folded (#835).
-                ForEach(FoldedRow.rows(SidebarTree.rows(fold.sessions, in: model.work, folds: folds), in: .sessions)) { row in
-                    SessionSidebarRow(agent: row.item.agent, tree: row.item, folds: folds)
-                }
-                // Then its workflows, after the sessions (Alex, #495): rows, not a page,
-                // a plain line between the two kinds when there are both (Alex, #631).
-                if !fold.sessions.isEmpty && !fold.workflows.isEmpty {
-                    Divider()
-                        .listRowInsets(.vertical, 2)
-                        .accessibilityHidden(true)
-                }
-                ForEach(FoldedRow.rows(fold.workflows, in: .workflows)) { row in
-                    WorkflowListRow(summary: row.item, project: key)
-                }
-                if fold.isSearching {
-                    // What matched in the archive, in the group while searching, so a
-                    // match is one click away as it was.
-                    searchMatches(fold)
-                } else {
-                    // Its MCP servers (#753), when its .agents/mcp.json has any: a page, red
-                    // when one does not answer.
-                    let servers = model.work.mcpServers(in: key)
-                    if let tally = MCPHealthWords.tally(servers) {
-                        ProjectPageRow(title: "MCP Servers", systemImage: "server.rack",
-                                       item: .projectMCPServers(key), warns: tally.failing)
-                            .help(tally.words)
-                    }
-                    // The archive, one row opening a page (#495): never a fold inside
-                    // the group.
-                    let archived = fold.archivedCount(summary) + fold.archivedWorkflows.count
-                    if archived > 0 {
-                        ProjectPageRow(title: "Archived", systemImage: "archivebox", item: .archive(key))
-                            .help("\(archived) archived")
-                    }
-                }
-            } header: {
-                ProjectRow(summary: summary, label: label, isFolded: !isOpen, asHeading: true) {
-                    // A search holds every match open.
-                    if !fold.isSearching { folds.set(key, open: !isOpen) }
-                }
-                    .appText(.supporting)
-                    // As tall as its one or two lines and a little air (#104).
-                    .listRowInsets(.vertical, 3)
-                    // Last known, not current: the server is not answering (037).
-                    .foregroundStyle(model.hostUnreachable(summary.host) ? .secondary : .primary)
-                    .contextMenu { ProjectMenu(summary: summary) }
-                    // A file dropped here goes into the project's drop box (#231).
-                    .dropsIntoDropbox(of: key)
-                    // No tag: the row is not something to open (#375). The project's
-                    // `.project` item is its New session row.
-            }
-        }
-    }
-
-    /// A server's project says which server (Alex, #145): no heading for each host, so
-    /// the host goes in the name. This Mac's go by name alone.
-    private var label: String {
-        SidebarOrder.label(summary) { model.hosts.label($0) }
-    }
-
-    /// While searching: the workflows and archived sessions that matched, after the live
-    /// ones, the archived capped until Show all (#176).
-    @ViewBuilder
-    private func searchMatches(_ fold: SidebarProjectFold) -> some View {
-        ForEach(FoldedRow.rows(fold.archivedWorkflows, in: .archivedWorkflows)) { row in
-            WorkflowListRow(summary: row.item, project: key)
-        }
-        let shown = fold.archivedShown(showingAll: showsAllMatches)
-        ForEach(FoldedRow.rows(shown, in: .archivedSessions)) { row in
-            SessionSidebarRow(agent: row.item)
-        }
-        if fold.archived.count > shown.count {
-            Button("Show all \(fold.archived.count)", action: showAllMatches)
-                .buttonStyle(.plain)
-                .appText(.fine)
-                .foregroundStyle(.secondary)
-        }
-    }
-}
-
-/// The first row of the sidebar (#495): a new session, in the project the last one was
-/// started in, as ⌘N starts one. The page it opens can switch project. It carries that
-/// project's own item, which the sidebar lights while its new session is open.
+/// The first row of the source list (#495): a new session, in the project the last one
+/// was started in, as ⌘N starts one. The page it opens can switch project. The list
+/// column lists that project (#866).
 private struct NewSessionTopRow: View {
     @Environment(AppModel.self) private var model
     @Environment(WindowRequests.self) private var requests
+    let column: ListColumn
 
     var body: some View {
         let project = model.newSessionProject
@@ -509,26 +294,14 @@ private struct NewSessionTopRow: View {
         // while the prompt has lost the keyboard. See `ProjectRow` before #375.
         .simultaneousGesture(TapGesture().onEnded {
             guard let project else { return }
+            column.source = .project(project)
             model.showProject(project)
             requests.focusPrompt()
         })
         .disabled(project == nil)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("New Session")
-        .modifier(NewSessionTag(project: project))
-    }
-}
-
-/// The row's item while there is a project to start in; none while there is not.
-private struct NewSessionTag: ViewModifier {
-    let project: ProjectKey?
-
-    func body(content: Content) -> some View {
-        if let project {
-            content.sidebarInk(.project(project)).tag(SidebarItem.project(project))
-        } else {
-            content
-        }
+        .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -606,14 +379,14 @@ private struct DropboxDrop: ViewModifier {
     }
 }
 
-private extension View {
+extension View {
     func dropsIntoDropbox(of project: ProjectKey) -> some View {
         modifier(DropboxDrop(project: project))
     }
 }
 
 /// A project's context menu, and the project menu's items.
-private struct ProjectMenu: View {
+struct ProjectMenu: View {
     @Environment(AppModel.self) private var model
     @Environment(WindowRequests.self) private var requests
     let summary: DaemonAPI.ProjectSummary
@@ -928,9 +701,11 @@ private struct MacHostDownNotice: View {
     }
 }
 
-/// What the sidebar has picked, and whether it has the keyboard, for `SidebarInk`.
+/// What a list column has picked, and whether it has the keyboard, for `SidebarInk`:
+/// the list column's items, or the source list's source (#866).
 struct SidebarPicks {
     var items: Set<SidebarItem> = []
+    var source: ListSource?
     var listFocused = false
 }
 
@@ -957,9 +732,29 @@ private struct SidebarInk: ViewModifier {
     }
 }
 
+/// `SidebarInk` for a row of the source list (#866).
+private struct SourceInk: ViewModifier {
+    let source: ListSource
+    @Environment(\.sidebarPicks) private var picks
+    @Environment(\.controlActiveState) private var windowState
+
+    func body(content: Content) -> some View {
+        if picks.listFocused, windowState == .key, picks.source == source {
+            content.foregroundStyle(Paper.ground)
+        } else {
+            content
+        }
+    }
+}
+
 extension View {
     /// On a sidebar row, outside its own foreground, with the tag the row carries.
     func sidebarInk(_ item: SidebarItem) -> some View {
         modifier(SidebarInk(item: item))
+    }
+
+    /// On a source list row, with the tag the row carries (#866).
+    func sourceInk(_ source: ListSource) -> some View {
+        modifier(SourceInk(source: source))
     }
 }

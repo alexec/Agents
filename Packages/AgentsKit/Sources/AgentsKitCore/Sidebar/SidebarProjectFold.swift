@@ -82,8 +82,11 @@ public struct SidebarProjectFold {
     /// no smart group lists (#587). The busy groups go to Needs You and Working whole, so
     /// what is left is the rest, less the unread and the pinned among them, and less the
     /// session Unread keeps while it is open (#689).
-    public static func ownCount(_ key: ProjectKey, in work: AgentsModel, keptInUnread: UUID? = nil) -> Int {
+    public static func ownCount(_ key: ProjectKey, in work: AgentsModel, keptInUnread: UUID? = nil,
+                                listedOnce: Bool = true) -> Int {
         let shelf = work.shelf(key)
+        // Every live session, when a project lists them all (#866).
+        if !listedOnce { return AgentGroup.live.reduce(0) { $0 + (shelf.counts[$1] ?? 0) } }
         let rest = AgentGroup.live.filter { !SidebarSmartRow.busyGroups.contains($0) }
             .reduce(0) { $0 + (shelf.counts[$1] ?? 0) }
         let pinnedAtRest = SidebarSmartRow.pinnedSessions(in: work, key).count {
@@ -123,9 +126,11 @@ public struct SidebarProjectFold {
     /// row is drawn, so nothing is filed for it, and the row reads its own numbers off the
     /// project's shelf (#165). A search unfolds every project, and `label` is the name the
     /// row shows, which the search also matches. `keptInUnread` is the session Unread keeps
-    /// while it is open, listed there and not here (#689).
+    /// while it is open, listed there and not here (#689). With `listedOnce` false (the
+    /// Mac's four columns, #866), `sessions` and `workflows` hold every live one, pinned or
+    /// in a smart group too.
     public init(_ key: ProjectKey, label: String, in work: AgentsModel, query: String = "", isOpen: Bool,
-                keptInUnread: UUID? = nil) {
+                keptInUnread: UUID? = nil, listedOnce: Bool = true) {
         self.key = key
         let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
         self.query = words
@@ -143,7 +148,7 @@ public struct SidebarProjectFold {
         }
         let pinnedFlowIDs = Set(pinnedFlows.map(\.workflowID))
         pinnedWorkflows = pinnedFlows
-        self.workflows = workflows.filter { !$0.isArchived && !pinnedFlowIDs.contains($0.workflowID) }
+        self.workflows = workflows.filter { !$0.isArchived && (!listedOnce || !pinnedFlowIDs.contains($0.workflowID)) }
         archivedWorkflows = workflows.filter(\.isArchived)
 
         let shelf = work.shelf(key)
@@ -154,7 +159,7 @@ public struct SidebarProjectFold {
         for group in AgentGroup.live {
             let held = shelf.groups[group] ?? []
             if !held.isEmpty { hasLive = true }
-            let unpinned = pinnedIDs.isEmpty ? held : held.filter { !pinnedIDs.contains($0.id) }
+            let unpinned = pinnedIDs.isEmpty || !listedOnce ? held : held.filter { !pinnedIDs.contains($0.id) }
             let shown = matcher.map { unpinned.filter($0.matches) } ?? unpinned
             for heading in group.headings(shown) {
                 groups.append(Group(group: group, heading: heading))
@@ -164,7 +169,8 @@ public struct SidebarProjectFold {
         // one Unread keeps too (#689).
         let kept = SidebarSmartRow.keptInUnread(keptInUnread, in: work, query: words)?.id
         sessions = groups.flatMap { group in
-            group.agents.filter { SidebarSmartRow.home(of: $0, in: group.group, isPinned: false) == nil && $0.id != kept }
+            listedOnce ? group.agents.filter { SidebarSmartRow.home(of: $0, in: group.group, isPinned: false) == nil && $0.id != kept }
+                       : group.agents
         }.sorted { $0.createdAt > $1.createdAt }
         let archived = shelf.groups[.archived] ?? []
         self.archived = matcher.map { archived.filter($0.matches) } ?? archived

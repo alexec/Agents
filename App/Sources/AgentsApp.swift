@@ -13,6 +13,7 @@ struct AgentsApp: App {
     @State private var requests = WindowRequests()
     @State private var frame = SidebarFrame()
     @State private var terminal = ProjectTerminalFrame()
+    @State private var listColumn = ListColumn()
 
     init() {
         // Before anything can throw: the next layout crash names its view (#76).
@@ -32,13 +33,13 @@ struct AgentsApp: App {
             // so one more modifier here renames it: the window saved last time matches
             // no scene, and the app opens with none. What the window needs besides the
             // model goes in through `ContentView`'s own properties instead.
-            ContentView(requests: requests, frame: frame, terminal: terminal)
+            ContentView(requests: requests, frame: frame, terminal: terminal, listColumn: listColumn)
                 .environment(model)
                 .onChange(of: appearance, initial: true) { Appearance.apply(appearance) }
         }
         .defaultSize(width: 1_100, height: 720)
         .commands {
-            AgentsCommands(model: model, requests: requests, frame: frame, terminal: terminal)
+            AgentsCommands(model: model, requests: requests, frame: frame, terminal: terminal, listColumn: listColumn)
         }
 
         // The app's first Settings scene, and what gives it ⌘, and the menu item.

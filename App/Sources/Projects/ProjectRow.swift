@@ -14,15 +14,15 @@ struct ProjectRow: View {
     var label: String? = nil
     /// Folded, the row says what is under it; unfolded, the rows under it say that.
     var isFolded = true
-    /// Drawn as its group's heading in the sidebar (#495): the name in grey, as a group's
-    /// heading is, so the sessions under it read first.
-    var asHeading = false
+    /// Drawn as a row of the source list (#866): one line, the name, then how many live
+    /// sessions the list column will show, after a dot when one needs the person.
+    var asSource = false
     /// What a click does: the fold opens or closes, and nothing else (#375), as the
     /// Remote's row and the web's do. A session starts from the fold's New session row.
     var onClick: () -> Void = {}
 
     /// The name's colour, which the chat project's mark takes too (#694).
-    private var nameStyle: HierarchicalShapeStyle { summary.exists && !asHeading ? .primary : .secondary }
+    private var nameStyle: HierarchicalShapeStyle { summary.exists ? .primary : .secondary }
 
     /// The dot grows with the title beside it (#750).
     @Environment(\.textSize) private var textSize
@@ -47,7 +47,7 @@ struct ProjectRow: View {
                     Text("Folder is missing")
                         .appText(.fine)
                         .foregroundStyle(.secondary)
-                } else if isFolded, !asHeading, let subtitle {
+                } else if isFolded, !asSource, let subtitle {
                     Text(subtitle)
                         .appText(.fine)
                         .foregroundStyle(.secondary)
@@ -55,10 +55,10 @@ struct ProjectRow: View {
                 }
             }
             Spacer(minLength: 4)
-            if asHeading {
-                // How many its group lists, as every group's heading says it (#587). Who
-                // needs you is in Needs You at the top, so no dot.
-                let own = SidebarProjectFold.ownCount(summary.key, in: model.work, keptInUnread: model.keptInUnread)
+            if asSource {
+                // How many the list column lists (#866), and the dot when one is waiting.
+                if needsPerson { dot }
+                let own = SidebarProjectFold.ownCount(summary.key, in: model.work, listedOnce: false)
                 if own > 0 {
                     Text("\(own)")
                         .monospacedDigit()
@@ -66,14 +66,9 @@ struct ProjectRow: View {
                         .foregroundStyle(.secondary)
                 }
             } else if needsPerson {
-                Circle()
-                    .fill(StateTint.attention.style(or: .secondary))
-                    .frame(width: 7 * textSize.scale, height: 7 * textSize.scale)
-                    .accessibilityHidden(true)
+                dot
             }
         }
-        // As a group's heading, its count over the rows' times (#495).
-        .padding(.trailing, asHeading ? SidebarHeading.trailingInset : 0)
         .contentShape(Rectangle())
         // Clicking a project folds or unfolds it (#375); the detail stays as it was.
         // `simultaneousGesture` sits alongside the list's own handling rather than
@@ -82,6 +77,13 @@ struct ProjectRow: View {
         .help(abbreviatedPath)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var dot: some View {
+        Circle()
+            .fill(StateTint.attention.style(or: .secondary))
+            .frame(width: 7 * textSize.scale, height: 7 * textSize.scale)
+            .accessibilityHidden(true)
     }
 
     /// This window's own counts, from the one grouping its panel uses.
@@ -140,8 +142,9 @@ struct ProjectRow: View {
         if summary.isChat == true { parts.append("chat project") }
         if summary.project.isPinned { parts.append("pinned") }
         if !summary.exists { parts.append("folder is missing") }
-        if asHeading {
-            let own = SidebarProjectFold.ownCount(summary.key, in: model.work, keptInUnread: model.keptInUnread)
+        if asSource {
+            if needsPerson { parts.append("needs you") }
+            let own = SidebarProjectFold.ownCount(summary.key, in: model.work, listedOnce: false)
             if own > 0 { parts.append("\(own)") }
         } else if let subtitle {
             parts.append(subtitle)
