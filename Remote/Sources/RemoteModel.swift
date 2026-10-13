@@ -413,15 +413,18 @@ final class RemoteModel {
         }
     }
 
+    /// Why a file is not sent to a drop box from a phone: too big for one record.
+    static func dropboxTooBig(_ name: String) -> String {
+        "From a phone, a drop box file can be 900 KB, and \(name) is bigger. Copy it into .agents/dropbox/ on the Mac instead."
+    }
+
     /// A file put into a project's drop box (#231), where a workflow on
     /// `dropbox.file_added` can pick it up. `subfolder` is inside `.agents/dropbox/`, empty
     /// for its top. Held to what crosses the relayed link in one record, as an attachment
     /// is. Answers why it did not go, or nil.
     func putInDropbox(_ data: Data, name: String, subfolder: String, project: ProjectKey) async -> String? {
         guard !isStale(on: project.host) else { return notAnswering(project.host, "\(name) was not sent.") }
-        guard data.count <= PhoneAttachment.limit else {
-            return "From a phone, a drop box file can be 900 KB, and \(name) is bigger. Copy it into .agents/dropbox/ on the Mac instead."
-        }
+        guard data.count <= PhoneAttachment.limit else { return Self.dropboxTooBig(name) }
         let folder = subfolder.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
         let request = DaemonAPI.DropboxPutRequest(folder: project.folder, subfolder: folder.isEmpty ? nil : folder,
                                                   name: name, data: data)

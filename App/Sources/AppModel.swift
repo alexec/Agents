@@ -4795,9 +4795,18 @@ final class AppModel {
                 carried.append(attachment)
                 continue
             }
+            // Looked at before it is read, and read off the main thread (#930): a film
+            // attached by mistake is refused at once, not after it is read whole.
+            let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+            guard size <= DaemonAPI.attachmentLimit else {
+                problem = "\(name) is too big to send to \(hosts.label(host))."
+                return nil
+            }
             let data: Data
             do {
-                data = try Data(contentsOf: url)  // store-ok: a file the person attached: picked or dropped
+                data = try await Task.detached {
+                    try Data(contentsOf: url)  // store-ok: a file the person attached: picked or dropped
+                }.value
             } catch {
                 // Not "too big": a file this window may not read, or one gone, says so (073).
                 problem = "\(name) could not be read to send to \(hosts.label(host)): \(error.localizedDescription)"

@@ -48,6 +48,23 @@ public enum PhoneAttachment {
                                    displayName: name, byteCount: text.utf8.count))
     }
 
+    /// The largest picture file read to be shrunk. Bigger than any camera's photo.
+    public static let pictureReadLimit = 50_000_000
+
+    /// Why a file from Files of this size cannot be attached, or nil when it may be
+    /// read (#930). Asked before the read, so a film picked by mistake is refused at
+    /// once, not after it is read whole: a picture is shrunk, so only a huge one is
+    /// refused; anything else goes as it is, so it has to fit `limit`.
+    public static func sizeRefusal(name: String, size: Int, type: UTType?) -> Refusal? {
+        if let type, type.conforms(to: .image) {
+            guard size > pictureReadLimit else { return nil }
+            return Refusal("\(name) is too big a picture to attach from a phone.")
+        }
+        guard size > limit else { return nil }
+        let said = ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)
+        return Refusal("From a phone, attachments can be 900 KB in all, and \(name) is \(said).")
+    }
+
     /// Why these cannot go together, or nil when they can.
     public static func totalRefusal(_ attachments: [Attachment]) -> String? {
         let total = attachments.reduce(0) { $0 + inlineBytes($1) }

@@ -55,9 +55,24 @@ export async function shrink(picture: Blob): Promise<Uint8Array | null> {
   }
 }
 
+/** The largest picture file read to be shrunk (PhoneAttachment.pictureReadLimit). */
+export const pictureReadLimit = 50_000_000;
+
+/** Why a file this big can't be attached, or null when it may be read (#930): asked before the
+ * read, so a film picked by mistake is refused at once, not after it is read whole. */
+export function sizeRefusal(name: string, size: number, type: string): string | null {
+  if (type.startsWith("image/")) {
+    return size > pictureReadLimit ? `${name} is too big a picture to attach from a browser.` : null;
+  }
+  if (size <= limit) return null;
+  return `From a browser, attachments can be 900 KB in all, and ${name} is ${sizeWords(size)}.`;
+}
+
 /** A dropped, pasted or picked file, made fit to send. */
 export async function attach(file: File): Promise<Made> {
   const name = file.name || "Pasted picture";
+  const tooBig = sizeRefusal(name, file.size, file.type);
+  if (tooBig) return { refused: tooBig };
   if (file.type.startsWith("image/")) {
     const jpeg = await shrink(file);
     return jpeg ? { ok: pictureAttachment(jpeg, name) } : { refused: `${name} could not be read as a picture.` };

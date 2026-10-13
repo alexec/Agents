@@ -36,6 +36,17 @@ test("900 KB in all", () => {
     "From a browser, attachments can be 900 KB in all, and these are 1.2 MB. Remove one to send.");
 });
 
+test("a file too big is refused before it is read (#930)", async () => {
+  assert.equal(a.sizeRefusal("notes.md", 10_000, "text/markdown"), null);
+  assert.equal(a.sizeRefusal("film.mov", 1_000_000_000, "video/quicktime"),
+    "From a browser, attachments can be 900 KB in all, and film.mov is 1000.0 MB.");
+  assert.equal(a.sizeRefusal("a.heic", 20_000_000, "image/heic"), null);
+  assert.ok(a.sizeRefusal("a.heic", 60_000_000, "image/heic"));
+  const film = { name: "film.mov", size: 1_000_000_000, type: "video/quicktime",
+    arrayBuffer: () => { throw new Error("read"); } };
+  assert.ok((await a.attach(film)).refused);
+});
+
 // A clipboard as a browser hands it to a paste: items, files and types.
 const clipboard = ({ items = [], files = [], types = [] }) => ({ items, files, types });
 const item = (kind, file = null) => ({ kind, getAsFile: () => file });
