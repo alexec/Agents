@@ -1,15 +1,16 @@
 import AgentsKitCore
 import SwiftUI
 
-/// What a project is working on besides its sessions, under them in its fold of the
-/// sidebar (#145): its workflows. Rows the size of a session's, tagged into the same
-/// list selection, so the sidebar is one list: the arrow keys, ⌘-click, ⌫ and the
-/// highlight go through both, and a workflow opens its page on the right as a session
-/// opens its chat.
+/// A project's workflows, under its sessions in its fold of the sidebar (#145): a
+/// Workflows row with a chevron and a grey count, and when it is open the workflows one
+/// level in, as a mailbox's sub-mailboxes in Mail (#885). Rows the size of a session's,
+/// tagged into the same list selection, so the sidebar is one list: the arrow keys,
+/// ⌘-click, ⌫ and the highlight go through both, and a workflow opens its page on the
+/// right as a session opens its chat.
 ///
-/// Left out for a project with none, so a fold is as long as its work. Archived
-/// workflows fold away at its foot, where their pages (and Bring Back) are. A search
-/// narrows it with the sessions, and leaves it out when nothing in it matches.
+/// Closed until opened, and kept per project (Alex, #885). Left out for a project with
+/// no live workflow; pinned ones are in Pinned (#432) and archived ones on the Archived
+/// page (#495). A search opens it to show what matched.
 struct ProjectWorkflowRows: View {
     /// The project's fold, which has its workflows as the search leaves them.
     let fold: SidebarProjectFold
@@ -19,34 +20,19 @@ struct ProjectWorkflowRows: View {
 
     var body: some View {
         let workflows = fold.workflows
-        let archived = fold.archivedWorkflows
-        if !workflows.isEmpty || !archived.isEmpty {
-            // Folds as a session group does (#181); a search unfolds it to show what matched.
-            let workflowsOpen = fold.isSearching || folds.isOpen(project, .workflows)
+        if !workflows.isEmpty {
+            let isOpen = fold.isSearching || folds.isOpen(project, .workflows)
             let workflowsFold = Binding(
-                get: { workflowsOpen },
+                get: { isOpen },
                 set: { folds.set(project, .workflows, open: $0) })
             DisclosureGroup(isExpanded: workflowsFold) {
-                ForEach(FoldedRow.rows(workflowsOpen ? workflows : [], in: .workflows)) { row in
+                // A closed fold has no rows at all (#237).
+                ForEach(FoldedRow.rows(isOpen ? workflows : [], in: .workflows)) { row in
                     WorkflowListRow(summary: row.item, project: project)
                 }
             } label: {
                 SidebarSubheading(title: "Workflows", count: workflows.count)
                     .togglesFold(workflowsFold)
-            }
-            if !archived.isEmpty {
-                let archivedOpen = fold.isSearching || folds.isOpen(project, .archivedWorkflows)
-                let archivedFold = Binding(
-                    get: { archivedOpen },
-                    set: { folds.set(project, .archivedWorkflows, open: $0) })
-                DisclosureGroup(isExpanded: archivedFold) {
-                    ForEach(FoldedRow.rows(archivedOpen ? archived : [], in: .archivedWorkflows)) { row in
-                        WorkflowListRow(summary: row.item, project: project)
-                    }
-                } label: {
-                    SidebarSubheading(title: "Archived workflows", count: archived.count)
-                        .togglesFold(archivedFold)
-                }
             }
         }
     }
