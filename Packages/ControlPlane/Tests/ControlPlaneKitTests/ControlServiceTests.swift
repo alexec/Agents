@@ -22,14 +22,12 @@ struct ControlServiceTests {
 
     func start(store: any ControlStore = MemoryStore(), port: Int? = nil, tls: NIOSSLContext? = nil,
                pin: String? = nil, bind: String = "127.0.0.1") async throws -> Running {
-        let chosen: Int
-        if let port { chosen = port } else { chosen = try await freePort() }
-        let port = chosen
-        let url = URL(string: "\(tls == nil ? "http" : "https")://127.0.0.1:\(port)")!
-        let service = try ControlService(.init(store: store, privateKey: control.privateKey, url: url, pin: pin, tls: tls,
-                                               bind: bind, port: port, name: "test", machineID: "m"))
-        try await service.start()
-        return Running(service: service, url: url, port: port)
+        func url(_ port: Int) -> URL { URL(string: "\(tls == nil ? "http" : "https")://127.0.0.1:\(port)")! }
+        let (service, port) = try await started(port: port) { [control] port in
+            try ControlService(.init(store: store, privateKey: control.privateKey, url: url(port), pin: pin, tls: tls,
+                                     bind: bind, port: port, name: "test", machineID: "m"))
+        }
+        return Running(service: service, url: url(port), port: port)
     }
 
     /// Dials and proves `credentials`; the socket after the exchange.
@@ -386,6 +384,27 @@ func freePort() async throws -> Int {
 
 /// A port for a test that stops and starts a listener on it (#848): any `freePort()` is one.
 func keptPort() async throws -> Int { try await freePort() }
+
+/// Starts the service `make` builds for a port: a `freePort()`, or `port` for a test that
+/// starts again on the one it had. Should the port be taken by the time the service binds
+/// it (#949, seen on CI with no other test holding it), it is another free port, or the
+/// same one a little later.
+func started(port: Int? = nil, _ make: (Int) throws -> ControlService) async throws -> (ControlService, Int) {
+    var attempt = 1
+    while true {
+        let chosen = if let port { port } else { try await freePort() }
+        let service = try make(chosen)
+        do {
+            try await service.start()
+            return (service, chosen)
+        } catch let error as IOError where error.errnoCode == EADDRINUSE && attempt < 10 {
+            await service.stop()
+            print("port \(chosen) was taken by the time it was bound (#949); trying again")
+            attempt += 1
+            try await Task.sleep(for: .milliseconds(100))
+        }
+    }
+}
 
 struct NoFreePort: Error {}
 

@@ -11,13 +11,12 @@ import Testing
 extension ControlServiceTests {
     /// A copy that starts empty, for a handover to fill.
     func receiving() async throws -> Running {
-        let port = try await freePort()
-        let url = URL(string: "http://localhost:\(port)")!
-        let service = try ControlService(.init(store: MemoryStore(), privateKey: control.privateKey, url: url,
-                                               bind: "127.0.0.1", port: port, name: "test", machineID: "cloud",
-                                               receive: true))
-        try await service.start()
-        return Running(service: service, url: url, port: port)
+        let (service, port) = try await started { [control] port in
+            try ControlService(.init(store: MemoryStore(), privateKey: control.privateKey,
+                                     url: URL(string: "http://localhost:\(port)")!,
+                                     bind: "127.0.0.1", port: port, name: "test", machineID: "cloud", receive: true))
+        }
+        return Running(service: service, url: URL(string: "http://localhost:\(port)")!, port: port)
     }
 
     @Test func aHandoverMovesEveryMemberWithoutPairingAgain() async throws {

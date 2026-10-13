@@ -248,14 +248,13 @@ struct LoopbackListenerTests {
     }()
 
     func start(web: ControlService.Configuration.Web?) async throws -> (ControlService, Int) {
-        let port = try await freePort()
-        var configuration = ControlService.Configuration(
-            store: MemoryStore(), privateKey: ControlAgreement.generate().privateKey,
-            url: URL(string: "http://127.0.0.1:\(port)")!, bind: "127.0.0.1", port: port, name: "test")
-        configuration.web = web
-        let service = try ControlService(configuration)
-        try await service.start()
-        return (service, port)
+        try await started { port in
+            var configuration = ControlService.Configuration(
+                store: MemoryStore(), privateKey: ControlAgreement.generate().privateKey,
+                url: URL(string: "http://127.0.0.1:\(port)")!, bind: "127.0.0.1", port: port, name: "test")
+            configuration.web = web
+            return try ControlService(configuration)
+        }
     }
 
     @Test func aCopyServesTheBuiltPageOnBothLoopbackAddresses() async throws {
