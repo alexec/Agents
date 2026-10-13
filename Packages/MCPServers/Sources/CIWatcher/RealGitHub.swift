@@ -355,6 +355,29 @@ public actor RealGitHub: GitHub {
         return ["url": JSON(comment["html_url"]?.string)]
     }
 
+    public func prDetail(repo: String, number: Int, diff: Bool) async throws -> JSON {
+        let view = await Self.gh(["pr", "view", String(number), "-R", repo, "--json",
+                                  "number,title,headRefName,baseRefName,url,author,state,isDraft,body,createdAt,additions,deletions,"
+                                      + "mergeable,reviewDecision,statusCheckRollup,files,comments,reviews,autoMergeRequest"])
+        if view.code != 0 { throw Self.failure(view.missing, view.stderr, nil) }
+        guard let p = try? JSON.parse(view.stdout) else { throw GhError(.failed, "gh: GitHub's answer is not JSON") }
+        var text: String?
+        if diff {
+            let ran = await Self.gh(["pr", "diff", String(number), "-R", repo, "--color", "never"])
+            if ran.code != 0 { throw Self.failure(ran.missing, ran.stderr, nil) }
+            text = ran.stdout
+        }
+        return prPage(gh: p, diff: text)
+    }
+
+    public func mergePR(repo: String, number: Int, auto: Bool) async throws -> JSON {
+        // -R keeps gh off the server's own folder: it deletes the branch on GitHub only, and never
+        // checks out or deletes a local branch.
+        let ran = await Self.gh(["pr", "merge", String(number), "-R", repo, "--squash", "--delete-branch"] + (auto ? ["--auto"] : []))
+        if ran.code != 0 { throw Self.failure(ran.missing, ran.stderr, nil) }
+        return ["merged": .bool(!auto), "auto": .bool(auto), "url": .string("https://github.com/\(repo)/pull/\(number)")]
+    }
+
     /// As `encodeURIComponent` does it.
     static func encode(_ text: String) -> String {
         let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.!~*'()")
