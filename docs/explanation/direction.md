@@ -35,14 +35,14 @@ skills come from a marketplace.
 - **A marketplace for MCP servers and skills.** #687 is walked and shipped on all three
   clients, private GitHub repositories work (#697), and our MCP servers ship as static
   Swift binaries, so a cloud host needs no Node (#700).
-- **Releases are routine** (Alex, 2026-10-13). Every two weeks, or when Alex says, the
-  Release workflow takes `main` to a new version with nobody watching: the stale reviews
-  run, high and medium findings are fixed, and a tag publishes Agents Host on GitHub and
-  the Mac window and the Remote on TestFlight (#914, the `release` skill).
+- **Releases are routine.** A release workflow runs the security, runtime and usability
+  reviews when they are stale, fixes the high and medium findings, chooses the next
+  version, and puts the app on TestFlight and on the GitHub release page with nobody
+  watching (#914).
 
 ## Not now
 
-- Submitting to App Review. Releases go as far as TestFlight.
+- Submitting to App Review.
 - #59 (one-click set-up, a hosted service), #60 (webhooks) and #61 (the control plane in
   the cloud) stay parked.
 - New runtimes. Goose and auto-approve were tried and closed.
