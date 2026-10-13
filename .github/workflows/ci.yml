@@ -196,6 +196,30 @@ jobs:
             macos-xcode-27-agentskit-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*') }}-
             macos-xcode-27-agentskit-${{ steps.toolchain.outputs.fingerprint }}-
 
+      # The same stale graph as the Xcode cache's above (#684), in SwiftPM's build: on
+      # 2026-10-13 every pull request that changed AgentsKit (#882, #886, #887, #889)
+      # restored an older .build, SwiftPM recompiled AgentsKit but not AgentsKitCore, the
+      # link failed on undefined AgentsKitCore symbols, and the clean retry rebuilt the
+      # dependencies too: 6–11 minutes for a step that takes under one when warm. The save
+      # records which AgentsKit sources the graph was built from; when they differ, only the
+      # package's own targets go, and swift-nio, swift-nio-ssl and SwiftTerm stay warm.
+      - name: Drop a stale AgentsKit from the AgentsKit build cache
+        if: steps.agentskit-cache.outputs.cache-matched-key != '' && steps.agentskit-cache.outputs.cache-hit != 'true'
+        env:
+          AGENTSKIT: ${{ steps.keys.outputs.agentskit }}
+        run: |
+          out=Packages/AgentsKit/.build/out
+          built="$(cat Packages/AgentsKit/.build/agentskit-sources 2>/dev/null || true)"
+          if [[ "$built" != "$AGENTSKIT" ]]; then
+            echo "AgentsKit sources differ from the restored graph's (${built:-unrecorded}); dropping its own targets."
+            rm -rf "$out/Intermediates.noindex/AgentsKit.build"
+            if [[ -d "$out/Products/Debug" ]]; then
+              find "$out/Products/Debug" -maxdepth 1 \( -name 'AgentsKit*' -o -name 'libAgentsKit*' \
+                -o -name 'ControlDial*' -o -name 'libControlDial*' -o -name 'CShims*' \
+                -o -name 'accept-probe*' -o -name 'accept_probe*' \) -exec rm -rf {} +
+            fi
+          fi
+
       - name: Tools
         run: |
           xcodebuild -version
@@ -224,6 +248,10 @@ jobs:
           source scripts/ci-clean-retry.sh
           clean_retry "$RESTORED" Packages/AgentsKit/.build -- \
             swift build --build-tests --package-path Packages/AgentsKit
+
+      - name: Record the AgentsKit sources this build was made from
+        if: ${{ always() && steps.agentskit-cache.outputs.cache-hit != 'true' && steps.build-agentskit.outcome == 'success' }}
+        run: echo "${{ steps.keys.outputs.agentskit }}" > Packages/AgentsKit/.build/agentskit-sources
 
       # Only completed builds are saved. Cancellation must not persist a partial cache
       # that can fill runner disk or poison a later restore.
