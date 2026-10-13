@@ -398,4 +398,63 @@ struct SidebarModelTests {
         #expect(SidebarSmartRow.keptInUnread(working.id, in: model) == nil)
         #expect(SidebarSmartRow.keptInUnread(pinned.id, in: model) == nil)
     }
+
+    /// A smart group turned off (#846) is not drawn, and its sessions go to the next group
+    /// they fit, or under their project: still listed once, none left out.
+    @Test func aGroupTurnedOffPassesItsSessionsOn() {
+        let model = AgentsModel()
+        let pinnedAsking = started(api, .waitingOnUser, "pinned asking", at: 1)
+        let asking = started(api, .waitingOnUser, "asking", at: 2)
+        let working = started(api, .running, "working", at: 3)
+        var archiving = started(api, .finished, "archiving", at: 4, unread: true)
+        archiving.archiveRequest = .requested(at: t0)
+        let unread = started(api, .finished, "unread", at: 5, unread: true)
+        let read = started(api, .finished, "read", at: 6)
+        model.replaceAgents([pinnedAsking, asking, working, archiving, unread, read])
+        model.replacePins([ProjectPins(folder: api, pins: [], sessions: [pinnedAsking.id])])
+        let projects = [key]
+
+        func listing(_ on: Set<SidebarSmartRow>) -> (rows: [SidebarSmartRow: [UUID]], own: [UUID]) {
+            let rows = Dictionary(uniqueKeysWithValues: SidebarSmartRow.allCases.map {
+                ($0, $0.agents(in: model, projects: projects, on: on).map(\.id))
+            })
+            for row in SidebarSmartRow.allCases where on.contains(row) {
+                #expect(row.count(in: model, projects: projects, on: on) == rows[row]?.count, "\(row) \(on)")
+            }
+            let own = SidebarProjectFold(key, label: "api", in: model, isOpen: true, on: on).sessions.map(\.id)
+            #expect(SidebarProjectFold.ownCount(key, in: model, on: on) == own.count, "\(on)")
+            let every = rows.values.flatMap { $0 } + own
+            #expect(every.count == Set(every).count && Set(every).count == 6, "\(on): once each, none left out")
+            return (rows, own)
+        }
+
+        // Pinned off: the pinned session that asks is in Needs You.
+        let noPins = listing(SidebarSmartRow.all.subtracting([.pinned]))
+        #expect(noPins.rows[.pinned] == [])
+        #expect(Set(noPins.rows[.needsYou] ?? []) == [pinnedAsking.id, asking.id, archiving.id])
+        #expect(!SidebarSmartRow.pinned.isShown(in: model, projects: projects, on: SidebarSmartRow.all.subtracting([.pinned])))
+
+        // Needs You off: the unread one asking to be archived goes to Unread, the one
+        // asking a question under its project.
+        let noNeeds = listing(SidebarSmartRow.all.subtracting([.needsYou]))
+        #expect(Set(noNeeds.rows[.unread] ?? []) == [archiving.id, unread.id])
+        #expect(noNeeds.own.contains(asking.id))
+
+        // Working off: the working session goes under its project.
+        let noWorking = listing(SidebarSmartRow.all.subtracting([.working]))
+        #expect(noWorking.own.contains(working.id))
+
+        // Every group off: all six under the project, the pinned one too.
+        let none = listing([])
+        #expect(Set(none.own) == Set([pinnedAsking, asking, working, archiving, unread, read].map(\.id)))
+        #expect(SidebarSmartRow.keptInUnread(read.id, in: model, on: []) == nil)
+    }
+
+    /// What a device keeps: the groups turned off, so a new group would start on.
+    @Test func theGroupsOnRoundTripThroughDefaults() {
+        #expect(SidebarSmartRow.on(off: "") == SidebarSmartRow.all)
+        #expect(SidebarSmartRow.off(on: SidebarSmartRow.all) == "")
+        #expect(SidebarSmartRow.off(on: [.needsYou, .unread]) == "pinned,working")
+        #expect(SidebarSmartRow.on(off: "pinned,working,gone") == [.needsYou, .unread])
+    }
 }

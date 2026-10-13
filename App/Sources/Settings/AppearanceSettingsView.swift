@@ -83,28 +83,38 @@ private struct ChosenTextSize: ViewModifier {
     }
 }
 
-/// Settings ▸ General: appearance, text size, what agents call you, the chat project, whether this Mac
-/// stays awake, and archived agents.
-struct GeneralSettingsView: View {
+/// Settings ▸ Account (#846): what agents call you, and the chat project.
+struct AccountSettingsView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         Form {
-            AppearanceSettingsView()
             PersonSettingsSection()
             ChatProjectSettingsSection()
+        }
+        .paperForm()
+        .task { await model.refreshPerson() }
+    }
+}
+
+/// Settings ▸ Mac (#846): whether this Mac stays awake, and how long archived agents are kept.
+struct MacSettingsView: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Form {
             WakeSettingsSection()
             ArchiveSettingsSection()
         }
         .paperForm()
         .task {
             await model.refreshWakeSettings()
-            await model.refreshPerson()
             await model.refreshRetentionState()
         }
     }
 }
 
+/// Settings ▸ Appearance: the theme and the text size.
 struct AppearanceSettingsView: View {
     @AppStorage(Appearance.defaultsKey) private var appearance = Appearance.system
     @AppStorage(TextSize.defaultsKey) private var textSize = TextSize.standard

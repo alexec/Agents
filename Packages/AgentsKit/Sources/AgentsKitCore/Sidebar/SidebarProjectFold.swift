@@ -81,9 +81,20 @@ public struct SidebarProjectFold {
     /// How many sessions the project's own group lists, folded or not: its live ones that
     /// no smart group lists (#587). The busy groups go to Needs You and Working whole, so
     /// what is left is the rest, less the unread and the pinned among them, and less the
-    /// session Unread keeps while it is open (#689).
-    public static func ownCount(_ key: ProjectKey, in work: AgentsModel, keptInUnread: UUID? = nil) -> Int {
+    /// session Unread keeps while it is open (#689). With a smart group off (#846), a pass
+    /// over its live sessions instead, as `SidebarSmartRow.home` places each.
+    public static func ownCount(_ key: ProjectKey, in work: AgentsModel, keptInUnread: UUID? = nil,
+                                on: Set<SidebarSmartRow> = SidebarSmartRow.all) -> Int {
         let shelf = work.shelf(key)
+        if on != SidebarSmartRow.all {
+            let pinned = Set(work.pinnedSessions(in: key.folder))
+            let kept = SidebarSmartRow.keptInUnread(keptInUnread, in: work, on: on)?.id
+            return AgentGroup.live.reduce(0) { total, group in
+                total + (shelf.groups[group] ?? []).count {
+                    $0.id != kept && SidebarSmartRow.home(of: $0, in: group, isPinned: pinned.contains($0.id), on: on) == nil
+                }
+            }
+        }
         let rest = AgentGroup.live.filter { !SidebarSmartRow.busyGroups.contains($0) }
             .reduce(0) { $0 + (shelf.counts[$1] ?? 0) }
         let pinnedAtRest = SidebarSmartRow.pinnedSessions(in: work, key).count {
@@ -123,9 +134,10 @@ public struct SidebarProjectFold {
     /// row is drawn, so nothing is filed for it, and the row reads its own numbers off the
     /// project's shelf (#165). A search unfolds every project, and `label` is the name the
     /// row shows, which the search also matches. `keptInUnread` is the session Unread keeps
-    /// while it is open, listed there and not here (#689).
+    /// while it is open, listed there and not here (#689). `on` is the smart groups turned
+    /// on (#846): with Pinned off, the pinned are listed here as any other.
     public init(_ key: ProjectKey, label: String, in work: AgentsModel, query: String = "", isOpen: Bool,
-                keptInUnread: UUID? = nil) {
+                keptInUnread: UUID? = nil, on: Set<SidebarSmartRow> = SidebarSmartRow.all) {
         self.key = key
         let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
         self.query = words
@@ -138,7 +150,8 @@ public struct SidebarProjectFold {
         // Pinned (#432): in the pin's order, out of the Workflows group. An archived one
         // shows only under Archived workflows, though its pin may linger until the host
         // takes it off.
-        let pinnedFlows = work.pinnedWorkflows(in: key.folder).compactMap { id in
+        let pinsOn = on.contains(.pinned)
+        let pinnedFlows = !pinsOn ? [] : work.pinnedWorkflows(in: key.folder).compactMap { id in
             workflows.first { $0.workflowID == id && !$0.isArchived }
         }
         let pinnedFlowIDs = Set(pinnedFlows.map(\.workflowID))
@@ -147,7 +160,7 @@ public struct SidebarProjectFold {
         archivedWorkflows = workflows.filter(\.isArchived)
 
         let shelf = work.shelf(key)
-        let pinned = work.pinnedSessions(in: key.folder).compactMap { work.agent($0) }
+        let pinned = !pinsOn ? [] : work.pinnedSessions(in: key.folder).compactMap { work.agent($0) }
             .filter { $0.host == key.host && $0.state != .archived }
         let pinnedIDs = Set(pinned.map(\.id))
         self.pinned = matcher.map { pinned.filter($0.matches) } ?? pinned
@@ -162,9 +175,9 @@ public struct SidebarProjectFold {
         }
         // Only those no smart group lists: each session is in the sidebar once (#587), the
         // one Unread keeps too (#689).
-        let kept = SidebarSmartRow.keptInUnread(keptInUnread, in: work, query: words)?.id
+        let kept = SidebarSmartRow.keptInUnread(keptInUnread, in: work, query: words, on: on)?.id
         sessions = groups.flatMap { group in
-            group.agents.filter { SidebarSmartRow.home(of: $0, in: group.group, isPinned: false) == nil && $0.id != kept }
+            group.agents.filter { SidebarSmartRow.home(of: $0, in: group.group, isPinned: false, on: on) == nil && $0.id != kept }
         }.sorted { $0.createdAt > $1.createdAt }
         let archived = shelf.groups[.archived] ?? []
         self.archived = matcher.map { archived.filter($0.matches) } ?? archived

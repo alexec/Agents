@@ -9,7 +9,7 @@ export function chatProject(projects: ProjectSummary[] | undefined): ProjectSumm
 }
 
 /**
- * The host's chat project is archived, as the window's Settings ▸ General ▸ Chat project switch leaves
+ * The host's chat project is archived, as the window's Settings ▸ Account ▸ Chat project switch leaves
  * it when off (#694): New Chat is not offered. False when it has none at all, so New Chat can say why.
  */
 export function chatSwitchedOff(projects: ProjectSummary[] | undefined): boolean {

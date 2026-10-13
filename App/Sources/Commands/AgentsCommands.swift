@@ -73,7 +73,7 @@ struct AgentsCommands: Commands {
                 .keyboardShortcut("n", modifiers: [.command, .option])
                 .disabled(model.selectedProjectSummary == nil || !model.draftWorktrees.canMakeNew)
             // A chat in the project this Mac made for chats (#229), with no project to pick;
-            // gone while Settings ▸ General ▸ Chat project is off (#694).
+            // gone while Settings ▸ Account ▸ Chat project is off (#694).
             if !model.chatProjectSwitchedOff {
                 Button("New Chat") { newChat(on: .mac) }
                     .keyboardShortcut("n", modifiers: [.command, .shift])

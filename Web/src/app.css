@@ -281,7 +281,6 @@ button.link {
 }
 
 .identity .confirm { display: flex; gap: 6px; }
-.identity .text-size select { font: inherit; color: inherit; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-control); }
 
 /* The chat: entries above, then the cards and the prompt, pinned to the foot. */
 /* Centred without its own display, so the narrow layout can still hide it. */
