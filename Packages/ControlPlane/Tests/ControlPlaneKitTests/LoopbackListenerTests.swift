@@ -318,8 +318,10 @@ struct LoopbackListenerTests {
     /// Taken on ::1 alone, by anyone, the listener stays off: a browser may go to ::1 for
     /// localhost, and would find whatever holds it at this page's origin.
     @Test func aPortTakenOnIPv6AloneLeavesTheListenerOff() async throws {
+        // Not port 0: 127.0.0.1 on that port is bound again below, and an ephemeral one may
+        // be another test's by then (#949).
         let taken = try await ServerBootstrap(group: MultiThreadedEventLoopGroup.singleton)
-            .bind(host: "::1", port: 0).get()
+            .bind(host: "::1", port: try await freePort()).get()
         defer { taken.close(promise: nil) }
         let (service, port) = try await start(web: .init(folder: Self.dist, port: taken.localAddress?.port ?? 0))
         defer { Task { await service.stop() } }
@@ -344,8 +346,9 @@ struct LoopbackListenerTests {
     }
 
     @Test func aTakenPortIsReportedAsNotServedAndTryingAgainServesOnceItIsFree() async throws {
+        // Not port 0: it is let go and bound again below (#949).
         var taken: (any Channel)? = try await ServerBootstrap(group: MultiThreadedEventLoopGroup.singleton)
-            .bind(host: "127.0.0.1", port: 0).get()
+            .bind(host: "127.0.0.1", port: try await freePort()).get()
         let port = try #require(taken?.localAddress?.port)
         defer { taken?.close(promise: nil) }
         let lines = Lines()
