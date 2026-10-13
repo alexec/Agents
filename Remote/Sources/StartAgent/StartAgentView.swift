@@ -56,6 +56,7 @@ struct StartAgentView: View {
 
     private var form: some View {
         Form {
+            personaHeading
             // Starts kept for this project's stopped workspace (#691 US3, layouts.md L6a): the
             // agent each makes opens once the host is up.
             if case let starts = model.keptStarts(in: project), !starts.isEmpty {
@@ -78,7 +79,6 @@ struct StartAgentView: View {
                     }
                 }
             }
-            personaSection
             ChoiceRows()
             Section("Reach") {
                 ForEach(model.startFolders, id: \.self) { folder in
@@ -116,47 +116,71 @@ struct StartAgentView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) { promptBar }
     }
 
-    /// The project's personas, first (#760): segments on a project, a menu on the chat
-    /// project, and what the picked one is for under them. Not drawn where there are none.
-    @ViewBuilder private var personaSection: some View {
+    /// The kind of session to start (#760), at the top of the page as a heading-style menu
+    /// (#913), with what the picked one is for, and any persona file that cannot be read,
+    /// under it. The project stays the title. Not drawn where there are none.
+    @ViewBuilder private var personaHeading: some View {
         let usable = model.startPersonas.filter { $0.problem == nil }
         let broken = model.startPersonas.filter { $0.problem != nil }
+        let picked = usable.first { $0.id == model.startPersona }
         if !model.startPersonas.isEmpty {
             Section {
-                let selection = Binding<String>(get: { model.startPersona ?? "" },
-                                                set: { id in pickPersona(id) })
-                if !usable.isEmpty {
-                    if model.work.project(project)?.isChat == true {
-                        Picker("Persona", selection: selection) {
-                            Text("None").tag("")
-                            ForEach(usable) { Text($0.name).tag($0.id) }
+                VStack(spacing: 4) {
+                    if !usable.isEmpty {
+                        Menu {
+                            personaButton(nil, picked: picked == nil)
+                            ForEach(usable) { personaButton($0, picked: $0.id == picked?.id) }
+                        } label: {
+                            HStack(spacing: 5) {
+                                Text(picked?.name ?? Self.noPersona)
+                                    .appText(.reading).fontWeight(.semibold)
+                                    .foregroundStyle(picked == nil ? .secondary : .primary)
+                                    .lineLimit(1)
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .imageScale(.small)
+                                    .foregroundStyle(.secondary)
+                                    .accessibilityHidden(true)
+                            }
+                            .contentShape(Rectangle())
                         }
-                    } else {
-                        Picker("Persona", selection: selection) {
-                            Text("None").tag("")
-                            ForEach(usable) { Text($0.name).tag($0.id) }
-                        }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Persona: \(picked?.name ?? Self.noPersona)")
+                    }
+                    if let description = picked?.description {
+                        Text(description)
+                            .appText(.supporting)
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(broken) { persona in
+                        Text("\(persona.id).md: \(persona.problem ?? "")")
+                            .appText(.supporting)
+                            .foregroundStyle(.secondary)
                     }
                 }
-                ForEach(broken) { persona in
-                    Text("\(persona.id).md: \(persona.problem ?? "")")
-                        .appText(.supporting)
-                        .foregroundStyle(.secondary)
-                }
-            } footer: {
-                if let description = usable.first(where: { $0.id == model.startPersona })?.description {
-                    Text(description)
-                }
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .listRowBackground(Color.clear)
             }
             .disabled(model.isStarting)
         }
     }
 
+    static let noPersona = "No persona"
+
+    private func personaButton(_ persona: Persona?, picked: Bool) -> some View {
+        Button {
+            pickPersona(persona)
+        } label: {
+            if picked {
+                Label(persona?.name ?? Self.noPersona, systemImage: "checkmark")
+            } else {
+                Text(persona?.name ?? Self.noPersona)
+            }
+        }
+    }
+
     /// Every setting the persona names, and its labels beside any already there.
-    private func pickPersona(_ id: String) {
-        let persona = model.startPersonas.first { $0.id == id }
+    private func pickPersona(_ persona: Persona?) {
         for label in persona?.settings.labels ?? []
         where !draftLabels.contains(where: { SessionLabelPolicy.key($0) == SessionLabelPolicy.key(label) }) {
             draftLabels.append(label)

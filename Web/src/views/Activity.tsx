@@ -18,6 +18,7 @@ import { folderKey, projectFolder } from "../model/groups";
 import { runtimeTally } from "../model/runtimes";
 import { healthTally, personalEmpty, personalIntro, personalServers } from "../model/hostedMCP";
 import { refusalMessage } from "../model/workflows";
+import { dayTokenLimitReached } from "../model/limits";
 import { UsageCharts } from "./UsageCharts";
 import { TimeCharts } from "./TimeCharts";
 
@@ -66,12 +67,15 @@ export function headroom(state: CostState | undefined): string | null {
 
 /** Close enough to the daily limit to say so in colour (CostState.dayIsCloseToFull). */
 export function closeToFull(state: CostState | undefined): boolean {
+  const tokens = state?.limits.dailyTokens;
+  if (state && tokens !== undefined && tokens > 0 && (state.tokensToday ?? 0) / tokens >= 0.85) return true;
   const daily = state?.limits.daily;
   if (!state || !daily || daily.amount <= 0) return false;
   return (state.today[daily.currency] ?? 0) / daily.amount >= 0.85;
 }
 
 export function dayLimitReached(state: CostState | undefined): boolean {
+  if (dayTokenLimitReached(state)) return true;
   const daily = state?.limits.daily;
   return !!daily && daily.amount > 0 && (state?.today[daily.currency] ?? 0) >= daily.amount;
 }
@@ -149,8 +153,9 @@ function useActivity(store: Store): void {
 /** Each Activity page's icon, the window's SF Symbol as near as text has it (#495). */
 const activityIcons: Record<ActivityPage, string> = { events: "☰\uFE0E", resources: "◫", runtimes: "⚙\uFE0E", mcp: "▤", worktrees: "⑂", spending: "$", time: "◷" };
 
-export function ActivityRows({ store, chosen, onPick }: {
-  store: Store; chosen: ActivityPage | undefined; onPick: (page: ActivityPage) => void;
+/** The rows of one of the sidebar's two groups (#915): Status, what goes on now, or Usage, the past. */
+export function ActivityRows({ group, store, chosen, onPick }: {
+  group: "status" | "usage"; store: Store; chosen: ActivityPage | undefined; onPick: (page: ActivityPage) => void;
 }) {
   useActivity(store);
   const last = lastEvent(store);
@@ -176,6 +181,13 @@ export function ActivityRows({ store, chosen, onPick }: {
     </button>
   );
   const spent = [today && `${today} today`, left].filter(Boolean).join(", ");
+  if (group === "usage") return (
+    <>
+      {row("spending", "Cost", "What all of the work has cost, and what it cost today", spent || null,
+        closeToFull(mac))}
+      {row("time", "Time", "Where the time of running chats went: the agent, its tools, and waiting", null)}
+    </>
+  );
   return (
     <>
       {row("events", "Events", "What happened, what came of it, and who is waiting", last && `Last at ${clock(last)}`)}
@@ -187,9 +199,6 @@ export function ActivityRows({ store, chosen, onPick }: {
       {row("mcp", "MCP Servers", "Every server in your own mcp.json, and how each is doing",
         mcp?.words ?? null, mcp?.failing ?? false)}
       {row("worktrees", "Worktrees", "Every project's worktrees, and how much each holds", worktrees)}
-      {row("spending", "Cost", "What all of the work has cost, and what it cost today", spent || null,
-        closeToFull(mac))}
-      {row("time", "Time", "Where the time of running chats went: the agent, its tools, and waiting", null)}
     </>
   );
 }
@@ -486,6 +495,11 @@ function SpendingPage({ store, hostName }: { store: Store; hostName: (host: stri
             Daily limit {money(state.limits.daily.amount, state.limits.daily.currency)} · {headroom(state)}{dayLimitReached(state) && " · Nothing new will start until tomorrow"}</p>}
           {state.limits.perAgent && <p class="quiet small">
             Each agent up to {money(state.limits.perAgent.amount, state.limits.perAgent.currency)}</p>}
+          {state.limits.dailyTokens !== undefined ? <p class={`quiet small${closeToFull(state) ? " close" : ""}`}>
+            Daily token limit {state.limits.dailyTokens.toLocaleString()} · {Math.max(0, state.limits.dailyTokens - (state.tokensToday ?? 0)).toLocaleString()} left{dayTokenLimitReached(state) && " · Nothing new will start until tomorrow"}</p>
+            : (state.tokensToday ?? 0) > 0 && <p class="quiet small">{state.tokensToday.toLocaleString()} tokens today</p>}
+          {state.limits.perAgentTokens !== undefined && <p class="quiet small">
+            Each agent up to {state.limits.perAgentTokens.toLocaleString()} tokens</p>}
           {state.note && <p class="quiet small">⚠︎ {state.note}</p>}
         </section>
       ))}

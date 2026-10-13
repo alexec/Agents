@@ -38,11 +38,12 @@ down for a runtime that has none. [Overall score](#overall-score), after the
 tables, adds every feature up.
 
 The matrix was filled in on 2026-10-12 from each app's own docs, changelog, README,
-releases and, where open, source. Every app is held to the same bar, Agents included: a ●
+releases and, where open, source. Agents' row was last brought up to date on 2026-10-13. Every app is held to the same bar, Agents included: a ●
 needs the whole feature, documented by the app itself, and a ○ needs evidence, such as an
-app that ships for macOS alone having no Android app. Keep it current when the weekly
-competitor check finds something new; its reports in `~/.agents/reviews/competitors/`
-give the sources. Apps change every week, so check a row against the app before relying
+app that ships for macOS alone having no Android app. Every Monday, after the
+Competitor check, the Feature matrix workflow (`.agents/workflows/feature-matrix.md`)
+brings it up to date from the week's merged changes and the Competitor check's report.
+The reports in `~/.agents/reviews/competitors/` give the sources. Apps change every week, so check a row against the app before relying
 on it.
 
 ## Where Agents falls short
@@ -58,17 +59,11 @@ Agents' ◐ cells, and why:
 - **Notifications:** the Mac gets them. The relay takes them to the iPhone and iPad, which
   has not yet been checked away from home, and the web page gets none. See
   [Phone and iPad](../explanation/phone-and-ipad.md).
-- **Pull requests:** the ci board lists them. Nothing can be created, reviewed or merged in
-  the app.
-- **Starts agents from issues:** only through a workflow on the `ci` server's
-  `issue.opened`, and only for GitHub.
 - **Spending limits:** only for runtimes that report a price. See
   [Limit spending](../how-to/limit-spending.md).
-- **Rich cards in replies:** a tool's ui:// view is drawn in the conversation where the
-  tool was called, but an agent can show only a view some server already has, and the
-  `agents` server has no general table or chart view yet. Views from local (stdio)
-  servers are not drawn yet.
-- **Task board:** the `ci` server's issues view lists GitHub issues in the app, read only.
+- **Task board:** the `ci` server's issues view lists GitHub issues in the app, with who
+  has each one and Start Agent on each row. It has no columns, and an issue cannot be moved
+  or edited there.
 - **A browser the agent drives, trackers beyond GitHub, git hosts beyond GitHub:** through
   Playwright, Linear, Jira and GitLab servers from the MCP marketplace, with nothing shown
   in the app. A GitLab server of Agents' own is parked (#813).
@@ -76,7 +71,6 @@ Agents' ◐ cells, and why:
 Agents has none of these at all:
 
 - Android app (#810), Windows or Linux desktop (#811).
-- Sessions as a tree.
 - Simulator panes, language servers.
 - Several accounts per runtime, teams.
 
@@ -214,6 +208,7 @@ Agents has none of these at all:
 
 | App | Shows who needs you | Sessions side by side | Sessions as a tree | Send while it works | Voice or dictation | Rich cards in replies | Score |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|--:|
+| **Agents** | ● | ● | ● | ● | ● | ● | 100% |
 | GitHub Copilot | ● | ● | ● | ● | ● | ● | 100% |
 | Agentastic | ● | ● | ● | ● | ◐ | ● | 92% |
 | Claude Code | ● | ● | ● | ● | ● | ◐ | 92% |
@@ -222,7 +217,6 @@ Agents has none of these at all:
 | Nimbalyst | ● | ?⃝ | ● | ● | ● | ● | 83% |
 | OpenAI Codex | ● | ● | ◐ | ● | ● | ◐ | 83% |
 | Paseo | ● | ● | ◐ | ● | ● | ◐ | 83% |
-| **Agents** | ● | ● | ○ | ● | ● | ◐ | 75% |
 | Atelier (was Acepe) | ● | ● | ◐ | ● | ● | ○ | 75% |
 | Codeg | ● | ● | ◐ | ● | ?⃝ | ● | 75% |
 | Happy | ● | ?⃝ | ◐ | ● | ● | ● | 75% |
@@ -255,9 +249,9 @@ Agents has none of these at all:
 | GitHub Copilot | ● | ● | ● | ● | ● | 100% |
 | Threadlines | ● | ● | ● | ● | ● | 100% |
 | Agentastic | ● | ● | ◐ | ● | ● | 90% |
+| **Agents** | ● | ● | ◐ | ● | ● | 90% |
 | Codeg | ● | ● | ● | ● | ◐ | 90% |
 | Paseo | ● | ● | ● | ● | ◐ | 90% |
-| **Agents** | ● | ◐ | ◐ | ● | ● | 80% |
 | Claude Code | ● | ● | ◐ | ● | ◐ | 80% |
 | Conductor | ● | ● | ?⃝ | ● | ● | 80% |
 | Roamgate | ● | ● | ● | ● | ?⃝ | 80% |
@@ -329,11 +323,11 @@ Agents has none of these at all:
 | Codeg | ● | ● | ● | ● | ● | ● | 100% |
 | Superset | ● | ● | ● | ● | ● | ● | 100% |
 | Rove | ● | ● | ◐ | ● | ● | ● | 92% |
+| **Agents** | ◐ | ● | ◐ | ● | ● | ● | 83% |
 | Cursor | ?⃝ | ● | ● | ● | ● | ● | 83% |
 | GitHub Copilot | ?⃝ | ● | ● | ● | ● | ● | 83% |
 | OpenAI Codex | ?⃝ | ● | ● | ● | ● | ● | 83% |
 | Warp | ?⃝ | ● | ● | ● | ● | ● | 83% |
-| **Agents** | ◐ | ◐ | ◐ | ● | ● | ● | 75% |
 | Claude Code | ?⃝ | ● | ◐ | ● | ● | ● | 75% |
 | Conductor | ?⃝ | ● | ● | ● | ◐ | ● | 75% |
 | Nimbalyst | ● | ?⃝ | ◐ | ● | ● | ● | 75% |
@@ -440,13 +434,13 @@ Each app's score in every table, and overall: its points over the 45 scored feat
 |--:|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
 | 1 | GitHub Copilot | 92% | 83% | 100% | 100% | 80% | 83% | 100% | 50% | **86%** |
 | 2 | Paseo | 100% | 100% | 83% | 90% | 60% | 67% | 60% | 100% | **83%** |
+| 3 | **Agents** | 92% | 50% | 100% | 90% | 50% | 83% | 70% | 83% | **78%** |
 | 3 | Codeg | 100% | 67% | 75% | 90% | 60% | 100% | 40% | 83% | **78%** |
 | 3 | Cursor | 83% | 67% | 83% | 100% | 80% | 83% | 80% | 50% | **78%** |
 | 3 | Nimbalyst | 83% | 83% | 83% | 70% | 70% | 75% | 70% | 83% | **78%** |
-| 6 | Agentastic | 100% | 42% | 92% | 90% | 80% | 100% | 80% | 33% | **77%** |
-| 6 | Claude Code | 67% | 83% | 92% | 80% | 70% | 75% | 80% | 67% | **77%** |
-| 8 | **Agents** | 92% | 50% | 75% | 80% | 50% | 75% | 70% | 83% | **72%** |
-| 8 | OpenAI Codex | 67% | 83% | 83% | 70% | 40% | 83% | 80% | 67% | **72%** |
+| 7 | Agentastic | 100% | 42% | 92% | 90% | 80% | 100% | 80% | 33% | **77%** |
+| 7 | Claude Code | 67% | 83% | 92% | 80% | 70% | 75% | 80% | 67% | **77%** |
+| 9 | OpenAI Codex | 67% | 83% | 83% | 70% | 40% | 83% | 80% | 67% | **72%** |
 | 10 | Warp | 83% | 58% | 92% | 60% | 70% | 83% | 70% | 50% | **71%** |
 | 11 | T3 Code | 83% | 92% | 67% | 80% | 80% | 50% | 40% | 67% | **70%** |
 | 12 | Superset | 75% | 42% | 67% | 70% | 70% | 100% | 40% | 83% | **69%** |

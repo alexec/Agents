@@ -76,6 +76,13 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// `agents/setCeiling`.
     public var costCeiling: Cost?
 
+    /// The tokens this agent has used so far, as a token limit counts them (#838):
+    /// `TurnUsage.limitTokens` of every turn, added at the turn's end.
+    public var tokensToDate: Int
+
+    /// This agent's own token ceiling, on the same terms as `costCeiling` (#838).
+    public var tokenCeiling: Int?
+
     /// What the agent said it was going to do. The current one is last.
     public var plans: [Plan]
 
@@ -320,6 +327,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // New in 010. A record written before limits existed has no ceiling of its
         // own, which is the app-wide per-agent limit applying.
         costCeiling = try c.decodeIfPresent(Cost.self, forKey: .costCeiling)
+        // New in #838. A record written before token limits counted nothing.
+        tokensToDate = try c.decodeIfPresent(Int.self, forKey: .tokensToDate) ?? 0
+        tokenCeiling = try c.decodeIfPresent(Int.self, forKey: .tokenCeiling)
         plans = try c.decodeIfPresent([Plan].self, forKey: .plans) ?? []
         background = try c.decodeIfPresent([BackgroundItem].self, forKey: .background) ?? []
         additionalDirectories = try c.decodeIfPresent([URL].self, forKey: .additionalDirectories) ?? []
@@ -425,6 +435,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(lastTurnUsage, forKey: .lastTurnUsage)
         if !costToDate.isEmpty { try c.encode(costToDate, forKey: .costToDate) }
         try c.encodeIfPresent(costCeiling, forKey: .costCeiling)
+        if tokensToDate > 0 { try c.encode(tokensToDate, forKey: .tokensToDate) }
+        try c.encodeIfPresent(tokenCeiling, forKey: .tokenCeiling)
         if !plans.isEmpty { try c.encode(plans, forKey: .plans) }
         if !background.isEmpty { try c.encode(background, forKey: .background) }
         if !additionalDirectories.isEmpty {
@@ -475,7 +487,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case id, runtimeID, cwd, title, labels, state, runtimeSessionID, startOptions
         case advertisedOptions, availableCommands, createdAt, lastActivityAt, isUnread, reportSeenAt
         case endedReason, archivedReason
-        case usage, lastTurnUsage, costToDate, costCeiling, plans, additionalDirectories, mcpServers
+        case usage, lastTurnUsage, costToDate, costCeiling, tokensToDate, tokenCeiling, plans, additionalDirectories, mcpServers
         case queuedPrompts, suggestedPrompts
         case startedByWorkflow, startedByRun, startedByAgent, chainDepth, eventWait, startRequestID
         case purpose
@@ -531,6 +543,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 lastTurnUsage: TurnUsage? = nil,
                 costToDate: [String: Decimal] = [:],
                 costCeiling: Cost? = nil,
+                tokensToDate: Int = 0,
+                tokenCeiling: Int? = nil,
                 plans: [Plan] = [],
                 background: [BackgroundItem] = [],
                 additionalDirectories: [URL] = [],
@@ -573,6 +587,8 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.lastTurnUsage = lastTurnUsage
         self.costToDate = costToDate
         self.costCeiling = costCeiling
+        self.tokensToDate = tokensToDate
+        self.tokenCeiling = tokenCeiling
         self.plans = plans
         self.background = background
         self.additionalDirectories = additionalDirectories
@@ -683,9 +699,88 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// at it. False when there is no ceiling, and false when the agent is unmeasured —
     /// a runtime that reports no cost can never be capped, and must never be treated
     /// as though it had been.
+    /// Either limit counts (#838): money or tokens, whichever is reached first.
     public func isAtCostLimit(under limits: CostLimits) -> Bool {
+        isAtMoneyLimit(under: limits) || isAtTokenLimit(under: limits)
+    }
+
+    /// Whether this agent has spent all the money it is allowed to.
+    public func isAtMoneyLimit(under limits: CostLimits) -> Bool {
         guard !costIsUnmeasured, let ceiling = ceiling(under: limits) else { return false }
         return (costToDate[ceiling.currency] ?? 0) >= ceiling.amount
+    }
+
+    /// The token ceiling this agent is held to: its own, else the app-wide one (#838).
+    public func tokenCeiling(under limits: CostLimits) -> Int? {
+        tokenCeiling ?? limits.perAgentTokens
+    }
+
+    /// Whether this agent has used all the tokens it is allowed to (#838). False when
+    /// its runtime reports no tokens: such an agent is never capped by tokens.
+    public func isAtTokenLimit(under limits: CostLimits) -> Bool {
+        guard !tokensAreUnmeasured, let ceiling = tokenCeiling(under: limits) else { return false }
+        return tokensToDate >= ceiling
+    }
+
+    /// The tokens left before it stops, floored at zero. `nil` when it has no token
+    /// ceiling or its runtime reports no tokens.
+    public func tokenHeadroom(under limits: CostLimits) -> Int? {
+        guard !tokensAreUnmeasured, let ceiling = tokenCeiling(under: limits) else { return nil }
+        return max(0, ceiling - tokensToDate)
+    }
+
+    /// The token ceiling that lets this agent carry on once more: one more step of
+    /// the ceiling on top of what it has used, as `ceilingToGoOn` does for money.
+    /// `nil` when it has no token ceiling, so nothing is set.
+    public func tokenCeilingToGoOn(under limits: CostLimits) -> Int? {
+        guard let ceiling = tokenCeiling(under: limits) else { return nil }
+        return tokensToDate + max(ceiling, 1)
+    }
+
+    /// Its tokens against its token ceiling, "12,000 of 50,000 tokens", for the figure
+    /// above the prompt (#838). Nil when no token limit applies to it.
+    public func tokenFigure(under limits: CostLimits) -> String? {
+        guard !tokensAreUnmeasured, let ceiling = tokenCeiling(under: limits) else { return nil }
+        return "\(tokensToDate.formatted()) of \(ceiling.formatted()) tokens"
+    }
+
+    /// Near its token ceiling, on `Usage.closeToFull` as the money is (#838).
+    public func isCloseToTokenLimit(under limits: CostLimits) -> Bool {
+        guard !tokensAreUnmeasured, let ceiling = tokenCeiling(under: limits), ceiling > 0 else { return false }
+        return Double(tokensToDate) / Double(ceiling) >= Usage.closeToFull
+    }
+
+    /// What it has used, in the words of the limit it reached: money, else tokens.
+    public func spentWords(under limits: CostLimits) -> String {
+        if !isAtMoneyLimit(under: limits), isAtTokenLimit(under: limits) {
+            return "\(tokensToDate.formatted()) tokens used."
+        }
+        return "\(Cost.total(of: costToDate) ?? "") spent."
+    }
+
+    /// Why no limit can stop it, or nil when one can (#838). A runtime that reports a
+    /// price or tokens can be held to a limit; one that reports neither cannot.
+    public var noLimitApplies: String? {
+        guard costIsUnmeasured, tokensAreUnmeasured else { return nil }
+        return "This runtime reports neither a price nor tokens, so no limit applies to this agent."
+    }
+
+    /// What "let this one go on" asks for (#838): one more step of whichever limit it
+    /// reached, money or tokens, and its other ceiling left as it is. A limit it has
+    /// not reached is never set on it by going on.
+    public func goOnRequest(under limits: CostLimits) -> DaemonAPI.SetCeilingRequest {
+        DaemonAPI.SetCeilingRequest(
+            agentID: id,
+            ceiling: isAtMoneyLimit(under: limits) ? ceilingToGoOn(under: limits) : costCeiling,
+            tokenCeiling: isAtTokenLimit(under: limits) ? tokenCeilingToGoOn(under: limits) : tokenCeiling)
+    }
+
+    /// A turn has ended and the runtime reported no tokens (#838): Codex reports only
+    /// how full its context is. No token limit applies to such an agent, and the app
+    /// says so. Settled rather than running, as `costIsUnmeasured` is.
+    public var tokensAreUnmeasured: Bool {
+        !state.hasTurnInFlight && tokensToDate == 0 && (lastTurnUsage?.limitTokens ?? 0) == 0
+            && lastActivityAt > createdAt
     }
 
     /// What is left before it stops. `nil` when uncapped, which is how a view knows to

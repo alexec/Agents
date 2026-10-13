@@ -1529,21 +1529,41 @@ public enum DaemonAPI {
         /// The day's ledger could not be read and was set aside in this run (#171), so
         /// `today` may be short; said beside the limits. Nil when it read.
         public var note: String?
+        /// The tokens this local day has used, as a token limit counts them (#838).
+        /// Zero from a daemon that predates it.
+        public var tokensToday: Int
 
-        public init(limits: CostLimits, today: [String: Decimal], day: String, note: String? = nil) {
+        public init(limits: CostLimits, today: [String: Decimal], day: String, note: String? = nil,
+                    tokensToday: Int = 0) {
             self.limits = limits
             self.today = today
             self.day = day
             self.note = note
+            self.tokensToday = tokensToday
+        }
+
+        enum CodingKeys: String, CodingKey { case limits, today, day, note, tokensToday }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            limits = try c.decode(CostLimits.self, forKey: .limits)
+            today = try c.decode([String: Decimal].self, forKey: .today)
+            day = try c.decode(String.self, forKey: .day)
+            note = try c.decodeIfPresent(String.self, forKey: .note)
+            tokensToday = try c.decodeIfPresent(Int.self, forKey: .tokensToday) ?? 0
         }
 
         /// Derived here rather than sent, so there is one place the rule lives.
-        public var dayLimitReached: Bool { limits.isDayLimitReached(spentToday: today) }
+        public var dayLimitReached: Bool { limits.isDayLimitReached(spentToday: today, tokensToday: tokensToday) }
         public var dayHeadroom: Decimal? { limits.dailyHeadroom(against: today) }
+        /// What is left of the day's token limit (#838). `nil` with no token limit.
+        public var dayTokenHeadroom: Int? { limits.dailyTokenHeadroom(against: tokensToday) }
 
         /// Close enough to be worth saying before it arrives, on the app's existing
         /// threshold for a nearly full context rather than a second number.
         public var dayIsCloseToFull: Bool {
+            if let dailyTokens = limits.dailyTokens, dailyTokens > 0,
+               Double(tokensToday) / Double(dailyTokens) >= Usage.closeToFull { return true }
             guard let daily = limits.daily, daily.amount > 0 else { return false }
             let spent = today[daily.currency] ?? 0
             return (spent / daily.amount) >= Decimal(Usage.closeToFull)
@@ -1563,13 +1583,25 @@ public enum DaemonAPI {
     public struct SetLimitsRequest: Codable, Sendable {
         public var perAgent: Cost??
         public var daily: Cost??
+        /// The token limits (#838), on the same absent / null terms.
+        public var perAgentTokens: Int??
+        public var dailyTokens: Int??
 
-        public init(perAgent: Cost?? = nil, daily: Cost?? = nil) {
+        public init(perAgent: Cost?? = nil, daily: Cost?? = nil,
+                    perAgentTokens: Int?? = nil, dailyTokens: Int?? = nil) {
             self.perAgent = perAgent
             self.daily = daily
+            self.perAgentTokens = perAgentTokens
+            self.dailyTokens = dailyTokens
         }
 
-        enum CodingKeys: String, CodingKey { case perAgent, daily }
+        /// Every limit in `limits`, each present: what a copy to another host sends.
+        public init(copying limits: CostLimits) {
+            self.init(perAgent: .some(limits.perAgent), daily: .some(limits.daily),
+                      perAgentTokens: .some(limits.perAgentTokens), dailyTokens: .some(limits.dailyTokens))
+        }
+
+        enum CodingKeys: String, CodingKey { case perAgent, daily, perAgentTokens, dailyTokens }
 
         public init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -1577,6 +1609,10 @@ public enum DaemonAPI {
                 ? .some(try c.decodeIfPresent(Cost.self, forKey: .perAgent)) : .none
             daily = c.contains(.daily)
                 ? .some(try c.decodeIfPresent(Cost.self, forKey: .daily)) : .none
+            perAgentTokens = c.contains(.perAgentTokens)
+                ? .some(try c.decodeIfPresent(Int.self, forKey: .perAgentTokens)) : .none
+            dailyTokens = c.contains(.dailyTokens)
+                ? .some(try c.decodeIfPresent(Int.self, forKey: .dailyTokens)) : .none
         }
 
         public func encode(to encoder: any Encoder) throws {
@@ -1589,6 +1625,14 @@ public enum DaemonAPI {
                 if let value { try c.encode(value, forKey: .daily) }
                 else { try c.encodeNil(forKey: .daily) }
             }
+            if case .some(let value) = perAgentTokens {
+                if let value { try c.encode(value, forKey: .perAgentTokens) }
+                else { try c.encodeNil(forKey: .perAgentTokens) }
+            }
+            if case .some(let value) = dailyTokens {
+                if let value { try c.encode(value, forKey: .dailyTokens) }
+                else { try c.encodeNil(forKey: .dailyTokens) }
+            }
         }
     }
 
@@ -1597,9 +1641,12 @@ public enum DaemonAPI {
     public struct SetCeilingRequest: Codable, Sendable {
         public var agentID: UUID
         public var ceiling: Cost?
-        public init(agentID: UUID, ceiling: Cost?) {
+        /// Its own token ceiling (#838). Null is none of its own, as `ceiling` is.
+        public var tokenCeiling: Int?
+        public init(agentID: UUID, ceiling: Cost?, tokenCeiling: Int? = nil) {
             self.agentID = agentID
             self.ceiling = ceiling
+            self.tokenCeiling = tokenCeiling
         }
     }
 

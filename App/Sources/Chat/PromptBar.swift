@@ -113,7 +113,6 @@ struct PromptBar: View {
     var body: some View {
         GlassEffectContainer(spacing: 12) {
             VStack(alignment: .leading, spacing: 12) {
-                personaChoice
                 whereAndWhat
                 atItsLimit
                 startingOnOut
@@ -207,6 +206,8 @@ struct PromptBar: View {
         // and unsent, the same as a suggestion taken with Tab.
         .onChange(of: model.offeredStart, initial: true) { takeOfferedStart() }
         .onChange(of: model.draftCwd) { takeOfferedStart() }
+        // A persona is picked on the page's heading (#913); its labels go here.
+        .onChange(of: model.draftPersona) { _, id in addLabels(ofPersona: id) }
         .onChange(of: model.offeredPrompt) {
             guard let offered = model.offeredPrompt else { return }
             text = offered
@@ -1179,59 +1180,10 @@ struct PromptBar: View {
 
     // MARK: A kind of session (#760)
 
-    /// The project's personas, first on a new session's form: segments on a project,
-    /// a menu on the chat project, and what the picked one is for under them. Not drawn
-    /// where there are none.
-    @ViewBuilder private var personaChoice: some View {
-        let usable = model.draftPersonas.filter { $0.problem == nil }
-        let broken = model.draftPersonas.filter { $0.problem != nil }
-        if isNew, !model.draftPersonas.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                let selection = Binding<String>(get: { model.draftPersona ?? "" },
-                                                set: { pickPersona($0) })
-                if !usable.isEmpty {
-                    if isChatProject {
-                        Picker("Persona", selection: selection) {
-                            Text("No persona").tag("")
-                            ForEach(usable) { Text($0.name).tag($0.id) }
-                        }
-                        .pickerStyle(.menu)
-                        .fixedSize()
-                    } else {
-                        Picker("Persona", selection: selection) {
-                            Text("None").tag("")
-                            ForEach(usable) { Text($0.name).tag($0.id) }
-                        }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                    }
-                }
-                if let description = usable.first(where: { $0.id == model.draftPersona })?.description {
-                    Text(description)
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                }
-                ForEach(broken) { persona in
-                    Text("\(persona.id).md: \(persona.problem ?? "")")
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .disabled(model.isStarting)
-        }
-    }
-
-    private var isChatProject: Bool {
-        model.projects.contains {
-            $0.isChat == true && $0.host == model.selectedProjectHost && $0.project.folder == model.draftCwd
-        }
-    }
-
-    /// Every setting the persona names, and its labels beside any already there.
-    private func pickPersona(_ id: String) {
-        let persona = model.draftPersonas.first { $0.id == id }
-        model.choosePersona(persona)
-        for label in persona?.settings.labels ?? []
+    /// The picked persona's labels, beside any already there.
+    private func addLabels(ofPersona id: String?) {
+        guard isNew, let persona = model.draftPersonas.first(where: { $0.id == id }) else { return }
+        for label in persona.settings.labels
         where !draftLabels.contains(where: { SessionLabelPolicy.key($0) == SessionLabelPolicy.key(label) }) {
             draftLabels.append(label)
         }

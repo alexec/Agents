@@ -3639,7 +3639,7 @@ final class RemoteModel {
             return
         }
         do {
-            let request = DaemonAPI.SetCeilingRequest(agentID: agent.id, ceiling: agent.ceilingToGoOn(under: costLimits))
+            let request = agent.goOnRequest(under: costLimits)
             let changed = try await client(for: request).call(DaemonAPI.Method.agentsSetCeiling, request,
                                                               returning: Agent.self)
             work.upsert(changed)

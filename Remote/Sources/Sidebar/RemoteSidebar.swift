@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 
 /// The Mac's one sidebar, on an iPad or an iPhone (#226, #498): New Session at the top,
-/// then Activity, then what wants the person across every project — Pinned, Needs You,
+/// then Status and Usage, then what wants the person across every project — Pinned, Needs You,
 /// Working, Unread — then a group per project, its sessions newest first with their state
 /// the row's mark, its workflows, and one Archived row opening a page; then the archived
 /// projects, folded, each with Bring Back (#343). Never more than two levels deep (#495).
@@ -25,8 +25,11 @@ struct RemoteSidebar: View {
     @State private var showingAllMatches: Set<ProjectKey> = []
     /// Archived projects, open or closed, kept as the window keeps it (#343).
     @AppStorage("showsArchivedProjects") private var showsArchived = false
-    /// Activity, open until folded, and kept so, as the window keeps it.
-    @AppStorage("showsActivity") private var showsActivity = true
+    /// Status, open until folded, and kept so, as the window keeps it. It keeps Activity's
+    /// key (#915), so it opens as Activity was left.
+    @AppStorage("showsActivity") private var showsStatus = true
+    /// Usage, open until folded, and kept so, as the window keeps it (#915).
+    @AppStorage("showsUsage") private var showsUsage = true
     /// Add Project… or Clone Project from Git URL…, on a host, from the + (#537).
     @State private var adding: NewProject?
     /// The smart groups turned off in Settings ▸ Sidebar (#846).
@@ -70,8 +73,9 @@ struct RemoteSidebar: View {
 
                 // Pages about all the work rather than one project, above the smart
                 // groups, as the window has them (#495). Plain titles beside their icons
-                // in the accent (#155). It folds, as a project does.
-                Section(isExpanded: $showsActivity) {
+                // in the accent (#155). Each folds, as a project does. Status is what
+                // goes on now; Usage charts the past (#915).
+                Section(isExpanded: $showsStatus) {
                     EventsRow().activityIcon("list.bullet.rectangle").appText(.supporting).tag(SidebarItem.events)
                     ResourcesRow().activityIcon("square.stack.3d.up").appText(.supporting).tag(SidebarItem.resources)
                     RuntimesRow().activityIcon("cpu", warns: runtimesFailing)
@@ -80,11 +84,16 @@ struct RemoteSidebar: View {
                         .appText(.supporting).tag(SidebarItem.mcpServers)
                     WorktreesRow().activityIcon("arrow.triangle.branch")
                         .appText(.supporting).tag(SidebarItem.worktrees)
+                } header: {
+                    Text("Status")
+                }
+
+                Section(isExpanded: $showsUsage) {
                     SpendingRow().activityIcon("dollarsign.circle", warns: model.costState?.dayIsCloseToFull == true)
                         .appText(.supporting).tag(SidebarItem.spending)
                     TimeRow().activityIcon("clock").appText(.supporting).tag(SidebarItem.time)
                 } header: {
-                    Text("Activity")
+                    Text("Usage")
                 }
 
                 // Pinned, Needs You, Working, Unread: a group each across every project

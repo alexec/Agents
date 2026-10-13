@@ -3,8 +3,8 @@
 // the window keeps them in defaults (SidebarFolds.swift). A project's fold is named by host and
 // folder, so the same folder on two hosts folds apart; its Workflows fold the same, after
 // `workflows:`; a smart group's by its name. Archived projects, the one fold under no
-// project, is kept on its own, as the window's `showsArchivedProjects` (#343), and so is
-// Activity, as its `showsActivity`.
+// project, is kept on its own, as the window's `showsArchivedProjects` (#343), and so are
+// Status, as its `showsActivity` (Status was Activity, #915), and Usage, as its `showsUsage`.
 import { signal } from "@preact/signals";
 import { folderKey } from "./groups";
 import { smartStartsOpen, type SmartRow } from "./sidebar";
@@ -14,8 +14,10 @@ const storageKey = "agents.sidebar.folds";
 const closedKey = "agents.sidebar.folded";
 /** Whether Archived projects is open; closed until opened (#343). */
 const archivedProjectsKey = "agents.sidebar.archivedProjects";
-/** Whether Activity is open; open until folded. */
-const activityKey = "agents.sidebar.activity";
+/** Whether Status is open; open until folded. Activity's key, so Status opens as Activity was left (#915). */
+const statusKey = "agents.sidebar.activity";
+/** Whether Usage is open; open until folded (#915). */
+const usageKey = "agents.sidebar.usage";
 /** The sessions whose children are shown (#835), the last opened last. */
 const sessionsKey = "agents.sidebar.openSessions";
 /** How many of those are kept, as `SidebarFolds.sessionsKept`, so the list stays small. */
@@ -42,7 +44,8 @@ export class Folds {
   readonly open;
   readonly closed;
   readonly showsArchivedProjects;
-  readonly showsActivity;
+  readonly showsStatus;
+  readonly showsUsage;
   readonly openSessions;
 
   constructor(private readonly storage: Storage | undefined) {
@@ -50,15 +53,18 @@ export class Folds {
     this.closed = signal(read(storage, closedKey));
     this.openSessions = signal([...read(storage, sessionsKey)]);
     let shows = false;
-    let showsActivity = true;
+    let showsStatus = true;
+    let showsUsage = true;
     try {
       shows = storage?.getItem(archivedProjectsKey) === "true";
-      showsActivity = storage?.getItem(activityKey) !== "false";
+      showsStatus = storage?.getItem(statusKey) !== "false";
+      showsUsage = storage?.getItem(usageKey) !== "false";
     } catch {
-      // Unreadable storage leaves Archived projects closed and Activity open.
+      // Unreadable storage leaves Archived projects closed, and Status and Usage open.
     }
     this.showsArchivedProjects = signal(shows);
-    this.showsActivity = signal(showsActivity);
+    this.showsStatus = signal(showsStatus);
+    this.showsUsage = signal(showsUsage);
   }
 
   setShowsArchivedProjects(isOpen: boolean): void {
@@ -67,10 +73,16 @@ export class Folds {
     this.keep(archivedProjectsKey, isOpen);
   }
 
-  setShowsActivity(isOpen: boolean): void {
-    if (this.showsActivity.peek() === isOpen) return;
-    this.showsActivity.value = isOpen;
-    this.keep(activityKey, isOpen);
+  setShowsStatus(isOpen: boolean): void {
+    if (this.showsStatus.peek() === isOpen) return;
+    this.showsStatus.value = isOpen;
+    this.keep(statusKey, isOpen);
+  }
+
+  setShowsUsage(isOpen: boolean): void {
+    if (this.showsUsage.peek() === isOpen) return;
+    this.showsUsage.value = isOpen;
+    this.keep(usageKey, isOpen);
   }
 
   private keep(key: string, isOpen: boolean): void {

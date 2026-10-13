@@ -30,6 +30,7 @@ import type { WhenDone } from "./workflowSettings";
 import { keyKind, takesKey, wantedRuntime } from "./credentials";
 import type { Method, Params, Result } from "../protocol/methods";
 import { dropboxRefusal, dropboxRequest } from "./dropbox";
+import { goOnRequest } from "./limits";
 import type { ChartHint } from "./chart";
 
 export { folderKey } from "./groups";
@@ -1859,14 +1860,9 @@ export class Store extends Work {
   }
 
   async letAgentGoOn(host: string, agent: Agent): Promise<void> {
-    const limits = this.costs.value[host]?.limits;
-    const ceiling = agent.costCeiling ?? limits?.perAgent;
-    const currency = ceiling?.currency ?? "USD";
-    const spent = agent.costToDate?.[currency] ?? 0;
-    const step = ceiling?.amount ?? spent;
-    await this.act("agents/setCeiling", {
-      agentID: agent.id, ceiling: { amount: spent + step, currency },
-    }, host);
+    // Money or tokens, whichever it reached (#838): Agent.goOnRequest.
+    const request = goOnRequest(agent, this.costs.value[host]?.limits);
+    await this.act("agents/setCeiling", { ...request, agentID: agent.id }, host);
   }
 
   /** Whether the host took it, so a caller can leave the chat only when it did (#586). */

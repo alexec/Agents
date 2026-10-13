@@ -74,6 +74,25 @@ public struct TurnUsage: Codable, Hashable, Sendable {
 }
 
 public extension TurnUsage {
+    /// The tokens a token limit counts (#838): the input the model read afresh and the
+    /// output it wrote, never what it read back from a cache.
+    ///
+    /// The runtimes disagree about where a cache read goes. Claude, Codex and OpenCode
+    /// report it beside `inputTokens`; Copilot reports it inside, with a total that is
+    /// input plus output. So a total of exactly input plus output (plus thought) is the
+    /// sign it is inside, and it is taken out. A cache write is new input either way,
+    /// and counts. Thought tokens are left out: OpenAI's reasoning is already part of
+    /// its output, and counting it twice would stop an agent early.
+    var limitTokens: Int {
+        let cachedRead = cachedReadTokens ?? 0
+        let cachedWrite = cachedWriteTokens ?? 0
+        let readInsideInput = cachedRead > 0 && cachedRead <= inputTokens
+            && (totalTokens == inputTokens + outputTokens
+                || totalTokens == inputTokens + outputTokens + (thoughtTokens ?? 0))
+        let freshInput = readInsideInput ? inputTokens - cachedRead : inputTokens + cachedWrite
+        return max(0, freshInput) + max(0, outputTokens)
+    }
+
     /// Every usage report in these entries, added up: what one turn used, when a turn
     /// carries more than one (#465). Nil when there is none. A count only one report
     /// carries is kept rather than dropped, and costs in two currencies keep the first.

@@ -41,6 +41,7 @@ struct ContextMeter: View {
 
     /// Approaching a limit, on `Usage.closeToFull` rather than a threshold of its own.
     private var isCloseToItsLimit: Bool {
+        if agent.isCloseToTokenLimit(under: limits) { return true }
         guard let ceiling = agent.ceiling(under: limits), ceiling.amount > 0,
               !agent.costIsUnmeasured else { return false }
         let spent = agent.costToDate[ceiling.currency] ?? 0
@@ -48,9 +49,15 @@ struct ContextMeter: View {
     }
 
     private var costHelp: String {
+        if let none = agent.noLimitApplies { return none }
         if agent.costIsUnmeasured {
-            return "This runtime reports no price, so this agent cannot be measured "
-                + "and no limit applies to it."
+            // Tokens and no price (#838): only the token limit holds it.
+            guard let left = agent.tokenHeadroom(under: limits) else {
+                return "This runtime reports tokens but no price. Set a token limit to hold it."
+            }
+            return agent.isAtCostLimit(under: limits)
+                ? PromptWords.atItsCostLimit
+                : "This runtime reports tokens but no price — \(left.formatted()) tokens left of its limit"
         }
         guard let ceiling = agent.ceiling(under: limits), let headroom else {
             return "What this agent has cost so far"
@@ -90,7 +97,7 @@ struct ContextMeter: View {
         // The worst failure available here is a reader believing an agent is covered
         // by a limit that cannot touch it. A runtime that reports no price is named
         // as such, never shown as a zero and never given a headroom.
-        if agent.costIsUnmeasured { return "Not measured" }
+        if agent.costIsUnmeasured { return agent.tokenFigure(under: limits) ?? "Not measured" }
         let spent = Cost.total(of: agent.costToDate)
             ?? (agent.usage?.cost?.amount ?? 0)
                 .money(in: agent.usage?.cost?.currency ?? "USD")

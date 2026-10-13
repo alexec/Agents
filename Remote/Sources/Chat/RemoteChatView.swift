@@ -475,7 +475,7 @@ struct ContextMeter: View {
     /// priced at all, a plain zero. A runtime that reports no price is named as
     /// unmeasured rather than shown as within a limit it cannot be held to.
     private var cost: String {
-        if agent.costIsUnmeasured { return "Not measured" }
+        if agent.costIsUnmeasured { return agent.tokenFigure(under: model.costLimits) ?? "Not measured" }
         let spent = Cost.total(of: agent.costToDate)
             ?? (agent.usage?.cost?.amount ?? 0)
                 .money(in: agent.usage?.cost?.currency ?? "USD")
@@ -485,6 +485,7 @@ struct ContextMeter: View {
 
     /// The app's existing threshold for a nearly full context, not a second number.
     private var isCloseToItsLimit: Bool {
+        if agent.isCloseToTokenLimit(under: model.costLimits) { return true }
         guard let ceiling = agent.ceiling(under: model.costLimits), ceiling.amount > 0,
               !agent.costIsUnmeasured else { return false }
         return ((agent.costToDate[ceiling.currency] ?? 0) / ceiling.amount)

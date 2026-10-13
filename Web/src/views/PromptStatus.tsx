@@ -1,27 +1,32 @@
 import type { Agent, CostState, SandboxChoice } from "../protocol/generated";
 import { sandboxChoices, sandboxExplanation, sandboxState, sandboxStateWords, sandboxWhy } from "../model/sandbox";
+import { costIsUnmeasured, dayTokenLimitReached, isAtMoneyLimit, isAtTokenLimit, tokenFigure } from "../model/limits";
 
 export function CostLimitBanner({ agent, costs, goOn }: { agent: Agent; costs: CostState | undefined; goOn: () => void }) {
   const limits = costs?.limits;
-  const ceiling = agent.costCeiling ?? limits?.perAgent;
-  const spent = ceiling ? (agent.costToDate?.[ceiling.currency] ?? 0) : 0;
-  const atAgentLimit = !!ceiling && spent >= ceiling.amount;
-  const atDayLimit = !!limits?.daily && (costs?.today?.[limits.daily.currency] ?? 0) >= limits.daily.amount;
+  const atMoney = isAtMoneyLimit(agent, limits);
+  const atTokens = isAtTokenLimit(agent, limits);
+  const atAgentLimit = atMoney || atTokens;
+  const atDayTokens = dayTokenLimitReached(costs);
+  const atDayLimit = atDayTokens || (!!limits?.daily && (costs?.today?.[limits.daily.currency] ?? 0) >= limits.daily.amount);
   const amount = Object.entries(agent.costToDate ?? {}).sort(([a], [b]) => a.localeCompare(b))
     .map(([currency, value]) => new Intl.NumberFormat(undefined, { style: "currency", currency }).format(value)).join(" · ");
+  // Money, else tokens (#838): in the words of the limit it reached.
+  const used = !atMoney && atTokens ? `${(agent.tokensToDate ?? 0).toLocaleString()} tokens used.` : `${amount || ""} spent.`;
+  const day = atDayTokens ? "The day's token limit has been reached." : "The day's spending limit has been reached.";
   return atAgentLimit || atDayLimit ? <div class="cost-limit" role="status">
-      <span>{atAgentLimit ? `This agent reached its cost limit. ${amount || ""} spent. Anything you send waits until you allow more.` : "The day's spending limit has been reached. What you send waits here, and goes when the day rolls over."}</span>
+      <span>{atAgentLimit ? `This agent reached its cost limit. ${used} Anything you send waits until you allow more.` : `${day} What you send waits here, and goes when the day rolls over.`}</span>
       {atAgentLimit && <button onClick={goOn}>Let this one go on</button>}
     </div> : null;
 }
 
-export function ContextMeter({ agent }: { agent: Agent }) {
+export function ContextMeter({ agent, costs }: { agent: Agent; costs: CostState | undefined }) {
   const usage = agent.usage;
   const fraction = usage && usage.size > 0 ? Math.min(1, usage.used / usage.size) : undefined;
   const amounts = Object.entries(agent.costToDate ?? {}).sort(([a], [b]) => a.localeCompare(b))
     .map(([currency, value]) => new Intl.NumberFormat(undefined, { style: "currency", currency }).format(value)).join(" · ");
   const cost = amounts || (usage?.cost ? new Intl.NumberFormat(undefined, { style: "currency", currency: usage.cost.currency }).format(usage.cost.amount)
-    : ["starting", "running", "waitingOnUser"].includes(agent.state) ? "$0.00" : "Not measured");
+    : !costIsUnmeasured(agent) ? "$0.00" : tokenFigure(agent, costs?.limits) ?? "Not measured");
   return <span class="context-meter" title={fraction === undefined ? "Cost reported by the runtime" : `${usage!.used.toLocaleString()} of ${usage!.size.toLocaleString()} tokens`}>
     {fraction !== undefined && <span class={`context-ring${fraction >= .85 ? " close" : ""}`} style={{ "--used": `${fraction * 100}%` }} aria-label={`${Math.round(fraction * 100)}% context used`} />}
     {cost}
