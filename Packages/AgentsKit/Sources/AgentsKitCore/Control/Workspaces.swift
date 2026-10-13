@@ -168,7 +168,8 @@ public extension DaemonAPI.Method {
     static let providersList = "providers/list"
     /// `ProviderAdd` → `ProviderSummary`, once the server has been checked and has listed.
     static let providersAdd = "providers/add"
-    /// `ProviderAdd` with `id`; secrets left out are kept.
+    /// `ProviderAdd` with `id`; secrets left out are kept, and so are its command, address,
+    /// headers, and map or commands (#858).
     static let providersUpdate = "providers/update"
     /// `ProviderRequest`. Its hosts stay, unlinked.
     static let providersRemove = "providers/remove"

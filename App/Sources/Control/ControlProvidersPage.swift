@@ -11,6 +11,8 @@ struct ControlProvidersPage: View {
     @State private var addingHost: ControlAddServerSheet.Prefill?
     /// New Workspace… (US5, L9).
     @State private var making: DaemonAPI.ProviderSummary?
+    /// Write the Map Again… (#858 US4, L10f).
+    @State private var rewriting: DaemonAPI.ProviderSummary?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -31,6 +33,7 @@ struct ControlProvidersPage: View {
         // Lists every provider again when the page opens (FR-004).
         .task { await control.listWorkspacesAgain() }
         .sheet(isPresented: $adding) { AddProviderSheet(control: control).paperSheet() }
+        .sheet(item: $rewriting) { provider in AddProviderSheet(control: control, editing: provider).paperSheet() }
         .sheet(item: $addingHost) { prefill in ControlAddServerSheet(control: control, prefill: prefill).paperSheet() }
         .sheet(item: $making) { provider in
             NewWorkspaceSheet(control: control, provider: provider) { prefill in
@@ -58,6 +61,12 @@ struct ControlProvidersPage: View {
                 }
                 Menu {
                     Button("List Again") { Task { await control.listWorkspacesAgain(provider.id) } }
+                    // An agent writes its map or commands again, from the ones it has (#858 US4).
+                    if provider.kind == "commands" ? provider.preset == nil : provider.mapped {
+                        Button(provider.kind == "commands" ? "Write the Commands Again…" : "Write the Map Again…") {
+                            rewriting = provider
+                        }
+                    }
                     Divider()
                     Button("Remove…") { removing = provider }
                 } label: {
@@ -139,9 +148,15 @@ struct ControlProvidersPage: View {
 
 /// Add a Provider (#691, layouts.md L4, as Alex chose it): pick what kind first, then a short
 /// form for just that kind. A preset needs its CLI signed in where the control plane runs.
+///
+/// The MCP server and Your commands forms have Write It for Me (#858, L10): an agent on the
+/// control plane's host reads the server's tools or the CLI's help and writes the tool map or
+/// the commands into the form, for the person to read and Add. With `editing`, it is the
+/// provider card's Write Again… (US4): the same, from the map or commands it has, and Save.
 struct AddProviderSheet: View {
     @Environment(\.dismiss) private var dismiss
     let control: ControlSettingsModel
+    var editing: DaemonAPI.ProviderSummary?
 
     enum Kind: String, CaseIterable, Identifiable {
         case docker, digitalOcean, codespaces, coder, workstations, commands, mcp
@@ -183,6 +198,18 @@ struct AddProviderSheet: View {
             case .mcp: "An MCP server that offers workspaces_list, workspace_start and workspace_stop, or a tool map onto its own tools."
             }
         }
+
+        /// The kind a preset's name stands for (#858 US2 AS6).
+        static func ofPreset(_ preset: String) -> Kind? {
+            switch preset {
+            case "docker": .docker
+            case "doctl": .digitalOcean
+            case "codespaces": .codespaces
+            case "coder": .coder
+            case "gcloud-workstations": .workstations
+            default: nil
+            }
+        }
     }
 
     @State private var kind: Kind?
@@ -197,10 +224,14 @@ struct AddProviderSheet: View {
     @State private var config = ""
     @State private var region = ""
     // Your commands
+    @State private var cli = ""
     @State private var workspace = ""
     @State private var start = ""
     @State private var stop = ""
     @State private var status = ""
+    /// A config the fields can't hold (`list` and `columns`), as JSON (#858 L10e).
+    @State private var commandsConfig = ""
+    @State private var byConfig = false
     // MCP server
     @State private var byAddress = false
     @State private var command = ""
@@ -210,6 +241,16 @@ struct AddProviderSheet: View {
     @State private var secrets: [Secret] = []
     @State private var working = false
     @State private var problem: String?
+    // Write It for Me (#858)
+    @State private var runtimes: DaemonAPI.ProviderRuntimes?
+    @State private var runtime: String?
+    @State private var draftID: UUID?
+    @State private var startingDraft = false
+    /// What the agent wrote, to tell when the person has changed it.
+    @State private var written: JSONValue?
+    /// Said with no agent: a contract server, a shipped map, a preset.
+    @State private var answered: String?
+    @State private var presetKind: Kind?
 
     struct Secret: Identifiable {
         let id = UUID()
@@ -219,7 +260,7 @@ struct AddProviderSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(kind.map { "Add \($0.title)" } ?? "Add a Provider").appText(.title).fontWeight(.semibold)
+            Text(title).appText(.title).fontWeight(.semibold)
             if let kind {
                 form(kind)
             } else {
@@ -228,7 +269,26 @@ struct AddProviderSheet: View {
         }
         .padding(28)
         .frame(width: 560)
+        .task {
+            if let editing { prepareEdit(editing) }
+            runtimes = await control.writerRuntimes()
+            runtime = runtimes?.runtimes.first { $0.isDefault }?.id ?? runtimes?.runtimes.first?.id
+        }
+        .onChange(of: draft?.state) { _, state in
+            if state == "done", let json = draft?.draftJSON { fill(json) }
+        }
+        .onDisappear { cancelDraft() }
     }
+
+    private var title: String {
+        if let editing { return "Write \(editing.name)’s \(editing.kind == "commands" ? "Commands" : "Map") Again" }
+        return kind.map { "Add \($0.title)" } ?? "Add a Provider"
+    }
+
+    private var draft: DaemonAPI.ProviderDraftUpdate? { draftID.flatMap { control.drafts[$0] } }
+
+    /// The agent is writing: its field is read-only and Add is off (L10b).
+    private var writing: Bool { startingDraft || draft.map { !$0.ended } == true }
 
     // MARK: Pick a kind
 
@@ -264,12 +324,21 @@ struct AddProviderSheet: View {
         }
     }
 
+    private func prepareEdit(_ provider: DaemonAPI.ProviderSummary) {
+        kind = provider.kind == "commands" ? .commands : .mcp
+        name = provider.name
+        byAddress = provider.kind == "http"
+        byConfig = provider.kind == "commands"
+    }
+
     // MARK: Its form
 
     @ViewBuilder
     private func form(_ kind: Kind) -> some View {
         Form {
-            TextField("Name", text: $name)
+            if editing == nil {
+                TextField("Name", text: $name)
+            }
             switch kind {
             case .docker:
                 TextField("Containers", text: $containers, prompt: Text("agents-devbox, other"))
@@ -286,57 +355,162 @@ struct AddProviderSheet: View {
                 TextField("Configuration", text: $config)
                 TextField("Region", text: $region)
             case .commands:
+                commandsForm
+            case .mcp:
+                mcpForm
+            }
+            if editing == nil { secretsSection }
+        }
+        .formStyle(.grouped)
+        if let needs = kind.needs, editing == nil {
+            Text(needs).appText(.supporting).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+        if let problem {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(problem).appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
+                // A refusal a map would fix (L10f, US1 AS7).
+                if kind == .mcp, Self.mapWouldFix(problem) {
+                    HStack {
+                        Spacer()
+                        Button("Write a Tool Map") { writeIt(kind) }
+                            .buttonStyle(.paper)
+                            .disabled(writing || runtimes?.runtimes.isEmpty != false)
+                    }
+                }
+            }
+        }
+        HStack {
+            if editing == nil {
+                Button("Back") {
+                    cancelDraft()
+                    self.kind = nil
+                    problem = nil
+                }
+            }
+            Spacer()
+            if working { ProgressView().controlSize(.small) }
+            Button("Cancel") {
+                cancelDraft()
+                dismiss()
+            }
+            .keyboardShortcut(.cancelAction)
+            Button(editing == nil ? "Add" : "Save") { add(kind) }
+                .keyboardShortcut(.defaultAction)
+                .disabled(working || writing || name.trimmingCharacters(in: .whitespaces).isEmpty
+                          || (editing != nil && written == nil))
+        }
+    }
+
+    @ViewBuilder
+    private var mcpForm: some View {
+        if editing == nil {
+            Picker("Server", selection: $byAddress) {
+                Text("A command").tag(false)
+                Text("An address").tag(true)
+            }
+            .pickerStyle(.segmented)
+            if byAddress {
+                TextField("Address", text: $url, prompt: Text("https://…/mcp"))
+            } else {
+                TextField("Command", text: $command, prompt: Text("npx -y @digitalocean/mcp"))
+            }
+        }
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Tool map").appText(.supporting)
+                Spacer()
+                WriteItForMeButton(runtimes: runtimes, runtime: $runtime, again: written != nil,
+                                   isDisabled: writing || !hasServer) { writeIt(.mcp) }
+            }
+            TextEditor(text: $map)
+                .appText(.code)
+                .frame(height: written == nil ? 90 : 180)
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Paper.rule))
+                .disabled(writing)
+                .accessibilityLabel("Tool map")
+            draftStatus(changed: mapChanged)
+            if let answered {
+                Text(answered).appText(.supporting).foregroundStyle(.secondary)
+            }
+            if editing == nil {
+                HStack {
+                    Text("Leave it empty for a server that follows the contract.").appText(.fine).foregroundStyle(.secondary)
+                    Spacer()
+                    // The map Agents ships (FR-072), with the command and the secret it reads.
+                    Button("Use DigitalOcean’s") { useDigitalOcean() }
+                        .buttonStyle(.borderless)
+                        .appText(.fine)
+                        .disabled(writing)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var commandsForm: some View {
+        HStack {
+            TextField("CLI", text: $cli, prompt: Text(editing == nil ? "cws" : "The program its commands use"))
+            WriteItForMeButton(runtimes: runtimes, runtime: $runtime, again: written != nil,
+                               isDisabled: writing || (editing == nil && cli.trimmingCharacters(in: .whitespaces).isEmpty)) {
+                writeIt(.commands)
+            }
+        }
+        if startingDraft || draft != nil || answered != nil {
+            VStack(alignment: .leading, spacing: 6) {
+                draftStatus(changed: commandsChanged)
+                if let answered {
+                    HStack {
+                        Text(answered).appText(.supporting).foregroundStyle(.secondary)
+                        Spacer()
+                        if let presetKind {
+                            Button("Use \(presetKind.title)") {
+                                self.answered = nil
+                                self.presetKind = nil
+                                choose(presetKind)
+                            }
+                            .buttonStyle(.paper)
+                        }
+                    }
+                }
+            }
+        }
+        if byConfig {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Config").appText(.supporting)
+                TextEditor(text: $commandsConfig)
+                    .appText(.code)
+                    .frame(height: 180)
+                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Paper.rule))
+                    .disabled(writing)
+                    .accessibilityLabel("Config")
+                if editing == nil {
+                    Button("Use the Fields Instead") { byConfig = false }
+                        .buttonStyle(.borderless)
+                        .appText(.fine)
+                }
+            }
+        } else {
+            Section {
                 TextField("Workspace", text: $workspace, prompt: Text("devstack"))
                 TextField("ssh", text: $ssh, prompt: Text("devstack-1.cws"))
                 TextField("Start", text: $start, prompt: Text("cws start devstack-1"))
                 TextField("Stop", text: $stop, prompt: Text("cws stop devstack-1"))
                 TextField("Status", text: $status, prompt: Text("Optional: prints running or stopped"))
-            case .mcp:
-                Picker("Server", selection: $byAddress) {
-                    Text("A command").tag(false)
-                    Text("An address").tag(true)
-                }
-                .pickerStyle(.segmented)
-                if byAddress {
-                    TextField("Address", text: $url, prompt: Text("https://…/mcp"))
-                } else {
-                    TextField("Command", text: $command, prompt: Text("npx -y @digitalocean/mcp"))
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Tool map").appText(.supporting)
-                    TextEditor(text: $map)
-                        .appText(.code)
-                        .frame(height: 90)
-                        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Paper.rule))
-                        .accessibilityLabel("Tool map")
-                    HStack {
-                        Text("Leave it empty for a server that follows the contract.").appText(.fine).foregroundStyle(.secondary)
-                        Spacer()
-                        // The map Agents ships (FR-072), with the command and the secret it reads.
-                        Button("Use DigitalOcean’s") { useDigitalOcean() }
-                            .buttonStyle(.borderless)
-                            .appText(.fine)
-                    }
-                }
+            } header: {
+                Text("Or by hand")
             }
-            secretsSection
+            .disabled(writing)
         }
-        .formStyle(.grouped)
-        if let needs = kind.needs {
-            Text(needs).appText(.supporting).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-        }
-        if let problem {
-            Text(problem).appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
-        }
-        HStack {
-            Button("Back") { self.kind = nil; problem = nil }
-            Spacer()
-            if working { ProgressView().controlSize(.small) }
-            Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-            Button("Add") { add(kind) }
-                .keyboardShortcut(.defaultAction)
-                .disabled(working || name.trimmingCharacters(in: .whitespaces).isEmpty)
-        }
+    }
+
+    private func draftStatus(changed: Bool) -> some View {
+        ProviderDraftStatus(update: draft, starting: startingDraft, changed: changed,
+                            cancel: { cancelDraft() },
+                            answer: { question, yes in
+                                guard let draftID else { return }
+                                Task { await control.answerDraft(draftID, question: question, yes: yes) }
+                            },
+                            again: { if let kind { writeIt(kind) } })
     }
 
     @ViewBuilder
@@ -359,7 +533,7 @@ struct AddProviderSheet: View {
         } header: {
             Text("Secrets")
         } footer: {
-            Text("Given to the provider as environment, or as ${NAME} in its headers. Kept on the control plane, never shown again.")
+            Text("Given to the provider as environment, or as ${NAME} in its headers. Kept on the control plane, never shown again. A writing agent sees their names, never their values.")
                 .appText(.fine).foregroundStyle(.secondary)
         }
     }
@@ -368,13 +542,121 @@ struct AddProviderSheet: View {
         byAddress = false
         if command.trimmingCharacters(in: .whitespaces).isEmpty { command = "npx -y @digitalocean/mcp" }
         if name.trimmingCharacters(in: .whitespaces).isEmpty { name = "DigitalOcean" }
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        if let data = try? encoder.encode(ShippedToolMaps.digitalOcean) { map = String(decoding: data, as: UTF8.self) }
+        map = Self.pretty(ShippedToolMaps.digitalOcean)
         if !secrets.contains(where: { $0.name == ShippedToolMaps.digitalOceanSecret }) {
             secrets.append(Secret(name: ShippedToolMaps.digitalOceanSecret))
         }
     }
+
+    // MARK: Write It for Me (#858)
+
+    private var hasServer: Bool {
+        editing != nil || !(byAddress ? url : command).trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    private func writeIt(_ kind: Kind) {
+        guard let runtime else { return }
+        cancelDraft()
+        problem = nil
+        answered = nil
+        presetKind = nil
+        let form: DaemonAPI.ProviderAdd
+        do {
+            form = try draftForm(kind)
+        } catch {
+            problem = "\(error)"
+            return
+        }
+        startingDraft = true
+        Task {
+            let result = await control.startDraft(.init(form: form, secrets: givenSecrets, provider: editing?.id, runtimeID: runtime))
+            startingDraft = false
+            switch result {
+            case .success(let started):
+                if let said = started.answered {
+                    answered = said.note
+                    if let shipped = said.map {
+                        map = Self.pretty(shipped)
+                        if name.trimmingCharacters(in: .whitespaces).isEmpty { name = "DigitalOcean" }
+                    }
+                    presetKind = said.preset.flatMap(Kind.ofPreset)
+                } else {
+                    draftID = started.draft
+                }
+            case .failure(let refusal):
+                problem = refusal.message
+            }
+        }
+    }
+
+    /// The form so far, for the agent: what reaches the server or names the CLI.
+    private func draftForm(_ kind: Kind) throws -> DaemonAPI.ProviderAdd {
+        let trimmedName = name.trimmingCharacters(in: .whitespaces)
+        if kind == .commands {
+            return DaemonAPI.ProviderAdd(name: trimmedName, kind: .commands, cli: cli.trimmingCharacters(in: .whitespaces))
+        }
+        if editing != nil {
+            return DaemonAPI.ProviderAdd(name: trimmedName, kind: byAddress ? .http : .stdio)
+        }
+        return try request(.mcp, map: nil)
+    }
+
+    private func cancelDraft() {
+        guard let id = draftID else { return }
+        draftID = nil
+        if control.drafts[id]?.ended == true {
+            control.forgetDraft(id)
+        } else {
+            Task { await control.cancelDraft(id) }
+        }
+    }
+
+    /// The agent's result, into the form's own fields (L10d, L10e).
+    private func fill(_ json: JSONValue) {
+        written = json
+        guard kind == .commands else {
+            map = Self.pretty(json)
+            return
+        }
+        let entries = json["workspaces"]?.arrayValue ?? []
+        let plain = json.objectValue?.keys.sorted() == ["workspaces"] && entries.count == 1
+            && (entries.first?.objectValue ?? [:]).keys.allSatisfy { ["id", "name", "start", "stop", "status", "ssh"].contains($0) }
+        if plain, editing == nil {
+            let entry = entries[0]
+            workspace = entry["name"]?.stringValue ?? entry["id"]?.stringValue ?? ""
+            start = entry["start"]?.stringValue ?? ""
+            stop = entry["stop"]?.stringValue ?? ""
+            status = entry["status"]?.stringValue ?? ""
+            ssh = entry["ssh"]?.stringValue ?? ""
+            byConfig = false
+        } else {
+            commandsConfig = Self.pretty(json)
+            byConfig = true
+        }
+    }
+
+    private var mapChanged: Bool {
+        guard let written else { return false }
+        return (try? JSONValue.parse(Data(map.utf8))) != written
+    }
+
+    private var commandsChanged: Bool {
+        guard let written else { return false }
+        return (try? commandsJSON()) != written
+    }
+
+    /// "It isn't a workspace provider: it has no …", or a map tool it lacks: a map would fix it.
+    static func mapWouldFix(_ refusal: String) -> Bool {
+        refusal.hasPrefix("It isn’t a workspace provider") || refusal.hasPrefix("The tool map names")
+    }
+
+    static func pretty(_ json: JSONValue) -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        return (try? encoder.encode(json)).map { String(decoding: $0, as: UTF8.self) } ?? ""
+    }
+
+    // MARK: Adding
 
     private func add(_ kind: Kind) {
         let request: DaemonAPI.ProviderAdd
@@ -389,15 +671,56 @@ struct AddProviderSheet: View {
         Task {
             let refused = await control.addProvider(request)
             working = false
-            if let refused { problem = refused } else { dismiss() }
+            if let refused {
+                problem = refused
+            } else {
+                if let draftID { control.forgetDraft(draftID) }
+                draftID = nil
+                dismiss()
+            }
         }
     }
 
     struct Wrong: Error, CustomStringConvertible { var description: String }
 
+    private var givenSecrets: [String: String] {
+        Dictionary(secrets.filter { !trimmed($0.name).isEmpty }.map { (trimmed($0.name), $0.value) }) { $1 }
+    }
+
+    private func trimmed(_ text: String) -> String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    /// Your commands, as the fields or the Config editor hold them.
+    private func commandsJSON() throws -> JSONValue {
+        if byConfig {
+            guard let parsed = try? JSONValue.parse(Data(commandsConfig.utf8)), parsed.objectValue != nil else {
+                throw Wrong(description: "The config isn’t a JSON object.")
+            }
+            return parsed
+        }
+        guard !trimmed(workspace).isEmpty, !trimmed(start).isEmpty, !trimmed(stop).isEmpty else {
+            throw Wrong(description: "Give the workspace a name, and its Start and Stop commands.")
+        }
+        var entry: [String: JSONValue] = ["name": .string(trimmed(workspace)), "start": .string(trimmed(start)),
+                                          "stop": .string(trimmed(stop))]
+        if !trimmed(status).isEmpty { entry["status"] = .string(trimmed(status)) }
+        if !trimmed(ssh).isEmpty { entry["ssh"] = .string(trimmed(ssh)) }
+        return ["workspaces": [.object(entry)]]
+    }
+
     private func request(_ kind: Kind) throws -> DaemonAPI.ProviderAdd {
-        func trimmed(_ text: String) -> String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
-        let given = Dictionary(secrets.filter { !trimmed($0.name).isEmpty }.map { (trimmed($0.name), $0.value) }) { $1 }
+        var mapped: JSONValue?
+        if kind == .mcp, !trimmed(map).isEmpty {
+            guard let parsed = try? JSONValue.parse(Data(map.utf8)) else { throw Wrong(description: "The tool map isn’t JSON.") }
+            mapped = parsed
+        }
+        var request = try self.request(kind, map: mapped)
+        request.id = editing?.id
+        request.draft = draftID
+        return request
+    }
+
+    private func request(_ kind: Kind, map mapped: JSONValue?) throws -> DaemonAPI.ProviderAdd {
+        let given = givenSecrets
         let name = trimmed(self.name)
         var commands: [String: JSONValue] = [:]
         switch kind {
@@ -417,19 +740,11 @@ struct AddProviderSheet: View {
             commands = ["preset": "gcloud-workstations", "cluster": .string(trimmed(cluster)),
                         "config": .string(trimmed(config)), "region": .string(trimmed(region))]
         case .commands:
-            guard !trimmed(workspace).isEmpty, !trimmed(start).isEmpty, !trimmed(stop).isEmpty else {
-                throw Wrong(description: "Give the workspace a name, and its Start and Stop commands.")
-            }
-            var entry: [String: JSONValue] = ["name": .string(trimmed(workspace)), "start": .string(trimmed(start)),
-                                              "stop": .string(trimmed(stop))]
-            if !trimmed(status).isEmpty { entry["status"] = .string(trimmed(status)) }
-            if !trimmed(ssh).isEmpty { entry["ssh"] = .string(trimmed(ssh)) }
-            commands = ["workspaces": [.object(entry)]]
+            return DaemonAPI.ProviderAdd(name: name, kind: .commands, commands: try commandsJSON(), secrets: given)
         case .mcp:
-            var mapped: JSONValue?
-            if !trimmed(map).isEmpty {
-                guard let parsed = try? JSONValue.parse(Data(map.utf8)) else { throw Wrong(description: "The tool map isn’t JSON.") }
-                mapped = parsed
+            // Edit… sends only the map: the control plane keeps the server as it is.
+            if editing != nil {
+                return DaemonAPI.ProviderAdd(name: name, kind: byAddress ? .http : .stdio, map: mapped)
             }
             if byAddress {
                 // An address's one secret is its bearer token.

@@ -468,3 +468,48 @@ struct ProviderDraftAddTests {
         #expect(record.writtenBy == nil)
     }
 }
+
+@Suite("Write It for Me: Write the Map Again (#858 US4)")
+struct ProviderDraftRewriteTests {
+    @Test("Writing again starts from the kept record and its secrets; Save keeps the server")
+    func rewrite() async throws {
+        let harness = try await ProviderHarness()
+        let world = DraftWorld(tools: ["droplet-list", "droplet-power-on", "droplet-power-off"])
+        let draftHarness = DraftHarness(world: world)
+        await harness.providers.draft(with: draftHarness.drafts)
+        let add = DaemonAPI.ProviderAdd(name: "Droplets", kind: .stdio, command: "npx", args: ["-y", "@do/mcp"],
+                                        map: DraftHarness.goodMap, secrets: ["TOKEN": "dop_v1_keptsecretvalue"])
+        let kept = try await harness.call(DaemonAPI.Method.providersAdd, try JSONValue.encoding(add)).decode(DaemonAPI.ProviderSummary.self)
+
+        // The sheet knows only the name and kind, and types no secret.
+        let start = DaemonAPI.ProviderDraftStart(form: .init(name: "Droplets", kind: .stdio), provider: kept.id, runtimeID: "claude")
+        let started = try await harness.call(DaemonAPI.Method.providersDraftStart, try JSONValue.encoding(start))
+            .decode(DaemonAPI.ProviderDraftStarted.self)
+        let prompt = try #require(world.started.first).prompt
+        #expect(prompt.contains("It has this map now"))
+        #expect(prompt.contains("droplet-power-on"))
+        #expect(prompt.contains("TOKEN"))
+        #expect(!prompt.contains("dop_v1_keptsecretvalue"))
+
+        var object = try #require(DraftHarness.goodMap.objectValue)
+        object["list"] = ["tool": "droplet-list", "items": "droplets", "id": "id", "name": "name", "state": "state"]
+        let newMap = JSONValue.object(object)
+        _ = try await draftHarness.tool(started.draft, AppTool.sendDraft, ["draft": newMap])
+        let save = DaemonAPI.ProviderAdd(id: kept.id, name: "Droplets", kind: .stdio, map: newMap, draft: started.draft)
+        _ = try await harness.call(DaemonAPI.Method.providersUpdate, try JSONValue.encoding(save))
+        let object2 = try #require(try await harness.store.get(WorkspaceProviders.key(kept.id)))
+        let record = try ControlRecords.decoder.decode(ProviderRecord.self, from: object2.data)
+        #expect(record.command == "npx")
+        #expect(record.args == ["-y", "@do/mcp"])
+        #expect(record.map == newMap)
+        #expect(record.writtenBy?.runtimeID == "claude")
+        #expect(record.secretNames == ["TOKEN"])
+    }
+
+    @Test("A command provider's CLI is found from its commands")
+    func cliOfCommands() {
+        let record = ProviderRecord(id: .init(rawValue: "c"), name: "C", kind: .commands,
+                                    commands: ["workspaces": [["name": "a", "start": "cws start a", "stop": "cws stop a"]]])
+        #expect(WorkspaceProviders.cli(of: record) == "cws")
+    }
+}

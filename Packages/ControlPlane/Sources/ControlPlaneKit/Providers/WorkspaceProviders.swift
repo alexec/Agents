@@ -301,13 +301,18 @@ public actor WorkspaceProviders: WorkspaceHandling {
             return try JSONValue.encoding(await drafts.runtimes())
         case DaemonAPI.Method.providersDraftStart:
             guard let drafts else { throw JSONRPCError(code: DaemonAPI.Failure.notSupported, message: "This control plane can’t start a writing agent.") }
-            let request = try Self.require(params, as: DaemonAPI.ProviderDraftStart.self)
+            var request = try Self.require(params, as: DaemonAPI.ProviderDraftStart.self)
             var existing: (record: ProviderRecord, secrets: [String: String], problem: String?)?
             if let id = request.provider {
                 guard let held = providers[id]?.record else {
                     throw JSONRPCError(code: JSONRPCError.invalidParams, message: "There is no such provider.")
                 }
                 existing = (held, await secrets.values(id), listed[id]?.problem)
+                // Written again from the provider as it is kept: the sheet knows only its name.
+                let cli = request.form.cli?.trimmingCharacters(in: .whitespaces) ?? ""
+                request.form = DaemonAPI.ProviderAdd(id: id, name: held.name, kind: held.kind, command: held.command,
+                                                     args: held.args, url: held.url, headers: held.headers,
+                                                     cli: cli.isEmpty ? Self.cli(of: held) : cli)
             }
             return try JSONValue.encoding(try await drafts.start(request, from: caller, existing: existing))
         case DaemonAPI.Method.providersDraftCancel:
@@ -369,6 +374,16 @@ public actor WorkspaceProviders: WorkspaceHandling {
             throw JSONRPCError(code: JSONRPCError.invalidParams, message: "There is already a provider called \(request.name).")
         }
         let before = updating ? await secrets.values(id) : [:]
+        // An update keeps what it leaves out, as it keeps the secrets (#858 US4: Edit… sends
+        // only the map or commands it wrote again).
+        var request = request
+        if updating, let held = providers[id]?.record, request.kind == held.kind {
+            request.command = request.command ?? held.command
+            request.args = request.args ?? held.args
+            request.url = request.url ?? held.url
+            request.headers = request.headers ?? held.headers
+            if request.kind == .commands { request.commands = request.commands ?? held.commands } else { request.map = request.map ?? held.map }
+        }
         let given = (request.secrets ?? [:]).filter { !$0.value.isEmpty }
         let values = before.merging(given) { $1 }
         var record = ProviderRecord(id: id, name: request.name.trimmingCharacters(in: .whitespaces), kind: request.kind,
@@ -417,6 +432,13 @@ public actor WorkspaceProviders: WorkspaceHandling {
         }
         guard let before else { return nil }
         return (before.kind == .commands ? before.commands : before.map) == given ? before.writtenBy : nil
+    }
+
+    /// The program a command provider's commands use: the first word of its list, or of its
+    /// first workspace's start (#858 US4).
+    static func cli(of record: ProviderRecord) -> String? {
+        let line = record.commands?["list"]?.stringValue ?? record.commands?["workspaces"]?.arrayValue?.first?["start"]?.stringValue
+        return line?.split(separator: " ").first.map(String.init)
     }
 
     /// A provider goes; its hosts stay, unlinked (US2 AS5).
