@@ -60,6 +60,10 @@ public extension DaemonAPI.Method {
     static let relayDevices = "relay/devices"
     /// `RelayDelivery`: one mailbox item to seal and post.
     static let relayDeliver = "relay/deliver"
+    /// A relay host, on its channel 0 (#824): `RelaySwitch`, itself switched on or off,
+    /// as `hosts/setRelay` would. What Agents Host has it say where it has no control
+    /// plane's key (Join one elsewhere). Refused from a host that runs agents.
+    static let relaySwitch = "relay/switch"
 }
 
 public extension DaemonAPI.Notification {
@@ -421,6 +425,12 @@ public extension DaemonAPI {
             self.caCertificate = caCertificate
             self.standIn = standIn
         }
+    }
+
+    /// `relay/switch` (#824): the relay host that says it, on or off.
+    struct RelaySwitch: Codable, Sendable, Hashable {
+        public var relay: Bool
+        public init(relay: Bool) { self.relay = relay }
     }
 
     /// `hosts/setRelay`.

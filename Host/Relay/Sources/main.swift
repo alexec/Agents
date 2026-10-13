@@ -15,9 +15,12 @@ import Foundation
 //
 //     agents-relay --join '<host code>' [--name <name>]   once, then:
 //     agents-relay [--name <name>]
+//     agents-relay --on | --off                           says so to the control plane, and ends
 //
 // Agents Host's *Relay for my devices* (#809) leaves the code in `relay-join-code` in the
-// relay's folder instead, and starts it as a launch agent with no arguments.
+// relay's folder instead, and starts it as a launch agent with no arguments. Under Join one
+// elsewhere, where it has no control plane's key, it runs `--on` or `--off` too (#824): the
+// relay says it is switched on or off by its own word (`relay/switch`).
 //
 // `AGENTS_ROOT=<dir>` keeps its membership and key in `<dir>/relay`, as Agents Host's
 // scratch set-ups do; `AGENTS_RELAY_FOLDER=<dir>` stands a folder in for iCloud, for a
@@ -63,6 +66,22 @@ func log(_ message: String) {
 }
 
 let name = argument("--name") ?? ((Host.current().localizedName ?? "This Mac") + " relay")
+
+// `--on` / `--off` (#824): said, and done. The exit status is Agents Host's answer, and
+// the last line on stderr its reason.
+if let on = CommandLine.arguments.contains("--on") ? true : CommandLine.arguments.contains("--off") ? false : nil {
+    Task {
+        do {
+            try await ControlRelay.switchRelay(on, files: files, name: name)
+            log("switched \(on ? "on" : "off") at the control plane")
+            exit(0)
+        } catch {
+            log("\(error)")
+            exit(1)
+        }
+    }
+    dispatchMain()
+}
 
 Task {
     do {

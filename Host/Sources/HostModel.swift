@@ -385,6 +385,8 @@ final class HostModel {
         if storeDraft == .bucket {
             guard await saveBucket() else { return }
         }
+        // A relay for a control plane elsewhere does not relay for this one (#824).
+        if settings.role == .joinElsewhere { await forgetRelay() }
         settings.role = .runHere
         settings.store = storeDraft
         settings.save(paths)
@@ -470,10 +472,9 @@ final class HostModel {
             }
         }
         settings.role = .joinElsewhere
-        // The relay was this Mac's control plane's, which stops now (Alex: no relay under
-        // Join elsewhere).
-        if settings.relaysForDevices { await services.unregister(.relay) }
-        settings.relay = nil
+        // The relay was the control plane this Mac left's: it joins the new one only with
+        // a code of that one's, asked for when it is turned on again (#824).
+        await forgetRelay()
         settings.save(paths)
         await services.unregister(.control)
         let wasRunning = await services.running(.daemon) != nil
@@ -713,18 +714,30 @@ final class HostModel {
     private(set) var relayJob: LaunchJobState?
     private(set) var relayLogin: LoginItemStatus?
 
-    /// Where it may be turned on: where the control plane runs, which makes the relay's
-    /// code (Alex: not under Join elsewhere). Off may always be chosen.
-    var relayAvailable: Bool {
+    /// Whether this Mac's own control plane makes the relay's code and is told of the
+    /// switch over its key (#809).
+    private var relayCodedHere: Bool {
         settings.role == .runHere && settings.movedTo == nil && settings.receiving != true
     }
+
+    /// Where it may be turned on: where the control plane runs, while it runs, or under
+    /// Join one elsewhere with a host code from that control plane (#824). Not while this
+    /// Mac waits for its control plane to come back. Off may always be chosen.
+    var relayAvailable: Bool {
+        relayCodedHere ? controlRunning : settings.receiving != true
+    }
+
+    /// Turned on under Join one elsewhere, before the relay has joined: Agents Host asks
+    /// for a host code from that control plane (#824).
+    var relayCodeAsked = false
 
     /// The relay's line under its switch: what it does when on, and how it stands.
     var relayLine: String {
         guard settings.relaysForDevices else {
-            return relayAvailable
-                ? "Your iPhone and iPad reach your agents through your iCloud when away, and are told when an agent needs you."
-                : "Turn it on at the Mac that runs your control plane."
+            if relayAvailable {
+                return "Your iPhone and iPad reach your agents through your iCloud when away, and are told when an agent needs you."
+            }
+            return relayCodedHere ? "Turn it on while the control plane runs." : "Turn it on once your control plane is back here."
         }
         if relayRunning {
             return services.relayHost == nil
@@ -745,25 +758,41 @@ final class HostModel {
 
     /// Turn the relay on or off (#809). On: the first time, a host code is left in the
     /// relay's folder and it enrols as a relay host; after that the control plane is told it
-    /// relays again (`hosts/setRelay`). Then its launch agent is registered. Off: the control
-    /// plane is told, and the launch agent unregistered; the enrolment is kept (Alex), so on
-    /// again resumes at once. Paired devices stay paired either way.
-    func setRelay(_ on: Bool) async {
+    /// relays again. Then its launch agent is registered. Off: the control plane is told,
+    /// and the launch agent unregistered; the enrolment is kept (Alex), so on again resumes
+    /// at once. Paired devices stay paired either way.
+    ///
+    /// Where the control plane runs, it makes the code and is told over its key
+    /// (`hosts/setRelay`). Elsewhere (#824) the code is one the person gives, from that
+    /// control plane, and the relay tells it itself (`agents-relay --on`, `--off`).
+    func setRelay(_ on: Bool, code given: String? = nil) async {
         guard busy == nil, settings.relaysForDevices != on else { return }
         problem = nil
         if on {
-            guard relayAvailable, controlRunning else {
+            guard relayAvailable else {
                 problem = "Turn the relay on where the control plane runs, while it is running."
+                return
+            }
+            if !relayCodedHere, services.relayHost == nil, given == nil {
+                relayCodeAsked = true
                 return
             }
             busy = "Starting the relay…"
             defer { busy = nil }
             if let host = services.relayHost {
-                let told = await tellRelay(host, on: true)
+                let told = relayCodedHere ? await tellRelay(host, on: true) : await ControlTool.relay(["--on"], paths: paths)
                 guard told.ok else {
-                    problem = "The control plane didn’t switch the relay on: \(told.problem)"
+                    problem = "The control plane didn’t switch the relay on: \(relayProblem(told))"
                     return
                 }
+            } else if let given {
+                let code = given.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard ControlCode(text: code)?.purpose == .host else {
+                    problem = "That isn't a host code. Ask your control plane for one: Settings ▸ Control plane ▸ Hosts ▸ Add a Mac."
+                    return
+                }
+                do { try services.leaveRelayCode(code) } catch { problem = "\(error)"; return }
+                relayCodeAsked = false
             } else {
                 guard let code = await makeOwnHostCode() else {
                     problem = "The control plane made no code for the relay. Its log is at \(paths.controlLog.path)."
@@ -782,10 +811,8 @@ final class HostModel {
         } else {
             busy = "Stopping the relay…"
             defer { busy = nil }
-            // Told only where it can be: a control plane moved away keeps the relay as it was.
-            if let host = services.relayHost, relayAvailable, controlRunning {
-                let told = await tellRelay(host, on: false)
-                if !told.ok { problem = "The relay stopped, but the control plane wasn’t told: \(told.problem)" }
+            if let told = await tellRelayOff(), !told.ok {
+                problem = "The relay stopped, but the control plane wasn’t told: \(relayProblem(told))"
             }
             await services.unregister(.relay)
             settings.relay = false
@@ -793,6 +820,35 @@ final class HostModel {
         }
         try? await Task.sleep(for: .seconds(1))
         await refresh()
+    }
+
+    /// The control plane told the relay is off, where it can be: over its key here, or by
+    /// the relay's own word elsewhere (#824). Nil when it has never joined.
+    private func tellRelayOff() async -> ControlTool.Result? {
+        guard let host = services.relayHost else { return nil }
+        if relayCodedHere {
+            return controlRunning ? await tellRelay(host, on: false) : nil
+        }
+        return await ControlTool.relay(["--off"], paths: paths)
+    }
+
+    /// The relay left for another control plane (#824): told off where it relayed, if it
+    /// can be, stopped, and its enrolment there forgotten. Its key is kept.
+    private func forgetRelay() async {
+        if settings.relaysForDevices {
+            if services.relayHost != nil { _ = await ControlTool.relay(["--off"], paths: paths) }
+            await services.unregister(.relay)
+        }
+        settings.relay = nil
+        relayCodeAsked = false
+        services.forgetRelayMembership()
+    }
+
+    /// What went wrong, without the tool's name and time in front.
+    private func relayProblem(_ result: ControlTool.Result) -> String {
+        let line = result.error.split(separator: "\n").last.map(String.init) ?? result.problem
+        guard line.hasPrefix("agents-relay "), let colon = line.range(of: ": ") else { return result.problem }
+        return String(line[colon.upperBound...])
     }
 
     /// `hosts/setRelay`, over the session the control plane's key proves.

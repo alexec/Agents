@@ -1,3 +1,4 @@
+import AgentsKitCore
 import Foundation
 
 /// Runs `agents-control` with its secrets on inherited descriptors (058, T056, T058a):
@@ -53,6 +54,22 @@ enum ControlTool {
         do {
             let planned = try plan(arguments, paths: paths, settings: settings, key: key, store: store, keys: keys)
             return try await spawn(paths.agentsControl.path, planned.arguments, planned.environment, planned.secrets)
+        } catch {
+            return Result(status: -1, output: "", error: "\(error)")
+        }
+    }
+
+    /// `agents-relay --on` or `--off` (#824): the relay says so to its control plane, by
+    /// its own membership, where this Mac has no control plane's key.
+    static func relay(_ arguments: [String], paths: HostPaths) async -> Result {
+        var environment = ["HOME": NSHomeDirectory(), "PATH": "/usr/bin:/bin:/usr/sbin:/sbin"]
+        // `<root>/relay` on a scratch set-up, as its launch agent's.
+        if let root = paths.scratchRoot { environment[StoreLocations.rootVariable] = root.path }
+        #if DEBUG
+        if let root = ProcessInfo.processInfo.environment["AGENTS_TEST_TRUST_ROOT"] { environment["AGENTS_TEST_TRUST_ROOT"] = root }
+        #endif
+        do {
+            return try await spawn(paths.agentsRelay.path, arguments, environment, [:])
         } catch {
             return Result(status: -1, output: "", error: "\(error)")
         }

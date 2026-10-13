@@ -207,7 +207,8 @@ public actor ControlMethods: ControlHandling {
     }
 
     /// `hosts/setRelay`, from a client or from Agents Host over the control plane's own key
-    /// (#809): a relay switched on or off, keeping its enrolment.
+    /// (#809), or `relay/switch` from the relay itself (#824): a relay switched on or off,
+    /// keeping its enrolment.
     public func setRelay(_ request: DaemonAPI.HostRelayRequest, by: String) async throws {
         guard var record = await records.host(request.host) else {
             throw JSONRPCError(code: DaemonAPI.Failure.noSuchHost, message: "No host is called \(request.host.rawValue).")
@@ -438,6 +439,12 @@ public actor ControlMethods: ControlHandling {
                 record.detectProjects = nil
                 try await records.save(record)
             }
+            return [:]
+        case DaemonAPI.Method.relaySwitch:
+            // A relay host on or off by its own word (#824): only its own record, and only
+            // one enrolled as a relay, which `setRelay` checks.
+            let request = try Self.require(params, as: DaemonAPI.RelaySwitch.self)
+            try await setRelay(.init(host: host, relay: request.relay), by: host.rawValue)
             return [:]
         case DaemonAPI.Method.attentionNeed:
             await hooks.need(host, params)

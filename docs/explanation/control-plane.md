@@ -60,8 +60,8 @@ plane, and nothing connects in to a host.
 │ HOST: this Mac            │   │ HOST: another Mac         │   │ HOST: a Linux server       │
 │ Agents Host               │   │ Agents Host,              │   │ agentsd, installed over    │
 │  ├ agentsd                │   │ Join one elsewhere        │   │ ssh or by one command      │
-│  ├ agents-control, if the │   │  └ agentsd only           │   │                            │
-│  │ control plane runs here│   │                           │   │                            │
+│  ├ agents-control, if the │   │  ├ agentsd                │   │                            │
+│  │ control plane runs here│   │  └ agents-relay, optional │   │                            │
 │  └ agents-relay, optional │   │                           │   │                            │
 │ projects, agents,         │   │ projects, agents,         │   │ projects, agents,          │
 │ runtimes, files, terminals│   │ runtimes                  │   │ runtimes                   │
