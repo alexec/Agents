@@ -1,6 +1,6 @@
 // What the work used over time, as Health draws it (#823): the page's half of the window's and
-// the Remote's UsageChartsSection. D / W / M / 3M, cost or tokens, the daily average above the
-// bars, and a bar picked to read its own figure. The bars are worked out in model/usage.ts.
+// the Remote's UsageChartsSection. D / W / M / 3M, the daily average above the bars, and a bar
+// picked to read its own figure; in cost on Cost and in tokens on Tokens (#956). The bars are worked out in model/usage.ts.
 import { useSignal } from "@preact/signals";
 import type { UsageHistory } from "../protocol/generated";
 import { type UsageBar, type UsageMetric, type UsageRange, unattributed, usageChart, usageHeadline,
@@ -10,12 +10,13 @@ const width = 600;
 const height = 200;
 const axis = 56;
 
-export function UsageCharts({ history, runtimeName }: { history: UsageHistory | undefined; runtimeName: (id: string) => string }) {
-  const metric = useSignal<UsageMetric>("cost");
+export function UsageCharts({ metric, history, runtimeName }: {
+  metric: UsageMetric; history: UsageHistory | undefined; runtimeName: (id: string) => string;
+}) {
   const range = useSignal<UsageRange>("W");
   const picked = useSignal<string | null>(null);
   if (!history) return <p class="quiet">Loading…</p>;
-  const chart = usageChart(history, range.value, metric.value);
+  const chart = usageChart(history, range.value, metric);
   const bar = chart.bars.find((b) => b.stamp === picked.value) ?? null;
   const top = Math.max(...chart.bars.map((b) => b.value), chart.range === "3M" ? chart.average * 7 : chart.average, 0) || 1;
   const step = (width - axis) / chart.bars.length;
@@ -26,12 +27,6 @@ export function UsageCharts({ history, runtimeName }: { history: UsageHistory | 
 
   return (
     <section class="usage-charts">
-      <div class="segmented" role="radiogroup" aria-label="Show">
-        {(["cost", "tokens"] as const).map((m) => (
-          <button key={m} role="radio" aria-checked={metric.value === m} class={metric.value === m ? "on" : ""}
-            onClick={() => choose(metric, m)}>{m === "cost" ? "Cost" : "Tokens"}</button>
-        ))}
-      </div>{" "}
       <div class="segmented" role="radiogroup" aria-label="Range">
         {usageRanges.map((r) => (
           <button key={r} role="radio" aria-checked={range.value === r} class={range.value === r ? "on" : ""}

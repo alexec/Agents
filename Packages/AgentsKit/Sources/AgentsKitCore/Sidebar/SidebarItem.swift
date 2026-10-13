@@ -21,6 +21,8 @@ public enum SidebarItem: Hashable, Sendable {
     /// A project's archived sessions and workflows, as a page (#495), with Bring Back.
     case archive(ProjectKey)
     case spending
+    /// The tokens the work used, and the token limits (#956): Cost's figures in tokens.
+    case tokens
     /// Where the time of running chats went (#852): the agent, its tools, and waiting.
     case time
     /// Every resource an agent can lease, and who holds and waits for each (036).

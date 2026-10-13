@@ -154,6 +154,7 @@ struct AgentsCommands: Commands {
             Button("Worktrees") { model.showsWorktrees = true }
             Button("Cost") { model.showsSpending = true }
                 .keyboardShortcut("s", modifiers: [.command, .option])
+            Button("Tokens") { model.showsTokens = true }
             Button("Time") { model.showsTime = true }
             // Agents as a web page on this Mac, found from here (#109).
             Button("Open in Browser") { openInBrowser() }

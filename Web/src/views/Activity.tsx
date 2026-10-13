@@ -67,8 +67,17 @@ export function headroom(state: CostState | undefined): string | null {
 
 /** Close enough to the daily limit to say so in colour (CostState.dayIsCloseToFull). */
 export function closeToFull(state: CostState | undefined): boolean {
+  return spendCloseToFull(state) || tokensCloseToFull(state);
+}
+
+/** Close to the daily token limit (CostState.dayTokensAreCloseToFull): Tokens' row warns (#956). */
+export function tokensCloseToFull(state: CostState | undefined): boolean {
   const tokens = state?.limits.dailyTokens;
-  if (state && tokens !== undefined && tokens > 0 && (state.tokensToday ?? 0) / tokens >= 0.85) return true;
+  return !!state && tokens !== undefined && tokens > 0 && (state.tokensToday ?? 0) / tokens >= 0.85;
+}
+
+/** Close to the daily money limit (CostState.daySpendIsCloseToFull): Cost's row warns (#956). */
+export function spendCloseToFull(state: CostState | undefined): boolean {
   const daily = state?.limits.daily;
   if (!state || !daily || daily.amount <= 0) return false;
   return (state.today[daily.currency] ?? 0) / daily.amount >= 0.85;
@@ -151,7 +160,7 @@ function useActivity(store: Store): void {
 }
 
 /** Each Activity page's icon, the window's SF Symbol as near as text has it (#495). */
-const activityIcons: Record<ActivityPage, string> = { events: "☰\uFE0E", resources: "◫", runtimes: "⚙\uFE0E", mcp: "▤", worktrees: "⑂", spending: "$", time: "◷" };
+const activityIcons: Record<ActivityPage, string> = { events: "☰\uFE0E", resources: "◫", runtimes: "⚙\uFE0E", mcp: "▤", worktrees: "⑂", spending: "$", tokens: "#", time: "◷" };
 
 /** The rows of one of the sidebar's two groups (#915): Status, what goes on now, or Usage, the past. */
 export function ActivityRows({ group, store, chosen, onPick }: {
@@ -181,10 +190,14 @@ export function ActivityRows({ group, store, chosen, onPick }: {
     </button>
   );
   const spent = [today && `${today} today`, left].filter(Boolean).join(", ");
+  const tokensLeft = mac?.limits.dailyTokens !== undefined
+    ? `${Math.max(0, mac.limits.dailyTokens - (mac.tokensToday ?? 0)).toLocaleString()} left` : null;
+  const tokens = mac ? [`${(mac.tokensToday ?? 0).toLocaleString()} tokens today`, tokensLeft].filter(Boolean).join(", ") : null;
   if (group === "usage") return (
     <>
       {row("spending", "Cost", "What all of the work has cost, and what it cost today", spent || null,
-        closeToFull(mac))}
+        spendCloseToFull(mac))}
+      {row("tokens", "Tokens", "What the work used in tokens, and the token limits", tokens, tokensCloseToFull(mac))}
       {row("time", "Time", "Where the time of running chats went: the agent, its tools, and waiting", null)}
     </>
   );
@@ -203,7 +216,7 @@ export function ActivityRows({ group, store, chosen, onPick }: {
   );
 }
 
-const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", mcp: "MCP Servers", worktrees: "Worktrees", spending: "Cost", time: "Time" };
+const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", mcp: "MCP Servers", worktrees: "Worktrees", spending: "Cost", tokens: "Tokens", time: "Time" };
 
 /** An Activity page in the chat's place. */
 export function ActivityPageView({ store, page }: { store: Store; page: ActivityPage }) {
@@ -211,8 +224,8 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
   useEffect(() => {
     for (const host of hosts) {
       if (page === "events") void store.loadEvents(host.id, 100);
-      if (page === "spending") void store.loadCost(host.id);
-      if (page === "spending") void store.loadRuntimes(host.id);
+      if (page === "spending" || page === "tokens") void store.loadCost(host.id);
+      if (page === "spending" || page === "tokens") void store.loadRuntimes(host.id);
       if (page === "runtimes") void store.loadRuntimes(host.id);
     }
   }, [page]);
@@ -287,6 +300,7 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
           )}
           {page === "runtimes" && <p class="hint">Installing and signing in are managed on the Mac, in Settings ▸ Agent Runtimes.</p>}
           {page === "spending" && <SpendingPage store={store} hostName={hostName} />}
+          {page === "tokens" && <TokensPage store={store} hostName={hostName} />}
           {page === "time" && <TimePage store={store} />}
         </div>
       </div>
@@ -454,6 +468,31 @@ function TimePage({ store }: { store: Store }) {
   return host ? <TimeCharts history={store.time.value[host]} runtimeName={runtimeName} /> : <p class="quiet">No host is connected.</p>;
 }
 
+/** What the work used in tokens (#956): the charts in tokens, then each host's day against its token limits. */
+function TokensPage({ store, hostName }: { store: Store; hostName: (host: string) => string }) {
+  const chartHost = store.hosts.value.some((h) => h.id === "mac") ? "mac" : store.hosts.value[0]?.id;
+  const chartCost = chartHost ? store.costs.value[chartHost] : undefined;
+  useEffect(() => { if (chartHost) void store.loadUsage(chartHost); }, [chartHost, chartCost]);
+  const runtimeName = (id: string) =>
+    (chartHost && store.runtimes.value[chartHost]?.find((s) => s.runtime.id === id)?.runtime.name) || id;
+  return (
+    <>
+      {chartHost && <UsageCharts metric="tokens" history={store.usage.value[chartHost]} runtimeName={runtimeName} />}
+      {Object.entries(store.costs.value).map(([host, state]) => (
+        <section key={host}>
+          <h2 class="section-head">{hostName(host)}</h2>
+          <p>{(state.tokensToday ?? 0).toLocaleString()} tokens today</p>
+          {state.limits.dailyTokens !== undefined && <p class={`quiet small${tokensCloseToFull(state) ? " close" : ""}`}>
+            Daily token limit {state.limits.dailyTokens.toLocaleString()} · {Math.max(0, state.limits.dailyTokens - (state.tokensToday ?? 0)).toLocaleString()} left{dayTokenLimitReached(state) && " · Nothing new will start until tomorrow"}</p>}
+          {state.limits.perAgentTokens !== undefined && <p class="quiet small">
+            Each agent up to {state.limits.perAgentTokens.toLocaleString()} tokens</p>}
+        </section>
+      ))}
+      <p class="hint">Limits are set on the Mac.</p>
+    </>
+  );
+}
+
 function SpendingPage({ store, hostName }: { store: Store; hostName: (host: string) => string }) {
   const projects = Object.values(store.projects.value).flat();
   const totals = lifetimeTotals(projects);
@@ -469,7 +508,7 @@ function SpendingPage({ store, hostName }: { store: Store; hostName: (host: stri
     (chartHost && store.runtimes.value[chartHost]?.find((s) => s.runtime.id === id)?.runtime.name) || id;
   return (
     <>
-      {chartHost && <UsageCharts history={store.usage.value[chartHost]} runtimeName={runtimeName} />}
+      {chartHost && <UsageCharts metric="cost" history={store.usage.value[chartHost]} runtimeName={runtimeName} />}
       <p class="spending-today"><span class="quiet">All time</span> <span class="strong">{totalWords(totals) ?? "Nothing has been spent yet"}</span></p>
       {currencies.map((currency) => (
         <section key={currency}>
@@ -491,15 +530,10 @@ function SpendingPage({ store, hostName }: { store: Store; hostName: (host: stri
         <section key={host}>
           <h2 class="section-head">{hostName(host)}</h2>
           <p>{totalWords(state.today) ?? "Nothing spent today"}</p>
-          {state.limits.daily && <p class={`quiet small${closeToFull(state) ? " close" : ""}`}>
+          {state.limits.daily && <p class={`quiet small${spendCloseToFull(state) ? " close" : ""}`}>
             Daily limit {money(state.limits.daily.amount, state.limits.daily.currency)} · {headroom(state)}{dayLimitReached(state) && " · Nothing new will start until tomorrow"}</p>}
           {state.limits.perAgent && <p class="quiet small">
             Each agent up to {money(state.limits.perAgent.amount, state.limits.perAgent.currency)}</p>}
-          {state.limits.dailyTokens !== undefined ? <p class={`quiet small${closeToFull(state) ? " close" : ""}`}>
-            Daily token limit {state.limits.dailyTokens.toLocaleString()} · {Math.max(0, state.limits.dailyTokens - (state.tokensToday ?? 0)).toLocaleString()} left{dayTokenLimitReached(state) && " · Nothing new will start until tomorrow"}</p>
-            : (state.tokensToday ?? 0) > 0 && <p class="quiet small">{state.tokensToday.toLocaleString()} tokens today</p>}
-          {state.limits.perAgentTokens !== undefined && <p class="quiet small">
-            Each agent up to {state.limits.perAgentTokens.toLocaleString()} tokens</p>}
           {state.note && <p class="quiet small">⚠︎ {state.note}</p>}
         </section>
       ))}

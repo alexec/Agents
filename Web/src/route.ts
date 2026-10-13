@@ -1,13 +1,13 @@
 // Where the page is, in the URL's fragment (071 research R2): #/h/<host>/p/<folder>/s/<session>, or
 // /w/<workflow> for a workflow's page in the chat's place (#98), /ar/1 for the project's archive (#499),
 // or #/a/<page> for an Activity page of the sidebar (#151): events, resources, runtimes, mcp (#589),
-// worktrees (#790) or spending, or #/settings for this browser's Settings (#846).
+// worktrees (#790), spending, tokens (#956) or time, or #/settings for this browser's Settings (#846).
 // Every step is a history entry, so the browser's own Back moves between columns (US6).
 import { signal } from "@preact/signals";
 
-export type ActivityPage = "events" | "resources" | "runtimes" | "mcp" | "worktrees" | "spending" | "time";
+export type ActivityPage = "events" | "resources" | "runtimes" | "mcp" | "worktrees" | "spending" | "tokens" | "time";
 
-export const activityPages: readonly ActivityPage[] = ["events", "resources", "runtimes", "mcp", "worktrees", "spending", "time"];
+export const activityPages: readonly ActivityPage[] = ["events", "resources", "runtimes", "mcp", "worktrees", "spending", "tokens", "time"];
 
 export interface Route {
   /** This browser's Settings (#846): its text size and which smart groups are on. */
