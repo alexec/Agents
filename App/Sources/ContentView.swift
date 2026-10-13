@@ -140,6 +140,8 @@ struct ContentView: View {
                                    call: { method, params in try await model.client(for: key.host).call(method, params) },
                                    unpin: { await model.unpin(path, in: key) },
                                    startAgent: { model.offerStart($0, in: key) })
+                        // One page per pin, so another pin gets its own store and place (#872).
+                        .id(pin.path)
                 } else {
                     PinnedPage(project: key, path: path)
                 }

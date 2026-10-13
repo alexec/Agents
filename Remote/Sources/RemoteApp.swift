@@ -280,6 +280,8 @@ struct RemoteView: View {
                                        }
                                        return model.offerStart(start, in: key)
                                    })
+                        // One page per pin, so another pin gets its own store and place (#872).
+                        .id(pin.path)
                         .paperGround()
                 } else {
                     PinnedPage(folder: folder, path: path).paperGround()
