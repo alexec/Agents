@@ -393,8 +393,8 @@ private struct SmartHeading: View {
 
 /// One project in the sidebar (#495, #498): a group headed by its row, its pinned pages,
 /// then its live sessions newest started first, their state the row's mark, then its
-/// workflows, then one Archived row opening a page. Its pinned sessions and workflows are
-/// in Pinned at the top. The Mac's `ProjectFold`, drawn from the same
+/// Workflows fold (#885), then one Archived row opening a page. Its pinned sessions and
+/// workflows are in Pinned at the top. The Mac's `ProjectFold`, drawn from the same
 /// `SidebarProjectFold`.
 private struct RemoteProjectFold: View {
     @Environment(RemoteModel.self) private var model
@@ -428,15 +428,10 @@ private struct RemoteProjectFold: View {
                 ForEach(SidebarTree.rows(fold.sessions, in: model.work, folds: folds)) { row in
                     SidebarSessionRow(agent: row.agent, tree: row, folds: folds)
                 }
-                // Its workflows after the sessions (Alex, #495): rows, not a page, a
-                // plain line between the two kinds when there are both (Alex, #631).
-                if !fold.sessions.isEmpty && !fold.workflows.isEmpty {
-                    Divider()
-                        .listRowInsets(.vertical, 2)
-                        .accessibilityHidden(true)
-                }
-                ForEach(fold.workflows) { summary in
-                    SidebarWorkflowRow(summary: summary, project: key)
+                // Its workflows after the sessions (Alex, #495), in a Workflows fold of
+                // their own, one level in, as a mailbox's sub-mailboxes in Mail (#885).
+                if !fold.workflows.isEmpty {
+                    workflowsFold(fold)
                 }
                 if fold.isSearching {
                     // What matched in the archive, in the group while searching, so a
@@ -471,6 +466,31 @@ private struct RemoteProjectFold: View {
                         if isOpen { await model.fillProject(summary.folder) }
                     }
             }
+        }
+    }
+
+    /// The project's live workflows, under a Workflows row with a chevron and a grey
+    /// count (Alex, #885). Closed until opened, kept per project; a search opens it to
+    /// show what matched. The Mac's `ProjectWorkflowRows`.
+    private func workflowsFold(_ fold: SidebarProjectFold) -> some View {
+        let isOpen = fold.isSearching || folds.isOpen(key, .workflows)
+        return DisclosureGroup(isExpanded: Binding(get: { isOpen },
+                                                   set: { folds.set(key, .workflows, open: $0) })) {
+            // A closed fold has no rows at all (#237).
+            ForEach(isOpen ? fold.workflows : []) { summary in
+                SidebarWorkflowRow(summary: summary, project: key)
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Text("Workflows").lineLimit(1)
+                Spacer(minLength: 4)
+                Text("\(fold.workflows.count)")
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            .appText(.supporting)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Workflows, \(fold.workflows.count)")
         }
     }
 

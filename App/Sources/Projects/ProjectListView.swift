@@ -372,8 +372,8 @@ struct ProjectListView: View {
 }
 
 /// One project in the sidebar: its row, and folded under it its sessions — Needs you
-/// first, the way the project page groups them — then its workflows, each kind's
-/// archived ones folded once more at its foot.
+/// first, the way the project page groups them — then its Workflows fold (#885), then
+/// its pages: MCP Servers and Archived.
 ///
 /// A search unfolds every project with something that matches and hides the rest.
 private struct ProjectFold: View {
@@ -415,16 +415,9 @@ private struct ProjectFold: View {
                 ForEach(FoldedRow.rows(SidebarTree.rows(fold.sessions, in: model.work, folds: folds), in: .sessions)) { row in
                     SessionSidebarRow(agent: row.item.agent, tree: row.item, folds: folds)
                 }
-                // Then its workflows, after the sessions (Alex, #495): rows, not a page,
-                // a plain line between the two kinds when there are both (Alex, #631).
-                if !fold.sessions.isEmpty && !fold.workflows.isEmpty {
-                    Divider()
-                        .listRowInsets(.vertical, 2)
-                        .accessibilityHidden(true)
-                }
-                ForEach(FoldedRow.rows(fold.workflows, in: .workflows)) { row in
-                    WorkflowListRow(summary: row.item, project: key)
-                }
+                // Then its workflows, after the sessions (Alex, #495), in a Workflows fold
+                // of their own, one level in, as a mailbox's sub-mailboxes in Mail (#885).
+                ProjectWorkflowRows(fold: fold, folds: folds)
                 if fold.isSearching {
                     // What matched in the archive, in the group while searching, so a
                     // match is one click away as it was.

@@ -14,9 +14,10 @@ import Observation
 @MainActor
 @Observable
 public final class SidebarFolds {
-    /// The folds that start closed and have been opened: projects, the Archived folds.
+    /// The folds that start closed and have been opened: projects, the Archived folds, a
+    /// project's Workflows (#885).
     public private(set) var open: Set<String>
-    /// The folds that start open and have been closed: the groups and Workflows (#181).
+    /// The folds that start open and have been closed: the groups (#181).
     /// Kept apart so that a project nobody has touched shows its groups as it always has.
     public private(set) var closed: Set<String>
     @ObservationIgnored private let defaults: UserDefaults
@@ -65,11 +66,12 @@ public final class SidebarFolds {
         /// One of the smart rows at the sidebar's top (#495), across every project.
         case smart(SidebarSmartRow)
 
-        /// A project and the Archived folds start folded; the rest start open.
+        /// A project, the Archived folds and a project's Workflows (Alex, #885) start
+        /// folded; the rest start open.
         public var startsOpen: Bool {
             switch self {
-            case .project, .archivedSessions, .archivedWorkflows: false
-            case .group, .pinned, .workflows, .sessions: true
+            case .project, .archivedSessions, .archivedWorkflows, .workflows: false
+            case .group, .pinned, .sessions: true
             case .smart(let row): row.startsOpen
             }
         }

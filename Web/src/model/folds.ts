@@ -1,7 +1,8 @@
 // Which projects in the sidebar are unfolded (#151) and which of its smart groups (#495) are
-// open, kept across visits in localStorage, as the window keeps them in defaults
-// (SidebarFolds.swift). A project's fold is named by host and folder, so the same folder on two
-// hosts folds apart; a smart group's by its name. Archived projects, the one fold under no
+// open, and which projects' Workflows folds (#885) are open, kept across visits in localStorage, as
+// the window keeps them in defaults (SidebarFolds.swift). A project's fold is named by host and
+// folder, so the same folder on two hosts folds apart; its Workflows fold the same, after
+// `workflows:`; a smart group's by its name. Archived projects, the one fold under no
 // project, is kept on its own, as the window's `showsArchivedProjects` (#343), and so is
 // Activity, as its `showsActivity`.
 import { signal } from "@preact/signals";
@@ -86,6 +87,15 @@ export class Folds {
 
   set(host: string, folder: string, isOpen: boolean): void {
     this.change(this.open, storageKey, foldName(host, folder), isOpen);
+  }
+
+  /** Whether a project's Workflows fold is open (#885): folded until opened. */
+  isWorkflowsOpen(host: string, folder: string): boolean {
+    return this.open.value.has(`workflows:${foldName(host, folder)}`);
+  }
+
+  setWorkflows(host: string, folder: string, isOpen: boolean): void {
+    this.change(this.open, storageKey, `workflows:${foldName(host, folder)}`, isOpen);
   }
 
   /** Whether a session's children are shown under it (#835): folded until opened. */

@@ -42,6 +42,19 @@ test("Pinned and Needs You start open, Working and Unread folded, and a fold of 
   assert.deepEqual(JSON.parse(storage.getItem("agents.sidebar.folds")), ["smart:working"]);
 });
 
+test("a project's Workflows fold starts folded and is kept per project (#885)", async () => {
+  const { Folds } = await load("src/model/folds.ts");
+  const storage = new Memory();
+  const first = new Folds(storage);
+  assert.equal(first.isWorkflowsOpen("mac", "file:///w/a"), false, "folded until opened");
+  first.setWorkflows("mac", "file:///w/a", true);
+  const next = new Folds(storage);
+  assert.equal(next.isWorkflowsOpen("mac", "file:///w/a/"), true, "kept open");
+  assert.equal(next.isWorkflowsOpen("mac", "file:///w/b"), false, "only that project");
+  assert.equal(next.isWorkflowsOpen("box", "file:///w/a"), false, "the same folder on another host folds apart");
+  assert.equal(next.isOpen("mac", "file:///w/a"), false, "the project's own fold is not touched");
+});
+
 const agent = (id, createdAt, fields = {}) => ({ id, createdAt, lastActivityAt: createdAt, state: "finished",
   cwd: "file:///w/a", title: id, ...fields });
 
