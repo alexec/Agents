@@ -44,6 +44,23 @@ struct MCPEventStoreTests {
         #expect(record.seen.count == MCPSubscriptionRecord.seenLimit)
     }
 
+    /// Asking whether an id was seen reads an index, kept with `seen` through a load and
+    /// a change made to `seen` itself.
+    @Test func seenIsAskedThroughAnIndexThatKeepsUp() throws {
+        let root = try scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = MCPEventStore(root: root)
+        var record = MCPSubscriptionRecord(seen: [.init(id: "a", at: now)], lastNamedAt: now)
+        record.see(["b", "b", "c"], at: now)
+        #expect(record.seen.map(\.id) == ["a", "b", "c"])
+        try store.save(MCPEventRecords(subscriptions: ["p|k": record]))
+        var loaded = try #require(store.load().subscriptions["p|k"])
+        #expect(loaded == record)
+        #expect(loaded.hasSeen("a") && loaded.hasSeen("c") && !loaded.hasSeen("d"))
+        loaded.seen.removeAll { $0.id == "a" }
+        #expect(!loaded.hasSeen("a") && loaded.hasSeen("b"))
+    }
+
     @Test func aRecordNoWorkflowNamesForADayIsDropped() {
         var records = MCPEventRecords(subscriptions: [
             "p|named": MCPSubscriptionRecord(lastNamedAt: now.addingTimeInterval(-3 * 24 * 60 * 60)),
