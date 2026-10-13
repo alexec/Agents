@@ -6,7 +6,7 @@ import { AnnounceRefused, BadServerProof, pair, Refused, type RefusalReason, Wro
 import { base64url } from "./wire/bytes";
 import { parseCode } from "./wire/code";
 import { IndexedKeyStore, type KeyStore, makeKeyPair, newClientID, UnsupportedBrowser } from "./wire/keys";
-import { Link, type LinkState, Lines, type SocketLike } from "./wire/link";
+import { CallFailed, Link, type LinkState, Lines, type SocketLike } from "./wire/link";
 
 
 /**
@@ -152,14 +152,16 @@ export class Session {
     }
   }
 
-  /** **Forget This Browser**: the control plane forgets it, then the key goes (FR-015). */
-  async forgetThisBrowser(): Promise<void> {
+  /** **Forget This Browser**: the control plane forgets it, then the key goes (FR-015). Answers
+   *  why not, with nothing changed, or null: the Remote's `forgetThisDevice` (#935). */
+  async forgetThisBrowser(): Promise<string | null> {
     this.forgettingMyself = true;
     try {
       await this.link.call("clients/forgetSelf", {});
-    } catch {
+      return null;
+    } catch (error) {
       this.forgettingMyself = false;
-      throw new Error("not forgotten");
+      return error instanceof CallFailed ? error.message : "Your Mac is not answering. This browser is still paired.";
     }
   }
 }

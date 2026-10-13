@@ -281,6 +281,8 @@ button.link {
 }
 
 .identity .confirm { display: flex; gap: 6px; }
+.identity .forget { display: flex; flex-direction: column; gap: 4px; }
+.identity .forget p { margin: 0; }
 
 /* The chat: entries above, then the cards and the prompt, pinned to the foot. */
 /* Centred without its own display, so the narrow layout can still hide it. */
