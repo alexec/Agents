@@ -186,7 +186,7 @@ struct TimeHistoryTests {
     }
 
     @Test("the chart stacks each bar by kind and averages over the days with time")
-    func theChart() {
+    func theChart() throws {
         var history = TimeHistory(now: "2026-10-12T15")
         history.add(TimeBucket(agent: 3600, tools: 1800, turns: 2), runtime: "claude", hour: "2026-10-12T09")
         history.add(TimeBucket(person: 600, turns: 1), runtime: "codex", hour: "2026-10-10T09")
@@ -198,7 +198,7 @@ struct TimeHistoryTests {
         #expect(week.shares.map(\.runtime) == ["claude", "codex"])
         #expect(week.percent(week.time.person) == "10%")
         let day = TimeChart(history, range: .day)
-        #expect(day.bars.count == 24)
+        try #require(day.bars.count == 24)
         #expect(day.bars[9].total == 5400)
         #expect(day.average == 5400)
     }
