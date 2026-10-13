@@ -53,6 +53,15 @@ final class DraftWorld: @unchecked Sendable {
     func logged(_ line: String) { lock.withLock { _logs.append(line) } }
 }
 
+/// The drafts' clock, which moves only when the test moves it (#891).
+final class DraftClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _now = ContinuousClock.now
+
+    var now: ContinuousClock.Instant { lock.withLock { _now } }
+    func advance(by duration: Duration) { lock.withLock { _now += duration } }
+}
+
 /// One connection to the stand-in server, as a record (with its draft map) says.
 struct DraftServer: WorkspaceProvider {
     let world: DraftWorld
@@ -93,7 +102,7 @@ struct DraftHarness {
     init(world: DraftWorld, timing: ProviderDrafts.Timing = .init(total: .seconds(300), answer: .seconds(120), lastWord: .seconds(60),
                                                                    ownerGone: .seconds(30), keptAfter: .seconds(600),
                                                                    tick: .milliseconds(20), help: .seconds(25)),
-         localHost: Bool = true, busy: String? = nil) {
+         localHost: Bool = true, busy: String? = nil, clock: DraftClock? = nil) {
         self.world = world
         let host = self.host
         drafts = ProviderDrafts(timing: timing, hooks: .init(
@@ -115,7 +124,8 @@ struct DraftHarness {
             },
             ownerHere: { _ in world.ownerHere },
             busyHost: { _, _ in busy }),
-            log: { world.logged($0) })
+            log: { world.logged($0) },
+            now: { clock?.now ?? .now })
     }
 
     static let mapForm = DaemonAPI.ProviderAdd(name: "DigitalOcean", kind: .stdio, command: "npx", args: ["-y", "@digitalocean/mcp"])
@@ -240,16 +250,21 @@ struct ProviderDraftMapTests {
         #expect(world.last?.note == "It has no list.")
     }
 
-    // Times out on a loaded runner (#891), until the drafts take an injected clock.
-    @Test("Out of time with a passed draft: that draft is the result", .flakyUnderLoad)
+    @Test("Out of time with a passed draft: that draft is the result")
     func outOfTime() async throws {
         let world = DraftWorld(tools: ["droplet-list", "droplet-power-on", "droplet-power-off"])
+        // The drafts' clock moves only once the draft has passed (#891), so a slow runner can't end it first.
+        let clock = DraftClock()
         let harness = DraftHarness(world: world, timing: .init(total: .milliseconds(150), answer: .seconds(5), lastWord: .milliseconds(100),
                                                                ownerGone: .seconds(30), keptAfter: .seconds(600),
-                                                               tick: .milliseconds(10), help: .seconds(25)))
+                                                               tick: .milliseconds(10), help: .seconds(25)),
+                                   clock: clock)
         let id = try await harness.start().draft
         #expect(try await harness.tool(id, AppTool.checkDraft, ["draft": DraftHarness.goodMap]).hasPrefix("Passed"))
-        try await Task.sleep(for: .milliseconds(600))
+        for _ in 0..<500 where !["done", "failed", "cancelled"].contains(world.last?.state ?? "") {
+            clock.advance(by: .milliseconds(50))
+            try await Task.sleep(for: .milliseconds(10))
+        }
         #expect(world.last?.state == "done")
         #expect(world.last?.draftJSON == DraftHarness.goodMap)
     }
