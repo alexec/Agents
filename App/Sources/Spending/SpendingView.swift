@@ -30,7 +30,7 @@ struct SpendingView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 // Over time, as Health draws it (#823).
-                UsageChartsSection(load: { await model.usageHistory() }, refresh: model.costState)
+                UsageChartsSection(metric: .cost, load: { await model.usageHistory() }, refresh: model.costState)
                     .padding(.bottom, 8)
                 if spending.isEmpty {
                     nothingSpent

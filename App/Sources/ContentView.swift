@@ -118,6 +118,8 @@ struct ContentView: View {
             WorktreesView().paperGround()
         } else if model.showsSpending {
             SpendingView().paperGround()
+        } else if model.showsTokens {
+            TokensView().paperGround()
         } else if model.showsTime {
             TimeView().paperGround()
         } else if let id = model.openWorkflow {
@@ -167,7 +169,7 @@ struct ContentView: View {
     private var projectForTerminal: DaemonAPI.ProjectSummary? {
         guard terminal.isOpen, !model.showsEvents, !model.showsResources, !model.showsRuntimes,
               !model.showsMCPServers, !model.showsWorktrees,
-              !model.showsSpending, !model.showsTime, let project = model.selectedProjectSummary, project.exists else { return nil }
+              !model.showsSpending, !model.showsTokens, !model.showsTime, let project = model.selectedProjectSummary, project.exists else { return nil }
         return project
     }
 

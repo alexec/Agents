@@ -2,28 +2,23 @@ import AgentsKitCore
 import Charts
 import SwiftUI
 
-/// What the work used over time, as Health draws it (#823): D / W / M / 3M, cost or
-/// tokens, the daily average above the bars, and a bar picked to read its own figure.
+/// What the work used over time, as Health draws it (#823): D / W / M / 3M, the daily
+/// average above the bars, and a bar picked to read its own figure.
 ///
-/// Drawn on Cost by the window and the Remote; the page draws `UsageCharts` in
+/// Drawn in cost on Cost and in tokens on Tokens (#956), by the window and the Remote; the page draws `UsageCharts` in
 /// UsageCharts.tsx. The bars are worked out in `UsageChart`, where they are tested; this
 /// only draws them. It fetches through `load`, again whenever `refresh` changes.
 struct UsageChartsSection<Refresh: Equatable>: View {
+    let metric: UsageChart.Metric
     let load: () async -> UsageHistory?
     let refresh: Refresh
 
     @State private var history: UsageHistory?
     @State private var range: UsageChart.Range = .week
-    @State private var metric: UsageChart.Metric = .cost
     @State private var picked: Date?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Picker("Show", selection: $metric) {
-                ForEach(UsageChart.Metric.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
             Picker("Range", selection: $range) {
                 ForEach(UsageChart.Range.allCases) { Text($0.rawValue).tag($0) }
             }
@@ -36,7 +31,6 @@ struct UsageChartsSection<Refresh: Equatable>: View {
             }
         }
         .onChange(of: range) { picked = nil }
-        .onChange(of: metric) { picked = nil }
         .task(id: refresh) {
             if let loaded = await load() { history = loaded }
         }

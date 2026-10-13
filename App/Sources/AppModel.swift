@@ -161,6 +161,7 @@ final class AppModel {
             showsRuntimes = false
             showsMCPServers = false
             showsTime = false
+            showsTokens = false
             showsWorktrees = false
             // The same rule as picking a project: what you picked is what you see,
             // and a conversation or a workflow left open underneath would be waiting
@@ -184,6 +185,7 @@ final class AppModel {
             showsRuntimes = false
             showsMCPServers = false
             showsTime = false
+            showsTokens = false
             showsWorktrees = false
             selection = nil
             openWorkflow = nil
@@ -202,6 +204,7 @@ final class AppModel {
             showsRuntimes = false
             showsMCPServers = false
             showsTime = false
+            showsTokens = false
             showsWorktrees = false
             selection = nil
             openWorkflow = nil
@@ -223,6 +226,7 @@ final class AppModel {
             showsEvents = false
             showsMCPServers = false
             showsTime = false
+            showsTokens = false
             showsWorktrees = false
             selection = nil
             openWorkflow = nil
@@ -242,6 +246,7 @@ final class AppModel {
             showsEvents = false
             showsRuntimes = false
             showsTime = false
+            showsTokens = false
             showsWorktrees = false
             selection = nil
             openWorkflow = nil
@@ -268,6 +273,25 @@ final class AppModel {
         }
     }
 
+    /// Whether the window is showing Tokens: what the work used in tokens, and the token
+    /// limits (#956). A page like Cost, and not persisted for the same reason.
+    var showsTokens = false {
+        didSet {
+            guard showsTokens, showsTokens != oldValue else { return }
+            showsSpending = false
+            showsResources = false
+            showsEvents = false
+            showsRuntimes = false
+            showsMCPServers = false
+            showsTime = false
+            showsWorktrees = false
+            selection = nil
+            openWorkflow = nil
+            projectPage = nil
+            composing = false
+        }
+    }
+
     /// Whether the window is showing Worktrees: every project's, and how much each holds
     /// on disk (#790). A page like MCP Servers, and not persisted for the same reason; it
     /// was in Project Settings, which are for what a person sets, not what changes.
@@ -280,6 +304,7 @@ final class AppModel {
             showsRuntimes = false
             showsMCPServers = false
             showsTime = false
+            showsTokens = false
             selection = nil
             openWorkflow = nil
             projectPage = nil
@@ -331,6 +356,7 @@ final class AppModel {
         showsRuntimes = false
         showsMCPServers = false
         showsTime = false
+        showsTokens = false
         showsWorktrees = false
         if let agent = agents.first(where: { $0.id == agentID }) {
             select(ProjectKey(host: agent.host, folder: agent.projectFolder))
@@ -348,6 +374,7 @@ final class AppModel {
         showsRuntimes = false
         showsMCPServers = false
         showsTime = false
+        showsTokens = false
         showsWorktrees = false
         select(key)
         openWorkflow = nil
@@ -370,6 +397,7 @@ final class AppModel {
             if showsMCPServers { return .mcpServers }
             if showsWorktrees { return .worktrees }
             if showsSpending { return .spending }
+            if showsTokens { return .tokens }
             if showsTime { return .time }
             guard let key = selectedProjectKey else { return nil }
             if let id = openWorkflow { return .workflow(id, in: key) }
@@ -390,6 +418,7 @@ final class AppModel {
                 showsRuntimes = false
                 showsMCPServers = false
                 showsTime = false
+                showsTokens = false
                 showsWorktrees = false
                 select(key)
                 openWorkflow = id
@@ -401,6 +430,8 @@ final class AppModel {
                 showProjectPage(.mcpServers, of: key)
             case .spending:
                 showsSpending = true
+            case .tokens:
+                showsTokens = true
             case .time:
                 showsTime = true
             case .resources:
@@ -420,6 +451,7 @@ final class AppModel {
                 showsRuntimes = false
                 showsMCPServers = false
                 showsTime = false
+                showsTokens = false
                 showsWorktrees = false
                 showProject(key)
             case nil:
@@ -439,6 +471,7 @@ final class AppModel {
         showsRuntimes = false
         showsMCPServers = false
         showsTime = false
+        showsTokens = false
         showsWorktrees = false
         select(key)
         projectPage = page
@@ -466,6 +499,7 @@ final class AppModel {
         showsRuntimes = false
         showsMCPServers = false
         showsTime = false
+        showsTokens = false
         showsWorktrees = false
         select(key)
         // A new session in it (#366): the project's own page is where a session starts,
@@ -643,6 +677,7 @@ final class AppModel {
         showsRuntimes = false
         showsMCPServers = false
         showsTime = false
+        showsTokens = false
         showsWorktrees = false
         select(key)
         openPin = path

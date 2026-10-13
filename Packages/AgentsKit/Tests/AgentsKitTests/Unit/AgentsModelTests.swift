@@ -428,6 +428,22 @@ struct AgentsModelTests {
         #expect(model.costState?.dayIsCloseToFull == true)
     }
 
+    @Test("Cost warns near the money limit and Tokens near the token limit, each on its own (#956)")
+    func eachRowWarnsOnItsOwnLimit() {
+        let tokensNearFull = DaemonAPI.CostState(
+            limits: CostLimits(daily: Cost(amount: 10, currency: "USD"), dailyTokens: 1000),
+            today: ["USD": 1], day: "2026-10-13", tokensToday: 900)
+        #expect(tokensNearFull.dayTokensAreCloseToFull)
+        #expect(!tokensNearFull.daySpendIsCloseToFull)
+        #expect(tokensNearFull.dayIsCloseToFull)
+
+        let spendNearFull = DaemonAPI.CostState(
+            limits: CostLimits(daily: Cost(amount: 10, currency: "USD"), dailyTokens: 1000),
+            today: ["USD": 9], day: "2026-10-13", tokensToday: 100)
+        #expect(spendNearFull.daySpendIsCloseToFull)
+        #expect(!spendNearFull.dayTokensAreCloseToFull)
+    }
+
     @Test("a changed day resets today without the client consulting its own clock")
     func theDaemonsDayIsTheOnlyDay() throws {
         let model = AgentsModel()

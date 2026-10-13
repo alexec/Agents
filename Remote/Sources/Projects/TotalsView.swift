@@ -19,14 +19,6 @@ struct TotalsView: View {
 
     private var spending: Spending { Spending(model.allProjects) }
 
-    private var costStates: [(String, DaemonAPI.CostState)] {
-        var states: [(String, DaemonAPI.CostState)] = []
-        if let state = model.costState { states.append(("This Mac", state)) }
-        states += model.serverCosts.map { (model.hostLabel($0.key), $0.value) }
-            .sorted { $0.0.localizedCaseInsensitiveCompare($1.0) == .orderedAscending }
-        return states
-    }
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -37,7 +29,7 @@ struct TotalsView: View {
                         .foregroundStyle(.secondary)
                 }
                 // The Mac's use over time, as Health draws it (#823).
-                UsageChartsSection(load: { await model.usageHistory() }, refresh: model.costState)
+                UsageChartsSection(metric: .cost, load: { await model.usageHistory() }, refresh: model.costState)
                     .padding(.bottom, 8)
                 if spending.isEmpty {
                     nothingSpent
@@ -49,7 +41,8 @@ struct TotalsView: View {
                     if spending.unmeasuredAgents > 0 { unmeasured }
                 }
                 today
-                ForEach(costStates, id: \.0) { host, state in
+                // The money limits, by host; the token ones are on Tokens (#956).
+                ForEach(model.costStates.filter { $0.1.limits.daily != nil || $0.1.limits.perAgent != nil }, id: \.0) { host, state in
                     VStack(alignment: .leading, spacing: 4) {
                         Text(host).appText(.supporting).foregroundStyle(.secondary)
                         if let daily = state.limits.daily {
@@ -58,18 +51,6 @@ struct TotalsView: View {
                         }
                         if let perAgent = state.limits.perAgent {
                             Text("Each agent up to \(perAgent.amount.formatted(.currency(code: perAgent.currency)))")
-                                .appText(.fine).monospacedDigit().foregroundStyle(.secondary)
-                        }
-                        // Tokens (#838): the limit for runtimes that report no price.
-                        if let dailyTokens = state.limits.dailyTokens {
-                            Text("Daily token limit \(dailyTokens.formatted()) · \((state.dayTokenHeadroom ?? 0).formatted()) left")
-                                .appText(.fine).monospacedDigit().foregroundStyle(.secondary)
-                        } else if state.tokensToday > 0 {
-                            Text("\(state.tokensToday.formatted()) tokens today")
-                                .appText(.fine).monospacedDigit().foregroundStyle(.secondary)
-                        }
-                        if let perAgentTokens = state.limits.perAgentTokens {
-                            Text("Each agent up to \(perAgentTokens.formatted()) tokens")
                                 .appText(.fine).monospacedDigit().foregroundStyle(.secondary)
                         }
                     }
@@ -176,6 +157,18 @@ struct TotalsView: View {
                 .appText(.supporting)
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+extension RemoteModel {
+    /// Each host's day and limits, This Mac first, then the servers by name: Cost and
+    /// Tokens (#956) both list them.
+    var costStates: [(String, DaemonAPI.CostState)] {
+        var states: [(String, DaemonAPI.CostState)] = []
+        if let state = costState { states.append(("This Mac", state)) }
+        states += serverCosts.map { (hostLabel($0.key), $0.value) }
+            .sorted { $0.0.localizedCaseInsensitiveCompare($1.0) == .orderedAscending }
+        return states
     }
 }
 

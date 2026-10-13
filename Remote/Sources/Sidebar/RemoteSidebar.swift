@@ -89,8 +89,10 @@ struct RemoteSidebar: View {
                 }
 
                 Section(isExpanded: $showsUsage) {
-                    SpendingRow().activityIcon("dollarsign.circle", warns: model.costState?.dayIsCloseToFull == true)
+                    SpendingRow().activityIcon("dollarsign.circle", warns: model.costState?.daySpendIsCloseToFull == true)
                         .appText(.supporting).tag(SidebarItem.spending)
+                    TokensRow().activityIcon("number", warns: model.costState?.dayTokensAreCloseToFull == true)
+                        .appText(.supporting).tag(SidebarItem.tokens)
                     TimeRow().activityIcon("clock").appText(.supporting).tag(SidebarItem.time)
                 } header: {
                     Text("Usage")

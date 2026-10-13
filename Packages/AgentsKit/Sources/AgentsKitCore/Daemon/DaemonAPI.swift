@@ -1561,12 +1561,19 @@ public enum DaemonAPI {
 
         /// Close enough to be worth saying before it arrives, on the app's existing
         /// threshold for a nearly full context rather than a second number.
-        public var dayIsCloseToFull: Bool {
-            if let dailyTokens = limits.dailyTokens, dailyTokens > 0,
-               Double(tokensToday) / Double(dailyTokens) >= Usage.closeToFull { return true }
+        public var dayIsCloseToFull: Bool { daySpendIsCloseToFull || dayTokensAreCloseToFull }
+
+        /// Close to the day's money limit: Cost's row warns on this (#956).
+        public var daySpendIsCloseToFull: Bool {
             guard let daily = limits.daily, daily.amount > 0 else { return false }
             let spent = today[daily.currency] ?? 0
             return (spent / daily.amount) >= Decimal(Usage.closeToFull)
+        }
+
+        /// Close to the day's token limit: Tokens' row warns on this (#956).
+        public var dayTokensAreCloseToFull: Bool {
+            guard let dailyTokens = limits.dailyTokens, dailyTokens > 0 else { return false }
+            return Double(tokensToday) / Double(dailyTokens) >= Usage.closeToFull
         }
     }
 

@@ -100,8 +100,10 @@ struct ProjectListView: View {
 
             Section(isExpanded: $showsUsage) {
                 SpendingRow(selection: $selection).activityIcon("dollarsign.circle",
-                                                                warns: model.costState?.dayIsCloseToFull == true)
+                                                                warns: model.costState?.daySpendIsCloseToFull == true)
                     .appText(.supporting).sidebarInk(.spending).tag(SidebarItem.spending)
+                TokensRow().activityIcon("number", warns: model.costState?.dayTokensAreCloseToFull == true)
+                    .appText(.supporting).sidebarInk(.tokens).tag(SidebarItem.tokens)
                 TimeRow().activityIcon("clock")
                     .appText(.supporting).sidebarInk(.time).tag(SidebarItem.time)
             } header: {
