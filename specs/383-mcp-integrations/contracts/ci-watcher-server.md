@@ -61,6 +61,9 @@ all. The other `pr.*` events are left as they are: their data is a PR's number, 
 | `get_pr` (#837) | `repo`, `number`, optional `diff` | `{number, title, branch, base, url, author, state: "open"\|"merged"\|"closed", draft, body, createdAt, additions, deletions, checks, failedRunId?, conflicts?, review?: "approved"\|"changes_requested"\|"review_required", autoMerge, checkRuns: [{name, state: "passing"\|"failing"\|"running"\|"skipped", url}], files: [{path, additions, deletions, patch?}], diffTruncated?, comments: [{author, body, at, url?, review?}], viewer?}`. `viewer` is the signed-in login, left out when gh can't say. `comments` are the PR's comments and its reviews with words or a verdict, oldest first; line comments are not in it. With `diff: true`, each file's hunks are its `patch`, at most 2000 lines in all; a file past that has none, and `diffTruncated` is true | `readOnlyHint: true` | `model`, `app`; `_meta.ui.resourceUri: "ui://ci/pr"` |
 | `merge_pr` (#837) | `repo`, `number`, optional `auto` | `{ merged, auto, url }`: `gh pr merge -R repo --squash --delete-branch` (`--auto` with `auto`). `-R` keeps gh off the server's folder, so only the branch on GitHub is deleted | none | `app` only: a person merges, never the model |
 | `review_pr` (#837) | `repo`, `number`, `event`: `approve`\|`request_changes`, `body` (needed to request changes) | `{ event, url }`: `gh pr review N -R repo --approve`\|`--request-changes [-b body]`. GitHub refuses either on the signed-in person's own PR | none | `app` only: a person reviews, never the model |
+| `list_branches` (#837) | `repo` | `{ base, branches: [{name, updatedAt, headline}] }`: branches pushed in the last 14 days with no open or merged PR, not the base, newest first (one GraphQL query of the newest 100) | `readOnlyHint: true` | `app` |
+| `fill_pr` (#837) | `repo`, `branch` | `{ base, title, body, commits }`, as `gh pr create --fill` writes them from the commits ahead of the base: one commit gives its first line and the rest; more give the branch's name and a list of first lines. An error when none are ahead | `readOnlyHint: true` | `app` |
+| `create_pr` (#837) | `repo`, `branch`, `title`, optional `body`, `draft` | `{ number, url }`: `gh pr create -R repo --head branch --base <default> --title --body [--draft]` | none | `app` only: a person creates it |
 
 ## Resources
 
@@ -71,6 +74,11 @@ all. The other `pr.*` events are left as they are: their data is a PR's number, 
   `list_prs` again.
 - A PR's title opens its page (below) in the same view, with **‹ Pull requests** back to a
   fresh list (#837).
+- Under the PRs, **Branches without a pull request** (`list_branches`, shown only when there
+  are some): each branch, its last commit's first line and how long ago, and **Create**.
+  Create opens a form in the page's place, filled in by `fill_pr`: a title, a description, and
+  **Open it as a draft**. **Create Pull Request** calls `create_pr`, and the new PR's page opens
+  (#837).
 - Links open through `ui/open-link`.
 - Because `list_prs` is read-only and `app`-visible, the view can be pinned with
   `{repo: "alexec/Agents"}`.

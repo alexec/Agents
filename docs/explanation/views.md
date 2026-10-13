@@ -149,7 +149,10 @@ The `ci` server's views are drawn as above, on all three clients alike, from its
 request's page (`ui://ci/pr`, fed by `get_pr`): its description, comments, files and diff and
 checks, with **Comment**, **Merge**, **Ask the Agent to Fix** and, on someone else's pull
 request, **Approve** and **Request Changes**. A title on the board opens
-the same page in place. **Merge** asks again in the page before it squash-merges and deletes the
+the same page in place. Under the pull requests, the board lists branches pushed in the last 14
+days that have none, each with **Create**: a form filled in from the branch's commits, as
+`gh pr create --fill` writes it, with a draft switch; the new pull request's page opens after.
+**Merge** asks again in the page before it squash-merges and deletes the
 branch. **Ask the Agent to Fix** is an `agents/message-agent` to the session on the PR's branch, so
 you send it, from a chat or a pin; with no session on the branch, it opens the new-agent form on
 that branch. The

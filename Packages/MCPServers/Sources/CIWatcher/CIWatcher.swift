@@ -288,6 +288,23 @@ public enum CIWatcher {
                                   "body": .string("The review's words, in Markdown; needed to request changes.", maxLength: 65536)],
                                  required: ["number", "event"]),
              meta: ["ui": ["visibility": ["app"]]]),
+        Tool(name: "list_branches", title: "List branches without a pull request",
+             description: "Branches pushed in the last 14 days that have no open or merged pull request, newest first, each with its last commit's first line, and the base a pull request would go into.",
+             inputSchema: Schema(["repo": repoProperty]),
+             annotations: ["readOnlyHint": true],
+             meta: ["ui": ["visibility": ["app"]]]),
+        Tool(name: "fill_pr", title: "Fill in a new pull request",
+             description: "What gh pr create --fill writes for a branch: a title and a body from its commits ahead of the base.",
+             inputSchema: Schema(["repo": repoProperty, "branch": .string("The branch on GitHub.")], required: ["branch"]),
+             annotations: ["readOnlyHint": true],
+             meta: ["ui": ["visibility": ["app"]]]),
+        Tool(name: "create_pr", title: "Create a pull request",
+             description: "Opens a pull request from a branch on GitHub into the repo's default branch, as the signed-in person; draft: true opens it as a draft. Only a view may call it: a person creates it.",
+             inputSchema: Schema(["repo": repoProperty, "branch": .string("The branch on GitHub."),
+                                  "title": .string("The title.", maxLength: 256),
+                                  "body": .string("The description, in Markdown.", maxLength: 65536),
+                                  "draft": .boolean("true: open it as a draft.")], required: ["branch", "title"]),
+             meta: ["ui": ["visibility": ["app"]]]),
     ]
 
     /// A tool's answer; anything that goes wrong, bad arguments included, is `isError` with why.
@@ -308,6 +325,22 @@ public enum CIWatcher {
                 return ToolResult.structured(try await gh.prDetail(repo: repo, number: a["number"]?.int ?? 0, diff: a["diff"]?.bool == true))
             case "merge_pr":
                 return ToolResult.structured(try await gh.mergePR(repo: repo, number: a["number"]?.int ?? 0, auto: a["auto"]?.bool == true))
+            case "list_branches":
+                let (base, branches) = try await gh.branchesWithoutPR(repo: repo)
+                return ToolResult.structured(["base": .string(base), "branches": .array(branches.map(\.json))])
+            case "fill_pr":
+                let branch = a["branch"]?.string ?? ""
+                let (base, commits) = try await gh.prFill(repo: repo, branch: branch)
+                guard !commits.isEmpty else { return ToolResult.error("\(branch) has no commits ahead of \(base)") }
+                let (title, body) = fillPR(branch: branch, messages: commits)
+                return ToolResult.structured(["base": .string(base), "title": .string(title), "body": .string(body), "commits": .int(commits.count)])
+            case "create_pr":
+                let title = (a["title"]?.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !title.isEmpty else { return ToolResult.error("A pull request needs a title") }
+                let branch = a["branch"]?.string ?? ""
+                let (base, _) = try await gh.prFill(repo: repo, branch: branch)
+                return ToolResult.structured(try await gh.createPR(repo: repo, branch: branch, base: base, title: title,
+                                                                  body: a["body"]?.string ?? "", draft: a["draft"]?.bool == true))
             case "review_pr":
                 guard let event = ReviewEvent(rawValue: a["event"]?.string ?? "") else {
                     return ToolResult.error("event is approve or request_changes")

@@ -6,7 +6,8 @@ import MCPServerKit
 /// A PR's `draft` is false when left out. An issue's, comment's or PR's `authorAssociation` is GitHub's (`OWNER`, `NONE`…); left out,
 /// it is `NONE`, as a stranger. A login ending `[bot]` is a bot.
 /// `"gh": "notSignedIn"` or `"gh": {"rateLimitedForMs": n}` makes every call fail that way.
-/// `viewer` is the signed-in login; left out, it is `alexec`.
+/// `viewer` is the signed-in login; left out, it is `alexec`. A repo's `branches` are
+/// `{name, updatedAt, commits: [message]}`, its base `defaultBranch` (`main` left out).
 public struct FakeGitHub: GitHub {
     public let file: URL
     /// Writes one at a time, so two at once don't lose one.
@@ -213,6 +214,51 @@ public struct FakeGitHub: GitHub {
     }
 
     static func viewer(_ data: JSON) -> String { data["viewer"]?.string ?? "alexec" }
+
+    func base(_ data: JSON, _ repo: String) -> String { repoOf(data, repo)["defaultBranch"]?.string ?? "main" }
+
+    public func branchesWithoutPR(repo: String) async throws -> (base: String, branches: [Branch]) {
+        let data = try load()
+        let taken = Set(list(data, repo, "prs").filter { ["open", "merged"].contains($0["state"]?.string ?? "open") }
+            .compactMap { $0["branch"]?.string })
+        let nodes: [JSON] = list(data, repo, "branches").map { b in
+            let name = b["name"]?.string ?? ""
+            return ["name": .string(name),
+                    "target": ["committedDate": b["updatedAt"] ?? "", "messageHeadline": .string(
+                        (b["commits"]?.array?.last?.string ?? "").split(separator: "\n").first.map(String.init) ?? "")],
+                    "associatedPullRequests": ["totalCount": .int(taken.contains(name) ? 1 : 0)]]
+        }
+        let answer: JSON = ["data": ["repository": ["defaultBranchRef": ["name": .string(base(data, repo))], "refs": ["nodes": .array(nodes)]]]]
+        return branchesFrom(graphQL: answer, now: Date())
+    }
+
+    public func prFill(repo: String, branch: String) async throws -> (base: String, commits: [String]) {
+        let data = try load()
+        guard let b = list(data, repo, "branches").first(where: { $0["name"]?.string == branch }) else {
+            throw GhError(.notFound, "not found on GitHub")
+        }
+        return (base(data, repo), (b["commits"]?.array ?? []).compactMap(\.string))
+    }
+
+    /// Opens it as the next number. Refused when the branch is not there or already has an open PR, as GitHub does.
+    public func createPR(repo: String, branch: String, base: String, title: String, body: String, draft: Bool) async throws -> JSON {
+        try change { data in
+            guard list(data, repo, "branches").contains(where: { $0["name"]?.string == branch }) else {
+                throw GhError(.failed, "gh: Head sha can't be blank, Base sha can't be blank, No commits between \(base) and \(branch)")
+            }
+            var prs = list(data, repo, "prs")
+            if prs.contains(where: { $0["branch"]?.string == branch && ($0["state"]?.string ?? "open") == "open" }) {
+                throw GhError(.failed, "gh: a pull request for branch \"\(branch)\" into branch \"\(base)\" already exists")
+            }
+            let number = (prs.compactMap { $0["number"]?.int }.max() ?? 0) + 1
+            let url = "https://github.com/\(repo)/pull/\(number)"
+            prs.append(["number": .int(number), "title": .string(title), "branch": .string(branch), "base": .string(base),
+                        "body": .string(body), "draft": .bool(draft), "author": .string(Self.viewer(data)), "authorAssociation": "OWNER",
+                        "url": .string(url), "state": "open", "updatedAt": .string(Time.string(Date()))])
+            data["repos"]?[repo]?["prs"] = .array(prs)
+            return ["number": .int(number), "url": .string(url)]
+        }
+    }
 
     /// Adds the viewer's review to it. Refused on one's own PR and on one not open, as GitHub does.
     public func reviewPR(repo: String, number: Int, event: ReviewEvent, body: String) async throws -> JSON {

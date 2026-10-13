@@ -455,12 +455,13 @@ func editIssue(_ r: inout JSON, _ number: Int, _ change: (inout JSON) -> Void) {
     @Test func toolsListAnnotationsAndVisibility() async throws {
         let tools = try #require(try await h.ok("tools/list")["tools"]?.array)
         let byName = Dictionary(tools.map { ($0["name"]?.string ?? "", $0) }) { a, _ in a }
-        #expect(byName.keys.sorted() == ["comment_on_pr", "failed_log", "get_pr", "list_issues", "list_prs", "merge_pr", "rerun_failed",
-                                         "review_pr"])
+        #expect(byName.keys.sorted() == ["comment_on_pr", "create_pr", "failed_log", "fill_pr", "get_pr", "list_branches", "list_issues",
+                                         "list_prs", "merge_pr", "rerun_failed", "review_pr"])
         for (name, readOnly, visibility) in [("list_issues", true, ["model", "app"]), ("list_prs", true, ["model", "app"]),
                                              ("failed_log", true, ["model"]), ("rerun_failed", false, ["model", "app"]),
                                              ("comment_on_pr", false, ["model", "app"]), ("get_pr", true, ["model", "app"]),
-                                             ("merge_pr", false, ["app"]), ("review_pr", false, ["app"])] {
+                                             ("merge_pr", false, ["app"]), ("review_pr", false, ["app"]),
+                                             ("list_branches", true, ["app"]), ("fill_pr", true, ["app"]), ("create_pr", false, ["app"])] {
             #expect(byName[name]?["annotations"]?["readOnlyHint"] == (readOnly ? true : nil), "\(name)")
             #expect(byName[name]?["_meta"]?["ui"]?["visibility"] == JSON(visibility), "\(name)")
         }
@@ -638,7 +639,8 @@ func editIssue(_ r: inout JSON, _ number: Int, _ change: (inout JSON) -> Void) {
     }
 
     @Test(arguments: [("list_prs", "ui://ci/board", ["rerun_failed", "list_prs", "get_pr", "merge_pr", "‹ Pull requests",
-                                                       "agents/message-agent"]),
+                                                       "agents/message-agent", "list_branches", "fill_pr", "create_pr",
+                                                       "Branches without a pull request", "Create Pull Request", "Open it as a draft"]),
                       ("list_issues", "ui://ci/issues", ["list_issues", "agents/start-agent", "Start Agent", "--add-assignee @me"]),
                       ("get_pr", "ui://ci/pr", ["get_pr", "merge_pr", "comment_on_pr", "ui/message", "Ask the Agent to Fix",
                                                        "agents/message-agent", "agents/start-agent", "branch: pr.branch",
@@ -762,6 +764,52 @@ func editIssue(_ r: inout JSON, _ number: Int, _ change: (inout JSON) -> Void) {
         let own = try await h.call("review_pr", ["repo": .string(repo), "number": 401, "event": "approve"])
         #expect(own["isError"] == true)
         #expect(own["content"]?.array?.first?["text"]?.string?.contains("your own pull request") == true)
+    }
+
+    /// A branch pushed lately with no PR is offered; Create fills it in from its commits and opens it.
+    @Test func aBranchWithoutAPRIsFilledInAndCreated() async throws {
+        try h.editRepo {
+            append(&$0, "branches",
+                   ["name": "agents/one-commit", "updatedAt": .string(now(-3_600_000)), "commits": ["Fold the sidebar\n\nFixes #885"]],
+                   ["name": "agents/two-commits", "updatedAt": .string(now(-60_000)), "commits": ["First step", "Second step\n\nMore."]],
+                   ["name": "agents/fold-faster", "updatedAt": .string(now()), "commits": ["Has a PR"]],
+                   ["name": "agents/old", "updatedAt": "2026-01-01T00:00:00Z", "commits": ["Old"]],
+                   ["name": "main", "updatedAt": .string(now()), "commits": []])
+        }
+        let listed = try await h.call("list_branches", ["repo": .string(repo)])["structuredContent"] ?? [:]
+        #expect(listed["base"] == "main")
+        #expect(listed["branches"]?.array?.compactMap { $0["name"]?.string } == ["agents/two-commits", "agents/one-commit"],
+                "newest first; none with a PR, none old, not the base")
+        #expect(listed["branches"]?.array?.first?["headline"] == "Second step")
+
+        let one = try await h.call("fill_pr", ["repo": .string(repo), "branch": "agents/one-commit"])["structuredContent"] ?? [:]
+        #expect(one == ["base": "main", "title": "Fold the sidebar", "body": "Fixes #885", "commits": 1])
+        let two = try await h.call("fill_pr", ["repo": .string(repo), "branch": "agents/two-commits"])["structuredContent"] ?? [:]
+        #expect(two["title"] == "Two commits")
+        #expect(two["body"] == "- First step\n- Second step")
+        let none = try await h.call("fill_pr", ["repo": .string(repo), "branch": "main"])
+        #expect(none["isError"] == true, "nothing ahead of the base")
+
+        let untitled = try await h.call("create_pr", ["repo": .string(repo), "branch": "agents/one-commit", "title": " "])
+        #expect(untitled["isError"] == true)
+        let made = try await h.call("create_pr", ["repo": .string(repo), "branch": "agents/one-commit", "title": "Fold the sidebar",
+                                                  "body": "Fixes #885", "draft": true])["structuredContent"] ?? [:]
+        let number = try #require(made["number"]?.int)
+        #expect(made["url"] == .string("https://github.com/\(repo)/pull/\(number)"))
+        let page = try await h.call("get_pr", ["repo": .string(repo), "number": .int(number)])["structuredContent"] ?? [:]
+        #expect(page["title"] == "Fold the sidebar")
+        #expect(page["branch"] == "agents/one-commit")
+        #expect(page["draft"] == true)
+        let after = try await h.call("list_branches", ["repo": .string(repo)])["structuredContent"] ?? [:]
+        #expect(after["branches"]?.array?.compactMap { $0["name"]?.string } == ["agents/two-commits"], "with its PR, it leaves the list")
+        let twice = try await h.call("create_pr", ["repo": .string(repo), "branch": "agents/one-commit", "title": "Again"])
+        #expect(twice["isError"] == true)
+    }
+
+    @Test func fillWritesWhatGhFillWrites() {
+        #expect(fillPR(branch: "agents/x", messages: ["Title line\n\nBody\nmore"]) == ("Title line", "Body\nmore"))
+        #expect(fillPR(branch: "agents/x", messages: ["Only a title"]) == ("Only a title", ""))
+        #expect(fillPR(branch: "agents/fix-the_fold", messages: ["a\nb", "c"]) == ("Fix the fold", "- a\n- c"))
     }
 
     @Test func mergePrMergesAndDeletesTheBranchOrTurnsOnAutoMerge() async throws {

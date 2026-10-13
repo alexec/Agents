@@ -2,12 +2,15 @@
 // Each is a page with no network: it talks to the host only through postMessage.
 
 /// `ui://ci/board`: the open pull requests with a check pill, and Rerun on a failing one. A
-/// PR's title opens its page in the same view (#837).
+/// PR's title opens its page in the same view (#837). Under them, branches without a pull
+/// request, each with Create (#837).
 let boardHTML = #"""
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Pull requests</title>
 <!-- The CI watcher's board (ui://ci/board): list_prs's result, with Rerun on a failing PR.
      A PR's title opens its page (get_pr, #837) in place, with a way back to the list.
+     Branches without a pull request (list_branches) each have Create: a form filled in from the
+     branch's commits (fill_pr), then create_pr, then the new PR's page.
      It has no network: it speaks only the MCP Apps postMessage bridge to its host. -->
 <style>
 :root { color-scheme: light dark;
@@ -46,6 +49,16 @@ button { font: inherit; font-size: 13px; color: var(--color-text-primary); backg
 button:disabled { opacity: 0.5; cursor: default; }
 .error { color: var(--color-text-danger); font-size: var(--font-text-sm-size); }
 #list { display: grid; gap: 8px; }
+#branches[hidden] { display: none; }
+#branches { display: grid; gap: 4px; margin-top: 8px; }
+#branches h2 { font-size: 13px; margin: 0; font-weight: 600; color: var(--color-text-secondary); }
+#branches li { grid-template-columns: 1fr auto; }
+#branches .headline { grid-column: 1; font-size: var(--font-text-sm-size); color: var(--color-text-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.form { display: grid; gap: 6px; }
+.form input[type=text] { font: inherit; color: inherit; background: var(--color-background-primary); border: 1px solid var(--color-border-primary);
+  border-radius: var(--border-radius-sm); padding: 4px 8px; }
+.form label { display: flex; gap: 6px; align-items: center; font-size: 13px; }
 a.title { color: inherit; }
 \#(prPageCSS)
 </style></head>
@@ -54,6 +67,7 @@ a.title { color: inherit; }
     <button id="refresh" type="button" disabled>Refresh</button></header>
   <div id="state" class="muted">Waiting for the host…</div>
   <ul id="prs"></ul>
+  <div id="branches" hidden><h2>Branches without a pull request</h2><div id="branchState" class="muted"></div><ul id="branchList"></ul></div>
 </div><div id="page" hidden></div></main>
 <script>
 \#(prPageJS)
@@ -100,6 +114,86 @@ a.title { color: inherit; }
     $("prs").replaceChildren(...prs.map(row));
     say(prs.length ? `${prs.length} open · as of ${new Date().toLocaleTimeString()}` : "No open pull requests.");
     $("refresh").disabled = !repo;
+    branches();
+  };
+
+  // Branches pushed lately with no pull request, each with Create (#837).
+  const ago = (time) => {
+    const minutes = Math.max(0, Math.round((Date.now() - Date.parse(time)) / 60000));
+    if (!Number.isFinite(minutes)) return "";
+    if (minutes < 60) return minutes + "m ago";
+    if (minutes < 48 * 60) return Math.round(minutes / 60) + "h ago";
+    return Math.round(minutes / 1440) + "d ago";
+  };
+  const branches = async () => {
+    if (!repo) return;
+    try {
+      const result = await request("tools/call", { name: "list_branches", arguments: { repo } });
+      if (!result || result.isError) throw new Error(errorText(result));
+      const found = (result.structuredContent || JSON.parse(result.content[0].text)).branches || [];
+      $("branchList").replaceChildren(...found.map(branchRow));
+      $("branchState").textContent = "";
+      $("branches").hidden = !found.length;
+    } catch (e) {
+      $("branchState").textContent = "Couldn't list branches: " + e.message;
+      $("branchList").replaceChildren();
+      $("branches").hidden = false;
+      log("list_branches: " + e.message, "warning");
+    }
+  };
+  const branchRow = (b) => {
+    const create = el("button", { type: "button", textContent: "Create", title: `A pull request from ${b.name}` });
+    create.onclick = () => { $("list").hidden = true; $("page").hidden = false; createForm(b.name); };
+    return el("li", {}, [
+      el("span", { className: "branch", textContent: b.name, title: b.name }),
+      create,
+      el("span", { className: "headline", textContent: [b.headline, ago(b.updatedAt)].filter(Boolean).join(" · "), title: b.headline || "" }),
+    ]);
+  };
+
+  // The new pull request's form, in the page's place: title and body from the branch's commits,
+  // as gh pr create --fill writes them. The person creates it, or goes back.
+  const createForm = async (branch) => {
+    const root = $("page");
+    const head = el("div", { className: "bar" }, [button("‹ Pull requests", back)]);
+    root.replaceChildren(head, el("div", { className: "muted", textContent: `Filling in a pull request from ${branch}…` }));
+    let fill;
+    try {
+      const result = await request("tools/call", { name: "fill_pr", arguments: { repo, branch } });
+      if (!result || result.isError) throw new Error(errorText(result));
+      fill = result.structuredContent || JSON.parse(result.content[0].text);
+    } catch (e) {
+      root.replaceChildren(head, el("div", { className: "error", textContent: `Couldn't fill in a pull request from ${branch}: ` + e.message }));
+      return;
+    }
+    const title = el("input", { type: "text", value: fill.title || "", placeholder: "Title" });
+    const body = el("textarea", { value: fill.body || "", placeholder: "Description", rows: 8 });
+    const draft = el("input", { type: "checkbox" });
+    const status = el("div", { className: "muted" });
+    const create = button("Create Pull Request", async () => {
+      if (!title.value.trim()) { status.className = "error"; status.textContent = "A pull request needs a title."; return; }
+      create.disabled = true;
+      try {
+        const result = await request("tools/call", { name: "create_pr", arguments: { repo, branch, title: title.value, body: body.value, draft: draft.checked } });
+        if (!result || result.isError) throw new Error(errorText(result));
+        const made = result.structuredContent || JSON.parse(result.content[0].text);
+        log(`create #${made.number} from ${branch}`);
+        page.show(made.number);
+      } catch (e) { create.disabled = false; status.className = "error"; status.textContent = "Couldn't create it: " + e.message; }
+    }, { className: "primary" });
+    root.replaceChildren(head,
+      el("h2", { textContent: "New pull request" }),
+      el("div", { className: "branch", textContent: `${branch} → ${fill.base} · ${fill.commits} commit${fill.commits === 1 ? "" : "s"}` }),
+      el("div", { className: "form" }, [title, body, el("label", {}, [draft, "Open it as a draft"])]),
+      el("div", { className: "actions" }, [el("span", { className: "grow" }), button("Cancel", back), create]),
+      status);
+    title.focus();
+    size();
+  };
+  const button = (text, onclick, props) => {
+    const b = el("button", Object.assign({ type: "button", textContent: text }, props || {}));
+    b.onclick = onclick;
+    return b;
   };
 
   const row = (pr) => {
