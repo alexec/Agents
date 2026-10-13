@@ -47,10 +47,17 @@ public actor ProviderConnection: WorkspaceProvider {
         public var capabilities: [String]
         public var contract: Int
         public var workspaces: [DaemonAPI.WorkspaceInfo]
-        public init(capabilities: [String] = [], contract: Int = 1, workspaces: [DaemonAPI.WorkspaceInfo]) {
+        /// For a tool map: how many items were at `list.items`, and the first, so a writer
+        /// can see what a map that reads none of them missed (#858).
+        public var items: Int?
+        public var firstItem: JSONValue?
+        public init(capabilities: [String] = [], contract: Int = 1, workspaces: [DaemonAPI.WorkspaceInfo],
+                    items: Int? = nil, firstItem: JSONValue? = nil) {
             self.capabilities = capabilities
             self.contract = contract
             self.workspaces = workspaces
+            self.items = items
+            self.firstItem = firstItem
         }
     }
 
@@ -139,11 +146,14 @@ public actor ProviderConnection: WorkspaceProvider {
             }
             contract = said
         } else if ToolMapping.value(mapping.listing.items, in: content)?.arrayValue == nil {
-            throw ProviderFailure("The tool map’s list.items finds no list in what \(mapping.list.tool) answered.")
+            let keys = content.objectValue.map { " Its answer has the keys \($0.keys.sorted().joined(separator: ", "))." } ?? ""
+            throw ProviderFailure("The tool map’s list.items finds no list in what \(mapping.list.tool) answered.\(keys)")
         }
+        let items = mapping.native ? nil : ToolMapping.value(mapping.listing.items, in: content)?.arrayValue
         let capabilities = mapping.native ? ToolMapping.optional.filter { tools.contains($0.key) }.map(\.value).sorted()
             : mapping.capabilities
-        return Checked(capabilities: capabilities, contract: contract, workspaces: mapping.workspaces(content))
+        return Checked(capabilities: capabilities, contract: contract, workspaces: mapping.workspaces(content),
+                       items: items?.count, firstItem: items?.first)
     }
 
     /// Every tool the server offers, as it described them (#858): what a writing agent

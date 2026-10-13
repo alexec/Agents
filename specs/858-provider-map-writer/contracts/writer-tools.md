@@ -9,7 +9,7 @@ a line that says so (FR-015). Every call is a step.
 |---|---|---|---|
 | `read_tools` | none | MCP | Each tool of the server: its name, description, input schema and annotations. |
 | `read_help` | `words: [String]` | CLI | The output of `‹cli› ‹words…› --help`. `words` are plain words (letters, digits, `-`, `_`). Nothing else runs. |
-| `check_draft` | `draft: object` | both | "Passed: listed N: …" with each workspace as the map reads it, or "Failed: ‹the check's words›". Or "The person must run this check: ‹reason›", when the safety rules say ask (FR-013, FR-014), and then the answer of the person's Run Check. |
+| `check_draft` | `draft: object` | both | "Passed: listed N: …" with each workspace as the map reads it, or "Failed: ‹the check's words›". When the map reads fewer items than `list.items` holds, the answer also gives how many it missed and the first item as JSON, cut at 2 KB. When `list.items` finds no list, the failure names the answer's keys. Or "The person must run this check: ‹reason›", when the safety rules say ask (FR-013, FR-014), and then the answer of the person's Run Check. |
 | `prove_start` | `workspace: String` | both | "Started ‹name›: ‹state›" or "Failed: …" or "The person said no." Waits for the person (R6). |
 | `prove_stop` | `workspace: String` | both | As `prove_start`. |
 | `send_draft` | `draft: object`, `note: String` | both | "Sent." The draft goes to the sheet. The last one sent is the result. The agent should end its turn. |
