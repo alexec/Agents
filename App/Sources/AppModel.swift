@@ -43,7 +43,7 @@ final class AppModel {
     /// 021: the Mac's banner, and the window's report of where the person is. Neither
     /// decides anything; the daemon routes and these two obey.
     private let notifier = MacNotifier()
-    private var presence: PresenceReporter?
+    var presence: PresenceReporter?
     /// The loop going back for a lost daemon, while there is one.
     private var reconnecting: Task<Void, Never>?
     /// One connect at a time. `attempt` can call `connect` while the reconnect loop's
@@ -537,6 +537,12 @@ final class AppModel {
     /// A counter rather than a flag, so two asks in a row both land. The end of a
     /// transcript is not an entry, which is why this is not `focusedEntry`.
     private(set) var scrollToEndToken = 0
+
+    /// The sessions open in windows of their own (#826), each with its own page of its
+    /// transcript. See `AppModel+Popouts`.
+    var popouts: [UUID: PoppedChat] = [:]
+    /// The one of them in the key window, if one is: what the person is watching.
+    @ObservationIgnored var popoutInFront: UUID?
 
     func scrollToEnd() { scrollToEndToken += 1 }
 
@@ -2520,7 +2526,7 @@ final class AppModel {
         let shown = work.shown
         listening = Task.detached(priority: .userInitiated) { [weak self] in
             for await notification in notifications {
-                let update = AgentsModel.read(notification.method, notification.params, showing: shown.id)
+                let update = AgentsModel.read(notification.method, notification.params, showing: shown.id, alsoShowing: shown.also)
                 await self?.received(notification.method, notification.params, update)
             }
             // The daemon went, or the connection did. A list that has quietly stopped
@@ -2536,6 +2542,7 @@ final class AppModel {
         // Mac's own: the shells and terminals a phone has no business with.
         if let update {
             work.apply(update)
+            applyToPopouts(update)
             if case .projectChanged = update { settleProjectSelection() }
             // And the other way: every server hears what the Mac learned about a plan it
             // relays (052, R6). Only a newer word changes anything there.
@@ -2645,7 +2652,7 @@ final class AppModel {
         let shown = work.shown
         hosts.onNotification = { [weak self] host, method, params in
             // Read off the main actor, as the Mac's own are (#203).
-            let update = await Task.detached { AgentsModel.read(method, params, showing: shown.id) }.value
+            let update = await Task.detached { AgentsModel.read(method, params, showing: shown.id, alsoShowing: shown.also) }.value
             await self?.receivedFromServer(host, method, params, update)
         }
         hosts.offerFor = { [weak self] id in self?.credentialOffer(id) }
@@ -2880,7 +2887,7 @@ final class AppModel {
             Task.detached(priority: .userInitiated) { [weak self] in
                 for await note in server.notifications() {
                     // Read here, off the main actor, and applied there (#203).
-                    let update = AgentsModel.read(note.method, note.params, showing: shown.id)
+                    let update = AgentsModel.read(note.method, note.params, showing: shown.id, alsoShowing: shown.also)
                     await self?.receivedFromServer(id, note.method, note.params, update)
                 }
             }
@@ -2951,6 +2958,7 @@ final class AppModel {
         }
         if let update {
             work.apply(update, from: host)
+            applyToPopouts(update)
             if method == DaemonAPI.Notification.projectChanged { settleProjectSelection() }
             return
         }
@@ -3057,6 +3065,7 @@ final class AppModel {
             work.replaceElicitations(work.elicitations.filter { !theirs.contains($0.agentID) } + listed)
         }
         if let watching = selection, theirs.contains(watching) { await loadTranscript() }
+        for chat in popouts.values where theirs.contains(chat.id) { await loadTranscript(of: chat) }
     }
 
     func refreshEverything() async {
@@ -3091,7 +3100,8 @@ final class AppModel {
         async let events: Void = refreshEvents()
         async let modes: Void = refreshModes()
         async let transcript: Void = loadTranscript()
-        _ = await (runtimes, accounts, workflows, pinned, permissions,
+        async let popped: Void = loadPoppedTranscripts()
+        _ = await (popped, runtimes, accounts, workflows, pinned, permissions,
                    elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
                    transcript, runtimeStates, sandbox, person, disk, storeNotes, hostedMCP, mcpHealth)
         #if DEBUG
@@ -3546,7 +3556,7 @@ final class AppModel {
             self.openAgent(agentID)
         }
         notifier.openProject = { [weak self] folder in self?.openProject(ProjectKey(host: .mac, folder: folder)) }
-        let reporter = PresenceReporter { [weak self] watching, active, showing in
+        let reporter = PresenceReporter { [weak self] watching, active, showing, popped in
             guard let self else { return }
             // Every host hears whether the person is here; only the one the open
             // conversation lives on hears which it is, since that is what marks it read
@@ -3554,10 +3564,14 @@ final class AppModel {
             // finished turns stayed under Needs you however often they were opened. The
             // same host hears which chat is open, in front or not, which is where it sends
             // that agent's entries and output (#203).
+            // Chats in windows of their own go to their own hosts the same way (#826).
             let owner = showing.map { self.host(ofAgent: $0) }
+            let watcher = watching.map { self.host(ofAgent: $0) }
+            let poppedHosts = popped.sorted { $0.uuidString < $1.uuidString }.map { ($0, self.host(ofAgent: $0)) }
             func report(for host: HostID) -> DaemonAPI.PresenceReport {
-                DaemonAPI.PresenceReport(watching: owner == host ? watching : nil, active: active,
-                                         showing: owner == host ? showing : nil)
+                DaemonAPI.PresenceReport(watching: watcher == host ? watching : nil, active: active,
+                                         showing: owner == host ? showing : nil,
+                                         alsoShowing: poppedHosts.filter { $0.1 == host }.map(\.0))
             }
             if self.hasMacHost {
                 _ = try? await self.client.call(DaemonAPI.Method.presenceReport, report(for: .mac))
@@ -3569,6 +3583,8 @@ final class AppModel {
             // stale while nobody was looking.
             if active { await self.refreshAttention() }
         }
+        // Windows of their own restored at launch opened before there was a reporter (#826).
+        reporter.popped(Set(popouts.keys), inFront: popoutInFront)
         reporter.start()
         presence = reporter
     }
@@ -3667,6 +3683,76 @@ final class AppModel {
         await whole
     }
 
+    /// A session's transcript in a window of its own (#826), loaded as the main window's
+    /// is, into that window's own page of it.
+    func loadTranscript(of chat: PoppedChat) async {
+        let id = chat.id
+        let load = chat.work.beginTranscriptLoad()
+        async let whole: Void = loadWholeAgent(id)
+        let host = host(ofAgent: id)
+        var reason: String?
+        let loaded = await attempt(on: host) {
+            let client = self.client(for: host)
+            do {
+                let opening = try await ChatOpening.load(
+                    turns: {
+                        try await client.call(DaemonAPI.Method.agentsTurns, DaemonAPI.TurnsRequest.opening(id),
+                                              returning: TurnsPage.self)
+                    },
+                    transcript: { from in
+                        try await client.call(DaemonAPI.Method.agentsTranscript,
+                                              DaemonAPI.TranscriptRequest(agentID: id, from: from),
+                                              returning: TranscriptPage.self)
+                    },
+                    describe: { self.describe($0) })
+                // A window closed while it loaded has nothing to put it in.
+                guard self.popouts[id] === chat else { return }
+                _ = chat.work.takeOpening(opening, load: load)
+            } catch {
+                reason = self.describe(error)
+                throw error
+            }
+        }
+        if !loaded, popouts[id] === chat {
+            let why = reason ?? (macHostNotice?.action ?? HostSet.macDownProblem)
+            Self.chatLog.notice("history of \(id) did not load in its own window from \(host.rawValue, privacy: .public): \(why, privacy: .public)")
+            chat.work.failOpening(why, load: load)
+        }
+        await whole
+        // Looked for: from here a session not in hand is one that has gone.
+        chat.looked = true
+    }
+
+    /// Every window of its own's transcript again, as on a reconnect (#826).
+    func loadPoppedTranscripts() async {
+        for chat in popouts.values { await loadTranscript(of: chat) }
+    }
+
+    /// An earlier page of a session in a window of its own (#826), as `loadEarlier`.
+    func loadEarlier(of chat: PoppedChat) async {
+        let id = chat.id
+        let work = chat.work
+        guard work.hasMoreOfTheConversation else { return }
+        if !work.hasMoreBefore {
+            await attempt {
+                let turns = try await self.client(forAgent: id).call(
+                    DaemonAPI.Method.agentsTurns, DaemonAPI.TurnsRequest(agentID: id, before: work.firstTurn),
+                    returning: TurnsPage.self)
+                guard self.popouts[id] === chat else { return }
+                work.prependTurns(turns)
+            }
+            return
+        }
+        await attempt {
+            let page = try await self.client(forAgent: id).call(
+                DaemonAPI.Method.agentsTranscript,
+                DaemonAPI.TranscriptRequest(agentID: id, before: work.firstEntryIndex, from: work.openTurnStart),
+                returning: TranscriptPage.self)
+            guard self.popouts[id] === chat else { return }
+            work.prepend(page)
+        }
+    }
+
     /// Where a chat that did not open says why (#400).
     nonisolated private static let chatLog = Logger(subsystem: "com.alexecollins.Agents", category: "chat")
 
@@ -3677,6 +3763,7 @@ final class AppModel {
             returning: TranscriptPage.self),
               let entry = page.entries.first(where: { $0.id == entryID }) else { return }
         work.fillOversized(entry, for: agentID)
+        popouts[agentID]?.work.fillOversized(entry, for: agentID)
     }
 
     /// A finished turn's entries, for the chat to open it: the last page of them when
@@ -4060,8 +4147,9 @@ final class AppModel {
     /// way this is the same call: whether there is room for it is not the window's
     /// question to answer.
     @discardableResult
-    func send(_ text: String, attachments: [Attachment] = []) async -> Bool {
-        guard let selection, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+    func send(_ text: String, attachments: [Attachment] = [], to agentID: UUID? = nil) async -> Bool {
+        // The main window's chat, or the one in a window of its own that sent it (#826).
+        guard let selection = agentID ?? selection, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         let host = host(ofAgent: selection)
         // A stopped workspace that starts when used: kept by the control plane (#691 US3).
         if host != .mac, hosts.isOffline(host), startsWhenUsed(host) {
@@ -4232,8 +4320,11 @@ final class AppModel {
     /// What the runtime behind the current agent, or the draft, says it will take.
     /// Nothing is refused on a guess: this is what the runtime advertised.
     var promptCapabilities: ACP.PromptCapabilities {
-        let runtimeID = selectedAgent?.runtimeID ?? draftRuntimeID
-        return runtimeID.flatMap { accounts[$0]?.promptCapabilities } ?? ACP.PromptCapabilities()
+        promptCapabilities(for: selectedAgent?.runtimeID ?? draftRuntimeID)
+    }
+
+    func promptCapabilities(for runtimeID: String?) -> ACP.PromptCapabilities {
+        runtimeID.flatMap { accounts[$0]?.promptCapabilities } ?? ACP.PromptCapabilities()
     }
 
     func refreshAccounts() async {

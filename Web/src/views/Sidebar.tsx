@@ -33,7 +33,7 @@ import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./Contex
 import { CloningRows, EmptyProjects, NewProjectMenu } from "./NewProject";
 import { putFilesInDropbox, useDropboxDrop } from "./DropboxDialog";
 import { rowExtras, SessionRow } from "./SessionRow";
-import { RenameInput, runSessionAction, sessionActions, startedBy } from "./SessionMenu";
+import { openInNewTab, RenameInput, runSessionAction, sessionActions, startedBy } from "./SessionMenu";
 import { markAgentOf, treeRows, type TreeRow } from "../model/tree";
 import { WorkflowRow } from "./WorkflowRow";
 import { PinnedPageRows } from "./Pins";
@@ -666,6 +666,8 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
     void store.arrangeSessionPins(host, folder, ids);
   };
   const menu = (): MenuItem[] => [
+    // Beside this tab or in a window of its own (#826), as the Mac's Open in New Window.
+    { label: "Open in New Tab", help: "Open this session in a new browser tab", run: () => openInNewTab(host, agent) },
     ...sessionActions(agent, store.sessionPinsIn(host, folder).includes(agent.id), startedBy(store, host, agent)).map(({ action, label: words, help }) => ({
       label: words, help, disabled: down || !!store.onItsWay.value[agent.id],
       run: () => runSessionAction(store, host, agent, action),

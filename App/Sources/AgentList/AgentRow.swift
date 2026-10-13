@@ -8,6 +8,7 @@ import SwiftUI
 /// is the thing you came to find out.
 struct AgentRow: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
     /// The agent as the list had it when it drew this row. Only its id is trusted.
     private let given: Agent
     /// A row of the Mac's sessions list rather than a card on a page: a list-sized
@@ -252,6 +253,9 @@ struct AgentRow: View {
         .padding(.leading, tree?.isChild == true ? 22 : 0)
         .fixedSize(horizontal: false, vertical: true)
         .contextMenu {
+            // Beside the main window or on another screen (#826).
+            Button("Open in New Window") { openWindow(id: MainWindow.poppedSceneID, value: agent.id) }
+            Divider()
             if model.isBlocked(agent) {
                 Button(AgentsModel.carryOnLabel) { Task { await model.carryOn(agent.id) } }
             }

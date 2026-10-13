@@ -185,10 +185,16 @@ public final class AgentsModel {
     public final class Shown: @unchecked Sendable {
         private let lock = NSLock()
         private var held: UUID?
+        private var others: Set<UUID> = []
         public init() {}
         public var id: UUID? {
             get { lock.withLock { held } }
             set { lock.withLock { held = newValue } }
+        }
+        /// The chats open in windows of their own (#826), whose entries are read too.
+        public var also: Set<UUID> {
+            get { lock.withLock { others } }
+            set { lock.withLock { others = newValue } }
         }
     }
 
@@ -400,13 +406,14 @@ public final class AgentsModel {
     /// agentID alone, before the rest of it is decoded (#203). A host sends them only to
     /// the client showing that agent; this is for the moment the chat changes, and for a
     /// host from before.
-    public nonisolated static func read(_ method: String, _ params: JSONValue?, showing: UUID?? = nil) -> Update? {
+    public nonisolated static func read(_ method: String, _ params: JSONValue?, showing: UUID?? = nil,
+                                        alsoShowing: Set<UUID> = []) -> Update? {
         func decode<T: Decodable>(_ type: T.Type, _ wrap: (T) -> Update) -> Update {
             (try? params?.decode(type)).map(wrap) ?? .unreadable
         }
         if let showing, method == DaemonAPI.Notification.agentEntry || method == DaemonAPI.Notification.agentTerminalOutput {
             let agentID = params?["agentID"]?.stringValue.flatMap(UUID.init(uuidString:))
-            guard let agentID, agentID == showing else { return .skipped }
+            guard let agentID, agentID == showing || alsoShowing.contains(agentID) else { return .skipped }
         }
         switch method {
         case DaemonAPI.Notification.agentChanged: return decode(Agent.self, Update.agentChanged)

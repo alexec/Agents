@@ -58,6 +58,15 @@ struct AgentsCommands: Commands {
 
     /// Off unless asked for. The session draws thinking only while this is on.
     @AppStorage(TurnDisplay.defaultsKey) private var turnDetail = TurnDisplay.initial
+    /// The session in the key window when that is a window of its own (#826).
+    @FocusedValue(\.poppedChat) private var popped
+    @Environment(\.openWindow) private var openWindow
+
+    /// What the Session menu acts on: the key window's session, which is the main
+    /// window's selection unless a session's own window is in front (#826).
+    private var sessionAgent: Agent? {
+        popped.map { model.work.agent($0.id) } ?? model.selectedAgent
+    }
 
     static let helpURL = URL(string: "https://alexec.github.io/Agents/")!
 
@@ -125,8 +134,9 @@ struct AgentsCommands: Commands {
             ForEach(Array(SidebarPane.allCases.enumerated()), id: \.element) { index, pane in
                 Button(pane.title) { show(pane) }
                     .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")))
-                    // Off while a question card is up: ⌘1…n answer that card instead.
-                    .disabled(model.selectedAgent == nil || !inspectorFits || answeringCard)
+                    // Off while a question card is up: ⌘1…n answer that card instead. A
+                    // session's own window has no inspector (#826).
+                    .disabled(model.selectedAgent == nil || !inspectorFits || answeringCard || popped != nil)
             }
             // The project's own shell (#418), the editor's key for a terminal. ⌘J,
             // the usual panel key, is Next Needing Attention.
@@ -152,9 +162,9 @@ struct AgentsCommands: Commands {
             // A menu item rather than a shortcut on the button. The button only
             // exists while you are scrolled away from the end, which is precisely
             // when a keyboard route is no help if it lives on the button.
-            Button("Jump to Latest") { model.scrollToEnd() }
+            Button("Jump to Latest") { if let popped { popped.scrollToEnd() } else { model.scrollToEnd() } }
                 .keyboardShortcut(.downArrow, modifiers: .command)
-                .disabled(model.selectedAgent == nil)
+                .disabled(sessionAgent == nil)
             // What every turn starts at (069). Thinking is part of Details now, so
             // Show Thinking went with it.
             Picker("Turns", selection: $turnDetail) {
@@ -169,7 +179,7 @@ struct AgentsCommands: Commands {
         }
 
         CommandMenu("Session") {
-            let agent = model.selectedAgent
+            let agent = sessionAgent
             // Held while something is already on its way to it (#87).
             let acting = agent.flatMap { model.acting($0.id) } != nil
             Button("Stop") { act { await model.stop($0.id) } }
@@ -197,13 +207,22 @@ struct AgentsCommands: Commands {
             // The person's title (#751), edited in the toolbar.
             Button("Rename…") {
                 guard let agent else { return }
-                model.renaming = Renaming(id: agent.id, inToolbar: true)
+                if let popped { popped.isRenaming = true } else { model.renaming = Renaming(id: agent.id, inToolbar: true) }
             }
             .disabled(agent == nil || agent?.state == .archived)
             Divider()
             Button("Branch") { act { await model.fork($0.id) } }
                 .keyboardShortcut("b", modifiers: [.command, .option])
                 .disabled(agent == nil || agent?.state == .archived)
+            Divider()
+            // Beside the main window or on another screen (#826). Its own window is
+            // already one.
+            Button("Open in New Window") {
+                guard let agent else { return }
+                openWindow(id: MainWindow.poppedSceneID, value: agent.id)
+            }
+            .keyboardShortcut("o", modifiers: [.command, .option])
+            .disabled(agent == nil || popped != nil)
         }
 
         CommandMenu("Go") {
@@ -304,12 +323,12 @@ struct AgentsCommands: Commands {
     // MARK: Session
 
     private func act(_ work: @escaping (Agent) async -> Void) {
-        guard let agent = model.selectedAgent else { return }
+        guard let agent = sessionAgent else { return }
         Task { await work(agent) }
     }
 
     private func archive() {
-        guard let agent = model.selectedAgent, agent.state != .archived else { return }
+        guard let agent = sessionAgent, agent.state != .archived else { return }
         Task { await model.archive(agent.id, andLeave: true) }
     }
 

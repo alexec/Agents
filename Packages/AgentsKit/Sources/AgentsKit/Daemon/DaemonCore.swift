@@ -867,27 +867,29 @@ public actor DaemonCore {
         }
     }
 
-    /// The agent each connection shows, as its presence last said (#203). In a box rather
+    /// The agents each connection shows, as its presence last said (#203): the one in its
+    /// main window, and any it has open in windows of their own (#826). In a box rather
     /// than on the actor because a terminal's reader addresses its output from off it.
     public final class ShowingBox: @unchecked Sendable {
         private let lock = NSLock()
-        private var shown: [UUID: UUID] = [:]
+        private var shown: [UUID: Set<UUID>] = [:]
 
-        /// Returns whether it moved.
+        /// Returns the agents newly shown, which are sent what their terminals hold; an
+        /// empty set when none were added, even if some were let go.
         @discardableResult
-        func set(_ agentID: UUID?, for connection: UUID) -> Bool {
+        func set(_ agents: Set<UUID>, for connection: UUID) -> Set<UUID> {
             lock.withLock {
-                guard shown[connection] != agentID else { return false }
-                shown[connection] = agentID
-                return true
+                let before = shown[connection] ?? []
+                shown[connection] = agents.isEmpty ? nil : agents
+                return agents.subtracting(before)
             }
         }
 
         func connections(showing agentID: UUID) -> Set<UUID> {
-            lock.withLock { Set(shown.compactMap { $0.value == agentID ? $0.key : nil }) }
+            lock.withLock { Set(shown.compactMap { $0.value.contains(agentID) ? $0.key : nil }) }
         }
 
-        var agents: Set<UUID> { lock.withLock { Set(shown.values) } }
+        var agents: Set<UUID> { lock.withLock { shown.values.reduce(into: []) { $0.formUnion($1) } } }
     }
 
     public final class CloserBox: @unchecked Sendable {

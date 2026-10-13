@@ -19,6 +19,8 @@ struct PermissionView: View {
     @Environment(AppModel.self) private var model
     @Environment(SidebarFrame.self) private var frame
     @Environment(SidebarStates.self) private var states
+    /// Set in a window of its own (#826), which has no Files pane.
+    @Environment(\.poppedChat) private var popped
     let request: PermissionRequest
 
     /// Which option was clicked, while its answer is on the way. Every answer is held
@@ -158,6 +160,7 @@ struct PermissionView: View {
 
     /// The same as the daemon's own showing of it: the files pane, open on the plan.
     private func show(_ file: ShownFile) {
+        if popped != nil, let agent = model.work.agent(request.agentID) { return model.open(file.url, on: agent.host) }
         let state = states.state(for: request.agentID)
         state.folder = file.url.deletingLastPathComponent()
         state.openFile = file.url

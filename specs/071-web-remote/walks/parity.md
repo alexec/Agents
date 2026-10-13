@@ -15,12 +15,12 @@
 
 ## Counts
 
-Of 222 rows: **150 same**, **45 by design**, **27 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 223 rows: **150 same**, **45 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
 | Sidebar and project list | 13 | 4 | 5 |
-| Session rows and states | 16 | 2 | 5 |
+| Session rows and states | 16 | 2 | 6 |
 | Chat turns and turn detail | 24 | 4 | 2 |
 | Prompt bar and queued prompts | 20 | 3 | 0 |
 | Question and permission cards | 14 | 3 | 0 |
@@ -36,9 +36,9 @@ Of 222 rows: **150 same**, **45 by design**, **27 delta** (after #188, #189, #19
 | Hosts, connection and pairing | 3 | 3 | 0 |
 | MCP Apps views | 5 | 1 | 0 |
 
-The deltas are tracked by 29 issues:
+The deltas are tracked by 30 issues:
 - **Already open:** #226 (the Remote's one sidebar) and #235 (the page's one sidebar at phone width).
-- **Filed by this audit, the Remote to change:** #238 (with the page), #239, #240, #241, #242, #243, #244, #245, #246 (with one web row), #247, #248, #249.
+- **Filed by this audit, the Remote to change:** #238 (with the page), #239, #240, #241, #242, #243, #244, #245, #246 (with one web row), #247, #248, #249, #888.
 - **The page to change:** #250, #251, #252, #253, #254, #255, #256, #257, #260, #261, #262.
 - **The window to change, or more than one side:** #264, #265, #266.
 - **Alex to decide** (one client only, nothing says whether that is meant): #267.
@@ -106,6 +106,7 @@ The deltas are tracked by 29 issues:
 | Swipe waits for the swipe to close (#74) | Yes | Yes | n/a | **by design** (the page has no swipe) |
 | Mark Read / Unread reaches the agent's host | Per host | Per host: `R/RemoteModel.swift:2493-2507` | Per host: `W/views/SessionMenu.tsx:78` | **same** (#238) |
 | Rename | None | None | None | **same** |
+| A session in a window of its own (#826) | Session ▸ Open in New Window (⌥⌘O) and the row's menu: `A/Sessions/PoppedChatWindow.swift`, its own page of the transcript in `A/Sessions/PoppedChat.swift`, `alsoShowing` in the presence report | Not yet: a scene of its own on the iPad (#888); none on the iPhone, by design | Open in New Tab in the row's menu, the page's own address for one session: `W/views/SessionMenu.tsx` (`sessionTabURL`) | **delta**: remote #888; unwalked |
 
 ## Chat turns and turn detail
 

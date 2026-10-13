@@ -1366,6 +1366,7 @@ export interface PresenceReport {
   active: boolean;
   mayNotify?: boolean;
   showing?: UUID;
+  alsoShowing?: UUID[];
 }
 
 export interface PrewarmRequest {
@@ -2682,7 +2683,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PinsChangedNotification: { required: ["folder", "pins"], optional: ["sessions", "workflows"] },
   Plan: { required: ["entries", "state", "at"], optional: ["planID"] },
   PlanEntry: { required: ["content", "priority", "status"], optional: [] },
-  PresenceReport: { required: ["active"], optional: ["watching", "mayNotify", "showing"] },
+  PresenceReport: { required: ["active"], optional: ["watching", "mayNotify", "showing", "alsoShowing"] },
   PrewarmRequest: { required: ["agentID", "why"], optional: [] },
   Project: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits", "diskSpace", "pinned"] },
   ProjectDetection: { required: ["enabled", "paths"], optional: [] },
