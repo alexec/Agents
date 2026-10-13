@@ -234,3 +234,6 @@
     -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
   }
 }
+/* Where files dropped on a row went (#934): under it, for a moment. Empty, it takes no room. */
+.with-sidebar .sidebar .drop-note { padding: 0 10px 4px 26px; font-size: calc(11px * var(--text-scale)); color: var(--accent); }
+.with-sidebar .sidebar .drop-note:empty { padding: 0; }
