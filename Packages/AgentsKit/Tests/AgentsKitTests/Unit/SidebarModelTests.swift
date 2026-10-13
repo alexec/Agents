@@ -412,7 +412,9 @@ struct SidebarModelTests {
         archiving.archiveRequest = .requested(at: t0)
         let unread = started(api, .finished, "unread", at: 5, unread: true)
         let read = started(api, .finished, "read", at: 6)
-        model.replaceAgents([pinnedAsking, asking, working, archiving, unread, read])
+        var readArchiving = started(api, .finished, "read archiving", at: 7)
+        readArchiving.archiveRequest = .requested(at: t0)
+        model.replaceAgents([pinnedAsking, asking, working, archiving, unread, read, readArchiving])
         model.replacePins([ProjectPins(folder: api, pins: [], sessions: [pinnedAsking.id])])
         let projects = [key]
 
@@ -426,14 +428,19 @@ struct SidebarModelTests {
             let own = SidebarProjectFold(key, label: "api", in: model, isOpen: true, on: on).sessions.map(\.id)
             #expect(SidebarProjectFold.ownCount(key, in: model, on: on) == own.count, "\(on)")
             let every = rows.values.flatMap { $0 } + own
-            #expect(every.count == Set(every).count && Set(every).count == 6, "\(on): once each, none left out")
+            #expect(every.count == Set(every).count && Set(every).count == 7, "\(on): once each, none left out")
             return (rows, own)
         }
+
+        // All on: those asking to be archived are in Needs You, not counted under their
+        // project too (#937).
+        let all = listing(SidebarSmartRow.all)
+        #expect(all.own == [read.id])
 
         // Pinned off: the pinned session that asks is in Needs You.
         let noPins = listing(SidebarSmartRow.all.subtracting([.pinned]))
         #expect(noPins.rows[.pinned] == [])
-        #expect(Set(noPins.rows[.needsYou] ?? []) == [pinnedAsking.id, asking.id, archiving.id])
+        #expect(Set(noPins.rows[.needsYou] ?? []) == [pinnedAsking.id, asking.id, archiving.id, readArchiving.id])
         #expect(!SidebarSmartRow.pinned.isShown(in: model, projects: projects, on: SidebarSmartRow.all.subtracting([.pinned])))
 
         // Needs You off: the unread one asking to be archived goes to Unread, the one
@@ -446,9 +453,9 @@ struct SidebarModelTests {
         let noWorking = listing(SidebarSmartRow.all.subtracting([.working]))
         #expect(noWorking.own.contains(working.id))
 
-        // Every group off: all six under the project, the pinned one too.
+        // Every group off: all seven under the project, the pinned one too.
         let none = listing([])
-        #expect(Set(none.own) == Set([pinnedAsking, asking, working, archiving, unread, read].map(\.id)))
+        #expect(Set(none.own) == Set([pinnedAsking, asking, working, archiving, unread, read, readArchiving].map(\.id)))
         #expect(SidebarSmartRow.keptInUnread(read.id, in: model, on: []) == nil)
     }
 
