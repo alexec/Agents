@@ -171,6 +171,20 @@ struct ContentView: View {
         return project
     }
 
+    /// The selected session, while the detail shows its chat: not while a page, a
+    /// workflow, a project page or a pin is open over it (#926). Opening a workflow
+    /// keeps the selection, so Back and the sidebar still know the session.
+    private var chatAgent: Agent? { showsChat ? model.selectedAgent : nil }
+
+    /// Whether `detail` shows the chat: a session is selected and nothing above it in
+    /// that chain is open.
+    private var showsChat: Bool {
+        model.selection != nil && !model.showsEvents && !model.showsResources
+            && !model.showsRuntimes && !model.showsMCPServers && !model.showsWorktrees
+            && !model.showsSpending && !model.showsTime && model.openWorkflow == nil
+            && model.projectPage == nil && model.openPin == nil
+    }
+
     /// The detail's toolbar: what a project and its sessions are done with, in reach
     /// whichever of its pages is open (#97).
     @ToolbarContentBuilder
@@ -179,7 +193,7 @@ struct ContentView: View {
         // project menu start one.
         // Pin and Archive (#586), as the workflow page has them: the two things a session
         // is most often done with. Archive leaves the chat, as ⌥⌘⌫ does.
-        if let agent = model.selectedAgent {
+        if let agent = chatAgent {
             ToolbarItemGroup {
                 let pinned = model.isPinned(agent)
                 Button {
@@ -224,7 +238,7 @@ struct ContentView: View {
                 }
             }
         }
-        if model.selection != nil {
+        if showsChat {
             ToolbarItem {
                 SidebarToggle(windowWidth: frame.windowWidth)
             }
