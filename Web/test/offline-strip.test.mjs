@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";
 
-const { offlineStrip, elapsed } = await load("src/views/OfflineStrip.tsx");
+const { offlineStrip, elapsed, footLine } = await load("src/views/OfflineStrip.tsx");
 const { Store } = await load("src/model/store.ts");
 
 const workspace = (more) => ({ provider: "p", providerName: "Coder", workspace: "w", workspaceName: "dev",
@@ -90,4 +90,13 @@ test("control/hostChanged's state and workspace are kept at once, so each step o
   assert.equal(store.hosts.value[0].workspace.phase, "connecting");
   link.notify("control/hostChanged", { host: "box", state: "offline" });
   assert.equal(store.hosts.value[0].workspace, undefined);
+});
+
+test("the sidebar's foot says a workspace's words, not that it is offline (#961)", () => {
+  assert.equal(footLine(row("stopped", workspace())), "devbox is stopped. Agents there are paused until it starts.");
+  assert.equal(footLine(row("starting", workspace({ phase: "provider" }))), "Starting devbox…");
+  // Running, so agentsd is what went: the plain words.
+  assert.equal(footLine(row("offline", workspace({ workspaceState: "running", canStart: false }))), "devbox is offline");
+  assert.equal(footLine(row("connecting")), "devbox is connecting…");
+  assert.equal(footLine(row("offline")), "devbox is offline");
 });

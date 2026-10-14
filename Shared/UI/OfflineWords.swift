@@ -30,6 +30,16 @@ enum OfflineWords {
         return "\(name) is stopped. Agents there are paused until it starts."
     }
 
+    /// What the sidebar's foot says for a server that isn't online (#961): a workspace's
+    /// words, as its strip says them, or that it is offline.
+    static func footLine(name: String, row: DaemonAPI.ControlHost?) -> String {
+        if let row, let workspace = row.workspace,
+           let words = workspaceLine(name: name, state: row.state, workspace: workspace) {
+            return words
+        }
+        return "\(name) is offline"
+    }
+
     /// Whether the strip offers Start: a stopped or failed workspace, with nothing under way.
     static func offersStart(state: String, workspace: DaemonAPI.HostWorkspace) -> Bool {
         workspace.canStart && state != "online" && state != "starting" && state != "stopping"

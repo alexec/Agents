@@ -36,6 +36,7 @@ import { rowExtras, SessionRow } from "./SessionRow";
 import { openInNewTab, RenameInput, runSessionAction, sessionActions, startedBy } from "./SessionMenu";
 import { markAgentOf, treeRows, type TreeRow } from "../model/tree";
 import { WorkflowRow } from "./WorkflowRow";
+import { footLine, offersStart } from "./OfflineStrip";
 import { PinnedPageRows } from "./Pins";
 import { ApprovalRow } from "./Approval";
 import { approvalID } from "../model/approvals";
@@ -203,7 +204,12 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
         ))}
         {offline.filter((host) => host.id !== "mac").map((host) => (
           <p class="foot-line" role="status" key={host.id}>
-            <span aria-hidden="true">⚡︎</span> {host.name} is {host.state === "connecting" ? "connecting…" : "offline"}
+            <span aria-hidden="true">⚡︎</span> {footLine(host)}
+            {/* One on a stopped workspace offers Start, as its strip (#961). */}
+            {host.workspace && offersStart(host.state, host.workspace) ? (
+              <button type="button" class="foot-start" disabled={store.hostsBeingStarted.value.includes(host.id)}
+                aria-label={`Start ${host.name}`} onClick={() => void store.startHost(host.id)}>Start</button>
+            ) : null}
           </p>
         ))}
         {/* A file a host keeps that could not be read (#205, #223): why paired devices or projects
