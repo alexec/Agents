@@ -27,6 +27,13 @@ export function workspaceLine(name: string, state: string, workspace: HostWorksp
   return `${name} is stopped. Agents there are paused until it starts.`;
 }
 
+/** What the sidebar's foot says for a host that isn't online (#961; OfflineWords.footLine): a
+ *  workspace's words, as its strip says them, or that it is connecting or offline. */
+export function footLine(host: ControlHost): string {
+  const said = host.workspace ? workspaceLine(host.name, host.state, host.workspace) : null;
+  return said ?? `${host.name} is ${host.state === "connecting" ? "connecting…" : "offline"}`;
+}
+
 /** Whether the strip offers Start: a stopped or failed workspace, with nothing under way. */
 export function offersStart(state: string, workspace: HostWorkspace): boolean {
   return workspace.canStart && state !== "online" && state !== "starting" && state !== "stopping";

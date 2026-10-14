@@ -718,13 +718,25 @@ private struct SidebarFoot: View {
             }
             ForEach(model.hosts.servers.filter { model.hostUnreachable($0) }, id: \.self) { host in
                 // A server gone quiet greys its projects; this says why, once, where the
-                // Mac's own state is said.
-                Label("\(model.hosts.label(host)) is offline", systemImage: "bolt.horizontal.circle")
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 4)
-                    .accessibilityElement(children: .combine)
+                // Mac's own state is said. One on a stopped workspace says so, with Start (#961).
+                let row = model.hosts.controlRows[host]
+                HStack(spacing: 8) {
+                    Label(OfflineWords.footLine(name: model.hosts.label(host), row: row),
+                          systemImage: "bolt.horizontal.circle")
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityElement(children: .combine)
+                    Spacer(minLength: 0)
+                    if let row, let workspace = row.workspace, OfflineWords.offersStart(state: row.state, workspace: workspace) {
+                        Button("Start") { Task { await model.startHost(host) } }
+                            .controlSize(.small)
+                            .disabled(model.hostsBeingStarted.contains(host))
+                            .help("Starts \(workspace.workspaceName) at \(workspace.providerName).")
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 4)
             }
             // A file this Mac keeps that could not be read (#205): why paired devices or
             // projects may have gone from view, and that what they held is kept.

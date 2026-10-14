@@ -144,10 +144,25 @@ struct RemoteSidebar: View {
             if !offline.isEmpty {
                 Section {
                     ForEach(offline, id: \.self) { host in
-                        Label("\(model.hostLabel(host)) is offline", systemImage: "bolt.horizontal.circle")
-                            .appText(.fine)
-                            .foregroundStyle(.secondary)
-                            .accessibilityElement(children: .combine)
+                        // One on a stopped workspace says so, with Start, as its strip (#961).
+                        let row = model.controlHost(host)
+                        HStack(spacing: 8) {
+                            Label(OfflineWords.footLine(name: model.hostLabel(host), row: row),
+                                  systemImage: "bolt.horizontal.circle")
+                                .appText(.fine)
+                                .foregroundStyle(.secondary)
+                                .accessibilityElement(children: .combine)
+                            Spacer(minLength: 0)
+                            if let row, let workspace = row.workspace,
+                               OfflineWords.offersStart(state: row.state, workspace: workspace) {
+                                Button("Start") { Task { await model.startHost(host) } }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
+                                    .appText(.fine)
+                                    .disabled(model.hostsBeingStarted.contains(host))
+                                    .accessibilityLabel("Start \(model.hostLabel(host))")
+                            }
+                        }
                     }
                 }
             }
