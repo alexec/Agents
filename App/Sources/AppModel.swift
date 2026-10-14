@@ -2937,6 +2937,14 @@ final class AppModel {
             startPresence()
             presence?.connected()
         }
+        // One offline or stopped when this window started lists what it last did, greyed, as
+        // one that went while it ran (#962).
+        for host in others where host.state != "online" && !work.holdsProjects(of: host.id) {
+            if let heard = try? await control.call(DaemonAPI.Method.hostsLastHeard, DaemonAPI.HostRequest(host: host.id),
+                                                   returning: DaemonAPI.HostLastHeard.self) {
+                work.takeLastHeard(heard)
+            }
+        }
         // A host removed from the control plane leaves the window too: its projects and
         // agents are no longer anybody's to show here (FR-014; they carry on where they are).
         for id in controlHosts.keys where !others.contains(where: { $0.id == id }) {

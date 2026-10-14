@@ -276,6 +276,10 @@ public final class ControlService: @unchecked Sendable {
         await syncRelays()
         await methods.setThisMacHost(configuration.thisMacHost)
         await methods.attach(router)
+        // What each host last listed, for a client that starts while it is offline (#962).
+        let copies = HostCopies(store: configuration.store)
+        await methods.setCopies(copies)
+        await router.setCopier { host, method, reply in Task { await copies.take(host, method: method, reply: reply) } }
         let codes = self.codes
         var hooks = ControlMethods.Hooks(
             startPairing: { browser in try JSONValue.encoding(try await codes.issue(.client, browser: browser)) },

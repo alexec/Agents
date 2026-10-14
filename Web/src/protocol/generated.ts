@@ -975,6 +975,13 @@ export interface HostJoinStatus {
   at: WireDate;
 }
 
+export interface HostLastHeard {
+  host: HostID;
+  projects?: ProjectSummary[];
+  agents?: Agent[];
+  heardAt?: WireDate;
+}
+
 export interface HostRequest {
   host: HostID;
   purge?: boolean;
@@ -2319,6 +2326,7 @@ export interface Methods {
   "files/unwatch": { params: FilesWatchRequest; result: Empty };
   "files/watch": { params: FilesWatchRequest; result: Empty };
   "hosts/dropKept": { params: KeptRequestID; result: Empty };
+  "hosts/lastHeard": { params: HostRequest; result: HostLastHeard };
   "hosts/list": { params: Empty; result: ControlHost[] };
   "hosts/listKept": { params: Empty; result: KeptList };
   "hosts/retryKept": { params: KeptRequestID; result: Empty };
@@ -2442,6 +2450,7 @@ export const MethodTarget = {
   "files/unwatch": "host",
   "files/watch": "host",
   "hosts/dropKept": "control",
+  "hosts/lastHeard": "control",
   "hosts/list": "control",
   "hosts/listKept": "control",
   "hosts/retryKept": "control",
@@ -2638,6 +2647,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Headline: { required: ["h1", "h2", "h3"], optional: [] },
   HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive"] },
   HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
+  HostLastHeard: { required: ["host"], optional: ["projects", "agents", "heardAt"] },
   HostRequest: { required: ["host"], optional: ["purge"] },
   HostStop: { required: ["host"], optional: ["confirmRunning"] },
   HostTunnel: { required: ["up"], optional: ["problem"] },
