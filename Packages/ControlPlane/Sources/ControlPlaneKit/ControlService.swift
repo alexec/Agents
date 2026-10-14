@@ -322,7 +322,12 @@ public final class ControlService: @unchecked Sendable {
                                              name: WorkspaceProviders.sshDestination(destination), controlPath: nil,
                                              environment: HostInstall.environment(keepAgent: true))
                         ssh.options = HostInstall.configFile + HostInstall.options(keyFile: nil, knownHosts: nil)
-                        try await ServerInstaller(ssh: ssh).startDaemon(extra: ["--control-network", "--host-name", record.name])
+                        do {
+                            try await ServerInstaller(ssh: ssh).startDaemon(extra: ["--control-network", "--host-name", record.name])
+                        } catch let problem as HostProblem {
+                            // In words, as an install says them (#960).
+                            throw ProviderFailure(WorkspaceProviders.say(problem, destination: destination))
+                        }
                     },
                     openTunnel: { _ in await tunnels?.reconcile() },
                     hostCommand: { [codes] in

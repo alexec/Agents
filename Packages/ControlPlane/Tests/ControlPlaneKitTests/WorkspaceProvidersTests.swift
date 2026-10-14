@@ -105,7 +105,8 @@ struct ProviderHarness {
          workspaces: [DaemonAPI.WorkspaceInfo] = [
              .init(id: "agents-devbox", name: "agents-devbox", state: "stopped", ssh: "alex@127.0.0.1 -p 2222"),
              .init(id: "scratch-1", name: "scratch-1", state: "running"),
-         ]) async throws {
+         ],
+         sshFails: HostProblem? = nil) async throws {
         records = ControlRecords(store: store)
         let settings = try await records.settings { ControlSettings(name: "test", machineID: "m") }
         methods = ControlMethods(records: records, settings: settings, version: "1")
@@ -118,7 +119,10 @@ struct ProviderHarness {
         providers = WorkspaceProviders(
             store: store, records: records, methods: methods, router: router, secrets: ProviderSecrets(home: home),
             timing: timing,
-            hooks: .init(sshStart: { _, destination in sshStarts.add(destination) },
+            hooks: .init(sshStart: { _, destination in
+                             sshStarts.add(destination)
+                             if let sshFails { throw ProviderFailure(WorkspaceProviders.say(sshFails, destination: destination)) }
+                         },
                          hostCommand: { "curl -fsSL https://cp.local/v1/install.sh | sh -s -- 'agents-control:2:h:secret'" },
                          connect: { _, _ in provider }),
             log: { _ in })
@@ -313,7 +317,20 @@ struct WorkspaceProvidersTests {
         let row = try await h.waitFor("offline", seconds: 15) { $0.workspace?.problem != nil }
         #expect(h.sshStarts.destinations == ["alex@127.0.0.1 -p 2222"])
         #expect(row.workspace?.problem == "devbox didn’t connect in 2 seconds.")
-        #expect(row.workspace?.canStart == false, "the workspace is running: it is agentsd that is down")
+        #expect(row.workspace?.canStart == true, "running, but its agentsd is down: Start tries again (#960)")
+    }
+
+    @Test func aFailedSSHStartEndsTheStartAtOnceInWords() async throws {
+        let h = try await ProviderHarness(timing: .init(listEvery: .seconds(3600), sshAfter: .milliseconds(100),
+                                                        giveUp: .seconds(3600), lookEvery: .milliseconds(20),
+                                                        calls: .standard),
+                                          sshFails: .hostKeyUnknown)
+        try await h.link(try await h.add())
+        _ = try await h.call(DaemonAPI.Method.hostsStart, try JSONValue.encoding(DaemonAPI.HostRequest(host: h.devbox)))
+        let row = try await h.waitFor("offline", seconds: 15) { $0.workspace?.problem != nil }
+        #expect(row.workspace?.problem == "devbox started, but its agentsd didn’t connect, and starting it over ssh failed. "
+                + "Its host key isn’t in your known_hosts. Check and trust it with “ssh alex@127.0.0.1 -p 2222”, then start it again.")
+        #expect(row.workspace?.canStart == true)
     }
 
     @Test func stopStopsTheWorkspace() async throws {
