@@ -41,6 +41,8 @@ public actor WorkspaceProviders: WorkspaceHandling {
         public var sshStart: @Sendable (_ host: HostRecord, _ destination: String) async throws -> Void
         /// Opens the host's reverse tunnel now, if it has one.
         public var openTunnel: @Sendable (HostID) async -> Void
+        /// The ssh destination the host was installed over, when its tunnel keeps it (#965).
+        public var installedOver: @Sendable (HostID) async -> String?
         /// A connection to a provider, as its record says.
         public var connect: @Sendable (ProviderRecord, [String: String]) throws -> any WorkspaceProvider
         /// The one line that installs a host with a new host code (`install.sh`), for a new
@@ -51,12 +53,14 @@ public actor WorkspaceProviders: WorkspaceHandling {
                         throw ProviderFailure("This control plane can’t start agentsd over ssh.")
                     },
                     openTunnel: @escaping @Sendable (HostID) async -> Void = { _ in },
+                    installedOver: @escaping @Sendable (HostID) async -> String? = { _ in nil },
                     hostCommand: @escaping @Sendable () async throws -> String = {
                         throw ProviderFailure("This control plane can’t give out host codes.")
                     },
                     connect: @escaping @Sendable (ProviderRecord, [String: String]) throws -> any WorkspaceProvider) {
             self.sshStart = sshStart
             self.openTunnel = openTunnel
+            self.installedOver = installedOver
             self.hostCommand = hostCommand
             self.connect = connect
         }
@@ -524,6 +528,10 @@ public actor WorkspaceProviders: WorkspaceHandling {
                 startWhenUsed: request.startWhenUsed ?? had?.startWhenUsed ?? true,
                 stopWhenIdleMinutes: request.stopWhenIdleMinutes.map { $0 > 0 ? $0 : nil }
                     ?? (had == nil ? WorkspaceLink.defaultIdleMinutes : had?.stopWhenIdleMinutes))
+        } then: {
+            // Listed again, in the background: the last list can be from before an install
+            // woke the workspace (#965).
+            Task { await self.refresh(request.provider) }
         }
     }
 
@@ -625,7 +633,7 @@ public actor WorkspaceProviders: WorkspaceHandling {
                 return
             }
             if !sshTried, ContinuousClock.now - began >= timing.sshAfter,
-               let destination = workspace(link)?.ssh, let record = await records.host(host) {
+               let record = await records.host(host), let destination = await sshDestination(link, host) {
                 sshTried = true
                 await setPhase(host, "sshStart")
                 do {
@@ -644,7 +652,7 @@ public actor WorkspaceProviders: WorkspaceHandling {
         }
         let minutes = Self.words(timing.giveUp)
         let problem: String
-        if workspace(link)?.ssh == nil {
+        if await sshDestination(link, host) == nil {
             problem = "\(name) started, but its agentsd didn’t connect in \(minutes), and the provider gives no ssh destination to start it with. Make agentsd start on boot (loginctl enable-linger)."
         } else {
             problem = "\(name) didn’t connect in \(minutes)."
@@ -822,6 +830,13 @@ public actor WorkspaceProviders: WorkspaceHandling {
         problems[host] = problem
         await changed()
         if kind == .start, let problem { await kept?.startFailed(host, problem) }
+    }
+
+    /// Where agentsd is started over ssh: the provider's destination, or the one the host
+    /// was installed over, as its tunnel keeps it (#965).
+    private func sshDestination(_ link: WorkspaceLink, _ host: HostID) async -> String? {
+        if let given = workspace(link)?.ssh { return given }
+        return await hooks.installedOver(host)
     }
 
     private func workspace(_ link: WorkspaceLink) -> DaemonAPI.WorkspaceInfo? {

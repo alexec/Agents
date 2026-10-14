@@ -33,6 +33,9 @@ actor StandInProvider: WorkspaceProvider {
 
     func list() async throws -> [DaemonAPI.WorkspaceInfo] { workspaces }
 
+    /// A change the control plane hasn't listed yet, such as an install waking it.
+    func set(_ id: String, state: String) { setState(id, state) }
+
     func start(_ id: String) async throws -> DaemonAPI.WorkspaceInfo? {
         starts += 1
         try? await Task.sleep(for: startTakes)
@@ -106,7 +109,8 @@ struct ProviderHarness {
              .init(id: "agents-devbox", name: "agents-devbox", state: "stopped", ssh: "alex@127.0.0.1 -p 2222"),
              .init(id: "scratch-1", name: "scratch-1", state: "running"),
          ],
-         sshFails: HostProblem? = nil) async throws {
+         sshFails: HostProblem? = nil,
+         installedOver: String? = nil) async throws {
         records = ControlRecords(store: store)
         let settings = try await records.settings { ControlSettings(name: "test", machineID: "m") }
         methods = ControlMethods(records: records, settings: settings, version: "1")
@@ -123,6 +127,7 @@ struct ProviderHarness {
                              sshStarts.add(destination)
                              if let sshFails { throw ProviderFailure(WorkspaceProviders.say(sshFails, destination: destination)) }
                          },
+                         installedOver: { _ in installedOver },
                          hostCommand: { "curl -fsSL https://cp.local/v1/install.sh | sh -s -- 'agents-control:2:h:secret'" },
                          connect: { _, _ in provider }),
             log: { _ in })
@@ -331,6 +336,31 @@ struct WorkspaceProvidersTests {
         #expect(row.workspace?.problem == "devbox started, but its agentsd didn’t connect, and starting it over ssh failed. "
                 + "Its host key isn’t in your known_hosts. Check and trust it with “ssh alex@127.0.0.1 -p 2222”, then start it again.")
         #expect(row.workspace?.canStart == true)
+    }
+
+    @Test func withoutTheProvidersSSHItStartsOverTheInstallsDestination() async throws {
+        // A codespace (#965): the provider gives no ssh, but the host was installed over one.
+        let h = try await ProviderHarness(timing: .init(listEvery: .seconds(3600), sshAfter: .milliseconds(100),
+                                                        giveUp: .seconds(2), lookEvery: .milliseconds(20),
+                                                        calls: .standard),
+                                          workspaces: [.init(id: "cs-1", name: "cs-1", state: "stopped")],
+                                          installedOver: "cs.cs-1.main")
+        try await h.link(try await h.add(), nil, "cs-1")
+        _ = try await h.call(DaemonAPI.Method.hostsStart, try JSONValue.encoding(DaemonAPI.HostRequest(host: h.devbox)))
+        let row = try await h.waitFor("offline", seconds: 15) { $0.workspace?.problem != nil }
+        #expect(h.sshStarts.destinations == ["cs.cs-1.main"])
+        #expect(row.workspace?.problem == "devbox didn’t connect in 2 seconds.")
+    }
+
+    @Test func linkingListsTheProviderAgain() async throws {
+        // The last list can be from before an install woke the workspace (#965).
+        let h = try await ProviderHarness()
+        let provider = try await h.add()
+        await h.provider.set("agents-devbox", state: "running")
+        try await h.link(provider)
+        let row = try await h.waitFor("offline") { $0.workspace?.workspaceState == "running" }
+        #expect(row.workspace?.workspaceState == "running")
+        #expect(row.workspace?.canStart == false)
     }
 
     @Test func stopStopsTheWorkspace() async throws {

@@ -321,7 +321,19 @@ public final class ControlService: @unchecked Sendable {
                         var ssh = SSHCommand(executable: HostInstall.sshExecutable,
                                              name: WorkspaceProviders.sshDestination(destination), controlPath: nil,
                                              environment: HostInstall.environment(keepAgent: true))
-                        ssh.options = HostInstall.configFile + HostInstall.options(keyFile: nil, knownHosts: nil)
+                        // The key trusted at the install, when it was installed over this
+                        // destination; else the person's own known_hosts (#965).
+                        var knownHosts: URL?
+                        if let installed = await tunnels?.installed(for: record.id),
+                           installed.destination == destination, !installed.knownHosts.isEmpty {
+                            let file = FileManager.default.temporaryDirectory
+                                .appendingPathComponent("agents-start-\(UUID().uuidString).known_hosts")
+                            try Data(installed.knownHosts.utf8).write(to: file, options: .atomic)
+                            knownHosts = file
+                        }
+                        defer { if let knownHosts { try? FileManager.default.removeItem(at: knownHosts) } }
+                        ssh.options = HostInstall.configFile + HostInstall.options(keyFile: nil, knownHosts: knownHosts)
+                        if knownHosts == nil { ssh.options += await HostInstall.personsKnownHosts(ssh) }
                         do {
                             try await ServerInstaller(ssh: ssh).startDaemon(extra: ["--control-network", "--host-name", record.name])
                         } catch let problem as HostProblem {
@@ -330,6 +342,7 @@ public final class ControlService: @unchecked Sendable {
                         }
                     },
                     openTunnel: { _ in await tunnels?.reconcile() },
+                    installedOver: { host in await tunnels?.installed(for: host)?.destination },
                     hostCommand: { [codes] in
                         guard let command = try await codes.issue(.host).command else {
                             throw ProviderFailure("This control plane gave no install command with its host code.")
