@@ -168,6 +168,12 @@ public actor HostTunnels {
         return states[record.id] ?? .init(up: false)
     }
 
+    /// Where this host was installed over ssh, and its key as trusted then (empty when the
+    /// person's own known_hosts had it), for starting its agentsd again (#965).
+    public func installed(for host: HostID) -> (destination: String, knownHosts: String)? {
+        records.values.first { $0.host == host }.map { ($0.destination, $0.knownHosts) }
+    }
+
     /// The servers whose tunnel is held but who have not joined yet, by name (#660): they
     /// have no host row, so the window lists them with how the tunnel stands.
     public func unjoined() -> [DaemonAPI.HostTunnelChanged] {
@@ -240,11 +246,21 @@ public actor HostTunnels {
                     await self?.say(record.id, .init(up: true))
                 }
                 guard !Task.isCancelled else { return }
-                await self?.say(record.id, .init(up: false, problem: problem))
+                await self?.say(record.id, .init(up: false, problem: problem.map(Self.worded)))
                 // A session that lasted is tried again soon; one that keeps failing, less often.
                 wait = Date().timeIntervalSince(started) > 60 ? 2 : min(wait * 2, 60)
                 try? await Task.sleep(for: .seconds(wait))
             }
+        }
+    }
+
+    /// Why a session ended, in words where ssh's are known (#965): "Connection to UNKNOWN
+    /// port 65535 timed out", from a codespace still waking, says it did not answer.
+    static func worded(_ problem: String) -> String {
+        if problem.contains("Connection to "), problem.contains(" timed out") { return HostInstall.say(.timedOut("connect")) }
+        return switch SSHCommand.classify(status: 255, stderr: problem, agentHasKeys: true) {
+        case .installFailed?, nil: problem
+        case let known?: HostInstall.say(known)
         }
     }
 

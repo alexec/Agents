@@ -16,6 +16,15 @@ struct HostTunnelsTests {
         #expect(!SSHCommand.throughBastion("hostname devbox.lan\nport 22\n"))
     }
 
+    @Test func aTunnelsEndIsSaidInWords() {
+        // A codespace still waking, through `gh codespace ssh` (#965).
+        #expect(HostTunnels.worded("Connection to UNKNOWN port 65535 timed out")
+                == "It did not answer: the connection timed out or was refused.")
+        #expect(HostTunnels.worded("No ED25519 host key is known for cs and you have requested strict checking.")
+                == HostInstall.say(.hostKeyUnknown))
+        #expect(HostTunnels.worded("the ssh session ended") == "the ssh session ended")
+    }
+
     @Test func theTunnelIsAMasterOfItsOwnThatOpensNoForwardOfTheConfigs() {
         let ssh = SSHCommand(name: "agents@ws:2222", controlPath: nil)
         let control = URL(fileURLWithPath: "/tmp/agents-tunnels-1-2/abcd1234.ctl")
@@ -93,7 +102,7 @@ struct HostTunnelsTests {
         #expect(refusedState == refusal, "\(refusedChanges)")
         await other.stop()
 
-        // ssh itself gave up: its own last words.
+        // ssh itself gave up: its last words, said as an install says them (#965).
         let denied = try Self.fakeSSH(in: folder, named: "denied", forward: "exit 255", master: """
             echo "agents@ws: Permission denied (publickey)." >&2
             exit 255
@@ -102,7 +111,7 @@ struct HostTunnelsTests {
         let third = HostTunnels(store: MemoryStore(), executable: denied, environment: [:],
                                 hosts: { [HostRecord(id: host, name: "ws")] }, changed: { await refusing.add($0) })
         try await third.add(Self.record(host: host))
-        let denial = DaemonAPI.HostTunnel(up: false, problem: "agents@ws: Permission denied (publickey).")
+        let denial = DaemonAPI.HostTunnel(up: false, problem: HostInstall.say(.loginRefused))
         try await refusing.waitFor { $0.contains { $0.tunnel == denial } }
         let deniedState = await third.state(for: host), deniedChanges = await refusing.changes
         #expect(deniedState == denial, "\(deniedChanges)")
