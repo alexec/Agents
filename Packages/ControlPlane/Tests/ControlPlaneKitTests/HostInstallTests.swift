@@ -23,9 +23,25 @@ struct HostInstallTests {
         #expect(!options.contains { $0.hasPrefix("IdentitiesOnly") || $0.hasPrefix("IdentityAgent") })
         // The host key is still confirmed, and still kept out of the person's known_hosts.
         #expect(options == ["-o", "UserKnownHostsFile=/tmp/agents-install-x/known_hosts",
-                            "-o", "GlobalKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=yes"])
+                            "-o", "GlobalKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=yes",
+                            "-o", "LogLevel=error"])
         #expect(HostInstall.environment(keepAgent: true, from: ["SSH_AUTH_SOCK": "/tmp/agent", "AGENTS_ROOT": "/r"])
             == ["SSH_AUTH_SOCK": "/tmp/agent"])
+    }
+
+    /// #964: gh's codespace entry says `LogLevel quiet`, which hid "Host key verification
+    /// failed"; ssh takes the command line's over the config's.
+    @Test func sshsErrorsAreSaidOverAQuietConfig() async throws {
+        let config = FileManager.default.temporaryDirectory.appendingPathComponent("agents-quiet-\(UUID().uuidString)")
+        try "Host cs.*\n  LogLevel quiet\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n"
+            .write(to: config, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: config) }
+        let ssh = SSHCommand(executable: SSHCommand.system, name: "cs.w857.main", controlPath: nil)
+        let resolved = try await ssh.run(["-F", config.path] + HostInstall.options(keyFile: nil, knownHosts: nil)
+                                         + ssh.resolveArguments)
+        #expect(resolved.status == 0, "\(resolved.stderr)")
+        #expect(resolved.stdout.split(whereSeparator: \.isNewline).contains("loglevel ERROR"))
+        #expect(resolved.stdout.split(whereSeparator: \.isNewline).contains("stricthostkeychecking true"))
     }
 
     @Test func aRefusalSaysWhichKeysWereTried() {

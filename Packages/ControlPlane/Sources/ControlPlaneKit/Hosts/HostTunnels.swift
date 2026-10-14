@@ -279,6 +279,7 @@ public actor HostTunnels {
     static func session(_ record: Record, ssh base: SSHCommand, folder: URL,
                         up: @escaping @Sendable () async -> Void) async -> String? {
         var ssh = base
+        ssh.options += HostInstall.sayErrors
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true,
                                                     attributes: [.posixPermissions: 0o700])

@@ -217,12 +217,17 @@ public struct HostInstall: Sendable {
     /// What ssh is told besides the person's config. The host key goes into the install's
     /// own known_hosts, or, for a server from the ssh config, is checked against the
     /// person's (#429). A key given is the only one tried; with none, ssh offers what it
-    /// would for `ssh user@host` (#413).
+    /// would for `ssh user@host` (#413). ssh's own errors are always said, over a config's
+    /// `LogLevel quiet` (gh's, #964), so `HostProblem` hears why it failed.
     static func options(keyFile: URL?, knownHosts: URL?) -> [String] {
         let only = keyFile.map { ["-i", $0.path, "-o", "IdentitiesOnly=yes", "-o", "IdentityAgent=none"] } ?? []
         let hosts = knownHosts.map { ["-o", "UserKnownHostsFile=\($0.path)", "-o", "GlobalKnownHostsFile=/dev/null"] } ?? []
-        return only + hosts + ["-o", "StrictHostKeyChecking=yes"]
+        return only + hosts + ["-o", "StrictHostKeyChecking=yes"] + sayErrors
     }
+
+    /// Over a config's `LogLevel quiet`, which keeps even "Host key verification failed" off
+    /// standard error (#964).
+    static let sayErrors = ["-o", "LogLevel=error"]
 
     /// The person's own known_hosts, for a server whose ssh config checks against none:
     /// `UserKnownHostsFile /dev/null`, as generated configs often write beside
