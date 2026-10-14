@@ -3438,7 +3438,9 @@ final class RemoteModel {
     /// A chat's history that did not come, in words (#400).
     private static func describeLoadFailure(_ error: any Error) -> String {
         switch error {
-        case is HostAway: "its host can't be reached right now."
+        // The strip over the chat says why; this, what is shown, in the window's words (#963).
+        case is HostAway: OfflineWords.lastHeard
+        case let error as JSONRPCError where error.code == DaemonAPI.Failure.hostOffline: OfflineWords.lastHeard
         case is MacAway: "your Mac can't be reached right now."
         case is DaemonClient.NoAnswer: "no answer from your Mac in time."
         case let error as JSONRPCError: error.message

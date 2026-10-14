@@ -3686,7 +3686,7 @@ final class AppModel {
         // server's chat does not fail because this Mac's host is down (#400).
         let host = host(ofAgent: selection)
         var reason: String?
-        let loaded = await attempt(on: host) {
+        let loaded = await attempt(on: host, quietWhenDown: true) {
             let client = self.client(for: host)
             do {
                 // A few turns rather than a full page: a screen holds two or three, the
@@ -3716,7 +3716,8 @@ final class AppModel {
                                       + "\(opening.page.entries.count) entries, data in \(dataIn ?? 0) ms")
                 }
             } catch {
-                reason = self.describe(error)
+                // A server that went: the strip says so, and this says what is shown (#963).
+                reason = host != .mac && OfflineWords.hostDown(error) ? OfflineWords.lastHeard : self.describe(error)
                 throw error
             }
         }
@@ -3738,7 +3739,7 @@ final class AppModel {
         async let whole: Void = loadWholeAgent(id)
         let host = host(ofAgent: id)
         var reason: String?
-        let loaded = await attempt(on: host) {
+        let loaded = await attempt(on: host, quietWhenDown: true) {
             let client = self.client(for: host)
             do {
                 let opening = try await ChatOpening.load(
@@ -3756,7 +3757,8 @@ final class AppModel {
                 guard self.popouts[id] === chat else { return }
                 _ = chat.work.takeOpening(opening, load: load)
             } catch {
-                reason = self.describe(error)
+                // A server that went: the strip says so, and this says what is shown (#963).
+                reason = host != .mac && OfflineWords.hostDown(error) ? OfflineWords.lastHeard : self.describe(error)
                 throw error
             }
         }
@@ -4906,7 +4908,8 @@ final class AppModel {
     }
 
     @discardableResult
-    func attempt(on host: HostID = .mac, _ work: () async throws -> Void) async -> Bool {
+    /// `quietWhenDown`: a server the offline strip already explains raises no alert (#963).
+    func attempt(on host: HostID = .mac, quietWhenDown: Bool = false, _ work: () async throws -> Void) async -> Bool {
         // Already known to be quiet: said now, naming why, not after waiting out a
         // connect the reconnect loop is already making (#83, #303). The strip has Try Again.
         if host == .mac, !controlPlaneAway, hosts.isOffline(.mac) || macHostNotice != nil {
@@ -4923,6 +4926,7 @@ final class AppModel {
                 await connect()
                 if isConnected, (try? await work()) != nil { return true }
             }
+            if quietWhenDown, host != .mac, hosts.isOffline(host) || OfflineWords.hostDown(error) { return false }
             fail(error, on: host)
             return false
         }

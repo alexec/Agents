@@ -30,6 +30,18 @@ enum OfflineWords {
         return "\(name) is stopped. Agents there are paused until it starts."
     }
 
+    /// Under a chat's history that did not load because its server is down (#963): the strip
+    /// above already says why, so this says only what the page shows. The web's words.
+    static let lastHeard = "That host is offline. What's shown is from when it was last heard."
+
+    /// Whether a call failed because its host is down, not because of what it asked: the
+    /// host refused as offline, or its channel closed under it (#963).
+    static func hostDown(_ error: any Error) -> Bool {
+        if let error = error as? JSONRPCError { return error.code == DaemonAPI.Failure.hostOffline }
+        if case .closed? = error as? JSONRPCTransportError { return true }
+        return false
+    }
+
     /// What the sidebar's foot says for a server that isn't online (#961): a workspace's
     /// words, as its strip says them, or that it is offline.
     static func footLine(name: String, row: DaemonAPI.ControlHost?) -> String {
