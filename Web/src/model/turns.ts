@@ -518,6 +518,86 @@ export function turns(items: readonly Item[]): ChatTurn[] {
   return result;
 }
 
+/** A run of turns, and the cards that wait after it (ChatStretch, #973). */
+export interface ChatStretch<Card> {
+  /** The turns before `cards`. A turn a card arrived in shows as two: up to the card, and the rest. */
+  turns: ChatTurn[];
+  cards: Card[];
+}
+
+/** How long after a request (seconds) its own record may be written and still count as before it. */
+const recordGrace = 0.5;
+
+/** When it was said or done. None for a run of tool calls: it goes with what is next to it. */
+function itemAt(item: Item): number | undefined {
+  return item.kind === "entry" ? item.entry.at : undefined;
+}
+
+/**
+ * The turns, cut at each card's place, as Swift's `placing` has it (#973): after the last thing
+ * said or done before its request arrived, so the first thing with a later time is below it. A run
+ * of tool calls keeps no time and stays before a card when the next thing with a time is later.
+ * One stretch with no cards when there are none; the last has no cards when turns came after the
+ * last card.
+ */
+export function placing<Card>(rows: readonly ChatTurn[], cards: readonly Card[], at: (card: Card) => number): ChatStretch<Card>[] {
+  if (!cards.length) return [{ turns: [...rows], cards: [] }];
+  // A place is [turn, item]: before the ask of `turn` at item -1, before `items[item]` otherwise.
+  // The host's own record of the question comes a moment after it, and stays above its card.
+  const placeOf = (asked: number): [number, number] => {
+    const time = asked + recordGrace;
+    let place: [number, number] = [rows.length, -1];
+    for (let turn = rows.length - 1; turn >= 0; turn--) {
+      const row = rows[turn]!;
+      for (let item = row.items.length - 1; item >= 0; item--) {
+        const when = itemAt(row.items[item]!);
+        if (when === undefined) continue;
+        if (when > time) place = [turn, item];
+        else return place;
+      }
+      const when = row.ask && itemAt(row.ask);
+      if (when !== undefined) {
+        if (when > time) place = [turn, -1];
+        else return place;
+      }
+    }
+    return place;
+  };
+  const cut = ([fromTurn, fromItem]: [number, number], [toTurn, toItem]: [number, number]): ChatTurn[] => {
+    const out: ChatTurn[] = [];
+    for (let turn = fromTurn; turn < Math.min(toTurn + 1, rows.length); turn++) {
+      const row = rows[turn]!;
+      const from = turn === fromTurn ? fromItem : -1;
+      const to = turn === toTurn ? toItem : row.items.length;
+      if (to === -1) break;
+      if (from === -1 && to === row.items.length) out.push(row);
+      else if (from === -1) {
+        if (!row.ask && to === 0) continue;
+        out.push({ id: row.id, ...(row.ask ? { ask: row.ask } : {}), items: row.items.slice(0, to) });
+      } else if (from < to) out.push({ id: row.items[from]!.id, items: row.items.slice(from, to) });
+    }
+    return out;
+  };
+  const groups = new Map<string, { place: [number, number]; cards: Card[] }>();
+  for (const card of cards) {
+    const place = placeOf(at(card));
+    const key = place.join(",");
+    const group = groups.get(key) ?? { place, cards: [] };
+    group.cards.push(card);
+    groups.set(key, group);
+  }
+  const sorted = [...groups.values()].sort((a, b) => a.place[0] - b.place[0] || a.place[1] - b.place[1]);
+  const stretches: ChatStretch<Card>[] = [];
+  let at0: [number, number] = [0, -1];
+  for (const { place, cards: here } of sorted) {
+    stretches.push({ turns: cut(at0, place), cards: here });
+    at0 = place;
+  }
+  const rest = cut(at0, [rows.length, -1]);
+  if (rest.length) stretches.push({ turns: rest, cards: [] });
+  return stretches;
+}
+
 function entryItem(entry: TranscriptEntry): Item {
   return { kind: "entry", id: entry.id, entry };
 }

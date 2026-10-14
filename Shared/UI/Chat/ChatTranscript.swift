@@ -32,10 +32,10 @@ struct ChatTranscript: View {
     let loadEarlier: () async -> Void
     /// How much of the foot of the pane the floating prompt covers.
     var bottomInset: CGFloat = 0
-    /// What waits on the person (questions, forms, guarded changes), drawn as the last
-    /// thing in the conversation rather than over it, so what led to it can be scrolled
-    /// back to past it (#723). Each card keeps the chat column itself.
-    var cards: AnyView? = nil
+    /// What waits on the person (questions, forms, guarded changes), drawn in the
+    /// conversation rather than over it (#723), where each was asked: what came after it
+    /// is below it (#973). Each card keeps the chat column itself.
+    var cards: [WaitingCard] = []
     /// Somebody asked for the end: the prompt was sent, or the menu command was used.
     /// A counter rather than a flag, so two asks in a row both land.
     var scrollToEndToken = 0
@@ -113,9 +113,9 @@ struct ChatTranscript: View {
     /// Whether there is more conversation than pane. No point offering a way to the
     /// end of something already wholly on screen.
     @State private var canScroll = false
-    /// Whether any of the waiting cards is on screen. Scrolled away from, the way back
-    /// says a question is waiting (#723).
-    @State private var cardsShown = true
+    /// Where the first waiting card is from the screen. Scrolled away from, the way back
+    /// says a question is waiting (#723), and which way (#973).
+    @State private var cardPlace = CardPlace.shown
     /// How tall the pane is, which the foot's margin is held to (#371).
     @State private var paneHeight: CGFloat?
     /// The tallest honest content height seen for this conversation.
@@ -186,67 +186,95 @@ struct ChatTranscript: View {
         // Once per pass. Read inside the row closure, `rows` was the whole conversation
         // mapped again for every row it drew (#90).
         let rows = self.rows
-        let liveID = isWorking ? rows.last?.id : nil
+        // The conversation cut at each card's place (#973). With none waiting, one stretch.
+        let stretches = rows.placing(cards, at: \.at)
+        // The live turn is the last row, and when a card cut it, its part after the card.
+        let liveID = isWorking ? stretches.last(where: { !$0.turns.isEmpty })?.turns.last?.id : nil
+        let firstCard = stretches.firstIndex { !$0.cards.isEmpty }
+        let firstCardID = firstCard.map { stretches[$0].cards[0].id }
+        let cardsAtTheEnd = firstCard == stretches.count - 1
         ScrollViewReader { scroller in
             ScrollView {
                 VStack(spacing: 14) {
-                    LazyVStack(alignment: .leading, spacing: 14) {
-                        if let loadFailure {
-                            LoadFailureLine(sentence: loadFailure.sentence, retry: actions.reloadTranscript)
+                    // Named by the first card after them, so a card answered above leaves
+                    // the cards below it built as they were.
+                    ForEach(Array(stretches.enumerated()), id: \.element.id) { offset, stretch in
+                        if !stretch.turns.isEmpty || (offset == 0 && (loadFailure != nil || hasMore)) {
+                            LazyVStack(alignment: .leading, spacing: 14) {
+                                if offset == 0 {
+                                    if let loadFailure {
+                                        LoadFailureLine(sentence: loadFailure.sentence, retry: actions.reloadTranscript)
+                                    }
+                                    if hasMore {
+                                        // No button. Reaching the top is the ask.
+                                        ProgressView()
+                                            .controlSize(.small)
+                                            .frame(maxWidth: .infinity, alignment: .center)
+                                    }
+                                }
+                                // Folded once by the model as each entry lands, not here on every
+                                // redraw: a reply arrives several chunks a second.
+                                // Each turn at the app's level, or the one chosen for it. A new turn
+                                // leaves the ones before it as they were: one being read stays open.
+                                ForEach(stretch.turns) { turn in
+                                    TurnView(turn: turn,
+                                             detail: turnViews[turn.id] ?? defaultDetail,
+                                             fetched: fetchedTurns[turn.id]?.items,
+                                             hasEarlier: fetchedTurns[turn.id]?.hasEarlier(than: turn) ?? false,
+                                             fetchFailed: failedTurns.contains(turn.id),
+                                             isLive: turn.id == liveID,
+                                             toggle: { toggle(turn) },
+                                             fetch: { await fetch(turn) },
+                                             fetchEarlier: { await fetchEarlier(turn) })
+                                        .equatable()
+                                        .id(turn.id)
+                                }
+                                .environment(\.backgroundWork, agent.background)
+                                .environment(\.textIsLazy, true)
+                            }
+                            // The chat column, shared with the prompt bar below it and with
+                            // the cards: one pair of edges down the pane, set in one place
+                            // (FR-021).
+                            .chatColumn()
+                            .scrollTargetLayout()
                         }
-                        if hasMore {
-                            // No button. Reaching the top is the ask.
-                            ProgressView()
-                                .controlSize(.small)
-                                .frame(maxWidth: .infinity, alignment: .center)
-                        }
-                        // Folded once by the model as each entry lands, not here on every
-                        // redraw: a reply arrives several chunks a second.
-                        // Each turn at the app's level, or the one chosen for it. A new turn
-                        // leaves the ones before it as they were: one being read stays open.
-                        ForEach(rows) { turn in
-                            TurnView(turn: turn,
-                                     detail: turnViews[turn.id] ?? defaultDetail,
-                                     fetched: fetchedTurns[turn.id]?.items,
-                                     hasEarlier: fetchedTurns[turn.id]?.hasEarlier(than: turn) ?? false,
-                                     fetchFailed: failedTurns.contains(turn.id),
-                                     isLive: turn.id == liveID,
-                                     toggle: { toggle(turn) },
-                                     fetch: { await fetch(turn) },
-                                     fetchEarlier: { await fetchEarlier(turn) })
-                                .equatable()
-                                .id(turn.id)
-                        }
-                        .environment(\.backgroundWork, agent.background)
-                        .environment(\.textIsLazy, true)
-                        ForEach(agent.queuedPrompts) { queued in
-                            QueuedPromptRow(prompt: queued, agentID: agent.id,
-                                            canSendNow: canSendNow)
-                        }
-                        // Kept by the control plane for a stopped workspace (#691 US3).
-                        ForEach(actions.kept(agent.id)) { kept in
-                            KeptPromptRow(kept: kept)
-                        }
-                        // Live, and so at the foot rather than in the record: the chat
-                        // itself says what the row in the list says, and it stops saying
-                        // it the moment the prompt lands.
-                        if isComingBack {
-                            ComingBackLine()
-                        } else if agent.state == .running || agent.state == .starting {
-                            WorkingLine()
+                        // Between two lazy stacks rather than in one, so a card scrolled far
+                        // away is still built: its half-filled answers and its ⌘1…9 stay
+                        // with it (#723).
+                        if !stretch.cards.isEmpty {
+                            let block = VStack(spacing: 12) {
+                                ForEach(stretch.cards) { $0.view }
+                            }
+                            .id(stretch.cards[0].id)
+                            if offset == firstCard {
+                                block.onGeometryChange(for: CardPlace.self) { proxy in
+                                    CardPlace(proxy.frame(in: .scrollView), visibleHeight: (paneHeight ?? 0) - footMargin)
+                                } action: { cardPlace = $0 }
+                            } else {
+                                block
+                            }
                         }
                     }
-                    // The chat column, shared with the prompt bar below it and with the
-                    // cards at the end: one pair of edges down the pane, set in one place
-                    // (FR-021).
-                    .chatColumn()
-                    .scrollTargetLayout()
-                    // Outside the lazy stack, so a card scrolled far away is still built:
-                    // its half-filled answers and its ⌘1…9 stay with it (#723).
-                    if let cards {
-                        cards
-                            .onScrollVisibilityChange(threshold: 0.2) { cardsShown = $0 }
-                            .onDisappear { cardsShown = true }
+                    if hasFoot {
+                        LazyVStack(alignment: .leading, spacing: 14) {
+                            ForEach(agent.queuedPrompts) { queued in
+                                QueuedPromptRow(prompt: queued, agentID: agent.id,
+                                                canSendNow: canSendNow)
+                            }
+                            // Kept by the control plane for a stopped workspace (#691 US3).
+                            ForEach(actions.kept(agent.id)) { kept in
+                                KeptPromptRow(kept: kept)
+                            }
+                            // Live, and so at the foot rather than in the record: the chat
+                            // itself says what the row in the list says, and it stops saying
+                            // it the moment the prompt lands.
+                            if isComingBack {
+                                ComingBackLine()
+                            } else if agent.state == .running || agent.state == .starting {
+                                WorkingLine()
+                            }
+                        }
+                        .chatColumn()
                     }
                     Color.clear.frame(height: 1).id(bottom)
                 }
@@ -489,7 +517,14 @@ struct ChatTranscript: View {
                 // against each other for the length of the ease.
                 ZStack(alignment: .bottom) {
                     if canScroll, !isFollowing || questionWaiting {
-                        JumpToEnd(hasNewBelow: hasNewBelow, questionWaiting: questionWaiting) { goToEnd(scroller) }
+                        JumpToEnd(hasNewBelow: hasNewBelow, questionWaiting: questionWaiting,
+                                  questionAbove: cardPlace == .above) {
+                            if questionWaiting, let firstCardID {
+                                goToQuestion(firstCardID, atTheEnd: cardsAtTheEnd, scroller)
+                            } else {
+                                goToEnd(scroller)
+                            }
+                        }
                             // Clear of the floating prompt, whose height the chat has
                             // already measured for the transcript's own bottom inset.
                             .padding(.bottom, bottomInset + 12)
@@ -501,8 +536,29 @@ struct ChatTranscript: View {
         }
     }
 
-    /// A card waits on the person and none of it is on screen (#723).
-    private var questionWaiting: Bool { cards != nil && !cardsShown }
+    /// A card waits on the person and none of it is on screen (#723). Above as well as
+    /// below: a reader following the end is left there as new output pushes the card up,
+    /// and told it is there (#973).
+    private var questionWaiting: Bool { !cards.isEmpty && cardPlace != .shown }
+
+    /// Something to draw after the last turn and the cards: what waits to be sent, and
+    /// the line that says the agent is at work.
+    private var hasFoot: Bool {
+        !agent.queuedPrompts.isEmpty || !actions.kept(agent.id).isEmpty || isComingBack
+            || agent.state == .running || agent.state == .starting
+    }
+
+    /// To the first waiting card (#973). At the end of the conversation it is the end, and
+    /// following goes on; anywhere else it is a place in the middle, as a line the reader
+    /// is sent to is, and following stops there.
+    private func goToQuestion(_ id: String, atTheEnd: Bool, _ scroller: ScrollViewProxy) {
+        if atTheEnd, cardPlace == .below {
+            goToEnd(scroller)
+            return
+        }
+        isFollowing = false
+        withAnimation(.easeOut(duration: 0.2)) { scroller.scrollTo(id, anchor: .top) }
+    }
 
     /// Open a turn's steps, or close them. Open is the app's level when that shows
     /// steps, and Messages when it does not (#759); closed is always the outcome, never
@@ -766,6 +822,42 @@ struct ChatTranscript: View {
     }
 
     private var bottom: String { "bottom" }
+}
+
+/// A card that waits on the person, and when it was asked: where it is drawn (#973).
+struct WaitingCard: Identifiable {
+    let id: String
+    let at: Date
+    let view: AnyView
+
+    init(id: String, at: Date, @ViewBuilder _ view: () -> some View) {
+        self.id = id
+        self.at = at
+        self.view = AnyView(view())
+    }
+}
+
+extension ChatStretch where Card == WaitingCard {
+    /// Named by its first card, the one after its turns; the stretch with none is the end.
+    var id: String { cards.first?.id ?? "end" }
+}
+
+/// Where a waiting card is from what is on screen.
+private enum CardPlace: Equatable {
+    case shown, above, below
+
+    /// Shown while a fifth of it, or 40 points, is in the part of the pane not under the
+    /// prompt.
+    init(_ frame: CGRect, visibleHeight: CGFloat) {
+        let enough = min(40, frame.height * 0.2)
+        if frame.maxY < enough {
+            self = .above
+        } else if visibleHeight > 0, frame.minY > visibleHeight - enough {
+            self = .below
+        } else {
+            self = .shown
+        }
+    }
 }
 
 /// The history, or part of it, that did not load, and the way to ask again (#400).

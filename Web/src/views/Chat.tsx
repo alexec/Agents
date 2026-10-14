@@ -1,18 +1,19 @@
 // The chosen session's chat (071 US2, FR-023): concise turns at the chosen level (069), tool
 // calls, plans and background tasks (057), live from agent/entry and agent/changed; the cards
-// above the prompt; the prompt pinned to the foot at every width (US6 scenario 4), with where
+// where each was asked (#973); the prompt pinned to the foot at every width (US6 scenario 4), with where
 // the session works, its labels and its runtime over it, as in the window (#108). Long
 // conversations come a page at a time as the top is reached, and the pane follows the end
 // unless the person has scrolled up.
+import { Fragment } from "preact";
 import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import { openTurnsHeld, rememberOpen, type Store } from "../model/store";
 import { backgroundAge, backgroundEnded, backgroundNoun, isRunning, subagentNoSteps, subagentStatus } from "../model/background";
-import { display, isPersonsAsk, isWorking, omittingThoughts, type ChatTurn, type Item } from "../model/turns";
+import { display, isPersonsAsk, isWorking, omittingThoughts, placing, type ChatTurn, type Item } from "../model/turns";
 import { toWireDate } from "../protocol/dates";
 import type { Agent, AppViewCall, BackgroundItem, FileMentionDTO, TranscriptEntry } from "../protocol/generated";
 import { replace, route } from "../route";
-import { Cards } from "./Cards";
+import { useWaitingCards, type WaitingCard } from "./Cards";
 import { OfflineStrip } from "./OfflineStrip";
 import { KeptBubbles } from "./Kept";
 import { FolderGoneNotice, MissingFolderStrip } from "./MissingFolder";
@@ -40,7 +41,7 @@ import { comingBackDescription } from "../model/status";
 import { ArchiveCard } from "./ArchiveCard";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
 import { eventWaitCapsule, leaseMark } from "../model/rowLines";
-import { GuardedChangeCards } from "./GuardedChange";
+import { GuardedChangeCard } from "./GuardedChange";
 
 const detailKey = "agents.turnDetail";
 
@@ -384,21 +385,44 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     }
   }, [focus, rows, level.value, chosen.value]);
 
-  // What waits on the person is the last thing in the conversation, not over it (#723). Scrolled
-  // out of sight, the way back says a question is waiting.
+  // What waits on the person is in the conversation, not over it (#723), each where it was asked:
+  // what came after it is below it (#973). Scrolled out of sight, the way back says a question is
+  // waiting, and which way.
+  const asked = useWaitingCards({ store, host, session, down });
+  const cards: WaitingCard[] = [
+    // A change its agent made to the project's own files, asked here (#531).
+    ...store.guardedChanges(host, { session }).map(({ folder, change }) => ({
+      key: `guarded:${folder}|${change.path}`, at: change.since,
+      node: <div class="cards"><GuardedChangeCard store={store} host={host} folder={folder} change={change} down={down} /></div>,
+    })),
+    ...asked,
+    // An ask to be archived waits the same way, last when asked at once (#827).
+    ...(agent && asksToArchive(agent) ? [{
+      key: `archive:${agent.id}`,
+      at: agent.archiveRequest && "requested" in agent.archiveRequest ? agent.archiveRequest.requested.at : Infinity,
+      node: <ArchiveCard store={store} host={host} agent={agent} disabled={down} />,
+    }] : []),
+  ];
+  const stretches = placing(rows, cards, (card) => card.at);
+  const firstCard = stretches.findIndex((stretch) => stretch.cards.length > 0);
+  const firstCardKey = firstCard < 0 ? null : stretches[firstCard]!.cards[0]!.key;
+  const cardsAtTheEnd = firstCard >= 0 && firstCard === stretches.length - 1;
   const waiting = useRef<HTMLDivElement>(null);
-  const waitingShown = useSignal(true);
-  const anyWaiting = store.permissionsFor(host, session).length > 0 || store.elicitationsFor(host, session).length > 0
-    || store.guardedChanges(host, { session }).length > 0 || (!!agent && asksToArchive(agent));
+  const waitingPlace = useSignal<"shown" | "above" | "below">("shown");
   useEffect(() => {
     const el = waiting.current;
     const root = scroller.current;
     if (!el || !root) return;
-    const watcher = new IntersectionObserver(([seen]) => (waitingShown.value = seen?.isIntersecting ?? true), { root, threshold: 0.2 });
+    const watcher = new IntersectionObserver(([seen]) => {
+      if (!seen) return;
+      waitingPlace.value = seen.isIntersecting ? "shown"
+        : seen.boundingClientRect.bottom <= (seen.rootBounds?.top ?? 0) ? "above" : "below";
+    }, { root, threshold: 0.2 });
     watcher.observe(el);
     return () => watcher.disconnect();
-  }, [host, session]);
-  const questionWaiting = anyWaiting && !waitingShown.value;
+  }, [host, session, firstCardKey]);
+  const questionWaiting = cards.length > 0 && waitingPlace.value !== "shown";
+  const questionAbove = questionWaiting && waitingPlace.value === "above";
 
   const toEnd = () => {
     const el = scroller.current;
@@ -406,6 +430,14 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     newBelow.value = false;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     if (el) readingPlaces.set(`${host}|${session}`, { following: true });
+  };
+
+  // To the first waiting card (#973). At the end it is the end, and following goes on; anywhere
+  // else it is a place in the middle, as a line the reader is sent to is, and following stops.
+  const toQuestion = () => {
+    if (cardsAtTheEnd && !questionAbove) return toEnd();
+    follow(false);
+    waiting.current?.scrollIntoView({ block: "start", behavior: "smooth" });
   };
 
   const toggle = (turn: ChatTurn) => {
@@ -536,13 +568,30 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           </p>
         )}
         {store.hasMoreOfTheConversation && <p class="more" aria-label="Loading earlier"><span class="spinner" /></p>}
-        {rows.map((turn, index) => (
-          <TurnView key={turn.id} turn={turn} detail={chosen.value[turn.id] ?? level.value}
-            fetched={fetched.value[turn.id]?.items} fetchFailed={!!failedTurns.value[turn.id]} hasEarlier={fetched.value[turn.id]?.hasEarlier ?? false}
-            auto={index >= rows.length - openTurnsHeld}
-            isLive={index === rows.length - 1 && live} background={background}
-            toggle={turnActions.toggle} loadDetail={turnActions.loadDetail} loadEarlier={turnActions.loadEarlier} />
-        ))}
+        {(() => {
+          // Each stretch's turns, then the cards asked after them, in one keyed list: a card answered
+          // lets the turns around it join up without drawing them again (#973).
+          const drawn = stretches.reduce((n, stretch) => n + stretch.turns.length, 0);
+          let index = 0;
+          return stretches.flatMap((stretch, at) => [
+            ...stretch.turns.map((turn) => {
+              const i = index++;
+              return (
+                <TurnView key={turn.id} turn={turn} detail={chosen.value[turn.id] ?? level.value}
+                  fetched={fetched.value[turn.id]?.items} fetchFailed={!!failedTurns.value[turn.id]} hasEarlier={fetched.value[turn.id]?.hasEarlier ?? false}
+                  auto={i >= drawn - openTurnsHeld}
+                  isLive={i === drawn - 1 && live} background={background}
+                  toggle={turnActions.toggle} loadDetail={turnActions.loadDetail} loadEarlier={turnActions.loadEarlier} />
+              );
+            }),
+            ...(stretch.cards.length ? [
+              <div key={`waiting:${stretch.cards[0]!.key}`} class="waiting" aria-label="Waiting for you"
+                {...(at === firstCard ? { ref: waiting } : {})}>
+                {stretch.cards.map((card) => <Fragment key={card.key}>{card.node}</Fragment>)}
+              </div>,
+            ] : []),
+          ]);
+        })()}
         {agent && <Queued store={store} host={host} agent={agent} disabled={down} />}
         {agent && <KeptBubbles store={store} kept={store.keptFor(host, agent.id)} />}
         {/* Live, at the foot: what the row says, until the prompt lands (ChatTranscript, #251). */}
@@ -550,14 +599,6 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           : agent && (agent.state === "running" || agent.state === "starting") && (
           <p class="working" aria-label="Working"><span class="spinner" /></p>
         )}
-        {/* Outside the turns, at the end, as the window's ChatTranscript has them (#723). */}
-        <div class="waiting" ref={waiting}>
-          {/* A change its agent made to the project's own files, asked here (#531). */}
-          <GuardedChangeCards store={store} host={host} where={{ session }} down={down} />
-          <Cards store={store} host={host} session={session} down={down} />
-          {/* An ask to be archived waits the same way, last (#827). */}
-          <ArchiveCard store={store} host={host} agent={agent} disabled={down} />
-        </div>
       </div>
       {subagent.value && (
         <SubagentSteps store={store} item={agent?.background?.find((b) => b.id === subagent.value!.id) ?? subagent.value}
@@ -566,14 +607,14 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       </ViewLayerContext.Provider>
       </CallActionsContext.Provider>
       {/* As JumpToEnd: shown whenever the reader is away from the end; what came since, or a question
-          waiting there, said in words. */}
+          waiting above or below, said in words (#973). */}
       {(away.value || newBelow.value || questionWaiting) && (
-        <button class={`jump${newBelow.value || questionWaiting ? " news" : ""}`} onClick={toEnd}
-          title={questionWaiting ? "Go to the question waiting at the end"
+        <button class={`jump${newBelow.value || questionWaiting ? " news" : ""}`} onClick={questionWaiting ? toQuestion : toEnd}
+          title={questionWaiting ? `Go to the question waiting ${questionAbove ? "above" : "below"}`
             : newBelow.value ? "Go to the end, where something new is" : "Go to the end"}
-          aria-label={questionWaiting ? "Go to the question waiting at the end of the conversation"
+          aria-label={questionWaiting ? `Go to the question waiting ${questionAbove ? "above" : "below"} in the conversation`
             : newBelow.value ? "Go to the end of the conversation, where something new is" : "Go to the end of the conversation"}>
-          <span aria-hidden="true">↓</span>{questionWaiting ? " Question waiting" : newBelow.value && " Something new"}
+          <span aria-hidden="true">{questionAbove ? "↑" : "↓"}</span>{questionWaiting ? " Question waiting" : newBelow.value && " Something new"}
         </button>
       )}
       <footer class="foot">

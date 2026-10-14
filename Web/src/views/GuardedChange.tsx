@@ -67,7 +67,7 @@ export function readingLines(reading: GuardedChangeReading | null): DiffLine[] {
   return (reading?.lines ?? []).map((line) => ({ kind: line.kind === "same" ? "context" : line.kind, text: line.text }));
 }
 
-function GuardedChangeCard({ store, host, folder, change, down }: {
+export function GuardedChangeCard({ store, host, folder, change, down }: {
   store: Store; host: string; folder: string; change: GuardedChange; down: boolean;
 }) {
   const reading = useSignal<GuardedChangeReading | null>(null);

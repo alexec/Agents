@@ -244,45 +244,49 @@ struct ChatView: View {
         model.offlineHelp(for: agent?.host ?? .mac)
     }
 
-    /// What waits on the person, at the end of the transcript (#723): nothing when
-    /// nothing does, so the transcript has no way back to a question to offer.
-    private var cards: AnyView? {
-        guard let agent else { return nil }
-        let guarded = model.work.guardedChanges(askedIn: agent.id)
-        let permissions = model.work.permissions(for: agent.id)
-        let elicitation = model.work.elicitation(for: agent.id)
-        guard !permissions.isEmpty || !guarded.isEmpty
-                || elicitation != nil || agent.asksToArchive else { return nil }
-        return AnyView(VStack(spacing: 12) {
-            ForEach(permissions) { request in
+    /// What waits on the person, each where it was asked in the transcript (#723, #973):
+    /// none when nothing does, so the transcript has no way back to a question to offer.
+    private var cards: [WaitingCard] {
+        guard let agent else { return [] }
+        var cards: [WaitingCard] = []
+        for request in model.work.permissions(for: agent.id) {
+            cards.append(WaitingCard(id: request.id.uuidString, at: request.askedAt) {
                 PermissionView(request: request)
                     .disabled(selectedHostOffline)
                     .help(selectedHostOffline ? offlineHelp : "")
-            }
-            // A change its agent made to the project's own files waits the same way (#531).
-            ForEach(guarded) { change in
+            })
+        }
+        // A change its agent made to the project's own files waits the same way (#531).
+        for change in model.work.guardedChanges(askedIn: agent.id) {
+            cards.append(WaitingCard(id: "guarded:" + change.id, at: change.since) {
                 GuardedChangeQuestion(change: change, key: ProjectKey(host: agent.host, folder: agent.projectFolder))
                     .chatColumn()
-            }
-            // A form waits the same way a permission question does, and sits with it.
-            if let request = elicitation {
+            })
+        }
+        // A form waits the same way a permission question does.
+        if let request = model.work.elicitation(for: agent.id) {
+            cards.append(WaitingCard(id: request.id.uuidString, at: request.askedAt) {
                 // A fresh card per form, so the answers and the step reached on one
                 // are not carried into the next.
                 ElicitationView(request: request)
                     .id(request.id)
                     .disabled(selectedHostOffline)
                     .help(selectedHostOffline ? offlineHelp : "")
-            }
-            // An ask to be archived waits the same way, last (#827).
-            if agent.asksToArchive {
+            })
+        }
+        // An ask to be archived waits the same way, last when asked at once (#827).
+        if agent.asksToArchive {
+            cards.append(WaitingCard(id: "archive:" + agent.id.uuidString,
+                                     at: agent.archiveRequest?.requestedAt ?? .distantFuture) {
                 ArchiveRequestCard(agent: agent,
                                    approve: { await model.archive(agent.id, andLeave: true) },
                                    keep: { await model.keepSession(agent) },
                                    isDisabled: selectedHostOffline || model.acting(agent.id) != nil)
                     .chatColumn()
                     .help(selectedHostOffline ? offlineHelp : "")
-            }
-        })
+            })
+        }
+        return cards
     }
 
     private var form: some View {
