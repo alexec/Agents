@@ -616,7 +616,6 @@ public actor WorkspaceProviders: WorkspaceHandling {
         await setPhase(host, "connecting")
         await hooks.openTunnel(host)
         var sshTried = false
-        var sshProblem: String?
         while ContinuousClock.now - began < timing.giveUp {
             if await router.state(of: host)?.isOnline == true {
                 log("workspace: start \(what) by \(who): ok in \(Self.seconds(since: began))")
@@ -633,8 +632,12 @@ public actor WorkspaceProviders: WorkspaceHandling {
                     try await hooks.sshStart(record, destination)
                     log("workspace: ssh start \(name): ok")
                 } catch {
-                    sshProblem = (error as? ProviderFailure)?.description ?? "\(error)"
-                    log("workspace: ssh start \(name): failed: \(sshProblem!)")
+                    // Nothing else will bring it online, so the start ends now, with why (#960).
+                    let reason = (error as? ProviderFailure)?.description ?? "\(error)"
+                    log("workspace: ssh start \(name): failed: \(reason)")
+                    log("workspace: start \(what) by \(who): failed: ssh start failed")
+                    await finish(host, link, problem: "\(name) started, but its agentsd didn’t connect, and starting it over ssh failed. \(reason)")
+                    return
                 }
             }
             try? await Task.sleep(for: timing.lookEvery)
@@ -644,7 +647,7 @@ public actor WorkspaceProviders: WorkspaceHandling {
         if workspace(link)?.ssh == nil {
             problem = "\(name) started, but its agentsd didn’t connect in \(minutes), and the provider gives no ssh destination to start it with. Make agentsd start on boot (loginctl enable-linger)."
         } else {
-            problem = "\(name) didn’t connect in \(minutes)\(sshProblem.map { ". Starting it over ssh failed: \($0)" } ?? ".")"
+            problem = "\(name) didn’t connect in \(minutes)."
         }
         log("workspace: start \(what) by \(who): failed: didn't connect in \(minutes)")
         await finish(host, link, problem: problem)
@@ -854,7 +857,9 @@ public actor WorkspaceProviders: WorkspaceHandling {
             phase: activity?.kind == .start ? activity?.phase : nil, since: activity?.since,
             problem: problems[record.id],
             stoppedBy: hostState == "stopped" ? stoppedBy[record.id] : nil,
-            canStart: activity == nil && !["running", "starting"].contains(state),
+            // A running one whose start failed can be started again: its agentsd is what is down (#960).
+            canStart: activity == nil && (!["running", "starting"].contains(state)
+                                          || (state == "running" && problems[record.id] != nil)),
             canStop: activity == nil && ["running", "starting", "unknown"].contains(state),
             startWhenUsed: link.startWhenUsed ?? true, stopWhenIdleMinutes: link.stopWhenIdleMinutes,
             cost: found?.cost, current: list?.current ?? false)
@@ -875,6 +880,14 @@ public actor WorkspaceProviders: WorkspaceHandling {
         let words = given.split(whereSeparator: \.isWhitespace).map(String.init)
         guard words.count == 3, words[1] == "-p", let port = Int(words[2]) else { return given }
         return "ssh://\(words[0]):\(port)"
+    }
+
+    /// Why an ssh start failed, in words (#960): an install's, but a host key to trust is
+    /// trusted with ssh itself, as there is no install here to show it.
+    public static func say(_ problem: HostProblem, destination: String) -> String {
+        guard problem == .hostKeyUnknown else { return HostInstall.say(problem) }
+        let ssh = destination.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        return "Its host key isn’t in your known_hosts. Check and trust it with “ssh \(ssh)”, then start it again."
     }
 
     static func seconds(since start: ContinuousClock.Instant) -> String {
