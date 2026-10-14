@@ -100,6 +100,10 @@ public actor ControlMethods: ControlHandling {
 
     public func attach(_ router: ControlRouter) { self.router = router }
 
+    /// What each host last listed (#962), for `hosts/lastHeard`; nil where nothing is kept.
+    private var copies: HostCopies?
+    public func setCopies(_ copies: HostCopies?) { self.copies = copies }
+
     /// The executable's part, handed in once it exists (the network listener needs the
     /// records, and the records need the listener's hooks).
     public func setHooks(_ hooks: Hooks) { self.hooks = hooks }
@@ -235,7 +239,7 @@ public actor ControlMethods: ControlHandling {
         DaemonAPI.Method.clientsSetGrant, DaemonAPI.Method.clientsForget, DaemonAPI.Method.clientsConnections,
         DaemonAPI.Method.clientsForgetSelf,
         DaemonAPI.Method.devicesList, DaemonAPI.Method.devicesStartPairing, DaemonAPI.Method.devicesStopPairing,
-        DaemonAPI.Method.devicesForget,
+        DaemonAPI.Method.devicesForget, DaemonAPI.Method.hostsLastHeard,
     ]
 
     public nonisolated func handles(_ method: String) -> Bool {
@@ -377,10 +381,17 @@ public actor ControlMethods: ControlHandling {
                 throw JSONRPCError(code: DaemonAPI.Failure.noSuchHost, message: "No host is called \(request.host.rawValue).")
             }
             await router?.forgetHost(request.host)
+            await copies?.forget(request.host)
             await hooks.hostsChanged()
             await hooks.changed(ControlEvent(kind: .hostRemoved, subject: request.host.rawValue, at: Date(),
                                              by: caller.client.uuidString))
             return [:]
+        case DaemonAPI.Method.hostsLastHeard:
+            let request = try Self.require(params, as: DaemonAPI.HostRequest.self)
+            guard await records.host(request.host) != nil else {
+                throw JSONRPCError(code: DaemonAPI.Failure.noSuchHost, message: "No host is called \(request.host.rawValue).")
+            }
+            return await copies?.lastHeard(request.host) ?? ["host": .string(request.host.rawValue)]
         case _ where DaemonAPI.Method.workspaceMethods.contains(method):
             guard let workspaces = hooks.workspaces else {
                 throw JSONRPCError(code: DaemonAPI.Failure.providersNeedOneCopy,

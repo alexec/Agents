@@ -221,6 +221,8 @@ public extension DaemonAPI {
                 Row(Method.hostsListKept, params: Empty.self, result: KeptList.self, kind: .controlRequest),
                 Row(Method.hostsDropKept, params: KeptRequestID.self, result: Empty.self, kind: .controlRequest),
                 Row(Method.hostsRetryKept, params: KeptRequestID.self, result: Empty.self, kind: .controlRequest),
+                // What an offline host last listed (#962).
+                Row(Method.hostsLastHeard, params: HostRequest.self, result: HostLastHeard.self, kind: .controlRequest),
                 // Heard
                 Row(Notification.agentChanged, params: Agent.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.agentEntry, params: EntryNotification.self, result: Empty.self, kind: .hostNotification),

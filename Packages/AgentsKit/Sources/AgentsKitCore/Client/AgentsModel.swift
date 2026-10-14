@@ -922,6 +922,16 @@ public final class AgentsModel {
         projects = (projects.filter { $0.host != host } + stamped).sorted(by: SidebarOrder.byAdded)
     }
 
+    /// What an offline host last listed (#962), for a client that started while it was down:
+    /// taken only when nothing of that host is held, so a live list always wins.
+    public func takeLastHeard(_ heard: DaemonAPI.HostLastHeard) {
+        guard !holdsProjects(of: heard.host) else { return }
+        if let agents = heard.agents { replaceAgents(agents, from: heard.host) }
+        if let projects = heard.projects { replaceProjects(projects, from: heard.host) }
+    }
+
+    public func holdsProjects(of host: HostID) -> Bool { projects.contains { $0.host == host } }
+
     /// Down to the budget, never taking the terminal just written to.
     private func dropOldTerminalOutput() {
         while terminalsByWrite.count > 1,

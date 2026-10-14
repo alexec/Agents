@@ -49,6 +49,8 @@ public actor ControlRouter {
         /// Requests sent to each host and not answered yet, so a host that goes answers
         /// them with `hostOffline` rather than leaving the client to wait for ever (#77).
         var inFlight: [HostID: Set<JSONRPCID>] = [:]
+        /// Of those, the whole lists whose answer is kept for when the host is offline (#962).
+        var copying: [HostID: [JSONRPCID: String]] = [:]
     }
 
     /// Who a channel on a host's uplink is for: a client session here, or a stream a
@@ -90,6 +92,8 @@ public actor ControlRouter {
     private var workspaces: [HostID: DaemonAPI.HostWorkspace] = [:]
     /// Keeps a prompt or agent start for a stopped host (#691 US3); nil where nothing is kept.
     private var keeper: (any KeptHandling)?
+    /// Told each host's answer to a whole list (#962), for `hosts/lastHeard`; nil where none is kept.
+    private var copier: (@Sendable (HostID, String, String) -> Void)?
     /// The last keep asked for, so kept requests are stored in the order they came.
     private var keeping: Task<Void, Never>?
     /// Kept requests on their way to a host, by their delivery, until it answers.
@@ -394,6 +398,7 @@ public actor ControlRouter {
                 clients[sessionID]?.channels[host] = nil
                 // What was asked of it is answered, not lost (#77).
                 let waiting = clients[sessionID]?.inFlight.removeValue(forKey: host) ?? []
+                clients[sessionID]?.copying[host] = nil
                 let wrapped = clients[sessionID]?.wrapped ?? true
                 for id in waiting {
                     reply(to: sessionID, host: host, id: id, wrapped: wrapped,
@@ -555,6 +560,9 @@ public actor ControlRouter {
             // line itself goes on as it came.
             if session.inFlight[host]?.isEmpty == false, let id = Self.answeredID(message) {
                 clients[sessionID]?.inFlight[host]?.remove(id)
+                if let method = clients[sessionID]?.copying[host]?.removeValue(forKey: id) {
+                    copier?(host, method, message)
+                }
             }
             if session.wrapped {
                 write(ControlWire.wrap(host: host, message: message), to: sessionID)
@@ -793,6 +801,9 @@ public actor ControlRouter {
             do {
                 try uplink.transport.write(line: ControlWire.channel(channel, message: message))
                 clients[sessionID]?.inFlight[host, default: []].insert(id)
+                if copier != nil, HostCopies.keeps(method, params) {
+                    clients[sessionID]?.copying[host, default: [:]][id] = method
+                }
             } catch {
                 reply(to: sessionID, host: host, id: id, wrapped: wrapped,
                       error: JSONRPCError(code: DaemonAPI.Failure.hostOffline, message: "That host is offline."))
@@ -855,6 +866,9 @@ public actor ControlRouter {
     // MARK: Kept requests (#691 US3)
 
     public func setKeeper(_ keeper: (any KeptHandling)?) { self.keeper = keeper }
+
+    /// Where each host's answer to a whole list goes (#962): `(host, method, the reply line)`.
+    public func setCopier(_ copier: (@Sendable (HostID, String, String) -> Void)?) { self.copier = copier }
 
     /// Sends a kept request to a host on a channel of its own, bound to the client that
     /// asked, and waits for its reply. Nil when the host isn't here, goes before it answers,

@@ -1041,6 +1041,9 @@ export class Store extends Work {
         if (!this.hostIsOnline(host.id)) return;
         await this.loadHost(host.id);
       })));
+      // One offline or stopped now lists what it last did, greyed, as the window keeps it (#962).
+      await Promise.all(this.hosts.value.filter((host) => host.state !== "online" && host.relay !== true)
+        .map((host) => this.onHost(host.id, () => this.loadLastHeard(host.id))));
       const watching = this.watching.value;
       if (watching) await this.loadTranscript(watching.host, watching.session);
     });
@@ -1125,7 +1128,7 @@ export class Store extends Work {
     await this.onHost(host, async () => {
       const now = this.hosts.value.find((h) => h.id === host);
       if (!now) return this.forgetHost(host);
-      if (now.state !== "online") return;
+      if (now.state !== "online") return this.loadLastHeard(host);
       await this.loadHost(host);
       const watching = this.watching.value;
       if (watching?.host === host) await this.loadTranscript(host, watching.session);
@@ -1167,6 +1170,18 @@ export class Store extends Work {
     for (const key of [...this.archivedLoaded]) if (key.startsWith(prefix)) this.archivedLoaded.delete(key);
     this.searched.delete(host);
     if (this.searchNext.value[host]) this.searchNext.value = without(this.searchNext.value);
+  }
+
+  /** What an offline host last listed, from the control plane (#962), when nothing of it is held:
+   *  a page opened while it is stopped lists its projects and sessions as one open when it went. */
+  private async loadLastHeard(host: string): Promise<void> {
+    if (this.hostIsOnline(host) || this.projects.value[host] !== undefined) return;
+    const heard = await this.link.call("hosts/lastHeard", { host: host as HostID }).catch(() => null);
+    if (!heard || this.hostIsOnline(host) || this.projects.value[host] !== undefined) return;
+    batch(() => {
+      if (heard.agents) this.replaceAgents(heard.agents, host);
+      if (heard.projects) this.projects.value = { ...this.projects.value, [host]: heard.projects };
+    });
   }
 
   private async loadHost(host: string): Promise<void> {

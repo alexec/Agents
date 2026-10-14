@@ -1915,6 +1915,15 @@ final class RemoteModel {
             // A new connection is a new record there: where the person is, and what is open.
             presence?.connected()
         }
+        // One offline or stopped when this started lists what it last did, greyed, as one that
+        // went while it ran (#962).
+        for host in controlHosts where host.id != status.homeHost && host.state != "online"
+            && !work.holdsProjects(of: host.id) {
+            if let heard = try? await control.call(DaemonAPI.Method.hostsLastHeard, DaemonAPI.HostRequest(host: host.id),
+                                                   returning: DaemonAPI.HostLastHeard.self) {
+                work.takeLastHeard(heard)
+            }
+        }
         // A host that went offline keeps its projects, greyed under its heading (frame H).
         // One the control plane no longer lists is gone, and so is what it showed.
         for id in otherHosts.keys where !others.contains(where: { $0.id == id }) {

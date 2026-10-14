@@ -100,3 +100,24 @@ test("the sidebar's foot says a workspace's words, not that it is offline (#961)
   assert.equal(footLine(row("connecting")), "devbox is connecting…");
   assert.equal(footLine(row("offline")), "devbox is offline");
 });
+
+test("a page opened while a host is stopped lists what it last did, from the control plane (#962)", async () => {
+  const agent = { id: "a1", title: "w857 seeded chat", cwd: "file:///home/agents/chat/", createdAt: 1, lastActivityAt: 1,
+    runtimeID: "claude", state: "finished", advertisedOptions: [], availableCommands: [],
+    startOptions: { extraArguments: [], values: {} } };
+  const project = { project: { folder: "file:///home/agents/chat/", name: "chat", addedAt: 1 }, lastActivityAt: 1, exists: true };
+  const link = fakeLink((method) => {
+    if (method === "hosts/list") return [row("stopped", workspace())];
+    if (method === "hosts/lastHeard") return { host: "box", projects: [project], agents: [agent] };
+    if (method === "control/status") return { machineID: "m" };
+    if (method === "hosts/listKept") return { kept: [] };
+    return [];
+  });
+  const store = new Store(link);
+  await store.load();
+  assert.deepEqual(link.asked.find((a) => a.method === "hosts/lastHeard")?.params, { host: "box" });
+  assert.equal(store.projects.value.box?.length, 1);
+  assert.equal((store.agents.value.box ?? []).length, 1);
+  // Nothing the host itself was asked: it is stopped.
+  assert.equal(link.asked.filter((a) => a.host === "box").length, 0);
+});

@@ -363,6 +363,24 @@ struct WorkspaceProvidersTests {
         #expect(row.workspace?.canStart == false)
     }
 
+    @Test func aStoppedHostsListsAreGivenBackAsLastHeard() async throws {
+        // A client that starts while the host is stopped still lists its projects (#962).
+        let h = try await ProviderHarness()
+        let copies = HostCopies(store: h.store)
+        await h.methods.setCopies(copies)
+        let projects: JSONValue = [["project": ["folder": "/src/api"], "lastActivityAt": 0]]
+        await copies.take(h.devbox, method: DaemonAPI.Method.projectsList,
+                          reply: try JSONRPCCodec.encode(.success(id: .number(1), result: projects)))
+        let heard = try await h.call(DaemonAPI.Method.hostsLastHeard, try JSONValue.encoding(DaemonAPI.HostRequest(host: h.devbox)))
+        #expect(heard.objectValue?["projects"] == projects)
+        #expect(heard.objectValue?["agents"] == nil)
+        _ = try await h.call(DaemonAPI.Method.hostsRemove, try JSONValue.encoding(DaemonAPI.HostRequest(host: h.devbox)))
+        #expect(await copies.lastHeard(h.devbox) == ["host": .string(h.devbox.rawValue)])
+        await #expect(throws: JSONRPCError.self) {
+            try await h.call(DaemonAPI.Method.hostsLastHeard, try JSONValue.encoding(DaemonAPI.HostRequest(host: h.devbox)))
+        }
+    }
+
     @Test func stopStopsTheWorkspace() async throws {
         let h = try await ProviderHarness()
         let id = try await h.add()
