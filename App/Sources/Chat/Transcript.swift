@@ -14,8 +14,8 @@ struct Transcript: View {
     let agent: Agent
     /// How much of the foot of the pane the floating prompt covers.
     var bottomInset: CGFloat = 0
-    /// What waits on the person, drawn at the end of the conversation (#723).
-    var cards: AnyView? = nil
+    /// What waits on the person, each drawn where it was asked (#723, #973).
+    var cards: [WaitingCard] = []
 
     var body: some View {
         let page = popped?.work ?? model.work

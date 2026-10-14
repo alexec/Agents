@@ -239,49 +239,56 @@ struct RemoteChatView: View {
         }
     }
 
-    /// What waits on the person, at the end of the conversation as on the Mac (#723):
-    /// nothing when nothing does, so the conversation has no way back to one to offer.
+    /// What waits on the person, each where it was asked in the conversation, as on the
+    /// Mac (#723, #973): none when nothing does, so the conversation has no way back to
+    /// one to offer.
     ///
     /// The question card keeps the phone's own shape — its options stacked and what it
     /// covers shown in full — because a row of buttons at a large text size is a row of
     /// truncated words.
-    private var cards: AnyView? {
-        guard let agent else { return nil }
-        let questions = model.work.permissions(for: agent.id)
-        let guarded = model.work.guardedChanges(askedIn: agent.id)
-        let form = model.work.elicitation(for: agent.id)
-        guard !questions.isEmpty || !guarded.isEmpty || form != nil || agent.asksToArchive else { return nil }
-        return AnyView(VStack(spacing: 12) {
-            ForEach(questions) { request in
+    private var cards: [WaitingCard] {
+        guard let agent else { return [] }
+        var cards: [WaitingCard] = []
+        for request in model.work.permissions(for: agent.id) {
+            cards.append(WaitingCard(id: request.id.uuidString, at: request.askedAt) {
                 // A fresh sheet per question, so a tap in flight on the last one is not
                 // carried over to the next.
                 PermissionSheet(request: request)
                     .id(request.id)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-            // A change its agent made to the project's own files waits the same way (#531).
-            ForEach(guarded) { change in
+            })
+        }
+        // A change its agent made to the project's own files waits the same way (#531).
+        for change in model.work.guardedChanges(askedIn: agent.id) {
+            cards.append(WaitingCard(id: "guarded:" + change.id, at: change.since) {
                 GuardedChangeQuestion(change: change, key: ProjectKey(host: agent.host, folder: agent.projectFolder))
                     .chatColumn()
                     .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-            // A form waits the same way a permission does and sits with it, never
-            // hidden behind one (#243), as on the Mac.
-            if let form {
+            })
+        }
+        // A form waits the same way a permission does, never hidden behind one (#243),
+        // as on the Mac.
+        if let form = model.work.elicitation(for: agent.id) {
+            cards.append(WaitingCard(id: form.id.uuidString, at: form.askedAt) {
                 ElicitationSheet(request: form)
                     .id(form.id)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-            // An ask to be archived waits the same way, last, as on the Mac (#827).
-            if agent.asksToArchive {
+            })
+        }
+        // An ask to be archived waits the same way, last when asked at once, as on the
+        // Mac (#827).
+        if agent.asksToArchive {
+            cards.append(WaitingCard(id: "archive:" + agent.id.uuidString,
+                                     at: agent.archiveRequest?.requestedAt ?? .distantFuture) {
                 ArchiveRequestCard(agent: agent,
                                    approve: { await model.archive(agent.id) },
                                    keep: { await model.keepSession(agent) },
                                    isDisabled: model.isStale(agent) || model.acting(agent.id) != nil)
                     .chatColumn()
                     .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-        })
+            })
+        }
+        return cards
     }
 
     /// The prompt, floating over the foot of the conversation in its column, as on the

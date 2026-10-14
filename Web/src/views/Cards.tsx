@@ -1,10 +1,11 @@
-// Permission requests and question cards at the end of the conversation (071 FR-024, #723;
+// Permission requests and question cards in the conversation, each where it was asked (071 FR-024, #723, #973;
 // PermissionView.swift and ElicitationView.swift). Answering one here answers it everywhere. One answered somewhere else
 // while it is on screen says so, and its buttons do nothing (US2 scenario 5).
 //
 // The first card takes keys, as the window's do (#256): Return its first real answer when no field
 // has the keys, and ⌥1…9 its answers by position. The window's are ⌘1…9; a browser keeps those for
 // its tabs, so the page's are on Option.
+import type { ComponentChildren } from "preact";
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type {
@@ -44,11 +45,19 @@ const questionWentUnanswered = "Nobody answered this question before the agent e
 /** How long a card answered elsewhere stays to say so. */
 const answeredElsewhereShownFor = 4_000;
 
-export function Cards({ store, host, session, down = false }: {
+/** A card that waits on the person, and when it was asked: where the chat draws it (WaitingCard, #973). */
+export interface WaitingCard { key: string; at: number; node: ComponentChildren }
+
+/**
+ * The permission and question cards waiting in a session, each with the time it was asked, for the
+ * chat to draw in its place. A hook rather than a component, so the cards can sit apart while what
+ * they hold (an answer on its way, one answered elsewhere) is kept in one place.
+ */
+export function useWaitingCards({ store, host, session, down = false }: {
   store: Store; host: string; session: string;
   /** Its host is down: the answers are held, greyed, until it is back, as the window's are (#83). */
   down?: boolean;
-}) {
+}): WaitingCard[] {
   // A question taken away because its runtime went is said in the conversation first, then
   // withdrawn (RuntimeNote.questionWentUnanswered): that line, after it was asked, is the tell.
   const unansweredSince = (askedAt: number) => store.entries.value.some((e) =>
@@ -127,27 +136,27 @@ export function Cards({ store, host, session, down = false }: {
   };
 
   const cards = held.value.filter((c) => c.answered !== "here");
-  if (!cards.length) return null;
+  if (!cards.length) return [];
   const recipient = host === "mac" ? "your Mac" : store.hosts.value.find((h) => h.id === host)?.name ?? "the host";
   // Who is asking, by title and runtime (#121).
   const runtimeName = (id: string) => (store.runtimes.value[host] ?? []).find((r) => r.runtime.id === id)?.runtime.name;
   const asker = (agentID: string, subagent?: string) =>
     askerFor(store.agents.value[host] ?? [], agentID, runtimeName, subagent);
-  return (
-    <div class="cards" aria-label="Waiting for you">
-      {cards.map((card, index) => card.kind === "permission"
-        ? <PermissionCard key={card.request.id} active={index === 0} request={card.request} asker={asker(card.request.agentID, card.request.subagent)}
-            // Shown as the host shows it: the page beside the chat, read again (the window's Show plan).
-            showPlan={(path) => (store.shownFile.value = { host, agentID: card.request.agentID, path, at: Date.now() })}
-            hold={{ answered: card.answered, chosen: card.chosen, recipient, down }}
-            answer={(option) => send(card.request.id, option.optionID, (sendID) => store.link.call("permissions/answer",
-              { permissionID: card.request.id, optionID: option.optionID, sendID }, host))} />
-        : <ElicitationCard key={card.request.id} active={index === 0} request={card.request} asker={asker(card.request.agentID)}
-            hold={{ answered: card.answered, chosen: card.chosen, recipient, down }}
-            answer={(key, action, content) => send(card.request.id, key, (sendID) => store.link.call("elicitations/answer",
-              { requestID: card.request.id, action, content, sendID }, host))} />)}
-    </div>
-  );
+  return cards.map((card, index) => ({
+    key: card.request.id,
+    at: card.request.askedAt,
+    node: card.kind === "permission"
+      ? <PermissionCard key={card.request.id} active={index === 0} request={card.request} asker={asker(card.request.agentID, card.request.subagent)}
+          // Shown as the host shows it: the page beside the chat, read again (the window's Show plan).
+          showPlan={(path) => (store.shownFile.value = { host, agentID: card.request.agentID, path, at: Date.now() })}
+          hold={{ answered: card.answered, chosen: card.chosen, recipient, down }}
+          answer={(option) => send(card.request.id, option.optionID, (sendID) => store.link.call("permissions/answer",
+            { permissionID: card.request.id, optionID: option.optionID, sendID }, host))} />
+      : <ElicitationCard key={card.request.id} active={index === 0} request={card.request} asker={asker(card.request.agentID)}
+          hold={{ answered: card.answered, chosen: card.chosen, recipient, down }}
+          answer={(key, action, content) => send(card.request.id, key, (sendID) => store.link.call("elicitations/answer",
+            { requestID: card.request.id, action, content, sendID }, host))} />,
+  }));
 }
 
 function AnsweredNote({ answered }: { answered: Answered }) {
