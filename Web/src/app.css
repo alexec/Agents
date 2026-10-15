@@ -1179,8 +1179,6 @@ button.plain:hover { opacity: 1; }
 .time-bar.others { fill: color-mix(in srgb, currentColor 35%, transparent); }
 .time-bar.person { fill: var(--tint-attention); }
 .time-charts g.dim { opacity: 0.35; }
-/* The recap over the bars (#985): today and the last 7 days side by side, then the records. */
-.time-recap { margin-bottom: 20px; }
 /* The milestones (#984): the Time page's checklist, and the one-time card at the bottom right. */
 .milestones { margin-bottom: 24px; }
 .milestones ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
@@ -1192,10 +1190,6 @@ button.plain:hover { opacity: 1; }
 .milestones-count { font-weight: normal; margin-left: 6px; font-variant-numeric: tabular-nums; }
 .milestone-card { position: fixed; right: 20px; bottom: 20px; max-width: 320px; z-index: 20; }
 .milestone-card > button.link { align-self: flex-start; }
-.time-recap-table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
-.time-recap-table th, .time-recap-table td { padding: 3px 0; text-align: right; }
-.time-recap-table th + th, .time-recap-table td + td { padding-left: 24px; }
-.time-recap-table th:first-child, .time-recap-table td:first-child { text-align: left; }
 .time-swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 8px; vertical-align: baseline; }
 .time-swatch.agent { background: var(--accent); }
 .time-swatch.tools { background: color-mix(in srgb, var(--accent) 50%, transparent); }

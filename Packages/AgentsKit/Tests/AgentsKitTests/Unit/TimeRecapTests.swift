@@ -3,8 +3,8 @@ import Testing
 @testable import AgentsKit
 @testable import AgentsKitCore
 
-/// The Time page's daily recap and records (#985): what the ledger notes as agents run,
-/// what `gh` said about merged pull requests, and what the page reads from them.
+/// The host's daily recap and records (#985): what the ledger notes as agents run, and
+/// what `gh` said about merged pull requests. Milestones (#984) read them.
 @Suite("Time recap and records")
 struct TimeRecapTests {
     private func temporary() -> StoreLocations {
@@ -96,32 +96,6 @@ struct TimeRecapTests {
         #expect(history.recap.isEmpty)
         #expect(history.records.isEmpty)
         #expect(history.days["2026-10-12"]?["claude"]?.turns == 1)
-    }
-
-    @Test("today and the last seven days: turns, agents, pull requests, leverage and peak")
-    func theRecap() {
-        var history = TimeHistory(now: "2026-10-12T15")
-        history.days["2026-10-12"] = ["claude": TimeBucket(agent: 3000, tools: 600, person: 1200, turns: 4),
-                                      "codex": TimeBucket(agent: 600, turns: 1)]
-        history.days["2026-10-08"] = ["claude": TimeBucket(agent: 6600, person: 600, turns: 2)]
-        history.days["2026-10-01"] = ["claude": TimeBucket(agent: 9999, person: 1, turns: 9)]
-        history.recap["2026-10-12"] = DayRecap(prsMerged: 2, agents: 3, peakAgents: 2)
-        history.recap["2026-10-08"] = DayRecap(agents: 1, peakAgents: 4)
-        let recap = TimeRecap(history)
-        #expect(recap.today.turns == 5)
-        #expect(recap.today.agents == 3)
-        #expect(recap.today.prsMerged == 2)
-        #expect(recap.today.leverage == 3.5)
-        #expect(recap.week.turns == 7)
-        #expect(recap.week.agents == 4)
-        #expect(recap.week.prsMerged == 2)
-        #expect(recap.week.peakAgents == 4)
-        #expect(recap.week.leverage == 6)
-        #expect(TimeRecap.leverageWords(3.5) == "3.5×")
-        #expect(TimeRecap.leverageWords(12.4) == "12×")
-        #expect(TimeRecap.leverageWords(nil) == "–")
-        // No pull request figure until gh has said something.
-        #expect(TimeRecap(TimeHistory(now: "2026-10-12T15")).today.prsMerged == nil)
     }
 
     @Test("gh's merged pull requests: only the app's branches, each once, by the host's day")

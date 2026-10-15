@@ -1,7 +1,7 @@
 // The bars of the Time page (#852), as AgentsKitCore's TimeChart works them out, so the page says
 // what the window's and the Remote's say. Each bar is stacked by kind of time. Every stamp is the
 // host's, counted back from history.now; nothing asks the browser's clock what today is.
-import type { TimeBucket, TimeHistory, TimeRecords } from "../protocol/generated";
+import type { TimeBucket, TimeHistory } from "../protocol/generated";
 import { dayStamp, hourStamp, stampDate, type UsageRange } from "./usage";
 
 export type TimeKind = "agent" | "tools" | "others" | "person";
@@ -108,60 +108,4 @@ export function timeWords(seconds: number): string {
   if (hours >= 100) return `${hours}h`;
   const rest = minutes % 60;
   return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`;
-}
-
-// The recap at the top of the Time page (#985), as AgentsKitCore's TimeRecap works it out.
-
-export interface RecapFigures {
-  /** Undefined when gh said nothing about any of the days. */
-  prsMerged?: number;
-  turns: number;
-  /** Agents that ran a turn, added up day by day. */
-  agents: number;
-  /** The agent's own time: thinking, writing and its tools. */
-  agentTime: number;
-  personTime: number;
-  peakAgents: number;
-}
-
-export interface TimeRecap { today: RecapFigures; week: RecapFigures; records: TimeRecords }
-
-function recapFigures(history: TimeHistory, days: string[]): RecapFigures {
-  const f: RecapFigures = { turns: 0, agents: 0, agentTime: 0, personTime: 0, peakAgents: 0 };
-  for (const day of days) {
-    for (const b of Object.values(history.days[day] ?? {})) {
-      f.turns += b.turns;
-      f.agentTime += b.agent + b.tools;
-      f.personTime += b.person;
-    }
-    // A host from before #985 sends no recap.
-    const recap = history.recap?.[day];
-    if (!recap) continue;
-    if (recap.prsMerged !== undefined && recap.prsMerged !== null) f.prsMerged = (f.prsMerged ?? 0) + recap.prsMerged;
-    f.agents += recap.agents;
-    f.peakAgents = Math.max(f.peakAgents, recap.peakAgents);
-  }
-  return f;
-}
-
-export function timeRecap(history: TimeHistory): TimeRecap {
-  const now = stampDate(history.now) ?? new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const days = [0, 1, 2, 3, 4, 5, 6].map((n) => dayStamp(addDays(today, -n)));
-  return {
-    today: recapFigures(history, [days[0]!]),
-    week: recapFigures(history, days),
-    records: history.records ?? {},
-  };
-}
-
-/** Agent hours for each hour of the person's: undefined until they were waited on for a minute. */
-export function leverage(f: RecapFigures): number | undefined {
-  return f.personTime >= 60 && f.agentTime > 0 ? f.agentTime / f.personTime : undefined;
-}
-
-/** "6.2×", or a dash: TimeRecap.leverageWords. */
-export function leverageWords(value: number | undefined): string {
-  if (value === undefined) return "–";
-  return value >= 10 ? `${Math.round(value)}×` : `${value.toFixed(1)}×`;
 }

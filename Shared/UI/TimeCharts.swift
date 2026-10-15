@@ -18,10 +18,6 @@ struct TimeChartsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if let history {
-                TimeRecapSection(recap: TimeRecap(history))
-                    .padding(.bottom, 12)
-            }
             Picker("Range", selection: $range) {
                 ForEach(TimeChart.Range.allCases) { Text($0.rawValue).tag($0) }
             }
@@ -44,76 +40,6 @@ struct TimeChartsSection: View {
                 try? await Task.sleep(for: .seconds(60))
             }
         }
-    }
-}
-
-/// The recap at the top of the Time page (#985): today and the last seven days side by
-/// side, then the person's records. Worked out in `TimeRecap`; the page draws
-/// `TimeRecapSection` in TimeCharts.tsx. No streaks, nothing about tokens or cost.
-struct TimeRecapSection: View {
-    let recap: TimeRecap
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 24, verticalSpacing: 6) {
-                GridRow {
-                    Text("Recap").appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
-                    heading("Today")
-                    heading("Last 7 days")
-                }
-                row("PRs merged", recap.today.prsMerged.map(String.init) ?? "–",
-                    recap.week.prsMerged.map(String.init) ?? "–",
-                    help: "Pull requests merged from agents' branches, as gh says")
-                row("Turns finished", "\(recap.today.turns)", "\(recap.week.turns)")
-                row("Agents run", "\(recap.today.agents)", "\(recap.week.agents)",
-                    help: "Agents that ran a turn, counted on each day they ran")
-                row("Leverage", TimeRecap.leverageWords(recap.today.leverage),
-                    TimeRecap.leverageWords(recap.week.leverage),
-                    help: "Agent hours for each hour the agents waited for you")
-                row("Peak agents at once", "\(recap.today.peakAgents)", "\(recap.week.peakAgents)")
-            }
-            if !recap.records.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Records").appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
-                    if let record = recap.records.mostAgents {
-                        recordRow("Most agents at once", "\(Int(record.value))", record)
-                    }
-                    if let record = recap.records.mostPRs {
-                        recordRow("Most PRs merged in a day", "\(Int(record.value))", record)
-                    }
-                    if let record = recap.records.longestClear {
-                        recordRow("Longest stretch with no agent waiting for you",
-                                  TimeChart.words(record.value), record)
-                    }
-                }
-            }
-        }
-    }
-
-    private func heading(_ title: String) -> some View {
-        Text(title).appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
-            .gridColumnAlignment(.trailing)
-    }
-
-    private func row(_ title: String, _ today: String, _ week: String, help: String? = nil) -> some View {
-        GridRow {
-            Text(title)
-            Text(today).monospacedDigit()
-            Text(week).monospacedDigit()
-        }
-        .help(help ?? "")
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(title): today \(today), last 7 days \(week)")
-    }
-
-    private func recordRow(_ title: String, _ value: String, _ record: TimeRecord) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(title)
-            Spacer(minLength: 24)
-            Text(value).monospacedDigit()
-            Text(TimeRecap.dayWords(record.day)).foregroundStyle(.secondary)
-        }
-        .accessibilityElement(children: .combine)
     }
 }
 
