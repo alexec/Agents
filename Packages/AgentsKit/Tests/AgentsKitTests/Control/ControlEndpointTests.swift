@@ -14,6 +14,21 @@ struct ControlEndpointTests {
                           addresses: [], name: "home", url: "https://mac.local:8791", pin: pin)
     }
 
+    /// A client's pairing stays out of backups (#1031), each time it is written again.
+    @Test func aClientsPairingIsNotBackedUp() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let file = folder.appendingPathComponent("control-client.json")
+        for _ in 0..<2 {
+            try membership().save(file, backedUp: false)
+            #expect(try file.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true)
+            #expect(ControlMembership.load(file) == membership())
+        }
+        let host = folder.appendingPathComponent("control-host.json")
+        try membership().save(host)
+        #expect(try host.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == false)
+    }
+
     @Test func aMembershipFromBeforeTheListDialsItsOneAddress() throws {
         // Written by a build with no endpoints: the version 2 fields only.
         let old = #"{"host":"abcd1234","controlKey":"BAEB","addresses":[],"name":"home","url":"https://mac.local:8791","pin":"\#(pin)"}"#

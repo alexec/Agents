@@ -2,8 +2,9 @@ import AgentsKitCore
 import Foundation
 
 /// Where the window's control plane is (058, US1, frame K): only ever elsewhere, reached
-/// over a WebSocket with this window's own key, kept in its container. There is no local
-/// socket, no host run from here and no old way: Agents Host does all of that.
+/// over a WebSocket with this window's own key, kept in the keychain on this Mac only
+/// (#1031). There is no local socket, no host run from here and no old way: Agents Host
+/// does all of that.
 enum ControlConfig {
     enum Endpoint {
         case remote(ControlMembership)
@@ -33,15 +34,28 @@ enum ControlConfig {
     /// Where a walk's window writes the page Open in Browser would open (#109), for the
     /// walk's headless browser to go to: a walk never opens the person's own browser.
     static var walkOpenedURL: URL? { walk == nil ? nil : folder.appendingPathComponent("opened-url") }
+    /// Not backed up (#1031): a restored Mac pairs again.
     private static var membershipFile: URL { folder.appendingPathComponent("control-client.json") }
-    private static var keyFile: URL { folder.appendingPathComponent("control-client-key") }
+    /// The window's key in the keychain; a walk's window has its own, as it has its own pairing.
+    private static var keyAccount: String { walk.map { "control-client-key.walk.\($0)" } ?? "control-client-key" }
 
     static var endpoint: Endpoint? {
+        _ = retiredFileKey
         guard let membership = ControlMembership.load(membershipFile), membership.client != nil, membership.url != nil else {
             return nil
         }
         return .remote(membership)
     }
+
+    /// An older build kept the key in `control-client-key`, which went into backups
+    /// (#1031). It goes, once, with the pairing made under it, so the window asks how to
+    /// work again (v0.x, no migration).
+    private static let retiredFileKey: Void = {
+        let old = folder.appendingPathComponent("control-client-key")
+        guard FileManager.default.fileExists(atPath: old.path) else { return }  // store-ok: the window's own container
+        try? FileManager.default.removeItem(at: membershipFile)  // store-ok: the window's own container
+        try? FileManager.default.removeItem(at: old)  // store-ok: the window's own container
+    }()
 
     static var needsFirstRun: Bool { endpoint == nil }
 
@@ -52,11 +66,11 @@ enum ControlConfig {
     static func link(_ endpoint: Endpoint) -> ControlLink? {
         switch endpoint {
         case .remote(let membership):
-            guard let key = try? ControlAgreement.loadOrMake(file: keyFile),
+            guard let key = try? ControlClientKey.loadOrMake(account: keyAccount),
                   let dial = try? ControlCodeUse.clientDial(membership, privateKey: key, kind: "mac", dial: dial, keep: { newer in
                       // The control plane moved, or changed its certificate (R16): kept for next time,
                       // and tried again at the next answer if the disk refused it (#212).
-                      try newer.save(membershipFile)
+                      try newer.save(membershipFile, backedUp: false)
                   }) else { return nil }
             return ControlLink(dial: dial)
         }
@@ -71,14 +85,14 @@ enum ControlConfig {
     /// Connect to a control plane (frames C and K2): say who this window is with the code,
     /// then keep what it was told. What the window may do is the code's.
     static func pair(with code: ControlCode) async throws -> ControlMembership {
-        let key = try ControlAgreement.loadOrMake(file: keyFile)
+        let key = try ControlClientKey.loadOrMake(account: keyAccount)
         let membership = try await ControlCodeUse.pairClient(code, privateKey: key, id: UUID(),
                                                              name: Host.current().localizedName ?? "A Mac",
                                                              kind: .mac, dial: dial)
         // Given up on (Cancel, or the sheet's deadline): not kept, so the window does
         // not wake up paired with something the person walked away from (#84).
         try Task.checkCancellation()
-        try membership.save(membershipFile)
+        try membership.save(membershipFile, backedUp: false)
         return membership
     }
 }

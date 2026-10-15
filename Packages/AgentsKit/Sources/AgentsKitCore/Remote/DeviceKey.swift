@@ -170,6 +170,17 @@ public struct DeviceKey: Sendable {
             let status = SecItemAdd(add as CFDictionary, nil)
             guard status == errSecSuccess else { throw Failure.keychain(status) }
         }
+
+        /// `data` as `account`, only if there is none yet: false when one was already there.
+        func add(_ data: Data, account: String) throws -> Bool {
+            var add = base(account)
+            add[kSecValueData as String] = data
+            add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            let status = SecItemAdd(add as CFDictionary, nil)
+            if status == errSecDuplicateItem { return false }
+            guard status == errSecSuccess else { throw Failure.keychain(status) }
+            return true
+        }
     }
 
     public enum Failure: Error, Sendable {
