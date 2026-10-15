@@ -202,6 +202,16 @@ export function NewAgent({ store, host, folder, projectName, down }: {
     };
   }, [host, chosenRuntime, cwd, asking.value]);
 
+  // Back in touch (#1047): choices that failed, or never came, are asked again, as Try again
+  // would, rather than kept until the form is closed and opened.
+  const reachable = !down && store.hostIsOnline(host);
+  const wasReachable = useRef(reachable);
+  useEffect(() => {
+    const cameBack = reachable && !wasReachable.current;
+    wasReachable.current = reachable;
+    if (cameBack && form.peek().state !== "ready") asking.value = asking.peek() + 1;
+  }, [reachable]);
+
   // The correction to a form answered from memory.
   const correction = store.draftOptions.value;
   useEffect(() => {

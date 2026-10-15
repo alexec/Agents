@@ -220,6 +220,9 @@ struct PromptBar: View {
         }
         .onAppear { prepare() }
         .onChange(of: model.availableRuntimes.map(\.id)) { prepare() }
+        // Back in touch (#1047): choices that failed, or never came, are asked again,
+        // as Try again would, rather than kept until the form is closed and opened.
+        .modifier(OnReachable(reachable: hostReachable) { prepare() })
         // Until a folder is chosen, the first agent to arrive names it. After that,
         // another project's agent arriving is not a reason to list this one's
         // worktrees again (#285).
@@ -1160,6 +1163,12 @@ struct PromptBar: View {
         return counts.values.reduce(0, +)
     }
 
+    /// The new agent's host answers: this Mac's daemon, or the project's server.
+    private var hostReachable: Bool {
+        let host = model.selectedProjectHost
+        return host == .mac ? model.isConnected : !model.hosts.isOffline(host)
+    }
+
     /// Open on the runtime and folder already in use. An empty chooser is a click
     /// asking for something the app knows.
     private func prepare() {
@@ -1393,5 +1402,16 @@ private struct ScrollingChoices<Content: View>: View {
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
         }
         .frame(height: min(contentHeight, Self.tallest))
+    }
+}
+
+/// Runs `act` each time `reachable` turns true. Its own modifier, so the prompt bar's
+/// long chain stays one the compiler can check in time.
+private struct OnReachable: ViewModifier {
+    let reachable: Bool
+    let act: () -> Void
+
+    func body(content: Content) -> some View {
+        content.onChange(of: reachable) { _, now in if now { act() } }
     }
 }
