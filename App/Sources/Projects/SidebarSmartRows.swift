@@ -41,8 +41,13 @@ struct SmartFold: View {
                 }
                 if isOpen {
                     ForEach(row.approvals(in: model.work, projects: projects, query: query), id: \.approval.id) { item in
-                        ApprovalListRow(approval: item.approval, project: item.project,
-                                        place: place(of: item.project))
+                        if item.approval.opensItsSubject {
+                            FailedWorkflowRow(approval: item.approval, project: item.project,
+                                              place: place(of: item.project))
+                        } else {
+                            ApprovalListRow(approval: item.approval, project: item.project,
+                                            place: place(of: item.project))
+                        }
                     }
                 }
             }
@@ -159,6 +164,42 @@ private struct ApprovalListRow: View {
     /// From the menu, of the version the row was drawn from: a later change is refused.
     private func answerNow(_ action: Approval.Action) {
         Task { await model.settleApproval(approval, action, for: project) }
+    }
+}
+
+/// A workflow that has stopped working, under Needs You (#989): the failure in its grey line.
+/// Picking it opens the run's agent, which Needs You does not list again, or the workflow
+/// when no agent ran; Dismiss, in its menu, takes it out until it fails again.
+private struct FailedWorkflowRow: View {
+    @Environment(AppModel.self) private var model
+    let approval: Approval
+    let project: ProjectKey
+    let place: String?
+
+    var body: some View {
+        ApprovalRowLabel(approval: approval, place: place)
+            .help("\(approval.kindWord) · \(approval.line)")
+            .sidebarInk(item)
+            .tag(item)
+            .contextMenu {
+                Button("Open") { model.sidebarItem = item }
+                if approval.agentID != nil {
+                    Button("Open Workflow") { model.sidebarItem = workflow }
+                }
+                if approval.actions.contains(.dismiss) {
+                    Button(approval.word(for: .dismiss)) {
+                        Task { await model.settleApproval(approval, .dismiss, for: project) }
+                    }
+                }
+            }
+    }
+
+    private var item: SidebarItem { approval.agentID.map(SidebarItem.session) ?? workflow }
+
+    private var workflow: SidebarItem {
+        let id = model.work.workflows(in: project.folder).first { $0.workflowID == approval.key }?.id
+            ?? project.folder.path + "/" + approval.key
+        return .workflow(id, in: project)
     }
 }
 

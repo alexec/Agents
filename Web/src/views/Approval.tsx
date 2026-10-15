@@ -14,6 +14,8 @@ import { fromWireDate } from "../protocol/dates";
 import { Lines } from "./Changes";
 import { readingLines } from "./GuardedChange";
 import { Modal } from "./Modal";
+import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
+import { go } from "../route";
 
 /** The mark every approval row wears: a shield with a tick, in the attention tint. */
 export function ApprovalMark() {
@@ -25,6 +27,57 @@ export function ApprovalMark() {
         <path d="m5.6 8.1 1.7 1.7 3.2-3.4" />
       </svg>
     </span>
+  );
+}
+
+/** A failed workflow's mark (#989): the triangle its own row wears on its project's page, in the attention tint. */
+export function FailedMark() {
+  return (
+    <span class="sidebar-mark approval" aria-hidden="true">
+      <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"
+        stroke-linejoin="round" stroke-linecap="round">
+        <path d="M8 2 1.75 13.25h12.5z" />
+        <path d="M8 6.5v3.25M8 11.6v.01" />
+      </svg>
+    </span>
+  );
+}
+
+/**
+ * A workflow that has stopped working, under Needs You (#989), as the window's FailedWorkflowRow:
+ * the failure in its grey line. A press opens the run's agent, which Needs You does not list again,
+ * or the workflow when no agent ran; Dismiss, in its menu, takes it out until it fails again.
+ */
+export function FailedWorkflowRow({ store, host, folder, approval, place, down, chosen }: {
+  store: Store; host: string; folder: string; approval: ApprovalItem; place: string; down: boolean; chosen: boolean;
+}) {
+  const since = approval.since === undefined ? undefined : fromWireDate(approval.since);
+  const agentID = approval.agentID as string | undefined;
+  const open = () => go(agentID ? { host, project: folder, session: agentID } : { host, project: folder, workflow: approval.key });
+  const menu = (): MenuItem[] => [
+    { label: "Open", run: open },
+    ...(agentID ? [{ label: "Open Workflow", run: () => go({ host, project: folder, workflow: approval.key }) }] : []),
+    ...(approval.actions.includes("dismiss") ? [{
+      label: actionWord(approval.kind, "dismiss"), disabled: down, help: "Out of Needs You until it fails again",
+      run: () => void store.dismissWorkflowFailure(host, folder, approval),
+    }] : []),
+  ];
+  return (
+    <div class="nav-item">
+      <button class={`row session approval${chosen ? " chosen" : ""}`} aria-current={chosen} aria-description="stopped working"
+        onClick={open} onContextMenu={(e) => openContextMenu(e, menu())}
+        onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }} {...holdForMenu(menu)}>
+        <FailedMark />
+        <span class="body">
+          <span class="title placed">
+            <span class="name">{approval.title}</span>
+            <span class="place"> {place}</span>
+          </span>
+          <span class="subtitle">{approvalLine(approval)}</span>
+        </span>
+        {since && <time class="when" dateTime={since.toISOString()} title={since.toLocaleString()}>{shortAgo(since)}</time>}
+      </button>
+    </div>
   );
 }
 

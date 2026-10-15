@@ -193,4 +193,57 @@ struct WorkflowOutcomeTests {
         #expect(!WorkflowRefusal.missedWhileClosed.needsAPerson)
         #expect(!WorkflowRefusal.agentUnavailable.needsAPerson)
     }
+
+    // MARK: What Needs You lists (#989)
+
+    @Test func onlyAFailureThatStaysIsListed() {
+        let at = Date()
+        func failure(_ refusal: WorkflowRefusal) -> WorkflowFailure? {
+            WorkflowFailure.of(workflow(), lastOutcome: .refused(refusal, at: at, repeats: 1), ranAgent: nil)
+        }
+        #expect(failure(.chainTooDeep(depth: 3))?.key == "refused:chain_too_deep")
+        #expect(failure(.folderGone)?.line == "Did not run — the project folder is not there")
+        #expect(failure(.overLimit(.total))?.key == "refused:over_limit")
+        // The ones that clear by themselves, and the OK that #773 already lists.
+        for passing in [WorkflowRefusal.coolingDown(until: nil), .dayLimitReached, .missedWhileClosed, .runInFlight,
+                        .queued, .awaitingApproval, .deniedHere] {
+            #expect(failure(passing) == nil, "\(passing) is not a failure")
+        }
+        // An unreadable refusal from a file read well since is history.
+        #expect(failure(.unreadable("x")) == nil)
+        let broken = workflow(problem: .unreadable("No prompt"))
+        #expect(WorkflowFailure.of(broken, lastOutcome: nil, ranAgent: nil)?.line == "Cannot be read — No prompt")
+    }
+
+    @Test func aRunFailsWhenItsAgentStoppedShortStuckOrBlockedOnThePerson() {
+        let at = Date()
+        func failure(_ agent: Agent) -> WorkflowFailure? {
+            WorkflowFailure.of(workflow(), lastOutcome: .ran(agentID: agent.id, at: at), ranAgent: agent)
+        }
+        let crashed = Agent(runtimeID: "claude", cwd: URL(filePath: "/tmp/p"), state: .stopped, endedReason: .processDied)
+        #expect(failure(crashed)?.line == "Run failed — The runtime crashed")
+        #expect(failure(crashed)?.agentID == crashed.id)
+        var stuck = Agent(runtimeID: "claude", cwd: URL(filePath: "/tmp/p"), state: .finished, endedReason: .endTurn)
+        stuck.report = WorkReport(outcome: .stuck, message: "No network", at: at)
+        #expect(failure(stuck)?.line == "Run failed — No network")
+        var asks = stuck
+        asks.report = WorkReport(outcome: .needsAnswer, message: "Which branch?", at: at)
+        #expect(failure(asks) == nil, "a question is the agent's own row")
+        let stopped = Agent(runtimeID: "claude", cwd: URL(filePath: "/tmp/p"), state: .stopped, endedReason: .cancelled)
+        #expect(failure(stopped) == nil, "stopped by the person")
+        let running = Agent(runtimeID: "claude", cwd: URL(filePath: "/tmp/p"), state: .running)
+        #expect(failure(running) == nil)
+    }
+
+    @Test func aDismissalLastsUntilSomethingElseHappens() {
+        var records = WorkflowRecords()
+        let folder = URL(filePath: "/tmp/p")
+        records.record(.refused(.folderGone, at: Date(), repeats: 1), folder: folder, workflowID: "w")
+        records.update(folder: folder, workflowID: "w") { $0.dismissedFailure = "refused:folder_gone" }
+        records.record(.refused(.folderGone, at: Date(), repeats: 1), folder: folder, workflowID: "w")
+        #expect(records.state(folder: folder, workflowID: "w")?.dismissedFailure == "refused:folder_gone",
+                "the same refusal again is the one dismissed")
+        records.record(.ran(agentID: UUID(), at: Date()), folder: folder, workflowID: "w")
+        #expect(records.state(folder: folder, workflowID: "w")?.dismissedFailure == nil, "a run is news")
+    }
 }

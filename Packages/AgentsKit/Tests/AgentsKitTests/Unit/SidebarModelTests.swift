@@ -307,6 +307,29 @@ struct SidebarModelTests {
         #expect(SidebarSmartRow.unread.agents(in: model, projects: projects).isEmpty)
     }
 
+    /// A failed workflow is a row of Needs You (#989), and its run's agent is that row, not a
+    /// session row as well: listed once, and counted once.
+    @Test func aFailedWorkflowStandsForItsRunsAgent() {
+        let model = AgentsModel()
+        let asking = started(api, .waitingOnUser, "asking", at: 1)
+        var failed = started(api, .finished, "nightly run", at: 2)
+        failed.report = WorkReport(outcome: .stuck, message: "No network", at: t0)
+        model.replaceAgents([asking, failed])
+        var api = summary(self.api)
+        api.approvals = [Approval(kind: .workflowFailed, key: "nightly", title: "Nightly", digest: "ran:x",
+                                  line: "Run failed — No network", since: t0, actions: [.dismiss], agentID: failed.id)]
+        model.replaceProjects([api])
+        let projects = [key]
+
+        #expect(SidebarSmartRow.needsYou.agents(in: model, projects: projects).map(\.id) == [asking.id])
+        #expect(SidebarSmartRow.needsYou.approvals(in: model, projects: projects).map(\.approval.key) == ["nightly"])
+        #expect(SidebarSmartRow.needsYou.count(in: model, projects: projects) == 2)
+        #expect(api.hasFailedWorkflow)
+        // With Working off, the pass over every session leaves it out the same way (#846).
+        let on = SidebarSmartRow.all.subtracting([.working])
+        #expect(SidebarSmartRow.needsYou.count(in: model, projects: projects, on: on) == 2)
+    }
+
     /// Pinned gathers every project's pinned sessions in pin order, never an archived one
     /// (#495), and they are not among their project's own sessions.
     @Test func pinnedGathersEveryProjectsPinsInTheirOrder() {

@@ -6,8 +6,9 @@ import Foundation
 ///
 /// Needs You holds everything waiting for the person (#773): sessions asking a question or
 /// blocked, sessions asking to be archived (#584, #649, once their own group), and each
-/// project's `approvals` — MCP servers, workflows, plugins and guarded files — as rows of
-/// their own.
+/// project's `approvals` — MCP servers, workflows, plugins and guarded files, and workflows
+/// that failed (#989) — as rows of their own. A failed run's agent is its workflow's row,
+/// not a session row as well.
 ///
 /// Read off each project's shelf (#165), so a folded smart row costs a sum of counts per
 /// project and not a pass over every agent held; only an open one lists its sessions.
@@ -74,8 +75,13 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
             }
             switch self {
             case .needsYou:
+                // Less the failed runs' agents: their workflows' rows stand for them (#989).
+                let failedHere = Self.failedRuns(in: work, key).count { id in
+                    work.agent(id).map { Self.home(of: $0, in: work.group(of: $0), isPinned: false) == .needsYou
+                        && !work.pinnedSessions(in: key.folder).contains(id) } ?? false
+                }
                 return total + (shelf.counts[.needsAttention] ?? 0) + (shelf.counts[.blocked] ?? 0)
-                    + Self.askingAtRest(in: shelf) + Self.ownApprovals(in: work, key).count - pinnedHere
+                    + Self.askingAtRest(in: shelf) + Self.ownApprovals(in: work, key).count - pinnedHere - failedHere
             case .working:
                 return total + (shelf.counts[.running] ?? 0) - pinnedHere
             case .unread:
@@ -165,9 +171,11 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
             let gathered = projects.flatMap { key -> [Agent] in
                 let shelf = work.shelf(key)
                 let pinned = Set(work.pinnedSessions(in: key.folder))
+                let failed = self == .needsYou ? Self.failedRuns(in: work, key) : []
                 return AgentGroup.live.flatMap { group in
                     (shelf.groups[group] ?? []).filter {
                         Self.home(of: $0, in: group, isPinned: pinned.contains($0.id), on: on) == self
+                            && !failed.contains($0.id)
                     }
                 }
             }
@@ -190,9 +198,11 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
             case .unread: AgentGroup.live.filter { !Self.busyGroups.contains($0) }
                 .flatMap { shelf.groups[$0] ?? [] }.filter { $0.showsUnread && !$0.asksToArchive }
             }
-            // A pinned session is listed in Pinned and nowhere else (#587).
-            let pinned = Set(work.pinnedSessions(in: key.folder))
-            return pinned.isEmpty ? held : held.filter { !pinned.contains($0.id) }
+            // A pinned session is listed in Pinned and nowhere else (#587); a failed run's
+            // agent, as its workflow's row (#989).
+            let hidden = Set(work.pinnedSessions(in: key.folder))
+                .union(self == .needsYou ? Self.failedRuns(in: work, key) : [])
+            return hidden.isEmpty ? held : held.filter { !hidden.contains($0.id) }
         }
         let shown = matcher.map { gathered.filter($0.matches) } ?? gathered
         return shown.sorted { $0.createdAt > $1.createdAt }
@@ -234,6 +244,13 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
     @MainActor
     public static func ownApprovals(in work: AgentsModel, _ key: ProjectKey) -> [Approval] {
         (work.project(key)?.approvals ?? []).filter { !$0.isSession }
+    }
+
+    /// The agents of one project's failed workflow runs (#989): Needs You lists each as its
+    /// workflow's row, which opens it, and not as a session too.
+    @MainActor
+    public static func failedRuns(in work: AgentsModel, _ key: ProjectKey) -> Set<UUID> {
+        Set((work.project(key)?.approvals ?? []).filter { $0.kind == .workflowFailed }.compactMap(\.agentID))
     }
 
     /// One project's pinned sessions held and not archived, in the order they were put in.

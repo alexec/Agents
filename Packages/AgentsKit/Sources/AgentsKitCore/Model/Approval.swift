@@ -2,14 +2,18 @@ import Foundation
 
 /// One thing in a project waiting for the person's approval (#773), as its host lists it on
 /// the project's summary: a project MCP server, a workflow, a plugin, a guarded `.agents`
-/// file, or a session asking to be archived. Every client draws the one list in Needs You,
-/// the same way for every kind, rather than each gathering it from five places.
+/// file, or a session asking to be archived; and a workflow that failed (#989), waiting for
+/// the person to fix it or dismiss it. Every client draws the one list in Needs You, the
+/// same way for every kind, rather than each gathering it from six places.
 ///
 /// The host says which answers each takes (`actions`), so a client offers what the host
 /// would do and nothing else.
 public struct Approval: Codable, Hashable, Sendable, Identifiable {
     public enum Kind: String, Codable, Sendable, CaseIterable {
         case mcpServer, workflow, plugin, file, archive
+        /// A workflow that has stopped working (#989): `WorkflowFailure`. Its key is the
+        /// workflow's id and its digest the failure's key.
+        case workflowFailed
     }
 
     public enum Action: String, Codable, Sendable, CaseIterable {
@@ -20,6 +24,8 @@ public struct Approval: Codable, Hashable, Sendable, Identifiable {
         case deny
         /// A note sent back to the agent that made the change. Only where one did.
         case requestChanges
+        /// Out of Needs You until it fails again: a failed workflow's only answer (#989).
+        case dismiss
     }
 
     public var kind: Kind
@@ -61,6 +67,7 @@ public struct Approval: Codable, Hashable, Sendable, Identifiable {
         case .plugin: "Plugin"
         case .file: "File"
         case .archive: "Archive"
+        case .workflowFailed: "Workflow"
         }
     }
 
@@ -74,6 +81,7 @@ public struct Approval: Codable, Hashable, Sendable, Identifiable {
         case (.deny, .archive): "Keep Session"
         case (.deny, _): "Deny"
         case (.requestChanges, _): "Request Changes"
+        case (.dismiss, _): "Dismiss"
         }
     }
 
@@ -94,12 +102,19 @@ public struct Approval: Codable, Hashable, Sendable, Identifiable {
                 + "on; Undo puts the approved copy back in the file."
         case .archive:
             "The session asked to be archived. Keep Session takes the request away and leaves it where it is."
+        case .workflowFailed:
+            "The workflow has stopped working. It leaves Needs You when the cause is gone; Dismiss takes it out "
+                + "until it fails again."
         }
     }
 
     /// Whether a session's own row draws it: an archive request is the session's row, with
     /// its mark, and not a row of its own.
     public var isSession: Bool { kind == .archive }
+
+    /// Whether choosing the row reads something before an answer (#773), or opens what it
+    /// is about: a failed workflow opens the run's agent, or the workflow (#989).
+    public var opensItsSubject: Bool { kind == .workflowFailed }
 }
 
 /// Approve, Deny or Request changes, for one waiting item (#773).

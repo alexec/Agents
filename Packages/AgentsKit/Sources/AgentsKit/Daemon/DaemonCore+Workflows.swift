@@ -561,6 +561,8 @@ extension DaemonCore {
         let current = workflows[Project.standardize(workflow.folder)]?[workflow.workflowID] ?? workflow
         guard current.runs(on: MachineID.current) else { return }
         broadcast(DaemonAPI.Notification.workflowChanged, summary(for: current, records: records))
+        // A failure listed in Needs You, or gone from it, is on the project's summary (#989).
+        projectChanged(forAgentIn: current.folder)
     }
 
     /// Write `hosts:`. A single id on one line is that same list, so it is rewritten
@@ -587,6 +589,7 @@ extension DaemonCore {
             broadcast(DaemonAPI.Notification.workflowChanged,
                       summary(for: workflow, records: records, ceilings: ceilings))
         }
+        projectChanged(forAgentIn: standardized)
     }
 
     /// Tell the windows about every workflow, in every project, after something that

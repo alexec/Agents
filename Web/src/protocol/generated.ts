@@ -283,7 +283,7 @@ export interface Approval {
   agentID?: UUID;
 }
 
-export type ApprovalAction = "approve" | "deny" | "requestChanges";
+export type ApprovalAction = "approve" | "deny" | "requestChanges" | "dismiss";
 
 export interface ApprovalAnswer {
   folder: URLString;
@@ -294,7 +294,7 @@ export interface ApprovalAnswer {
   note?: string;
 }
 
-export type ApprovalKind = "mcpServer" | "workflow" | "plugin" | "file" | "archive";
+export type ApprovalKind = "mcpServer" | "workflow" | "plugin" | "file" | "archive" | "workflowFailed";
 
 export interface ApprovalReadRequest {
   folder: URLString;

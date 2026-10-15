@@ -12,7 +12,7 @@ struct ApprovalRowLabel: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            ApprovalMark()
+            ApprovalMark(kind: approval.kind)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
                     Text(approval.title)
@@ -37,15 +37,18 @@ struct ApprovalRowLabel: View {
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .accessibilityValue("waiting for your approval")
+        .accessibilityValue(approval.kind == .workflowFailed ? "stopped working" : "waiting for your approval")
     }
 }
 
 /// The mark every approval row wears: a shield in the attention tint, as a workflow
-/// waiting for an OK has worn (#587).
+/// waiting for an OK has worn (#587); a failed workflow (#989), the triangle its own row
+/// wears on its project's page.
 struct ApprovalMark: View {
+    var kind: Approval.Kind?
+
     var body: some View {
-        Image(systemName: "checkmark.shield")
+        Image(systemName: kind == .workflowFailed ? "exclamationmark.triangle" : "checkmark.shield")
             .foregroundStyle(StateTint.attention.style(or: .primary))
             .frame(width: 16)
             .accessibilityHidden(true)

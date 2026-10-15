@@ -21,8 +21,9 @@ struct ProjectRow: View {
     /// knowing which agents have asked to be looked at. The Mac's row does the same.
     private var counts: [AgentGroup: Int] { model.counts(in: summary.key) }
 
-    /// Exactly when something in it is under Needs you.
-    private var needsPerson: Bool { (counts[.needsAttention] ?? 0) > 0 }
+    /// Exactly when something in it is under Needs you: a session, or a workflow that has
+    /// stopped working (#989).
+    private var needsPerson: Bool { (counts[.needsAttention] ?? 0) > 0 || summary.hasFailedWorkflow }
 
     /// The name's colour, which the chat project's mark takes too (#694).
     private var nameStyle: HierarchicalShapeStyle { summary.exists && !asHeading ? .primary : .secondary }

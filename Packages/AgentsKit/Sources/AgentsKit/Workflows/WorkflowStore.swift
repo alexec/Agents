@@ -106,6 +106,10 @@ public struct WorkflowState: Codable, Hashable, Sendable {
     /// workflow deleted for good does not stay in this file for ever. A branch
     /// switched for a week and back keeps its history and its approval.
     public var goneSince: Date?
+    /// The failure the person dismissed from Needs You (#989): its `WorkflowFailure.key`.
+    /// Kept here so every client and a restart see it; a new failure has a new key, and
+    /// an outcome that is not the same refusal again clears it.
+    public var dismissedFailure: String?
 
     public var key: String { folder.path + "/" + workflowID }
 
@@ -127,7 +131,7 @@ public struct WorkflowState: Codable, Hashable, Sendable {
     enum CodingKeys: String, CodingKey {
         case folder, workflowID, offBy, offDigest, standingAgentID, lastFiredAt, lastFiredBy
         case lastOutcome, lastCausingEvent, approvedDigest, approvedContent, approvedCopy, waitingChange, deniedDigest
-        case heldFire, queuedFires, goneSince
+        case heldFire, queuedFires, goneSince, dismissedFailure
         // Before #125.
         case isArchived, isDisabled, disabledByAgent, enabledChosen, writtenOffByAgent
     }
@@ -163,6 +167,7 @@ public struct WorkflowState: Codable, Hashable, Sendable {
         heldFire = try? c.decodeIfPresent(HeldWorkflowFire.self, forKey: .heldFire)
         queuedFires = (try? c.decodeIfPresent([HeldWorkflowFire].self, forKey: .queuedFires)) ?? []
         goneSince = try? c.decodeIfPresent(Date.self, forKey: .goneSince)
+        dismissedFailure = try? c.decodeIfPresent(String.self, forKey: .dismissedFailure)
     }
 
     /// Written in the old keys while a migration is still owed, so an older build
@@ -193,6 +198,7 @@ public struct WorkflowState: Codable, Hashable, Sendable {
         try c.encodeIfPresent(heldFire, forKey: .heldFire)
         if !queuedFires.isEmpty { try c.encode(queuedFires, forKey: .queuedFires) }
         try c.encodeIfPresent(goneSince, forKey: .goneSince)
+        try c.encodeIfPresent(dismissedFailure, forKey: .dismissedFailure)
     }
 
     public init(folder: URL, workflowID: String,
@@ -471,7 +477,11 @@ extension WorkflowRecords {
     mutating func record(_ outcome: WorkflowOutcome, folder: URL, workflowID: String,
                          causingEvent: EventPosition? = nil, cause: WorkflowCause? = nil) {
         update(folder: folder, workflowID: workflowID) { state in
-            state.lastOutcome = outcome.following(state.lastOutcome)
+            let next = outcome.following(state.lastOutcome)
+            // A refusal for the same reason again is the failure dismissed; anything else
+            // is news, and a later failure is listed again (#989).
+            if case .refused(_, _, let repeats) = next, repeats > 1 {} else { state.dismissedFailure = nil }
+            state.lastOutcome = next
             state.lastCausingEvent = causingEvent
             if case .ran = outcome {
                 state.lastFiredAt = outcome.at

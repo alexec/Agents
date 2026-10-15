@@ -486,6 +486,46 @@ struct WorkflowFiringTests {
         }
     }
 
+    /// #989. A run whose agent got stuck is listed in Needs You, as the workflow's row and not
+    /// the agent's too; Dismiss takes it out, on the workflow's record, until it fails again.
+    @Test func aFailedRunIsListedUntilDismissed() async throws {
+        let (locations, root) = try temporary()
+        let work = try project(root)
+        try write(everyHalfHour("Check the build."), as: "nightly", in: work)
+        let turn = TurnGate()
+        let core = try await core(locations, script: .init(gate: turn))
+        await core.rescanWorkflows(in: work)
+        let summary = try await core.runWorkflow(DaemonAPI.WorkflowRequest(folder: work, workflowID: "nightly"))
+        guard case .ran(let agentID, _) = summary.lastOutcome else {
+            Issue.record("expected a run, got \(String(describing: summary.lastOutcome))")
+            return
+        }
+        let token = await eventuallySome("the run's agent has a token") {
+            await core.appTokens.first { $0.value == agentID }?.key
+        } ?? ""
+        _ = try await core.reportOutcome(.init(token: token, outcome: "stuck", message: "The build machine is unreachable."))
+        turn.open()
+
+        @Sendable func failure() async -> Approval? {
+            await core.projectSummary(for: work)?.approvals?.first { $0.kind == .workflowFailed }
+        }
+        await eventually("the failed run is in Needs You") { await failure() != nil }
+        let item = try #require(await failure())
+        #expect(item.key == "nightly")
+        #expect(item.agentID == agentID, "the row opens the run's agent")
+        #expect(item.line == "Run failed — The build machine is unreachable.")
+        #expect(item.actions == [.dismiss])
+
+        await #expect(throws: JSONRPCError.self, "a failed workflow takes Dismiss only") {
+            _ = try await core.answerApproval(.init(item, in: work, action: .approve))
+        }
+        let dismissed = try await core.answerApproval(.init(item, in: work, action: .dismiss))
+        #expect(dismissed.approvals?.contains { $0.kind == .workflowFailed } != true, "dismissed, it leaves Needs You")
+        #expect(WorkflowStore(locations: locations).load().state(folder: work, workflowID: "nightly")?.dismissedFailure
+                == item.digest,
+                "kept on the workflow's record, for every client and a restart")
+    }
+
     @Test func aTriggeringWorkflowSendsThePromptBackIntoTheSameAgent() async throws {
         let (locations, root) = try temporary()
         let work = try project(root)

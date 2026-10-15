@@ -281,7 +281,12 @@ private struct RemoteSmartFold: View {
                     }
                     // Then everything else waiting for an OK (#773), as the window lists it.
                     ForEach(row.approvals(in: model.work, projects: keys, query: query), id: \.approval.id) { item in
-                        RemoteApprovalRow(approval: item.approval, project: item.project, place: place(of: item.project))
+                        if item.approval.opensItsSubject {
+                            RemoteFailedWorkflowRow(approval: item.approval, project: item.project,
+                                                    place: place(of: item.project))
+                        } else {
+                            RemoteApprovalRow(approval: item.approval, project: item.project, place: place(of: item.project))
+                        }
                     }
                 }
             }
@@ -391,6 +396,47 @@ private struct RemoteApprovalRow: View {
 
     private func answerNow(_ action: Approval.Action) {
         Task { await model.settleApproval(approval, action, for: project) }
+    }
+}
+
+/// A workflow that has stopped working, under Needs You (#989), the window's
+/// `FailedWorkflowRow`: a tap opens the run's agent, or the workflow when no agent ran;
+/// Dismiss is a swipe and in the long press.
+private struct RemoteFailedWorkflowRow: View {
+    @Environment(RemoteModel.self) private var model
+    let approval: Approval
+    let project: ProjectKey
+    let place: String?
+
+    var body: some View {
+        ApprovalRowLabel(approval: approval, place: place)
+            .tag(item)
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                if approval.actions.contains(.dismiss) {
+                    Button(approval.word(for: .dismiss), systemImage: "xmark") { dismissNow() }
+                        .tint(.gray)
+                }
+            }
+            .contextMenu {
+                if approval.agentID != nil {
+                    Button("Open Workflow", systemImage: "flowchart") { model.sidebarItem = workflow }
+                }
+                if approval.actions.contains(.dismiss) {
+                    Button(approval.word(for: .dismiss), systemImage: "xmark") { dismissNow() }
+                }
+            }
+    }
+
+    private var item: SidebarItem { approval.agentID.map(SidebarItem.session) ?? workflow }
+
+    private var workflow: SidebarItem {
+        let id = model.work.workflows(in: project.folder).first { $0.workflowID == approval.key }?.id
+            ?? project.folder.path + "/" + approval.key
+        return .workflow(id, in: project)
+    }
+
+    private func dismissNow() {
+        Task { await model.settleApproval(approval, .dismiss, for: project) }
     }
 }
 
