@@ -3,9 +3,9 @@ import Foundation
 
 /// Everything in a project waiting for the person's approval, as one list (#773): the
 /// guarded files and workflows (#502, #569), the project's MCP servers (060) and plugins
-/// (S2), and the sessions asking to be archived (#584). It rides on the project's summary,
-/// so every client hears it move with `project/changed`, and each client's Needs You draws
-/// it as it is rather than gathering five kinds of state itself.
+/// (S2), the sessions asking to be archived (#584), and the workflows that failed (#989). It
+/// rides on the project's summary, so every client hears it move with `project/changed`, and
+/// each client's Needs You draws it as it is rather than gathering six kinds of state itself.
 ///
 /// The summary is made on every streamed token, so what reads files is kept: the guarded
 /// files and workflows already are, the MCP servers and plugins in `approvalKitCache`, and
@@ -17,6 +17,7 @@ extension DaemonCore {
         var items = (guarded ?? []).map { approval(for: $0, in: folder) }
         items += approvalKit(in: folder)
         items += archiveApprovals(in: folder)
+        items += workflowFailures(in: folder)
         return items.isEmpty ? nil : items
     }
 
@@ -102,6 +103,35 @@ extension DaemonCore {
             }
     }
 
+    /// The project's workflows that have stopped working (#989), less the one failure each
+    /// the person dismissed. What the daemon holds decides first, with no file read; only
+    /// a workflow already failing is summed up, for the approval it waits for, the denial
+    /// here and the ceiling.
+    private func workflowFailures(in folder: URL) -> [Approval] {
+        guard let held = workflows[folder], !held.isEmpty else { return [] }
+        let records = workflowStore.load()
+        var ceilings: WorkflowCeilings?
+        return held.values.sorted { $0.workflowID < $1.workflowID }.compactMap { workflow -> Approval? in
+            guard workflow.runs(on: MachineID.current) else { return nil }
+            let state = records.state(folder: folder, workflowID: workflow.workflowID)
+            let ranAgent = state?.lastOutcome.flatMap { outcome -> Agent? in
+                if case .ran(let id, _) = outcome { return agents[id] }
+                return nil
+            }
+            guard WorkflowFailure.of(workflow, lastOutcome: state?.lastOutcome, ranAgent: ranAgent) != nil else {
+                return nil
+            }
+            if ceilings == nil { ceilings = workflowCeilings(records: records) }
+            let summary = summary(for: workflow, records: records, ceilings: ceilings)
+            guard let failure = summary.failure(ranAgent: ranAgent), failure.key != state?.dismissedFailure else {
+                return nil
+            }
+            return Approval(kind: .workflowFailed, key: workflow.workflowID, title: workflow.name,
+                            digest: failure.key, line: failure.line, since: failure.since,
+                            actions: [.dismiss], agentID: failure.agentID)
+        }
+    }
+
     // MARK: Reading
 
     /// What is being approved, before the choice: a file's lines against the approved
@@ -128,6 +158,8 @@ extension DaemonCore {
                                         current: Self.pluginListing(plugin))
         case .archive:
             throw Self.notWaiting("An archive request has nothing to read: open the session.")
+        case .workflowFailed:
+            throw Self.notWaiting("A failed workflow has nothing to read: open the workflow.")
         }
     }
 
@@ -183,6 +215,11 @@ extension DaemonCore {
     }
 
     private func settle(_ answer: ApprovalAnswer, in folder: URL) async throws {
+        // A failed workflow takes Dismiss and nothing else; nothing else takes Dismiss.
+        guard (answer.kind == .workflowFailed) == (answer.action == .dismiss) else {
+            throw Self.notWaiting(answer.kind == .workflowFailed ? "A failed workflow can only be dismissed."
+                                  : "Only a failed workflow can be dismissed.")
+        }
         let approve = answer.action == .approve
         func digest() throws -> String {
             guard let digest = answer.digest else { throw Self.notWaiting("Say which version you were shown.") }
@@ -220,7 +257,22 @@ extension DaemonCore {
                 throw Self.notWaiting("That session is not asking to be archived any more.")
             }
             if approve { try await archive(id) } else { clearArchiveRequest(id) }
+        case .workflowFailed:
+            try dismissWorkflowFailure(answer.key, failure: try digest(), in: folder)
         }
+    }
+
+    /// Dismiss (#989): out of Needs You until it fails again. Kept on the workflow's record,
+    /// so every client and a restart see it. Refused when it has failed anew since it was
+    /// shown, so a dismissal never hides a failure nobody saw.
+    func dismissWorkflowFailure(_ workflowID: String, failure key: String, in folder: URL) throws {
+        guard workflowFailures(in: folder).contains(where: { $0.key == workflowID && $0.digest == key }) else {
+            throw Self.notWaiting("That workflow has failed again since you looked, or it works now. Look again.")
+        }
+        var records = workflowStore.load()
+        records.update(folder: folder, workflowID: workflowID) { $0.dismissedFailure = key }
+        try keep("the dismissal") { try workflowStore.save(records) }
+        DaemonLog.shared.write("workflows: failure of \(workflowID) in \(folder.path) dismissed")
     }
 
     /// Deny: the server stays off, as it was while it waited, and is not asked about again

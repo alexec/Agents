@@ -96,9 +96,10 @@ struct ProjectRow: View {
     /// moment, by construction (FR-007, FR-009).
     private var counts: [AgentGroup: Int] { model.counts(in: summary.key) }
 
-    /// Whether a session in this project needs the person to read or act.
+    /// Whether a session in this project needs the person to read or act, or a workflow
+    /// here has stopped working (#989).
     private var needsPerson: Bool {
-        (counts[.needsAttention] ?? 0) > 0
+        (counts[.needsAttention] ?? 0) > 0 || summary.hasFailedWorkflow
     }
 
     /// What is going on in there, in as few words as it takes.

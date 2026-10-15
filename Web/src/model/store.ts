@@ -1685,6 +1685,18 @@ export class Store extends Work {
     if (summary) this.upsertProject(summary, host);
   }
 
+  /**
+   * Dismiss a failed workflow (#989): out of Needs You until it fails again, kept on the workflow's
+   * record on its host. From the row's menu, so a refusal is said in `problem`.
+   */
+  async dismissWorkflowFailure(host: string, folder: string, approval: Approval): Promise<void> {
+    const summary = await this.act("approvals/answer", {
+      folder: folder as never, kind: approval.kind, key: approval.key, action: "dismiss",
+      ...(approval.digest !== undefined ? { digest: approval.digest } : {}),
+    }, host);
+    if (summary) this.upsertProject(summary, host);
+  }
+
   /** A project pinned to the top of the sidebar, or not, as the window's Pin and Unpin. */
   async setProjectPinned(host: string, folder: string, pinned: boolean): Promise<void> {
     const summary = await this.act("projects/setPinned", { folder: folder as never, pinned }, host);

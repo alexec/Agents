@@ -38,8 +38,8 @@ import { markAgentOf, treeRows, type TreeRow } from "../model/tree";
 import { WorkflowRow } from "./WorkflowRow";
 import { footLine, offersStart } from "./OfflineStrip";
 import { PinnedPageRows } from "./Pins";
-import { ApprovalRow } from "./Approval";
-import { approvalID } from "../model/approvals";
+import { ApprovalRow, FailedWorkflowRow } from "./Approval";
+import { approvalID, failedRuns, opensItsSubject } from "../model/approvals";
 import { memo } from "../render/memo";
 
 /** The most archived matches a fold shows before Show all, as the window's (#176). */
@@ -380,8 +380,11 @@ function SmartFold({ row, store, projects, query, linkDown }: {
       const live = liveSessions(store, placed.host.id, placed.project.project.folder);
       // The pinned are in Pinned alone: each session is listed once (#587).
       const pins = store.sessionPinsIn(placed.host.id, placed.project.project.folder);
-      count += smartAgents(row, live, undefined, pins, on).length;
-      if (open || parsed) for (const agent of smartAgents(row, live, parsed, pins, on)) found.set(agent, placed);
+      // A failed workflow run's agent is its workflow's row under Needs You, not a session too (#989).
+      const failed = row === "needsYou" ? failedRuns(placed.project.approvals) : new Set<string>();
+      const gathered = (query?: typeof parsed) => smartAgents(row, live, query, pins, on).filter((a) => !failed.has(a.id));
+      count += gathered().length;
+      if (open || parsed) for (const agent of gathered(parsed)) found.set(agent, placed);
     }
     // Unread keeps the session opened from it in its place, read now; none while searching.
     const kept = row === "unread" && !parsed ? keptInUnread.value : null;
@@ -428,10 +431,17 @@ function SmartFold({ row, store, projects, query, linkDown }: {
       {open && approvals.map(({ project: placed, approval }) => {
         const host = placed.host.id;
         const folder = placed.project.project.folder;
-        return (
-          <ApprovalRow key={`${host}|${folder}|${approvalID(approval)}`} store={store} host={host} folder={folder}
-            approval={approval} place={projectLabel(placed.host, placed.project)} down={linkDown || !store.hostIsOnline(host)} />
-        );
+        const key = `${host}|${folder}|${approvalID(approval)}`;
+        const place = projectLabel(placed.host, placed.project);
+        const down = linkDown || !store.hostIsOnline(host);
+        if (opensItsSubject(approval)) {
+          const agentID = approval.agentID as string | undefined;
+          return (
+            <FailedWorkflowRow key={key} store={store} host={host} folder={folder} approval={approval} place={place} down={down}
+              chosen={agentID ? r.host === host && r.session === agentID : r.host === host && r.workflow === approval.key} />
+          );
+        }
+        return <ApprovalRow key={key} store={store} host={host} folder={folder} approval={approval} place={place} down={down} />;
       })}
     </details>
   );
