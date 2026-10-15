@@ -22,9 +22,27 @@ export function workspaceLine(name: string, state: string, workspace: HostWorksp
   if (state === "stopping") return `Stopping ${name}…`;
   if (workspace.problem) return workspace.problem;
   if (state !== "stopped") return null;
+  // Its wake-up call, after why it stopped (#1004 FR-007).
+  const wake = wakeLine(workspace);
+  const then = wake ? ` ${wake}.` : "";
   const by = workspace.stoppedBy;
-  if (by) return `${name} was ${by.slice(0, 1).toLowerCase() + by.slice(1)}.`;
-  return `${name} is stopped. Agents there are paused until it starts.`;
+  if (by) return `${name} was ${by.slice(0, 1).toLowerCase() + by.slice(1)}.${then}`;
+  return `${name} is stopped. Agents there are paused until it starts.${then}`;
+}
+
+/** "Starts at 02:55 for Nightly review" (#1004; OfflineWords.wakeLine): when the control plane
+ *  will start it for its next scheduled workflow, or null when it won't. */
+export function wakeLine(workspace: HostWorkspace, now: number = Date.now()): string | null {
+  if (workspace.wakeAt == null || !workspace.nextWorkflow) return null;
+  return `Starts ${clock(fromWireDate(workspace.wakeAt).getTime(), now)} for ${workspace.nextWorkflow}`;
+}
+
+/** "at 02:55" within the day; "Tue at 02:55" further off (OfflineWords.clock). */
+export function clock(at: number, now: number): string {
+  const date = new Date(at);
+  const time = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  if (at - now < 20 * 3600 * 1000) return `at ${time}`;
+  return `${date.toLocaleDateString(undefined, { weekday: "short" })} at ${time}`;
 }
 
 /** What the sidebar's foot says for a host that isn't online (#961; OfflineWords.footLine): a

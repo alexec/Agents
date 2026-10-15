@@ -230,6 +230,14 @@ questions waiting and no shells open. The control plane counts down each linked 
 **stop when idle** from that, and stops the workspace through its provider when the time
 is up. The host's own clock isn't used.
 
+With its idle status, a host also sends the time and name of its next scheduled workflow. The
+control plane keeps the last one on the host's link. While the workspace is stopped, it gives
+it a **wake-up call**: it starts the workspace before that time, by the last measured start
+time plus 2 minutes (5 minutes before one is measured), once for each due time. The host
+connects, and its own clock fires the workflow; the control plane decides only when the
+machine runs. It does not stop a host as idle while its next workflow is due within its idle
+time. While the Mac that runs the control plane sleeps, no wake-up calls are made.
+
 For now only a control plane with one copy runs providers, as only one holds ssh tunnels.
 
 **Write It for Me** puts an agent in the Add Provider sheet, at authoring time only. The

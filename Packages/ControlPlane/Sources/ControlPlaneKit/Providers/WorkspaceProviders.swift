@@ -20,18 +20,22 @@ public actor WorkspaceProviders: WorkspaceHandling {
         public var calls: ProviderConnection.Timing
         /// What one minute of a stop when idle lasts: a minute, but shorter in tests.
         public var idleMinute: Duration
+        /// How often stopped workspaces are looked at for a wake-up call that is due (#1004).
+        public var wakeLookEvery: Duration
 
         public static let standard = Timing(listEvery: .seconds(300), sshAfter: .seconds(120), giveUp: .seconds(600),
                                             lookEvery: .seconds(1), calls: .standard)
 
         public init(listEvery: Duration, sshAfter: Duration, giveUp: Duration, lookEvery: Duration,
-                    calls: ProviderConnection.Timing, idleMinute: Duration = .seconds(60)) {
+                    calls: ProviderConnection.Timing, idleMinute: Duration = .seconds(60),
+                    wakeLookEvery: Duration = .seconds(15)) {
             self.listEvery = listEvery
             self.sshAfter = sshAfter
             self.giveUp = giveUp
             self.lookEvery = lookEvery
             self.calls = calls
             self.idleMinute = idleMinute
+            self.wakeLookEvery = wakeLookEvery
         }
     }
 
@@ -101,6 +105,8 @@ public actor WorkspaceProviders: WorkspaceHandling {
     /// Why each host's last start or stop failed, until the next one.
     private var problems: [HostID: String] = [:]
     private var ticker: Task<Void, Never>?
+    /// Looks for wake-up calls that are due (#1004).
+    private var waker: Task<Void, Never>?
     /// Prompts and agent starts kept for stopped hosts (US3).
     public private(set) var kept: KeptRequests?
     /// Write It for Me's drafts (#858).
@@ -161,10 +167,18 @@ public actor WorkspaceProviders: WorkspaceHandling {
                 await self?.refresh(nil)
             }
         }
+        let look = timing.wakeLookEvery
+        waker = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: look)
+                await self?.wakeUps(now: Date())
+            }
+        }
     }
 
     public func stop() async {
         ticker?.cancel()
+        waker?.cancel()
         for connection in connections.values { await connection.end() }
         connections = [:]
     }
@@ -266,6 +280,7 @@ public actor WorkspaceProviders: WorkspaceHandling {
                 guard var link = record.workspace else { return }
                 if let on = options.startWhenUsed { link.startWhenUsed = on }
                 if let minutes = options.stopWhenIdleMinutes { link.stopWhenIdleMinutes = minutes > 0 ? minutes : nil }
+                if let on = options.startForSchedules { link.startForSchedules = on }
                 record.workspace = link
             }, then: { await self.countIdle(options.host) }))
         case DaemonAPI.Method.hostsStart:
@@ -523,11 +538,15 @@ public actor WorkspaceProviders: WorkspaceHandling {
         }
         return try await changeLink(request.host) { record in
             let had = record.workspace
-            record.workspace = WorkspaceLink(
+            var link = WorkspaceLink(
                 provider: request.provider, workspace: request.workspace,
                 startWhenUsed: request.startWhenUsed ?? had?.startWhenUsed ?? true,
                 stopWhenIdleMinutes: request.stopWhenIdleMinutes.map { $0 > 0 ? $0 : nil }
                     ?? (had == nil ? WorkspaceLink.defaultIdleMinutes : had?.stopWhenIdleMinutes))
+            // The host's schedule and the switch are the host's, whatever it is linked to.
+            link.startForSchedules = had?.startForSchedules
+            link.schedule = had?.schedule
+            record.workspace = link
         } then: {
             // Listed again, in the background: the last list can be from before an install
             // woke the workspace (#965).
@@ -627,6 +646,9 @@ public actor WorkspaceProviders: WorkspaceHandling {
         while ContinuousClock.now - began < timing.giveUp {
             if await router.state(of: host)?.isOnline == true {
                 log("workspace: start \(what) by \(who): ok in \(Self.seconds(since: began))")
+                // How long it takes, so a wake-up call starts it early enough (#1004 FR-004).
+                let took = Int((ContinuousClock.now - began).components.seconds)
+                await changeLinkQuietly(host) { $0.measuredStartSeconds = took }
                 // Done as it connects, so a Stop pressed the moment it shows online is heard.
                 await finish(host, link, problem: nil)
                 await refresh(link.provider)
@@ -769,6 +791,12 @@ public actor WorkspaceProviders: WorkspaceHandling {
     public func heard(_ host: HostID, status: DaemonAPI.HostStatus) async {
         let was = statuses[host]
         statuses[host] = status
+        // Kept on its link, for while it is stopped (#1004 FR-003). A host from before
+        // #1004 says nothing, and is left as it was (FR-011).
+        if let schedule = status.schedule, await records.host(host)?.workspace.map({ $0.schedule != schedule }) == true {
+            await changeLinkQuietly(host) { $0.schedule = schedule }
+            await changed()
+        }
         // Busy again cancels the count; still idle leaves it running (US4 AS2).
         if !status.idle { idleTimers.removeValue(forKey: host)?.cancel() }
         if status.idle, was?.idle != true || idleTimers[host] == nil { await countIdle(host) }
@@ -793,7 +821,14 @@ public actor WorkspaceProviders: WorkspaceHandling {
         // Still idle, still online, and still set to this (US4 AS1).
         guard statuses[host]?.idle == true, activities[host] == nil,
               await router.state(of: host)?.isOnline == true,
-              await records.host(host)?.workspace?.stopWhenIdleMinutes == minutes else { return }
+              let link = await records.host(host)?.workspace, link.stopWhenIdleMinutes == minutes else { return }
+        // Its next scheduled workflow is due within its idle time, or it was started for it:
+        // it stays up for the run, and counts again (#1004 FR-005).
+        if Self.keptUp(link, idleFor: Self.interval(timing.idleMinute * minutes), now: Date()), let at = link.schedule?.at {
+            log("workspace: \(host) idle \(minutes) min, kept up for \(link.schedule?.workflow ?? "a workflow") at \(at)")
+            await countIdle(host)
+            return
+        }
         idleStopping[host] = minutes
         do {
             _ = try await begin(.stop, host, by: "idle (\(minutes) min)")
@@ -801,6 +836,58 @@ public actor WorkspaceProviders: WorkspaceHandling {
             idleStopping[host] = nil
             log("workspace: stop \(host) by idle (\(minutes) min): refused: \((error as? JSONRPCError)?.message ?? "\(error)")")
         }
+    }
+
+    // MARK: Wake-up calls (#1004)
+
+    /// How long before a due time a stopped workspace is started (FR-004): its last
+    /// measured start and 2 minutes, or 5 minutes when none has been measured.
+    static func lead(_ link: WorkspaceLink) -> TimeInterval {
+        link.measuredStartSeconds.map { TimeInterval($0 + 120) } ?? 300
+    }
+
+    /// Whether its next scheduled workflow keeps it up though it is idle (FR-005): due within
+    /// its idle time, or it was started for it.
+    static func keptUp(_ link: WorkspaceLink, idleFor: TimeInterval, now: Date) -> Bool {
+        guard let at = link.schedule?.at, at > now else { return false }
+        return at.timeIntervalSince(now) <= idleFor || link.wokeFor == at
+    }
+
+    /// When a wake-up call would start it for its next scheduled workflow: with the switch on
+    /// and a due time still to come that it was not already started for.
+    static func wakeAt(_ link: WorkspaceLink, now: Date) -> Date? {
+        guard link.startForSchedules ?? true, let at = link.schedule?.at, at > now, link.wokeFor != at else { return nil }
+        return at.addingTimeInterval(-lead(link))
+    }
+
+    /// Starts each stopped workspace whose wake-up call is due (FR-004, FR-006). Only this
+    /// copy runs providers, so only it makes them.
+    func wakeUps(now: Date) async {
+        for record in await records.hosts {
+            guard let link = record.workspace, providers[link.provider] != nil,
+                  let wake = Self.wakeAt(link, now: now), wake <= now, let at = link.schedule?.at,
+                  activities[record.id] == nil, overlay(record)?.hostState == "stopped",
+                  await router.state(of: record.id)?.isOnline != true else { continue }
+            // Marked before the start, so a restart or a reconnect never starts it twice for it.
+            await changeLinkQuietly(record.id) { $0.wokeFor = at }
+            let workflow = link.schedule?.workflow ?? "a workflow"
+            log("workspace: wake-up call for \(record.name): \(workflow) due at \(at)")
+            _ = try? await begin(.start, record.id, by: "schedule (\(workflow))")
+        }
+    }
+
+    /// Changes a host's link and saves it, without telling clients.
+    private func changeLinkQuietly(_ host: HostID, _ change: (inout WorkspaceLink) -> Void) async {
+        guard var record = await records.host(host), var link = record.workspace else { return }
+        change(&link)
+        guard link != record.workspace else { return }
+        record.workspace = link
+        do { try await records.save(record) } catch { log("workspace: couldn't save \(record.name)'s link: \(error)") }
+    }
+
+    static func interval(_ duration: Duration) -> TimeInterval {
+        let parts = duration.components
+        return TimeInterval(parts.seconds) + TimeInterval(parts.attoseconds) / 1e18
     }
 
     static func words(minutes: Int) -> String {
@@ -861,6 +948,8 @@ public actor WorkspaceProviders: WorkspaceHandling {
         let found = workspace(link)
         let state = found?.state ?? "unknown"
         let activity = activities[record.id]
+        let now = Date()
+        let upcoming = link.schedule.flatMap { $0.at.map { $0 > now } == true ? $0 : nil }
         let hostState: String? = switch activity?.kind {
         case .start?: "starting"
         case .stop?: "stopping"
@@ -877,7 +966,11 @@ public actor WorkspaceProviders: WorkspaceHandling {
                                           || (state == "running" && problems[record.id] != nil)),
             canStop: activity == nil && ["running", "starting", "unknown"].contains(state),
             startWhenUsed: link.startWhenUsed ?? true, stopWhenIdleMinutes: link.stopWhenIdleMinutes,
-            cost: found?.cost, current: list?.current ?? false)
+            cost: found?.cost, current: list?.current ?? false,
+            startForSchedules: link.startForSchedules ?? true, tellsSchedule: link.schedule != nil,
+            nextWorkflow: upcoming?.workflow, nextWorkflowAt: upcoming?.at,
+            // Also while it runs, so Stop's confirmation can say when it starts next (FR-010).
+            wakeAt: Self.wakeAt(link, now: now))
     }
 
     // MARK: Helpers

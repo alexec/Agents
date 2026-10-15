@@ -81,12 +81,13 @@ there, Agents names them and asks first. The row says **Stopping…** and then *
 
 ## Start when used and stop when idle
 
-A linked server's `···` menu has two settings:
+A linked server's `···` menu has three settings:
 
 - **Start when used**, on by default.
 - **Stop when idle**, after 30 minutes by default.
+- **Start for scheduled workflows**, on by default.
 
-Both are kept with the link.
+All three are kept with the link.
 
 ### Start when used
 
@@ -125,11 +126,34 @@ A turn starting in that time starts the count again. When Agents stops it, its r
 strip over its chats say **devbox was stopped by Agents after 30 minutes idle**. With **Start
 when used** on as well, your next prompt starts it again.
 
-A server's scheduled workflows don't run while it is stopped. Its row warns you when it has
-some and **Stop when idle** is on.
-
 A server on a build of Agents from before this never says whether it is idle, so it is never
 stopped as idle. Update it from its row.
+
+### Start for scheduled workflows
+
+A stopped server runs nothing, so its scheduled workflows would not run. With **Start for
+scheduled workflows** on, Agents starts the workspace a little before the server's next
+scheduled workflow is due:
+
+- The server's own clock still fires the workflow. Agents only starts the machine.
+- It starts it 5 minutes before the due time. After the first start, it uses how long the
+  last start took, plus 2 minutes.
+- It starts it once for each due time.
+- **Stop when idle** does not stop a server whose next scheduled workflow is due within its
+  idle time. After the run, the server is idle again and stops as usual.
+
+A stopped server's row, and the strip over its chats on the Mac, the iPhone and the web page,
+say when it starts and for which workflow: **Starts at 02:55 for Nightly review**. **Stop**
+says it too, before it stops the server.
+
+With the switch off, the server stays stopped, and its scheduled workflows don't run while it
+is stopped. Its row warns you of that when it has some and **Stop when idle** is on. A server
+on a build of Agents from before this doesn't say when its workflows are due, so it is not
+started for them, and its row warns you the same way.
+
+Only scheduled workflows start a server. An event (such as `issue.opened`) is still heard only
+when the server is next up. Agents knows only the due time the server last sent: a workflow
+added while it is stopped is not seen until it is next up.
 
 ## Make a new workspace
 

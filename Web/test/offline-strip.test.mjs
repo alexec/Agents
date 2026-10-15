@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";
 
-const { offlineStrip, elapsed, footLine } = await load("src/views/OfflineStrip.tsx");
+const { offlineStrip, elapsed, footLine, wakeLine, clock } = await load("src/views/OfflineStrip.tsx");
 const { Store } = await load("src/model/store.ts");
 
 const workspace = (more) => ({ provider: "p", providerName: "Coder", workspace: "w", workspaceName: "dev",
@@ -18,6 +18,18 @@ test("a stopped workspace says so and offers Start", () => {
   assert.equal(offlineStrip("box", row("stopped", workspace({ stoppedBy: "Stopped by Agents after 30 minutes idle" })), null).line,
     "devbox was stopped by Agents after 30 minutes idle.");
   assert.equal(offlineStrip("box", row("stopped", workspace({ canStart: false })), null).start, false);
+});
+
+test("a stopped workspace says its wake-up call (#1004)", () => {
+  const wire = (ms) => ms / 1000 - 978_307_200;
+  const at = new Date(2026, 9, 15, 2, 55).getTime();
+  const ws = workspace({ wakeAt: wire(at), nextWorkflow: "Nightly review", stoppedBy: "Stopped by Agents after 30 minutes idle" });
+  assert.equal(wakeLine(ws, at - 3_600_000), "Starts at 02:55 for Nightly review");
+  assert.equal(offlineStrip("box", row("stopped", ws), null).line.startsWith(
+    "devbox was stopped by Agents after 30 minutes idle. Starts "), true);
+  assert.equal(wakeLine(workspace({ nextWorkflow: "Nightly review" })), null, "no wake-up call, no words");
+  assert.equal(clock(at, at - 3 * 86_400_000).endsWith(" at 02:55"), true);
+  assert.equal(clock(at, at - 3 * 86_400_000).startsWith("at"), false, "further off names the day");
 });
 
 test("a starting one waits with a spinner and a timer, and no Start", () => {

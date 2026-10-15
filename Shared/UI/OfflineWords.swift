@@ -26,8 +26,34 @@ enum OfflineWords {
         if state == "stopping" { return "Stopping \(name)…" }
         if let problem = workspace.problem { return problem }
         guard state == "stopped" else { return nil }
-        if let by = workspace.stoppedBy { return "\(name) was \(by.prefix(1).lowercased() + by.dropFirst())." }
-        return "\(name) is stopped. Agents there are paused until it starts."
+        // Its wake-up call, after why it stopped (#1004 FR-007).
+        let wake = wakeLine(workspace).map { " \($0)." } ?? ""
+        if let by = workspace.stoppedBy { return "\(name) was \(by.prefix(1).lowercased() + by.dropFirst()).\(wake)" }
+        return "\(name) is stopped. Agents there are paused until it starts.\(wake)"
+    }
+
+    /// "Starts at 02:55 for Nightly review" (#1004 FR-007): when the control plane will start
+    /// it for its next scheduled workflow, or nil when it won't.
+    static func wakeLine(_ workspace: DaemonAPI.HostWorkspace, now: Date = Date()) -> String? {
+        guard let at = workspace.wakeAt, let workflow = workspace.nextWorkflow else { return nil }
+        return "Starts \(clock(at, now: now)) for \(workflow)"
+    }
+
+    /// "Stays up for Nightly review at 03:00": an idle host its next scheduled workflow keeps
+    /// up, as it is due within its idle time (#1004 FR-005).
+    static func staysUpLine(_ workspace: DaemonAPI.HostWorkspace, now: Date = Date()) -> String? {
+        guard let minutes = workspace.stopWhenIdleMinutes, let at = workspace.nextWorkflowAt,
+              let workflow = workspace.nextWorkflow, at.timeIntervalSince(now) <= TimeInterval(minutes * 60) else { return nil }
+        return "Stays up for \(workflow) \(clock(at, now: now))"
+    }
+
+    /// "at 02:55" today or within the day; "Tue at 02:55" further off. 24-hour, as the web's.
+    static func clock(_ date: Date, now: Date) -> String {
+        let calendar = Calendar.current
+        let parts = calendar.dateComponents([.hour, .minute, .weekday], from: date)
+        let time = String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0)
+        guard date.timeIntervalSince(now) >= 20 * 3600, let weekday = parts.weekday else { return "at \(time)" }
+        return "\(calendar.shortWeekdaySymbols[weekday - 1]) at \(time)"
     }
 
     /// Under a chat's history that did not load because its server is down (#963): the strip

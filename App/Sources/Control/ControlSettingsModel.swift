@@ -202,10 +202,12 @@ final class ControlSettingsModel {
     }
 
     /// `stopWhenIdleMinutes` 0 turns idle stopping off.
-    func setWorkspaceOptions(_ host: HostID, startWhenUsed: Bool? = nil, stopWhenIdleMinutes: Int? = nil) async {
+    func setWorkspaceOptions(_ host: HostID, startWhenUsed: Bool? = nil, stopWhenIdleMinutes: Int? = nil,
+                             startForSchedules: Bool? = nil) async {
         await perform(DaemonAPI.Method.hostsSetWorkspaceOptions,
                       DaemonAPI.HostWorkspaceOptions(host: host, startWhenUsed: startWhenUsed,
-                                                     stopWhenIdleMinutes: stopWhenIdleMinutes))
+                                                     stopWhenIdleMinutes: stopWhenIdleMinutes,
+                                                     startForSchedules: startForSchedules))
     }
 
     func start(_ host: HostID) async {
