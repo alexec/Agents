@@ -61,6 +61,11 @@ for pid in $(pgrep -f "AGENTS_ROOT.*$ROOT" || true); do kill "$pid" 2>/dev/null 
 
 # The window's pairing for this walk, in its container.
 rm -rf "$HOME/Library/Containers/com.alexecollins.agents.store/Data/Library/Application Support/Agents/walks/$WALK"
+# And its defaults, a domain of its own (#1029); a window still quitting is caught by the
+# next launch's sweep, since its walk folder has gone.
+WALK_DEFAULTS="$HOME/Library/Containers/com.alexecollins.agents.store/Data/Library/Preferences/com.alexecollins.agents.store.walk.$WALK"
+defaults delete "$WALK_DEFAULTS" >/dev/null 2>&1 || true
+rm -f "$WALK_DEFAULTS.plist"
 
 if [ "$KEEP" = 0 ]; then
   rm -rf "$ROOT"

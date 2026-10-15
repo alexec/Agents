@@ -16,7 +16,7 @@ struct SmartFold: View {
     let query: String
     /// The smart groups turned off in Settings ▸ Sidebar (#846): their sessions are listed
     /// by the next group they fit.
-    @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = SidebarSmartRow.offAtFirst
+    @AppStorage(SidebarSmartRow.offDefaultsKey, store: WindowDefaults.store) private var smartOff = SidebarSmartRow.offAtFirst
     private var on: Set<SidebarSmartRow> { SidebarSmartRow.on(off: smartOff) }
 
     var body: some View {

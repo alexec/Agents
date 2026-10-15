@@ -33,15 +33,10 @@ final class DraftKeeper {
     /// The options chosen on it, until the runtime they belong to has said what it offers.
     private var leftChoices: [String: JSONValue]?
 
-    /// The ordinary root keeps plain keys; a copy of the app on any other root — a branch
-    /// build, a scratch run — keeps to a scope of its own, because it shares this bundle's
-    /// defaults and would otherwise write its start form over the real one.
-    private static var scope: String? {
-        let root = StoreLocations.default
-        return root.isStandard ? nil : root.name
-    }
-
-    init(store: DraftStore = DraftStore(scope: DraftKeeper.scope)) {
+    /// In `WindowDefaults`: a copy of the app on any other root or walk — a branch build, a
+    /// scratch run — keeps to a domain of its own, and never writes its start form over
+    /// the real one.
+    init(store: DraftStore = DraftStore(defaults: WindowDefaults.store)) {
         self.store = store
         leftForm = store.startDraft()
         leftChoices = leftForm?.chosen

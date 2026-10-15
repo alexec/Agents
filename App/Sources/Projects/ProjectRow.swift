@@ -10,7 +10,7 @@ import SwiftUI
 struct ProjectRow: View {
     @Environment(AppModel.self) private var model
     /// The smart groups turned off in Settings ▸ Sidebar (#846), for the count.
-    @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = SidebarSmartRow.offAtFirst
+    @AppStorage(SidebarSmartRow.offDefaultsKey, store: WindowDefaults.store) private var smartOff = SidebarSmartRow.offAtFirst
     let summary: DaemonAPI.ProjectSummary
     /// The name as the sidebar shows it: `server:Project` on a server.
     var label: String? = nil

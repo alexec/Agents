@@ -203,21 +203,17 @@ private struct RuntimeStatusIcon: View {
     }
 }
 
-/// Which missing agents the start-up sheet has already offered (048). Scoped by root the
-/// way drafts and the appearance are: every copy of the app shares one defaults domain,
-/// and a scratch copy offering its own agents must not silence the real app's sheet.
+/// Which missing agents the start-up sheet has already offered (048). In `WindowDefaults`,
+/// so a scratch copy offering its own agents does not silence the real app's sheet.
 enum InstallOffer {
-    static var defaultsKey: String {
-        let locations = StoreLocations.default
-        return locations.isStandard ? "installOffered" : "installOffered.root:\(locations.name)"
-    }
+    static let defaultsKey = "installOffered"
 
     static var offered: Set<String> {
-        Set(UserDefaults.standard.stringArray(forKey: defaultsKey) ?? [])
+        Set(WindowDefaults.store.stringArray(forKey: defaultsKey) ?? [])
     }
 
     static func remember(_ ids: [String]) {
-        UserDefaults.standard.set(Array(offered.union(ids)).sorted(), forKey: defaultsKey)
+        WindowDefaults.store.set(Array(offered.union(ids)).sorted(), forKey: defaultsKey)
     }
 
     /// Not here, or not here yet: what the sheet is for. Signed out is here.

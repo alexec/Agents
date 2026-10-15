@@ -23,7 +23,7 @@ struct AddMCPSheet: View {
     @State private var marketplaces: [DaemonAPI.Marketplace] = []
     @State private var managing = false
     /// The marketplace last searched, kept across sheets (#687).
-    @AppStorage("catalog.mcp.marketplace") private var chosen = "provided:github-mcp"
+    @AppStorage("catalog.mcp.marketplace", store: WindowDefaults.store) private var chosen = "provided:github-mcp"
 
     static let size = CGSize(width: 720, height: 540)
 

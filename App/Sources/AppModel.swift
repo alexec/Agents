@@ -126,13 +126,13 @@ final class AppModel {
 
     /// Which project this window is looking at.
     ///
-    /// Kept here and in `UserDefaults` rather than in the daemon: the daemon owns what
+    /// Kept here and in `WindowDefaults` rather than in the daemon: the daemon owns what
     /// is true about the work, and which of it somebody happens to be reading is not
     /// that. It is also what keeps two windows independent.
     var selectedProject: URL? {
         didSet {
             guard selectedProject != oldValue else { return }
-            UserDefaults.standard.set(selectedProjectKey?.stored, forKey: Self.selectedProjectDefault)
+            WindowDefaults.store.set(selectedProjectKey?.stored, forKey: Self.selectedProjectDefault)
             // Picking a project shows the project, not a conversation, and not a
             // workflow either. Both are things you go into from here, and come back
             // out of.
@@ -529,14 +529,14 @@ final class AppModel {
     }
 
     private var rememberedNewSessionProject: ProjectKey? =
-        UserDefaults.standard.string(forKey: AppModel.newSessionProjectDefault).flatMap(ProjectKey.init(stored:))
+        WindowDefaults.store.string(forKey: AppModel.newSessionProjectDefault).flatMap(ProjectKey.init(stored:))
 
     static let newSessionProjectDefault = "newSessionProject"
 
     private func rememberNewSessionProject(_ key: ProjectKey) {
         guard rememberedNewSessionProject != key else { return }
         rememberedNewSessionProject = key
-        UserDefaults.standard.set(key.stored, forKey: Self.newSessionProjectDefault)
+        WindowDefaults.store.set(key.stored, forKey: Self.newSessionProjectDefault)
     }
 
     /// A new session in the selected project: the empty chat with its prompt, where a
@@ -2006,7 +2006,7 @@ final class AppModel {
         let live = liveProjects
         if let selectedProjectKey, live.contains(where: { $0.key == selectedProjectKey }) { return }
         // `host|path`.
-        let stored = UserDefaults.standard.string(forKey: Self.selectedProjectDefault)
+        let stored = WindowDefaults.store.string(forKey: Self.selectedProjectDefault)
             .flatMap(ProjectKey.init(stored:))
             .map { ProjectKey(host: $0.host, folder: Project.standardize($0.folder)) }
         if let stored, live.contains(where: { $0.key == stored }) {

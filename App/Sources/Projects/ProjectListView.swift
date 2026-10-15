@@ -14,14 +14,14 @@ struct ProjectListView: View {
     @Environment(WindowRequests.self) private var requests
     @Binding var selection: SidebarItem?
 
-    @AppStorage("showsArchivedProjects") private var showsArchived = false
+    @AppStorage("showsArchivedProjects", store: WindowDefaults.store) private var showsArchived = false
     /// Status, open until folded, and kept so. It keeps Activity's key (#915), so it
     /// opens as Activity was left.
-    @AppStorage("showsActivity") private var showsStatus = true
+    @AppStorage("showsActivity", store: WindowDefaults.store) private var showsStatus = true
     /// Usage, open until folded, and kept so (#915).
-    @AppStorage("showsUsage") private var showsUsage = true
+    @AppStorage("showsUsage", store: WindowDefaults.store) private var showsUsage = true
     /// The smart groups turned off in Settings ▸ Sidebar (#846).
-    @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = SidebarSmartRow.offAtFirst
+    @AppStorage(SidebarSmartRow.offDefaultsKey, store: WindowDefaults.store) private var smartOff = SidebarSmartRow.offAtFirst
     private var smartOn: Set<SidebarSmartRow> { SidebarSmartRow.on(off: smartOff) }
     @State private var folds = SidebarFolds()
     /// What the list has highlighted — one or several (⌘-click), sessions and workflows
@@ -398,7 +398,7 @@ struct ProjectListView: View {
 /// A search unfolds every project with something that matches and hides the rest.
 private struct ProjectFold: View {
     @Environment(AppModel.self) private var model
-    @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = SidebarSmartRow.offAtFirst
+    @AppStorage(SidebarSmartRow.offDefaultsKey, store: WindowDefaults.store) private var smartOff = SidebarSmartRow.offAtFirst
     @Environment(WindowRequests.self) private var requests
     let summary: DaemonAPI.ProjectSummary
     let folds: SidebarFolds

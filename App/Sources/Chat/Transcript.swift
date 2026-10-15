@@ -8,7 +8,7 @@ import SwiftUI
 struct Transcript: View {
     @Environment(AppModel.self) private var model
     /// The level every turn starts at: View ▸ Turns (069).
-    @AppStorage(TurnDisplay.defaultsKey) private var turnDetail = TurnDisplay.initial
+    @AppStorage(TurnDisplay.defaultsKey, store: WindowDefaults.store) private var turnDetail = TurnDisplay.initial
     /// Set in a window of its own (#826), whose page of the transcript is its own.
     @Environment(\.poppedChat) private var popped
     let agent: Agent

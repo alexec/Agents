@@ -9,9 +9,9 @@ import SwiftUI
 /// one place to choose from.
 struct SettingsWindow: View {
     @Environment(AppModel.self) private var model
-    @AppStorage("settingsPane") private var paneRaw = SettingsPane.appearance.rawValue
-    @AppStorage("settingsSharedPage") private var sharedPageRaw = AgentConfigurationPage.overview.rawValue
-    @AppStorage("settingsRuntimeID") private var runtimeIDRaw = RuntimeCatalog.claude.id
+    @AppStorage("settingsPane", store: WindowDefaults.store) private var paneRaw = SettingsPane.appearance.rawValue
+    @AppStorage("settingsSharedPage", store: WindowDefaults.store) private var sharedPageRaw = AgentConfigurationPage.overview.rawValue
+    @AppStorage("settingsRuntimeID", store: WindowDefaults.store) private var runtimeIDRaw = RuntimeCatalog.claude.id
     /// Agent Configuration's snapshot lives here, not in its pane, because the rail shows its
     /// counts. Asked for when the window appears, when it is chosen, and whenever the app comes
     /// back to the front, which is when an edit made elsewhere shows.

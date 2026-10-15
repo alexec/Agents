@@ -5,7 +5,7 @@ import SwiftUI
 /// its text size is (#750). The Mac's Settings window and the Remote's Settings screen draw
 /// the same section; the web page keeps the same choice in its local storage.
 struct SidebarSettingsSection: View {
-    @AppStorage(SidebarSmartRow.offDefaultsKey) private var off = SidebarSmartRow.offAtFirst
+    @AppStorage(SidebarSmartRow.offDefaultsKey, store: WindowDefaults.store) private var off = SidebarSmartRow.offAtFirst
 
     var body: some View {
         Section {

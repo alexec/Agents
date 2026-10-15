@@ -81,7 +81,7 @@ final class SidebarFrame {
     var windowWidth: Double = 0
     var paneWidth: Double = 0
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = WindowDefaults.store) {
         self.defaults = defaults
         // Kept through #358, and read back into every launch since.
         defaults.removeObject(forKey: "sidebar.isOpen")

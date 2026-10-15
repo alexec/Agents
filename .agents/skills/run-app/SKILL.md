@@ -244,9 +244,10 @@ done.
 
 Don't. One root is one host, one control plane and one window's pairing. If you need
 a second surface, launch a second root with another slug and stop both. The windows
-share one container and its defaults (the bundle id is the real window's), so a
-walk can still move the user's own window's sidebar or selected project; the
-pairing is the one thing kept apart.
+share one container (the bundle id is the real window's), but a walk's window keeps
+its pairing in `walks/<walk>` and its defaults in a domain of its own,
+`com.alexecollins.agents.store.walk.<walk>` (`WindowDefaults`, #1029); `stop.sh`
+removes both.
 
 ## The Remote
 

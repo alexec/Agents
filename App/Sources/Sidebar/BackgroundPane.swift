@@ -9,7 +9,7 @@ import SwiftUI
 /// finished subagent can still be read.
 struct BackgroundPane: View {
     @Environment(AppModel.self) private var model
-    @AppStorage(TurnDisplay.defaultsKey) private var turnDetail = TurnDisplay.initial
+    @AppStorage(TurnDisplay.defaultsKey, store: WindowDefaults.store) private var turnDetail = TurnDisplay.initial
     let agent: Agent
     let state: AgentPaneState
 
