@@ -22,3 +22,10 @@ Since 2026-10-03 the icon is **Blob** from `colour/` (violet, oval eyes, the sof
 chosen from the variations in `blob/`. `blob/final/make.sh` draws it and writes the Mac
 and iPhone icons, the docs logo and favicon, and the web page's favicon; `Web/dist` is rebuilt by the next
 Agents Host build, or `scripts/web.sh build`.
+
+## Three happy Blobs (#1007)
+
+`three-blobs/` holds eight ways to draw three Blobs together, each at 240, 64, 32 and 16
+points on `sheet.png` (`python3 make.py`, then `swift render.swift sheet.svg sheet.png`).
+On 2026-10-14 Alex chose **B Huddle**, one white Blob in front and two light-blue ones
+behind, as a mark for the places that show a team. The app icon stays one Blob.
