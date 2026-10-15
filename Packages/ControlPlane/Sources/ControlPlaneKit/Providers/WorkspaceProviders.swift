@@ -917,6 +917,9 @@ public actor WorkspaceProviders: WorkspaceHandling {
         problems[host] = problem
         await changed()
         if kind == .start, let problem { await kept?.startFailed(host, problem) }
+        // A host says it is idle as it connects, while the start is still under way, and
+        // isn't counted then: count now, or a host started and left idle is never stopped.
+        if kind == .start, problem == nil { await countIdle(host) }
     }
 
     /// Where agentsd is started over ssh: the provider's destination, or the one the host
