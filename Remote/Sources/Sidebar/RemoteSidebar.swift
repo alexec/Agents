@@ -643,7 +643,6 @@ private struct RemoteSettings: View {
         NavigationStack {
             Form {
                 Section {
-                    TextSizeRow()
                     CelebrationsRow()
                 } header: {
                     Text("Appearance")
@@ -661,20 +660,6 @@ private struct RemoteSettings: View {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
         }
-    }
-}
-
-/// Text Size (#750): Default, Large or Larger, kept on this device only, as the window's
-/// Settings ▸ Appearance and the page's Settings keep theirs.
-private struct TextSizeRow: View {
-    @AppStorage(TextSize.defaultsKey) private var textSize = TextSize.standard
-
-    var body: some View {
-        Picker("Text Size", selection: $textSize) {
-            ForEach(TextSize.allCases) { Text($0.title).tag($0) }
-        }
-        .pickerStyle(.menu)
-        .appText(.supporting)
     }
 }
 

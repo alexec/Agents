@@ -10,7 +10,7 @@ export type ActivityPage = "events" | "resources" | "runtimes" | "mcp" | "worktr
 export const activityPages: readonly ActivityPage[] = ["events", "resources", "runtimes", "mcp", "worktrees", "spending", "tokens", "time"];
 
 export interface Route {
-  /** This browser's Settings (#846): its text size and which smart groups are on. */
+  /** This browser's Settings (#846): Celebrations and which smart groups are on. */
   settings?: boolean | undefined;
   /** An Activity page (#151): about all the work rather than one project. */
   activity?: ActivityPage | undefined;

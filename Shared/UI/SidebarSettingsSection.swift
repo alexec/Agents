@@ -1,8 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Settings ▸ Sidebar (#846): a switch for each smart group, kept on this device only, as
-/// its text size is (#750). The Mac's Settings window and the Remote's Settings screen draw
+/// Settings ▸ Sidebar (#846): a switch for each smart group, kept on this device only. The Mac's Settings window and the Remote's Settings screen draw
 /// the same section; the web page keeps the same choice in its local storage.
 struct SidebarSettingsSection: View {
     @AppStorage(SidebarSmartRow.offDefaultsKey, store: WindowDefaults.store) private var off = SidebarSmartRow.offAtFirst

@@ -29,7 +29,7 @@ struct ProjectRow: View {
     private var nameStyle: HierarchicalShapeStyle { summary.exists && !asHeading ? .primary : .secondary }
 
     /// The dot grows with the title beside it (#750).
-    @Environment(\.textSize) private var textSize
+    @ScaledMetric private var scale: CGFloat = 1
 
     var body: some View {
         HStack(spacing: 8) {
@@ -71,7 +71,7 @@ struct ProjectRow: View {
             } else if needsPerson {
                 Circle()
                     .fill(StateTint.attention.style(or: .secondary))
-                    .frame(width: 7 * textSize.scale, height: 7 * textSize.scale)
+                    .frame(width: 7 * scale, height: 7 * scale)
                     .accessibilityHidden(true)
             }
         }

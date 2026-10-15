@@ -204,7 +204,7 @@ private struct SessionMark: View {
     }
 
     /// The well grows with the text beside it (#750), so the row keeps its shape.
-    @Environment(\.textSize) private var textSize
+    @ScaledMetric private var scale: CGFloat = 1
 
     var body: some View {
         Group {
@@ -212,7 +212,7 @@ private struct SessionMark: View {
             case .needsYou:
                 Image(systemName: "hand.raised.fill").tinted(.attention)
             case .working:
-                SyncedSpinner(diameter: 14 * textSize.scale)
+                SyncedSpinner(diameter: 14 * scale)
             case .queued:
                 Image(systemName: "list.number").foregroundStyle(Paper.accent)
             case .waiting:
@@ -229,7 +229,7 @@ private struct SessionMark: View {
         }
         // Decorative: a mark filling the rows' 20-point well, as `WorkflowMark` (FR-015).
         .glyph(size: 14)
-        .frame(width: 20 * textSize.scale, height: 20 * textSize.scale)
+        .frame(width: 20 * scale, height: 20 * scale)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
     }
@@ -372,12 +372,12 @@ struct WorkflowMark: View {
     let summary: WorkflowSummary
 
     /// The well grows with the text beside it (#750), so the row keeps its shape.
-    @Environment(\.textSize) private var textSize
+    @ScaledMetric private var scale: CGFloat = 1
 
     var body: some View {
         Group {
             if summary.isRunning {
-                SyncedSpinner(diameter: 14 * textSize.scale)
+                SyncedSpinner(diameter: 14 * scale)
             } else {
                 Image(systemName: symbol)
                     // Decorative: the workflow's mark filling a 20-point well, not text (FR-015).
@@ -387,7 +387,7 @@ struct WorkflowMark: View {
                                      : AnyShapeStyle(Paper.accent))
             }
         }
-        .frame(width: 20 * textSize.scale, height: 20 * textSize.scale)
+        .frame(width: 20 * scale, height: 20 * scale)
         .accessibilityHidden(true)
     }
 

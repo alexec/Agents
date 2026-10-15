@@ -54,7 +54,6 @@ struct PoppedChatWindow: View {
             model.open(url, on: agent?.host ?? .mac)
             return .handled
         })
-        .chosenTextSize()
         .task(id: id) {
             guard let id, chat?.id != id else { return }
             if let chat { model.closePopout(chat) }

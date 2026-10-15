@@ -31,8 +31,7 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
     public static let all = Set(allCases)
 
     /// Where each device keeps the groups turned off (#846): their raw values, comma-
-    /// separated, so a group added later starts on. A device's own choice, as its text size
-    /// is (#750); the web page keeps the same in its local storage.
+    /// separated, so a group added later starts on. A device's own choice; the web page keeps the same in its local storage.
     public static let offDefaultsKey = "sidebarSmartGroupsOff"
 
     /// What a device with nothing kept under `offDefaultsKey` reads (#979): Working and

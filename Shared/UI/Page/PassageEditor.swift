@@ -91,7 +91,7 @@ private struct PassageTextView: NSViewRepresentable {
         view.importsGraphics = false
         view.allowsUndo = true
         view.drawsBackground = false
-        view.font = TextStep.reading.nsFont(context.environment.textSize)
+        view.font = TextStep.reading.nsFont
         view.textColor = .textColor
         // No inset and no padding, so the first character sits where the rendered one
         // did and opening the passage moves nothing.
@@ -121,8 +121,8 @@ private struct PassageTextView: NSViewRepresentable {
 
     func updateNSView(_ view: EndingTextView, context: Context) {
         context.coordinator.parent = self
-        // The person's text size, if it changed while the passage was open (#750).
-        let font = TextStep.reading.nsFont(context.environment.textSize)
+        // The system's text size, if it changed while the passage was open.
+        let font = TextStep.reading.nsFont
         if view.font != font { view.font = font }
         // Only when the text changed from outside — "Use theirs" — never on the
         // person's own keystroke coming back, which would put the caret at the end.

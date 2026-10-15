@@ -397,7 +397,7 @@ private struct SessionMark: View {
     }
 
     /// The well grows with the text beside it (#750), so the row keeps its shape.
-    @Environment(\.textSize) private var textSize
+    @ScaledMetric private var scale: CGFloat = 1
 
     var body: some View {
         Group {
@@ -420,7 +420,7 @@ private struct SessionMark: View {
                 Image(systemName: ArchiveRequestWords.symbol).tinted(.attention)
             }
         }
-        .frame(width: 16 * textSize.scale, height: 16 * textSize.scale)
+        .frame(width: 16 * scale, height: 16 * scale)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
     }
@@ -458,7 +458,7 @@ struct StatusIcon: View {
     /// it does not want a person, whatever its stopped shape says.
     var isWaitingForAllowance = false
     /// The well grows with the text beside it (#750), so the row keeps its shape.
-    @Environment(\.textSize) private var textSize
+    @ScaledMetric private var scale: CGFloat = 1
 
     private var shape: StatusShape {
         StatusShape(state: state, outcome: outcome, isWaiting: isWaiting, isComingBack: isComingBack,
@@ -477,10 +477,10 @@ struct StatusIcon: View {
                                       ? StateTint.attention : .none)
                         .style(or: .secondary))
             } else {
-                SyncedSpinner(diameter: 12 * textSize.scale)
+                SyncedSpinner(diameter: 12 * scale)
             }
         }
-        .frame(width: 18 * textSize.scale, height: 18 * textSize.scale)
+        .frame(width: 18 * scale, height: 18 * scale)
         .help(description)
         .accessibilityLabel(description)
     }
@@ -497,12 +497,12 @@ struct StatusIcon: View {
 /// The unread mark before a row's title (#70). Grey, not the attention colour: unread
 /// is news, not a need. Silent to a screen reader, which hears the title's value instead.
 struct UnreadDot: View {
-    @Environment(\.textSize) private var textSize
+    @ScaledMetric private var scale: CGFloat = 1
 
     var body: some View {
         Circle()
             .fill(.secondary)
-            .frame(width: 7 * textSize.scale, height: 7 * textSize.scale)
+            .frame(width: 7 * scale, height: 7 * scale)
             .accessibilityHidden(true)
     }
 }
