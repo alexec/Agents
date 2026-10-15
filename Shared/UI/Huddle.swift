@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The Huddle (#987, the mark of #1007): three Blobs over the empty page of a new session,
-/// one white in front and two light blue behind, tilted in.
+/// The Huddle (#987, the mark of #1007): three Blobs over the empty page of a new session
+/// and over the first-run page, one white in front and two light blue behind, tilted in.
 ///
 /// They are alive. Left alone, their eyes look around now and then and blink, and the two
 /// at the back glance at the one in front. While the prompt has focus, all three look at

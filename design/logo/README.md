@@ -29,3 +29,9 @@ Agents Host build, or `scripts/web.sh build`.
 points on `sheet.png` (`python3 make.py`, then `swift render.swift sheet.svg sheet.png`).
 On 2026-10-14 Alex chose **B Huddle**, one white Blob in front and two light-blue ones
 behind, as a mark for the places that show a team. The app icon stays one Blob.
+
+The Huddle is drawn in code, not from these files: `Shared/UI/Huddle.swift` for the window
+and the Remote, `Web/src/views/Huddle.tsx` for the web page. It shows over a new session
+and a new chat (#987) and on the first-run page of all three (#1007), without a tile and
+with the two Blobs at the back light blue, on paper and on the dark theme alike. The
+README, the docs, the favicon and About keep the one Blob.

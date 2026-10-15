@@ -2,6 +2,7 @@
 // or arrives in the address from Open in Browser (#109, pairLink.ts).
 import { useSignal } from "@preact/signals";
 import type { Session } from "../session";
+import { Huddle } from "./Huddle";
 
 export function Pairing({ session }: { session: Session }) {
   const code = useSignal("");
@@ -16,6 +17,8 @@ export function Pairing({ session }: { session: Session }) {
         {session.wasForgotten.value && (
           <p class="pairing-forgotten" role="status">This browser was forgotten. Pair it again to carry on.</p>
         )}
+        {/* The mark of a team (#1007): no prompt here, so the Blobs only look around. */}
+        <Huddle focused={false} typed={0} />
         <h1>Connect this browser to your agents</h1>
         <p>
           Get a code from Agents on this Mac: in the window,{" "}
