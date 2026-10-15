@@ -16,7 +16,7 @@ const LASTS = 2200;
 /** The confetti's bits: where each flies, how it spins, its colour. Made once. */
 const BITS = Array.from({ length: 26 }, (_, i) => ({
   x: Math.round(-110 + Math.random() * 220),
-  y: Math.round(-200 - Math.random() * 110),
+  y: Math.round(-50 - Math.random() * 80),
   spin: Math.round(-540 + Math.random() * 1080),
   colour: ["#3A78E6", "#CFE3FF", "#FF7BA9", "#FFD23F", "#5ED6B0", "#FF9F45"][i % 6],
 }));

@@ -806,7 +806,7 @@ button.remove:hover { opacity: 1; }
 @keyframes confetti-burst {
   0% { opacity: 1; transform: translate(0, 0) rotate(0); }
   45% { opacity: 1; transform: translate(calc(var(--x) * 0.6), var(--y)) rotate(calc(var(--spin) * 0.5)); }
-  100% { opacity: 0; transform: translate(var(--x), calc(var(--y) + 170px)) rotate(var(--spin)); }
+  100% { opacity: 0; transform: translate(var(--x), calc(var(--y) + 110px)) rotate(var(--spin)); }
 }
 @media (prefers-reduced-motion: reduce) {
   .celebration-blob { animation-name: celebration-fade; }
