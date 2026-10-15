@@ -549,6 +549,7 @@ struct ProviderDraftCommandsTests {
         let world = world()
         let preset = try await DraftHarness(world: world).start(.init(name: "D", kind: .commands, cli: "doctl"), secrets: [:])
         #expect(preset.answered?.preset == "doctl")
+        #expect(preset.answered?.note == "Agents has a preset for doctl: use DigitalOcean Droplets.")
         #expect(world.started.isEmpty)
         world.notInstalled = true
         await #expect(throws: JSONRPCError.self) { try await DraftHarness(world: world).start(Self.form, secrets: [:]) }

@@ -25,7 +25,7 @@ struct ControlProvidersPage: View {
                     providerCard(provider)
                 }
                 Button("Add Provider…") { adding = true }.buttonStyle(.paper)
-                Text("A provider starts and stops the machines your hosts run on: Docker containers, DigitalOcean droplets, Codespaces, or anything with a command. It runs here, on the control plane, so it can start a host that is down.")
+                Text("A provider starts and stops the machines your hosts run on: Docker containers, DigitalOcean Droplets, GitHub Codespaces, Coder workspaces, Google Cloud Workstations, or anything with a command. It runs here, on the control plane, so it can start a host that is down.")
                     .appText(.supporting).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -198,11 +198,11 @@ struct AddProviderSheet: View {
 
         var title: String {
             switch self {
-            case .docker: "Docker"
-            case .digitalOcean: "DigitalOcean"
-            case .codespaces: "Codespaces"
-            case .coder: "Coder"
-            case .workstations: "Workstations"
+            case .docker: "Docker Containers"
+            case .digitalOcean: "DigitalOcean Droplets"
+            case .codespaces: "GitHub Codespaces"
+            case .coder: "Coder Workspaces"
+            case .workstations: "Google Cloud Workstations"
             case .commands: "Your commands"
             case .mcp: "MCP server"
             }
@@ -353,7 +353,7 @@ struct AddProviderSheet: View {
         kind = each
         problem = nil
         name = switch each {
-        case .docker: "Docker on this Mac"
+        case .docker: "Docker Containers on this Mac"
         case .commands, .mcp: ""
         default: each.title
         }
@@ -581,7 +581,7 @@ struct AddProviderSheet: View {
     private func useDigitalOcean() {
         byAddress = false
         if command.trimmingCharacters(in: .whitespaces).isEmpty { command = "npx -y @digitalocean/mcp" }
-        if name.trimmingCharacters(in: .whitespaces).isEmpty { name = "DigitalOcean" }
+        if name.trimmingCharacters(in: .whitespaces).isEmpty { name = "DigitalOcean Droplets" }
         map = Self.pretty(ShippedToolMaps.digitalOcean)
         if !secrets.contains(where: { $0.name == ShippedToolMaps.digitalOceanSecret }) {
             secrets.append(Secret(name: ShippedToolMaps.digitalOceanSecret))
@@ -617,7 +617,7 @@ struct AddProviderSheet: View {
                     answered = said.note
                     if let shipped = said.map {
                         map = Self.pretty(shipped)
-                        if name.trimmingCharacters(in: .whitespaces).isEmpty { name = "DigitalOcean" }
+                        if name.trimmingCharacters(in: .whitespaces).isEmpty { name = "DigitalOcean Droplets" }
                     }
                     presetKind = said.preset.flatMap(Kind.ofPreset)
                 } else {

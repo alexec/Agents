@@ -28,10 +28,10 @@ waits for its agentsd to connect, and the server comes online by itself.
 
 1. Open **Settings ▸ Control plane ▸ Providers** on the Mac and choose **Add Provider…**.
 2. Pick the kind:
-   - **Docker**: containers on the Mac that runs the control plane.
-   - **DigitalOcean**: droplets with a tag. Agents reaches each one as `root@` its address
+   - **Docker Containers**: containers on the Mac that runs the control plane.
+   - **DigitalOcean Droplets**: droplets with a tag. Agents reaches each one as `root@` its address
      unless you say another user.
-   - **Codespaces**, **Coder**, or **Workstations** (Google Cloud Workstations).
+   - **GitHub Codespaces**, **Coder Workspaces**, or **Google Cloud Workstations**.
    - **Your commands**: one workspace, given as the commands you already use to start and
      stop it, such as `cws start devstack-1`. A status command is optional; it prints
      `running` or `stopped`.
