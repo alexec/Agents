@@ -21,6 +21,9 @@ struct PinnedViewPage: View {
     /// The session on a branch in this project, and a send to it (#837).
     var recipient: (@MainActor (AppViewAgentMessage) -> AppViewRecipient?)? = nil
     var sendTo: (@MainActor (UUID, String) async -> Bool)? = nil
+    /// Whether the link to the host is up. Coming back, a page whose call or read failed or
+    /// never answered makes it again (#978).
+    var connected = true
 
     @Environment(\.openURL) private var openURL
     @State private var store = AppViewStore()
@@ -28,6 +31,8 @@ struct PinnedViewPage: View {
     @State private var place = UUID()
     @State private var answer: JSONValue?
     @State private var problem: String?
+    /// Try Again and a reconnect make the feeding call again.
+    @State private var attempt = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -35,7 +40,12 @@ struct PinnedViewPage: View {
             Divider()
             content.frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .task(id: view) { await feed() }
+        .task(id: Feeding(view: view, attempt: attempt)) { await feed() }
+        .onChange(of: connected) {
+            guard connected else { return }
+            if problem != nil || answer == nil { attempt += 1 }
+            store.reconnected()
+        }
         .onDisappear { store.tearDownAll(reason: "The pinned view was closed.") }
     }
 
@@ -66,7 +76,12 @@ struct PinnedViewPage: View {
         if let reason = pin.missingReason {
             note("This view can't be drawn here: \(reason).")
         } else if let problem {
-            note(problem)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(problem).appText(.supporting).foregroundStyle(.secondary)
+                Button("Try Again") { attempt += 1 }.buttonStyle(.paper)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(24)
         } else {
             AppViewPage(host: store.host(for: fedCall, actions: actions))
         }
@@ -91,14 +106,27 @@ struct PinnedViewPage: View {
                     arguments: view.arguments, result: answer, state: answer == nil ? .running : .done)
     }
 
+    private struct Feeding: Equatable {
+        var view: ViewPin
+        var attempt: Int
+    }
+
+    /// The feeding call, within its deadline (#978): one with no answer said so, with Try Again.
     private func feed() async {
         guard pin.missingReason == nil else { return }
+        problem = nil
+        let call = call
         do {
-            answer = try await call(DaemonAPI.Method.viewsCall, try JSONValue.encoding(DaemonAPI.ViewCallRequest(
+            let params = try JSONValue.encoding(DaemonAPI.ViewCallRequest(
                 agentID: place, viewID: place, name: view.tool, arguments: view.arguments, project: folder, feed: true,
-                server: view.server == AppTool.serverName ? nil : view.server)))
-            problem = nil
+                server: view.server == AppTool.serverName ? nil : view.server))
+            let value = try await AppViewLoad.answered(within: AppViewLoad.feedDeadline) {
+                try await call(DaemonAPI.Method.viewsCall, params)
+            }
+            guard !Task.isCancelled else { return }
+            answer = value
         } catch {
+            guard !Task.isCancelled else { return }
             problem = "The view's call did not answer: \(AppViewHost.words(error))"
         }
     }

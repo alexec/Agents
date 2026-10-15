@@ -70,6 +70,12 @@ final class AppViewStore {
 
     func existing(_ id: UUID) -> AppViewHost? { hosts[id] }
 
+    /// The link came back: every view still loading, or whose read failed, is read again, as a
+    /// read in flight when it dropped may never be answered (#978).
+    func reconnected() {
+        for host in hosts.values { host.retry() }
+    }
+
     /// Every view, told and then taken down: the chat is closing or changing.
     func tearDownAll(reason: String = "The conversation was closed.") {
         let all = hosts.values
@@ -100,6 +106,8 @@ final class AppViewHost {
     private(set) var prefersBorder = true
     /// What Pin to Project last said: pinned, or why not.
     private(set) var pinNote: String?
+    /// Whether `retry()` would read it again: a failure drawn with Try Again (#978).
+    private(set) var canRetry = false
 
     @ObservationIgnored var actions: AppViewActions
     @ObservationIgnored weak var store: AppViewStore?
@@ -112,6 +120,8 @@ final class AppViewHost {
     @ObservationIgnored private var teardown: (id: JSONValue, done: CheckedContinuation<Void, Never>)?
     @ObservationIgnored private var nextRequest = 1
     @ObservationIgnored private var started = false
+    /// The load running now; an answer for an older one is dropped.
+    @ObservationIgnored private var attempt = 0
 
     static let maxInlineHeight: CGFloat = 640
 
@@ -145,40 +155,62 @@ final class AppViewHost {
 
     // MARK: Loading
 
-    /// Read the resource and draw it. Once.
+    /// Read the resource and draw it, once for each time it is shown: again only by `retry()`.
     func start() {
         guard !started else { return }
         started = true
-        Task { await load() }
+        retry()
     }
 
-    private func load() async {
+    /// Try Again, a reconnect, or the first read: a view still loading or one whose read
+    /// failed is read afresh (#978). A drawn view, one asking Show, and a closed one are left.
+    func retry() {
+        guard started else { return }
+        switch phase {
+        // The first read, or one a dropped link may have lost: the older answer is dropped.
+        case .loading: break
+        case .failed where canRetry: break
+        default: return
+        }
+        phase = .loading
+        canRetry = false
+        attempt += 1
+        let mine = attempt
+        Task { await load(mine) }
+    }
+
+    private func failed(_ words: String, _ mine: Int) {
+        guard mine == attempt, phase != .gone else { return }
+        canRetry = true
+        phase = .failed(words)
+    }
+
+    private func load(_ mine: Int) async {
+        let call = actions.call
+        let outcome = await AppViewLoad.read(DaemonAPI.ViewReadRequest(
+            agentID: actions.agentID, uri: self.call.resourceURI, server: server, project: actions.project)) { method, params in
+            try await call(method, params)
+        }
+        guard mine == attempt, phase != .gone else { return }
         let resource: DaemonAPI.ViewResource
-        do {
-            let value = try await actions.call(DaemonAPI.Method.viewsRead, try JSONValue.encoding(DaemonAPI.ViewReadRequest(
-                agentID: actions.agentID, uri: call.resourceURI, server: server, project: actions.project)))
-            resource = try value.decode(DaemonAPI.ViewResource.self)
-        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.viewNeedsShow {
-            // Nothing of it is drawn until the person says Show.
-            if let ask = try? error.data?.decode(DaemonAPI.ViewAsk.self) {
-                phase = .asking(ask)
-            } else {
-                phase = .failed(error.message)
-            }
+        switch outcome {
+        case .resource(let read): resource = read
+        case .asking(let ask):
+            phase = .asking(ask)
             return
-        } catch {
-            phase = .failed("This view could not be read from the server: \(Self.words(error))")
+        case .failed(let words):
+            failed(words, mine)
             return
         }
         policy = resource.policy
         prefersBorder = resource.prefersBorder ?? true
         // The network side of the policy, before anything is drawn. Never drawn without it.
-        guard let rules = try? await WKContentRuleListStore.default().compileContentRuleList(
-            forIdentifier: policy.rulesIdentifier, encodedContentRuleList: policy.contentRules) else {
-            phase = .failed("This view could not be drawn safely, so it is not drawn.")
+        guard let rules = await compileRules() else {
+            failed("This view could not be drawn safely, so it is not drawn.", mine)
             return
         }
-        guard phase != .gone else { return }
+        guard mine == attempt, phase != .gone else { return }
+        web.configuration.userContentController.removeAllContentRuleLists()
         web.configuration.userContentController.add(rules)
         let page = AppViewShell.page(html: resource.html, policy: policy)
         let response = HTTPURLResponse(url: AppViewShell.address, statusCode: 200, httpVersion: "HTTP/1.1",
@@ -188,6 +220,21 @@ final class AppViewHost {
         web.loadSimulatedRequest(URLRequest(url: AppViewShell.address), response: response,
                                  responseData: Data(page.utf8))
         phase = .ready
+    }
+
+    /// The policy's network rules, or nil when they did not compile within their deadline.
+    private func compileRules() async -> WKContentRuleList? {
+        let settled = ManagedAtomicFlag()
+        return await withCheckedContinuation { (done: CheckedContinuation<WKContentRuleList?, Never>) in
+            WKContentRuleListStore.default().compileContentRuleList(
+                forIdentifier: policy.rulesIdentifier, encodedContentRuleList: policy.contentRules) { list, _ in
+                if settled.set() { done.resume(returning: list) }
+            }
+            Task {
+                try? await Task.sleep(for: AppViewLoad.rulesDeadline)
+                if settled.set() { done.resume(returning: nil) }
+            }
+        }
     }
 
     private func makeWebView() -> WKWebView {
@@ -280,6 +327,8 @@ final class AppViewHost {
     func answerShow(_ show: Bool) {
         guard case .asking(let ask) = phase else { return }
         phase = .loading
+        attempt += 1
+        let mine = attempt
         Task {
             do {
                 _ = try await actions.call(DaemonAPI.Method.viewsShow, try JSONValue.encoding(DaemonAPI.ViewShowRequest(
@@ -289,8 +338,9 @@ final class AppViewHost {
                 phase = .failed("That could not be kept: \(Self.words(error))")
                 return
             }
+            guard mine == attempt, phase != .gone else { return }
             if show {
-                await load()
+                await load(mine)
             } else {
                 phase = .failed("Not shown. Ask Again is on \(ask.server)'s row in the project's MCP servers.")
             }

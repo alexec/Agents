@@ -143,7 +143,8 @@ struct ContentView: View {
                                    unpin: { await model.unpin(path, in: key) },
                                    startAgent: { model.offerStart($0, in: key) },
                                    recipient: { model.recipient(of: $0, in: key) },
-                                   sendTo: { id, text in await model.send(text, to: id) })
+                                   sendTo: { id, text in await model.send(text, to: id) },
+                                   connected: model.isConnected)
                         // One page per pin, so another pin gets its own store and place (#872).
                         .id(pin.path)
                 } else {
