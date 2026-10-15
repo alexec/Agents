@@ -351,9 +351,11 @@ for (const scene of scenes) {
       say(`records: ${JSON.stringify(await visible(".time-recap .usage-share"))}`);
       await shot("time");
     } else if (scene === "milestones") {
-      // #984: the milestones on the Time page, then the one-time card for one earned while
-      // the page looks. The walker earns one meanwhile (a first turn, from the socket).
-      await page.eval(`location.hash = "#/a/time"`);
+      // #984, #1067: the milestones on their own page, from their row in Usage, then the
+      // one-time card for one earned while the page looks. The walker earns one meanwhile (a
+      // first turn, from the socket).
+      say(`usage rows: ${JSON.stringify(await visible(".activity-row .title"))}`);
+      await page.eval(`location.hash = "#/a/milestones"`);
       await page.waitFor(`document.querySelector(".milestones li")`, 30_000);
       say(`milestones: ${JSON.stringify(await visible(".milestones li"))}`);
       await shot("milestones");

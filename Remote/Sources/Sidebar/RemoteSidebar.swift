@@ -94,6 +94,11 @@ struct RemoteSidebar: View {
                     TokensRow().activityIcon("number", warns: model.costState?.dayTokensAreCloseToFull == true)
                         .appText(.supporting).tag(SidebarItem.tokens)
                     TimeRow().activityIcon("clock").appText(.supporting).tag(SidebarItem.time)
+                    // The newcomer's checklist (#1067), only while a milestone is still to
+                    // earn, as an empty smart group hides (#507).
+                    if model.work.milestones?.isComplete == false {
+                        MilestonesRow().activityIcon("checkmark.seal").appText(.supporting).tag(SidebarItem.milestones)
+                    }
                 } header: {
                     Text("Usage")
                 }

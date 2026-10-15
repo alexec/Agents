@@ -25,6 +25,9 @@ public enum SidebarItem: Hashable, Sendable {
     case tokens
     /// Where the time of running chats went (#852): the agent, its tools, and waiting.
     case time
+    /// The first steps taken, and the ones still to take (#984, #1067): a row only while
+    /// some are still to earn.
+    case milestones
     /// Every resource an agent can lease, and who holds and waits for each (036).
     case resources
     /// What happened, and what came of it (042).

@@ -80,7 +80,7 @@ struct ProjectListView: View {
             if let milestone = model.milestoneCard {
                 Section {
                     MilestoneCard(milestone: milestone,
-                                  open: { model.dismissMilestone(milestone); picked = [.time] },
+                                  open: { model.dismissMilestone(milestone); picked = [.milestones] },
                                   dismiss: { model.dismissMilestone(milestone) })
                         .listRowSeparator(.hidden)
                         .selectionDisabled()
@@ -125,6 +125,12 @@ struct ProjectListView: View {
                     .appText(.supporting).sidebarInk(.tokens).tag(SidebarItem.tokens)
                 TimeRow().activityIcon("clock")
                     .appText(.supporting).sidebarInk(.time).tag(SidebarItem.time)
+                // The newcomer's checklist (#1067), only while a milestone is still to earn,
+                // as an empty smart group hides (#507). Then the list is under Time's charts.
+                if model.work.milestones?.isComplete == false {
+                    MilestonesRow().activityIcon("checkmark.seal")
+                        .appText(.supporting).sidebarInk(.milestones).tag(SidebarItem.milestones)
+                }
             } header: {
                 Text("Usage").appText(.supporting)
             }

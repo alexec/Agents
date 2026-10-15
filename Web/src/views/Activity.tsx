@@ -21,7 +21,8 @@ import { refusalMessage } from "../model/workflows";
 import { dayTokenLimitReached } from "../model/limits";
 import { UsageCharts } from "./UsageCharts";
 import { TimeCharts } from "./TimeCharts";
-import { TimeMilestonesAround } from "./Milestones";
+import { MilestonesSection, TimeMilestonesUnder } from "./Milestones";
+import { isComplete } from "../model/milestones";
 
 function navigate(destination: { host: string; project: string; session?: string; workflow?: string }): void {
   const parts = ["h", destination.host, "p", destination.project];
@@ -161,7 +162,7 @@ function useActivity(store: Store): void {
 }
 
 /** Each Activity page's icon, the window's SF Symbol as near as text has it (#495). */
-const activityIcons: Record<ActivityPage, string> = { events: "☰\uFE0E", resources: "◫", runtimes: "⚙\uFE0E", mcp: "▤", worktrees: "⑂", spending: "$", tokens: "#", time: "◷" };
+const activityIcons: Record<ActivityPage, string> = { events: "☰\uFE0E", resources: "◫", runtimes: "⚙\uFE0E", mcp: "▤", worktrees: "⑂", spending: "$", tokens: "#", time: "◷", milestones: "✓" };
 
 /** The rows of one of the sidebar's two groups (#915): Status, what goes on now, or Usage, the past. */
 export function ActivityRows({ group, store, chosen, onPick }: {
@@ -179,6 +180,7 @@ export function ActivityRows({ group, store, chosen, onPick }: {
   const costs = store.costs.value;
   const today = totalWords(todayTotals(costs));
   const mac = costs["mac"];
+  const milestones = store.milestones.value[milestonesHost(store) ?? ""];
   const left = headroom(mac);
   // The page's name in the projects' type, after its icon in the accent, as the window's rows
   // have it (#155, #495). Nothing at its end, which is only a session's (#587): what it would say
@@ -200,6 +202,10 @@ export function ActivityRows({ group, store, chosen, onPick }: {
         spendCloseToFull(mac))}
       {row("tokens", "Tokens", "What the work used in tokens, and the token limits", tokens, tokensCloseToFull(mac))}
       {row("time", "Time", "Where the time of running chats went: the agent, its tools, and waiting", null)}
+      {/* The newcomer's checklist (#1067), only while a milestone is still to earn, as an empty
+          smart group hides (#507). Then the list is under Time's charts. */}
+      {milestones && !isComplete(milestones)
+        && row("milestones", "Milestones", "The first steps taken in Agents, and the ones still to take", null)}
     </>
   );
   return (
@@ -217,7 +223,7 @@ export function ActivityRows({ group, store, chosen, onPick }: {
   );
 }
 
-const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", mcp: "MCP Servers", worktrees: "Worktrees", spending: "Cost", tokens: "Tokens", time: "Time" };
+const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", mcp: "MCP Servers", worktrees: "Worktrees", spending: "Cost", tokens: "Tokens", time: "Time", milestones: "Milestones" };
 
 /** An Activity page in the chat's place. */
 export function ActivityPageView({ store, page }: { store: Store; page: ActivityPage }) {
@@ -303,6 +309,7 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
           {page === "spending" && <SpendingPage store={store} hostName={hostName} />}
           {page === "tokens" && <TokensPage store={store} hostName={hostName} />}
           {page === "time" && <TimePage store={store} />}
+          {page === "milestones" && <MilestonesPage store={store} />}
         </div>
       </div>
     </section>
@@ -468,10 +475,22 @@ function TimePage({ store }: { store: Store }) {
   const runtimeName = (id: string) => (host && store.runtimes.value[host]?.find((s) => s.runtime.id === id)?.runtime.name) || id;
   if (!host) return <p class="quiet">No host is connected.</p>;
   return (
-    <TimeMilestonesAround milestones={store.milestones.value[host]}>
+    <TimeMilestonesUnder milestones={store.milestones.value[host]}>
       <TimeCharts history={store.time.value[host]} runtimeName={runtimeName} />
-    </TimeMilestonesAround>
+    </TimeMilestonesUnder>
   );
+}
+
+/** The host whose milestones are drawn: this Mac's, as on the window and the Remote. */
+function milestonesHost(store: Store): string | undefined {
+  return store.hosts.value.some((h) => h.id === "mac") ? "mac" : store.hosts.value[0]?.id;
+}
+
+/** The milestones as a page (#1067): the newcomer's checklist, from its row in Usage. */
+function MilestonesPage({ store }: { store: Store }) {
+  const milestones = store.milestones.value[milestonesHost(store) ?? ""];
+  if (!milestones) return <p class="quiet">No host is connected.</p>;
+  return <MilestonesSection milestones={milestones} />;
 }
 
 /** What the work used in tokens (#956): the charts in tokens, then each host's day against its token limits. */
