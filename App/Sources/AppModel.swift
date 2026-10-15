@@ -370,7 +370,12 @@ final class AppModel {
         showsTokens = false
         showsWorktrees = false
         if let agent = agents.first(where: { $0.id == agentID }) {
+            pendingOpen = nil
             select(ProjectKey(host: agent.host, folder: agent.projectFolder))
+        } else {
+            // Not listed yet (a banner tapped at launch): picking its project when the
+            // lists arrive would empty the selection, so it is opened again then (#1055).
+            pendingOpen = .agent(agentID)
         }
         openWorkflow = nil
         selection = agentID
@@ -387,10 +392,29 @@ final class AppModel {
         showsTime = false
         showsTokens = false
         showsWorktrees = false
+        // Not listed yet: settling the selection would pick another, so it waits (#1055).
+        pendingOpen = liveProjects.contains { $0.key == key } ? nil : .project(key)
         select(key)
         openWorkflow = nil
         projectPage = nil
         selection = nil
+    }
+
+    /// What a banner asked for before the agents and projects it names were listed, as
+    /// the Remote keeps a tapped need (#1045). Opened once they are; anything picked in
+    /// the sidebar first drops it.
+    private enum PendingOpen { case agent(UUID), project(ProjectKey) }
+    @ObservationIgnored private var pendingOpen: PendingOpen?
+
+    private func openPending() {
+        switch pendingOpen {
+        case .agent(let id) where agents.contains { $0.id == id }:
+            openAgent(id)
+        case .project(let key) where liveProjects.contains { $0.key == key }:
+            openProject(key)
+        default:
+            break
+        }
     }
 
     /// What is picked in the sidebar, as one value.
@@ -419,6 +443,8 @@ final class AppModel {
             return composing ? .project(key) : nil
         }
         set {
+            // The person's own pick wins over a banner still waiting for its lists.
+            if newValue != nil { pendingOpen = nil }
             switch newValue {
             case .session(let id):
                 openAgent(id)
@@ -782,6 +808,18 @@ final class AppModel {
         // On `controlLink` itself, not a link of its own (#445): a second connection that
         // nothing else knew of was never let go of, so a wedged one stayed for good.
         if let controlLink { client = DaemonClient(link: controlLink.link(for: .mac)) }
+        // From the start, not once connected: a banner tapped to launch the app arrives
+        // before then, and was dropped (#1055).
+        notifier.open = { [weak self] agentID in
+            // Its own project first, because picking a project empties the selection:
+            // a chat opened from a banner under some other project's heading is a
+            // sidebar and a page that disagree about where you are.
+            self?.openAgent(agentID)
+        }
+        notifier.openProject = { [weak self] folder in self?.openProject(ProjectKey(host: .mac, folder: folder)) }
+        #if DEBUG
+        openFromLaunchArguments()
+        #endif
     }
     /// Every host the control plane has besides this Mac's, each with a client of its own
     /// over `controlLink` (058, US3): what `HostSet` is for servers reached by ssh from
@@ -2025,6 +2063,7 @@ final class AppModel {
         } else {
             select(live.first?.key)
         }
+        openPending()
     }
 
     func addProject(_ folder: URL, on host: HostID = .mac) async {
@@ -3174,18 +3213,15 @@ final class AppModel {
         _ = await (popped, runtimes, accounts, workflows, pinned, permissions,
                    elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
                    transcript, runtimeStates, sandbox, person, disk, storeNotes, hostedMCP, mcpHealth, milestones)
-        #if DEBUG
-        openFromLaunchArguments()
-        #endif
     }
 
     #if DEBUG
-    /// `-open-agent <id>` opens that agent once the window has its lists, as the phone's
-    /// `-agent` does: a way to put a screen in front of a test that no accessibility
-    /// action reaches, such as a link inside an event's card. Debug builds only.
+    /// `-open-agent <id>` opens that agent as a banner tapped at launch does: asked at
+    /// once, before the lists, and opened once they arrive (#1055). A way to put a screen
+    /// in front of a test that no accessibility action reaches, such as a link inside an
+    /// event's card. Debug builds only.
     private func openFromLaunchArguments() {
-        // Once: this runs on every reconnect, and a window yanked back to the same agent
-        // each time would be a test hook getting in the way of the test.
+        // Once: a second window opened later is not the launch.
         guard !Self.launchArgumentsOpened else { return }
         Self.launchArgumentsOpened = true
         let arguments = ProcessInfo.processInfo.arguments
@@ -3624,14 +3660,6 @@ final class AppModel {
         work.onOversized = { [weak self] agentID, entryID, index in
             Task { await self?.loadOversized(entryID, of: agentID, at: index) }
         }
-        notifier.open = { [weak self] agentID in
-            guard let self else { return }
-            // Its own project first, because picking a project empties the selection:
-            // a chat opened from a banner under some other project's heading is a
-            // sidebar and a page that disagree about where you are.
-            self.openAgent(agentID)
-        }
-        notifier.openProject = { [weak self] folder in self?.openProject(ProjectKey(host: .mac, folder: folder)) }
         let reporter = PresenceReporter { [weak self] watching, active, showing, popped in
             guard let self else { return }
             // Every host hears whether the person is here; only the one the open
