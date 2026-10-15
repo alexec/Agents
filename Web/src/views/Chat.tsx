@@ -27,6 +27,7 @@ import { ContextMeter, CostLimitBanner, SandboxCapsule } from "./PromptStatus";
 import { RenameInput, SessionButtons, SessionMenu } from "./SessionMenu";
 import { drawable } from "../model/options";
 import { asksToArchive, projectFolder } from "../model/groups";
+import { savedDetail, toggled } from "../model/turnDetail";
 import { CallActionsContext, detailSummaries, detailTitles, fromLine, ItemRow, turnDetails, TurnView, type CallActions, type TurnDetail } from "./chat/Rows";
 import { Modal } from "./Modal";
 import { nameOf, pathOf, setPane } from "./files/paneState";
@@ -59,13 +60,9 @@ function shown(entries: TranscriptEntry[]): Item[] {
   return items[0] && isPersonsAsk(items[0]) ? items.slice(1) : items;
 }
 
-function savedDetail(): TurnDetail {
-  const saved = localStorage.getItem(detailKey);
-  return turnDetails.find((d) => d === saved) ?? "outcome";
-}
 
 /** The level every turn starts at, the page's one setting (View ▸ Turns in the window). */
-const defaultDetail = { value: savedDetail() };
+const defaultDetail = { value: savedDetail(localStorage.getItem(detailKey)) };
 
 /** How close to the end counts as being back at it, on the way down (#378). */
 const atTheEnd = 40;
@@ -446,9 +443,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   };
 
   const toggle = (turn: ChatTurn) => {
-    const now = chosen.value[turn.id] ?? level.value;
-    const open = level.value !== "outcome" ? level.value : "messages";
-    chosen.value = { ...chosen.value, [turn.id]: now !== "outcome" ? "outcome" : open };
+    chosen.value = { ...chosen.value, [turn.id]: toggled(chosen.value[turn.id] ?? level.value, level.value) };
   };
 
   // A turn closed, or the level put back to outcome, lets its entries go (#291).

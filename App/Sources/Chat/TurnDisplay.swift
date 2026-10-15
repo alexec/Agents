@@ -18,8 +18,8 @@ enum TurnDisplay {
     }
 
     /// Before anyone has chosen: Details for someone who had Show Thinking on, since
-    /// that is where thinking is now, and the outcome for everyone else.
+    /// that is where thinking is now, and Messages for everyone else (#993).
     static var initial: TurnDetail {
-        UserDefaults.standard.bool(forKey: thinkingKey) ? .details : .outcome
+        UserDefaults.standard.bool(forKey: thinkingKey) ? .details : .initial
     }
 }

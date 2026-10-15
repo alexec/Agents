@@ -18,7 +18,7 @@ struct ChatTranscript: View {
     /// The finished turns before `items`, as stored: drawn from their outcome until opened.
     var stored: [TurnSummary] = []
     /// The level a turn starts at, the app's one setting (069).
-    var defaultDetail: TurnDetail = .outcome
+    var defaultDetail: TurnDetail = .initial
     /// Whether there is more of the conversation before the first page in hand.
     let hasMore: Bool
     /// How many entries are in hand. Growth is what "something new" means.
@@ -560,12 +560,9 @@ struct ChatTranscript: View {
         withAnimation(.easeOut(duration: 0.2)) { scroller.scrollTo(id, anchor: .top) }
     }
 
-    /// Open a turn's steps, or close them. Open is the app's level when that shows
-    /// steps, and Messages when it does not (#759); closed is always the outcome, never
-    /// a trip through Details.
+    /// Open a turn's steps, or close them (`TurnDetail.toggled`).
     private func toggle(_ turn: ChatTurn) {
-        let now = turnViews[turn.id] ?? defaultDetail
-        turnViews[turn.id] = now.showsSteps ? .outcome : (defaultDetail.showsSteps ? defaultDetail : .messages)
+        turnViews[turn.id] = (turnViews[turn.id] ?? defaultDetail).toggled(level: defaultDetail)
     }
 
     /// A stored turn's entries, the first time it is drawn with its steps. The ask is

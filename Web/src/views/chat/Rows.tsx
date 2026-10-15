@@ -22,11 +22,10 @@ import { FileCard } from "./FileCard";
 import type { Shown } from "../../model/shownFile";
 import { switchNote } from "../../model/switchNote";
 import { continueWithout, keepStopped, sandboxCard } from "../../model/sandboxWords";
+import type { TurnDetail } from "../../model/turnDetail";
 import { memo } from "../../render/memo";
 
-/** How much of a turn is drawn (TurnDetail). */
-export type TurnDetail = "outcome" | "messages" | "steps" | "details";
-export const turnDetails: readonly TurnDetail[] = ["outcome", "messages", "steps", "details"];
+export { turnDetails, type TurnDetail } from "../../model/turnDetail";
 export const detailTitles: Record<TurnDetail, string> = { outcome: "Outcome", messages: "Messages", steps: "Steps", details: "Details" };
 export const detailSummaries: Record<TurnDetail, string> = {
   outcome: "What was asked and how it went",
