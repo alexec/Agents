@@ -50,6 +50,9 @@ skills come from a marketplace.
   parked (2026-10-14). Not Telegram.
 - Unlocking the Mac or keeping it awake to walk a change.
 - Machinery under a layout Alex has not settled. Get the layout in front of Alex first.
+- Moving workflow triggers to the control plane. Each host decides when its own workflows
+  run (2026-10-14). The control plane only starts a stopped workspace in time for its next
+  scheduled workflow (#1004).
 
 ## Signs we are in the weeds
 
