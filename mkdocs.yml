@@ -2,8 +2,7 @@
 # Preview: scripts/docs.sh serve   Check: scripts/docs.sh check
 site_name: Agents
 site_description: Run coding agents on your Mac, and follow them from your iPhone and iPad.
-site_url: https://alexec.github.io/Agents/
-repo_url: https://github.com/alexec/Agents
+site_url: https://www.alexecollins.com/agents/
 docs_dir: docs
 strict: true
 

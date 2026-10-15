@@ -30,7 +30,7 @@ the running scratch app.
 
 - [X] T001 Add `site/` and `.cache/` to `.gitignore`.
 - [X] T002 Create `mkdocs.yml` at the repository root:
-  - `site_name: Agents`, `site_url: https://alexec.github.io/Agents/`, `docs_dir: docs`,
+  - `site_name: Agents`, `site_url: https://www.alexecollins.com/agents/`, `docs_dir: docs`,
     `repo_url: https://github.com/alexec/Agents`, `strict: true`;
   - `theme`: `name: material`, `features: [navigation.tabs, navigation.sections, navigation.indexes,
     navigation.top, search.suggest, search.highlight, content.code.copy]`;
@@ -262,7 +262,7 @@ a running agent when the window closes and when the Mac restarts.
 - [X] T044 [P] [US5] Add the `## Docs *(mandatory)*` section to `.specify/templates/spec-template.md` after
   Success Criteria, exactly as in `contracts/spec-docs-section.md`.
 - [X] T045 [P] [US5] Add to `README.md`, near the top, one line: "Using the app? The docs are at
-  https://alexec.github.io/Agents/ (source in `docs/`; preview with `scripts/docs.sh serve`)". Add a sentence to
+  https://www.alexecollins.com/agents/ (source in `docs/`; preview with `scripts/docs.sh serve`)". Add a sentence to
   "How work happens here" saying each spec's Docs section lists its pages.
 - [X] T046 [US5] Document redirects in a comment above `redirect_maps` in `mkdocs.yml`: "a moved page leaves
   `old.md: new.md` here".
@@ -289,7 +289,7 @@ a running agent when the window closes and when the Mac restarts.
   on Pages with `gh api -X POST repos/alexec/Agents/pages -f build_type=workflow` or through Settings himself.
   Do not run it unasked (research R4).
 - [X] T049 [US6] After the branch merges (when Alex says it is this lane's turn), watch the first `docs-publish` run
-  with `gh run watch`, open `https://alexec.github.io/Agents/`, and record the time from merge to live (SC-005)
+  with `gh run watch`, open `https://www.alexecollins.com/agents/`, and record the time from merge to live (SC-005)
   in `specs/044-docs-site/walk/README.md`.
 
 ---

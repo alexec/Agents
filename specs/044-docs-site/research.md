@@ -81,7 +81,7 @@ the official `configure-pages` → `upload-pages-artifact` → `deploy-pages` ch
   run leaves the last deployed site in place, which is how Pages behaves (FR-016).
 - **Concurrency**: the group is `pages` with `cancel-in-progress: false`, so two quick merges publish in order.
 - **Permissions**: `pages: write` and `id-token: write` on the deploy job only; `contents: read` everywhere else.
-- **URL**: `https://alexec.github.io/Agents/`, set as `site_url` in `mkdocs.yml`.
+- **URL**: `https://www.alexecollins.com/agents/`, set as `site_url` in `mkdocs.yml`.
 
 `docs-check.yml` runs the same check on `pull_request` and on `push` to any branch, so a feature branch sees
 its failures before merge (User Story 5), and never deploys.
