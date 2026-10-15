@@ -59,7 +59,7 @@ struct SidebarTreeTests {
 
     /// Folded by default, the fold kept per row and across launches.
     @Test func aParentStartsFoldedAndKeepsItsFold() throws {
-        let defaults = try #require(UserDefaults(suiteName: "SidebarTreeTests.\(UUID())"))
+        let defaults = MemoryDefaults()
         let folds = SidebarFolds(defaults: defaults, scope: "")
         let model = AgentsModel()
         let lead = session(.finished, "lead", at: 1)
@@ -78,7 +78,7 @@ struct SidebarTreeTests {
 
     /// Only the last opened are kept, so the defaults stay small.
     @Test func openSessionsAreBounded() throws {
-        let defaults = try #require(UserDefaults(suiteName: "SidebarTreeTests.\(UUID())"))
+        let defaults = MemoryDefaults()
         let folds = SidebarFolds(defaults: defaults, scope: "")
         let ids = (0...SidebarFolds.sessionsKept).map { _ in UUID() }  // index-ok: one more than is kept, never none
         for id in ids { folds.set(session: id, open: true) }
