@@ -21,7 +21,7 @@ struct MCPAddByHandTests {
         let base = URL(fileURLWithPath: NSTemporaryDirectory())
             .appending(path: "MCPAddByHandTests-\(UUID().uuidString)").resolvingSymlinksInPath()
         let home = base.appending(path: "home")
-        for url in [base.appending(path: "root"), home.appending(path: ".agents")] {
+        for url in [base.appending(path: "root"), home.appending(path: ".agents"), home.appending(path: PersonalSecrets.folder)] {
             try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         }
         var locations = StoreLocations(root: base.appending(path: "root"))
