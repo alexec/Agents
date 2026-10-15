@@ -21,7 +21,9 @@ public enum Presets {
 
     /// Containers on the machine that runs the control plane, such as the Linux devbox: the
     /// ones named in `containers`, or else every container labelled `agents.workspace`, each
-    /// reached by its `agents.ssh` label or the shared `ssh` line.
+    /// reached by its `agents.ssh` label or the shared `ssh` line. With an `image`, it makes
+    /// labelled containers from it, which install Agents and join by themselves (#1025), and
+    /// deletes them with their anonymous volumes.
     private static func docker(_ json: JSON) throws(ConfigError) -> CommandConfig {
         let containers = json["containers"]?.array?.compactMap(\.string).filter { !$0.isEmpty } ?? []
         let ssh = json["ssh"]?.string.flatMap { $0.isEmpty ? nil : $0 }
@@ -43,7 +45,18 @@ public enum Presets {
                 commands: .init(start: "docker start ${id}", stop: "docker stop ${id}",
                                 status: nil, ssh: "${ssh}", tunnel: tunnel, cost: nil),
                 defaults: ssh.map { ["ssh": $0] } ?? [:]),
-            states: states)
+            states: states,
+            making: dockerMaking(image: json["image"]?.string.flatMap { $0.isEmpty ? nil : $0 }))
+    }
+
+    private static func dockerMaking(image: String?) -> CommandConfig.Making {
+        guard let image else { return CommandConfig.Making() }
+        return CommandConfig.Making(
+            create: "docker run -d --name ${name} --label agents.workspace ${image} && docker exec ${name} sh -c ${firstBoot}",
+            delete: "docker rm -f -v ${id}",
+            options: ["type": "object",
+                      "properties": ["image": ["type": "string", "title": "Image", "description": .string(image),
+                                               "default": .string(image)]]])
     }
 
     /// DigitalOcean droplets with a tag.

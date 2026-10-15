@@ -43,9 +43,15 @@ To make and delete workspaces from Agents as well, configure the command provide
   key are filled in, each as one shell word. With `${firstBoot}` in it, the new workspace
   installs Agents on its first boot. Without it, you add it over ssh once it is made.
 - **`delete`**: the command that deletes one, with `${id}` and its list's columns.
-- **`options`**: the New Workspace form, as a JSON Schema object.
+- **`options`**: the New Workspace form, as a JSON Schema object. A property's `default`
+  fills in a choice the form leaves empty.
 
-No preset makes workspaces, so this needs **An MCP server** or a provider configured by hand.
+The Docker preset makes workspaces when you give it an **Image** and no containers. New
+Workspace… runs `docker run -d --name <name> --label agents.workspace <image>`, then the
+install command in it with `docker exec`, so the container joins by itself. The image must
+keep running and have `curl`. Delete Workspace… runs `docker rm -f -v`, which also removes
+the container's anonymous volumes. Any other preset needs **An MCP server** or a provider
+configured by hand to make workspaces.
 
 The command provider is the `workspace-commands` binary. The control plane looks for it
 beside itself, then where `AGENTS_WORKSPACE_COMMANDS` says, then on its `PATH`. Its configuration is described in full in
