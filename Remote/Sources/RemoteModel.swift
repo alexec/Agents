@@ -264,6 +264,10 @@ final class RemoteModel {
         client = DaemonClient(link: link)
         files = RemoteFiles(client: client)
         pictures = PhonePictures(files: files)
+        // From the start, not once connected: a banner tapped to launch or wake the app
+        // arrives before then, and was dropped (#1045).
+        notifier.open = { [weak self] agentID in self?.open(agentID) }
+        notifier.openNeed = { [weak self] token in self?.open(needToken: token) }
         // The oldest of a long conversation go from the page as it runs on; what they
         // say the agent touched is kept with the rest of the history read for Files.
         work.onTrimmed = { [weak self] dropped in
@@ -2285,6 +2289,10 @@ final class RemoteModel {
         lastPublished = nil
         publishAttention()
         if let pendingOpen { open(pendingOpen) }
+        if let pendingNeed {
+            self.pendingNeed = nil
+            if let agentID = agentID(forNeedToken: pendingNeed) { open(agentID) } else { openUnheld(needToken: pendingNeed) }
+        }
         note("catch-up: \(plan.steps.count) steps (\(plan.parts.map(\.rawValue).sorted().joined(separator: ", "))), "
              + "\(carried?.carried.count ?? 0) carried, in \(ContinuousClock.now - began)")
     }
@@ -2472,8 +2480,9 @@ final class RemoteModel {
     /// since the model is as old as the last time the app ran.
     private func showOnTheWidget(_ push: AttentionPush) async {
         if isConnected {
-            await refreshAttention()
-            publishAttention()
+            // Whole, not only what waits: a guarded change's Needs You row rides on its
+            // project's summary, and the agent's state on its record (#1045).
+            await catchUp()
         } else if AttentionSnapshotStore.apply(push) {
             lastPublished = nil
             WidgetCenter.shared.reloadTimelines(ofKind: AttentionSnapshot.widgetKind)
@@ -2524,18 +2533,35 @@ final class RemoteModel {
     /// A project's page, from a banner with no session behind it (#531): where a change
     /// git brought to its files is asked. The phone holds the Mac's projects only.
     func openProject(_ folder: URL) {
-        sidebarItem = .project(ProjectKey(host: .mac, folder: folder))
+        sidebarItem = .project(work.project(folder)?.key ?? ProjectKey(host: .mac, folder: folder))
     }
 
-    /// Open what a need is about, from a banner or a widget row (#1046).
+    /// Open what a need is about, from a banner or a widget row (#1046). A need the
+    /// model does not hold yet (a cold launch, a wake) is kept and opened once caught up,
+    /// as `open(_:)` keeps an agent (#1045).
     func open(needToken token: String) {
         if let agentID = agentID(forNeedToken: token) {
+            pendingNeed = nil
             open(agentID)
-        } else if let folder = NeedID.guardedFolder(fromToken: token) {
-            // The project's own question (#531), on its page.
-            openProject(folder)
+        } else if catchingUp != nil || !isConnected {
+            pendingNeed = token
+        } else {
+            pendingNeed = nil
+            openUnheld(needToken: token)
         }
     }
+
+    /// Caught up and still no session for it: a guarded change no agent made goes to its
+    /// project's page, where it is asked (#531); anything else, to whoever needs you.
+    private func openUnheld(needToken token: String) {
+        if let folder = NeedID.guardedFolder(fromToken: token) {
+            sidebarItem = .project(work.project(folder)?.key ?? ProjectKey(host: .mac, folder: folder))
+        } else {
+            showTheFirstProjectNeedingYou()
+        }
+    }
+
+    private var pendingNeed: String?
 
     /// Which conversation a banner is about, from the need it names. The Mac's
     /// `attention/pending` is the truth; this reads the copy the model already holds.
@@ -2548,6 +2574,11 @@ final class RemoteModel {
             return work.elicitations.first { $0.id.uuidString == parts[1] }?.agentID
         case let parts where parts.count == 2 && parts[0] == "report":
             return UUID(uuidString: String(parts[1].split(separator: ":").first ?? ""))
+        case let parts where parts.count == 2 && parts[0] == "guarded":
+            // Made by an agent: opened in its chat, where it is asked (Alex, #1045).
+            guard let folder = NeedID.guardedFolder(fromToken: token) else { return nil }
+            let path = String(token.dropFirst("guarded:\(folder.path):".count))
+            return work.project(folder)?.guardedChanges?.first { $0.path == path }?.askedIn
         default:
             return nil
         }
@@ -2632,8 +2663,6 @@ final class RemoteModel {
 
     private func startPresence() {
         guard presence == nil else { return }
-        notifier.open = { [weak self] agentID in self?.open(agentID) }
-        notifier.openNeed = { [weak self] token in self?.open(needToken: token) }
         notifier.authorisationChanged = { [weak self] in self?.presence?.connected() }
         let reporter = PresenceReporter { [weak self] watching, active, mayNotify, showing, popped in
             guard let self else { return }
