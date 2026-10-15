@@ -18,11 +18,16 @@ enum RemoteControl {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Agents", isDirectory: true)
     }
+    /// Not backed up (#1031): a restored device pairs again. Its key is in the keychain,
+    /// this device only (`ControlClientKey`).
     private static var membershipFile: URL { folder.appendingPathComponent("control-client.json") }
-    private static var keyFile: URL { folder.appendingPathComponent("control-client-key") }
-    private static var relayKeyFile: URL { folder.appendingPathComponent("control-relay-key.pub") }
+    /// A copy of what `control/status` says, so a cache: made again at the next answer.
+    private static var relayKeyFile: URL {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Agents", isDirectory: true).appendingPathComponent("control-relay-key.pub")
+    }
     /// Present when the membership came from a move (T085): the key is this device's own,
-    /// the one it paired with the Mac under, not `control-client-key`. Kept for a device
+    /// the one it paired with the Mac under, not `ControlClientKey`. Kept for a device
     /// moved that way (FR-038); nothing tells a device of a move now the bridge is gone.
     private static var movedFile: URL { folder.appendingPathComponent("control-client-moved") }
 
@@ -37,6 +42,8 @@ enum RemoteControl {
     static func keepRelayKey(_ key: Data?) {
         guard membership != nil, key != relayKey else { return }
         if let key {
+            try? FileManager.default.createDirectory(at: relayKeyFile.deletingLastPathComponent(),
+                                                     withIntermediateDirectories: true)
             try? key.write(to: relayKeyFile, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         } else {
             try? FileManager.default.removeItem(at: relayKeyFile)
@@ -45,6 +52,7 @@ enum RemoteControl {
 
     /// This device's pairing with a control plane, if it has one.
     static var membership: ControlMembership? {
+        _ = retiredFileKey
         guard let kept = ControlMembership.load(membershipFile), kept.client != nil, kept.url != nil else { return nil }
         return kept
     }
@@ -61,14 +69,27 @@ enum RemoteControl {
     @discardableResult
     static func pair(with code: ControlCode, id: UUID) async throws -> ControlMembership {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let key = try ControlAgreement.loadOrMake(file: keyFile)
+        let key = try ControlClientKey.loadOrMake()
         let membership = try await ControlCodeUse.pairClient(code, privateKey: key, id: id,
                                                              name: UIDevice.current.name, kind: kind, dial: dial)
         // Given up on before it answered (#84): not kept.
         try Task.checkCancellation()
-        try membership.save(membershipFile)
+        try membership.save(membershipFile, backedUp: false)
         return membership
     }
+
+    /// An older build kept the key in `control-client-key`, which went into backups
+    /// (#1031). It goes, once, with the pairing made under it, so the device asks for a
+    /// code again (v0.x, no migration); a moved device's pairing never used it.
+    private static let retiredFileKey: Void = {
+        let old = folder.appendingPathComponent("control-client-key")
+        guard FileManager.default.fileExists(atPath: old.path) else { return }
+        if !FileManager.default.fileExists(atPath: movedFile.path) {
+            try? FileManager.default.removeItem(at: membershipFile)
+        }
+        try? FileManager.default.removeItem(at: old)
+        try? FileManager.default.removeItem(at: folder.appendingPathComponent("control-relay-key.pub"))
+    }()
 
     /// Forget the pairing: this device goes back to asking for a code.
     static func forget() {
@@ -80,13 +101,13 @@ enum RemoteControl {
     /// A newer list of the control plane's endpoints, given when it moved or changed its
     /// certificate (R16): kept, so the next launch dials there. One the disk refused is tried
     /// again at the next answer (#212).
-    static let keepNewer: EndpointBook.Keep = { newer in try newer.save(membershipFile) }
+    static let keepNewer: EndpointBook.Keep = { newer in try newer.save(membershipFile, backedUp: false) }
 
     /// The link the Remote's model is built on while paired with a control plane.
     static func link() -> (any DaemonLink)? {
         guard let membership else { return nil }
         if FileManager.default.fileExists(atPath: movedFile.path) { return movedLink(membership) }
-        guard let key = try? ControlAgreement.loadOrMake(file: keyFile),
+        guard let key = try? ControlClientKey.loadOrMake(),
               let dial = try? ControlCodeUse.clientDial(membership, privateKey: key, kind: kind.rawValue, dial: dial,
                                                         keep: keepNewer) else {
             return nil

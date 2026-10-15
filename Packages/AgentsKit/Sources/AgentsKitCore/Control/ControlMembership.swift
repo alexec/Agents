@@ -38,9 +38,20 @@ public struct ControlMembership: Codable, Sendable, Hashable {
         return try? JSONDecoder().decode(ControlMembership.self, from: data)
     }
 
-    public func save(_ file: URL) throws {
+    /// `backedUp: false` keeps the file out of iCloud and Finder backups (#1031): a client's
+    /// pairing is this device's, and a restored device pairs again rather than carry it.
+    public func save(_ file: URL, backedUp: Bool = true) throws {
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         try JSONEncoder().encode(self).write(to: file, options: .atomic)
         chmod(file.path, 0o600)
+        #if canImport(Darwin)
+        if !backedUp {
+            // Set after each write: an atomic write puts a new file in place, without the old one's mark.
+            var values = URLResourceValues()
+            values.isExcludedFromBackup = true
+            var marked = file
+            try marked.setResourceValues(values)
+        }
+        #endif
     }
 }
