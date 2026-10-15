@@ -23,6 +23,8 @@ struct StartAgentView: View {
     /// to keep and needs picking again.
     @State private var attachNote: String?
     @FocusState private var focused: Bool
+    /// Where an iPad's pointer is, for the Blobs to look at while the prompt has focus (#987).
+    @State private var pointer: CGPoint?
 
     var body: some View {
         form
@@ -56,6 +58,12 @@ struct StartAgentView: View {
 
     private var form: some View {
         Form {
+            // The Blobs (#987): at the pointer on an iPad with one, else down at the prompt.
+            Section {
+                Huddle(promptFocused: focused, pointer: pointer, typed: text.count)
+                    .frame(maxWidth: .infinity)
+                    .listRowBackground(Color.clear)
+            }
             personaHeading
             // Starts kept for this project's stopped workspace (#691 US3, layouts.md L6a): the
             // agent each makes opens once the host is up.
@@ -110,6 +118,9 @@ struct StartAgentView: View {
             }
         }
         .paperForm()
+        .onContinuousHover(coordinateSpace: .global) { phase in
+            if case let .active(location) = phase { pointer = location } else { pointer = nil }
+        }
         .navigationTitle(model.work.project(project)?.name ?? "New session")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top, spacing: 0) { HostOfflineStrip(host: model.startHost) }

@@ -783,6 +783,12 @@ button.remove:hover { opacity: 1; }
 .segmented button + button { border-left: 1px solid var(--paper-rule); }
 .segmented button.on { background: var(--paper-selection); }
 .new-heading p { margin: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The Huddle (#987): the Blobs' eyes ease to where they look, and blink. */
+.new-heading .huddle { flex: none; margin-bottom: 10px; overflow: visible; }
+.huddle-eyes { transition: transform 0.45s cubic-bezier(0.3, 1.4, 0.5, 1); }
+.huddle-eye { transform-box: fill-box; transform-origin: center; transition: transform 0.08s ease-in; }
+.huddle-eye.shut { transform: scaleY(0.08); }
+@media (prefers-reduced-motion: reduce) { .huddle-eyes, .huddle-eye { transition: none; } }
 .menu-anchor.reach { margin-right: 0; }
 .popover.up { top: auto; bottom: 32px; }
 .reach-popover { width: 300px; display: flex; flex-direction: column; gap: 8px; padding: 10px; }
