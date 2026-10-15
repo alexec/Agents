@@ -7,22 +7,23 @@ import Testing
 @MainActor
 @Suite("Celebrations")
 struct CelebrationsTests {
+    private let today = "2026-10-15"
     private let days = ["2026-10-15", "2026-10-14"]
 
     @Test func theFirstCountCelebratesNothing() {
         let history = TimeHistory()
-        #expect(history.landed(["2026-10-15": 3], on: days, today: days[0]) == nil)
+        #expect(history.landed(["2026-10-15": 3], on: days, today: today) == nil)
     }
 
     @Test func moreThanTheLastCountLandedAndTheDaysFirstIsSaid() {
         var history = TimeHistory()
         history.setPRsMerged(["2026-10-14": 2], on: days)
-        #expect(history.landed(["2026-10-14": 2], on: days, today: days[0]) == nil)
-        #expect(history.landed(["2026-10-14": 2, "2026-10-15": 1], on: days, today: days[0])
+        #expect(history.landed(["2026-10-14": 2], on: days, today: today) == nil)
+        #expect(history.landed(["2026-10-14": 2, "2026-10-15": 1], on: days, today: today)
             == PRsLanded(count: 1, firstToday: true))
         history.setPRsMerged(["2026-10-14": 2, "2026-10-15": 1], on: days)
         // A late one on yesterday and a second today: two, and not the day's first.
-        #expect(history.landed(["2026-10-14": 3, "2026-10-15": 2], on: days, today: days[0])
+        #expect(history.landed(["2026-10-14": 3, "2026-10-15": 2], on: days, today: today)
             == PRsLanded(count: 2, firstToday: false))
     }
 

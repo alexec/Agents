@@ -168,8 +168,12 @@ private struct Confetti: View {
     private static let lasts: Double = 1.4
     private static let pieces: [Piece] = (0..<26).map { _ in Piece() }
     /// The Blob's own blues and four bright papers, as the web page's: decoration, not a state.
-    private static let colours: [Color] = [Blob.outline, Blob.backFill] + [0xFF7BA9, 0xFFD23F, 0x5ED6B0, 0xFF9F45].map {
-        Color(red: Double($0 >> 16 & 0xFF) / 255, green: Double($0 >> 8 & 0xFF) / 255, blue: Double($0 & 0xFF) / 255)
+    private static let colours: [Color] = [Blob.outline, Blob.backFill, paper(0xFF7BA9), paper(0xFFD23F),
+                                           paper(0x5ED6B0), paper(0xFF9F45)]
+
+    private static func paper(_ rgb: Int) -> Color {
+        let red = Double((rgb >> 16) & 0xFF), green = Double((rgb >> 8) & 0xFF), blue = Double(rgb & 0xFF)
+        return Color(red: red / 255, green: green / 255, blue: blue / 255)
     }
 
     var body: some View {
