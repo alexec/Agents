@@ -37,6 +37,7 @@ Agents app writes.
 | `sandbox.json` | The command sandbox of each runtime | **Settings ▸ Agent Runtimes** |
 | `runtime-environment.json` | The names of the variables passed through to runtimes, never their values | By hand |
 | `modes.json` | The mode last chosen for each runtime | The start form |
+| `display.json` | Your display choices, the same on every client: how much of a turn shows, the smart groups that are off, whether Archived projects, Status and Usage are open, the new-session form's runtime and choices, and the marketplace last chosen | Any client |
 | `host.json` | The role of each of your Macs in Agents Host (its store, bucket, web remote and relay), one entry per Mac, by its local host name. The bucket's keys stay in the keychain. | Agents Host |
 
 A file you change by hand counts at once, without a restart. A file that cannot be read is
@@ -57,8 +58,8 @@ not be able to change them:
   retention-clock files, in `~/Library/Application Support/Agents`
   (`~/.agents-server/root` on a server).
 - **Caches and logs:** the system's cache and log folders. You can delete them at any time.
-- **Each device's own choices:** folds, drafts, window sizes, the selected project, and
-  pairing.
+- **Each device's own choices:** project folds, drafts, the new-session form's folders,
+  window sizes, the selected project, and pairing.
 
 A scratch copy of the app, started with its own root, keeps its settings in
 `<root>/settings` and never writes the real `~/.agents`, unless `AGENTS_PERSONAL_HOME`

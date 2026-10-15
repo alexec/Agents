@@ -56,3 +56,46 @@ struct PersonalSettingsTests {
         #expect(await core.personState().pronouns == "they/them")
     }
 }
+
+/// The display choices every client shares (#1033).
+@Suite("Display preferences", .timeLimit(.minutes(1)))
+struct DisplayPreferencesTests {
+    @Test func aSetIsMergedAndEveryClientIsTold() async throws {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("DisplayPreferences-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        var locations = StoreLocations(root: root)
+        locations.personalHome = nil
+        let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
+                              discovery: .findsEverything, launcher: FakeLauncher())
+        _ = try await core.setDisplayPreferences([DisplayPreference.turnDetail: "steps", DisplayPreference.showsUsage: false])
+        let all = try await core.setDisplayPreferences([DisplayPreference.showsUsage: .null])
+        #expect(all == [DisplayPreference.turnDetail: "steps"])
+        #expect(await core.displayPreferences() == all)
+        #expect(FileManager.default.fileExists(atPath: locations.displayPreferences.path))
+    }
+
+    @MainActor @Test func theDefaultsMirrorTheHostAndSendWhatChangesHere() throws {
+        let name = "DisplayMirror-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        var sent: [DaemonAPI.DisplayPreferences] = []
+        let mirror = DisplayPreferenceMirror(defaults: defaults) { sent.append($0) }
+
+        defaults.set(false, forKey: DisplayPreference.showsUsage)
+        NotificationCenter.default.post(name: UserDefaults.didChangeNotification, object: defaults)
+        #expect(sent.isEmpty, "nothing is sent before the host is heard")
+
+        mirror.hostSaid([DisplayPreference.turnDetail: "details", DisplayPreference.showsActivity: false])
+        #expect(defaults.string(forKey: DisplayPreference.turnDetail) == "details")
+        #expect(defaults.object(forKey: DisplayPreference.showsActivity) as? Bool == false)
+        #expect(defaults.object(forKey: DisplayPreference.showsUsage) == nil, "what the host lacks is the default")
+
+        defaults.set("outcome", forKey: DisplayPreference.turnDetail)
+        NotificationCenter.default.post(name: UserDefaults.didChangeNotification, object: defaults)
+        #expect(sent == [[DisplayPreference.turnDetail: "outcome"]])
+        NotificationCenter.default.post(name: UserDefaults.didChangeNotification, object: defaults)
+        #expect(sent.count == 1, "no change, nothing sent")
+    }
+}

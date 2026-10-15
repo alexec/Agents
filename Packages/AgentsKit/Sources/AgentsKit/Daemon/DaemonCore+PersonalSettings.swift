@@ -16,6 +16,7 @@ extension DaemonCore {
         }
         seenLimits = limitStore.load()
         seenModes = modeStore.remembered()
+        seenDisplay = displayStore.load()
         personalSettingsWatch = FolderWatch(root: folder) { [weak self] _ in
             Task { await self?.personalSettingsChanged() }
         }
@@ -59,10 +60,28 @@ extension DaemonCore {
             seenLimits = limits
             broadcastCostState()
         }
+        let display = displayStore.load()
+        if display != seenDisplay {
+            seenDisplay = display
+            broadcast(DaemonAPI.Notification.preferencesChanged, display)
+        }
         let modes = modeStore.remembered()
         if modes != seenModes {
             seenModes = modes
             broadcast(DaemonAPI.Notification.modesChanged, modes)
         }
+    }
+
+    /// `preferences/get` (#1033).
+    public func displayPreferences() -> DaemonAPI.DisplayPreferences { displayStore.load() }
+
+    /// `preferences/set`: merged into `display.json`, and every client told.
+    public func setDisplayPreferences(_ changes: DaemonAPI.DisplayPreferences) throws -> DaemonAPI.DisplayPreferences {
+        let all = try displayStore.merge(changes)
+        if all != seenDisplay {
+            seenDisplay = all
+            broadcast(DaemonAPI.Notification.preferencesChanged, all)
+        }
+        return all
     }
 }

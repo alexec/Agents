@@ -520,6 +520,13 @@ extension DaemonCore {
             case DaemonAPI.Method.modesRemembered:
                 return .success(try JSONValue.encoding(rememberedModes()))
 
+            case DaemonAPI.Method.preferencesGet:
+                return .success(try JSONValue.encoding(displayPreferences()))
+
+            case DaemonAPI.Method.preferencesSet:
+                let changes = try require(params, as: DaemonAPI.DisplayPreferences.self)
+                return .success(try JSONValue.encoding(try setDisplayPreferences(changes)))
+
             case DaemonAPI.Method.agentsDiscardDraft:
                 let request = try require(params, as: DaemonAPI.DiscardDraftRequest.self)
                 await discardDraft(request)

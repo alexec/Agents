@@ -813,10 +813,14 @@ final class RemoteModel {
     /// The runtime the page will start. Seeded by the kit's rule from the one it was last
     /// left on (#264), as the window's start form and the page's.
     private(set) var startRuntimeID: String?
-    private static let keptStartRuntime = "startRuntimeID"
+    private static let keptStartRuntime = DisplayPreference.startRuntimeID
+    /// The choices follow the person to every client (#1033), kept on the Mac.
     private func persistStartChoices() {
-        guard !startChosen.isEmpty, let startRuntimeID, let data = try? JSONEncoder().encode(startChosen) else { return }
-        UserDefaults.standard.set(data, forKey: "remote.startChoices.\(startRuntimeID)")
+        guard !startChosen.isEmpty, let startRuntimeID else { return }
+        var choices = displayMirror.preferences[DisplayPreference.startChoices]?.objectValue ?? [:]
+        guard choices[startRuntimeID] != .object(startChosen) else { return }
+        choices[startRuntimeID] = .object(startChosen)
+        displayMirror.set([DisplayPreference.startChoices: .object(choices)])
     }
     /// What that runtime offers, in the order they are drawn.
     private(set) var startOptions: [ConfigOption] = []
@@ -1056,8 +1060,7 @@ final class RemoteModel {
         let generation = startGeneration
         discardStartDraft()
         startOptions = []
-        startChosen = UserDefaults.standard.data(forKey: "remote.startChoices.\(runtimeID)")
-            .flatMap { try? JSONDecoder().decode([String: JSONValue].self, from: $0) } ?? [:]
+        startChosen = displayMirror.preferences[DisplayPreference.startChoices]?.objectValue?[runtimeID]?.objectValue ?? [:]
         startChoicesState = .loading
         let host = startHost
         do {
@@ -2090,6 +2093,10 @@ final class RemoteModel {
         if let removedProject, self.labelVocabularies[removedProject] != nil {
             self.reloadLabelVocabulary(in: removedProject)
         }
+        if notification.method == DaemonAPI.Notification.preferencesChanged,
+           let preferences = try? notification.params?.decode(DaemonAPI.DisplayPreferences.self) {
+            self.displayMirror.hostSaid(preferences)
+        }
         if Self.attentionNotifications.contains(notification.method) {
             self.publishAttentionSoon()
         }
@@ -2272,6 +2279,8 @@ final class RemoteModel {
         // The low-disk strip is under the banner on every page (#196), so it is read
         // on every catch-up, not when a page asks for it.
         if carried?.disk == nil { await refreshDisk() }
+        // The person's display choices (#1033): the sidebar and every chat read them.
+        await refreshDisplayPreferences()
         // What the Mac could not read (#205, #223), at the foot of the projects list.
         if carried?.storeNotes == nil { await refreshStoreNotes() }
         // The milestones (#984), for the Time page and the iPad's card.
@@ -3491,6 +3500,24 @@ final class RemoteModel {
     /// The mode last chosen for each runtime, on any device. `modes/changed` keeps it
     /// current afterwards. A Mac too old to know the method leaves the sheet opening
     /// on each runtime's own current mode.
+    /// The person's display choices (#1033), kept on the Mac. This device's defaults mirror
+    /// them, so every view reads them where it always did.
+    @ObservationIgnored lazy var displayMirror = DisplayPreferenceMirror(defaults: .standard) { [weak self] changes in
+        self?.sendDisplayPreferences(changes)
+    }
+
+    private func sendDisplayPreferences(_ changes: DaemonAPI.DisplayPreferences) {
+        Task { _ = try? await client.call(DaemonAPI.Method.preferencesSet, changes,
+                                         returning: DaemonAPI.DisplayPreferences.self) }
+    }
+
+    /// A Mac too old to know the method leaves this device's own choices as they are.
+    private func refreshDisplayPreferences() async {
+        guard let preferences = try? await client.call(DaemonAPI.Method.preferencesGet, Optional<Int>.none,
+                                                       returning: DaemonAPI.DisplayPreferences.self) else { return }
+        displayMirror.hostSaid(preferences)
+    }
+
     private func refreshModes() async {
         guard let modes = try? await client.call(DaemonAPI.Method.modesRemembered, Optional<Int>.none,
                                                  returning: DaemonAPI.RememberedModes.self) else { return }
