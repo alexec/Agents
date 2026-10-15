@@ -287,8 +287,7 @@ struct AgentsModelTests {
     }
 
     /// FR-020: the number on the row is the number of rows under the heading, for
-    /// every heading, including the one an agent is under only because it asked to
-    /// be looked at — the fact the daemon's own counts cannot see.
+    /// every heading. A file an agent shows does not move it to another (#1057).
     @Test func theCountsAreTheListUnderEveryHeading() throws {
         let model = AgentsModel()
         for state in AgentState.allCases {
@@ -304,8 +303,9 @@ struct AgentsModelTests {
         for group in AgentGroup.allCases {
             #expect(counts[group] ?? 0 == model.agents(in: folder, group: group).count, "\(group)")
         }
-        #expect(model.agents(in: folder, group: .needsAttention).contains { $0.id == shown.id })
-        #expect(!model.agents(in: folder, group: .running).contains { $0.id == shown.id })
+        // A shown file does not move the agent (#1057): it stays where it is working.
+        #expect(!model.agents(in: folder, group: .needsAttention).contains { $0.id == shown.id })
+        #expect(model.agents(in: folder, group: .running).contains { $0.id == shown.id })
     }
 
     /// The unread count is the finished chats the daemon has flagged, whichever group
