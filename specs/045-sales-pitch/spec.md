@@ -10,7 +10,7 @@
 
 ## Why this feature exists
 
-The docs site (044) is live at www.alexecollins.com/agents and says what Agents is in two sentences: a
+The docs site (044) is live at alexec.github.io/Agents and says what Agents is in two sentences: a
 Mac app that runs the coding agents you already have and lets you follow them from your iPhone and iPad.
 It never says why someone would choose it. A developer who lands there already has a coding agent they
 like, usually inside an editor (Cursor, VS Code with Copilot, Windsurf, Zed), in a terminal (Claude Code,

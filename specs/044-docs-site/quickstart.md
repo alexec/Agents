@@ -59,7 +59,7 @@ already covered the text. This pass is for what pictures show.
 
 1. A pull request touching `docs/` shows the `docs-check` workflow run and pass. A deliberately broken one fails
    with the file named.
-2. Merge a one-word docs change to `main`. The `docs-publish` run deploys, and `https://www.alexecollins.com/agents/`
+2. Merge a one-word docs change to `main`. The `docs-publish` run deploys, and `https://alexec.github.io/Agents/`
    shows the word within 10 minutes.
 3. A push to a branch that is not main runs the check and does not deploy.
 4. Open the site on the iPhone (SC-007).

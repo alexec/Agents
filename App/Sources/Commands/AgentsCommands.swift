@@ -68,7 +68,7 @@ struct AgentsCommands: Commands {
         popped.map { model.work.agent($0.id) } ?? model.selectedAgent
     }
 
-    static let helpURL = URL(string: "https://www.alexecollins.com/agents/")!
+    static let helpURL = URL(string: "https://alexec.github.io/Agents/")!
 
     var body: some Commands {
         // The standard Show/Hide Sidebar (⌃⌘S) for the projects column.
