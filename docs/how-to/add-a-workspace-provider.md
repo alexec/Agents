@@ -17,7 +17,7 @@ shell commands, and its presets fill those in for the common tools:
 
 | Preset | It needs, where the control plane runs | Workspaces |
 | --- | --- | --- |
-| Docker | `docker` | the containers you name |
+| Docker | `docker` | the containers you name, or the containers labelled `agents.workspace` |
 | DigitalOcean | `doctl`, signed in | droplets with a tag |
 | Codespaces | `gh`, signed in | your codespaces, or one repository's |
 | Coder | `coder`, signed in, after `coder config-ssh` | your Coder workspaces |

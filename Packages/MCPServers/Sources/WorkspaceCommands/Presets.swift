@@ -19,20 +19,31 @@ public enum Presets {
         }
     }
 
-    /// Containers on the machine that runs the control plane, such as the Linux devbox.
+    /// Containers on the machine that runs the control plane, such as the Linux devbox: the
+    /// ones named in `containers`, or else every container labelled `agents.workspace`, each
+    /// reached by its `agents.ssh` label or the shared `ssh` line.
     private static func docker(_ json: JSON) throws(ConfigError) -> CommandConfig {
-        guard let containers = json["containers"]?.array?.compactMap(\.string), !containers.isEmpty else {
-            throw ConfigError("the docker preset needs containers")
+        let containers = json["containers"]?.array?.compactMap(\.string).filter { !$0.isEmpty } ?? []
+        let ssh = json["ssh"]?.string.flatMap { $0.isEmpty ? nil : $0 }
+        let tunnel = json["tunnel"]?.bool ?? false
+        let states: [String: WorkspaceState] = [
+            "running": .running, "restarting": .starting, "created": .stopped, "exited": .stopped,
+            "paused": .stopped, "dead": .stopped, "removing": .stopping]
+        guard containers.isEmpty else {
+            let commands = CommandConfig.Commands(
+                start: "docker start ${id}", stop: "docker stop ${id}",
+                status: "docker inspect -f '{{.State.Status}}' ${id}",
+                ssh: ssh, tunnel: tunnel, cost: nil)
+            return CommandConfig(workspaces: containers.map { .init(id: $0, name: $0, commands: commands) }, states: states)
         }
-        let ssh = json["ssh"]?.string
-        let commands = CommandConfig.Commands(
-            start: "docker start ${id}", stop: "docker stop ${id}",
-            status: "docker inspect -f '{{.State.Status}}' ${id}",
-            ssh: ssh, tunnel: json["tunnel"]?.bool ?? false, cost: nil)
         return CommandConfig(
-            workspaces: containers.map { .init(id: $0, name: $0, commands: commands) },
-            states: ["running": .running, "restarting": .starting, "created": .stopped, "exited": .stopped,
-                     "paused": .stopped, "dead": .stopped, "removing": .stopping])
+            listing: .init(
+                command: "docker ps -a --filter label=agents.workspace --format '{{.Names}}\\t{{.State}}\\t{{.Label \"agents.ssh\"}}'",
+                shape: .columns(["id", "state", "ssh"]),
+                commands: .init(start: "docker start ${id}", stop: "docker stop ${id}",
+                                status: nil, ssh: "${ssh}", tunnel: tunnel, cost: nil),
+                defaults: ssh.map { ["ssh": $0] } ?? [:]),
+            states: states)
     }
 
     /// DigitalOcean droplets with a tag.

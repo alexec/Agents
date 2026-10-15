@@ -41,6 +41,8 @@ public struct CommandConfig: Sendable, Equatable {
         public var command: String
         public var shape: Shape
         public var commands: Commands
+        /// Values for a row that leaves a column or field empty, such as a preset's ssh line.
+        public var defaults: [String: String] = [:]
     }
 
     /// Making and deleting workspaces (US5): only beside a listing, which finds what was made.

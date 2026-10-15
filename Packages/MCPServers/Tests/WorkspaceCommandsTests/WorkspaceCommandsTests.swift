@@ -86,6 +86,7 @@ func config(_ json: JSON) throws -> CommandConfig { try CommandConfig.from(json)
     @Test func noPresetAsksForSudo() throws {
         let configs: [JSON] = [
             ["preset": "docker", "containers": ["agents-devbox"]],
+            ["preset": "docker"],
             ["preset": "doctl", "tag": "agents"],
             ["preset": "codespaces"],
             ["preset": "coder"],
@@ -97,7 +98,7 @@ func config(_ json: JSON) throws -> CommandConfig { try CommandConfig.from(json)
             let lines = commands.flatMap { [$0.start, $0.stop, $0.status ?? ""] } + [c.listing?.command ?? ""]
             #expect(!lines.contains { $0.contains("sudo") }, "\(json)")
         }
-        #expect(Presets.names.count == configs.count)
+        #expect(Presets.names.count == configs.count - 1)
     }
 
     @Test func dockerRunsTheContainersCommands() async throws {
@@ -114,6 +115,31 @@ func config(_ json: JSON) throws -> CommandConfig { try CommandConfig.from(json)
                             "ssh": "alex@127.0.0.1 -p 2222", "tunnel": false]],
         ])
         #expect(recorder.lines == ["docker inspect -f '{{.State.Status}}' 'agents-devbox'"])
+    }
+
+    @Test func dockerWithNoContainersListsTheLabelledOnes() async throws {
+        let recorder = Recorder { line in
+            line.hasPrefix("docker ps") ? (0, "devbox\trunning\talex@127.0.0.1 -p 2222\nbuild\texited\t\n") : (0, "")
+        }
+        let server = WorkspaceCommands.server(
+            try config(["preset": "docker", "containers": [], "ssh": "agents@build.local"]), timing: quick, run: recorder.run)
+        let list = try await call(server, "workspaces_list")
+        #expect(list["structuredContent"]?["workspaces"] == [
+            ["id": "devbox", "name": "devbox", "state": "running", "ssh": "alex@127.0.0.1 -p 2222", "tunnel": false],
+            ["id": "build", "name": "build", "state": "stopped", "ssh": "agents@build.local", "tunnel": false],
+        ])
+        #expect(recorder.lines == [
+            "docker ps -a --filter label=agents.workspace --format '{{.Names}}\\t{{.State}}\\t{{.Label \"agents.ssh\"}}'",
+        ])
+    }
+
+    @Test func dockerWithNoSSHLineLeavesAnUnlabelledContainerWithoutOne() async throws {
+        let recorder = Recorder { _ in (0, "build\texited\t\n") }
+        let server = WorkspaceCommands.server(try config(["preset": "docker"]), timing: quick, run: recorder.run)
+        let list = try await call(server, "workspaces_list")
+        #expect(list["structuredContent"]?["workspaces"] == [
+            ["id": "build", "name": "build", "state": "stopped", "tunnel": false],
+        ])
     }
 
     @Test func doctlListsByTagAndReachesTheDropletByItsAddress() async throws {

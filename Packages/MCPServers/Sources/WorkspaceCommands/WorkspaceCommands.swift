@@ -204,7 +204,7 @@ actor Provider {
         }
         return rows.prefix(WorkspaceCommands.listLimit).compactMap { row in
             guard let id = row["id"] else { return nil }
-            var values = row
+            var values = listing.defaults.merging(row) { $1 }
             values["name"] = row["name"] ?? id
             let said = row["state"].map(config.state(for:))
             return Workspace(id: id, name: values["name"]!, state: said ?? left[id] ?? .unknown,

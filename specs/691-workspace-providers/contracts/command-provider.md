@@ -68,7 +68,7 @@ Its parameters fill them in.
 
 | Preset | Parameters | List / start / stop | ssh |
 |---|---|---|---|
-| `docker` | `containers` (names), `ssh` | `docker inspect -f '{{.State.Status}}' ${id}` / `docker start ${id}` / `docker stop ${id}`. States: running→running, exited/created→stopped, restarting→starting. | as given |
+| `docker` | `containers` (names, optional), `ssh` | With `containers`: `docker inspect -f '{{.State.Status}}' ${id}` / `docker start ${id}` / `docker stop ${id}`. Without (#1024): `docker ps -a --filter label=agents.workspace --format '{{.Names}}\t{{.State}}\t{{.Label "agents.ssh"}}'`, columns `id state ssh`, with the same start and stop. A container opts in with `docker run --label agents.workspace --label agents.ssh='…'`. States: running→running, exited/created→stopped, restarting→starting. | each container's `agents.ssh` label; else `ssh` as given |
 | `doctl` | `tag` | `doctl compute droplet list --tag-name ${tag} …` / `droplet-action power-on --wait` / `power-off --wait`. States: active/new/off. | `root@${ip}` or `user` param |
 | `codespaces` | `repo` (optional) | `gh codespace list --json name,displayName,state` / `gh codespace ssh -c ${id} -- true` (a codespace starts when used) / `gh codespace stop -c ${id}`. States: Available→running, Shutdown→stopped, Starting→starting. | `gh codespace ssh --config` alias, `tunnel: true` |
 | `coder` | none | `coder list -o json` / `coder start -y ${id}` / `coder stop -y ${id}`. Read as JSON (`latest_build.status`). | `coder.${name}` (from `coder config-ssh`) |

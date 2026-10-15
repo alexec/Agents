@@ -376,6 +376,7 @@ struct AddProviderSheet: View {
             switch kind {
             case .docker:
                 TextField("Containers", text: $containers, prompt: Text("agents-devbox, other"))
+                Text("Empty: the containers labelled agents.workspace").appText(.supporting).foregroundStyle(.secondary)
                 TextField("ssh", text: $ssh, prompt: Text("alex@127.0.0.1 -p 2222"))
             case .digitalOcean:
                 TextField("Droplets tagged", text: $tag)
@@ -760,8 +761,8 @@ struct AddProviderSheet: View {
         switch kind {
         case .docker:
             let names = containers.split(separator: ",").map { trimmed(String($0)) }.filter { !$0.isEmpty }
-            guard !names.isEmpty else { throw Wrong(description: "Name at least one container.") }
-            commands = ["preset": "docker", "containers": .array(names.map(JSONValue.string))]
+            commands = ["preset": "docker"]
+            if !names.isEmpty { commands["containers"] = .array(names.map(JSONValue.string)) }
             if !trimmed(ssh).isEmpty { commands["ssh"] = .string(trimmed(ssh)) }
         case .digitalOcean:
             commands = ["preset": "doctl", "tag": .string(trimmed(tag)), "user": .string(trimmed(user).isEmpty ? "root" : trimmed(user))]
