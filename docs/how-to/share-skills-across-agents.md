@@ -53,7 +53,7 @@ Antigravity reads no instructions file when the app starts it, so neither gets i
 
 To find one on the MCP Registry and add it from the app, see
 [Add an MCP server from the registry](add-an-mcp-server-from-the-registry.md). The entry it
-writes names each secret as `${NAME}`, and the value goes in `~/.agents/secrets.env`, which
+writes names each secret as `${NAME}`, and the value goes in `~/.agents-secrets/secrets.env`, which
 is yours alone, readable only by you, and never committed. When an agent starts, the app
 fills each `${NAME}` from that file. A name that is not set means that server is left out
 of the session, and **Settings ▸ Agent Configuration** says which name is missing. The value is never

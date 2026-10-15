@@ -15,6 +15,7 @@ struct UnreadableSecretsTests {
         let home = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("UnreadableSecrets-\(UUID().uuidString)", isDirectory: true)
         try fileManager.createDirectory(at: home.appending(path: ".agents"), withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: home.appending(path: PersonalSecrets.folder), withIntermediateDirectories: true)
         return home
     }
 

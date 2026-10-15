@@ -5,7 +5,7 @@ import Foundation
 /// Signing in to a person's MCP server (#306). The daemon is the OAuth client: it finds
 /// where to sign in, registers itself or uses the person's own client, makes the PKCE pair,
 /// listens for the browser on loopback, exchanges the code and keeps the grant in
-/// `~/.agents/mcp-sign-ins.json`. The window only opens the page and waits.
+/// `~/.agents-secrets/mcp-sign-ins.json`. The window only opens the page and waits.
 ///
 /// Logged: the server's name and what happened in a word. Never an address, a code, a
 /// client secret or a token.

@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Set or replace a secret. The value is written to `~/.agents/secrets.env` and never
+/// Set or replace a secret. The value is written to `~/.agents-secrets/secrets.env` and never
 /// shown again (060, frame E).
 struct SetSecretSheet: View {
     @Environment(AppModel.self) private var model
@@ -19,7 +19,7 @@ struct SetSecretSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(title).appText(.title)
-            Text("\(serverName) needs \(names.count == 1 ? "this" : "these"). The value is saved in your ~/.agents/secrets.env, and it is not shown again.")
+            Text("\(serverName) needs \(names.count == 1 ? "this" : "these"). The value is saved in your ~/.agents-secrets/secrets.env, and it is not shown again.")
                 .appText(.fine)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

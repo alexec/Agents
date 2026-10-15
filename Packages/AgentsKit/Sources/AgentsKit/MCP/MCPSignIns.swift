@@ -1,7 +1,7 @@
 import AgentsKitCore
 import Foundation
 
-/// `~/.agents/mcp-sign-ins.json` (#306): the person's MCP sign-ins, beside `secrets.env` and
+/// `~/.agents-secrets/mcp-sign-ins.json` (#306, #1035): the person's MCP sign-ins, beside `secrets.env` and
 /// kept as it is: mode 0600, written whole, in the person's own home (a scratch root's in
 /// its scratch home). Keyed by the server's address as a resource, so a server named in
 /// both `~/.agents/mcp.json` and a project's is signed in to once.
@@ -36,7 +36,7 @@ struct MCPSignInFile: Codable, Equatable, Sendable {
     static let fileName = "mcp-sign-ins.json"
 
     static func url(home: URL) -> URL {
-        home.appending(path: PersonalDotAgents.folder).appending(path: fileName)
+        PersonalSecrets.url(home: home, file: fileName)
     }
 
     struct Unreadable: Error {}
@@ -54,7 +54,7 @@ struct MCPSignInFile: Codable, Equatable, Sendable {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         encoder.dateEncodingStrategy = .iso8601
-        try StoreCoding.writeAtomically(try encoder.encode(self), to: url, permissions: 0o600)
+        try PersonalSecrets.write(try encoder.encode(self), to: url)
     }
 
     private static let decoder: JSONDecoder = {

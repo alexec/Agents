@@ -180,7 +180,7 @@ it is merged. **General** also holds the project's two limits on agents that oth
 [Add a skill from a catalogue](../how-to/add-a-skill-from-a-catalogue.md).
 
 A project's MCP servers live in `.agents/mcp.json`, on that same page. The file is committed, so it names each secret as `${NAME}` and never
-holds the value. Each person sets their own in `~/.agents/secrets.env`. A server added from
+holds the value. Each person sets their own in `~/.agents-secrets/secrets.env`, a folder apart from `~/.agents` and readable only by them, because `~/.agents` is settings a person may copy or commit and a secret is not. A server added from
 the sheet is approved as it goes in. One that arrives with a pull waits, marked **waiting
 for your OK**, until you choose **Approve**; no agent is given it before that. Where you and
 the project both have a server of the same name, agents in the project get the project's. A

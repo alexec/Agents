@@ -174,7 +174,7 @@ private struct AddMarketplaceForm: View {
                     SecureField("Token", text: $tokenValue).textFieldStyle(.roundedBorder)
                         .disabled(token.isEmpty)
                 }
-                Text("The token goes in ~/.agents/secrets.env and is sent as a bearer token to this address only. Leave both empty if it is open.")
+                Text("The token goes in ~/.agents-secrets/secrets.env and is sent as a bearer token to this address only. Leave both empty if it is open.")
                     .appText(.fine).foregroundStyle(.secondary)
             }
             if let problem { Text(problem).appText(.fine).tinted(.failure) }

@@ -28,7 +28,7 @@ enum AgentsPlace: Equatable {
     var mcpNote: String {
         switch self {
         case .you:
-            "In ~/.agents/mcp.json. A secret is named here and kept in ~/.agents/secrets.env."
+            "In ~/.agents/mcp.json. A secret is named here and kept in ~/.agents-secrets/secrets.env."
         case .project:
             "In .agents/mcp.json, committed with the project. Secrets aren't: it names them, and each person sets their own."
         }
