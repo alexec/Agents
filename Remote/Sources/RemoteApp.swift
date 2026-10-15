@@ -292,8 +292,6 @@ struct RemoteView: View {
                 // go when it is not (029).
                 StartAgentView(project: folder)
                     .paperGround()
-                    .onAppear { model.startingIn = folder }
-                    .onDisappear { if model.startingIn == folder { model.startingIn = nil } }
             }
         case .page(let path):
             if let folder = model.selectedProject {
