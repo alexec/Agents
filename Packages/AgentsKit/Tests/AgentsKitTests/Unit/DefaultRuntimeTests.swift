@@ -45,4 +45,14 @@ struct DefaultRuntimeTests {
         #expect(model.defaultRuntimeID(available: ["claude", "codex"], kept: "gemini") == "claude")
         #expect(model.defaultRuntimeID(available: ["codex"], kept: "gemini") == "codex")
     }
+
+    /// A start form opened before its host listed any runtime gets one when they come
+    /// (#977), and one already on a runtime that can start stays there.
+    @Test func runtimesThatArriveAfterTheFormOpenedGiveItARuntime() {
+        #expect(RuntimeCatalog.startFormRuntime(current: nil, kept: "codex", available: []) == nil)
+        #expect(RuntimeCatalog.startFormRuntime(current: nil, kept: "codex", available: ["claude", "codex"]) == "codex")
+        #expect(RuntimeCatalog.startFormRuntime(current: nil, kept: nil, available: ["claude", "codex"]) == "claude")
+        #expect(RuntimeCatalog.startFormRuntime(current: "codex", kept: "grok", available: ["claude", "codex", "grok"]) == "codex")
+        #expect(RuntimeCatalog.startFormRuntime(current: "codex", kept: nil, available: ["claude"]) == "claude")
+    }
 }

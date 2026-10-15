@@ -28,7 +28,7 @@ struct ChoiceRows: View {
             case .failed(let reason):
                 VStack(alignment: .leading, spacing: 6) {
                     Text(reason).appText(.supporting).tinted(.failure)
-                    Button("Try again") { Task { await model.loadStartChoices() } }
+                    Button("Try again") { Task { await model.retryStartChoices() } }
                         .appText(.supporting)
                         .accessibilityHint("Asks \(runtimeName) again what it offers")
                 }
