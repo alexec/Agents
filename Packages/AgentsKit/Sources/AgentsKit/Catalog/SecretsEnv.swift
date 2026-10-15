@@ -1,7 +1,8 @@
 import Foundation
 import AgentsKitCore
 
-/// `~/.agents/secrets.env` (060, contracts/secrets-env.md): KEY=value lines, mode 0600.
+/// `~/.agents-secrets/secrets.env` (060, contracts/secrets-env.md; moved out of `~/.agents`
+/// in #1035): KEY=value lines, mode 0600.
 /// Values never leave this type except when filling a session's servers.
 struct SecretsEnv: Equatable, Sendable {
     struct Line: Equatable, Sendable {
@@ -17,7 +18,7 @@ struct SecretsEnv: Equatable, Sendable {
     static let fileName = "secrets.env"
 
     static func url(home: URL) -> URL {
-        home.appending(path: PersonalDotAgents.folder).appending(path: fileName)
+        PersonalSecrets.url(home: home, file: fileName)
     }
 
     /// Names that have a value, in file order. Never the values.
@@ -124,7 +125,7 @@ struct SecretsEnv: Equatable, Sendable {
     /// renamed over the old one, so a crash leaves the old secrets or the new, never none,
     /// and no copy is ever readable by others (#205).
     func save(to url: URL) throws {
-        try StoreCoding.writeAtomically(Data(text().utf8), to: url, permissions: 0o600)
+        try PersonalSecrets.write(Data(text().utf8), to: url)
     }
 
     /// Replace `${NAME}` in a string. Returns nil when a name is missing.

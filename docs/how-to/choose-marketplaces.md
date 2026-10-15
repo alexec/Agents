@@ -39,7 +39,7 @@ What you turn off is saved in `~/.agents/marketplaces.json` as `off`.
    - for skills, a GitHub repository (`owner/repo`) whose folders hold `SKILL.md` files, or
      a site that answers skills.sh's search.
 3. If the registry needs a token, type a name for it, such as `ACME_MCP_TOKEN`, and the
-   token. The value goes into `~/.agents/secrets.env` and is never shown again. The app
+   token. The value goes into `~/.agents-secrets/secrets.env` and is never shown again. The app
    sends it as `Authorization: Bearer …` to that address only.
 4. Choose **Add**. It is in the menu at once, and saved in `~/.agents/marketplaces.json`.
    **Remove** takes it out again. The token's value stays in `secrets.env`.

@@ -46,7 +46,7 @@ extension DaemonAPI {
         public var format: MarketplaceFormat
         /// The registry's base URL, skills.sh's, or `owner/repo` for a GitHub repository.
         public var url: String
-        /// The name in `~/.agents/secrets.env` whose value is sent as a bearer token.
+        /// The name in `~/.agents-secrets/secrets.env` whose value is sent as a bearer token.
         public var token: String?
         /// The token is named and has no value in `secrets.env`.
         public var tokenMissing: Bool

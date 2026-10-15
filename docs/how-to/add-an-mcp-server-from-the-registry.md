@@ -10,7 +10,7 @@ You can find a server on a registry, [GitHub's](https://github.com/mcp) by defau
 official [MCP Registry](https://registry.modelcontextprotocol.io), or one you added (see
 [Choose marketplaces](choose-marketplaces.md)), and add it without leaving the app, either for yourself, so every agent you start has it, or to one
 project. The app shows the command or URL before anything is written. A secret is stored as
-`${NAME}` in `mcp.json`, and the value goes in your own `~/.agents/secrets.env`, which is
+`${NAME}` in `mcp.json`, and the value goes in your own `~/.agents-secrets/secrets.env`, which is
 never committed and never shown again.
 
 ## Before you start
@@ -33,7 +33,7 @@ never committed and never shown again.
    already set. One that is already in `secrets.env` says so, and you can leave it or
    replace it.
 5. Choose **Add**. The entry goes into `~/.agents/mcp.json`. The value goes into
-   `~/.agents/secrets.env`, created if it is missing, and readable only by you. The next
+   `~/.agents-secrets/secrets.env`, created if it is missing, and readable only by you. The next
    agent you start has the server, with the name filled in.
 
 ## Add a server to a project
@@ -44,7 +44,7 @@ never committed and never shown again.
    holding them: each person sets their own.
 2. Choose **Add server…** there. The sheet is aimed at the project.
 3. Search and add as above. The entry goes into `<project>/.agents/mcp.json` with only
-   `${NAME}` in it. The value still goes into your `~/.agents/secrets.env`, not the project.
+   `${NAME}` in it. The value still goes into your `~/.agents-secrets/secrets.env`, not the project.
 
 A server added from the sheet is approved as it goes in. One that arrives with a pull is
 listed as **waiting for your OK**, with the command it runs, and no agent is given it until

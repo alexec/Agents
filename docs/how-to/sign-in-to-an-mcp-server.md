@@ -58,11 +58,12 @@ server offers that, and forgets it itself. The row says **needs sign-in** again.
 
 ## Where the sign-in is kept
 
-In `~/.agents/mcp-sign-ins.json`, beside `secrets.env`, and like it readable only by you.
-Never in `mcp.json`, so a project's committed entry carries no one's sign-in. The app logs
-the server's name and what happened, never an address, a code or a token, and it never
-sends a sign-in to your iPhone, iPad or the web page. If your `~/.agents` is a git
-repository, keep `mcp-sign-ins.json` out of it as you keep `secrets.env`.
+In `~/.agents-secrets/mcp-sign-ins.json`, beside `secrets.env`, and like it readable only
+by you. The folder is apart from `~/.agents` because `~/.agents` is settings that you can
+copy, sync or commit, and secrets are not settings. Never in `mcp.json`, so a project's
+committed entry carries no one's sign-in. The app logs the server's name and what
+happened, never an address, a code or a token, and it never sends a sign-in to your
+iPhone, iPad or the web page. Do not copy, sync or commit `~/.agents-secrets`.
 
 A sign-in is for the server's address, so a server in both your own `mcp.json` and a
 project's is signed in to once.

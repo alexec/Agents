@@ -141,7 +141,7 @@ struct AddMCPByHandPane: View {
                         .accessibilityLabel("Remove \(row.name.isEmpty ? (header ? "header" : "variable") : row.name)")
                     }
                     if row.secret, !row.name.isEmpty {
-                        Text("Kept in ~/.agents/secrets.env as ${\(secretName(row, header: header))}; mcp.json names it.")
+                        Text("Kept in ~/.agents-secrets/secrets.env as ${\(secretName(row, header: header))}; mcp.json names it.")
                             .appText(.fine).foregroundStyle(.secondary)
                             .padding(.leading, 90)
                     }
@@ -215,7 +215,7 @@ struct AddMCPByHandPane: View {
     // MARK: Actions
 
     private var footnote: String {
-        "Verify connects before anything is written. Secrets go to your own ~/.agents/secrets.env."
+        "Verify connects before anything is written. Secrets go to your own ~/.agents-secrets/secrets.env."
     }
 
     private var addLabel: String {
