@@ -111,7 +111,7 @@ public enum SessionLookup {
 
     /// The status in the agent list's words: the group, and why it stopped when it did.
     public static func status(of agent: Agent) -> String {
-        let group = agent.group(wantsEyes: false).title
+        let group = agent.group().title
         guard agent.state == .stopped, let why = agent.endedReason?.summary else { return group }
         return "\(group): \(why)"
     }

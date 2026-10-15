@@ -56,7 +56,7 @@ struct DerivedEndingTests {
         #expect(agent.title == "Rename the old helper everywhere it is used please")
         #expect(agent.suggestedPrompts.isEmpty)
         #expect(agent.endingIsUnaccountedFor == false)
-        #expect(agent.group(wantsEyes: false) == .finished)
+        #expect(agent.group() == .finished)
         #expect(try await asks(core, id) == 0)
     }
 

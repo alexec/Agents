@@ -80,7 +80,7 @@ struct AfterTurnTests {
         #expect(agent.state == .finished, "the turn ran to its end")
         #expect(agent.asksToArchive)
         // Partly done still says so under Needs you; the mark is beside it (#584).
-        #expect(agent.group(wantsEyes: false) == .needsAttention)
+        #expect(agent.group() == .needsAttention)
         #expect(agent.afterTurn == nil)
     }
 

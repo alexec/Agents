@@ -43,9 +43,11 @@ public enum Briefing {
     /// One sentence here, and it is the whole of what an agent is told about live
     /// documents — the page follows whatever the agent writes with the tools it
     /// already has, so there is nothing else to ask for.
+    /// "A Markdown document for me" was read as any Markdown file the agent edits
+    /// (#1057), so it names what counts: what the person asked for, not a change's files.
     public static let liveDocument = """
-        Before your first write to a Markdown document for me, call \(AppTool.showFile) \
-        on it once.
+        Before first writing a Markdown report, plan or spec I asked for, call \
+        \(AppTool.showFile) on it once.
         """
 
     /// Standing arrangements are a thing this app owns, and an agent that does not know

@@ -55,7 +55,7 @@ public struct WorkflowFailure: Hashable, Sendable {
     public static func runFailure(of agent: Agent) -> String? {
         switch agent.state {
         case .stopped:
-            guard agent.group(wantsEyes: false) == .needsAttention else { return nil }
+            guard agent.group() == .needsAttention else { return nil }
             return "Run failed — " + (agent.endedReason?.summary ?? "it stopped")
         case .finished:
             guard let report = agent.report else { return nil }

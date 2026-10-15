@@ -121,41 +121,6 @@
         ],
         "createdAt" : 812500000,
         "cwd" : "file:///fixture/project/",
-        "id" : "00000000-0000-0000-0000-000000000004",
-        "lastActivityAt" : 812500000,
-        "runtimeID" : "claude",
-        "startOptions" : {
-          "extraArguments" : [
-
-          ],
-          "values" : {
-
-          }
-        },
-        "state" : "running",
-        "title" : "Session 4"
-      },
-      "isComingBack" : false
-    },
-    "name" : "running, wants eyes"
-  },
-  {
-    "expected" : {
-      "shape" : "working",
-      "symbol" : null,
-      "tinted" : false,
-      "words" : "Working"
-    },
-    "input" : {
-      "agent" : {
-        "advertisedOptions" : [
-
-        ],
-        "availableCommands" : [
-
-        ],
-        "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
         "id" : "00000000-0000-0000-0000-000000000005",
         "lastActivityAt" : 812500000,
         "outcomeAsked" : true,
@@ -854,46 +819,6 @@
       "isComingBack" : false
     },
     "name" : "done, unread"
-  },
-  {
-    "expected" : {
-      "shape" : "done",
-      "symbol" : "checkmark.circle",
-      "tinted" : false,
-      "words" : "Complete"
-    },
-    "input" : {
-      "agent" : {
-        "advertisedOptions" : [
-
-        ],
-        "availableCommands" : [
-
-        ],
-        "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
-        "id" : "00000000-0000-0000-0000-000000000022",
-        "lastActivityAt" : 812500000,
-        "report" : {
-          "at" : 812500060,
-          "message" : "It went.",
-          "outcome" : "done"
-        },
-        "runtimeID" : "claude",
-        "startOptions" : {
-          "extraArguments" : [
-
-          ],
-          "values" : {
-
-          }
-        },
-        "state" : "finished",
-        "title" : "Session 22"
-      },
-      "isComingBack" : false
-    },
-    "name" : "done, wants eyes"
   },
   {
     "expected" : {

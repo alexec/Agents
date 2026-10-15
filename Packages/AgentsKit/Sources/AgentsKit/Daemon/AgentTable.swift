@@ -143,7 +143,7 @@ struct ProjectTally: Equatable {
 
     mutating func add(_ agent: Agent) {
         members += 1
-        counts[agent.group(wantsEyes: false), default: 0] += 1
+        counts[agent.group(), default: 0] += 1
         for (currency, amount) in agent.costToDate {
             costToDate[currency, default: 0] += amount
             currencyHolders[currency, default: 0] += 1
@@ -162,7 +162,7 @@ struct ProjectTally: Equatable {
 
     mutating func remove(_ agent: Agent) {
         members -= 1
-        let group = agent.group(wantsEyes: false)
+        let group = agent.group()
         counts[group, default: 0] -= 1
         if counts[group] == 0 { counts[group] = nil }
         for (currency, amount) in agent.costToDate {

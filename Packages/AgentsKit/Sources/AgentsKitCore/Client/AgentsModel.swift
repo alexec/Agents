@@ -680,8 +680,6 @@ public final class AgentsModel {
         case .showFile(let notification):
             filesToShow[notification.agentID] = notification.file
             rememberChart(notification.file)
-            // Its group can move with it: a file to look at is wanting eyes.
-            if let agent = byID[notification.agentID] { file(agent) }
 
         case .resuming(let notification):
             if notification.isResuming {
@@ -1366,9 +1364,7 @@ public final class AgentsModel {
     /// Taken out once it has been acted on. This is "look at this now", and a client
     /// opened tomorrow has missed it.
     public func takeFileToShow(for agentID: UUID) -> ShownFile? {
-        let taken = filesToShow.removeValue(forKey: agentID)
-        if taken != nil, let agent = byID[agentID] { file(agent) }
-        return taken
+        filesToShow.removeValue(forKey: agentID)
     }
 
     /// Everything the daemon said was on its way back when we connected. A window
@@ -1823,15 +1819,10 @@ public final class AgentsModel {
         for id in drop { cells[id] = nil }
     }
 
-    /// Where an agent sits, counting a file it has asked the person to look at.
-    ///
-    /// `filesToShow` is the unseen flag already: it is keyed by agent, it is put there
-    /// when the agent asks, and `takeFileToShow` removes it when that conversation is
-    /// opened. Nothing new is stored, and nothing outlives the window — which matches
-    /// the daemon, which stores nothing for this and refuses to show a file when no
-    /// window is open.
+    /// Where an agent sits: the daemon's grouping. A file the agent showed does not
+    /// move it (#1057); its card and the files pane say that.
     public func group(of agent: Agent) -> AgentGroup {
-        agent.group(wantsEyes: filesToShow[agent.id] != nil)
+        agent.group()
     }
 
     /// How many agents of one project are in each group, by this window's own grouping.

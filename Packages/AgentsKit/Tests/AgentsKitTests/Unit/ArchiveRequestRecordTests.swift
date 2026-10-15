@@ -36,7 +36,7 @@ struct ArchiveRequestRecordTests {
         let read = try StoreCoding.decoder.decode(Agent.self, from: JSONSerialization.data(withJSONObject: json))
         #expect(read.archiveRequest == nil)
         #expect(read.isUnread == false)
-        #expect(read.group(wantsEyes: false) == .finished)
+        #expect(read.group() == .finished)
         #expect(read.unknownFields.isEmpty)
         let again = try #require(try JSONSerialization.jsonObject(with: StoreCoding.encoder.encode(read)) as? [String: Any])
         #expect(again["parking"] == nil, "and is not written back")

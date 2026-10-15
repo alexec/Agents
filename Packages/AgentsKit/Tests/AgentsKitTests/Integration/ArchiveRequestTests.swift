@@ -79,7 +79,7 @@ struct ArchiveRequestTests {
 
         let after = try #require(await core.agent(seed.id))
         #expect(after.asksToArchive)
-        #expect(after.group(wantsEyes: false) == .finished, "a mark, not a group: still under Done")
+        #expect(after.group() == .finished, "a mark, not a group: still under Done")
         #expect(after.state == before.state)
         #expect(after.endedReason == before.endedReason)
         #expect(after.report == before.report)
@@ -122,7 +122,7 @@ struct ArchiveRequestTests {
         // The store keeps dates to its own precision, so to the second.
         let reread = try #require(reopened.archiveRequest?.requestedAt)
         #expect(abs(reread.timeIntervalSince(at)) < 1)
-        #expect(reopened.group(wantsEyes: false) == .finished)
+        #expect(reopened.group() == .finished)
     }
 
     // MARK: Taken away
@@ -154,7 +154,7 @@ struct ArchiveRequestTests {
         try await settle(core, seed.id)
         let agent = try #require(await core.agent(seed.id))
         #expect(agent.asksToArchive)
-        #expect(agent.group(wantsEyes: false) == .finished)
+        #expect(agent.group() == .finished)
     }
 
     @Test func archivingTakesItAwayAndUnarchivingDoesNotPutItBack() async throws {
@@ -166,12 +166,12 @@ struct ArchiveRequestTests {
         try await core.archive(seed.id)
         let archived = try #require(await core.agent(seed.id))
         #expect(archived.archiveRequest == nil)
-        #expect(archived.group(wantsEyes: false) == .archived)
+        #expect(archived.group() == .archived)
 
         try await core.unarchive(seed.id)
         let back = try #require(await core.agent(seed.id))
         #expect(back.archiveRequest == nil)
-        #expect(back.group(wantsEyes: false) == .finished)
+        #expect(back.group() == .finished)
     }
 
     // MARK: Asked while working
@@ -192,7 +192,7 @@ struct ArchiveRequestTests {
         try await settle(core, id)
         let agent = try #require(await core.agent(id))
         #expect(agent.asksToArchive)
-        #expect(agent.group(wantsEyes: false) == .finished)
+        #expect(agent.group() == .finished)
         #expect(agent.state == .finished, "it ran to its end, nothing was cut off")
     }
 
@@ -210,7 +210,7 @@ struct ArchiveRequestTests {
 
         let agent = try #require(await core.agent(id))
         #expect(agent.archiveRequest == nil)
-        #expect(agent.group(wantsEyes: false) == .needsAttention)
+        #expect(agent.group() == .needsAttention)
         #expect(await core.needs().contains { $0.agentID == id })
     }
 
@@ -225,7 +225,7 @@ struct ArchiveRequestTests {
 
         let agent = try #require(await core.agent(id))
         #expect(agent.state == .stopped)
-        #expect(agent.group(wantsEyes: false) == .stopped)
+        #expect(agent.group() == .stopped)
         #expect(agent.asksToArchive)
     }
 

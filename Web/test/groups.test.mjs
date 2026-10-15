@@ -9,7 +9,7 @@ const status = await load("src/model/status.ts");
 
 for (const { name, input, expected } of cases("groups/agents.json")) {
   test(`group: ${name}`, () => {
-    const group = groups.groupOf(input.agent, input.wantsEyes);
+    const group = groups.groupOf(input.agent);
     assert.deepEqual({ group, title: groups.groupTitles[group], needsAPerson: groups.needsAPerson(input.agent),
                        isWaiting: groups.isWaiting(input.agent), showsUnread: groups.showsUnread(input.agent),
                        asksToArchive: groups.asksToArchive(input.agent) }, expected);

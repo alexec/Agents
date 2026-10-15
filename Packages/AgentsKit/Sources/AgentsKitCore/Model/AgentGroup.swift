@@ -47,22 +47,23 @@ public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     /// Unread is not an argument (#70). It is a mark on the row, not a reason for a
     /// group: a group that depended on it moved the row out from under the person the
     /// moment they opened it. Nor is a request to archive (#584), for the same reason.
-    public init(for state: AgentState, wantsEyes: Bool, report: WorkReport?, outcomeAsked: Bool,
+    /// Nor is a file the agent showed (#1057): the file's card in the chat and the files
+    /// pane say it, and most files shown ask nothing of the person.
+    public init(for state: AgentState, report: WorkReport?, outcomeAsked: Bool,
                 waitingOnEvents: Bool = false,
                 endedReason: EndedReason? = nil, waitingForAllowance: Bool = false) {
         let wantsAnswer = report?.outcome.needsAPerson == true
         switch state {
-        // Grouped with the working agents, and without `running`'s `wantsEyes` arm: an
-        // agent whose conversation has not begun has not asked anybody to look at
-        // anything. No heading is added, renamed or removed (FR-006, FR-023).
+        // Grouped with the working agents. No heading is added, renamed or removed
+        // (FR-006, FR-023).
         case .starting: self = .running
         case .waitingOnUser: self = .needsAttention
         // Answering the app's question: where it was, not Working. See above.
         case .running where outcomeAsked:
-            self = Self.settled(wantsEyes || wantsAnswer || report == nil, report,
+            self = Self.settled(wantsAnswer || report == nil, report,
                                 waitingOnEvents: waitingOnEvents)
-        case .running: self = wantsEyes ? .needsAttention : .running
-        case .finished: self = Self.settled(wantsEyes || wantsAnswer || (outcomeAsked && report == nil), report,
+        case .running: self = .running
+        case .finished: self = Self.settled(wantsAnswer || (outcomeAsked && report == nil), report,
                                             waitingOnEvents: waitingOnEvents)
         case .stopped where waitingForAllowance: self = .waiting
         // A spent allowance is Paused, not Needs you (065, R7): the way on is a new chat,
@@ -122,15 +123,10 @@ extension AgentGroup: CodingKeyRepresentable {
 }
 
 public extension Agent {
-    /// Which group this agent falls in — the one way to ask.
-    ///
-    /// The argument is the one fact only a window holds: whether this agent asked the
-    /// person to look at something and they have not. `false` is honest from anything
-    /// that is not a window — the daemon, a preview, a test asking the daemon's view —
-    /// and a lie from anything that is. There is no version without the argument,
-    /// because the version without it was the bug (FR-001, FR-004).
-    func group(wantsEyes: Bool) -> AgentGroup {
-        AgentGroup(for: state, wantsEyes: wantsEyes, report: report, outcomeAsked: outcomeAsked,
+    /// Which group this agent falls in — the one way to ask. The daemon and every
+    /// window get the same answer (FR-001, FR-004): a shown file is not a group (#1057).
+    func group() -> AgentGroup {
+        AgentGroup(for: state, report: report, outcomeAsked: outcomeAsked,
                    waitingOnEvents: eventWait?.isOpen == true,
                    endedReason: endedReason, waitingForAllowance: allowanceWait != nil)
     }
