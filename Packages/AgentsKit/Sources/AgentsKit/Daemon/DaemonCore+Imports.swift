@@ -79,6 +79,11 @@ struct SessionClaims {
         #if os(macOS)
         return home.appendingPathComponent("Library/Application Support/Agents Session Locks", isDirectory: true)
         #else
+        // `$XDG_STATE_HOME` when it is set to an absolute path, as the spec asks (#1030).
+        if let state = environment["XDG_STATE_HOME"], state.hasPrefix("/") {
+            return URL(fileURLWithPath: state, isDirectory: true)
+                .appendingPathComponent("agents/session-locks", isDirectory: true)
+        }
         return home.appendingPathComponent(".local/state/agents/session-locks", isDirectory: true)
         #endif
     }

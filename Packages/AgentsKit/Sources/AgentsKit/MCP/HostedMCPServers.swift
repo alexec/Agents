@@ -19,7 +19,7 @@ import Foundation
 ///   call starts it again.
 /// - **Restarted with backoff** when it stops while in use: 1 s, 2 s, 4 s … up to a minute,
 ///   back to 1 s once it has run a minute. Its last error is kept for the status.
-/// - **stderr to a file of its own**, `<root>/mcp-logs/<name>-<scope digest>.log`, rolled at 1 MB.
+/// - **stderr to a file of its own**, `mcp-logs/<name>-<scope digest>.log` in the root's log folder (#1030), rolled at 1 MB.
 ///   The status keeps its last line.
 ///
 /// Logged: the server's name and a word, never its command, arguments, environment or

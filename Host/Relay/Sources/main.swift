@@ -42,13 +42,18 @@ let folder: URL = {
 }()
 let files = ControlRelay.Files(folder: folder)
 
-// Also kept in `relay.log` in its folder (#809): a launch agent's stderr goes nowhere, and
-// this is the log Agents Host's diagnostics read. Rolled once at 1 MB, at start.
+// Also kept in `relay.log` (#809): a launch agent's stderr goes nowhere, and this is the
+// log Agents Host's diagnostics read. In the set-up's log folder (#1030), as Agents Host's
+// `HostPaths.logs` works it out: `~/Library/Logs/Agents`, or the scratch root's own.
+// Rolled once at 1 MB, at start.
 let logFile: FileHandle? = {
-    let file = folder.appendingPathComponent("relay.log")
-    try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let logs = (environment[StoreLocations.rootVariable].flatMap { $0.isEmpty ? nil : $0 }
+        .map { StoreLocations(root: URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: true)
+            .standardizedFileURL) } ?? StoreLocations.standard).logRoot
+    let file = logs.appendingPathComponent("relay.log")
+    try? FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)
     if let size = (try? FileManager.default.attributesOfItem(atPath: file.path)[.size]) as? Int, size > 1_000_000 {
-        let old = folder.appendingPathComponent("relay.log.1")
+        let old = logs.appendingPathComponent("relay.log.1")
         try? FileManager.default.removeItem(at: old)
         try? FileManager.default.moveItem(at: file, to: old)
     }

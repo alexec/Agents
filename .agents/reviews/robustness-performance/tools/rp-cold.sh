@@ -5,7 +5,7 @@ P=$(head -1 $ROOT/daemon.lock)
 CMD=$(ps -o command= -p $P | sed 's/ --control-code .*//')
 CODE=$(ps -o command= -p $P | sed 's/.* --control-code //')
 kill $P; while kill -0 $P 2>/dev/null; do sleep 0.1; done
-[ "$1" = noindex ] && mv $ROOT/archive.json $ROOT/archive.json.aside
+[ "$1" = noindex ] && mv $ROOT/cache/archive.json $ROOT/cache/archive.json.aside
 T0=$(python3 -c 'import time;print(time.time())')
 env -u CLAUDECODE $(env | grep -oE '^CLAUDE_[A-Z_]+' | sed 's/^/-u /') AGENTS_ROOT=$ROOT nohup "$CMD" --control-code "$CODE" >>$ROOT/host.out 2>&1 &
 python3 - "$T0" <<'PY'
@@ -23,5 +23,5 @@ buf=b''
 while b'\n' not in buf: buf+=s.recv(1<<20)
 print(f"first lean list {1000*(time.time()-t0):.0f} ms after exec")
 PY
-sleep 1; grep "uplink: connected" $ROOT/daemon.log | tail -1
-ls -la $ROOT/archive.json | awk '{print "archive.json", $5, $8}'
+sleep 1; grep "uplink: connected" $ROOT/logs/daemon.log | tail -1
+ls -la $ROOT/cache/archive.json | awk '{print "archive.json", $5, $8}'

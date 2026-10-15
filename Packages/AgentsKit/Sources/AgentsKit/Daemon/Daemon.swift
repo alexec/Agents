@@ -78,6 +78,10 @@ public final class Daemon: @unchecked Sendable {
         #if canImport(Security)
         if !serve {
             if discovery.macToolsHome == nil { discovery.macToolsHome = locations.tools.path }
+            if discovery.macRoot == nil {
+                discovery.macRoot = locations.root.path
+                discovery.macCacheRoot = locations.cacheRoot.path
+            }
             #if canImport(CryptoKit)
             let toolsets = toolsetsFolder.map(Toolset.loadAll(from:)) ?? [:]
             let archives = toolsetsFolder.map(ArchiveToolset.loadAll(from:)) ?? [:]

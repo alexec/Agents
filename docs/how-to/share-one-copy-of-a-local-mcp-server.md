@@ -58,5 +58,6 @@ and why not. A project's server waiting for approval, and one missing a secret, 
 started to check them. The row's icon in the sidebar turns red when a server does not
 answer, or a hosted one stopped while in use.
 
-A hosted server's stderr goes to `mcp-logs/<name>-<digest>.log` in the app's data folder,
+A hosted server's stderr goes to `mcp-logs/<name>-<digest>.log` in the app's log folder
+(`~/Library/Logs/Agents` on a Mac),
 rolled at 1 MB.

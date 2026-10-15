@@ -6,7 +6,7 @@ P=$(head -1 $ROOT/daemon.lock 2>/dev/null)
 if [ -n "$P" ] && kill -0 $P 2>/dev/null && ps -o command= -p $P | grep -q agentsd; then kill $P; while kill -0 $P 2>/dev/null; do sleep 0.1; done; fi
 LINE=$(cat $ROOT/daemon.cmd)
 CMD=${LINE% --control-code *}; CODE=${LINE##* --control-code }
-[ "$1" = noindex ] && mv $ROOT/archive.json $ROOT/archive.json.aside 2>/dev/null
+[ "$1" = noindex ] && mv $ROOT/cache/archive.json $ROOT/cache/archive.json.aside 2>/dev/null
 T0=$(python3 -c 'import time;print(time.time())')
 env -u CLAUDECODE $(env | grep -oE '^CLAUDE_[A-Z_]+' | sed 's/^/-u /') AGENTS_TEST_RUNTIME=echo AGENTS_ROOT=$ROOT nohup "$CMD" --control-code "$CODE" >>$ROOT/host.out 2>&1 &
 python3 - "$T0" <<'PY'
@@ -24,5 +24,5 @@ buf=b''
 while b'\n' not in buf: buf+=s.recv(1<<20)
 print(f"first lean list {1000*(time.time()-t0):.0f} ms after exec")
 PY
-sleep 1; grep "uplink: connected" $ROOT/daemon.log | tail -1
-ls -la $ROOT/archive.json 2>/dev/null | awk '{print "archive.json", $5}'
+sleep 1; grep "uplink: connected" $ROOT/logs/daemon.log | tail -1
+ls -la $ROOT/cache/archive.json 2>/dev/null | awk '{print "archive.json", $5}'

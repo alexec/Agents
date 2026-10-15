@@ -417,6 +417,7 @@ public actor AgentStore {
         lineIndexes.remove(id)
         historyMarks.remove(id)
         turnCache.remove(id)
+        try removeIfThere(locations.turns(id))
         let folder = locations.agent(id)
         guard FileManager.default.fileExists(atPath: folder.path) else { return }
         let aside = setAside(id)
@@ -433,6 +434,14 @@ public actor AgentStore {
         for url in contents where url.lastPathComponent.hasPrefix(Self.setAsidePrefix) {
             DaemonLog.shared.write("finishing the delete of \(url.lastPathComponent), cut off last time")
             try? FileManager.default.removeItem(at: url)
+        }
+        // Turns of agents no longer here (#1030): the cache is outside the agents folder,
+        // so a delete cut off after the folder went, or a folder removed by hand, would
+        // otherwise leave them for ever.
+        let kept = Set(((try? FileManager.default.contentsOfDirectory(atPath: locations.agents.path)) ?? []))
+        for name in (try? FileManager.default.contentsOfDirectory(atPath: locations.turnsFolder.path)) ?? []
+        where name.hasSuffix(".jsonl") && !kept.contains(String(name.dropLast(".jsonl".count))) {
+            try? FileManager.default.removeItem(at: locations.turnsFolder.appendingPathComponent(name))
         }
     }
 
@@ -782,11 +791,13 @@ public actor AgentStore {
             try? FileManager.default.removeItem(at: url)
             return
         }
+        try FileManager.default.createDirectory(at: locations.turnsFolder, withIntermediateDirectories: true)
         try encoded(turns).write(to: url, options: .atomic)
     }
 
     private func appendTurns(_ turns: [TurnSummary], for agentID: UUID) throws {
         let url = locations.turns(agentID)
+        try FileManager.default.createDirectory(at: locations.turnsFolder, withIntermediateDirectories: true)
         let handle = try StoreCoding.openForAdding(url)
         defer { try? handle.close() }
         try handle.write(contentsOf: encoded(turns))

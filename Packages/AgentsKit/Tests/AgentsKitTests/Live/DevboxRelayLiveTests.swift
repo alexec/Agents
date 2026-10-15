@@ -112,7 +112,7 @@ struct DevboxRelayLiveTests {
         // The gate's port, from the server's own log; then a request from uid `other`.
         let ssh = try ssh(in: folder)
         let port = try await ssh.run(ssh.runArguments(
-            "grep -o 'relay offered for claude on port [0-9]*' ~/.agents-server/root/daemon.log | tail -1 | grep -o '[0-9]*$'"))
+            "grep -o 'relay offered for claude on port [0-9]*' ~/.local/state/agents/logs/roots/root-*/daemon.log | tail -1 | grep -o '[0-9]*$'"))
             .stdout.trimmingCharacters(in: .whitespacesAndNewlines)
         #expect(!port.isEmpty)
         let before = log.lines.count
@@ -127,7 +127,7 @@ struct DevboxRelayLiveTests {
         let code = String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
         #expect(code == "000", "the stranger got an HTTP answer: \(code)")
         #expect(log.lines.count == before, "the stranger's request reached the Mac: \(log.lines.suffix(3))")
-        let refused = try await ssh.run(ssh.runArguments("grep -c 'relay gate: refused' ~/.agents-server/root/daemon.log || true"))
+        let refused = try await ssh.run(ssh.runArguments("grep -c 'relay gate: refused' ~/.local/state/agents/logs/roots/root-*/daemon.log || true"))
         #expect((Int(refused.stdout.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0) > 0)
         await server.disconnect()
     }

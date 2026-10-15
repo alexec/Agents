@@ -48,8 +48,9 @@ struct OpenCodeRuntimeTests {
         #expect(environment["OPENCODE_ENABLE_QUESTION_TOOL"] == nil)
         #expect(environment["ANTHROPIC_API_KEY"] == "the person's key", "provider keys are neither added nor removed")
         #expect(environment["PATH"] == "/usr/bin")
-        #expect(environment["TMPDIR"] == "\(root.path)/runtimes/opencode/tmp", "a folder of its own to walk (R11)")
-        #expect(RuntimeLaunchCatalog.opencode.folders(root: root.path) == ["\(root.path)/runtimes/opencode/tmp"])
+        let cache = StoreLocations(root: root).cacheRoot.path
+        #expect(environment["TMPDIR"] == "\(cache)/runtimes/opencode/tmp", "a folder of its own to walk (R11), in the cache (#1030)")
+        #expect(RuntimeLaunchCatalog.opencode.folders(root: root.path, cache: cache) == ["\(cache)/runtimes/opencode/tmp"])
 
         let claude = ProcessSessionLauncher.environment(for: ToolPolicyCatalog.claude,
                                                         locations: StoreLocations(root: root), onto: base)

@@ -10,8 +10,9 @@ time, so the agent running it can hold the "build" lease around the one phase th
   nightly-runtimes.py report [RUN] [--dry-run]
 
 Each phase takes the run that `plan` made (the latest, without RUN). Every phase also takes
---home DIR, where the state between nights is kept (default ~/Library/Application Support/
-Agents Nightly Runtimes, or $AGENTS_NIGHTLY_HOME).
+--home DIR, where the state between nights is kept (default ~/Library/Caches/
+Agents Nightly Runtimes, or $AGENTS_NIGHTLY_HOME): a cache (#1030), as losing it costs only
+testing tonight's releases again. The newest RUNS_KEPT runs are kept.
 
 plan     Checks out --base (default main, this Mac's own: origin/main can be days behind it)
          into a worktree of its own (<home>/tree, never the project's checkout) and asks each runtime's source for its latest release. A runtime is
@@ -59,7 +60,9 @@ import urllib.request
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_HOME = os.environ.get("AGENTS_NIGHTLY_HOME") or os.path.expanduser(
-    "~/Library/Application Support/Agents Nightly Runtimes")
+    "~/Library/Caches/Agents Nightly Runtimes")
+# How many runs are kept in <home>/runs; the oldest go when `plan` makes a new one (#1030).
+RUNS_KEPT = 14
 
 # kind: npm (a toolset of Node + one npm package), archive (a vendor archive from the ACP
 # registry), github (a vendor archive from GitHub releases), installed (the person's own).
@@ -263,6 +266,9 @@ def plan(args):
     if os.path.lexists(latest_link):
         os.remove(latest_link)
     os.symlink(stamp, latest_link)
+    runs = sorted(n for n in os.listdir(os.path.join(args.home, "runs")) if n != "latest")
+    for old in runs[:-RUNS_KEPT]:
+        shutil.rmtree(os.path.join(args.home, "runs", old), ignore_errors=True)
     testing = [r for r, e in record["runtimes"].items() if e["status"] in ("testing", "failed")]
     if not testing:
         print("Nothing changed.")

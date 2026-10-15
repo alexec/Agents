@@ -122,13 +122,22 @@ public struct RuntimeLaunch: Hashable, Sendable {
 
     /// Where `<root>` stands in an environment value.
     public static let rootPlaceholder = "<root>"
+    /// Where `<cache>` stands: the root's cache folder (#1030), for what is made again.
+    public static let cachePlaceholder = "<cache>"
 
-    /// `environment` applied on top of `base`, with `<root>` replaced by `root`.
-    public func environment(over base: [String: String], root: String) -> [String: String] {
+    /// `value` with `<root>` and `<cache>` replaced.
+    static func expand(_ value: String, root: String, cache: String) -> String {
+        value.replacingOccurrences(of: rootPlaceholder, with: root)
+            .replacingOccurrences(of: cachePlaceholder, with: cache)
+    }
+
+    /// `environment` applied on top of `base`, with `<root>` replaced by `root` and
+    /// `<cache>` by `cache`.
+    public func environment(over base: [String: String], root: String, cache: String) -> [String: String] {
         var result = base
         for (name, value) in environment {
             if let value {
-                result[name] = value.replacingOccurrences(of: Self.rootPlaceholder, with: root)
+                result[name] = Self.expand(value, root: root, cache: cache)
             } else {
                 result.removeValue(forKey: name)
             }
@@ -136,14 +145,14 @@ public struct RuntimeLaunch: Hashable, Sendable {
         return result
     }
 
-    /// The folders `environment` names under `<root>`, which the daemon makes (0700)
+    /// The folders `environment` names under `<root>` or `<cache>`, which the daemon makes (0700)
     /// before launch: a runtime whose home or temporary folder is missing may refuse to
     /// start or make it world-readable.
-    public func folders(root: String) -> [String] {
+    public func folders(root: String, cache: String) -> [String] {
         environment.compactMap { name, value in
             guard name.hasSuffix("_HOME") || name == "TMPDIR", let value,
-                  value.hasPrefix(Self.rootPlaceholder) else { return nil }
-            return value.replacingOccurrences(of: Self.rootPlaceholder, with: root)
+                  value.hasPrefix(Self.rootPlaceholder) || value.hasPrefix(Self.cachePlaceholder) else { return nil }
+            return Self.expand(value, root: root, cache: cache)
         }
         .sorted()
     }
@@ -242,7 +251,7 @@ public enum RuntimeLaunchCatalog {
     public static let opencode = RuntimeLaunch(
         runtimeID: "opencode",
         environment: [
-            "TMPDIR": "<root>/runtimes/opencode/tmp",
+            "TMPDIR": "<cache>/runtimes/opencode/tmp",
             "OPENCODE_DISABLE_AUTOUPDATE": "1",
             "OPENCODE_DISABLE_SHARE": "1",
             "OPENCODE_AUTH_CONTENT": nil,

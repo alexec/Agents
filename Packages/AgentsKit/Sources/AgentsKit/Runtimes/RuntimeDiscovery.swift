@@ -11,6 +11,11 @@ public struct RuntimeDiscovery: Sendable {
     /// (048): Claude's for somebody with no Node, consulted after the person's own PATH so
     /// anyone who already has `npx` goes on using it; Codex's always, and only (047).
     public var macToolsHome: String?
+    /// On the Mac, the daemon's root and cache folder, for a runtime's `<root>` and
+    /// `<cache>` folders when one is started to check it (049). Not derived from
+    /// `macToolsHome`, which is in the cache since #1030.
+    public var macRoot: String?
+    public var macCacheRoot: String?
     /// The toolset id the app carries for each runtime it installs, so a Mac toolset left
     /// by an older app is known as outdated (047, 046). Empty on a server, where 043's own
     /// update-when-idle moves the toolset.
@@ -95,14 +100,14 @@ public struct RuntimeDiscovery: Sendable {
     public func probe(_ runtime: Runtime, at path: String, cwd: URL) async -> RuntimeAvailability {
         do {
             // The runtime's own launch variables too, so a probe of Antigravity never falls
-            // back to the person's `~/.gemini` (049). Its home is the daemon's, beside `tools/`.
-            let root = macToolsHome.map { ($0 as NSString).deletingLastPathComponent } ?? NSTemporaryDirectory()
+            // back to the person's `~/.gemini` (049). Its home is the daemon's.
+            let root = macRoot ?? macToolsHome.map { ($0 as NSString).deletingLastPathComponent } ?? NSTemporaryDirectory()
             let session = try ACPSession.launch(executable: URL(fileURLWithPath: path),
                                                 arguments: runtime.arguments,
                                                 cwd: cwd,
                                                 environment: RuntimeLaunchCatalog.launch(for: runtime.id)
                                                     .environment(over: RuntimeEnvironment.forRuntime(runtime.id, LoginShellPath.environment()),
-                                                                 root: root))
+                                                                 root: root, cache: macCacheRoot ?? root))
             let result = try await session.initialize()
             await session.end(gracePeriod: .seconds(2))
             return .available(path: path, supportsResume: result.supportsResume)

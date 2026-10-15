@@ -22,7 +22,7 @@ struct AntigravityLiveTests {
         try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
         let locations = StoreLocations(root: root)
         let launch = RuntimeLaunchCatalog.antigravity
-        for folder in launch.folders(root: root.path) {
+        for folder in launch.folders(root: root.path, cache: locations.cacheRoot.path) {
             try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
         }
         var environment = ProcessSessionLauncher.environment(for: ToolPolicyCatalog.antigravity,

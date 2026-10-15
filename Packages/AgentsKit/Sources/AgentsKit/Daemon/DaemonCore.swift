@@ -212,7 +212,7 @@ public actor DaemonCore {
     /// The MCP servers this host runs one copy of for every agent (#488), served beside
     /// the app's own tools.
     lazy var hostedServers = HostedMCPServers(
-        logFolder: locations.root.appending(path: "mcp-logs", directoryHint: .isDirectory))
+        logFolder: locations.mcpLogs)
     /// Agents whose next prompt carries the `Briefing`: the few things about this app
     /// an agent is told in words. Set when a conversation starts, and again only if a
     /// runtime loses one and we have to begin a new one — the briefing lives in the
@@ -719,7 +719,7 @@ public actor DaemonCore {
     /// session that reaches only its stand-in, and endpoints to match.
     var catalogSession: URLSession = .shared
     var catalogEndpoints = CatalogEndpoints.from(environment: ProcessInfo.processInfo.environment)
-    /// Previews fetched and not yet added, in `<root>/catalog-staging`.
+    /// Previews fetched and not yet added, in `<cache>/catalog-staging`.
     lazy var catalogStaging = SkillStaging(root: locations.catalogStaging)
     /// When each source was last asked whether it has moved on, and what it said (FR-018).
     var catalogUpdateChecks: [String: SkillUpdates.Answer] = [:]
@@ -1887,7 +1887,8 @@ public struct ProcessSessionLauncher: SessionLauncher {
         let policy = ToolPolicyCatalog.policy(for: runtime.id)
         // A runtime's own home under the daemon's root (049's `GEMINI_HOME`), made private
         // before it starts: one that is missing may be made world-readable by the runtime.
-        for folder in RuntimeLaunchCatalog.launch(for: runtime.id).folders(root: locations.root.path) {
+        for folder in RuntimeLaunchCatalog.launch(for: runtime.id).folders(root: locations.root.path,
+                                                                                     cache: locations.cacheRoot.path) {
             try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true,
                                                     attributes: [.posixPermissions: 0o700])
         }
@@ -1931,7 +1932,8 @@ public struct ProcessSessionLauncher: SessionLauncher {
 
     static func environment(for policy: ToolPolicy, locations: StoreLocations,
                             onto base: [String: String], onServer: Bool = false) -> [String: String] {
-        let own = RuntimeLaunchCatalog.launch(for: policy.runtimeID).environment(over: base, root: locations.root.path)
+        let own = RuntimeLaunchCatalog.launch(for: policy.runtimeID).environment(over: base, root: locations.root.path,
+                                                                                               cache: locations.cacheRoot.path)
         var environment = RuntimePolicyFiles(locations: locations)
             .environment(for: policy, onto: LentEnvironment.applied(to: own))
             .merging(policy.launchEnvironment) { _, policy in policy }
