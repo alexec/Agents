@@ -33,6 +33,9 @@ public struct StoreLocations: Sendable {
     /// build never rearranges somebody's `~/.claude` (research R4). Settable, so a test
     /// hands one in directly rather than through the environment.
     public var personalHome: URL?
+    /// Where `personalSettings` is when there is no personal home to put it in: a server's
+    /// daemon sets `$HOME/.agents/settings` (#1033). Nil, and it is the root's own.
+    public var personalSettingsOverride: URL?
 
     public init(root: URL) {
         self.root = root
@@ -124,6 +127,24 @@ public struct StoreLocations: Sendable {
         return URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)  // iOS has no homeDirectoryForCurrentUser
     }
     public static let rootArgument = "--root"
+
+    /// The person's settings (#1033), one file each: `~/.agents/settings`, which moves with
+    /// the person rather than with this machine. The Agents app writes it; the top of
+    /// `~/.agents` stays the hand-written config other tools read too.
+    ///
+    /// A root with no personal home (a scratch copy, a test) keeps its own, in
+    /// `<root>/settings`, so it never writes the real `~/.agents`; a server's daemon is
+    /// given `$HOME/.agents/settings` through `personalSettingsOverride`.
+    public var personalSettings: URL {
+        if let personalSettingsOverride { return personalSettingsOverride }
+        if let personalHome { return Self.settings(inHome: personalHome) }
+        return root.appendingPathComponent("settings", isDirectory: true)
+    }
+
+    /// `<home>/.agents/settings`.
+    public static func settings(inHome home: URL) -> URL {
+        home.appendingPathComponent(".agents/settings", isDirectory: true)
+    }
 
     /// Pure, so the rule is testable without a process to run it in.
     public static func chosen(arguments: [String], environment: [String: String]) -> StoreLocations {
@@ -250,8 +271,8 @@ public struct StoreLocations: Sendable {
     /// costs the next start form the wait it used to have every time.
     public var optionCache: URL { cacheRoot.appendingPathComponent("option-cache.json") }
     /// The mode last chosen for each runtime, so every window and phone offers the
-    /// same one first (029).
-    public var modes: URL { root.appendingPathComponent("modes.json") }
+    /// same one first (029). The person's, in `personalSettings` (#1033).
+    public var modes: URL { personalSettings.appendingPathComponent("modes.json") }
     /// What the daemon has already told somebody about: which outstanding needs have
     /// been delivered, where each is showing, when the person was last alerted, and
     /// when each need was first raised.
@@ -268,12 +289,8 @@ public struct StoreLocations: Sendable {
     public var attention: URL { root.appendingPathComponent("attention.json") }
     /// The two limits the reader set: the most any one agent may spend, and the most
     /// a day may. One file, because there are two facts in it and both belong to the
-    /// person rather than to any agent or project.
-    ///
-    /// One root is one budget. A branch build pointed at its own root has its own
-    /// limits and its own day, which is consistent with the root being the daemon's
-    /// identity and is worth knowing before wondering why a limit did not bite.
-    public var limits: URL { root.appendingPathComponent("limits.json") }
+    /// person rather than to any agent or project: in `personalSettings` (#1033).
+    public var limits: URL { personalSettings.appendingPathComponent("limits.json") }
     /// Every resource lease on the Mac and every line waiting for one (036). One file
     /// for the root, like the limits: a lease is the Mac's, not a project's.
     public var leases: URL { root.appendingPathComponent("leases.json") }
@@ -283,12 +300,23 @@ public struct StoreLocations: Sendable {
     /// What happened (042): one event, consequence or repeat per line, appended, and
     /// rewritten only when the oldest are dropped.
     public var events: URL { root.appendingPathComponent("events.jsonl") }
-    /// How long archived agents are kept and the clock that counts it (051).
-    public var retention: URL { root.appendingPathComponent("retention.json") }
+    /// How long archived agents are kept (051): the person's, in `personalSettings` (#1033).
+    public var retention: URL { personalSettings.appendingPathComponent("retention.json") }
+    /// The clock that counts it (051): this machine's, so in the root.
+    public var retentionClock: URL { root.appendingPathComponent("retention-clock.json") }
     /// Whether this Mac stays awake for agents, and for how long after they stop.
     public var wakeSettings: URL { root.appendingPathComponent("wake.json") }
     /// The person's total for workflows turned on (#506).
-    public var workflowLimit: URL { root.appendingPathComponent("workflow-limit.json") }
+    public var workflowLimit: URL { personalSettings.appendingPathComponent("workflow-limit.json") }
+    /// What agents call the person (#121).
+    public var person: URL { personalSettings.appendingPathComponent("person.json") }
+    /// Each runtime's permission mode (061).
+    public var clientPermissions: URL { personalSettings.appendingPathComponent("client-permissions.json") }
+    /// Each runtime's sandbox (064).
+    public var sandbox: URL { personalSettings.appendingPathComponent("sandbox.json") }
+    /// The names of the variables passed through to runtimes (`RuntimePassThrough`): names
+    /// only, never values, so it is configuration and not a secret (#1035).
+    public var runtimeEnvironment: URL { personalSettings.appendingPathComponent("runtime-environment.json") }
     /// Which credentials are out, until when, and what credit has been spent (052).
     /// The Mac's is the one that counts: a relayed plan is one allowance (R6).
     public var allowances: URL { root.appendingPathComponent("allowances.json") }

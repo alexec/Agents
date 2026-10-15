@@ -38,7 +38,7 @@ devices** is on.
 | Control plane | `Packages/ControlPlane` | Swift server, `agents-control` | Pairs clients, routes each request to its host, sends updates to clients. `:8791` wss, `:8792` loopback http. |
 | Control plane store | | A folder or an S3 bucket | Who is paired, which hosts there are, unused codes, settings. Nothing about agents. |
 | Host daemon | `Daemon/`, `Packages/AgentsKit` | Swift daemon, `agentsd`, macOS and Linux | Owns agents, terminals, files, git and workflows on its host. Serves the agents MCP tools. |
-| Host data | | Files on the host | Agent records, transcripts and settings in `~/Library/Application Support/Agents`; shared skills and instructions in `~/.agents`; a project's own `.agents/`. |
+| Host data | | Files on the host | Agent records and transcripts in `~/Library/Application Support/Agents`; the person's settings in `~/.agents/settings`, and shared skills and instructions in `~/.agents` ([the `~/.agents` folder](../reference/agents-folder.md)); a project's own `.agents/`. |
 | agents-relay | `Host/Relay` | macOS helper | Planned: an iCloud mailbox for phones away from home. |
 
 Every connection to the control plane is made **outwards**: from a client, and from each

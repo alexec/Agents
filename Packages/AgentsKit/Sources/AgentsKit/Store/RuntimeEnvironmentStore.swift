@@ -1,8 +1,9 @@
 import Foundation
 import AgentsKitCore
 
-/// `<root>/runtime-environment.json` (#727): the variables of the daemon's environment the
-/// person passes through to runtimes, beyond what `RuntimeEnvironment` lets through itself.
+/// `runtime-environment.json` in the person's settings (#727, #1033): the variables of the
+/// daemon's environment the person passes through to runtimes, beyond what
+/// `RuntimeEnvironment` lets through itself. Names only, never values.
 /// `"*"` is every runtime; a name ending in `*` is a prefix.
 ///
 ///     { "passThrough": { "*": ["AWS_PROFILE"], "claude": ["CLAUDE_CODE_USE_BEDROCK", "AWS_*"] } }
@@ -30,10 +31,9 @@ public struct RuntimePassThrough: Codable, Sendable, Hashable {
 }
 
 public struct RuntimeEnvironmentStore: Sendable {
-    private let root: URL
-    private var file: URL { root.appendingPathComponent("runtime-environment.json") }
+    private let file: URL
 
-    public init(locations: StoreLocations) { root = locations.root }
+    public init(locations: StoreLocations) { file = locations.runtimeEnvironment }
 
     public func load() -> RuntimePassThrough {
         StoreFile.load(RuntimePassThrough.self, at: file, empty: .init(), meaning: "nothing more passed through")

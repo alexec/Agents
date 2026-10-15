@@ -80,6 +80,7 @@ struct ModeStoreTests {
         let (locations, work) = try temporary()
         try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
         let written = #"{"grok":"not an entry","codex":{"mode":"auto","chosenAt":"2026-09-24T10:00:00Z"}}"#
+        try FileManager.default.createDirectory(at: locations.personalSettings, withIntermediateDirectories: true)
         try Data(written.utf8).write(to: locations.modes)
         let core = try core(locations)
 

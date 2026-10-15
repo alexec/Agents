@@ -23,6 +23,11 @@ at. Agents on iPhone and iPad, and the web page, each have a **Settings** screen
 **Appearance** (Celebrations) and **Sidebar**; everything else follows the Mac they are paired
 with.
 
+The settings that are yours rather than this Mac's (the spending limits, how long archived
+agents are kept, the workflow limit, what agents call you, and each runtime's permission
+mode and sandbox) are files in `~/.agents/settings`, one each, so they can go with you to
+another Mac. A file changed by hand counts at once. See [The `~/.agents` folder](agents-folder.md).
+
 | Device | Pane | Control | What it does |
 | --- | --- | --- | --- |
 | Mac | Appearance | **Appearance**: **System**, **Light**, **Dark** | Sets the app's look. **System** follows your Mac, and changes with it. |

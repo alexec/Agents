@@ -6,7 +6,7 @@ import Foundation
 /// A runtime remembers its own model and effort, so what it offers first is already the
 /// same for every window and every phone. The mode it does not remember, which is why
 /// the Mac's window used to, in its own defaults — where a phone could not read it and
-/// a scratch copy of the app wrote over it. Here it is one file per root.
+/// a scratch copy of the app wrote over it. Here it is one file in the person's settings (#1033).
 ///
 /// One file, read whole and written whole, the way the option cache is. An entry this
 /// build cannot read is left where it is: a later build may understand it, and throwing
@@ -48,6 +48,7 @@ public struct ModeStore: Sendable {
     }
 
     private func write(_ file: [String: JSONValue]) throws {
+        try FileManager.default.createDirectory(at: locations.personalSettings, withIntermediateDirectories: true)
         try StoreFile.write(try StoreCoding.encoder.encode(file), to: locations.modes)
     }
 }

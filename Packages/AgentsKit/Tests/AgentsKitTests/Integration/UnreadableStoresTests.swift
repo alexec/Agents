@@ -103,6 +103,7 @@ struct UnreadableStoresTests {
 
     @Test func modesThatDoNotReadAreSetAside() throws {
         let locations = try temporary()
+        try FileManager.default.createDirectory(at: locations.personalSettings, withIntermediateDirectories: true)
         try garbage.write(to: locations.modes)
         let store = ModeStore(locations: locations)
         #expect(store.remembered().isEmpty)

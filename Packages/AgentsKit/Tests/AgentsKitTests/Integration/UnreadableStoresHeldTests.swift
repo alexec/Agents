@@ -106,6 +106,7 @@ struct UnreadableStoresHeldTests {
     func aFileThatDoesNotDecodeIsSetAsideByteForByte(_ text: String) throws {
         let locations = try temporary()
         let bytes = Data(text.utf8)
+        try FileManager.default.createDirectory(at: locations.personalSettings, withIntermediateDirectories: true)
         try bytes.write(to: locations.limits)
         #expect(LimitStore(locations: locations).load() == CostLimits())
         let kept = StoreCoding.asides(of: locations.limits)
