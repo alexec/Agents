@@ -2,7 +2,8 @@
 // holds a runtime or a block, Branch (#342), and Archive, with Keep Session while an agent asks to
 // have it archived (#773), or Bring Back and Delete (#398). In the chat header's ··· menu, and the
 // sidebar row's menu. The chat's has Open File… first, as the Remote's ··· menu does (#543), for a
-// page with no keyboard to press ⌘P on.
+// page with no keyboard to press ⌘P on. Below 760 it has the header's Turns and Files too, so the
+// header's right is the ··· alone, as on the iPhone (#981).
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { Agent } from "../protocol/generated";
@@ -139,8 +140,11 @@ async function stopAll(store: Store, host: string, agent: Agent) {
 }
 
 /** `inChat`: the chat header's, whose Archive leaves the chat as the header's button does. */
-export function SessionMenu({ store, host, agent, disabled, openFile, inChat }:
-  { store: Store; host: string; agent: Agent | undefined; disabled: boolean; openFile?: () => void; inChat?: boolean }) {
+/** One of the chat header's own controls, in the ··· menu only below 760 (#981). */
+export type NarrowItem = { label: string; help?: string; checked: boolean; run: () => void };
+
+export function SessionMenu({ store, host, agent, disabled, openFile, inChat, narrow = [] }:
+  { store: Store; host: string; agent: Agent | undefined; disabled: boolean; openFile?: () => void; inChat?: boolean; narrow?: NarrowItem[] }) {
   const open = useSignal(false);
   const anchor = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -157,6 +161,14 @@ export function SessionMenu({ store, host, agent, disabled, openFile, inChat }:
         disabled={!agent || disabled || (agent && !!store.onItsWay.value[agent.id])} onClick={() => (open.value = !open.value)}>···</button>
       {open.value && agent && (
         <div class="popover right" role="menu">
+          {narrow.map(({ label, help, checked, run }) => (
+            <button key={label} class="narrow-only" role="menuitemcheckbox" aria-checked={checked} title={help}
+              onClick={() => {
+                open.value = false;
+                run();
+              }}>{label}</button>
+          ))}
+          {narrow.length > 0 && <hr class="narrow-only" />}
           {openFile && (
             <button role="menuitem" title="Find a file in this session's folder by name"
               onClick={() => {

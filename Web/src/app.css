@@ -693,6 +693,8 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 @media (max-width: 759px) {
   .medium-only, .wide-only { display: none; }
   .narrow-only { display: block; }
+  /* The header's Turns and Files, in its ··· menu (#981): a tick on the one in use. */
+  .popover [aria-checked=true]::before { content: "✓ "; }
   button.back.narrow-only { display: inline-block; border: none; background: none; color: var(--accent); padding: 0; }
   .column-head h1.narrow-only { display: block; text-align: center; }
 }
@@ -759,8 +761,8 @@ button.remove:hover { opacity: 1; }
 .labels .chip { display: inline-flex; align-items: center; gap: 2px; font-size: calc(12px * var(--text-scale)); padding: 2px 8px; }
 .label-field { flex: 0 1 auto; width: 7em; min-width: 4em; border: none; background: none; font: inherit; font-size: calc(12px * var(--text-scale)); color: inherit; outline: none; }
 .popover.right { right: 0; left: auto; min-width: 160px; display: flex; flex-direction: column; }
-.popover [role=menuitem] { text-align: left; background: none; border: none; padding: 6px 10px; border-radius: var(--radius-control); }
-.popover [role=menuitem]:hover { background: var(--paper-wash); }
+.popover [role^=menuitem] { text-align: left; background: none; border: none; padding: 6px 10px; border-radius: var(--radius-control); }
+.popover [role^=menuitem]:hover { background: var(--paper-wash); }
 .queued-actions { display: flex; align-items: center; gap: 10px; font-size: calc(12px * var(--text-scale)); }
 .problem {
   display: flex;
@@ -985,7 +987,7 @@ button.remove:hover { opacity: 1; }
 
 /* New project (#115): the + over the projects column, its menu, and the window's two sheets. */
 .menu-anchor.new-project { margin-right: 0; }
-.popover [role=menuitem]:disabled { background: none; }
+.popover [role^=menuitem]:disabled { background: none; }
 .popover hr { border: none; border-top: 1px solid var(--paper-rule); margin: 4px 0; }
 .new-project-host { display: flex; flex-direction: column; }
 .menu-head { margin: 6px 10px 2px; font-size: calc(11px * var(--text-scale)); opacity: 0.55; }
