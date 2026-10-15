@@ -1,5 +1,6 @@
 import AgentsKitCore
 import UserNotifications
+import WidgetKit
 
 /// The banner's words are assembled **on the device**, which is what a notification
 /// service extension is for (021 FR-022).
@@ -19,11 +20,19 @@ final class NotificationService: UNNotificationServiceExtension {
         handler = contentHandler
         let content = (request.content.mutableCopy() as? UNMutableNotificationContent) ?? UNMutableNotificationContent()
         self.content = content
-        guard let pushed = CloudKitMailbox.pushed(from: request.content.userInfo),
-              let envelope = pushed.envelope,
-              let key = try? DeviceKey.load(accessGroup: DeviceKey.sharedAccessGroup),
-              let headline = try? Envelope.open(envelope, with: key)
-        else {
+        guard let pushed = CloudKitMailbox.pushed(from: request.content.userInfo) else {
+            contentHandler(content)
+            return
+        }
+        let headline = pushed.envelope.flatMap { envelope in
+            (try? DeviceKey.load(accessGroup: DeviceKey.sharedAccessGroup)).flatMap { try? Envelope.open(envelope, with: $0) }
+        }
+        // A loud push never wakes the app, so the widget hears of it here (#1046).
+        if AttentionSnapshotStore.apply(AttentionPush(need: pushed.needID, headline: headline,
+                                                      withdrawn: pushed.withdrawn || pushed.envelope == nil)) {
+            WidgetCenter.shared.reloadTimelines(ofKind: AttentionSnapshot.widgetKind)
+        }
+        guard let headline else {
             contentHandler(content)
             return
         }

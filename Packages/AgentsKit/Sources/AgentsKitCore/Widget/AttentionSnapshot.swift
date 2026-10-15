@@ -92,6 +92,37 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
         now.timeIntervalSince(writtenAt) > Self.staleness
     }
 
+    /// This snapshot with one push laid over it (#1046): what the push says before the app
+    /// has caught up, written by whichever of the app and the notification extension the
+    /// push wakes. A guess until the app next writes the whole truth: an agent already
+    /// counted for an unread finish can be counted twice, and a need withdrawn that no row
+    /// names leaves the count as it is.
+    ///
+    /// - Returns: nil when the push changes nothing the widget shows.
+    public func applying(_ push: AttentionPush, at date: Date = Date()) -> AttentionSnapshot? {
+        var next = self
+        next.writtenAt = date
+        if push.withdrawn {
+            guard let row = sessions.firstIndex(where: { $0.needToken == push.token }) else { return nil }
+            next.sessions.remove(at: row)
+            next.total = max(0, total - 1)
+            return next
+        }
+        if sessions.contains(where: { $0.needToken == push.token }) { return nil }
+        let row = AttentionSnapshotSession(
+            id: push.agentID ?? UUID(), project: push.headline?.h1 ?? "Agents",
+            title: push.headline?.h2 ?? "An agent", wanted: push.headline?.h3, kind: push.kind,
+            since: date, needToken: push.token, agentUnknown: push.agentID == nil ? true : nil)
+        // The same session asking again is one row, and one in the count (FR-005).
+        if let agentID = push.agentID, let same = sessions.firstIndex(where: { $0.id == agentID }) {
+            next.sessions.remove(at: same)
+        } else {
+            next.total += 1
+        }
+        next.sessions = Array(([row] + next.sessions).prefix(Self.rowLimit))
+        return next
+    }
+
     /// The snapshot of what the app can see, at `date`.
     ///
     /// The count is the Dock badge's count and not a second rule: `AgentsModel.wantsALook`
@@ -139,7 +170,39 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
             title: agent.title ?? "Untitled",
             wanted: need?.headline.h3 ?? agent.report?.message,
             kind: need?.kind,
-            since: need?.raisedAt ?? agent.lastActivityAt)
+            since: need?.raisedAt ?? agent.lastActivityAt,
+            needToken: need?.id.token)
+    }
+}
+
+/// What a push about a need says, as the widget needs it (#1046): which need, whose, in
+/// what words, and whether it has gone.
+public struct AttentionPush: Hashable, Sendable {
+    public var token: String
+    public var kind: Need.Kind
+    /// The session, where the need names it: a report does, a question does not.
+    public var agentID: UUID?
+    /// The banner's words, when the envelope could be opened.
+    public var headline: Headline?
+    public var withdrawn: Bool
+
+    public init(token: String, kind: Need.Kind, agentID: UUID?, headline: Headline?, withdrawn: Bool) {
+        self.token = token
+        self.kind = kind
+        self.agentID = agentID
+        self.headline = headline
+        self.withdrawn = withdrawn
+    }
+
+    public init(need: NeedID, headline: Headline?, withdrawn: Bool) {
+        switch need {
+        case .permission: self.init(token: need.token, kind: .permission, agentID: nil, headline: headline, withdrawn: withdrawn)
+        case .elicitation: self.init(token: need.token, kind: .elicitation, agentID: nil, headline: headline, withdrawn: withdrawn)
+        case .report(let agentID, _):
+            self.init(token: need.token, kind: .report, agentID: agentID, headline: headline, withdrawn: withdrawn)
+        case .guardedChange:
+            self.init(token: need.token, kind: .guardedChange, agentID: nil, headline: headline, withdrawn: withdrawn)
+        }
     }
 }
 
@@ -161,14 +224,29 @@ public struct AttentionSnapshotSession: Codable, Hashable, Sendable, Identifiabl
     /// When the need was raised, or the agent's last activity when there is no need. The
     /// rows are ordered by this, newest first, as the app's own list is.
     public var since: Date
+    /// The need it is drawn for, so a push that withdraws it takes the row away (#1046).
+    public var needToken: String?
+    /// True for a row a push drew whose session it did not name: `id` is then no agent's,
+    /// and a tap opens the need instead.
+    public var agentUnknown: Bool?
 
-    public init(id: UUID, project: String, title: String, wanted: String?, kind: Need.Kind?, since: Date) {
+    public init(id: UUID, project: String, title: String, wanted: String?, kind: Need.Kind?, since: Date,
+                needToken: String? = nil, agentUnknown: Bool? = nil) {
         self.id = id
         self.project = project
         self.title = title
         self.wanted = wanted
         self.kind = kind
         self.since = since
+        self.needToken = needToken
+        self.agentUnknown = agentUnknown
+    }
+
+    /// Where a tap on the row goes: its conversation, or its need when the push that drew
+    /// it did not say whose it is.
+    public var link: AttentionLink {
+        if agentUnknown == true, let needToken { return .need(needToken) }
+        return .agent(id)
     }
 
     /// How long it has waited, as a row has room to say it: "now", "5m", "3h", "2d".

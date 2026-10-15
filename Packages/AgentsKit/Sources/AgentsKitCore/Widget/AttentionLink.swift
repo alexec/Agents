@@ -16,6 +16,9 @@ public enum AttentionLink: Hashable, Sendable {
     /// One session, named by its agent.
     case agent(UUID)
 
+    /// One need, by its token, for a row a push drew without naming its session (#1046).
+    case need(String)
+
     /// The scheme, registered by the Remote's `Info.plist`.
     public static let scheme = "agents"
 
@@ -25,6 +28,13 @@ public enum AttentionLink: Hashable, Sendable {
             return URL(string: "\(Self.scheme)://attention") ?? URL(string: "about:blank")!
         case .agent(let id):
             return URL(string: "\(Self.scheme)://agent/\(id.uuidString)") ?? URL(string: "about:blank")!
+        case .need(let token):
+            // A query, not a path: a guarded change's token holds a folder's slashes.
+            var parts = URLComponents()
+            parts.scheme = Self.scheme
+            parts.host = "need"
+            parts.queryItems = [URLQueryItem(name: "token", value: token)]
+            return parts.url ?? URL(string: "about:blank")!
         }
     }
 
@@ -39,6 +49,10 @@ public enum AttentionLink: Hashable, Sendable {
         case "agent":
             guard url.pathComponents.count == 2, let id = UUID(uuidString: url.pathComponents[1]) else { return nil }
             return .agent(id)
+        case "need":
+            guard let token = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "token" })?.value, !token.isEmpty else { return nil }
+            return .need(token)
         default:
             return nil
         }

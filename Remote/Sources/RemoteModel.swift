@@ -1,3 +1,4 @@
+import BackgroundTasks
 import SwiftUI
 import UIKit
 import WidgetKit
@@ -2280,6 +2281,8 @@ final class RemoteModel {
         await reopenStartChoices()
         settleSelection()
         // Once the counts have landed, so the widget's number is this refresh's number.
+        // Against the file, not the last write: a push may have laid a guess over it (#1046).
+        lastPublished = nil
         publishAttention()
         if let pendingOpen { open(pendingOpen) }
         note("catch-up: \(plan.steps.count) steps (\(plan.parts.map(\.rawValue).sorted().joined(separator: ", "))), "
@@ -2350,6 +2353,7 @@ final class RemoteModel {
     ///
     /// Each scene says its own (#888): the app is in front while any of them is.
     func scenePhase(_ phase: ScenePhase, of scene: UUID) {
+        if phase == .background { Self.scheduleWidgetRefresh() }
         let wasActive = scenesActive.isEmpty == false
         if phase == .active { scenesActive.insert(scene) } else { scenesActive.remove(scene) }
         let isActive = !scenesActive.isEmpty
@@ -2451,15 +2455,53 @@ final class RemoteModel {
         // The relay's wake-up: a relayed session polls, so there is nothing to poke.
         if CloudKitRelayChannel.isRelayPush(userInfo) { return }
         guard let pushed = CloudKitMailbox.pushed(from: userInfo) else { return }
-        // A need has moved here or away, which is the one thing the widget counts.
-        publishAttention()
+        let headline = pushed.envelope.flatMap { envelope in key.flatMap { try? Envelope.open(envelope, with: $0) } }
+        // A need has moved here or away, which is the one thing the widget counts (#1046).
+        await showOnTheWidget(AttentionPush(need: pushed.needID, headline: headline,
+                                            withdrawn: pushed.withdrawn || pushed.envelope == nil))
         if pushed.withdrawn || pushed.envelope == nil {
             notifier.withdraw(pushed.token)
             return
         }
-        guard let key, let envelope = pushed.envelope,
-              let headline = try? Envelope.open(envelope, with: key) else { return }
+        guard let headline else { return }
         notifier.show(headline, needID: pushed.needID, alert: pushed.alert)
+    }
+
+    /// A push, on the widget (#1046). Connected, the Mac is asked what waits and the whole
+    /// is written. Woken in the background with no link, the push is laid over the file,
+    /// since the model is as old as the last time the app ran.
+    private func showOnTheWidget(_ push: AttentionPush) async {
+        if isConnected {
+            await refreshAttention()
+            publishAttention()
+        } else if AttentionSnapshotStore.apply(push) {
+            lastPublished = nil
+            WidgetCenter.shared.reloadTimelines(ofKind: AttentionSnapshot.widgetKind)
+        }
+    }
+
+    /// The background refresh's name, as `BGTaskSchedulerPermittedIdentifiers` lists it.
+    nonisolated static let widgetRefreshTask = "com.alexecollins.agents.remote.widget-refresh"
+
+    /// Ask for the next background refresh, a quarter of an hour on at the soonest: the
+    /// widget's own staleness (#1046). The system decides when, or whether.
+    nonisolated static func scheduleWidgetRefresh() {
+        let request = BGAppRefreshTaskRequest(identifier: widgetRefreshTask)
+        request.earliestBeginDate = Date(timeIntervalSinceNow: AttentionSnapshot.staleness)
+        BGTaskScheduler.shared.submitTaskRequest(request) { _ in }
+    }
+
+    /// The system's background refresh (#1046): back in touch for a moment, caught up,
+    /// and the widget written, with no push and nobody opening the app.
+    func refreshInBackground() async {
+        note("widget: background refresh")
+        await goBackNow(.wake)
+        let deadline = ContinuousClock.now + .seconds(20)
+        while !isConnected, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+        guard isConnected else { return }
+        await catchUp()
     }
 
     /// Open one conversation from a banner, as the sidebar's pick (#226). A banner tapped
@@ -2483,6 +2525,16 @@ final class RemoteModel {
     /// git brought to its files is asked. The phone holds the Mac's projects only.
     func openProject(_ folder: URL) {
         sidebarItem = .project(ProjectKey(host: .mac, folder: folder))
+    }
+
+    /// Open what a need is about, from a banner or a widget row (#1046).
+    func open(needToken token: String) {
+        if let agentID = agentID(forNeedToken: token) {
+            open(agentID)
+        } else if let folder = NeedID.guardedFolder(fromToken: token) {
+            // The project's own question (#531), on its page.
+            openProject(folder)
+        }
     }
 
     /// Which conversation a banner is about, from the need it names. The Mac's
@@ -2547,6 +2599,10 @@ final class RemoteModel {
             // `open` has kept the id, so the conversation still opens if the agents are
             // merely late; a project is shown until then.
             if work.agent(id) == nil { showTheFirstProjectNeedingYou() }
+        case .need(let token):
+            // A row a push drew without naming its session (#1046).
+            if agentID(forNeedToken: token) == nil { showTheFirstProjectNeedingYou() }
+            open(needToken: token)
         case .attention:
             showTheFirstProjectNeedingYou()
         case nil:
@@ -2577,15 +2633,7 @@ final class RemoteModel {
     private func startPresence() {
         guard presence == nil else { return }
         notifier.open = { [weak self] agentID in self?.open(agentID) }
-        notifier.openNeed = { [weak self] token in
-            guard let self else { return }
-            if let agentID = self.agentID(forNeedToken: token) {
-                self.notifier.open(agentID)
-            } else if let folder = NeedID.guardedFolder(fromToken: token) {
-                // The project's own question (#531), on its page.
-                self.openProject(folder)
-            }
-        }
+        notifier.openNeed = { [weak self] token in self?.open(needToken: token) }
         notifier.authorisationChanged = { [weak self] in self?.presence?.connected() }
         let reporter = PresenceReporter { [weak self] watching, active, mayNotify, showing, popped in
             guard let self else { return }

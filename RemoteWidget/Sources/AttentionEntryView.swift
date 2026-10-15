@@ -114,7 +114,7 @@ private struct Medium: View {
         VStack(alignment: .leading, spacing: 7) {
             Heading(count: entry.count, leftover: entry.leftover(for: .medium))
             ForEach(entry.rows(for: .medium)) { session in
-                Link(destination: AttentionLink.agent(session.id).url) {
+                Link(destination: session.link.url) {
                     SessionRow(session: session)
                 }
             }
@@ -202,7 +202,7 @@ private struct Large: View {
     private func column(_ sessions: [AttentionSnapshotSession]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             ForEach(sessions) { session in
-                Link(destination: AttentionLink.agent(session.id).url) {
+                Link(destination: session.link.url) {
                     LargeRow(session: session, now: entry.date)
                 }
             }

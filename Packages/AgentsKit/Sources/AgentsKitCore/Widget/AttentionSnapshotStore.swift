@@ -57,6 +57,23 @@ public enum AttentionSnapshotStore {
         }
     }
 
+    /// Lay a push over the file (#1046), from the app or the notification extension.
+    /// Nothing when there is no file yet: a count made up from one push would claim to
+    /// know the rest.
+    ///
+    /// - Returns: whether it was written, so the caller reloads the widget only then.
+    @discardableResult
+    public static func apply(_ push: AttentionPush, into container: URL? = nil, at date: Date = Date()) -> Bool {
+        guard let next = read(from: container)?.applying(push, at: date),
+              let url = url(in: container), let data = try? JSONEncoder().encode(next) else { return false }
+        do {
+            try data.write(to: url, options: .atomic)
+            return true
+        } catch {
+            return false
+        }
+    }
+
     /// The last snapshot the app wrote, or nil when there is none — which the widget says
     /// out loud rather than showing a zero (FR-009).
     public static func read(from container: URL? = nil) -> AttentionSnapshot? {

@@ -56,6 +56,11 @@ struct RemoteApp: App {
                     Task { await old.stop() }
                 }
         }
+        // The widget kept true with the app shut and no push coming (#1046).
+        .backgroundTask(.appRefresh(RemoteModel.widgetRefreshTask)) { [model] in
+            RemoteModel.scheduleWidgetRefresh()
+            await model.refreshInBackground()
+        }
 
         // A session in a scene of its own on an iPad (#888), from a row's menu or a drag
         // out of the sidebar. One scene per session: opening one already open brings it
