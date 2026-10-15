@@ -15,11 +15,11 @@
 
 ## Counts
 
-Of 223 rows: **151 same**, **45 by design**, **27 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 224 rows: **151 same**, **46 by design**, **27 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888, #982). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
-| Sidebar and project list | 13 | 4 | 5 |
+| Sidebar and project list | 13 | 5 | 5 |
 | Session rows and states | 16 | 2 | 6 |
 | Chat turns and turn detail | 24 | 4 | 2 |
 | Prompt bar and queued prompts | 20 | 3 | 0 |
@@ -78,6 +78,7 @@ The deltas are tracked by 30 issues:
 | Files the host couldn't read (`store/notes`, #205) | Sidebar foot: `A/Projects/ProjectListView.swift:580-587` | A section at the foot of the projects list, asked on each catch-up: `R/Projects/ProjectListView.swift:42-55` | Sidebar foot, a server's named: `W/views/Sidebar.tsx:117-125` | **same** (#223) |
 | Keeping this Mac awake | Wake row: `A/Projects/ProjectListView.swift:745-809` | None | None | **by design** (the Mac's setting; the page isn't told the wake state, #151) |
 | Forget this client | *Forget This Mac…* on the window's own row of Settings ▸ Control plane ▸ Clients, asked first; the window goes back to first run: `A/Control/ControlClientsPane.swift:41-62`, `A/AppModel.swift:1840` (#344) | *Forget This iPhone…* / *iPad…* at the sidebar's foot, asked first; the app goes back to pairing: `R/Sidebar/RemoteSidebar.swift:76-80, 299-322`, `R/RemoteModel.swift:233` (#344) | *Forget This Browser…* at the sidebar's foot, asked first with the Remote's *cut off at once* sentence, why not under it (#935): `W/views/Sidebar.tsx`, `W/session.ts` `forgetThisBrowser` | **same** (#344): each forgets itself with `clients/forgetSelf` (071 FR-015) |
+| Get started checklist (#982) | A card at the top of the sidebar until every step is done or it is dismissed: paired, a runtime installed, a project, a first turn, a device paired (optional), each ticked from real state with its own button: `A/Projects/GetStartedCard.swift`, `A/AppModel+GetStarted.swift`, rules in `K/Sidebar/GetStarted.swift`, rows `S/ChecklistRow.swift` | None | None | **by design**: setup happens on the Mac; pairing stays as it is. #984's milestones, on all three, can reuse the facts and the row |
 
 ## Session rows and states
 
