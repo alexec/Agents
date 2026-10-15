@@ -150,6 +150,9 @@ public actor DaemonCore {
     /// for work, or while nothing is held. Compared with the verdict so a grace that
     /// keeps the same verdict still tells the windows its time.
     var lastGraceUntil: Date?
+    /// The hold the windows were last told about is for the power, with no agent
+    /// working (#992). A grace never begins from such a hold.
+    var lastHoldOnPower = false
     /// The last power reading actually taken, so reporting the charge to a window that
     /// has just connected costs nothing. Readings happen rarely by design — see the
     /// guard in `reviseWakefulness`.

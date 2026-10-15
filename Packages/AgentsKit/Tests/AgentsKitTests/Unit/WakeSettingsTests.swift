@@ -29,6 +29,20 @@ struct WakeSettingsTests {
         #expect(FileManager.default.fileExists(atPath: locations.wakeSettings.path) == false)
     }
 
+    @Test("A file from before #992 reads as off for the power switch, and a state with no onPower too")
+    func awakeOnPowerDecodesAsOff() throws {
+        let old = Data(#"{"keepsAwake":true,"graceHours":2,"warmRuntimes":3}"#.utf8)
+        let settings = try JSONDecoder().decode(WakeSettings.self, from: old)
+        #expect(settings.awakeOnPower == false)
+        #expect(settings.graceHours == 2)
+
+        let on = WakeSettings(awakeOnPower: true)
+        #expect(try JSONDecoder().decode(WakeSettings.self, from: JSONEncoder().encode(on)) == on)
+
+        let state = Data(#"{"isHolding":true,"agentsInFlight":0,"heldBackByBattery":false}"#.utf8)
+        #expect(try JSONDecoder().decode(DaemonAPI.WakeState.self, from: state).onPower == false)
+    }
+
     @Test("The grace line names today, tomorrow, or the day")
     func untilLine() {
         var calendar = Calendar(identifier: .gregorian)

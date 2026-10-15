@@ -31,19 +31,36 @@ extension DaemonAPI {
         /// the Mac is not being held. An older window that does not know the field
         /// still reads the rest.
         public var graceUntil: Date?
+        /// The hold is for the power, not for an agent: the Mac is on power and the
+        /// person chose to keep it awake there (#992). False when not holding.
+        public var onPower: Bool
 
         public init(isHolding: Bool,
                     agentsInFlight: Int,
                     heldBackByBattery: Bool,
                     batteryPercent: Int?,
                     since: Date?,
-                    graceUntil: Date? = nil) {
+                    graceUntil: Date? = nil,
+                    onPower: Bool = false) {
             self.isHolding = isHolding
             self.agentsInFlight = agentsInFlight
             self.heldBackByBattery = heldBackByBattery
             self.batteryPercent = batteryPercent
             self.since = since
             self.graceUntil = graceUntil
+            self.onPower = onPower
+        }
+
+        /// A daemon from before #992 sends no `onPower`: it never holds for the power.
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            isHolding = try c.decode(Bool.self, forKey: .isHolding)
+            agentsInFlight = try c.decode(Int.self, forKey: .agentsInFlight)
+            heldBackByBattery = try c.decode(Bool.self, forKey: .heldBackByBattery)
+            batteryPercent = try c.decodeIfPresent(Int.self, forKey: .batteryPercent)
+            since = try c.decodeIfPresent(Date.self, forKey: .since)
+            graceUntil = try c.decodeIfPresent(Date.self, forKey: .graceUntil)
+            onPower = try c.decodeIfPresent(Bool.self, forKey: .onPower) ?? false
         }
 
         /// Nothing held and nothing working. What a window shows before it has heard

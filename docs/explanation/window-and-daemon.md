@@ -75,6 +75,12 @@ in flight, so that grace is when you get the time. Closing the lid, or choosing 
 yourself, still puts the Mac to sleep, and a turn in flight goes to sleep with it. At
 20% battery or below the hold ends anyway.
 
+To let scheduled workflows and new issues run while you are away, turn on **Stay awake
+on power, even with no agents** in the same place. While the Mac is on power, the host
+then holds it awake with no agent working too. The display still sleeps and the screen
+still locks. On battery the rules above apply. A MacBook with its lid closed and no
+external display sleeps anyway, because a power assertion does not stop that.
+
 If the control plane runs on this Mac, remember that while the Mac sleeps no window or
 device can reach any of your agents, including those on servers.
 
