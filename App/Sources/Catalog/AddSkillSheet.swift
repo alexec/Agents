@@ -34,7 +34,7 @@ struct AddSkillSheet: View {
     @State private var marketplaces: [DaemonAPI.Marketplace] = []
     @State private var managing = false
     /// The marketplace last searched, kept across sheets (#687).
-    @AppStorage("catalog.skills.marketplace") private var chosen = "provided:skills-sh"
+    @AppStorage("catalog.skills.marketplace", store: WindowDefaults.store) private var chosen = "provided:skills-sh"
 
     static let size = CGSize(width: 720, height: 540)
 

@@ -63,8 +63,8 @@ struct ProjectSettingsSheet: View {
     static let size = CGSize(width: 760, height: 560)
 
     /// The size it was last left at, so it opens as the person left it.
-    @AppStorage("projectSettingsWidth") private var width = Double(Self.size.width)
-    @AppStorage("projectSettingsHeight") private var height = Double(Self.size.height)
+    @AppStorage("projectSettingsWidth", store: WindowDefaults.store) private var width = Double(Self.size.width)
+    @AppStorage("projectSettingsHeight", store: WindowDefaults.store) private var height = Double(Self.size.height)
 
     private var summary: DaemonAPI.ProjectSummary? { model.selectedProjectSummary }
     private var folder: URL? { model.selectedProject }

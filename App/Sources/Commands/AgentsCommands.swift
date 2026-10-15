@@ -57,7 +57,7 @@ struct AgentsCommands: Commands {
     let terminal: ProjectTerminalFrame
 
     /// Off unless asked for. The session draws thinking only while this is on.
-    @AppStorage(TurnDisplay.defaultsKey) private var turnDetail = TurnDisplay.initial
+    @AppStorage(TurnDisplay.defaultsKey, store: WindowDefaults.store) private var turnDetail = TurnDisplay.initial
     /// The session in the key window when that is a window of its own (#826).
     @FocusedValue(\.poppedChat) private var popped
     @Environment(\.openWindow) private var openWindow

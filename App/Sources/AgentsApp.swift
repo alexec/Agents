@@ -7,7 +7,7 @@ struct AgentsApp: App {
 
     /// Light, dark or the Mac's own, from Settings. Applied to the whole app from here,
     /// once at launch and on every change, so no window decides for itself.
-    @AppStorage(Appearance.defaultsKey) private var appearance = Appearance.system
+    @AppStorage(Appearance.defaultsKey, store: WindowDefaults.store) private var appearance = Appearance.system
 
     /// One window, so one of each: the menus act on the window they were made with.
     @State private var requests = WindowRequests()
@@ -19,6 +19,8 @@ struct AgentsApp: App {
         CrashHook.install()
         // And the next hang names its stack (#237).
         HangReporter.install()
+        // The defaults of scratch copies that have gone (#1029).
+        Task.detached(priority: .utility) { WindowDefaults.sweep() }
     }
 
     var body: some Scene {

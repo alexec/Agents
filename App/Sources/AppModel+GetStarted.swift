@@ -53,23 +53,16 @@ extension AppModel {
     }
 }
 
-/// The card's state, kept per root as `InstallOffer` is, and per walk: every copy of the
-/// app shares one defaults domain, and a scratch copy must not dismiss the real app's card.
-/// A walk's window (run-app) reads the standard root, so its walk name is the scope there.
+/// The card's state, in `WindowDefaults` as `InstallOffer` is, so a scratch copy does not
+/// dismiss the real app's card.
 enum GetStartedStore {
-    private static func key(_ name: String) -> String {
-        if let walk = ControlConfig.walk { return "\(name).walk:\(walk)" }
-        let locations = StoreLocations.default
-        return locations.isStandard ? name : "\(name).root:\(locations.name)"
-    }
-
     static var kept: GetStarted.Card? {
-        get { UserDefaults.standard.string(forKey: key("getStarted")).flatMap(GetStarted.Card.init(rawValue:)) }
-        set { UserDefaults.standard.set(newValue?.rawValue, forKey: key("getStarted")) }
+        get { WindowDefaults.store.string(forKey: "getStarted").flatMap(GetStarted.Card.init(rawValue:)) }
+        set { WindowDefaults.store.set(newValue?.rawValue, forKey: "getStarted") }
     }
 
     static var ranAgent: Bool {
-        get { UserDefaults.standard.bool(forKey: key("getStarted.ranAgent")) }
-        set { UserDefaults.standard.set(newValue, forKey: key("getStarted.ranAgent")) }
+        get { WindowDefaults.store.bool(forKey: "getStarted.ranAgent") }
+        set { WindowDefaults.store.set(newValue, forKey: "getStarted.ranAgent") }
     }
 }

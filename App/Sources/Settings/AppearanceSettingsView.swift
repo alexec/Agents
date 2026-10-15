@@ -34,13 +34,9 @@ enum Appearance: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Where the choice is kept, scoped by root the way drafts are: every copy of the
-    /// app shares one defaults domain, and a scratch copy trying the dark sheet must not
-    /// leave the real app dark.
-    static var defaultsKey: String {
-        let locations = StoreLocations.default
-        return locations.isStandard ? "appearance" : "appearance.root:\(locations.name)"
-    }
+    /// Where the choice is kept, in `WindowDefaults`: a scratch copy trying the dark sheet
+    /// must not leave the real app dark.
+    static let defaultsKey = "appearance"
 
     /// `--appearance dark|light|system`, which wins over the stored choice for the life
     /// of the process. For a scratch copy that has to be seen in a given appearance
@@ -60,12 +56,9 @@ enum Appearance: String, CaseIterable, Identifiable {
 }
 
 extension TextSize {
-    /// Where the choice is kept: scoped by root as `Appearance` is, so a scratch copy
+    /// Where the choice is kept: in `WindowDefaults` as `Appearance` is, so a scratch copy
     /// walked at Larger leaves the real app as it was (#750).
-    static var defaultsKey: String {
-        let locations = StoreLocations.default
-        return locations.isStandard ? "textSize" : "textSize.root:\(locations.name)"
-    }
+    static let defaultsKey = "textSize"
 }
 
 extension View {
@@ -76,7 +69,7 @@ extension View {
 }
 
 private struct ChosenTextSize: ViewModifier {
-    @AppStorage(TextSize.defaultsKey) private var textSize = TextSize.standard
+    @AppStorage(TextSize.defaultsKey, store: WindowDefaults.store) private var textSize = TextSize.standard
 
     func body(content: Content) -> some View {
         content.environment(\.textSize, TextSize.launchOverride ?? textSize)
@@ -116,8 +109,8 @@ struct MacSettingsView: View {
 
 /// Settings ▸ Appearance: the theme and the text size.
 struct AppearanceSettingsView: View {
-    @AppStorage(Appearance.defaultsKey) private var appearance = Appearance.system
-    @AppStorage(TextSize.defaultsKey) private var textSize = TextSize.standard
+    @AppStorage(Appearance.defaultsKey, store: WindowDefaults.store) private var appearance = Appearance.system
+    @AppStorage(TextSize.defaultsKey, store: WindowDefaults.store) private var textSize = TextSize.standard
 
     var body: some View {
         Section {

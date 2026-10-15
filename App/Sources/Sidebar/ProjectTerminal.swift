@@ -35,7 +35,7 @@ final class ProjectTerminalFrame {
         return fresh
     }
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = WindowDefaults.store) {
         self.defaults = defaults
         height = max((defaults.object(forKey: Self.heightKey) as? Double) ?? Self.defaultHeight, Self.minimumHeight)
     }

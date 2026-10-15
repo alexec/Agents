@@ -94,6 +94,11 @@ targets:
       - name: Check the sandbox gate
         script: python3 "$SRCROOT/scripts/check-store-window.py"
         basedOnDependencyAnalysis: false
+      # Every window preference in WindowDefaults (#1029): a scratch copy shares the
+      # bundle id, so a key in the standard domain lands in the person's window.
+      - name: Check window defaults
+        script: python3 "$SRCROOT/scripts/check-window-defaults.py"
+        basedOnDependencyAnalysis: false
     sources:
       - path: App/Sources
       - path: App/Resources

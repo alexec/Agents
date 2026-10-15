@@ -41,14 +41,26 @@ struct HostSettings: Codable, Sendable, Equatable {
     /// store, say. The first such value is kept and never written over.
     static func asideKey(_ paths: HostPaths) -> String { "\(key(paths)).unreadable" }
 
+    /// The ordinary set-up's are in the app's defaults. A scratch set-up's are a file in its
+    /// own root (#1029), which goes when the root does: in the defaults, keyed by the
+    /// root's hash, nothing ever removed them.
+    private static func read(_ key: String, _ paths: HostPaths) -> Data? {
+        guard let root = paths.scratchRoot else { return UserDefaults.standard.data(forKey: key) }
+        return try? Data(contentsOf: root.appendingPathComponent("\(key).json"))
+    }
+
+    private static func write(_ data: Data, _ key: String, _ paths: HostPaths) {
+        guard let root = paths.scratchRoot else { return UserDefaults.standard.set(data, forKey: key) }
+        try? data.write(to: root.appendingPathComponent("\(key).json"), options: .atomic)
+    }
+
     static func load(_ paths: HostPaths) -> HostSettings {
-        UserDefaults.standard.data(forKey: key(paths)).flatMap { try? JSONDecoder().decode(HostSettings.self, from: $0) }
-            ?? HostSettings()
+        read(key(paths), paths).flatMap { try? JSONDecoder().decode(HostSettings.self, from: $0) } ?? HostSettings()
     }
 
     /// What to tell the person when the saved settings would not decode, or nil.
     static func unreadableNote(_ paths: HostPaths) -> String? {
-        guard let data = UserDefaults.standard.data(forKey: key(paths)),
+        guard let data = read(key(paths), paths),
               (try? JSONDecoder().decode(HostSettings.self, from: data)) == nil else { return nil }
         return "This Mac's host settings could not be read (perhaps a newer build saved them), so it starts "
             + "with the defaults. What was saved is kept aside, under its own name, and never written over."
@@ -57,13 +69,12 @@ struct HostSettings: Codable, Sendable, Equatable {
     /// A value that would not decode is copied aside first, so the defaults written now
     /// never take the only copy of what a newer build chose.
     func save(_ paths: HostPaths) {
-        let defaults = UserDefaults.standard
-        if let old = defaults.data(forKey: Self.key(paths)),
+        if let old = Self.read(Self.key(paths), paths),
            (try? JSONDecoder().decode(HostSettings.self, from: old)) == nil,
-           defaults.data(forKey: Self.asideKey(paths)) == nil {
-            defaults.set(old, forKey: Self.asideKey(paths))
+           Self.read(Self.asideKey(paths), paths) == nil {
+            Self.write(old, Self.asideKey(paths), paths)
         }
-        if let data = try? JSONEncoder().encode(self) { defaults.set(data, forKey: Self.key(paths)) }
+        if let data = try? JSONEncoder().encode(self) { Self.write(data, Self.key(paths), paths) }
     }
 }
 
