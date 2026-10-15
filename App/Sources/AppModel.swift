@@ -1922,6 +1922,23 @@ final class AppModel {
         clientPermissions = settings
     }
 
+    /// The person's display choices (#1033): this Mac's host keeps them, and the window's
+    /// defaults mirror them so every view reads them where it always did.
+    @ObservationIgnored lazy var displayMirror = DisplayPreferenceMirror(defaults: WindowDefaults.store) { [weak self] changes in
+        self?.sendDisplayPreferences(changes)
+    }
+
+    private func sendDisplayPreferences(_ changes: DaemonAPI.DisplayPreferences) {
+        Task { _ = try? await client.call(DaemonAPI.Method.preferencesSet, changes,
+                                         returning: DaemonAPI.DisplayPreferences.self) }
+    }
+
+    func refreshDisplayPreferences() async {
+        guard let preferences = try? await client.call(DaemonAPI.Method.preferencesGet, Optional<String>.none,
+                                                       returning: DaemonAPI.DisplayPreferences.self) else { return }
+        displayMirror.hostSaid(preferences)
+    }
+
     func refreshPerson() async {
         guard let settings = try? await client.call(DaemonAPI.Method.personState, Optional<String>.none,
                                                     returning: PersonSettings.self) else { return }
@@ -2739,6 +2756,10 @@ final class AppModel {
             guard let settings = try? params?.decode(PersonSettings.self) else { return }
             person = settings
 
+        case DaemonAPI.Notification.preferencesChanged:
+            guard let preferences = try? params?.decode(DaemonAPI.DisplayPreferences.self) else { return }
+            displayMirror.hostSaid(preferences)
+
         case DaemonAPI.Notification.sandboxChanged:
             guard let settings = try? params?.decode(SandboxSettings.self) else { return }
             sandboxSettings = settings
@@ -3097,8 +3118,9 @@ final class AppModel {
             return
         case DaemonAPI.Notification.wakeChanged, DaemonAPI.Notification.modesChanged,
              DaemonAPI.Notification.attentionChanged, DaemonAPI.Notification.storeNotesChanged,
-             DaemonAPI.Notification.milestonesChanged:
-            // The milestones are the person's, kept on the Mac's own host (#984).
+             DaemonAPI.Notification.milestonesChanged, DaemonAPI.Notification.preferencesChanged:
+            // The milestones and display choices are the person's, kept on the Mac's own
+            // host (#984, #1033).
             return
         default:
             break
@@ -3247,11 +3269,13 @@ final class AppModel {
         async let disk: Void = refreshDisk()
         async let events: Void = refreshEvents()
         async let modes: Void = refreshModes()
+        async let display: Void = refreshDisplayPreferences()
         async let transcript: Void = loadTranscript()
         async let popped: Void = loadPoppedTranscripts()
         _ = await (popped, runtimes, accounts, workflows, pinned, permissions,
                    elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
-                   transcript, runtimeStates, sandbox, person, disk, storeNotes, hostedMCP, mcpHealth, milestones)
+                   transcript, runtimeStates, sandbox, person, disk, storeNotes, hostedMCP, mcpHealth, milestones,
+                   display)
     }
 
     #if DEBUG

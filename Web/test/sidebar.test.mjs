@@ -461,42 +461,33 @@ test("Projects: this Mac's then each server's, oldest added first, however busy 
   }
 });
 
-test("Status and Usage are open until folded, and each kept so (#915)", async () => {
-  const { Folds } = await load("src/model/folds.ts");
-  const storage = new Memory();
-  const first = new Folds(storage);
-  assert.equal(first.showsStatus.value, true, "open by default");
-  assert.equal(first.showsUsage.value, true, "open by default");
-  first.setShowsStatus(false);
-  assert.equal(new Folds(storage).showsStatus.value, false);
-  assert.equal(new Folds(storage).showsUsage.value, true, "folding Status leaves Usage open");
-  first.setShowsUsage(false);
-  first.setShowsStatus(true);
-  assert.equal(new Folds(storage).showsStatus.value, true);
-  assert.equal(new Folds(storage).showsUsage.value, false);
-});
-
-test("Status opens as Activity was left; Usage starts open (#915)", async () => {
-  const { Folds } = await load("src/model/folds.ts");
-  const storage = new Memory();
-  storage.setItem("agents.sidebar.activity", "false");
-  const folds = new Folds(storage);
+test("Status and Usage are open until folded, and Archived projects closed until opened (#915, #343)", async () => {
+  const m = await load("test/preferences-entry.ts");
+  const sent = [];
+  m.sendPreferencesWith((changes) => sent.push(changes));
+  const folds = new m.Folds(new Memory());
+  assert.equal(folds.showsStatus.value, true, "open by default");
+  assert.equal(folds.showsUsage.value, true, "open by default");
+  assert.equal(folds.showsArchivedProjects.value, false, "closed by default");
+  folds.setShowsStatus(false);
+  folds.setShowsArchivedProjects(true);
   assert.equal(folds.showsStatus.value, false);
-  assert.equal(folds.showsUsage.value, true);
+  assert.equal(folds.showsUsage.value, true, "folding Status leaves Usage open");
+  assert.equal(folds.showsArchivedProjects.value, true);
+  assert.deepEqual(sent, [{ showsActivity: false }, { showsArchivedProjects: true }], "sent to the Mac, by the window's names");
+  folds.setShowsStatus(false);
+  assert.equal(sent.length, 2, "no change, nothing sent");
 });
 
-test("Archived projects is closed until opened, and kept so (#343)", async () => {
-  const { Folds } = await load("src/model/folds.ts");
-  const storage = new Memory();
-  const first = new Folds(storage);
-  assert.equal(first.showsArchivedProjects.value, false, "closed by default");
-  first.setShowsArchivedProjects(true);
-  assert.equal(new Folds(storage).showsArchivedProjects.value, true);
-  first.setShowsArchivedProjects(false);
-  assert.equal(new Folds(storage).showsArchivedProjects.value, false);
-  const refusing = { getItem: () => { throw new Error("denied"); }, setItem: () => { throw new Error("quota"); } };
-  const held = new Folds(refusing);
-  assert.equal(held.showsArchivedProjects.value, false);
-  held.setShowsArchivedProjects(true);
-  assert.equal(held.showsArchivedProjects.value, true, "held for this visit");
+test("the sidebar follows what the Mac says (#1033)", async () => {
+  const m = await load("test/preferences-entry.ts");
+  const folds = new m.Folds(new Memory());
+  m.preferencesSaid({ showsActivity: false, showsUsage: false, showsArchivedProjects: true, sidebarSmartGroupsOff: "" });
+  assert.equal(folds.showsStatus.value, false);
+  assert.equal(folds.showsUsage.value, false);
+  assert.equal(folds.showsArchivedProjects.value, true);
+  assert.equal(m.smartGroupsOn.value.size, 4, "every group on is a choice too");
+  m.preferencesSaid({});
+  assert.equal(folds.showsStatus.value, true, "nothing said is the default");
+  assert.equal(m.smartGroupsOn.value.has("working"), false, "Working is off at first (#979)");
 });

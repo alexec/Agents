@@ -1180,6 +1180,12 @@ struct PromptBar: View {
         guard isNew else { return }
         // What was left on the form, before anything fills in a default over it.
         DraftKeeper.shared.putBackStartForm(into: model)
+        // Else what the person last chose on any client (#1033).
+        if model.draftRuntimeID == nil, let shared = DraftKeeper.shared.sharedStartForm(in: model),
+           model.availableRuntimes.contains(where: { $0.id == shared.runtimeID }) {
+            model.draftRuntimeID = shared.runtimeID
+            DraftKeeper.shared.putBackSharedChoices(shared.chosen)
+        }
         if model.draftRuntimeID == nil || !model.availableRuntimes.contains(where: { $0.id == model.draftRuntimeID }) {
             // The one rule (#264): what was put back, else the catalog's default, else the first.
             model.draftRuntimeID = model.defaultRuntimeID

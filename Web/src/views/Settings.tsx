@@ -1,6 +1,7 @@
 // This browser's Settings (#846), opened from the sidebar's foot, in the chat's place: what the
-// window has in Settings ▸ Appearance and Settings ▸ Sidebar. Both are this browser's alone, kept
-// in its localStorage: Celebrations (#986) and which smart groups are on.
+// window has in Settings ▸ Appearance and Settings ▸ Sidebar. Celebrations (#986) is this
+// browser's alone, in its localStorage; which smart groups are on is the person's, kept on their
+// Mac and the same on every client (#1033).
 import { smartRows, smartTitles } from "../model/sidebar";
 import { setSmartGroup, smartGroupsOn } from "../model/smartGroups";
 import { BackToList } from "./BackToList";

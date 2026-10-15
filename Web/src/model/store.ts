@@ -1,6 +1,7 @@
 // What the page holds and what each notification means: AgentsModel (Client/AgentsModel.swift),
 // ported by hand for the notifications the web remote hears and held to Fixtures/web/reducer
 // (research R7). Nothing here decides anything; the hosts do.
+import { preferencesSaid, sendPreferencesWith } from "./preferences";
 import { projectPath } from "./hostedMCP";
 import { batch, computed, signal, type ReadonlySignal, type Signal } from "@preact/signals";
 import type {
@@ -35,6 +36,9 @@ import { goOnRequest } from "./limits";
 import { milestonesSeen } from "./milestones";
 import { type Celebration, celebrate, earnedMore } from "./celebrations";
 import type { ChartHint } from "./chart";
+
+/** The person's Mac: the host that keeps their display choices (#1033). */
+const macHost = "mac";
 
 export { folderKey } from "./groups";
 
@@ -544,6 +548,9 @@ export class Work {
       case "prs/landed":
         this.celebration.value = celebrate(this.celebration.peek(), (params as PRsLanded).firstToday);
         return true;
+      case "preferences/changed":
+        if (host === macHost) preferencesSaid(params as Record<string, JSONValue>);
+        return true;
       case "modes/changed":
         this.rememberedModes.value = { ...this.rememberedModes.value, [host]: params as Record<string, JSONValue> };
         return true;
@@ -1010,6 +1017,11 @@ export function tellingWords(doing: string | null, recipient: string): string {
 export class Store extends Work {
   constructor(readonly link: Link) {
     super();
+    // The person's display choices are kept on their Mac (#1033).
+    sendPreferencesWith((changes) => {
+      void this.link.call("preferences/set", changes as Record<string, JSONValue>, macHost)
+        .then((said) => preferencesSaid(said)).catch(() => undefined);
+    });
     link.onNotification((method, params, host) => {
       if (method === "control/hostChanged") {
         this.hostChanged(params);
@@ -1274,6 +1286,12 @@ export class Store extends Work {
     void this.link.call("store/notes", {}, host).then((state) => {
       this.storeNotes.value = { ...this.storeNotes.value, [host]: state.notes };
     }).catch(failed("store/notes"));
+    // The person's display choices, from their Mac (#1033). A Mac too old to know the method
+    // leaves every choice at its default.
+    if (host === macHost) {
+      void this.link.call("preferences/get", {}, host).then((said) => preferencesSaid(said))
+        .catch(failed("preferences/get"));
+    }
     // A host from before #984 doesn't know it: the Time page shows no milestones.
     void this.link.call("milestones/state", {}, host).then((state) => this.takeMilestones(host, state))
       .catch(failed("milestones/state"));

@@ -690,6 +690,8 @@ public actor DaemonCore {
     /// The limits and modes as the watch last saw them, so only a change is told.
     var seenLimits: CostLimits?
     var seenModes: DaemonAPI.RememberedModes?
+    var seenDisplay: DaemonAPI.DisplayPreferences?
+    lazy var displayStore = DisplayPreferencesStore(locations: locations)
     /// The folders each project's watch leaves out, so a pin moving into one can
     /// restart it without them.
     var projectWatchExclusions: [URL: [URL]] = [:]

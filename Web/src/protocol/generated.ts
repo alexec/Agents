@@ -2393,6 +2393,8 @@ export interface Methods {
   "pins/unpinSession": { params: PinSessionRequest; result: Empty };
   "pins/unpinWorkflow": { params: WorkflowRequest; result: Empty };
   "pins/write": { params: PinWriteRequest; result: Empty };
+  "preferences/get": { params: Empty; result: Record<string, JSONValue> };
+  "preferences/set": { params: Record<string, JSONValue>; result: Record<string, JSONValue> };
   "presence/report": { params: PresenceReport; result: Empty };
   "projects/add": { params: ProjectRequest; result: ProjectSummary };
   "projects/archive": { params: ProjectRequest; result: ProjectSummary };
@@ -2518,6 +2520,8 @@ export const MethodTarget = {
   "pins/unpinSession": "host",
   "pins/unpinWorkflow": "host",
   "pins/write": "host",
+  "preferences/get": "host",
+  "preferences/set": "host",
   "presence/report": "host",
   "projects/add": "host",
   "projects/archive": "host",
@@ -2585,6 +2589,7 @@ export interface Notifications {
   "modes/changed": Record<string, JSONValue>;
   "pages/changed": PagesChangedNotification;
   "pins/changed": PinsChangedNotification;
+  "preferences/changed": Record<string, JSONValue>;
   "project/changed": ProjectSummary;
   "project/removed": ProjectRemovedNotification;
   "prs/landed": PRsLanded;

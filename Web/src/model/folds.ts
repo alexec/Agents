@@ -2,22 +2,16 @@
 // open, and which projects' Workflows folds (#885) are open, kept across visits in localStorage, as
 // the window keeps them in defaults (SidebarFolds.swift). A project's fold is named by host and
 // folder, so the same folder on two hosts folds apart; its Workflows fold the same, after
-// `workflows:`; a smart group's by its name. Archived projects, the one fold under no
-// project, is kept on its own, as the window's `showsArchivedProjects` (#343), and so are
-// Status, as its `showsActivity` (Status was Activity, #915), and Usage, as its `showsUsage`.
-import { signal } from "@preact/signals";
+// `workflows:`; a smart group's by its name. Archived projects (#343), Status (#915) and Usage
+// are the person's, kept on their Mac with the other display choices (#1033).
+import { computed, signal } from "@preact/signals";
+import { boolPreference, preferenceKeys, setPreferences } from "./preferences";
 import { folderKey } from "./groups";
 import { smartStartsOpen, type SmartRow } from "./sidebar";
 
 const storageKey = "agents.sidebar.folds";
 /** The smart groups that start open and have been closed (#495). */
 const closedKey = "agents.sidebar.folded";
-/** Whether Archived projects is open; closed until opened (#343). */
-const archivedProjectsKey = "agents.sidebar.archivedProjects";
-/** Whether Status is open; open until folded. Activity's key, so Status opens as Activity was left (#915). */
-const statusKey = "agents.sidebar.activity";
-/** Whether Usage is open; open until folded (#915). */
-const usageKey = "agents.sidebar.usage";
 /** The sessions whose children are shown (#835), the last opened last. */
 const sessionsKey = "agents.sidebar.openSessions";
 /** How many of those are kept, as `SidebarFolds.sessionsKept`, so the list stays small. */
@@ -43,54 +37,33 @@ function smartName(row: SmartRow): string {
 export class Folds {
   readonly open;
   readonly closed;
-  readonly showsArchivedProjects;
-  readonly showsStatus;
-  readonly showsUsage;
   readonly openSessions;
 
   constructor(private readonly storage: Storage | undefined) {
     this.open = signal(read(storage, storageKey));
     this.closed = signal(read(storage, closedKey));
     this.openSessions = signal([...read(storage, sessionsKey)]);
-    let shows = false;
-    let showsStatus = true;
-    let showsUsage = true;
-    try {
-      shows = storage?.getItem(archivedProjectsKey) === "true";
-      showsStatus = storage?.getItem(statusKey) !== "false";
-      showsUsage = storage?.getItem(usageKey) !== "false";
-    } catch {
-      // Unreadable storage leaves Archived projects closed, and Status and Usage open.
-    }
-    this.showsArchivedProjects = signal(shows);
-    this.showsStatus = signal(showsStatus);
-    this.showsUsage = signal(showsUsage);
   }
+
+  // Archived projects, Status and Usage are the person's display choices, kept on their Mac
+  // (#1033) as the window's showsArchivedProjects, showsActivity and showsUsage.
+  readonly showsArchivedProjects = computed(() => boolPreference(preferenceKeys.showsArchivedProjects) ?? false);
+  readonly showsStatus = computed(() => boolPreference(preferenceKeys.showsActivity) ?? true);
+  readonly showsUsage = computed(() => boolPreference(preferenceKeys.showsUsage) ?? true);
 
   setShowsArchivedProjects(isOpen: boolean): void {
     if (this.showsArchivedProjects.peek() === isOpen) return;
-    this.showsArchivedProjects.value = isOpen;
-    this.keep(archivedProjectsKey, isOpen);
+    setPreferences({ [preferenceKeys.showsArchivedProjects]: isOpen });
   }
 
   setShowsStatus(isOpen: boolean): void {
     if (this.showsStatus.peek() === isOpen) return;
-    this.showsStatus.value = isOpen;
-    this.keep(statusKey, isOpen);
+    setPreferences({ [preferenceKeys.showsActivity]: isOpen });
   }
 
   setShowsUsage(isOpen: boolean): void {
     if (this.showsUsage.peek() === isOpen) return;
-    this.showsUsage.value = isOpen;
-    this.keep(usageKey, isOpen);
-  }
-
-  private keep(key: string, isOpen: boolean): void {
-    try {
-      this.storage?.setItem(key, String(isOpen));
-    } catch {
-      // A private window may refuse to store; the fold still holds for this visit.
-    }
+    setPreferences({ [preferenceKeys.showsUsage]: isOpen });
   }
 
   isOpen(host: string, folder: string): boolean {

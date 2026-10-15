@@ -155,6 +155,40 @@ final class DraftKeeper {
         store.saveStartDraft(StartDraft(cwd: model.draftCwd, runtimeID: model.draftRuntimeID,
                                         folders: model.draftFolders, servers: model.draftServers,
                                         chosen: model.draftChosen))
+        shareStartForm(from: model)
+    }
+
+    /// The runtime and its choices follow the person to every client (#1033); the folders
+    /// and servers are this Mac's paths and stay in its draft.
+    private func shareStartForm(from model: AppModel) {
+        guard let runtimeID = model.draftRuntimeID else { return }
+        let preferences = model.displayMirror.preferences
+        var changes: DaemonAPI.DisplayPreferences = [:]
+        if preferences[DisplayPreference.startRuntimeID]?.stringValue != runtimeID {
+            changes[DisplayPreference.startRuntimeID] = .string(runtimeID)
+        }
+        var choices = preferences[DisplayPreference.startChoices]?.objectValue ?? [:]
+        if !model.draftChosen.isEmpty, choices[runtimeID] != .object(model.draftChosen) {
+            choices[runtimeID] = .object(model.draftChosen)
+            changes[DisplayPreference.startChoices] = .object(choices)
+        }
+        if !changes.isEmpty { model.displayMirror.set(changes) }
+    }
+
+    /// The runtime and choices another client last left on its start form, where this
+    /// Mac has none of its own to put back (#1033).
+    func sharedStartForm(in model: AppModel) -> (runtimeID: String, chosen: [String: JSONValue])? {
+        let preferences = model.displayMirror.preferences
+        guard let runtimeID = preferences[DisplayPreference.startRuntimeID]?.stringValue else { return nil }
+        let chosen = preferences[DisplayPreference.startChoices]?.objectValue?[runtimeID]?.objectValue ?? [:]
+        return (runtimeID, chosen)
+    }
+
+    /// Choices from another client, put back as this Mac's own would be once the runtime
+    /// says what it offers.
+    func putBackSharedChoices(_ chosen: [String: JSONValue]) {
+        guard leftForm == nil, leftChoices == nil, !chosen.isEmpty else { return }
+        leftChoices = chosen
     }
 
     /// The options could not be had, so the choices left on them cannot be put back.

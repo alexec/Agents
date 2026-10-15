@@ -5,7 +5,8 @@
 // conversations come a page at a time as the top is reached, and the pane follows the end
 // unless the person has scrolled up.
 import { Fragment } from "preact";
-import { useSignal } from "@preact/signals";
+import { useComputed, useSignal } from "@preact/signals";
+import { preferenceKeys, setPreferences, stringPreference } from "../model/preferences";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import { openTurnsHeld, rememberOpen, type Store } from "../model/store";
 import { backgroundAge, backgroundEnded, backgroundNoun, isRunning, subagentNoSteps, subagentStatus } from "../model/background";
@@ -44,8 +45,6 @@ import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWo
 import { eventWaitCapsule, leaseMark } from "../model/rowLines";
 import { GuardedChangeCard } from "./GuardedChange";
 
-const detailKey = "agents.turnDetail";
-
 /** One opened turn's entries, so an earlier page can be put in front and drawn again (#291). */
 interface HeldTurn {
   entries: TranscriptEntry[];
@@ -61,8 +60,11 @@ function shown(entries: TranscriptEntry[]): Item[] {
 }
 
 
-/** The level every turn starts at, the page's one setting (View ▸ Turns in the window). */
-const defaultDetail = { value: savedDetail(localStorage.getItem(detailKey)) };
+/** The level every turn starts at, the page's one setting (View ▸ Turns in the window): the
+ *  person's, kept on their Mac with the other display choices (#1033). */
+function defaultDetail(): TurnDetail {
+  return savedDetail(stringPreference(preferenceKeys.turnDetail) ?? null);
+}
 
 /** How close to the end counts as being back at it, on the way down (#378). */
 const atTheEnd = 40;
@@ -110,7 +112,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     setPane(session, { tab: "files", file: file.path, fileLine: undefined, last: file.path });
     if (!route.peek().files) replace({ ...route.peek(), files: true });
   };
-  const level = useSignal<TurnDetail>(defaultDetail.value);
+  const level = useComputed<TurnDetail>(defaultDetail);
   /** Turns opened or closed by hand, kept until the chat is left. */
   const chosen = useSignal<Record<string, TurnDetail>>({});
   /** The few opened turns whose entries are held, newest last (#291). */
@@ -522,9 +524,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   }), []);
 
   const choose = (detail: TurnDetail) => {
-    level.value = detail;
-    defaultDetail.value = detail;
-    localStorage.setItem(detailKey, detail);
+    setPreferences({ [preferenceKeys.turnDetail]: detail });
     chosen.value = {};
   };
 

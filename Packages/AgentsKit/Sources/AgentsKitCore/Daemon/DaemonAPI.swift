@@ -45,6 +45,13 @@ public enum DaemonAPI {
         /// window and every phone offers the same one first (029). The whole map: it is
         /// a handful of entries, and a client holding a copy needs all of it.
         public static let modesRemembered = "modes/remembered"
+        /// The person's display choices (#1033), kept once on the host in
+        /// `~/.agents/settings/display.json` so the window, the phone and the web page show
+        /// the same: the whole map, keyed as `DisplayPreference` names them.
+        public static let preferencesGet = "preferences/get"
+        /// Set some of them: each key given replaces its value, and `null` removes it.
+        /// Answers the whole map, and every client is told with `preferences/changed`.
+        public static let preferencesSet = "preferences/set"
         /// Where the person is, told by every surface when it comes to the front, goes
         /// behind, changes conversation, or sees input after a quiet spell (021 FR-011).
         /// No timestamp is accepted: the daemon stamps arrival with its own clock.
@@ -469,6 +476,8 @@ public enum DaemonAPI {
         /// The remembered modes changed: the whole map, as `modes/remembered` answers
         /// (029).
         public static let modesChanged = "modes/changed"
+        /// The display choices changed: the whole map, as `preferences/get` answers (#1033).
+        public static let preferencesChanged = "preferences/changed"
         /// The whole resolved fact for one need: where it should be showing and whether
         /// the person may be buzzed. Broadcast to every connection, not only to `to`,
         /// which is what lets the losers withdraw (021).
@@ -2572,6 +2581,10 @@ public enum DaemonAPI {
 
     /// Keyed by runtime id. What `modes/remembered` answers and `modes/changed` carries.
     public typealias RememberedModes = [String: JSONValue]
+
+    /// Keyed by `DisplayPreference`. What `preferences/get` answers, `preferences/set` takes
+    /// (a `null` removes a key) and `preferences/changed` carries (#1033).
+    public typealias DisplayPreferences = [String: JSONValue]
 
     public struct RememberedOptionsRequest: Codable, Sendable {
         public var runtimeID: String

@@ -317,6 +317,8 @@ public struct StoreLocations: Sendable {
     /// The names of the variables passed through to runtimes (`RuntimePassThrough`): names
     /// only, never values, so it is configuration and not a secret (#1035).
     public var runtimeEnvironment: URL { personalSettings.appendingPathComponent("runtime-environment.json") }
+    /// The display choices every client shares (#1033): `DisplayPreference`.
+    public var displayPreferences: URL { personalSettings.appendingPathComponent("display.json") }
     /// Which credentials are out, until when, and what credit has been spent (052).
     /// The Mac's is the one that counts: a relayed plan is one allowance (R6).
     public var allowances: URL { root.appendingPathComponent("allowances.json") }
