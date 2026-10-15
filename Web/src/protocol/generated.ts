@@ -1027,6 +1027,11 @@ export interface HostWorkspace {
   stopWhenIdleMinutes?: number;
   cost?: string;
   current: boolean;
+  startForSchedules?: boolean;
+  tellsSchedule?: boolean;
+  nextWorkflow?: string;
+  nextWorkflowAt?: WireDate;
+  wakeAt?: WireDate;
 }
 
 export interface HostedMCPSnapshot {
@@ -2673,7 +2678,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HostStop: { required: ["host"], optional: ["confirmRunning"] },
   HostTunnel: { required: ["up"], optional: ["problem"] },
   HostTunnelChanged: { required: ["name", "tunnel"], optional: ["host"] },
-  HostWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost"] },
+  HostWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },
   HostedMCPSnapshot: { required: ["servers", "at"], optional: [] },
   HostedMCPStatus: { required: ["name", "state", "restarts", "users"], optional: ["project", "since", "retryAt", "lastError"] },
   KeptDelivered: { required: ["host", "id"], optional: ["agentID"] },

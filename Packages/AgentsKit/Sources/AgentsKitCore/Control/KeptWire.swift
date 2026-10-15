@@ -113,9 +113,25 @@ public extension DaemonAPI {
         public var idle: Bool
         /// "Claude (fix-login)": each agent working or waiting on a person.
         public var running: [String]
-        public init(idle: Bool, running: [String] = []) {
+        /// Its next scheduled workflow, for the control plane's wake-up call (#1004 FR-002).
+        /// Nil from a host from before #1004 (FR-011); empty when nothing is scheduled.
+        public var schedule: HostSchedule?
+        public init(idle: Bool, running: [String] = [], schedule: HostSchedule? = nil) {
             self.idle = idle
             self.running = running
+            self.schedule = schedule
+        }
+    }
+
+    /// A host's next scheduled workflow (#1004): only workflows that run on it, are
+    /// approved, on and not archived. Both nil when there is none.
+    struct HostSchedule: Codable, Sendable, Hashable {
+        public var at: Date?
+        /// The workflow's name, as its page shows it.
+        public var workflow: String?
+        public init(at: Date? = nil, workflow: String? = nil) {
+            self.at = at
+            self.workflow = workflow
         }
     }
 

@@ -15,11 +15,37 @@ extension DaemonCore {
             return agent.title.map { "\(runtime) (\($0))" } ?? runtime
         }.sorted()
         let idle = working.isEmpty && pendingPermissions.isEmpty && shells.openCount == 0
-        return DaemonAPI.HostStatus(idle: idle, running: running)
+        return DaemonAPI.HostStatus(idle: idle, running: running, schedule: nextScheduled(after: now()))
+    }
+
+    /// This host's next scheduled workflow, for the control plane's wake-up call (#1004
+    /// FR-002): the soonest due of the ones that run here and could fire, as their pages say.
+    /// Only workflows with a schedule are looked at closer, so the 15-second tick reads no
+    /// file it doesn't need (a digest is kept by its file's stamp).
+    func nextScheduled(after date: Date) -> DaemonAPI.HostSchedule {
+        var candidates: [(Date, Workflow)] = []
+        for byID in workflows.values {
+            for workflow in byID.values where !workflow.schedules.isEmpty && !workflow.isArchived && !workflow.isOff
+                && workflow.runs(on: MachineID.current) {
+                if let due = workflow.nextDue(after: date) { candidates.append((due, workflow)) }
+            }
+        }
+        guard !candidates.isEmpty else { return DaemonAPI.HostSchedule() }
+        let records = workflowStore.load()
+        var ceilings: WorkflowCeilings?
+        for (due, workflow) in candidates.sorted(by: { ($0.0, $0.1.name) < ($1.0, $1.1.name) }) {
+            let state = records.state(folder: workflow.folder, workflowID: workflow.workflowID)
+            guard awaitingApproval(workflow, state: state, records: records) == nil,
+                  deniedHere(workflow, state: state) == nil else { continue }
+            if ceilings == nil { ceilings = workflowCeilings(records: records) }
+            guard limitReached(by: workflow, records: records, ceilings: ceilings) == nil else { continue }
+            return DaemonAPI.HostSchedule(at: due, workflow: workflow.name)
+        }
+        return DaemonAPI.HostSchedule()
     }
 
     /// Says `host/status` when it has changed: on the 15-second tick, and when the uplink
-    /// comes back. A turn starting is heard within the tick, well inside any idle time.
+    /// comes back. The next scheduled workflow changes it when one fires or is changed. A turn starting is heard within the tick, well inside any idle time.
     func reviseHostStatus() {
         guard let tellStatus else { return }
         let now = hostStatus()

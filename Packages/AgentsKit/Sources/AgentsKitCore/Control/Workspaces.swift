@@ -31,6 +31,15 @@ public struct WorkspaceLink: Codable, Hashable, Sendable {
     public var startWhenUsed: Bool?
     /// Stopped once idle this long (US4); nil is off.
     public var stopWhenIdleMinutes: Int?
+    /// Started a little before the host's next scheduled workflow while stopped (#1004
+    /// FR-009). Nil reads as on.
+    public var startForSchedules: Bool?
+    /// The host's next scheduled workflow as it last said it (FR-003), kept while it is stopped.
+    public var schedule: DaemonAPI.HostSchedule?
+    /// How long its last start took, from asking the provider to the host connecting (FR-004).
+    public var measuredStartSeconds: Int?
+    /// The due time it was last started for, so each starts it once (FR-006).
+    public var wokeFor: Date?
 
     public static let defaultIdleMinutes = 30
 
@@ -321,12 +330,29 @@ public extension DaemonAPI {
         public var cost: String?
         /// False when the provider's last list failed.
         public var current: Bool
+        /// The Start for scheduled workflows switch (#1004 FR-009).
+        public var startForSchedules: Bool?
+        /// Whether the host says when its next scheduled workflow is due (FR-011): one from
+        /// before #1004 doesn't, so it gets no wake-up calls and keeps the old warning.
+        public var tellsSchedule: Bool?
+        /// Its next scheduled workflow, as it last said it.
+        public var nextWorkflow: String?
+        public var nextWorkflowAt: Date?
+        /// When the control plane will start it for that workflow (FR-007): while it is
+        /// stopped, with the switch on.
+        public var wakeAt: Date?
 
         public init(provider: ProviderID, providerName: String, workspace: String, workspaceName: String,
                     workspaceState: String, hostState: String? = nil, phase: String? = nil, since: Date? = nil,
                     problem: String? = nil, stoppedBy: String? = nil, canStart: Bool = false, canStop: Bool = false,
                     startWhenUsed: Bool = true, stopWhenIdleMinutes: Int? = nil, cost: String? = nil,
-                    current: Bool = true) {
+                    current: Bool = true, startForSchedules: Bool? = nil, tellsSchedule: Bool? = nil,
+                    nextWorkflow: String? = nil, nextWorkflowAt: Date? = nil, wakeAt: Date? = nil) {
+            self.startForSchedules = startForSchedules
+            self.tellsSchedule = tellsSchedule
+            self.nextWorkflow = nextWorkflow
+            self.nextWorkflowAt = nextWorkflowAt
+            self.wakeAt = wakeAt
             self.provider = provider
             self.providerName = providerName
             self.workspace = workspace
@@ -413,8 +439,12 @@ public extension DaemonAPI {
         public var host: HostID
         public var startWhenUsed: Bool?
         public var stopWhenIdleMinutes: Int?
+        /// Start for scheduled workflows (#1004 FR-009).
+        public var startForSchedules: Bool?
 
-        public init(host: HostID, startWhenUsed: Bool? = nil, stopWhenIdleMinutes: Int? = nil) {
+        public init(host: HostID, startWhenUsed: Bool? = nil, stopWhenIdleMinutes: Int? = nil,
+                    startForSchedules: Bool? = nil) {
+            self.startForSchedules = startForSchedules
             self.host = host
             self.startWhenUsed = startWhenUsed
             self.stopWhenIdleMinutes = stopWhenIdleMinutes

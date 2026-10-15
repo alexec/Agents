@@ -301,10 +301,18 @@ struct ControlHostsPage: View {
         .confirmationDialog(stopping.map { "Stop \($0.name)?" } ?? "",
                             isPresented: Binding(get: { stopping != nil }, set: { if !$0 { stopping = nil } }),
                             titleVisibility: .visible, presenting: stopping) { host in
-            Button("Stop") { Task { _ = await control.stop(host.id, confirmed: true) } }
+            Button("Stop") {
+                Task {
+                    // Asked for its wake-up call only: who is working there is asked next.
+                    guard stoppingNames.isEmpty else { _ = await control.stop(host.id, confirmed: true); return }
+                    guard let names = await control.stop(host.id) else { return }
+                    stoppingNames = names
+                    stopping = host
+                }
+            }
             Button("Cancel", role: .cancel) {}
-        } message: { _ in
-            Text("\(Self.list(stoppingNames)) \(stoppingNames.count == 1 ? "is" : "are") working there. Stopping its workspace stops them.")
+        } message: { host in
+            Text(stopWords(host))
         }
         .sheet(item: $choosing) { host in
             ChooseProjectsSheet(host: host.id, hostName: host.id == control.thisMacHost?.id ? "This Mac" : host.name,
@@ -359,6 +367,12 @@ struct ControlHostsPage: View {
                 Button("Stop") {
                     // The control plane knows who is working there, from the host itself (US4).
                     Task {
+                        // Said first when it will start again for a schedule (#1004 FR-010).
+                        if workspace.wakeAt != nil {
+                            stoppingNames = []
+                            stopping = host
+                            return
+                        }
                         guard let names = await control.stop(host.id) else { return }
                         stoppingNames = names
                         stopping = host
@@ -396,6 +410,9 @@ struct ControlHostsPage: View {
                     Toggle("Start when used", isOn: Binding(
                         get: { workspace.startWhenUsed },
                         set: { on in Task { await control.setWorkspaceOptions(host.id, startWhenUsed: on) } }))
+                    Toggle("Start for scheduled workflows", isOn: Binding(
+                        get: { workspace.startForSchedules ?? true },
+                        set: { on in Task { await control.setWorkspaceOptions(host.id, startForSchedules: on) } }))
                     Picker("Stop when idle", selection: Binding(
                         get: { workspace.stopWhenIdleMinutes ?? 0 },
                         set: { minutes in Task { await control.setWorkspaceOptions(host.id, stopWhenIdleMinutes: minutes) } })) {
@@ -436,6 +453,18 @@ struct ControlHostsPage: View {
     static func list(_ names: [String]) -> String {
         guard names.count > 1 else { return names.first ?? "" }
         return names.dropLast().joined(separator: ", ") + " and " + names.last!
+    }
+
+    /// Stop's confirmation: who is working there, and when it starts again (#1004 FR-010).
+    private func stopWords(_ host: DaemonAPI.ControlHost) -> String {
+        var words: [String] = []
+        if !stoppingNames.isEmpty {
+            words.append("\(Self.list(stoppingNames)) \(stoppingNames.count == 1 ? "is" : "are") working there. Stopping its workspace stops them.")
+        }
+        if let workspace = host.workspace, let wake = OfflineWords.wakeLine(workspace) {
+            words.append("\(wake) again.")
+        }
+        return words.joined(separator: " ")
     }
 
     /// The host's workflows that run on a clock (L8): they don't run while it is stopped.
@@ -480,11 +509,16 @@ struct ControlHostsPage: View {
             if let problem = workspace.problem { second.append(problem) }
             if let minutes = workspace.stopWhenIdleMinutes { second.append("Stops after \(Self.minutes(minutes)) idle") }
             if workspace.startWhenUsed { second.append("Starts when used") }
+            // Its wake-up call (#1004 FR-007), or that its schedule keeps it up (edge case).
+            if host.state != "online", let wake = OfflineWords.wakeLine(workspace) { second.append(wake) }
+            if host.state == "online", let up = OfflineWords.staysUpLine(workspace) { second.append(up) }
             if !workspace.current { second.append("\(workspace.providerName) didn’t answer its last list") }
             var lines = [parts.joined(separator: " · ")]
             if !second.isEmpty { lines.append(second.joined(separator: " · ")) }
-            // L8: a host that stops when idle doesn't run its scheduled workflows while stopped.
-            let scheduled = workspace.stopWhenIdleMinutes == nil ? 0 : scheduledWorkflows(host.id)
+            // L8: a host that stops when idle doesn't run its scheduled workflows while stopped,
+            // unless it is started for them (#1004 FR-008, FR-009, FR-011).
+            let started = (workspace.startForSchedules ?? true) && workspace.tellsSchedule == true
+            let scheduled = workspace.stopWhenIdleMinutes == nil || started ? 0 : scheduledWorkflows(host.id)
             if scheduled > 0 {
                 lines.append("⚠ \(scheduled == 1 ? "1 scheduled workflow here doesn’t" : "\(scheduled) scheduled workflows here don’t") run while it is stopped.")
             }

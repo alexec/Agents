@@ -98,6 +98,21 @@ struct IdleStopsTests {
         #expect(row.workspace?.stoppedBy == nil)
     }
 
+    /// Its idle status comes as it connects, before the start is done (seen on the #1004 walk).
+    @Test func aHostIdleAsItsStartEndsIsStoppedAfterItsIdleTime() async throws {
+        let h = try await ProviderHarness(timing: ProviderHarness.quick)
+        try await h.link(try await h.add())
+        _ = try await h.call(DaemonAPI.Method.hostsSetWorkspaceOptions,
+                             try JSONValue.encoding(DaemonAPI.HostWorkspaceOptions(host: h.devbox, stopWhenIdleMinutes: 2)))
+        await h.provider.set(startTakes: .milliseconds(100))
+        _ = try await h.call(DaemonAPI.Method.hostsStart, try JSONValue.encoding(DaemonAPI.HostRequest(host: h.devbox)))
+        await h.router.setState(.online, of: h.devbox)
+        await h.said(true)
+        _ = try await h.waitFor("online") { $0.workspace?.canStop == true }
+        for _ in 0..<200 where await h.provider.stops == 0 { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(await h.provider.stops == 1)
+    }
+
     @Test func minutesAreSaidAsAPersonWould() {
         #expect(WorkspaceProviders.words(minutes: 30) == "30 minutes")
         #expect(WorkspaceProviders.words(minutes: 60) == "1 hour")
