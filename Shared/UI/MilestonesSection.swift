@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// The Time page's milestones (#984): the first steps the person has taken, each with its
+/// The milestones (#984): the first steps the person has taken, each with its
 /// day, then the ones not taken yet, greyed with how. The second list is the newcomer's
 /// checklist. Drawn by the window and the Remote; the page draws `Milestones` in
 /// Milestones.tsx. Kept and worked out on the host, in `Milestones`.
@@ -42,18 +42,15 @@ struct MilestonesSection: View {
     }
 }
 
-/// The Time page with its milestones (#984): above the recap while some are still to
-/// earn, where a newcomer looks first, and under the charts once all are.
-struct TimeMilestonesAround<Content: View>: View {
+/// The Time page with its milestones under the charts, once all are earned (#984). Until
+/// then they are a page of their own, with a row in the sidebar (#1067).
+struct TimeMilestonesUnder<Content: View>: View {
     let milestones: Milestones?
     var fresh: Set<Milestone> = []
     @ViewBuilder var content: () -> Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
-            if let milestones, !milestones.isComplete {
-                MilestonesSection(milestones: milestones, fresh: fresh)
-            }
             content()
             if let milestones, milestones.isComplete {
                 MilestonesSection(milestones: milestones, fresh: fresh)

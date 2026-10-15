@@ -643,7 +643,7 @@ final class RemoteModel {
                 openArchive = false
                 openMCPServers = false
                 openPin = path
-            case .spending, .tokens, .time, .resources, .events, .runtimes, .mcpServers, .worktrees:
+            case .spending, .tokens, .time, .milestones, .resources, .events, .runtimes, .mcpServers, .worktrees:
                 openActivity = newValue
             case .archive(let key):
                 // The project's archive page (#495, #498), with what is opened from it

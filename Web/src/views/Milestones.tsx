@@ -27,14 +27,13 @@ export function MilestonesSection({ milestones }: { milestones: Milestones }) {
   );
 }
 
-/** The Time page with its milestones: above while some are still to earn, under once all are. */
-export function TimeMilestonesAround({ milestones, children }: { milestones: Milestones | undefined; children: ComponentChildren }) {
-  const done = milestones ? isComplete(milestones) : false;
+/** The Time page with its milestones under the charts once all are earned; until then they are a
+ * page of their own (#1067). */
+export function TimeMilestonesUnder({ milestones, children }: { milestones: Milestones | undefined; children: ComponentChildren }) {
   return (
     <>
-      {milestones && !done && <MilestonesSection milestones={milestones} />}
       {children}
-      {milestones && done && <MilestonesSection milestones={milestones} />}
+      {milestones && isComplete(milestones) && <MilestonesSection milestones={milestones} />}
     </>
   );
 }

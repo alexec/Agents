@@ -1,8 +1,8 @@
 import AgentsKitCore
 import Foundation
 
-/// The milestones (#984): kept on the host, drawn on the Time page, and a one-time card
-/// in the sidebar for each one earned while this window has been looking.
+/// The milestones (#984): kept on the host, drawn on the Milestones page (#1067), and a
+/// one-time card in the sidebar for each one earned while this window has been looking.
 extension AppModel {
     /// As asked on connecting; then heard as it changes.
     func takeMilestones(_ milestones: Milestones) {

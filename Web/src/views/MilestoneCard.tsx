@@ -1,6 +1,6 @@
 // The one-time card for a milestone just earned (#984): the page's half of the window's and the
-// iPad's MilestoneCard, at the bottom right until closed or opened. Apart from Milestones.tsx so
-// the Time page does not load the router.
+// iPad's MilestoneCard, at the bottom right until closed or opened; See Milestones opens their page
+// (#1067). Apart from Milestones.tsx so the pages do not load the router.
 import { type MilestoneID, milestoneList, milestonesSeen } from "../model/milestones";
 import { go, route } from "../route";
 import type { Store } from "../model/store";
@@ -22,7 +22,7 @@ export function MilestoneCard({ store }: { store: Store }) {
         </span>
         <button class="link close" aria-label="Dismiss milestone" title="Dismiss" onClick={() => dismiss(id)}>✕</button>
       </div>
-      <button class="link small" onClick={() => { dismiss(id); go({ ...route.peek(), activity: "time", settings: undefined }); }}>
+      <button class="link small" onClick={() => { dismiss(id); go({ ...route.peek(), activity: "milestones", settings: undefined }); }}>
         See Milestones
       </button>
     </aside>

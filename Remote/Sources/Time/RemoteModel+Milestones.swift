@@ -1,9 +1,10 @@
 import AgentsKitCore
 import UIKit
 
-/// The milestones (#984): kept on the Mac's host, drawn on the Time page. A milestone
+/// The milestones (#984): kept on the Mac's host, drawn on the Milestones page
+/// (#1067) while any is still to earn and under Time's charts once all are. A milestone
 /// earned while this device has been looking is a one-time card on the iPad; on the
-/// iPhone it is marked New on the Time page instead (Alex, #984), until the page is left.
+/// iPhone it is marked New on that page instead (Alex, #984), until the page is left.
 extension RemoteModel {
     /// What the catch-up carried, or what was asked for on its own.
     func takeMilestones(_ milestones: Milestones) {
@@ -22,7 +23,7 @@ extension RemoteModel {
     /// The iPad's card: the first milestone earned and not yet seen here.
     var milestoneCard: Milestone? { showsMilestoneCards ? unseenMilestones.first : nil }
 
-    /// The iPhone's New marks on the Time page.
+    /// The iPhone's New marks on the Milestones page (or Time's, for the last one).
     var freshMilestones: Set<Milestone> { showsMilestoneCards ? [] : Set(unseenMilestones) }
 
     /// Closed or opened: it does not come back.
@@ -30,7 +31,7 @@ extension RemoteModel {
         keepMilestonesSeen((milestonesSeen ?? []).union([milestone.rawValue]))
     }
 
-    /// The Time page was left: what it marked New has been seen.
+    /// The Milestones or Time page was left: what it marked New has been seen.
     func sawMilestones() {
         let fresh = freshMilestones
         guard !fresh.isEmpty else { return }

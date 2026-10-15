@@ -147,7 +147,7 @@ struct RemoteView: View {
         .overlay(alignment: .bottomTrailing) {
             if let milestone = model.milestoneCard {
                 MilestoneCard(milestone: milestone,
-                              open: { model.dismissMilestone(milestone); model.sidebarItem = .time },
+                              open: { model.dismissMilestone(milestone); model.sidebarItem = .milestones },
                               dismiss: { model.dismissMilestone(milestone) })
                     .frame(maxWidth: 320)
                     .shadow(color: .black.opacity(0.12), radius: 8, y: 2)
@@ -339,6 +339,7 @@ struct RemoteView: View {
         case .mcpServers: MCPServersListView().paperGround()
         case .tokens: TokensView().paperGround()
         case .time: TimeView().paperGround()
+        case .milestones: MilestonesView().paperGround()
         case .worktrees: WorktreesListView().paperGround()
         default: TotalsView().paperGround()
         }

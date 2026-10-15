@@ -172,6 +172,7 @@ final class AppModel {
             showsRuntimes = false
             showsMCPServers = false
             showsTime = false
+            showsMilestones = false
             showsTokens = false
             showsWorktrees = false
             // The same rule as picking a project: what you picked is what you see,
@@ -196,6 +197,7 @@ final class AppModel {
             showsRuntimes = false
             showsMCPServers = false
             showsTime = false
+            showsMilestones = false
             showsTokens = false
             showsWorktrees = false
             selection = nil
@@ -215,6 +217,7 @@ final class AppModel {
             showsRuntimes = false
             showsMCPServers = false
             showsTime = false
+            showsMilestones = false
             showsTokens = false
             showsWorktrees = false
             selection = nil
@@ -237,6 +240,7 @@ final class AppModel {
             showsEvents = false
             showsMCPServers = false
             showsTime = false
+            showsMilestones = false
             showsTokens = false
             showsWorktrees = false
             selection = nil
@@ -257,6 +261,7 @@ final class AppModel {
             showsEvents = false
             showsRuntimes = false
             showsTime = false
+            showsMilestones = false
             showsTokens = false
             showsWorktrees = false
             selection = nil
@@ -276,6 +281,28 @@ final class AppModel {
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
+            showsMilestones = false
+            showsTokens = false
+            showsWorktrees = false
+            selection = nil
+            openWorkflow = nil
+            projectPage = nil
+            composing = false
+        }
+    }
+
+    /// Whether the window is showing Milestones: the first steps taken, and the ones still to
+    /// take (#1067). A page like Time, and not persisted for the same reason.
+    var showsMilestones = false {
+        didSet {
+            guard showsMilestones, showsMilestones != oldValue else { return }
+            showsSpending = false
+            showsResources = false
+            showsEvents = false
+            showsRuntimes = false
+            showsMCPServers = false
+            showsTime = false
+            showsTokens = false
             showsWorktrees = false
             selection = nil
             openWorkflow = nil
@@ -295,6 +322,7 @@ final class AppModel {
             showsRuntimes = false
             showsMCPServers = false
             showsTime = false
+            showsMilestones = false
             showsWorktrees = false
             selection = nil
             openWorkflow = nil
@@ -315,6 +343,7 @@ final class AppModel {
             showsRuntimes = false
             showsMCPServers = false
             showsTime = false
+            showsMilestones = false
             showsTokens = false
             selection = nil
             openWorkflow = nil
@@ -367,6 +396,7 @@ final class AppModel {
         showsRuntimes = false
         showsMCPServers = false
         showsTime = false
+        showsMilestones = false
         showsTokens = false
         showsWorktrees = false
         if let agent = agents.first(where: { $0.id == agentID }) {
@@ -390,6 +420,7 @@ final class AppModel {
         showsRuntimes = false
         showsMCPServers = false
         showsTime = false
+        showsMilestones = false
         showsTokens = false
         showsWorktrees = false
         // Not listed yet: settling the selection would pick another, so it waits (#1055).
@@ -434,6 +465,7 @@ final class AppModel {
             if showsSpending { return .spending }
             if showsTokens { return .tokens }
             if showsTime { return .time }
+            if showsMilestones { return .milestones }
             guard let key = selectedProjectKey else { return nil }
             if let id = openWorkflow { return .workflow(id, in: key) }
             if projectPage == .archive { return .archive(key) }
@@ -455,6 +487,7 @@ final class AppModel {
                 showsRuntimes = false
                 showsMCPServers = false
                 showsTime = false
+                showsMilestones = false
                 showsTokens = false
                 showsWorktrees = false
                 select(key)
@@ -471,6 +504,8 @@ final class AppModel {
                 showsTokens = true
             case .time:
                 showsTime = true
+            case .milestones:
+                showsMilestones = true
             case .resources:
                 showResources()
             case .events:
@@ -488,6 +523,7 @@ final class AppModel {
                 showsRuntimes = false
                 showsMCPServers = false
                 showsTime = false
+                showsMilestones = false
                 showsTokens = false
                 showsWorktrees = false
                 showProject(key)
@@ -508,6 +544,7 @@ final class AppModel {
         showsRuntimes = false
         showsMCPServers = false
         showsTime = false
+        showsMilestones = false
         showsTokens = false
         showsWorktrees = false
         select(key)
@@ -536,6 +573,7 @@ final class AppModel {
         showsRuntimes = false
         showsMCPServers = false
         showsTime = false
+        showsMilestones = false
         showsTokens = false
         showsWorktrees = false
         select(key)
@@ -714,6 +752,7 @@ final class AppModel {
         showsRuntimes = false
         showsMCPServers = false
         showsTime = false
+        showsMilestones = false
         showsTokens = false
         showsWorktrees = false
         select(key)

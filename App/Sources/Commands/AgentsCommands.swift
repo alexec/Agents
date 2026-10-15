@@ -156,6 +156,7 @@ struct AgentsCommands: Commands {
                 .keyboardShortcut("s", modifiers: [.command, .option])
             Button("Tokens") { model.showsTokens = true }
             Button("Time") { model.showsTime = true }
+            Button("Milestones") { model.showsMilestones = true }
             // Agents as a web page on this Mac, found from here (#109).
             Button("Open in Browser") { openInBrowser() }
                 .disabled(model.controlPlaneHosts == nil)
