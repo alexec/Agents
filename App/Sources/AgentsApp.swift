@@ -61,7 +61,6 @@ struct AgentsApp: App {
         Settings {
             SettingsWindow()
                 .paperGround()
-                .chosenTextSize()
                 .environment(model)
         }
         .defaultSize(width: SettingsWindow.size.width, height: SettingsWindow.size.height)

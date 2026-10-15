@@ -255,7 +255,6 @@ Packages/AgentsKit/Sources/AgentsKit/Store/PersonSettingsStore.swift  settings
 Packages/AgentsKit/Sources/AgentsKitCore/Model/PersonSettings.swift  settings
 Web/src/views/Settings.tsx                             settings
 Web/src/theme/                                         settings
-Web/src/model/textSize.ts                              settings
 docs/reference/settings.md                             settings
 
 # usage: cost, spending limits, allowances, usage and time charts.

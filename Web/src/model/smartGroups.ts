@@ -1,8 +1,7 @@
 // Which smart groups at the top of the sidebar are on (#846): Pinned, Needs You, Working and
 // Unread; with nothing kept, Working and Unread are off (#979). Kept in this browser's localStorage as the window and
 // the Remote keep it in their own defaults (SidebarSmartRow.offDefaultsKey): the groups turned
-// off, by name, comma-separated, so a new group starts on. It is this browser's alone, as its
-// text size is (#750).
+// off, by name, comma-separated, so a new group starts on. It is this browser's alone.
 import { signal } from "@preact/signals";
 import { smartRows, type SmartRow } from "./sidebar";
 

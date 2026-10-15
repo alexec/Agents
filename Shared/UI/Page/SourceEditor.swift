@@ -125,7 +125,7 @@ private struct SourceTextView: NSViewRepresentable {
         view.importsGraphics = false
         view.allowsUndo = true
         view.drawsBackground = false
-        view.font = TextStep.code.nsFont(context.environment.textSize)
+        view.font = TextStep.code.nsFont
         view.textColor = .textColor
         view.isAutomaticQuoteSubstitutionEnabled = false
         view.isAutomaticDashSubstitutionEnabled = false
@@ -157,8 +157,8 @@ private struct SourceTextView: NSViewRepresentable {
         context.coordinator.parent = self
         guard let view = scroll.documentView as? NSTextView else { return }
         view.isEditable = isEditable
-        // The person's text size, if it changed while the file was open (#750).
-        let font = TextStep.code.nsFont(context.environment.textSize)
+        // The system's text size, if it changed while the file was open.
+        let font = TextStep.code.nsFont
         if view.font != font { view.font = font }
         // Only when the text changed from outside — the file on disk — never on the
         // person's own keystroke coming back, which would lose the caret.

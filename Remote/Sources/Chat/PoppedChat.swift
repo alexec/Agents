@@ -100,7 +100,6 @@ struct PoppedChatScene: View {
             }
         }
         .background(Paper.ground)
-        .chosenTextSize()
         .onContinueUserActivity(PoppedChat.activityType) { activity in
             if let dragged = PoppedChat.agentID(in: activity) { id = dragged }
         }

@@ -1,7 +1,6 @@
 // This browser's Settings (#846), opened from the sidebar's foot, in the chat's place: what the
 // window has in Settings ▸ Appearance and Settings ▸ Sidebar. Both are this browser's alone, kept
-// in its localStorage: the text size (#750), Celebrations (#986) and which smart groups are on.
-import { chooseTextSize, parseTextSize, textSize, textSizes } from "../model/textSize";
+// in its localStorage: Celebrations (#986) and which smart groups are on.
 import { smartRows, smartTitles } from "../model/sidebar";
 import { setSmartGroup, smartGroupsOn } from "../model/smartGroups";
 import { BackToList } from "./BackToList";
@@ -24,12 +23,6 @@ export function SettingsPage() {
         <div class="activity-body settings-body">
           <section aria-labelledby="settings-appearance">
             <h2 class="section-head" id="settings-appearance">Appearance</h2>
-            <label class="setting">
-              <span>Text size</span>
-              <select value={textSize.value} onChange={(e) => chooseTextSize(parseTextSize(e.currentTarget.value))}>
-                {textSizes.map(({ size, title }) => <option value={size} key={size}>{title}</option>)}
-              </select>
-            </label>
             <label class="setting">
               <span>Celebrations</span>
               <input type="checkbox" role="switch" checked={celebrationsOn.value}

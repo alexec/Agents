@@ -55,27 +55,6 @@ enum Appearance: String, CaseIterable, Identifiable {
     }
 }
 
-extension TextSize {
-    /// Where the choice is kept: in `WindowDefaults` as `Appearance` is, so a scratch copy
-    /// walked at Larger leaves the real app as it was (#750).
-    static let defaultsKey = "textSize"
-}
-
-extension View {
-    /// Hands the person's text size, or the launch override, to everything below.
-    func chosenTextSize() -> some View {
-        modifier(ChosenTextSize())
-    }
-}
-
-private struct ChosenTextSize: ViewModifier {
-    @AppStorage(TextSize.defaultsKey, store: WindowDefaults.store) private var textSize = TextSize.standard
-
-    func body(content: Content) -> some View {
-        content.environment(\.textSize, TextSize.launchOverride ?? textSize)
-    }
-}
-
 /// Settings ▸ Account (#846): what agents call you, and the chat project.
 struct AccountSettingsView: View {
     @Environment(AppModel.self) private var model
@@ -107,10 +86,9 @@ struct MacSettingsView: View {
     }
 }
 
-/// Settings ▸ Appearance: the theme, the text size and the Blob's celebrations.
+/// Settings ▸ Appearance: the theme and the Blob's celebrations.
 struct AppearanceSettingsView: View {
     @AppStorage(Appearance.defaultsKey, store: WindowDefaults.store) private var appearance = Appearance.system
-    @AppStorage(TextSize.defaultsKey, store: WindowDefaults.store) private var textSize = TextSize.standard
     @AppStorage(Celebration.defaultsKey, store: WindowDefaults.store) private var celebrations = true
 
     var body: some View {
@@ -119,17 +97,11 @@ struct AppearanceSettingsView: View {
                 ForEach(Appearance.allCases) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented)
-            // Beside the appearance, and per Mac like it (#750): the whole app's text,
-            // with the marks beside it. The terminal keeps its own size.
-            Picker("Text size", selection: $textSize) {
-                ForEach(TextSize.allCases) { Text($0.title).tag($0) }
-            }
-            .pickerStyle(.segmented)
             // The Blob's bounce for a landed pull request, with confetti for the day's
             // first and a milestone (#986).
             Toggle("Celebrations", isOn: $celebrations)
         } footer: {
-            Text("System follows your Mac, and changes with it. Text size is for this Mac only; the terminal keeps its own. Celebrations: the Blob hops when a pull request lands, with confetti for the day's first and for a milestone. No sound; Reduce Motion keeps it still.")
+            Text("System follows your Mac, and changes with it. Celebrations: the Blob hops when a pull request lands, with confetti for the day's first and for a milestone. No sound; Reduce Motion keeps it still.")
                 .appText(.fine)
                 .foregroundStyle(.secondary)
         }

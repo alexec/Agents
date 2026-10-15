@@ -80,147 +80,34 @@ enum TextStep {
     }
 }
 
-/// How large a person has chosen the app's text to be (#750): the default and two steps
-/// up, and nothing smaller. Per device, like the appearance, and never sent anywhere.
-///
-/// The Mac draws its own steps larger, because macOS SwiftUI does not move its text styles
-/// with `dynamicTypeSize`; `appText` reads this from the environment and multiplies.
-/// The phone moves the system's Dynamic Type up a step or two instead, so the reader's own
-/// text-size setting is built on rather than replaced. Glyphs drawn beside text — a
-/// status mark, a dot, a capsule's chevron — take `scale` on both, so a row keeps its
-/// shape at every size.
-enum TextSize: String, CaseIterable, Identifiable, Sendable {
-    // One line, so the scale's own check counts five steps above and not these.
-    case standard = "default", large, larger
-
-    var id: Self { self }
-
-    var title: String {
-        switch self {
-        case .standard: "Default"
-        case .large: "Large"
-        case .larger: "Larger"
-        }
-    }
-
-    /// What a size drawn by hand is multiplied by: about two points a step at the Mac's
-    /// body size, as Dynamic Type's own steps are on the phone.
-    var scale: CGFloat {
-        switch self {
-        case .standard: 1
-        case .large: 1.15
-        case .larger: 1.3
-        }
-    }
-
-    /// `--text-size default|large|larger`, which wins over the stored choice for the life
-    /// of the process: a scratch copy can be walked at each size without anybody's setting
-    /// being changed to get there.
-    static let launchOverride: TextSize? = {
-        let arguments = CommandLine.arguments
-        guard let index = arguments.firstIndex(of: "--text-size"), index + 1 < arguments.count
-        else { return nil }
-        return TextSize(rawValue: arguments[index + 1])
-    }()
-
-    #if os(iOS)
-    /// The system's Dynamic Type, moved up this many steps. Into the accessibility sizes
-    /// if the reader is already at the top of the ordinary ones.
-    func applied(to size: DynamicTypeSize) -> DynamicTypeSize {
-        let steps = switch self {
-        case .standard: 0
-        case .large: 1
-        case .larger: 2
-        }
-        let all = DynamicTypeSize.allCases
-        guard let index = all.firstIndex(of: size) else { return size }
-        return all[min(index + steps, all.count - 1)]
-    }
-    #endif
-}
-
-extension EnvironmentValues {
-    /// Set once at each app's root from the person's choice.
-    @Entry var textSize = TextSize.standard
-}
-
 extension View {
     /// A glyph that is not text — a status mark, a capsule's chevron — at a fixed size
-    /// that still grows with the person's text size, so it keeps its place beside the
+    /// that still grows with the system's text size, so it keeps its place beside the
     /// text it marks.
     func glyph(size: CGFloat, weight: Font.Weight = .regular) -> some View {
         modifier(ScaledGlyph(points: size, weight: weight))
     }
 
-    /// The same for a glyph sized by a text style rather than a number. The phone moves
-    /// the style with Dynamic Type already; the Mac multiplies.
+    /// The same for a glyph sized by a text style rather than a number, which moves
+    /// with the system's text size by itself.
     func glyph(_ style: Font.TextStyle) -> some View {
-        modifier(StyledGlyph(style: style))
+        font(.system(style))
     }
 }
 
 private struct ScaledGlyph: ViewModifier {
     let points: CGFloat
     let weight: Font.Weight
-    @Environment(\.textSize) private var size
+    /// 1 at the default size, larger with Dynamic Type on the phone.
+    @ScaledMetric private var scale: CGFloat = 1
 
     func body(content: Content) -> some View {
-        content.font(.system(size: points * size.scale, weight: weight))
-    }
-}
-
-private struct StyledGlyph: ViewModifier {
-    let style: Font.TextStyle
-    @Environment(\.textSize) private var size
-
-    func body(content: Content) -> some View {
-        #if os(macOS)
-        if size == .standard {
-            content.font(.system(style))
-        } else {
-            content.font(.system(size: NSFont.preferredFont(forTextStyle: style.appKit).pointSize * size.scale))
-        }
-        #else
-        content.font(.system(style))
-        #endif
+        content.font(.system(size: points * scale, weight: weight))
     }
 }
 
 #if os(macOS)
-private extension Font.TextStyle {
-    var appKit: NSFont.TextStyle {
-        switch self {
-        case .largeTitle: .largeTitle
-        case .title: .title1
-        case .title2: .title2
-        case .title3: .title3
-        case .headline: .headline
-        case .subheadline: .subheadline
-        case .callout: .callout
-        case .footnote: .footnote
-        case .caption: .caption1
-        case .caption2: .caption2
-        default: .body
-        }
-    }
-}
-
 extension TextStep {
-    /// The step at a person's text size. The default is the semantic style itself, as it
-    /// always was; a larger one is the same face at the style's size times the scale.
-    func font(_ size: TextSize) -> Font {
-        guard size != .standard else { return font }
-        let points = nsFont.pointSize * size.scale
-        return self == .code ? .system(size: points, design: .monospaced) : .system(size: points)
-    }
-
-    /// `nsFont` at a person's text size, for the text views that take one.
-    func nsFont(_ size: TextSize) -> NSFont {
-        let base = nsFont
-        guard size != .standard else { return base }
-        return NSFont(descriptor: base.fontDescriptor, size: base.pointSize * size.scale) ?? base
-    }
-
     /// The same step for an AppKit text view, which takes an `NSFont` rather than a
     /// `Font`. Resolved here for the reason every other step is: this is the one place
     /// a step becomes a size.
@@ -242,12 +129,8 @@ extension Text {
     /// A step of the scale on a `Text` that has to stay a `Text` — one resolved inside
     /// a `GraphicsContext`, or interpolated into another. `appText` returns a view, and
     /// a text renderer cannot draw a view.
-    func stepped(_ step: TextStep, _ size: TextSize = .standard) -> Text {
-        #if os(macOS)
-        font(step.font(size))
-        #else
+    func stepped(_ step: TextStep) -> Text {
         font(step.font)
-        #endif
     }
 }
 
@@ -256,27 +139,12 @@ extension View {
     /// step to their own font, because this is the only place a step is resolved
     /// (FR-013). A weight goes on afterwards with `.fontWeight(_:)`.
     ///
-    /// On the Mac it reads the person's text size (#750) from the environment; on the
-    /// phone the root moves Dynamic Type instead, and the semantic style follows it.
+    /// The size is the system's (#1034): Dynamic Type on the phone, and the Mac's own
+    /// text size where SwiftUI applies it.
     func appText(_ step: TextStep) -> some View {
-        #if os(macOS)
-        modifier(MacSteppedText(step: step))
-        #else
         font(step.font)
-        #endif
     }
 }
-
-#if os(macOS)
-private struct MacSteppedText: ViewModifier {
-    let step: TextStep
-    @Environment(\.textSize) private var size
-
-    func body(content: Content) -> some View {
-        content.font(step.font(size))
-    }
-}
-#endif
 
 extension TextStep {
     /// A Markdown heading, which is not a step.
@@ -298,12 +166,10 @@ extension TextStep {
     ///
     /// All semibold, because what makes a heading a heading at the bottom of the ladder
     /// is the weight, not the size.
-    static func heading(level: Int, size: TextSize = .standard) -> Font {
+    static func heading(level: Int) -> Font {
         #if os(macOS)
         let style: Font.TextStyle = level <= 1 ? .title : level == 2 ? .title2 : .title3
-        guard size != .standard else { return Font.system(style).weight(.semibold) }
-        let base = NSFont.preferredFont(forTextStyle: style.appKit).pointSize
-        return .system(size: base * size.scale, weight: .semibold)
+        return Font.system(style).weight(.semibold)
         #else
         let style: Font.TextStyle = level <= 1 ? .title : level == 2 ? .title2 : .body
         let font = Font.system(style)
