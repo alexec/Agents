@@ -209,6 +209,15 @@ struct AttentionSnapshotTests {
                 "the count moved, so the widget is told")
     }
 
+    @Test func aWriteMakesTheCachesFolderItGoesIn() throws {
+        let directory = try TemporaryDirectory()
+        defer { directory.remove() }
+        let caches = directory.url.appendingPathComponent("Library/Caches", isDirectory: true)
+        let snapshot = AttentionSnapshot(writtenAt: Date(), total: 1, sessions: [])
+        #expect(AttentionSnapshotStore.write(snapshot, into: caches), "a new group has no Library/Caches yet (#1052)")
+        #expect(AttentionSnapshotStore.read(from: caches) == snapshot)
+    }
+
     @Test func aFileThatIsNotASnapshotIsNotOne() throws {
         let directory = try TemporaryDirectory()
         defer { directory.remove() }

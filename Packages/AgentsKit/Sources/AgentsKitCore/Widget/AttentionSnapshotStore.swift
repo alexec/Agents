@@ -19,9 +19,13 @@ public enum AttentionSnapshotStore {
     /// Where the file is, or nil when the app group is not available — a simulator run
     /// with no entitlement, an extension out of context, or a Linux server, which has no
     /// app groups.
+    ///
+    /// The group's `Library/Caches`, not its top folder: the Remote writes the file again
+    /// whenever the count moves, so it is a cache (#1030, #1052).
     public static var container: URL? {
         #if canImport(Darwin)
-        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)?
+            .appendingPathComponent("Library/Caches", isDirectory: true)
         #else
         nil
         #endif
@@ -50,6 +54,9 @@ public enum AttentionSnapshotStore {
         guard snapshot.needsWriting(over: last ?? read(from: container)),
               let data = try? JSONEncoder().encode(snapshot) else { return false }
         do {
+            // The group's Library/Caches is not there until something makes it.
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
+                                                    withIntermediateDirectories: true)
             try data.write(to: url, options: .atomic)
             return true
         } catch {
@@ -67,6 +74,9 @@ public enum AttentionSnapshotStore {
         guard let next = read(from: container)?.applying(push, at: date),
               let url = url(in: container), let data = try? JSONEncoder().encode(next) else { return false }
         do {
+            // The group's Library/Caches is not there until something makes it.
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
+                                                    withIntermediateDirectories: true)
             try data.write(to: url, options: .atomic)
             return true
         } catch {
