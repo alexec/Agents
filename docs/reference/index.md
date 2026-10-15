@@ -16,6 +16,8 @@ something up, not for reading through.
   whether you are asked before it runs.
 - [Settings, and the Runtimes and Resources pages](settings.md): every control in Settings
   on the Mac, the Runtimes and Resources pages, and what iPhone and iPad need.
+- [The `~/.agents` folder](agents-folder.md): every file in it, what writes it, and what
+  stays on each machine.
 - [Workflow triggers and actions](workflows.md): the workflow file format, every trigger
   and setting, and when a workflow does not run.
 - [Workspace providers](workspace-providers.md): the tools a workspace provider offers, and

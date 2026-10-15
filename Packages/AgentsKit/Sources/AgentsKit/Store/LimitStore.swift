@@ -53,7 +53,7 @@ public final class LimitStore: @unchecked Sendable {
 
     public func save(_ limits: CostLimits) throws {
         try lock.withLock {
-            try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: locations.personalSettings, withIntermediateDirectories: true)
             let data = try StoreCoding.encoder.encode(limits)
             try StoreFile.write(data, to: locations.limits)
             held = (limits, FileStamp(locations.limits))

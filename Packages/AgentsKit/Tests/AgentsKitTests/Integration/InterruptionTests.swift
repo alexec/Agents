@@ -207,13 +207,14 @@ struct InterruptionTests {
     @Test func anUnreadableLimitsFileIsKeptNotWrittenOver() throws {
         let (locations, _) = try temporary()
         try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: locations.personalSettings, withIntermediateDirectories: true)
         try Data("{ not json".utf8).write(to: locations.limits)
 
         let limits = LimitStore(locations: locations)
         #expect(limits.load().isEmpty)
         try limits.save(CostLimits(daily: Cost(amount: 3, currency: "USD")))
 
-        let kept = try FileManager.default.contentsOfDirectory(atPath: locations.root.path)
+        let kept = try FileManager.default.contentsOfDirectory(atPath: locations.personalSettings.path)
             .filter { $0.hasPrefix(locations.limits.lastPathComponent + ".corrupt-") }
         #expect(kept.count == 1, "what was there is set aside, not lost")
     }

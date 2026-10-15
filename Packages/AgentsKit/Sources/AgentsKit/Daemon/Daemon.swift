@@ -57,6 +57,13 @@ public final class Daemon: @unchecked Sendable {
                 sessionLocks: URL? = nil,
                 allowOutsideRoot: Bool = true) throws {
         Self.applyPrivateUmask()
+        var locations = locations
+        // A server has no personal home (054 R8); the person's settings there are its
+        // account's own, in `$HOME/.agents/settings` (#1033).
+        if serve, locations.personalHome == nil, locations.personalSettingsOverride == nil {
+            locations.personalSettingsOverride = StoreLocations.settings(
+                inHome: URL(fileURLWithPath: ServerSignIn.home, isDirectory: true))
+        }
         self.locations = locations
         self.control = control
         try locations.createDirectories()
@@ -69,7 +76,7 @@ public final class Daemon: @unchecked Sendable {
         try? FileManager.default.removeItem(at: locations.helpers)
         // Previews an earlier daemon fetched were held only in its memory (#211).
         try? FileManager.default.removeItem(at: locations.catalogStaging)
-        Task.detached(priority: .utility) { DiskSweep.runtimeTemporaries(locations) }
+        Task.detached(priority: .utility) { [locations] in DiskSweep.runtimeTemporaries(locations) }
         let store = try AgentStore(locations: locations)
         var discovery = discovery
         if serve, discovery.serverHome == nil { discovery.serverHome = ServerSignIn.home }
@@ -147,6 +154,8 @@ public final class Daemon: @unchecked Sendable {
         #endif
         // The person's `~/.agents`, laid out before anything is picked up (054).
         await core.reconcileHome()
+        // A setting the person edits by hand, or a sync brings, counts without a restart (#1033).
+        await core.watchPersonalSettings()
         // The chat project (#229), after the home it lives in and before recovery, so it
         // is listed before any client asks. A server has no personal home (054 R8), so its
         // chat project goes in its account's `$HOME`, as the server's shell has it.

@@ -685,6 +685,11 @@ public actor DaemonCore {
     /// branches alike (#173). What makes a file written by hand appear without the app
     /// being restarted.
     var projectWatches: [URL: FolderWatch] = [:]
+    /// The watch on the person's settings folder (#1033).
+    var personalSettingsWatch: FolderWatch?
+    /// The limits and modes as the watch last saw them, so only a change is told.
+    var seenLimits: CostLimits?
+    var seenModes: DaemonAPI.RememberedModes?
     /// The folders each project's watch leaves out, so a pin moving into one can
     /// restart it without them.
     var projectWatchExclusions: [URL: [URL]] = [:]

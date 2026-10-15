@@ -177,13 +177,13 @@ struct ClientPermissionTests {
     }
 
     @Test func settingsPersistAndCorruptFallsBackToDefault() throws {
-        let (root, _, locations) = try sandbox()
+        let (_, _, locations) = try sandbox()
         let store = ClientPermissionStore(locations: locations)
         try store.save(.init(cursor: .alwaysApprove, grok: .default))
         #expect(store.load().cursor == .alwaysApprove)
         #expect(store.load().grok == .default)
 
-        let file = root.appendingPathComponent("client-permissions.json")
+        let file = locations.clientPermissions
         try Data(#"{"cursor":"autoReview","grok":"autoReview"}"#.utf8).write(to: file)
         let migrated = store.load()
         #expect(migrated.cursor == .alwaysApprove)

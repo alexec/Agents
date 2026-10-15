@@ -1,7 +1,9 @@
+import AgentsKitCore
 import Foundation
 
-/// What the person chose in frame L, kept in the app's defaults under the set-up's suffix
-/// so the launcher (the same program, started by launchd) reads the same choice.
+/// What the person chose in frame L, kept in `~/.agents/settings/host.json` under this Mac's
+/// name (#1033), so the launcher (the same program, started by launchd) reads the same
+/// choice, and one file holds the role of each of the person's Macs.
 struct HostSettings: Codable, Sendable, Equatable {
     enum Role: String, Codable, Sendable {
         /// Nothing chosen yet.
@@ -35,23 +37,51 @@ struct HostSettings: Codable, Sendable, Equatable {
     var relay: Bool?
     var relaysForDevices: Bool { relay ?? false }
 
-    private static func key(_ paths: HostPaths) -> String { "hostSettings.\(paths.suffix)" }
+    /// This Mac's entry in `host.json`: its Bonjour name, which the person sees in Sharing.
+    private static func key(_ paths: HostPaths) -> String {
+        paths.scratchRoot == nil ? LocalHostName.current : "hostSettings.\(paths.suffix)"
+    }
 
     /// Where settings that would not decode are kept (#205): a newer build's role or
     /// store, say. The first such value is kept and never written over.
     static func asideKey(_ paths: HostPaths) -> String { "\(key(paths)).unreadable" }
 
-    /// The ordinary set-up's are in the app's defaults. A scratch set-up's are a file in its
-    /// own root (#1029), which goes when the root does: in the defaults, keyed by the
-    /// root's hash, nothing ever removed them.
+    /// `~/.agents/settings/host.json` (#1033): one entry per Mac, so the file can follow the
+    /// person and each Mac still keeps its own role. The bucket's keys stay in the keychain.
+    static var file: URL {
+        StoreLocations.settings(inHome: URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true))
+            .appendingPathComponent("host.json")
+    }
+
+    /// The ordinary set-up's are in `host.json`. A scratch set-up's are a file in its own
+    /// root (#1029), which goes when the root does, and never touches the real `~/.agents`.
     private static func read(_ key: String, _ paths: HostPaths) -> Data? {
-        guard let root = paths.scratchRoot else { return UserDefaults.standard.data(forKey: key) }
+        guard let root = paths.scratchRoot else {
+            guard let entry = entries()?[key] else { return nil }
+            return try? JSONSerialization.data(withJSONObject: entry, options: [.fragmentsAllowed])
+        }
         return try? Data(contentsOf: root.appendingPathComponent("\(key).json"))
     }
 
     private static func write(_ data: Data, _ key: String, _ paths: HostPaths) {
-        guard let root = paths.scratchRoot else { return UserDefaults.standard.set(data, forKey: key) }
+        guard let root = paths.scratchRoot else {
+            // A file that will not parse is the person's to mend, never ours to replace.
+            guard var all = entries() else { return }
+            all[key] = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
+            guard let whole = try? JSONSerialization.data(withJSONObject: all, options: [.prettyPrinted, .sortedKeys])
+            else { return }
+            try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? whole.write(to: file, options: .atomic)
+            return
+        }
         try? data.write(to: root.appendingPathComponent("\(key).json"), options: .atomic)
+    }
+
+    /// Every Mac's entry: none when there is no file, and nil when there is one that will
+    /// not parse, which `write` then leaves alone.
+    private static func entries() -> [String: Any]? {
+        guard let data = try? Data(contentsOf: file) else { return [:] }
+        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 
     static func load(_ paths: HostPaths) -> HostSettings {
@@ -60,6 +90,10 @@ struct HostSettings: Codable, Sendable, Equatable {
 
     /// What to tell the person when the saved settings would not decode, or nil.
     static func unreadableNote(_ paths: HostPaths) -> String? {
+        if paths.scratchRoot == nil, entries() == nil {
+            return "\(file.path) could not be read, so this Mac starts with the defaults and leaves the file "
+                + "as it is. Mend it, or remove it to start again."
+        }
         guard let data = read(key(paths), paths),
               (try? JSONDecoder().decode(HostSettings.self, from: data)) == nil else { return nil }
         return "This Mac's host settings could not be read (perhaps a newer build saved them), so it starts "

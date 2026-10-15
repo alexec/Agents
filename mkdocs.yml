@@ -112,6 +112,7 @@ nav:
       - reference/runtimes.md
       - reference/agent-tools.md
       - reference/settings.md
+      - reference/agents-folder.md
       - reference/workflows.md
       - reference/personas.md
       - reference/events.md

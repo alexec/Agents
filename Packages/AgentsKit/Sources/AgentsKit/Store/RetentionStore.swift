@@ -3,7 +3,7 @@ import AgentsKitCore
 
 /// How long archived agents are kept, and the clock that counts it (051).
 ///
-/// One small file, read whole and written whole, on `LimitStore`'s pattern. A missing
+/// Two small files, each read whole and written whole, on `LimitStore`'s pattern. A missing
 /// file is the defaults; an unreadable one is set aside and is the defaults. Deletion by age
 /// is on by default, so a daemon that loses its file keeps deleting, and never starts
 /// keeping everything for ever because of a bad read.
@@ -30,12 +30,23 @@ public struct RetentionStore: Sendable {
         self.locations = locations
     }
 
+    /// The person's settings from `retention.json` (#1033), and this machine's clock from
+    /// `retention-clock.json`: one moves with the person, the other stays with the root.
     public func load() -> File {
-        return StoreFile.load(File.self, at: locations.retention, empty: File(), meaning: "retention at its defaults")
+        File(settings: StoreFile.load(RetentionSettings.self, at: locations.retention, empty: RetentionSettings(),
+                                      meaning: "retention at its defaults"),
+             clock: StoreFile.load(RetentionClock.self, at: locations.retentionClock, empty: RetentionClock(),
+                                   meaning: "the clock starting again"))
     }
 
+    /// Writes the settings only when they differ from the file's, so the hourly clock does
+    /// not rewrite a file the person may be editing or syncing.
     public func save(_ file: File) throws {
         try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
-        try StoreFile.write(StoreCoding.encoder.encode(file), to: locations.retention)
+        try StoreFile.write(StoreCoding.encoder.encode(file.clock), to: locations.retentionClock)
+        let onDisk = try? StoreCoding.decoder.decode(RetentionSettings.self, from: Data(contentsOf: locations.retention))
+        guard onDisk != file.settings else { return }
+        try FileManager.default.createDirectory(at: locations.personalSettings, withIntermediateDirectories: true)
+        try StoreFile.write(StoreCoding.encoder.encode(file.settings), to: locations.retention)
     }
 }

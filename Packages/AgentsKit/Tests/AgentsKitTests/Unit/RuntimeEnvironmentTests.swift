@@ -34,9 +34,11 @@ struct RuntimeEnvironmentTests {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("env-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
+        let locations = StoreLocations(root: root)
+        try FileManager.default.createDirectory(at: locations.personalSettings, withIntermediateDirectories: true)
         try Data(#"{"passThrough": {"*": ["GITHUB_TOKEN"], "claude": ["AWS_*"]}}"#.utf8)
-            .write(to: root.appendingPathComponent("runtime-environment.json"))
-        let names = RuntimeEnvironmentStore(locations: StoreLocations(root: root)).load()
+            .write(to: locations.personalSettings.appendingPathComponent("runtime-environment.json"))
+        let names = RuntimeEnvironmentStore(locations: locations).load()
         let claude = RuntimeEnvironment.forRuntime("claude", Self.inherited, passing: names.names(for: "claude"))
         #expect(claude["AWS_SECRET_ACCESS_KEY"] == "cloud")
         #expect(claude["GITHUB_TOKEN"] == "gh")

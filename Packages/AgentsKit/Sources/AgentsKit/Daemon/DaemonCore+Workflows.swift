@@ -617,8 +617,8 @@ extension DaemonCore {
         readWorkflowLimit().effectiveTotal
     }
 
-    /// The person's setting, as `workflow-limit.json` has it. Read once and kept: the
-    /// daemon is its only writer. A missing or unreadable file is the default, which
+    /// The person's setting, as `workflow-limit.json` has it. Read once and kept, and read
+    /// again when the person's settings folder changes (#1033). A missing or unreadable file is the default, which
     /// is never more than the person chose.
     public func readWorkflowLimit() -> WorkflowLimitSettings {
         if let workflowLimitSettings { return workflowLimitSettings }
@@ -637,7 +637,7 @@ extension DaemonCore {
         }
         // The default is kept as no setting, so a host that never changed it has no file.
         let kept = WorkflowLimitSettings(total: settings.total == WorkflowLimit.defaultTotal ? nil : settings.total)
-        try FileManager.default.createDirectory(at: locations.root, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: locations.personalSettings, withIntermediateDirectories: true)
         if kept.total == nil {
             try? FileManager.default.removeItem(at: locations.workflowLimit)
         } else {

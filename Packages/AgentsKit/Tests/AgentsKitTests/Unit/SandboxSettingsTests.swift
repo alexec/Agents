@@ -30,7 +30,7 @@ struct SandboxSettingsTests {
         #expect(store.load() == SandboxSettings())
         try store.save(SandboxSettings(defaults: ["claude": .on]))
         #expect(store.load().choice(for: "claude") == .on)
-        try Data("not json".utf8).write(to: root.appendingPathComponent("sandbox-settings.json"))
+        try Data("not json".utf8).write(to: StoreLocations(root: root).sandbox)
         #expect(store.load() == SandboxSettings())
     }
 
