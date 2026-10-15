@@ -244,6 +244,10 @@ targets:
         # remove its own banner (021 T079). Best effort by Apple's design.
         UIBackgroundModes:
           - remote-notification
+          - fetch
+        # The widget's background refresh (#1046).
+        BGTaskSchedulerPermittedIdentifiers:
+          - com.alexecollins.agents.remote.widget-refresh
         # Scene-based from the first commit, because iOS 27 will not launch an app
         # without the UIScene lifecycle and nothing can be judged until it launches.
         UIApplicationSceneManifest:

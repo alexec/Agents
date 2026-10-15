@@ -223,6 +223,59 @@ struct AttentionSnapshotTests {
         #expect(stale.isStale())
     }
 
+    // MARK: A push laid over the file (#1046)
+
+    @Test func aPushWithANewNeedChangesTheWrittenSnapshot() throws {
+        let directory = try TemporaryDirectory()
+        defer { directory.remove() }
+        let agentID = UUID()
+        let before = AttentionSnapshot.make(model: model([agent(agentID)]), at: Date(timeIntervalSinceNow: -3600))
+        #expect(AttentionSnapshotStore.write(before, into: directory.url))
+        let need = NeedID.permission(UUID())
+        let push = AttentionPush(need: need, headline: Headline(h1: "web", h2: "Tidy CSS", h3: "may it edit files"),
+                                 withdrawn: false)
+        #expect(AttentionSnapshotStore.apply(push, into: directory.url))
+        let after = try #require(AttentionSnapshotStore.read(from: directory.url))
+        #expect(after.total == before.total + 1)
+        #expect(after.sessions.first?.title == "Tidy CSS")
+        #expect(after.sessions.first?.kind == .permission)
+        #expect(after.sessions.first?.link == .need(need.token), "a question's push does not name its session")
+        #expect(!after.isStale(), "written now, not when the app last caught up")
+        #expect(AttentionSnapshotStore.apply(push, into: directory.url) == false, "the same push twice is one need")
+    }
+
+    @Test func aWithdrawnNeedTakesItsRowAway() throws {
+        let agentID = UUID(), questionID = UUID()
+        let held = model([agent(agentID)])
+        held.replaceAttention(DaemonAPI.AttentionPending(needs: [need(questionID, agentID)], deliveries: []))
+        let before = AttentionSnapshot.make(model: held)
+        #expect(before.total == 1)
+        let push = AttentionPush(need: .elicitation(questionID), headline: nil, withdrawn: true)
+        let after = try #require(before.applying(push))
+        #expect(after.total == 0)
+        #expect(after.sessions.isEmpty)
+        #expect(before.applying(AttentionPush(need: .elicitation(UUID()), headline: nil, withdrawn: true)) == nil,
+                "a need no row names leaves the count alone")
+    }
+
+    @Test func aReportFromASessionAlreadyDrawnIsStillOneRow() throws {
+        let agentID = UUID()
+        let before = AttentionSnapshot.make(model: model([agent(agentID)]))
+        let push = AttentionPush(need: .report(agentID, Date()), headline: nil, withdrawn: false)
+        let after = try #require(before.applying(push))
+        #expect(after.total == before.total)
+        #expect(after.sessions.count == 1)
+        #expect(after.sessions.first?.link == .agent(agentID))
+    }
+
+    @Test func noFileIsNotMadeUpFromOnePush() throws {
+        let directory = try TemporaryDirectory()
+        defer { directory.remove() }
+        let push = AttentionPush(need: .permission(UUID()), headline: nil, withdrawn: false)
+        #expect(AttentionSnapshotStore.apply(push, into: directory.url) == false)
+        #expect(AttentionSnapshotStore.read(from: directory.url) == nil)
+    }
+
     // MARK: The link
 
     @Test func aLinkRoundTrips() throws {
@@ -230,6 +283,8 @@ struct AttentionSnapshotTests {
         #expect(AttentionLink.parse(AttentionLink.attention.url) == .attention)
         #expect(AttentionLink.parse(AttentionLink.agent(id).url) == .agent(id))
         #expect(AttentionLink.attention.url.scheme == AttentionLink.scheme)
+        let guarded = NeedID.guardedChange(URL(filePath: "/tmp/work/api"), ".agents/project.json").token
+        #expect(AttentionLink.parse(AttentionLink.need(guarded).url) == .need(guarded))
     }
 
     @Test func aUrlThatIsNotOursIsIgnoredRatherThanGuessedAt() {
