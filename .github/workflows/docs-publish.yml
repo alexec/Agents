@@ -1,10 +1,6 @@
-# Publishes the docs site (044) from main, and only after the check passes, to
-# https://www.alexecollins.com/agents/ (#1063). This repo is private, so the built site is
-# pushed into the public website repo's agents/ folder; that repo's own Pages workflow
-# copies it into the site at /agents/ and deploys it. A failed run leaves the last
-# published site where it is.
-# Needs the secret WWW_DEPLOY_KEY: the private half of a deploy key with write access
-# on alexec/www.alexecollins.com.
+# Publishes the docs site (044) to GitHub Pages from main, and only after the check
+# passes. A failed run leaves the last published site where it is.
+# Needs Pages turned on with Source: GitHub Actions (Settings ▸ Pages).
 name: docs-publish
 
 on:
@@ -18,43 +14,34 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: docs-publish
+  group: pages
   cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
-  publish:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
       - run: scripts/docs.sh check
-      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
         with:
-          repository: alexec/www.alexecollins.com
-          ref: master
-          path: www
-          ssh-key: ${{ secrets.WWW_DEPLOY_KEY }}
-      - name: Push the site to www.alexecollins.com
-        working-directory: www
-        env:
-          SHA: ${{ github.sha }}
-        run: |
-          rsync -a --delete ../site/ agents/
-          git add -A agents
-          if git diff --cached --quiet; then
-            echo "The docs have not changed."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -q -m "Publish: Agents docs at alexec/Agents@${SHA::9}"
-          # Someone may push to master while this runs: rebase and try again.
-          for try in 1 2 3; do
-            git push origin HEAD:master && exit 0
-            git pull -q --rebase origin master
-          done
-          exit 1
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -2,11 +2,11 @@
 
 Keep your editor and your coding agent. Agents runs several agents at once, shows which
 one needs you, lets them work together and on their own, and lets you answer them from
-your phone. [Why Agents](https://www.alexecollins.com/agents/explanation/why-agents/)
+your phone. [Why Agents](https://alexec.github.io/Agents/explanation/why-agents/)
 
 A Mac app, rebuilt one feature at a time against a written spec.
 
-Using the app? The docs are at https://www.alexecollins.com/agents/ (source in `docs/`;
+Using the app? The docs are at https://alexec.github.io/Agents/ (source in `docs/`;
 preview with `scripts/docs.sh serve`). This README is for building and working on it.
 
 The window is a list of the projects you work in — a project is a folder, named by that
@@ -29,13 +29,13 @@ On a Mac, Agents is two apps:
 Beside the window and the iPhone and iPad app, Agents Host serves Agents as a web page for
 a browser on this Mac, at `http://localhost:8792`. **View ▸ Open in Browser** in the window,
 or **Open in Browser** in Agents Host, opens it and pairs that browser the first time. See
-[Use Agents in a browser](https://www.alexecollins.com/agents/how-to/use-agents-in-a-browser/).
+[Use Agents in a browser](https://alexec.github.io/Agents/how-to/use-agents-in-a-browser/).
 
 The control plane is yours: on your Mac through Agents Host, or as several copies of
 `agents-control` in containers on hosting you rent, sharing an S3-compatible bucket. A
 Linux server becomes a host by running one command the window shows. See
-[Set up Agents on this Mac](https://www.alexecollins.com/agents/how-to/set-up-on-this-mac/)
-and [The control plane](https://www.alexecollins.com/agents/explanation/control-plane/).
+[Set up Agents on this Mac](https://alexec.github.io/Agents/how-to/set-up-on-this-mac/)
+and [The control plane](https://alexec.github.io/Agents/explanation/control-plane/).
 
 Neither app is in the App Store yet. The alpha is on TestFlight, and Agents Host is its
 own download. Building from source, below, is for working on Agents.
