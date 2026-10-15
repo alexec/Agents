@@ -241,6 +241,20 @@ public extension DaemonAPI {
             self.cost = cost
             self.host = host
         }
+
+        /// Whether a host added by hand may be this workspace (#976): its name is the
+        /// workspace's ssh destination, or one of its dot-separated parts is the workspace's
+        /// name, as `cws.devstack-d7539e59` is for `devstack-d7539e59`. Never a part of a
+        /// part: `dev` is not `devstack`.
+        public func mayBe(hostNamed hostName: String) -> Bool {
+            let host = hostName.lowercased()
+            if let ssh, !ssh.isEmpty, ssh.lowercased() == host { return true }
+            let name = name.lowercased()
+            guard !name.isEmpty else { return false }
+            if host == name { return true }
+            // The name may hold dots of its own, so match it as a run of whole parts.
+            return ".\(host).".contains(".\(name).")
+        }
     }
 
     /// A provider for the Providers page: never its commands, headers or secrets' values.
