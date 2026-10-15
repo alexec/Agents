@@ -465,5 +465,7 @@ struct SidebarModelTests {
         #expect(SidebarSmartRow.off(on: SidebarSmartRow.all) == "")
         #expect(SidebarSmartRow.off(on: [.needsYou, .unread]) == "pinned,working")
         #expect(SidebarSmartRow.on(off: "pinned,working,gone") == [.needsYou, .unread])
+        // Nothing kept (#979): Pinned and Needs You on.
+        #expect(SidebarSmartRow.on(off: SidebarSmartRow.offAtFirst) == [.pinned, .needsYou])
     }
 }

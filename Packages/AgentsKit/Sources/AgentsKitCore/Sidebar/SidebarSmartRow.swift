@@ -26,13 +26,18 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
         }
     }
 
-    /// Every group, on: as each device starts until one is turned off.
+    /// Every group, on.
     public static let all = Set(allCases)
 
     /// Where each device keeps the groups turned off (#846): their raw values, comma-
-    /// separated, so every group is on until one is turned off. A device's own choice, as
-    /// its text size is (#750); the web page keeps the same in its local storage.
+    /// separated, so a group added later starts on. A device's own choice, as its text size
+    /// is (#750); the web page keeps the same in its local storage.
     public static let offDefaultsKey = "sidebarSmartGroupsOff"
+
+    /// What a device with nothing kept under `offDefaultsKey` reads (#979): Working and
+    /// Unread off, Pinned and Needs You on. Every `@AppStorage(offDefaultsKey)` starts with
+    /// it; a device that keeps a choice, `""` (every group on) too, keeps it.
+    public static let offAtFirst = "working,unread"
 
     /// The groups on, from what the defaults keep under `offDefaultsKey`.
     public static func on(off raw: String) -> Set<SidebarSmartRow> {
