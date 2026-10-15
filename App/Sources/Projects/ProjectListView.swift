@@ -68,6 +68,15 @@ struct ProjectListView: View {
 
     var body: some View {
         List(selection: $picked) {
+            // A newcomer's checklist (#982), above everything until it has gone.
+            if model.showsGetStarted {
+                Section {
+                    GetStartedCard(isChoosingFolder: $isChoosingFolder)
+                        .listRowSeparator(.hidden)
+                        .selectionDisabled()
+                }
+            }
+
             // What wants the person, across every project and host (#495): Things'
             // Inbox and Today, Mail's smart mailboxes, each drawn only with something in
             // it (#507).

@@ -36,18 +36,32 @@ xcodegen generate
 open Agents.xcodeproj
 ```
 
-In Xcode, choose the **Agents** scheme with **My Mac** as the destination, and choose
-**Product ▸ Run**. The first build takes a few minutes.
+On a Mac, Agents is two apps: **Agents Host** runs your agents, and **Agents** is the
+window you work in. Build and run both from Xcode, Agents Host first:
 
-The first time it opens, a sheet called **Install your agents** lists every runtime the
-app knows and whether it is on this Mac. If Claude's row says **Not on this Mac**, click
-**Install** on it and wait for it to finish. You need none of the others for this
-tutorial. Click **Done** (or **Not now**); the sheet comes back only for a runtime it has
-not offered before, and the same rows are in **Settings ▸ Agent Runtimes**.
+1. Choose the **AgentsHost** scheme with **My Mac** as the destination, and choose
+   **Product ▸ Run**. The first build takes a few minutes. Agents Host starts this Mac's
+   agents and its control plane, and keeps them running with its window closed.
+2. Choose the **AgentsStore** scheme and choose **Product ▸ Run**. This is the window.
 
-You should see the Agents window, saying **No projects yet**. If it says **No agent
-runtime found** instead, nothing it can run is installed: install Claude from the row
-under it, or from **Settings ▸ Agent Runtimes**.
+The window opens on **Where should your agents run?** After a moment it says **Agents Host
+is running on this Mac**. Click **Pair**: Agents Host shows a code, and the window asks
+for it. Type or paste the code and click **Connect**.
+
+You should see the Agents window, with a **Get started** card at the top of the sidebar.
+It is a checklist from here to your first agent, and each step ticks itself when it is
+done:
+
+1. **Pair this window with Agents Host**: done already.
+2. **Install an agent runtime**: if it is not ticked, click **Install**. A sheet lists every
+   runtime the app knows and whether it is on this Mac. If Claude's row says **Not on this
+   Mac**, click **Install** on it and wait for it to finish. You need none of the others for
+   this tutorial. The same rows are in **Settings ▸ Agent Runtimes**.
+3. **Add a project**: steps 2 and 3 of this tutorial.
+4. **Start your first agent**: step 4.
+5. **Pair a phone or browser**: optional, and not part of this tutorial.
+
+Click **×** on the card to put it away before you are done; it does not come back.
 
 ## 2. Make a project to work on
 
@@ -107,8 +121,8 @@ git init -q && git add -A && git commit -qm "First version"
 
 ## 3. Add it to Agents
 
-In the Agents window, click **Add Project…** in the empty project list (once you have
-projects, it is **File ▸ Add Project…**), and pick
+In the Agents window, click **Add Project…** on the **Get started** card or in the empty
+project list (once you have projects, it is **File ▸ Add Project…**), and pick
 `weather-app` in your `Demo` folder.
 
 You should see `weather-app` in the list on the left, and beside it an empty new session:

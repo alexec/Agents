@@ -29,7 +29,13 @@ final class AppModel {
     /// The start-up sheet offering to install what is missing (048). Raised once per
     /// launch, and only for a runtime not already offered on this root.
     var isOfferingInstall = false
-    private var hasWeighedInstallOffer = false
+    var hasWeighedInstallOffer = false
+    /// The Get started card (#982): nil until weighed at this launch's first full lists,
+    /// then kept on this root. See `AppModel+GetStarted`.
+    var getStartedCard: GetStarted.Card? = GetStartedStore.kept
+    /// An agent has run a turn on this root, once seen: archived agents are not listed,
+    /// and the step stays ticked when the first one is archived.
+    var hasSeenAgentRun = GetStartedStore.ranAgent
     /// What each runtime last said about itself: signed in or not, what it takes in a
     /// prompt, which provider is answering.
     private(set) var accounts: [String: RuntimeAccount] = [:]
@@ -40,6 +46,8 @@ final class AppModel {
     /// Whether the daemon's list of projects has arrived at least once. Until it has,
     /// an empty sidebar means "not yet", not "none".
     private(set) var hasLoadedProjects = false
+    /// The same for the live agents: until they have come, no agent has not run yet.
+    private(set) var hasLoadedAgents = false
     /// 021: the Mac's banner, and the window's report of where the person is. Neither
     /// decides anything; the daemon routes and these two obey.
     private let notifier = MacNotifier()
@@ -1985,6 +1993,7 @@ final class AppModel {
             work.replaceProjects(listed, from: .mac)
             hasLoadedProjects = true
             settleProjectSelection()
+            weighGetStarted()
         } catch {
             // A list that failed is not worth an alert: the notification that follows
             // the next change will bring it back.
@@ -3205,6 +3214,8 @@ final class AppModel {
             let live = Set(listed.map(\.id))
             let archived = self.work.agents.filter { $0.host == .mac && $0.state == .archived && !live.contains($0.id) }
             self.work.replaceAgents(listed + archived, from: .mac)
+            self.hasLoadedAgents = true
+            self.weighGetStarted()
             Perf.sinceLaunch("first-list")
             // Whatever the list already shows was spent before this window opened, so
             // the session total starts from here rather than from the beginning of time.
@@ -3538,7 +3549,10 @@ final class AppModel {
                                                                                    Optional<String>.none,
                                                                                    returning: [RuntimeStatus].self))
         }
-        if listed { weighInstallOffer() }
+        if listed {
+            weighGetStarted()
+            weighInstallOffer()
+        }
     }
 
     /// Install a missing runtime on this Mac (048). Answers at once; the rest arrives on
@@ -3566,8 +3580,9 @@ final class AppModel {
         isOfferingInstall = false
     }
 
-    private func weighInstallOffer() {
-        guard !hasWeighedInstallOffer, !runtimes.isEmpty else { return }
+    func weighInstallOffer() {
+        // While the Get started card shows, its Install step is the offer (#982).
+        guard !hasWeighedInstallOffer, !runtimes.isEmpty, getStartedCard == .gone else { return }
         hasWeighedInstallOffer = true
         let offered = InstallOffer.offered
         if missingRuntimes.contains(where: { !offered.contains($0.id) }) { isOfferingInstall = true }
