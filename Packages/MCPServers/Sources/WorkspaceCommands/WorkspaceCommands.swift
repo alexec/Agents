@@ -265,7 +265,10 @@ actor Provider {
             throw WorkspaceCommands.Failure(reason: "There is already a workspace called \(name).")
         }
         var values: [String: String] = ["name": name, "firstBoot": firstBoot ?? ""]
-        for (key, value) in options {
+        // A choice left out takes the form's default, as the form showed it.
+        let properties = config.making.options?["properties"]?.object ?? [:]
+        let defaults = properties.compactMapValues { $0["default"] }.filter { options[$0.key] == nil }
+        for (key, value) in options.merging(defaults, uniquingKeysWith: { a, _ in a }) {
             switch value {
             case .string(let s): values[key] = s
             case .int(let i): values[key] = String(i)

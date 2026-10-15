@@ -250,6 +250,7 @@ struct AddProviderSheet: View {
     @State private var name = ""
     // Presets
     @State private var containers = ""
+    @State private var image = ""
     @State private var ssh = ""
     @State private var tag = "agents"
     @State private var user = "root"
@@ -378,6 +379,10 @@ struct AddProviderSheet: View {
                 TextField("Containers", text: $containers, prompt: Text("agents-devbox, other"))
                 Text("Empty: the containers labelled agents.workspace").appText(.supporting).foregroundStyle(.secondary)
                 TextField("ssh", text: $ssh, prompt: Text("alex@127.0.0.1 -p 2222"))
+                TextField("Image", text: $image, prompt: Text("agents-devbox:latest"))
+                    .disabled(!trimmed(containers).isEmpty)
+                Text("For New Workspace… and Delete Workspace…: an image that keeps running and has curl. Empty: it only lists.")
+                    .appText(.supporting).foregroundStyle(.secondary)
             case .digitalOcean:
                 TextField("Droplets tagged", text: $tag)
                 TextField("ssh as", text: $user)
@@ -763,6 +768,7 @@ struct AddProviderSheet: View {
             let names = containers.split(separator: ",").map { trimmed(String($0)) }.filter { !$0.isEmpty }
             commands = ["preset": "docker"]
             if !names.isEmpty { commands["containers"] = .array(names.map(JSONValue.string)) }
+            if names.isEmpty, !trimmed(image).isEmpty { commands["image"] = .string(trimmed(image)) }
             if !trimmed(ssh).isEmpty { commands["ssh"] = .string(trimmed(ssh)) }
         case .digitalOcean:
             commands = ["preset": "doctl", "tag": .string(trimmed(tag)), "user": .string(trimmed(user).isEmpty ? "root" : trimmed(user))]

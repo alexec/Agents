@@ -375,6 +375,30 @@ func config(_ json: JSON) throws -> CommandConfig { try CommandConfig.from(json)
         #expect(made2["isError"] == true, "the list doesn't show it, as this CLI makes nothing")
     }
 
+    @Test func dockerWithAnImageMakesAndDeletesLabelledContainers() async throws {
+        let made = Made()
+        let recorder = Recorder { line in
+            if line.hasPrefix("docker ps") { return (0, made.list.replacingOccurrences(of: " ", with: "\t")) }
+            if line.hasPrefix("docker run") { made.add("build-2") }
+            if line.hasPrefix("docker rm") { made.remove("build-2") }
+            return (0, "")
+        }
+        let server = WorkspaceCommands.server(try config(["preset": "docker", "image": "agents-devbox:latest"]),
+                                              timing: quick, run: recorder.run)
+        let options = try await call(server, "workspace_options")
+        #expect(options["structuredContent"]?["schema"]?["properties"]?["image"]?["default"] == "agents-devbox:latest")
+        // The image left out takes the form's default.
+        let answer = try await call(server, "workspace_create", ["name": "build-2", "firstBoot": "curl -fsSL https://x/install.sh | sh"])
+        #expect(answer["structuredContent"]?["firstBootRuns"] == true)
+        #expect(recorder.lines.contains(
+            "docker run -d --name 'build-2' --label agents.workspace 'agents-devbox:latest' && docker exec 'build-2' sh -c 'curl -fsSL https://x/install.sh | sh'"))
+        _ = try await call(server, "workspace_delete", ["id": "build-2"])
+        #expect(recorder.lines.contains("docker rm -f -v 'build-2'"))
+        // Without an image, or with named containers, it makes nothing.
+        #expect(try config(["preset": "docker"]).making.create == nil)
+        #expect(try config(["preset": "docker", "containers": ["a"], "image": "x"]).making.create == nil)
+    }
+
     @Test func createNeedsAListing() {
         #expect(throws: ConfigError.self) {
             try config(["workspaces": [["name": "a", "start": "x", "stop": "y"]], "create": "make"])

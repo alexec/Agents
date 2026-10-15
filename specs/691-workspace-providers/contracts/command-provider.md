@@ -57,7 +57,8 @@ WORKSPACE_COMMANDS_CONFIG='{"preset":"docker","containers":["agents-devbox"],"ss
 - `create`, `delete` and `options` (US5) need `list`, which finds what `create` made by its
   name. `create` fills in `${name}`, `${firstBoot}` and each option's key; with `${firstBoot}`
   it answers `firstBootRuns: true`. `delete` fills in `${id}` and the workspace's columns.
-  `options` is the New Workspace form's JSON Schema. No preset has them.
+  `options` is the New Workspace form's JSON Schema; a property's `default` fills in a
+  choice left out. Only `docker` with an `image` has them (#1025).
 - `states` maps the CLI's words to contract states. A status output is matched
   case-insensitively after trimming whitespace.
 
@@ -68,7 +69,7 @@ Its parameters fill them in.
 
 | Preset | Parameters | List / start / stop | ssh |
 |---|---|---|---|
-| `docker` | `containers` (names, optional), `ssh` | With `containers`: `docker inspect -f '{{.State.Status}}' ${id}` / `docker start ${id}` / `docker stop ${id}`. Without (#1024): `docker ps -a --filter label=agents.workspace --format '{{.Names}}\t{{.State}}\t{{.Label "agents.ssh"}}'`, columns `id state ssh`, with the same start and stop. A container opts in with `docker run --label agents.workspace --label agents.ssh='…'`. States: running→running, exited/created→stopped, restarting→starting. | each container's `agents.ssh` label; else `ssh` as given |
+| `docker` | `containers` (names, optional), `ssh`, `image` (optional) | With `containers`: `docker inspect -f '{{.State.Status}}' ${id}` / `docker start ${id}` / `docker stop ${id}`. Without (#1024): `docker ps -a --filter label=agents.workspace --format '{{.Names}}\t{{.State}}\t{{.Label "agents.ssh"}}'`, columns `id state ssh`, with the same start and stop. A container opts in with `docker run --label agents.workspace --label agents.ssh='…'`.With `image` and no `containers`: create `docker run -d --name ${name} --label agents.workspace ${image} && docker exec ${name} sh -c ${firstBoot}`, delete `docker rm -f -v ${id}`, options `image` (default the given one). States: running→running, exited/created→stopped, restarting→starting. | each container's `agents.ssh` label; else `ssh` as given |
 | `doctl` | `tag` | `doctl compute droplet list --tag-name ${tag} …` / `droplet-action power-on --wait` / `power-off --wait`. States: active/new/off. | `root@${ip}` or `user` param |
 | `codespaces` | `repo` (optional) | `gh codespace list --json name,displayName,state` / `gh codespace ssh -c ${id} -- true` (a codespace starts when used) / `gh codespace stop -c ${id}`. States: Available→running, Shutdown→stopped, Starting→starting. | `gh codespace ssh --config` alias, `tunnel: true` |
 | `coder` | none | `coder list -o json` / `coder start -y ${id}` / `coder stop -y ${id}`. Read as JSON (`latest_build.status`). | `coder.${name}` (from `coder config-ssh`) |
