@@ -1,4 +1,4 @@
-# Specification Quality Checklist: Workflow triggers on the control plane
+# Specification Quality Checklist: Start a stopped workspace for its next scheduled workflow
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-10-14
@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,7 +31,7 @@
 
 ## Notes
 
-- The spec names the project's own parts (control plane, host, MCP servers, `hosts:`), as the
+- The spec names the project's own parts (control plane, host, provider, Hosts row), as the
   other specs do. These are product terms here, not a choice of technology.
-- Three markers are open: FR-009 (how long a kept run waits), FR-012 (which host with no
-  `hosts:`), FR-014 (where server events are polled). They go to Alex.
+- No open markers. Alex decided the scope on 2026-10-14: scheduling stays on the hosts; the
+  control plane only starts a stopped workspace for its next scheduled workflow.
