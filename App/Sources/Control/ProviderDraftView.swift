@@ -119,6 +119,12 @@ struct ProviderDraftStatus: View {
                     .tinted(update.check?.passed == true ? .none : .attention)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            if let ssh = sshLine(update) {
+                Text(ssh.text)
+                    .appText(.supporting)
+                    .tinted(ssh.warning ? .attention : .none)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if !changed {
                 Text("Written by \(update.runtimeName). Read it before you add it.")
                     .appText(.supporting).foregroundStyle(.secondary)
@@ -154,6 +160,15 @@ struct ProviderDraftStatus: View {
         let workspaces = check.workspaces ?? []
         guard !workspaces.isEmpty else { return "✓ Listed none." }
         return "✓ Listed \(workspaces.count): " + workspaces.map { "\($0.name) (\($0.state))" }.joined(separator: ", ")
+    }
+
+    /// What its check made of ssh (#975): what `ssh -G` resolved, or a warning that there is none.
+    private func sshLine(_ update: DaemonAPI.ProviderDraftUpdate) -> (text: String, warning: Bool)? {
+        guard let check = update.check, check.passed else { return nil }
+        if check.noSSH == true {
+            return ("⚠ No ssh destination: Add as Host… and starting agentsd over ssh won’t work for these workspaces. Add one by hand: `user@{field}`.", true)
+        }
+        return check.ssh.map { ("✓ \($0)", false) }
     }
 
     private var detailsButton: some View {

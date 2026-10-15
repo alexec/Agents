@@ -123,6 +123,11 @@ struct ControlProvidersPage: View {
             parts.append("\(provider.current ? "Listed" : "Showing what it listed at") \(at.formatted(date: .omitted, time: .shortened))")
         }
         if provider.workspaces.isEmpty, provider.listedAt != nil { parts.append("No workspaces") }
+        // A map or commands written for it that give no ssh (#975); a preset's own way in is its own.
+        let written = provider.kind == "commands" ? provider.preset == nil : provider.mapped
+        if written, !provider.workspaces.isEmpty, provider.workspaces.allSatisfy({ $0.ssh == nil }) {
+            parts.append("⚠ No ssh destination: Add as Host… and starting agentsd over ssh won’t work for these workspaces. Add one by hand: `user@{field}`.")
+        }
         return parts.joined(separator: " · ")
     }
 

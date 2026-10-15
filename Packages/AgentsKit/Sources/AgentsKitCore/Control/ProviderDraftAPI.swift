@@ -142,10 +142,17 @@ public extension DaemonAPI {
         public var passed: Bool
         public var workspaces: [WorkspaceInfo]?
         public var problem: String?
-        public init(passed: Bool, workspaces: [WorkspaceInfo]? = nil, problem: String? = nil) {
+        /// What `ssh -G` resolved one workspace's destination to, in words (#975).
+        public var ssh: String?
+        /// The draft gives no ssh destination, so Add as Host… and an ssh start can't work (#975).
+        public var noSSH: Bool?
+        public init(passed: Bool, workspaces: [WorkspaceInfo]? = nil, problem: String? = nil, ssh: String? = nil,
+                    noSSH: Bool? = nil) {
             self.passed = passed
             self.workspaces = workspaces
             self.problem = problem
+            self.ssh = ssh
+            self.noSSH = noSSH
         }
     }
 

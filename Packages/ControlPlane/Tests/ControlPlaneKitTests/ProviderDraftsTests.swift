@@ -22,6 +22,16 @@ final class DraftWorld: @unchecked Sendable {
     var notInstalled = false
     /// When set, the list's items as the server gave them, none of which the map reads.
     var unread: [JSONValue]?
+    /// When set, the first item a check shows, though the map reads every item (#975).
+    var firstItem: JSONValue?
+    /// What `ssh -G` prints; nil is ssh failing.
+    var sshConfig: String? = "hostname cws.devstack-1\nuser coder\nport 22\nproxycommand ssh -W %h:%p bastion.cws.example\nproxyjump none\n"
+    private var _sshAsked: [String] = []
+    var sshAsked: [String] { lock.withLock { _sshAsked } }
+    func askedSSH(_ destination: String) -> ProviderDrafts.Help {
+        lock.withLock { _sshAsked.append(destination) }
+        return sshConfig.map { .init(status: 0, text: $0) } ?? .init(status: 255, text: "ssh: Could not resolve hostname")
+    }
 
     private var _checks = 0, _starts = 0, _stops = 0, _helpRuns: [[String]] = [], _updates: [DaemonAPI.ProviderDraftUpdate] = []
     private var _started: [DaemonAPI.StartRequest] = [], _stopped: [UUID] = [], _logs: [String] = []
@@ -85,7 +95,8 @@ struct DraftServer: WorkspaceProvider {
             }
         }
         if let unread = world.unread { return .init(workspaces: [], items: unread.count, firstItem: unread.first) }
-        return .init(workspaces: world.workspaces)
+        return .init(workspaces: world.workspaces, items: world.firstItem == nil ? nil : world.workspaces.count,
+                     firstItem: world.firstItem)
     }
 
     func list() async throws -> [DaemonAPI.WorkspaceInfo] { world.workspaces }
@@ -130,7 +141,8 @@ struct DraftHarness {
                 return true
             },
             ownerHere: { _ in world.askOwner() },
-            busyHost: { _, _ in busy }),
+            busyHost: { _, _ in busy },
+            sshConfig: { world.askedSSH($0) }),
             log: { world.logged($0) },
             now: { clock?.now ?? .now })
     }
@@ -146,6 +158,13 @@ struct DraftHarness {
     func tool(_ draft: UUID, _ name: String, _ arguments: JSONValue = [:], agent: UUID? = nil, from: HostID? = nil) async throws -> String {
         let answer = try await drafts.call(from: from ?? host, .init(agentID: agent ?? world.agent, draft: draft, tool: name, arguments: arguments))
         return answer["note"]?.stringValue ?? ""
+    }
+
+    /// goodMap, with `ssh` as list.ssh (#975).
+    static func map(ssh: String) -> JSONValue {
+        ["list": ["tool": "droplet-list", "items": "droplets", "id": "id", "name": "name", "state": "status", "ssh": .string(ssh)],
+         "start": ["tool": "droplet-power-on", "arguments": ["droplet_id": "{id}"]],
+         "stop": ["tool": "droplet-power-off", "arguments": ["droplet_id": "{id}"]]]
     }
 
     static let goodMap: JSONValue = [
@@ -243,6 +262,68 @@ struct ProviderDraftMapTests {
         #expect(answer.contains(#""label":"devbox""#))
         #expect(!answer.contains(secret))
         #expect(answer.contains("${DIGITALOCEAN_API_TOKEN}"))
+    }
+
+    @Test("A check of a map with no ssh says so, shows the first item, and the sheet is told (#975)")
+    func checkSaysThereIsNoSSH() async throws {
+        let world = DraftWorld(tools: ["droplet-list", "droplet-power-on", "droplet-power-off"])
+        world.firstItem = ["name": "devstack-1", "tools": ["IDEs": [["accessUrl": "vscode://vscode-remote/ssh-remote+coder@cws.devstack-1/home"]]]]
+        let harness = DraftHarness(world: world)
+        let id = try await harness.start().draft
+        let answer = try await harness.tool(id, AppTool.checkDraft, ["draft": DraftHarness.goodMap])
+        #expect(answer.contains("No workspace has an ssh destination, so none can be added as a host."))
+        #expect(answer.contains("ssh-remote+"))
+        #expect(answer.contains("coder@cws.devstack-1/home"))
+        #expect(world.last?.check?.noSSH == true)
+        #expect(world.last?.check?.ssh == nil)
+        #expect(world.sshAsked.isEmpty)
+        #expect(world.last?.steps.last?.text == "no ssh destination")
+    }
+
+    @Test("A check of a map with ssh tests one destination with ssh -G and says what it resolved to (#975)")
+    func checkResolvesSSH() async throws {
+        let world = DraftWorld(tools: ["droplet-list", "droplet-power-on", "droplet-power-off"])
+        world.workspaces = [.init(id: "d1", name: "devstack-1", state: "running", ssh: "coder@cws.devstack-1"),
+                            .init(id: "d2", name: "devstack-2", state: "stopped", ssh: "coder@cws.devstack-2")]
+        let harness = DraftHarness(world: world)
+        let id = try await harness.start().draft
+        let map = DraftHarness.map(ssh: "coder@cws.{name}")
+        let answer = try await harness.tool(id, AppTool.checkDraft, ["draft": map])
+        let words = "ssh -G coder@cws.devstack-1: hostname cws.devstack-1, user coder, port 22, ProxyCommand ssh -W %h:%p bastion.cws.example"
+        #expect(answer.contains(words))
+        #expect(!answer.contains("No workspace has an ssh destination"))
+        #expect(world.sshAsked == ["coder@cws.devstack-1"])
+        #expect(world.last?.check?.ssh == words)
+        #expect(world.last?.check?.noSSH == nil)
+
+        world.sshConfig = nil
+        let failed = try await harness.tool(id, AppTool.checkDraft, ["draft": map])
+        #expect(failed.contains("ssh -G coder@cws.devstack-1 failed: ssh: Could not resolve hostname. Check the destination."))
+    }
+
+    @Test("The prompt tells the writer where an ssh destination hides, and an ssh with a port is tested as one word (#975)")
+    func promptAndPort() async throws {
+        let world = DraftWorld(tools: ["droplet-list", "droplet-power-on", "droplet-power-off"])
+        world.workspaces = [.init(id: "d1", name: "box", state: "running", ssh: "alex@127.0.0.1 -p 2222")]
+        let harness = DraftHarness(world: world)
+        let id = try await harness.start().draft
+        let prompt = try #require(world.started.first?.prompt)
+        #expect(prompt.contains("ssh-remote+coder@host"))
+        #expect(prompt.contains("program=ssh"))
+        #expect(prompt.contains("ssh -G"))
+        let map = DraftHarness.map(ssh: "alex@127.0.0.1 -p 2222")
+        _ = try await harness.tool(id, AppTool.checkDraft, ["draft": map])
+        #expect(world.sshAsked == ["ssh://alex@127.0.0.1:2222"])
+    }
+
+    @Test("Whether a draft names ssh: a map's list.ssh, a config's, a workspace's or a preset's (#975)")
+    func hasSSH() {
+        #expect(!ProviderDrafts.hasSSH(DraftHarness.goodMap, commands: false))
+        #expect(ProviderDrafts.hasSSH(["list": ["ssh": "coder@cws.{name}"]], commands: false))
+        #expect(!ProviderDrafts.hasSSH(["list": "cws list", "columns": ["id"]], commands: true))
+        #expect(ProviderDrafts.hasSSH(["list": "cws list", "columns": ["id"], "ssh": "root@${ip}"], commands: true))
+        #expect(ProviderDrafts.hasSSH(["workspaces": [["id": "a"], ["id": "b", "ssh": "b.cws"]]], commands: true))
+        #expect(ProviderDrafts.hasSSH(["preset": "coder"], commands: true))
     }
 
     @Test("A map's check against a real server counts the items it missed, and names the keys when it finds no list")

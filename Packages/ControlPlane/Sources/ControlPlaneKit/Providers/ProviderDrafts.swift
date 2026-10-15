@@ -82,6 +82,9 @@ public actor ProviderDrafts {
         public var ownerHere: @Sendable (_ owner: ControlRouter.Caller) async -> Bool
         /// The host with agents working that a provider's workspace runs, by its name (FR-020).
         public var busyHost: @Sendable (_ provider: ProviderID?, _ workspace: String) async -> String?
+        /// `ssh -G ‹destination›` where the control plane runs: the config ssh would use, without
+        /// connecting (#975). Nil when ssh couldn't say.
+        public var sshConfig: @Sendable (_ destination: String) async -> Help?
 
         public init(connect: @escaping @Sendable (ProviderRecord, [String: String]) throws -> any WorkspaceProvider,
                     help: @escaping @Sendable (String, [String], [String: String]) async -> Help,
@@ -90,7 +93,8 @@ public actor ProviderDrafts {
                     stopAgent: @escaping @Sendable (HostID, UUID, ControlRouter.Caller) async -> Void,
                     notify: @escaping @Sendable (ControlRouter.Caller, DaemonAPI.ProviderDraftUpdate) async -> Bool,
                     ownerHere: @escaping @Sendable (ControlRouter.Caller) async -> Bool,
-                    busyHost: @escaping @Sendable (ProviderID?, String) async -> String? = { _, _ in nil }) {
+                    busyHost: @escaping @Sendable (ProviderID?, String) async -> String? = { _, _ in nil },
+                    sshConfig: @escaping @Sendable (String) async -> Help? = { _ in nil }) {
             self.connect = connect
             self.help = help
             self.localHost = localHost
@@ -99,6 +103,7 @@ public actor ProviderDrafts {
             self.notify = notify
             self.ownerHere = ownerHere
             self.busyHost = busyHost
+            self.sshConfig = sshConfig
         }
     }
 
@@ -394,6 +399,24 @@ public actor ProviderDrafts {
                 answer += "\n\(items - checked.workspaces.count) of the \(items) items at list.items have no id or name by this map. The first item:\n"
                     + draft.redact(Self.sample(first))
             }
+            // ssh, which Add as Host… and an ssh start need (#975): tested, or said to be missing.
+            var resolved: String?
+            let noSSH = checked.workspaces.isEmpty ? !Self.hasSSH(given, commands: draft.isCommands)
+                : checked.workspaces.allSatisfy { $0.ssh == nil }
+            if let workspace = checked.workspaces.first(where: { $0.ssh != nil }), let destination = workspace.ssh {
+                let words = Self.resolved(destination, await hooks.sshConfig(WorkspaceProviders.sshDestination(destination)))
+                resolved = draft.redact(words)
+                await step(draft, .check, words)
+                answer += "\n" + words
+            } else if noSSH {
+                await step(draft, .check, "no ssh destination")
+                answer += "\nNo workspace has an ssh destination, so none can be added as a host. " + Self.sshHunt
+                if checked.items == nil || checked.items == checked.workspaces.count, let first = checked.firstItem {
+                    answer += " The first item:\n" + draft.redact(Self.sample(first))
+                }
+            }
+            draft.check = .init(passed: true, workspaces: checked.workspaces, ssh: resolved, noSSH: noSSH ? true : nil)
+            await tell(draft)
             return answer
         case .failure(let error):
             let words = draft.redact(Self.words(error))
@@ -595,6 +618,14 @@ public actor ProviderDrafts {
         return Help(status: outcome.status, text: text)
     }
 
+    /// `ssh -G ‹destination›` where the control plane runs: what ssh's config makes of it, without
+    /// connecting (#975).
+    public static func runSSHConfig(_ destination: String, in folder: URL) async -> Help {
+        let outcome = await ChildProcess.run(URL(fileURLWithPath: "/usr/bin/ssh"), ["-G", "--", destination], in: folder,
+                                             deadline: .seconds(10), outputLimit: 64 * 1024)
+        return Help(status: outcome.status, text: outcome.status == 0 ? outcome.text : outcome.errorText)
+    }
+
     /// A record for the draft's form, with `map` as its tool map or commands.
     static func record(_ draft: Draft, map: JSONValue?) -> ProviderRecord {
         let form = draft.form
@@ -657,6 +688,45 @@ public actor ProviderDrafts {
         return "- " + parts.joined(separator: ", ")
     }
 
+    /// Whether a draft names an ssh destination: `list.ssh` in a map, `ssh` in a config or in
+    /// any of its workspaces, or a preset's (#975).
+    static func hasSSH(_ draft: JSONValue, commands: Bool) -> Bool {
+        func given(_ value: JSONValue?) -> Bool { !(value?.stringValue ?? "").isEmpty }
+        guard commands else { return given(draft["list"]?["ssh"]) }
+        return draft["preset"] != nil || given(draft["ssh"])
+            || (draft["workspaces"]?.arrayValue ?? []).contains { given($0["ssh"]) }
+    }
+
+    /// What `ssh -G` resolved a destination to, in one line for the agent and the checks (#975):
+    /// "ssh -G coder@cws.devstack-1: hostname cws.devstack-1, user coder, port 22, ProxyCommand ssh -W %h:%p bastion".
+    static func resolved(_ destination: String, _ output: Help?) -> String {
+        guard let output, output.status == 0 else {
+            let why = output.map { lines($0.text, 2) } ?? ""
+            return "ssh -G \(destination) failed\(why.isEmpty ? "" : ": \(why)"). Check the destination."
+        }
+        var config: [String: String] = [:]
+        for line in output.text.split(separator: "\n") {
+            let words = line.split(separator: " ", maxSplits: 1)
+            guard words.count == 2 else { continue }
+            let key = words[0].lowercased()
+            if config[key] == nil { config[key] = String(words[1]) }
+        }
+        var parts: [String] = []
+        for (key, name) in [("hostname", "hostname"), ("user", "user"), ("port", "port"),
+                            ("proxycommand", "ProxyCommand"), ("proxyjump", "ProxyJump")] {
+            if let value = config[key], value != "none" { parts.append("\(name) \(value)") }
+        }
+        return "ssh -G \(destination): " + (parts.isEmpty ? "it printed no hostname." : parts.joined(separator: ", "))
+    }
+
+    /// Where to look for an ssh destination an item doesn't give by name (#975).
+    static let sshHunt = """
+        Look through the whole item for one: a user@host inside IDE or deep-link URLs (ssh-remote+coder@host), \
+        host= and user= query parameters, a program=ssh argument (arg=coder%40host). Write it as a template over the \
+        item's own fields, such as "coder@cws.{name}", never one workspace's literal. If it can't be written from the \
+        item's fields, leave ssh out and give the literal you found in send_draft's note.
+        """
+
     static func cut(_ text: String) -> String {
         guard text.utf8.count > cut else { return text }
         let head = String(decoding: Array(text.utf8.prefix(cut)), as: UTF8.self)
@@ -707,6 +777,8 @@ public actor ProviderDrafts {
             - The list must be a plain list. A check that may change something is asked of the person, who may say no.
             - Ask with prove_start or prove_stop only when you are not sure of the start or stop. Each costs money and \
             changes a machine, so the person is asked every time. Don't ask more than once for each.
+            - Give ssh when you can: without it, no workspace can be added as a host, or started over ssh. \
+            \(sshHunt) check_draft tests it with `ssh -G`, which resolves it without connecting.
             - End with send_draft (the draft that passed, and a short note for the person: what you did not try), or \
             give_up with one sentence. Then end your turn.
             """,
