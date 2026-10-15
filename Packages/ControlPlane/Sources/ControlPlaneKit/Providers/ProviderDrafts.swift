@@ -120,8 +120,9 @@ public actor ProviderDrafts {
 
     /// The CLIs Agents has a preset for, and the preset's name (US2 AS6).
     static let presets: [String: (preset: String, kind: String)] = [
-        "docker": ("docker", "Docker"), "doctl": ("doctl", "DigitalOcean"), "gh": ("codespaces", "Codespaces"),
-        "coder": ("coder", "Coder"), "gcloud": ("gcloud-workstations", "Workstations"),
+        "docker": ("docker", "Docker Containers"), "doctl": ("doctl", "DigitalOcean Droplets"),
+        "gh": ("codespaces", "GitHub Codespaces"), "coder": ("coder", "Coder Workspaces"),
+        "gcloud": ("gcloud-workstations", "Google Cloud Workstations"),
     ]
 
     final class Draft {

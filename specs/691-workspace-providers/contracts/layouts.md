@@ -7,8 +7,9 @@ any client code is written.** The rest of each screen is as it is today.
 - **L1**: the one-line strip.
 - **L2**: Start or Stop, plus a `···` menu.
 - **L3**: a Providers page of its own.
-- **L4**: Add Provider starts by picking a kind. A grid (Docker, DigitalOcean, Codespaces,
-  Coder, Workstations, Your own commands, An MCP server) leads to a short form for just that
+- **L4**: Add Provider starts by picking a kind. A grid (Docker Containers, DigitalOcean
+  Droplets, GitHub Codespaces, Coder Workspaces, Google Cloud Workstations, Your own commands,
+  An MCP server; #1026) leads to a short form for just that
   kind, with Back. The single form drawn below is what was not chosen; its fields stay, split
   by kind.
 
@@ -101,7 +102,7 @@ Offline, linked, but its workspace is running (it lost the network)
 │ ○ scratch-1       Stopped   not a host                          [Add as Host…]   │
 │   Listed 14:31                                                       [Refresh]   │
 └──────────────────────────────────────────────────────────────────────────────────┘
-┌─ Docker on this Mac ────────────────────────── command provider · docker ─ [···] ┐
+┌─ Docker Containers on this Mac ─────────────── command provider · docker ─ [···] ┐
 │ ● agents-devbox   Running   not a host                          [Add as Host…]   │
 └──────────────────────────────────────────────────────────────────────────────────┘
 ┌─ Codespaces ──────────────────────────────────────── stdio · mapped ─── [ ··· ] ┐
@@ -122,11 +123,12 @@ Offline, linked, but its workspace is running (it lost the network)
 Chosen: pick a kind first. The fields below are split into one form per kind.
 
 ```text
-┌ Add a Provider ─────────────────────────────┐
-│ [Docker] [DigitalOcean] [Codespaces] [Coder]│
-│ [Workstations] [Your commands] [MCP server] │
-└─────────────────────────────────────────────┘
-→ DigitalOcean:  Name [DigitalOcean]  Tag [agents]
+┌ Add a Provider ────────────────────────────────────────────────┐
+│ [Docker Containers] [DigitalOcean Droplets] [GitHub Codespaces]│
+│ [Coder Workspaces] [Google Cloud Workstations]                 │
+│ [Your commands] [MCP server]                                   │
+└────────────────────────────────────────────────────────────────┘
+→ DigitalOcean Droplets:  Name [DigitalOcean Droplets]  Tag [agents]
                  needs doctl signed in on this Mac
                                      [Back] [Add]
 ```
@@ -172,7 +174,7 @@ The single form, which was not chosen:
 │ DigitalOcean                                          │
 │   ( ) scratch-1     Stopped                           │
 │   (•) agents-devbox Running                           │
-│ Docker on this Mac                                    │
+│ Docker Containers on this Mac                         │
 │   ( ) agents-devbox Running                           │
 │                                                       │
 │ [✓] Start when used                                   │

@@ -17,11 +17,11 @@ shell commands, and its presets fill those in for the common tools:
 
 | Preset | It needs, where the control plane runs | Workspaces |
 | --- | --- | --- |
-| Docker | `docker` | the containers you name, or the containers labelled `agents.workspace` |
-| DigitalOcean | `doctl`, signed in | droplets with a tag |
-| Codespaces | `gh`, signed in | your codespaces, or one repository's |
-| Coder | `coder`, signed in, after `coder config-ssh` | your Coder workspaces |
-| Workstations | `gcloud`, signed in | one cluster and configuration's workstations |
+| Docker Containers | `docker` | the containers you name, or the containers labelled `agents.workspace` |
+| DigitalOcean Droplets | `doctl`, signed in | droplets with a tag |
+| GitHub Codespaces | `gh`, signed in | your codespaces, or one repository's |
+| Coder Workspaces | `coder`, signed in, after `coder config-ssh` | your Coder workspaces |
+| Google Cloud Workstations | `gcloud`, signed in | one cluster and configuration's workstations |
 
 For anything else, choose **Your commands** and give:
 
