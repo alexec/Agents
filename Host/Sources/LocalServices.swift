@@ -186,6 +186,7 @@ struct LocalServices {
         case .relay: paths.relayFiles.folder
         }
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: paths.logs, withIntermediateDirectories: true)
         var plist: [String: Any] = [
             "Label": label(job),
             "ProgramArguments": arguments,
@@ -195,8 +196,8 @@ struct LocalServices {
             "ProcessType": "Interactive",
         ]
         if job == .daemon {
-            plist["StandardOutPath"] = paths.hostRoot.appendingPathComponent("host.out").path
-            plist["StandardErrorPath"] = paths.hostRoot.appendingPathComponent("host.out").path
+            plist["StandardOutPath"] = paths.hostOut.path
+            plist["StandardErrorPath"] = paths.hostOut.path
         }
         let file = folder.appendingPathComponent("\(label(job)).plist")
         do {

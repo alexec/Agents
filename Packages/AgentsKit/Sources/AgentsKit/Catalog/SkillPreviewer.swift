@@ -6,7 +6,7 @@ import Foundation
 /// here and shown, and nothing is fetched again (FR-008).
 struct StagedSkill: Sendable {
     var preview: DaemonAPI.SkillPreview
-    /// `<root>/catalog-staging/<previewID>/<name>`.
+    /// `<cache>/catalog-staging/<previewID>/<name>`.
     var folder: URL
     /// The skill's own `name`, which is the key the CLI records it under.
     var lockKey: String

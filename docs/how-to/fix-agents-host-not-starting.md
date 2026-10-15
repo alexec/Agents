@@ -42,9 +42,8 @@ it into the report, or **Save Diagnostics…** to keep it as a file. It holds th
 version and place, both login items as macOS and launchd see them, what is listening on
 8791 and 8792, and the end of both logs. Codes, keys and tokens are left out.
 
-**Show Logs** selects both logs in Finder: `control.log` in
-`~/Library/Application Support/Agents Control`, and `daemon.log` in this Mac's host's
-folder.
+**Show Logs** selects both logs in Finder: `control.log` and `daemon.log`, both in
+`~/Library/Logs/Agents`.
 
 From Terminal, the same report comes from
 `"/Applications/Agents Host.app/Contents/MacOS/Agents Host" --diagnose`.

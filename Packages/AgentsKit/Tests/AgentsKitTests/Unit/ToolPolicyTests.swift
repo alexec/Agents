@@ -250,7 +250,7 @@ struct ToolPolicyTests {
         #expect(antigravity["PATH"] == "/usr/bin")
         let claude = ProcessSessionLauncher.environment(for: ToolPolicyCatalog.claude, locations: locations, onto: base)
         #expect(claude == base)
-        #expect(RuntimeLaunchCatalog.antigravity.folders(root: root.path) == [root.path + "/runtimes/antigravity/home"])
+        #expect(RuntimeLaunchCatalog.antigravity.folders(root: root.path, cache: "/c") == [root.path + "/runtimes/antigravity/home"])
     }
 
     /// Antigravity signs in with a Google account only (049 D3): the key and Agent Platform
@@ -347,7 +347,7 @@ struct ToolPolicyTests {
 
         let environment = files.environment(for: ToolPolicyCatalog.grok, onto: ["PATH": "/usr/bin"])
         let path = try #require(environment["GROK_CONFIG_PATH"])
-        #expect(path == root.appendingPathComponent("runtimes/grok-overlay.toml").path)
+        #expect(path == StoreLocations(root: root).runtimeFiles.appendingPathComponent("grok-overlay.toml").path)
         #expect(environment["PATH"] == "/usr/bin")
         #expect(try String(contentsOfFile: path, encoding: .utf8).contains("image_gen = false"))
 
@@ -355,7 +355,7 @@ struct ToolPolicyTests {
         _ = files.environment(for: ToolPolicyCatalog.grok, onto: [:])
         #expect(FileManager.default.fileExists(atPath: path))
 
-        let directory = root.appendingPathComponent("runtimes", isDirectory: true)
+        let directory = StoreLocations(root: root).runtimeFiles
         #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path) == ["grok-overlay.toml"])
     }
 
@@ -441,14 +441,14 @@ struct ToolPolicyTests {
             lever: .file,
             environmentFiles: [EnvironmentFile(name: "imaginary-policy.toml", contents: "# rules\n",
                                                argument: "--policy")])
-        let path = root.appendingPathComponent("runtimes/imaginary-policy.toml").path
+        let path = StoreLocations(root: root).runtimeFiles.appendingPathComponent("imaginary-policy.toml").path
         #expect(files.arguments(for: imaginary) == ["--policy", path])
         #expect(try String(contentsOfFile: path, encoding: .utf8) == "# rules\n")
         #expect(files.environment(for: imaginary, onto: ["PATH": "/usr/bin"]) == ["PATH": "/usr/bin"],
                 "a file named by an argument is not also put in the environment")
 
         // Gemini's is named by a variable, and it passes no argument while it has no rules.
-        let defaults = root.appendingPathComponent("runtimes/gemini-system-defaults.json").path
+        let defaults = StoreLocations(root: root).runtimeFiles.appendingPathComponent("gemini-system-defaults.json").path
         #expect(files.environment(for: ToolPolicyCatalog.gemini, onto: ["PATH": "/usr/bin"])
                 == ["PATH": "/usr/bin", "GEMINI_CLI_SYSTEM_DEFAULTS_PATH": defaults])
         #expect(files.arguments(for: ToolPolicyCatalog.gemini).isEmpty)

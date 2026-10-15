@@ -9,7 +9,7 @@ Reads, and never changes:
       same stack also hits an app
   ~/Library/Logs/CrashReporter/MobileDevice/
       the Remote's reports, when a sync or devicectl has already put them on this Mac
-  Application Support/Agents/crashes/crash-*.txt
+  Library/Logs/Agents/crashes/crash-*.txt
       the window's crash notes (#76, #178), in its container and outside it; a note
       written up to five minutes before a window report names that report's exception
 
@@ -46,8 +46,8 @@ HOME = os.path.expanduser("~")
 REPORT_FOLDERS = [f"{HOME}/Library/Logs/DiagnosticReports", f"{HOME}/Library/DiagnosticReports"]
 DEVICE_FOLDER = f"{HOME}/Library/Logs/CrashReporter/MobileDevice"
 NOTE_GLOBS = [
-    f"{HOME}/Library/Application Support/Agents/crashes/crash-*.txt",
-    f"{HOME}/Library/Containers/com.alexecollins.agents*/Data/Library/Application Support/Agents/crashes/crash-*.txt",
+    f"{HOME}/Library/Logs/Agents/crashes/crash-*.txt",
+    f"{HOME}/Library/Containers/com.alexecollins.agents*/Data/Library/Logs/Agents/crashes/crash-*.txt",
 ]
 LIVE_GLOBS = [
     f"{HOME}/Applications/AgentsLive/*/Agents.app/Contents/MacOS/Agents",

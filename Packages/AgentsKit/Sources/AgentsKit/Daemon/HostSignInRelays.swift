@@ -11,29 +11,30 @@ import Foundation
 /// through a tunnel the control plane opens for a lend an operator allowed.
 ///
 /// A relay's keys and certificates live in `<root>/relay/`; its log, which says only what was
-/// asked and how it was answered, is `<root>/hosts/relay.log`.
+/// asked and how it was answered, is `host-relay.log` in the root's log folder (#1030).
 public final class HostSignInRelays: @unchecked Sendable {
     private let locations: StoreLocations
     private let lock = NSLock()
     private var relays: [String: MacSignInRelay] = [:]
     private var sources: [String: any MacSignInSource] = [:]
-    /// `hosts/relay.log`, rolled at 1 MB and kept open (#211).
+    /// `host-relay.log`, rolled at 1 MB and kept open (#211).
     private let log = DaemonLog(limit: HostSignInRelays.logLimit)
     static let logLimit = 1024 * 1024
 
     public init(locations: StoreLocations) {
         self.locations = locations
         try? FileManager.default.createDirectory(at: locations.hostsFolder, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: locations.logRoot, withIntermediateDirectories: true)
         // One written before the limit can be any size, and rolling would only move it to
-        // relay.previous.log whole: it goes, as it says only what was asked and answered.
-        for name in ["relay.log", "relay.previous.log"] {
-            let file = locations.hostsFolder.appendingPathComponent(name)
+        // host-relay.previous.log whole: it goes, as it says only what was asked and answered.
+        for name in ["host-relay.log", "host-relay.previous.log"] {
+            let file = locations.logRoot.appendingPathComponent(name)
             if let size = try? FileManager.default.attributesOfItem(atPath: file.path)[.size] as? Int,
                size > Self.logLimit {
                 try? FileManager.default.removeItem(at: file)
             }
         }
-        log.setDestination(locations.hostsFolder.appendingPathComponent("relay.log"))
+        log.setDestination(locations.hostRelayLog)
     }
 
     /// This Mac's own sign-in for `runtimeID`, where its policy says it is kept.

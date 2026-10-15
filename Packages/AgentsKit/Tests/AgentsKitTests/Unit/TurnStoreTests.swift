@@ -188,4 +188,21 @@ struct TurnStoreTests {
         await fresh.fillTurns(for: id)
         #expect(try keptTurns(locations, id).count == 39)
     }
+
+    /// The turns are in the cache, outside the agent's folder (#1030): they go with it.
+    @Test func turnsGoWithTheirAgent() async throws {
+        let (store, locations) = try store()
+        let (kept, gone, orphan) = (UUID(), UUID(), UUID())
+        for id in [kept, gone] {
+            try await store.appendAll([ask("One"), said("a"), ask("Two")], for: id)
+            _ = try await store.turns(for: id)
+        }
+        try Data("{}\n".utf8).write(to: locations.turns(orphan))
+        try await store.delete(gone)
+        #expect(!FileManager.default.fileExists(atPath: locations.turns(gone).path))
+        await store.finishDeleting()
+        #expect(!FileManager.default.fileExists(atPath: locations.turns(orphan).path), "no agent, no turns")
+        #expect(FileManager.default.fileExists(atPath: locations.turns(kept).path))
+    }
 }
+

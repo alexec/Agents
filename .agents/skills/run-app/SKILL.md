@@ -181,7 +181,7 @@ c.call("permissions/answer", {"permissionID": note["params"]["id"],
 ```
 
 This is how a daemon-side change is proved: state on the record, an entry in the
-transcript, a notification that arrived, a file on disk. `$ROOT/daemon.log` has
+transcript, a notification that arrived, a file on disk. `$ROOT/logs/daemon.log` has
 what it was doing (an `uplink:` line says it joined the control plane);
 `$ROOT/agents/<uuid>/agent.json` and `transcript.jsonl` are the record itself and
 are plain to `cat`. `$ROOT/control/control.log` is the control plane's side.

@@ -95,7 +95,7 @@ case "${1:-status}" in
     "${SSH[@]}" 'p=$(cat ~/.agents-server/root/daemon.lock 2>/dev/null | tr -d "[:space:]"); [ -n "$p" ] && kill "$p" 2>/dev/null; sleep 1; rm -rf ~/.agents-server; echo "removed ~/.agents-server"'
     ;;
   logs)
-    "${SSH[@]}" 'tail -n ${1:-80} ~/.agents-server/root/daemon.log'
+    "${SSH[@]}" 'tail -n ${1:-80} ${XDG_STATE_HOME:-~/.local/state}/agents/logs/roots/root-*/daemon.log'
     ;;
   rebuild)
     colima_up

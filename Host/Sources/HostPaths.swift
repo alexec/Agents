@@ -77,9 +77,18 @@ struct HostPaths: Sendable, Equatable {
                 .appendingPathComponent("Agents Relay", isDirectory: true)
         return ControlRelay.Files(folder: folder)
     }
-    var relayLog: URL { relayFiles.folder.appendingPathComponent("relay.log") }
+    /// Where the set-up's own logs go (#1030): the ordinary root's log folder,
+    /// `~/Library/Logs/Agents`, beside the daemon's; a scratch set-up's root's own.
+    /// `agents-relay` works out the same folder for itself (`Host/Relay`).
+    var logs: URL { Self.logs(scratchRoot: scratchRoot) }
+    static func logs(scratchRoot: URL?) -> URL {
+        (scratchRoot.map { StoreLocations(root: $0) } ?? StoreLocations.standard).logRoot
+    }
+    var relayLog: URL { logs.appendingPathComponent("relay.log") }
+    /// The daemon job's stdout and stderr, which launchd writes.
+    var hostOut: URL { logs.appendingPathComponent("host.out") }
 
-    var controlLog: URL { controlHome.appendingPathComponent("control.log") }
+    var controlLog: URL { logs.appendingPathComponent("control.log") }
     var hostLocations: StoreLocations { StoreLocations(root: hostRoot) }
 
     /// The single copy's store when it is kept on this Mac.

@@ -10,8 +10,8 @@ import os
 /// traps in `+[NSApplication _crashOnException:]`, and the crash report has no reason
 /// in it. So every exception is written up as it is thrown (name, reason and the stack,
 /// which still has the view that threw on it), and kept in memory. If the window then
-/// dies of SIGTRAP or SIGABRT, the last one goes to a crash note in the container,
-/// `Application Support/Agents/crashes/`. One that reaches the uncaught handler (thrown
+/// dies of SIGTRAP or SIGABRT, the last one goes to a crash note in the container's log
+/// folder, `Library/Logs/Agents/crashes/` (#1030), beside the hang stacks. One that reaches the uncaught handler (thrown
 /// from a display-link or Core Animation callback, say, which ends in `abort`) is
 /// written there, and logged at `.fault`, before the process aborts.
 ///
@@ -41,8 +41,8 @@ enum CrashHook {
     private nonisolated(unsafe) static var folder: URL?
 
     static var defaultFolder: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Agents/crashes", isDirectory: true)
+        FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Logs/Agents/crashes", isDirectory: true)
     }
 
     static func install(in crashes: URL = defaultFolder) {

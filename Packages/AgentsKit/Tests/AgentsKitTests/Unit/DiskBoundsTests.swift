@@ -66,7 +66,7 @@ struct DiskBoundsTests {
         let root = try root()
         defer { try? FileManager.default.removeItem(at: root) }
         let locations = StoreLocations(root: root)
-        let temporary = root.appendingPathComponent("runtimes/opencode/tmp", isDirectory: true)
+        let temporary = locations.runtimeFiles.appendingPathComponent("opencode/tmp", isDirectory: true)
         try make(temporary.appendingPathComponent("TemporaryDirectory.old"), changed: now.addingTimeInterval(-2 * day), folder: true)
         try make(temporary.appendingPathComponent("stale.txt"), changed: now.addingTimeInterval(-1.5 * day))
         try make(temporary.appendingPathComponent("TemporaryDirectory.new"), changed: now.addingTimeInterval(-3_600), folder: true)
@@ -147,8 +147,8 @@ struct DiskBoundsTests {
         let line = String(repeating: "x", count: 1_000)
         for _ in 0..<2_500 { relays.write(line) }
 
-        let log = locations.hostsFolder.appendingPathComponent("relay.log")
-        let previous = locations.hostsFolder.appendingPathComponent("relay.previous.log")
+        let log = locations.hostRelayLog
+        let previous = locations.logRoot.appendingPathComponent("host-relay.previous.log")
         let size = { (url: URL) in (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0 }
         #expect(size(log) <= 1024 * 1024)
         #expect(size(previous) <= 1024 * 1024)
@@ -161,9 +161,9 @@ struct DiskBoundsTests {
         let root = try root()
         defer { try? FileManager.default.removeItem(at: root) }
         let locations = StoreLocations(root: root)
-        try FileManager.default.createDirectory(at: locations.hostsFolder, withIntermediateDirectories: true)
-        let log = locations.hostsFolder.appendingPathComponent("relay.log")
-        let previous = locations.hostsFolder.appendingPathComponent("relay.previous.log")
+        try FileManager.default.createDirectory(at: locations.logRoot, withIntermediateDirectories: true)
+        let log = locations.hostRelayLog
+        let previous = locations.logRoot.appendingPathComponent("host-relay.previous.log")
         try Data(count: 3 * 1024 * 1024).write(to: log)
         try Data(count: 2 * 1024 * 1024).write(to: previous)
         let relays = HostSignInRelays(locations: locations)

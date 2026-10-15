@@ -64,7 +64,7 @@ scripts/crash-reports.py --notes .agents/reviews/crashes \
 
 It reads `~/Library/Logs/DiagnosticReports/`, `~/Library/DiagnosticReports/`, the Remote's
 reports in `~/Library/Logs/CrashReporter/MobileDevice/` when they are already on this Mac,
-and the window's crash notes (`Application Support/Agents/crashes/crash-*.txt`, in its
+and the window's crash notes (`Library/Logs/Agents/crashes/crash-*.txt`, in its
 container too), written since the last `read-through:` (14 days back on the first run).
 It prints one line per distinct stack, a **signature** such as `crashsig1a2b3c4d5e6f`, with
 the process, the count, where it ran and what to do:

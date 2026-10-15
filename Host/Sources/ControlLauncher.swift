@@ -143,6 +143,7 @@ enum ControlLauncher {
         let settings = HostSettings.load(paths)
         do {
             try FileManager.default.createDirectory(at: paths.controlHome, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: paths.logs, withIntermediateDirectories: true)
             let log = open(paths.controlLog.path, O_WRONLY | O_CREAT | O_APPEND, 0o600)
             if log >= 0 { dup2(log, 1); dup2(log, 2); close(log) }
             var arguments = ["serve", "--home", paths.controlHome.path, "--port", String(paths.port)]

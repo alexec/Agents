@@ -9,7 +9,7 @@ import Foundation
 /// read from a file named by `--policy` (046, R5), and it is the same shape written by the same
 /// code path; there are no rules today (2026-09-29), so it writes nothing and passes no flag.
 ///
-/// Under the daemon's own root, which is the daemon's identity: a second daemon on a
+/// In the root's cache folder (#1030), scoped like the root: a second daemon on a
 /// second root gets its own copy, exactly as every other file here does. Nothing goes
 /// near `~/.grok`, and nothing is left behind that the app did not write for itself.
 ///
@@ -48,7 +48,7 @@ public struct RuntimePolicyFiles: Sendable {
     }
 
     private func write(_ file: EnvironmentFile, for policy: ToolPolicy) -> String? {
-        let directory = locations.root.appendingPathComponent("runtimes", isDirectory: true)
+        let directory = locations.runtimeFiles
         let url = directory.appendingPathComponent(file.name)
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

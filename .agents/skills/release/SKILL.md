@@ -52,7 +52,7 @@ Alex decided (2026-10-13, #914):
 |---|---|---|
 | Security | newest `YYYY-MM-DD.md` on `agents/reviews-security` under `.agents/reviews/security/` | `security-review` |
 | Performance | the same on `agents/reviews-performance` under `.agents/reviews/performance/` | `performance-review` |
-| Runtimes | the time of `~/Library/Application Support/Agents Nightly Runtimes/runs/latest/report.md` | `nightly-runtimes` |
+| Runtimes | the time of `~/Library/Caches/Agents Nightly Runtimes/runs/latest/report.md` | `nightly-runtimes` |
 | Usability | the same on `agents/reviews-usability` under `.agents/reviews/usability/` | `usability-check` |
 
 List a branch's reports with

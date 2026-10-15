@@ -17,17 +17,17 @@ public enum DiskSweep {
     public static let crashNotesKept = 20
 
     /// What a daemon sweeps as it starts: the temporary folder each runtime is given under
-    /// the root, of entries older than a day. Off the start's path, since the first sweep
+    /// the root's cache folder, of entries older than a day. Off the start's path, since the first sweep
     /// can have a thousand folders to remove; anything a runtime it starts writes there is
     /// new, so it is never what goes.
     public static func runtimeTemporaries(_ locations: StoreLocations, now: Date = Date()) {
-        let root = locations.root.path
         for launch in RuntimeLaunchCatalog.builtIn {
             guard let temporary = launch.environment["TMPDIR"] ?? nil,
-                  temporary.hasPrefix(RuntimeLaunch.rootPlaceholder) else { continue }
-            let folder = URL(filePath: temporary.replacingOccurrences(of: RuntimeLaunch.rootPlaceholder, with: root),
+                  temporary.hasPrefix(RuntimeLaunch.cachePlaceholder) else { continue }
+            let folder = URL(filePath: RuntimeLaunch.expand(temporary, root: locations.root.path,
+                                                            cache: locations.cacheRoot.path),
                              directoryHint: .isDirectory)
-            removeOlder(than: temporaryAge, in: folder, within: locations.root, now: now)
+            removeOlder(than: temporaryAge, in: folder, within: locations.cacheRoot, now: now)
         }
     }
 

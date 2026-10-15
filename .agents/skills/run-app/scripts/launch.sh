@@ -156,18 +156,18 @@ env ${STRIP[@]+"${STRIP[@]}"} AGENTS_ROOT="$ROOT" ${EXTRA_ENV[@]+"${EXTRA_ENV[@]
 JOINED="uplink: connected to the control plane"
 [ "$HOST_FIRST" = 1 ] && JOINED="uplink: could not join the control plane yet"
 for _ in $(seq 1 200); do
-  [ -S "$ROOT/daemon.sock" ] && grep -q "$JOINED" "$ROOT/daemon.log" 2>/dev/null && break
+  [ -S "$ROOT/daemon.sock" ] && grep -q "$JOINED" "$ROOT/logs/daemon.log" 2>/dev/null && break
   sleep 0.1
 done
 if [ "$HOST_FIRST" = 1 ]; then
-  grep -q "$JOINED" "$ROOT/daemon.log" || { echo "the host never tried to join — see $ROOT/daemon.log" >&2; exit 1; }
+  grep -q "$JOINED" "$ROOT/logs/daemon.log" || { echo "the host never tried to join — see $ROOT/logs/daemon.log" >&2; exit 1; }
   sleep "${HOST_FIRST_WAIT:-5}"
   start_control
-  for _ in $(seq 1 300); do grep -q "uplink: connected to the control plane" "$ROOT/daemon.log" && break; sleep 0.1; done
-  grep -q "uplink: connected to the control plane" "$ROOT/daemon.log" \
-    || { echo "the host did not join once the control plane came up — see $ROOT/daemon.log" >&2; exit 1; }
+  for _ in $(seq 1 300); do grep -q "uplink: connected to the control plane" "$ROOT/logs/daemon.log" && break; sleep 0.1; done
+  grep -q "uplink: connected to the control plane" "$ROOT/logs/daemon.log" \
+    || { echo "the host did not join once the control plane came up — see $ROOT/logs/daemon.log" >&2; exit 1; }
 fi
-[ -S "$ROOT/daemon.sock" ] || { echo "no daemon.sock under $ROOT after 20s — see $ROOT/daemon.log and $ROOT/host.out" >&2; exit 1; }
+[ -S "$ROOT/daemon.sock" ] || { echo "no daemon.sock under $ROOT after 20s — see $ROOT/logs/daemon.log and $ROOT/host.out" >&2; exit 1; }
 DAEMON_PID="$(tr -d '[:space:]' < "$ROOT/daemon.lock" 2>/dev/null || true)"
 
 APP_PID=""
@@ -201,5 +201,5 @@ CONTROL_URL=$URL
 WEB_URL=http://localhost:$WEB_PORT/
 PAIR_CODE=${PAIR_CODE:-}
 SOCK=$ROOT/daemon.sock
-LOG=$ROOT/daemon.log
+LOG=$ROOT/logs/daemon.log
 EOF

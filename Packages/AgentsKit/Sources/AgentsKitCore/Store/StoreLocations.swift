@@ -18,6 +18,13 @@ import Musl
 /// ordinary one without either touching the other's agents.
 public struct StoreLocations: Sendable {
     public var root: URL
+    /// Where this root's caches go (#1030): everything rebuilt or downloaded again when it
+    /// is missing, so deleting the folder and starting again is always safe. The platform's
+    /// cache folder, so a person can reset it the ordinary way. Settable, like
+    /// `personalHome`, so a test hands one in.
+    public var cacheRoot: URL
+    /// Where this root's logs go (#1030): the platform's log folder.
+    public var logRoot: URL
 
     /// The home folder whose `~/.agents` every agent shares (054), or nil for none.
     ///
@@ -29,7 +36,60 @@ public struct StoreLocations: Sendable {
 
     public init(root: URL) {
         self.root = root
-        self.personalHome = Self.personalHome(root: root, environment: ProcessInfo.processInfo.environment)
+        let environment = ProcessInfo.processInfo.environment
+        self.personalHome = Self.personalHome(root: root, environment: environment)
+        (self.cacheRoot, self.logRoot) = Self.platformFolders(root: root, environment: environment)
+    }
+
+    /// The cache and log folders for `root` (#1030). Pure, so the rule is testable.
+    ///
+    /// - The ordinary root: `~/Library/Caches/com.alexecollins.agents` and
+    ///   `~/Library/Logs/Agents` on a Mac; `$XDG_CACHE_HOME/agents` (`~/.cache/agents`) and
+    ///   `$XDG_STATE_HOME/agents/logs` (`~/.local/state/agents/logs`) on Linux.
+    /// - Any other root: a folder of its own under each, `roots/<name>-<hash>`, so a second
+    ///   copy never shares a cache with the first.
+    /// - A root in the temporary folder (a test, a walk's `/tmp/run-<slug>`): `cache` and
+    ///   `logs` inside it, so that removing the root removes everything it made, and
+    ///   thousands of test roots leave nothing behind in the person's folders.
+    public static func platformFolders(root: URL, environment: [String: String]) -> (cache: URL, logs: URL) {
+        if isTemporary(root) {
+            return (root.appendingPathComponent("cache", isDirectory: true),
+                    root.appendingPathComponent("logs", isDirectory: true))
+        }
+        #if canImport(Darwin)
+        let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+        var cache = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("com.alexecollins.agents", isDirectory: true)
+        var logs = library.appendingPathComponent("Logs/Agents", isDirectory: true)
+        #else
+        let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+        func xdg(_ variable: String, _ fallback: String) -> URL {
+            if let value = environment[variable], value.hasPrefix("/") { return URL(fileURLWithPath: value, isDirectory: true) }
+            return home.appendingPathComponent(fallback, isDirectory: true)
+        }
+        var cache = xdg("XDG_CACHE_HOME", ".cache").appendingPathComponent("agents", isDirectory: true)
+        var logs = xdg("XDG_STATE_HOME", ".local/state").appendingPathComponent("agents/logs", isDirectory: true)
+        #endif
+        if root.standardizedFileURL.path != standardRoot.standardizedFileURL.path {
+            let own = "roots/\(root.lastPathComponent)-\(pathHash(root.standardizedFileURL.path))"
+            cache.appendPathComponent(own, isDirectory: true)
+            logs.appendPathComponent(own, isDirectory: true)
+        }
+        return (cache, logs)
+    }
+
+    /// Whether `url` is under the system's temporary folder or `/tmp`, through any link.
+    static func isTemporary(_ url: URL) -> Bool {
+        let path = url.resolvingSymlinksInPath().standardizedFileURL.path
+        let temporaries = [NSTemporaryDirectory(), "/tmp", "/private/tmp", "/var/tmp", "/private/var/tmp"]
+            .map { URL(fileURLWithPath: $0, isDirectory: true).resolvingSymlinksInPath().standardizedFileURL.path }
+        return temporaries.contains { path == $0 || path.hasPrefix($0.hasSuffix("/") ? $0 : $0 + "/") }
+    }
+
+    /// Eight hex digits of FNV-1a, the hash Agents Host labels a scratch set-up's jobs with.
+    static func pathHash(_ path: String) -> String {
+        let hash = path.utf8.reduce(UInt64(1469598103934665603)) { ($0 ^ UInt64($1)) &* 1099511628211 }
+        return String(String(hash, radix: 16).suffix(8))
     }
 
     /// The one every process uses unless it was told otherwise.
@@ -105,7 +165,12 @@ public struct StoreLocations: Sendable {
 
     public var socket: URL { root.appendingPathComponent("daemon.sock") }
     public var lock: URL { root.appendingPathComponent("daemon.lock") }
-    public var log: URL { root.appendingPathComponent("daemon.log") }
+    /// The daemon's log, rolled to `daemon.previous.log` beside it (#1030: in `logRoot`).
+    public var log: URL { logRoot.appendingPathComponent("daemon.log") }
+    /// Each hosted MCP server's stderr, `<name>-<scope digest>.log`, rolled at 1 MB.
+    public var mcpLogs: URL { logRoot.appendingPathComponent("mcp-logs", isDirectory: true) }
+    /// What each host sign-in relay was asked and how it answered (#211), rolled at 1 MB.
+    public var hostRelayLog: URL { logRoot.appendingPathComponent("host-relay.log") }
     /// Where each subscription to a server's events has got to (#383). The daemon's alone.
     public var mcpEvents: URL { root.appendingPathComponent("mcp-events.json") }
     /// Which root this is (#228): an id made the first time a daemon starts here, and
@@ -117,14 +182,18 @@ public struct StoreLocations: Sendable {
     public var personalLayout: URL { root.appendingPathComponent("personal-layout.json") }
     /// What the app installs for this daemon (048): `tools/<runtime>/<id>/`, with
     /// `current` pointing at the one in use. Per root, so a scratch copy installs its own.
-    public var tools: URL { root.appendingPathComponent("tools", isDirectory: true) }
+    /// A cache (#1030): a toolset that is missing is downloaded again.
+    public var tools: URL { cacheRoot.appendingPathComponent("tools", isDirectory: true) }
+    /// The files a runtime's policy names, written again at every launch (064), and each
+    /// runtime's own temporary folder (`<cache>` in `RuntimeLaunch`).
+    public var runtimeFiles: URL { cacheRoot.appendingPathComponent("runtimes", isDirectory: true) }
     /// Where copies of the daemon's binary were kept for runtimes to start as the MCP
     /// helper, until #185. Only named so a daemon starting can remove it.
     public var helpers: URL { root.appendingPathComponent("helpers", isDirectory: true) }
     public var agents: URL { root.appendingPathComponent("agents", isDirectory: true) }
     /// Skill previews fetched and not yet added (059). Held in memory, so a daemon starting
     /// removes what an earlier one left.
-    public var catalogStaging: URL { root.appendingPathComponent("catalog-staging", isDirectory: true) }
+    public var catalogStaging: URL { cacheRoot.appendingPathComponent("catalog-staging", isDirectory: true) }
     /// Every project we have been told about. One file, because the only things in it
     /// are the two a project's folder cannot tell us: that it is archived, and that it
     /// was added before anything ran in it.
@@ -179,7 +248,7 @@ public struct StoreLocations: Sendable {
     public var hostsFolder: URL { root.appendingPathComponent("hosts", isDirectory: true) }
     /// What each runtime last advertised. A cache: safe to delete, and deleting it
     /// costs the next start form the wait it used to have every time.
-    public var optionCache: URL { root.appendingPathComponent("option-cache.json") }
+    public var optionCache: URL { cacheRoot.appendingPathComponent("option-cache.json") }
     /// The mode last chosen for each runtime, so every window and phone offers the
     /// same one first (029).
     public var modes: URL { root.appendingPathComponent("modes.json") }
@@ -225,7 +294,7 @@ public struct StoreLocations: Sendable {
     public var allowances: URL { root.appendingPathComponent("allowances.json") }
     /// Every archived agent, slim, with its size: what start reads instead of each
     /// record (051). A cache, rebuilt when it is missing or unreadable.
-    public var archiveIndex: URL { root.appendingPathComponent("archive.json") }
+    public var archiveIndex: URL { cacheRoot.appendingPathComponent("archive.json") }
     /// The little the event sources remember between runs (042): the next position,
     /// branch tips, cost crossings.
     public var eventState: URL { root.appendingPathComponent("events-state.json") }
@@ -250,8 +319,10 @@ public struct StoreLocations: Sendable {
     public func record(_ id: UUID) -> URL { agent(id).appendingPathComponent("agent.json") }
     public func transcript(_ id: UUID) -> URL { agent(id).appendingPathComponent("transcript.jsonl") }
     /// Each finished turn of the transcript, as the chat shows it by default. Derived,
-    /// so it may be deleted at any time and is built again from the transcript.
-    public func turns(_ id: UUID) -> URL { agent(id).appendingPathComponent("turns.jsonl") }
+    /// so it may be deleted at any time and is built again from the transcript: in the
+    /// cache (#1030), one file per agent, removed with the agent.
+    public func turns(_ id: UUID) -> URL { turnsFolder.appendingPathComponent("\(id.uuidString).jsonl") }
+    public var turnsFolder: URL { cacheRoot.appendingPathComponent("turns", isDirectory: true) }
     /// Every call the agent made to the app's own tools, as the daemon answered it (#47).
     public func appTools(_ id: UUID) -> URL { agent(id).appendingPathComponent("app-tools.jsonl") }
     /// What the daemon made of each runtime assessment it scored (#47), by agent.
@@ -259,6 +330,8 @@ public struct StoreLocations: Sendable {
 
     public func createDirectories() throws {
         try FileManager.default.createDirectory(at: agents, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: turnsFolder, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: logRoot, withIntermediateDirectories: true)
     }
 }
 

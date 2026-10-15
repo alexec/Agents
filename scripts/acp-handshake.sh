@@ -40,15 +40,15 @@ RUNTIMES = {
     # Not "agent", which is what Cursor calls itself and what Grok installs.
     "cursor": ["cursor-agent", "acp"],
     # Never the person's npx or codex-acp (047, R1): the app's own toolset's shim, named by
-    # AGENTS_CODEX_SHIM, e.g. <root>/tools/codex/current/bin/codex-acp.
+    # AGENTS_CODEX_SHIM, e.g. <cache>/tools/codex/current/bin/codex-acp.
     "codex": [os.environ.get("AGENTS_CODEX_SHIM", "agents-codex-shim-not-set")],
     # Never a gemini on the PATH (046, D1): the app's own toolset's shim.
     "gemini": [os.environ.get("AGENTS_GEMINI_SHIM", "agents-gemini-shim-not-set"), "--acp", "--skip-trust"],
     # Google's ACP server, never the agy CLI (049, R1): the app's own copy's shim, named by
-    # AGENTS_ANTIGRAVITY_SHIM, e.g. <root>/tools/antigravity/current/bin/agy_acp_server.
+    # AGENTS_ANTIGRAVITY_SHIM, e.g. <cache>/tools/antigravity/current/bin/agy_acp_server.
     "antigravity": [os.environ.get("AGENTS_ANTIGRAVITY_SHIM", "agents-antigravity-shim-not-set")],
     # Never an opencode on the PATH (049, D1: two programs have that name): the app's own
-    # copy's shim, named by AGENTS_OPENCODE_SHIM, e.g. <root>/tools/opencode/current/bin/opencode.
+    # copy's shim, named by AGENTS_OPENCODE_SHIM, e.g. <cache>/tools/opencode/current/bin/opencode.
     "opencode": [os.environ.get("AGENTS_OPENCODE_SHIM", "agents-opencode-shim-not-set"), "acp"],
 }
 

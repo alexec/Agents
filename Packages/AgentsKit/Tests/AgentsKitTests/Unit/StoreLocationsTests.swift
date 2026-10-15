@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AgentsKit
+@testable import AgentsKitCore
 
 /// Which daemon a process belongs to.
 ///
@@ -68,5 +69,74 @@ struct StoreLocationsTests {
         #expect(one.log.path != two.log.path)
         #expect(one.agents.path != two.agents.path)
         #expect(one.projects.path != two.projects.path)
+    }
+
+    // MARK: Caches and logs (#1030)
+
+    @Test func theOrdinaryRootsCachesAndLogsAreThePlatformsFolders() {
+        let (cache, logs) = StoreLocations.platformFolders(root: StoreLocations.standardRoot, environment: [:])
+        #if canImport(Darwin)
+        #expect(cache.path.hasSuffix("Library/Caches/com.alexecollins.agents"))
+        #expect(logs.path.hasSuffix("Library/Logs/Agents"))
+        #else
+        #expect(cache.path.hasSuffix(".cache/agents"))
+        #expect(logs.path.hasSuffix(".local/state/agents/logs"))
+        #endif
+    }
+
+    @Test func anotherRootHasAFolderOfItsOwnInEach() {
+        let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+        let one = StoreLocations.platformFolders(root: home.appending(path: "branch/one"), environment: [:])
+        let two = StoreLocations.platformFolders(root: home.appending(path: "other/one"), environment: [:])
+        let ordinary = StoreLocations.platformFolders(root: StoreLocations.standardRoot, environment: [:])
+        #expect(one.cache.deletingLastPathComponent().deletingLastPathComponent() == ordinary.cache)
+        #expect(one.cache.lastPathComponent.hasPrefix("one-"))
+        #expect(one.cache != two.cache, "two roots with one name share nothing")
+        #expect(one.logs != two.logs)
+    }
+
+    #if !canImport(Darwin)
+    @Test func linuxFollowsTheXDGVariables() {
+        let root = URL(fileURLWithPath: NSHomeDirectory()).appending(path: "srv/root")
+        let (cache, logs) = StoreLocations.platformFolders(
+            root: root, environment: ["XDG_CACHE_HOME": "/c", "XDG_STATE_HOME": "/s"])
+        #expect(cache.path.hasPrefix("/c/agents/roots/root-"))
+        #expect(logs.path.hasPrefix("/s/agents/logs/roots/root-"))
+    }
+    #endif
+
+    /// A test's root, or a walk's `/tmp/run-<slug>`, keeps its caches and logs inside
+    /// itself, so removing it leaves nothing in the person's folders.
+    @Test func aRootInTheTemporaryFolderKeepsThemInside() {
+        let root = FileManager.default.temporaryDirectory.appending(path: "store-\(UUID().uuidString)")
+        let locations = StoreLocations(root: root)
+        #expect(locations.cacheRoot == root.appending(path: "cache", directoryHint: .isDirectory))
+        #expect(locations.logRoot == root.appending(path: "logs", directoryHint: .isDirectory))
+        #expect(StoreLocations.isTemporary(URL(fileURLWithPath: "/tmp/run-walk")))
+        #expect(locations.log.deletingLastPathComponent() == locations.logRoot)
+        #expect(locations.tools.deletingLastPathComponent() == locations.cacheRoot)
+        #expect(locations.archiveIndex.deletingLastPathComponent() == locations.cacheRoot)
+        #expect(locations.optionCache.deletingLastPathComponent() == locations.cacheRoot)
+    }
+
+    /// Delete the cache folder and start again: the daemon starts and the turns come back
+    /// from the transcript (#1030).
+    @Test func aDeletedCacheIsBuiltAgain() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "store-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let locations = StoreLocations(root: root)
+        let id = UUID()
+        let entries = [TranscriptEntry(kind: .userMessage("One")), TranscriptEntry(kind: .agentMessage(messageID: nil, text: "a")),
+                       TranscriptEntry(kind: .userMessage("Two"))]
+        let store = try AgentStore(locations: locations)
+        try await store.appendAll(entries, for: id)
+        _ = try await store.turns(for: id)
+        #expect(FileManager.default.fileExists(atPath: locations.turns(id).path))
+        try FileManager.default.removeItem(at: locations.cacheRoot)
+
+        let daemon = try Daemon(locations: locations, discovery: .findsEverything, launcher: FakeLauncher())
+        await daemon.shutDown()
+        let page = try await AgentStore(locations: locations).turns(for: id)
+        #expect(page.turns.map { $0.ask?.text } == ["One"])
     }
 }

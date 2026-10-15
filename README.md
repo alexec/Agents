@@ -114,10 +114,19 @@ ls ~/Library/Application\ Support/Agents/
 #   daemon.sock   the window, Agents Host and the Remote's bridge connect here
 #                 (agents' own tools are served on a loopback http port instead)
 #   daemon.lock   flock, held by the one daemon
-#   daemon.log    what it has been doing
 #   agents/<uuid>/agent.json        the record, written whole on every change
 #   agents/<uuid>/transcript.jsonl  appended as things happen, never rewritten
 #   projects.json                   only what a folder cannot tell us: archived, added
+
+# Its logs: daemon.log (what it has been doing), mcp-logs/, Agents Host's
+# control.log, relay.log and host.out, and the window's crashes/
+ls ~/Library/Logs/Agents/
+
+# Its caches, safe to delete while it is stopped: toolsets (tools/), turns/,
+# archive.json, option-cache.json. On Linux, $XDG_CACHE_HOME/agents and
+# $XDG_STATE_HOME/agents/logs. Any other root gets roots/<name>-<hash> under each,
+# and a root in /tmp keeps cache/ and logs/ inside itself.
+ls ~/Library/Caches/com.alexecollins.agents/
 
 # By hand, as a host of a control plane, on a root of its own
 AGENTS_ROOT=/tmp/agents-branch "./build/DD-host/Build/Products/Debug/Agents Host.app/Contents/Helpers/agentsd" \
