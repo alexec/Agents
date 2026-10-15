@@ -243,7 +243,8 @@ test("the groups on round-trip through what this browser keeps: the groups off (
   const { smartRowsOn, smartRowsOff } = await load("src/model/smartGroups.ts");
   const all = ["pinned", "needsYou", "working", "unread"];
   assert.deepEqual([...smartRowsOn("")], all);
-  assert.deepEqual([...smartRowsOn(null)], all, "nothing kept: every group on");
+  assert.deepEqual([...smartRowsOn(null)], ["pinned", "needsYou"], "nothing kept: Working and Unread off (#979)");
+  assert.deepEqual([...smartRowsOn(undefined)], ["pinned", "needsYou"]);
   assert.equal(smartRowsOff(new Set(all)), "");
   assert.equal(smartRowsOff(new Set(["unread", "needsYou"])), "pinned,working", "in the sidebar's order");
   assert.deepEqual([...smartRowsOn("pinned,working,gone")], ["needsYou", "unread"], "a name not a group's is passed over");

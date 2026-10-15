@@ -33,7 +33,7 @@ struct RemoteSidebar: View {
     /// Add Project… or Clone Project from Git URL…, on a host, from the + (#537).
     @State private var adding: NewProject?
     /// The smart groups turned off in Settings ▸ Sidebar (#846).
-    @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = ""
+    @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = SidebarSmartRow.offAtFirst
     /// Settings (#846), opened from the sidebar's foot.
     @State private var showsSettings = false
 
@@ -256,7 +256,7 @@ private struct RemoteSmartFold: View {
     let query: String
     /// The smart groups turned off in Settings ▸ Sidebar (#846): their sessions are listed
     /// by the next group they fit.
-    @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = ""
+    @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = SidebarSmartRow.offAtFirst
     private var on: Set<SidebarSmartRow> { SidebarSmartRow.on(off: smartOff) }
 
     var body: some View {
@@ -434,7 +434,7 @@ private struct RemoteProjectFold: View {
     /// Put Files in Drop Box… from the row's menu (#231).
     @State private var fillingDropbox = false
     /// The smart groups turned off in Settings ▸ Sidebar (#846).
-    @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = ""
+    @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = SidebarSmartRow.offAtFirst
 
     private var key: ProjectKey { summary.key }
 
