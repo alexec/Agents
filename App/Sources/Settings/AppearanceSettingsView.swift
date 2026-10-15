@@ -107,10 +107,11 @@ struct MacSettingsView: View {
     }
 }
 
-/// Settings ▸ Appearance: the theme and the text size.
+/// Settings ▸ Appearance: the theme, the text size and the Blob's celebrations.
 struct AppearanceSettingsView: View {
     @AppStorage(Appearance.defaultsKey, store: WindowDefaults.store) private var appearance = Appearance.system
     @AppStorage(TextSize.defaultsKey, store: WindowDefaults.store) private var textSize = TextSize.standard
+    @AppStorage(Celebration.defaultsKey, store: WindowDefaults.store) private var celebrations = true
 
     var body: some View {
         Section {
@@ -124,8 +125,11 @@ struct AppearanceSettingsView: View {
                 ForEach(TextSize.allCases) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented)
+            // The Blob's bounce for a landed pull request, with confetti for the day's
+            // first and a milestone (#986).
+            Toggle("Celebrations", isOn: $celebrations)
         } footer: {
-            Text("System follows your Mac, and changes with it. Text size is for this Mac only; the terminal keeps its own.")
+            Text("System follows your Mac, and changes with it. Text size is for this Mac only; the terminal keeps its own. Celebrations: the Blob hops when a pull request lands, with confetti for the day's first and for a milestone. No sound; Reduce Motion keeps it still.")
                 .appText(.fine)
                 .foregroundStyle(.secondary)
         }

@@ -17,6 +17,8 @@ struct ContentView: View {
     /// have to keep fetching back.
     @State private var columns = NavigationSplitViewVisibility.all
     @State private var offeringMove = false
+    /// Settings ▸ Appearance ▸ Celebrations (#986), per Mac.
+    @AppStorage(Celebration.defaultsKey, store: WindowDefaults.store) private var celebrations = true
 
     /// Put the file the selected agent asked about in front of the user.
     ///
@@ -293,6 +295,9 @@ struct ContentView: View {
                     .navigationTitle(title)
                     .navigationSubtitle(model.selectedAgent == nil ? "" : (model.selectedProjectSummary?.name ?? ""))
                 }
+                // The Blob, in the sidebar's corner, for a landed pull request (#986).
+                .celebrations(model.work.celebration, enabled: celebrations, held: model.asksOnScreen,
+                              celebrated: model.work.celebrated)
             }
         }
         }

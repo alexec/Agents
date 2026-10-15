@@ -263,6 +263,7 @@ public extension DaemonAPI {
                 Row(Notification.diskChanged, params: DiskState.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.worktreesSized, params: WorktreesSized.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.milestonesChanged, params: Milestones.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.prsLanded, params: PRsLanded.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.storeNotesChanged, params: StoreNotes.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.pinsChanged, params: PinsChangedNotification.self, result: Empty.self,

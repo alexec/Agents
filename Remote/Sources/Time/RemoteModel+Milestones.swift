@@ -47,3 +47,11 @@ extension RemoteModel {
         UserDefaults.standard.stringArray(forKey: milestonesSeenKey).map(Set.init)
     }
 }
+
+/// The Blob's celebrations (#986): the model holds the next one; the root plays it.
+extension RemoteModel {
+    /// A question card is on screen, so the Blob waits: the open session asks something.
+    var asksOnScreen: Bool {
+        work.permission(for: selection) != nil || work.elicitation(for: selection) != nil
+    }
+}

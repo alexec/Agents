@@ -642,8 +642,13 @@ private struct RemoteSettings: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Appearance") {
+                Section {
                     TextSizeRow()
+                    CelebrationsRow()
+                } header: {
+                    Text("Appearance")
+                } footer: {
+                    Text("Celebrations: the Blob hops when a pull request lands, with confetti for the day's first and for a milestone. No sound; Reduce Motion keeps it still.")
                 }
                 .paperListRow()
                 SidebarSettingsSection()
@@ -670,6 +675,17 @@ private struct TextSizeRow: View {
         }
         .pickerStyle(.menu)
         .appText(.supporting)
+    }
+}
+
+/// Celebrations (#986): the Blob's hop for a landed pull request, on by default, kept on
+/// this device only, as the window's Settings ▸ Appearance and the page's Settings keep theirs.
+private struct CelebrationsRow: View {
+    @AppStorage(Celebration.defaultsKey) private var celebrations = true
+
+    var body: some View {
+        Toggle("Celebrations", isOn: $celebrations)
+            .appText(.supporting)
     }
 }
 

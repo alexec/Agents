@@ -28,6 +28,7 @@ import { ActivityPageView } from "./Activity";
 import { SettingsPage } from "./Settings";
 import { ContextMenu } from "./ContextMenu";
 import { MilestoneCard } from "./MilestoneCard";
+import { Celebration } from "./Celebration";
 
 export function Columns({ session, store }: { session: Session; store: Store }) {
   const r = route.value;
@@ -80,6 +81,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
       <TokenAskDialog store={store} />
       <ContextMenu />
       <MilestoneCard store={store} />
+      <Celebration store={store} />
     </div>
   );
 }

@@ -554,6 +554,9 @@ public enum DaemonAPI {
         public static let storeNotesChanged = "store/notesChanged"
         /// A milestone was earned (#984). Carries the whole `Milestones`.
         public static let milestonesChanged = "milestones/changed"
+        /// The hourly count found more pull requests merged than it last did (#986), for
+        /// the Blob to celebrate. Carries `PRsLanded`.
+        public static let prsLanded = "prs/landed"
     }
 
     // MARK: Requests

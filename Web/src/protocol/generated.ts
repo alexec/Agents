@@ -1247,6 +1247,11 @@ export interface OptionsResponse {
   commands: SlashCommand[];
 }
 
+export interface PRsLanded {
+  count: number;
+  firstToday: boolean;
+}
+
 export interface PagesChangedNotification {
   folder: URLString;
   folders: string[];
@@ -2582,6 +2587,7 @@ export interface Notifications {
   "pins/changed": PinsChangedNotification;
   "project/changed": ProjectSummary;
   "project/removed": ProjectRemovedNotification;
+  "prs/landed": PRsLanded;
   "storage/writeFailed": WriteFailure;
   "store/notesChanged": StoreNotes;
   "workflow/changed": WorkflowSummary;
@@ -2719,6 +2725,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID"] },
   OptionsRequest: { required: ["runtimeID", "cwd", "mcpServers"], optional: [] },
   OptionsResponse: { required: ["draftID", "options", "commands"], optional: [] },
+  PRsLanded: { required: ["count", "firstToday"], optional: [] },
   PagesChangedNotification: { required: ["folder", "folders"], optional: [] },
   PendingMove: { required: ["target", "removeLeft", "discardChanges", "askedBy", "askedAt"], optional: [] },
   PermissionNotification: { required: ["agentID"], optional: ["request", "requestID"] },

@@ -114,19 +114,43 @@ export function Huddle({ focused, typed, height = 72 }: { focused: boolean; type
         const eyes = look(index);
         return (
           <g key={index} transform={`translate(${blob.cx} ${blob.cy}) rotate(${blob.tilt}) scale(${blob.scale})`}>
-            <path d={BODY} fill="none" stroke="#3A78E6" stroke-width="56" stroke-linejoin="round" />
-            <path d={BODY} fill={blob.fill} />
-            <g class="huddle-eyes" style={{ transform: `translate(${blob.facing + eyes.x * 18}px, ${eyes.y * 32}px)`,
-              transitionDuration: `${blob.pace}s`, transitionDelay: `${blob.lag}s` }}>
-              {[-92, 92].map((x) => (
-                <ellipse key={x} class={blinking[index] ? "huddle-eye shut" : "huddle-eye"} cx={x} cy={-30} rx={46} ry={62} fill="#0E1A3A" />
-              ))}
-            </g>
-            <path d={`M${blob.facing - 64} 80 Q${blob.facing} 150 ${blob.facing + 64} 80`} fill="none" stroke="#0E1A3A"
-              stroke-width="28" stroke-linecap="round" />
+            <BlobParts fill={blob.fill} facing={blob.facing} look={eyes} shut={blinking[index] ?? false}
+              pace={blob.pace} lag={blob.lag} />
           </g>
         );
       })}
+    </svg>
+  );
+}
+
+/**
+ * One Blob's body, outline, eyes and smile, centred on 0 0 in its own units of 600 by 580, as
+ * `Blob` in Swift: the Huddle draws it three times, and a celebration (#986) once.
+ */
+function BlobParts({ fill, facing = 0, look, shut, pace, lag }: {
+  fill: string; facing?: number; look: Look; shut: boolean; pace?: number; lag?: number;
+}) {
+  return (
+    <>
+      <path d={BODY} fill="none" stroke="#3A78E6" stroke-width="56" stroke-linejoin="round" />
+      <path d={BODY} fill={fill} />
+      <g class="huddle-eyes" style={{ transform: `translate(${facing + look.x * 18}px, ${look.y * 32}px)`,
+        ...(pace === undefined ? {} : { transitionDuration: `${pace}s` }), ...(lag === undefined ? {} : { transitionDelay: `${lag}s` }) }}>
+        {[-92, 92].map((x) => (
+          <ellipse key={x} class={shut ? "huddle-eye shut" : "huddle-eye"} cx={x} cy={-30} rx={46} ry={62} fill="#0E1A3A" />
+        ))}
+      </g>
+      <path d={`M${facing - 64} 80 Q${facing} 150 ${facing + 64} 80`} fill="none" stroke="#0E1A3A"
+        stroke-width="28" stroke-linecap="round" />
+    </>
+  );
+}
+
+/** One Blob alone, white, `height` high, its outline inside the box. */
+export function Blob({ look = AHEAD, shut = false, height }: { look?: Look; shut?: boolean; height: number }) {
+  return (
+    <svg class="blob" aria-hidden="true" viewBox="-328 -318 656 636" height={height} width={(height * 656) / 636}>
+      <BlobParts fill="#fff" look={look} shut={shut} />
     </svg>
   );
 }
