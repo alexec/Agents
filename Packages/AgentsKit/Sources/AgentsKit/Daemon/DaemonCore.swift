@@ -346,6 +346,8 @@ public actor DaemonCore {
     var projectIdleSettle: Duration = .seconds(60)
     /// The once-a-minute look at the volumes (#195). Nil until started.
     var diskTicker: Task<Void, Never>?
+    /// Counts the pull requests merged from agents' branches once an hour (#985).
+    var mergedPRsTicker: Task<Void, Never>?
     /// A look asked for by a lease given back or a wake, so a burst makes one.
     var diskCheckSoon: Task<Void, Never>?
     /// How a volume is read. A test hands in its own.
@@ -1793,6 +1795,8 @@ public actor DaemonCore {
         machineWatch?.stop()
         machineWatch = nil
         stopWatchingDisk()
+        mergedPRsTicker?.cancel()
+        mergedPRsTicker = nil
         await stopMCPEvents()
         // The servers the bridge started for Copilot sessions are this daemon's children,
         // not a runtime's, so nobody else ends them (054).

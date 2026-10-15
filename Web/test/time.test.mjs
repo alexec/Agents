@@ -42,3 +42,28 @@ test("times read at a glance", () => {
   assert.equal(time.timeWords(2 * 3600), "2h");
   assert.equal(time.timeWords(140 * 3600 + 59), "140h");
 });
+
+test("the recap: today and the last seven days, as TimeRecapTests says (#985)", () => {
+  const h = { hours: {}, now: "2026-10-12T15", records: { mostAgents: { value: 4, day: "2026-10-08" } }, days: {
+    "2026-10-12": { claude: bucket({ agent: 3000, tools: 600, person: 1200, turns: 4 }), codex: bucket({ agent: 600, turns: 1 }) },
+    "2026-10-08": { claude: bucket({ agent: 6600, person: 600, turns: 2 }) },
+    "2026-10-01": { claude: bucket({ agent: 9999, person: 1, turns: 9 }) },
+  }, recap: {
+    "2026-10-12": { prsMerged: 2, agents: 3, peakAgents: 2, longestClear: 0 },
+    "2026-10-08": { agents: 1, peakAgents: 4, longestClear: 0 },
+  } };
+  const recap = time.timeRecap(h);
+  assert.equal(recap.today.turns, 5);
+  assert.equal(recap.today.prsMerged, 2);
+  assert.equal(time.leverage(recap.today), 3.5);
+  assert.equal(recap.week.turns, 7);
+  assert.equal(recap.week.agents, 4);
+  assert.equal(recap.week.peakAgents, 4);
+  assert.equal(time.leverageWords(time.leverage(recap.week)), "6.0×");
+  assert.equal(time.leverageWords(undefined), "–");
+  assert.equal(recap.records.mostAgents.value, 4);
+  // A host from before #985 sends no recap or records.
+  const old = time.timeRecap({ hours: {}, days: {}, now: "2026-10-12T15" });
+  assert.equal(old.today.prsMerged, undefined);
+  assert.deepEqual(old.records, {});
+});

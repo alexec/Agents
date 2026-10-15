@@ -23,6 +23,14 @@ public final class TimeLedger: @unchecked Sendable {
     /// Each running turn's marks, by agent, since the turn began or was last banked, and
     /// how many of them were carried over from the last part banked.
     private var turns: [UUID: (marks: [TimeMark], carried: Int)] = [:]
+    /// The agents in a turn that wait for the person, and what each waits on: its state,
+    /// an ask, or an asking tool (#985).
+    private var waiting: [UUID: Set<String>] = [:]
+    /// Since when agents have run with none waiting for the person, while they do.
+    private var clearSince: Date?
+    /// The agents that ran a turn today. Only in memory: after a restart the day's count
+    /// is the larger of what was written and what is seen again, never counted twice.
+    private var seen: (day: String, agents: Set<UUID>) = ("", [])
     private let madeAt: Date
     private let needsSeed: Bool
 
@@ -42,32 +50,113 @@ public final class TimeLedger: @unchecked Sendable {
     public func note(_ entry: TranscriptEntry, agentID: UUID, runtime: String) -> Bool {
         guard let mark = TimeMark.of(entry) else { return false }
         return lock.withLock {
-            var (marks, carried) = turns[agentID] ?? ([], 0)
-            if case .state(let state, _) = mark, state == .running, marks.isEmpty {
-                turns[agentID] = ([mark], 0)
-                return false
-            }
-            // Nothing is counted outside a turn.
-            guard !marks.isEmpty else { return false }
-            marks.append(mark)
-            if case .state(let state, _) = mark, state != .running, state != .waitingOnUser {
-                bankLocked(TimeMark.segments(marks), runtime: runtime, endsTurn: true)
-                turns[agentID] = nil
-                return true
-            }
-            if marks.count - carried >= Self.marksKept {
-                let (segments, carry) = TimeMark.split(marks)
-                bankLocked(segments, runtime: runtime, endsTurn: false)
-                (marks, carried) = (carry, carry.count)
-            }
-            turns[agentID] = (marks, carried)
+            let ended = noteTurnLocked(mark, agentID: agentID, runtime: runtime)
+            noteRecapLocked(mark, agentID: agentID)
+            return ended
+        }
+    }
+
+    private func noteTurnLocked(_ mark: TimeMark, agentID: UUID, runtime: String) -> Bool {
+        var (marks, carried) = turns[agentID] ?? ([], 0)
+        if case .state(let state, _) = mark, state == .running, marks.isEmpty {
+            turns[agentID] = ([mark], 0)
             return false
         }
+        // Nothing is counted outside a turn.
+        guard !marks.isEmpty else { return false }
+        marks.append(mark)
+        if case .state(let state, _) = mark, state != .running, state != .waitingOnUser {
+            bankLocked(TimeMark.segments(marks), runtime: runtime, endsTurn: true)
+            turns[agentID] = nil
+            waiting[agentID] = nil
+            return true
+        }
+        if marks.count - carried >= Self.marksKept {
+            let (segments, carry) = TimeMark.split(marks)
+            bankLocked(segments, runtime: runtime, endsTurn: false)
+            (marks, carried) = (carry, carry.count)
+        }
+        turns[agentID] = (marks, carried)
+        return false
+    }
+
+    // MARK: Recap (#985)
+
+    /// After `noteTurnLocked`: which agents wait for the person, the agents in a turn at
+    /// once, the agents run today, and the stretches with nobody waited for.
+    private func noteRecapLocked(_ mark: TimeMark, agentID: UUID) {
+        let day = UsageChart.dayStamp(mark.at, calendar: calendar)
+        if turns[agentID] != nil {
+            var open = waiting[agentID] ?? []
+            switch mark {
+            case .state(let state, _):
+                if state == .waitingOnUser { open.insert("state") } else { open.remove("state") }
+            case .toolStarted(let id, let name, _):
+                if TimeMark.kind(ofTool: name) == .person { open.insert("tool:" + id) }
+            case .toolEnded(let id, _):
+                open.remove("tool:" + id)
+            case .askOpened(let id, _):
+                open.insert("ask:" + id)
+            case .askClosed(let id, _):
+                if let id { open.remove("ask:" + id) } else { open = open.filter { !$0.hasPrefix("ask:") } }
+            }
+            waiting[agentID] = open.isEmpty ? nil : open
+
+            if case .state(.running, _) = mark, turns[agentID]?.marks.count == 1 {
+                if seen.day != day { seen = (day, []) }
+                seen.agents.insert(agentID)
+                let (count, atOnce) = (seen.agents.count, turns.count)
+                var history = readLocked()
+                history.changeRecap(day) {
+                    $0.agents = max($0.agents, count)
+                    $0.peakAgents = max($0.peakAgents, atOnce)
+                }
+                held = history
+                unwritten = true
+            }
+        }
+        let clear = !turns.isEmpty && waiting.isEmpty
+        if clear, clearSince == nil {
+            clearSince = mark.at
+        } else if !clear, let since = clearSince {
+            clearSince = nil
+            bankClearLocked(from: since, to: mark.at)
+        }
+    }
+
+    /// A stretch with nobody waited for, counted on the day it ended.
+    private func bankClearLocked(from start: Date, to end: Date) {
+        let seconds = end.timeIntervalSince(start)
+        guard seconds > 0 else { return }
+        var history = readLocked()
+        history.changeRecap(UsageChart.dayStamp(end, calendar: calendar)) {
+            $0.longestClear = max($0.longestClear, seconds)
+        }
+        held = history
+        unwritten = true
+    }
+
+    /// What `gh` said about the pull requests merged on these days.
+    public func setPRsMerged(_ counts: [String: Int], on days: [String]) {
+        lock.withLock {
+            var history = readLocked()
+            history.setPRsMerged(counts, on: days)
+            held = history
+            unwritten = true
+        }
+    }
+
+    /// Whether `gh` has answered for any day yet: the first ask goes back as far as is kept.
+    public var hasPRsMerged: Bool {
+        lock.withLock { readLocked().recap.values.contains { $0.prsMerged != nil } }
     }
 
     /// Forget a turn that will not end in an entry: its agent was removed.
     public func forget(_ agentID: UUID) {
-        lock.withLock { _ = turns.removeValue(forKey: agentID) }
+        lock.withLock {
+            turns.removeValue(forKey: agentID)
+            waiting.removeValue(forKey: agentID)
+        }
     }
 
     private func bankLocked(_ segments: [TimeSegment], runtime: String, endsTurn: Bool) {
@@ -95,12 +184,18 @@ public final class TimeLedger: @unchecked Sendable {
         }
     }
 
-    /// What is kept, stamped with the host's hour now.
+    /// What is kept, stamped with the host's hour now, with a stretch still going
+    /// counted as far as now.
     public func history(at now: Date) -> TimeHistory {
         lock.withLock {
             var history = readLocked()
             history.prune()
             history.now = UsageHistory.hourStamp(for: now, calendar: calendar)
+            if let since = clearSince, now > since {
+                history.changeRecap(UsageChart.dayStamp(now, calendar: calendar)) {
+                    $0.longestClear = max($0.longestClear, now.timeIntervalSince(since))
+                }
+            }
             return history
         }
     }
