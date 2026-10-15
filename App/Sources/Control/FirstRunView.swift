@@ -18,6 +18,8 @@ struct FirstRunView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
+            // The mark of a team (#1007): no prompt here, so the Blobs only look around.
+            Huddle(promptFocused: false, pointer: nil)
             if let found = thisMacs { foundHere(found) } else { choice }
         }
         // A floor on the width: laid out narrower, the words fixed to their height push

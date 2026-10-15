@@ -60,6 +60,8 @@ a[href] { cursor: pointer; }
   width: min(440px, 100%);
 }
 
+.pairing-card .huddle { display: block; margin-bottom: 16px; overflow: visible; }
+
 .pairing-card h1 {
   font-size: calc(20px * var(--text-scale));
   margin: 0 0 12px;

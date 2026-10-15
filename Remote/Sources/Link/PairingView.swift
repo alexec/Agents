@@ -14,11 +14,9 @@ struct PairingView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Image(systemName: "qrcode.viewfinder")
-                // Decorative: a glyph above the words, not text, and hidden from VoiceOver.
-                .glyph(size: 28, weight: .light)
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
+            // The mark of a team (#1007), above the words; it hides itself from VoiceOver.
+            Huddle(promptFocused: false, pointer: nil, height: 64)
+                .padding(.bottom, 4)
             Text("Connect to your agents")
                 .appText(.reading).fontWeight(.semibold)
                 .multilineTextAlignment(.center)
