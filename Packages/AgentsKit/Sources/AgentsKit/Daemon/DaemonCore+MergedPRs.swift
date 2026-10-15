@@ -43,7 +43,10 @@ extension DaemonCore {
             answered = true
         }
         guard answered else { return }
-        timeLedger.setPRsMerged(GitHubCLI.mergedByDay(pulls, calendar: calendar), on: stamps)
+        let landed = timeLedger.setPRsMerged(GitHubCLI.mergedByDay(pulls, calendar: calendar), on: stamps,
+                                             today: stamps[0])
         keepQuietly("the time history") { try timeLedger.flush() }
+        // More merged than the last count said: the Blob celebrates on every client (#986).
+        if let landed { broadcast(DaemonAPI.Notification.prsLanded, landed) }
     }
 }

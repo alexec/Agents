@@ -791,6 +791,30 @@ button.remove:hover { opacity: 1; }
 .huddle-eye { transform-box: fill-box; transform-origin: center; transition: transform 0.08s ease-in; }
 .huddle-eye.shut { transform: scaleY(0.08); }
 @media (prefers-reduced-motion: reduce) { .huddle-eyes, .huddle-eye { transition: none; } }
+/* The Blob's celebrations (#986): up from the bottom left corner, one hop, and down; confetti out of
+   its top for the day's first merge and a milestone. Reduced motion: a fade where it stands, no confetti. */
+.celebration { position: fixed; left: 20px; bottom: 12px; width: 60px; height: 58px; pointer-events: none; z-index: 40; }
+.celebration-blob { animation: celebration-hop 2.2s both; }
+.celebration-blob .blob { display: block; overflow: visible; }
+@keyframes celebration-hop {
+  0% { transform: translateY(140px); animation-timing-function: cubic-bezier(0.3, 1.4, 0.5, 1); }
+  18% { transform: translateY(0); }
+  26% { transform: translateY(-22px) scale(0.94, 1.06); animation-timing-function: cubic-bezier(0.3, 1.6, 0.5, 1); }
+  38%, 84% { transform: translateY(0); animation-timing-function: ease-in; }
+  100% { transform: translateY(140px); }
+}
+.confetti { position: absolute; left: 50%; bottom: 35px; width: 0; height: 0; }
+.confetti i { position: absolute; width: 6px; height: 3px; border-radius: 1px; opacity: 0; animation: confetti-burst 1.4s 0.5s ease-out; }
+@keyframes confetti-burst {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0); }
+  45% { opacity: 1; transform: translate(calc(var(--x) * 0.6), var(--y)) rotate(calc(var(--spin) * 0.5)); }
+  100% { opacity: 0; transform: translate(var(--x), calc(var(--y) + 110px)) rotate(var(--spin)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .celebration-blob { animation-name: celebration-fade; }
+  .confetti { display: none; }
+}
+@keyframes celebration-fade { 0%, 100% { opacity: 0; } 12%, 88% { opacity: 1; } }
 .menu-anchor.reach { margin-right: 0; }
 .popover.up { top: auto; bottom: 32px; }
 .reach-popover { width: 300px; display: flex; flex-direction: column; gap: 8px; padding: 10px; }
