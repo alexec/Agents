@@ -17,6 +17,11 @@ import SwiftUI
 struct ProjectAgentsView: View {
     @Environment(AppModel.self) private var model
     @Binding var selection: UUID?
+    /// What the Blobs over the page look at (#987): the prompt, and the pointer while it
+    /// has focus.
+    @State private var promptFocused = false
+    @State private var typed = 0
+    @State private var pointer: CGPoint?
 
     private var folder: URL? { model.selectedProject }
     private var summary: DaemonAPI.ProjectSummary? { model.selectedProjectSummary }
@@ -49,6 +54,8 @@ struct ProjectAgentsView: View {
                 }
             }
             Spacer(minLength: 24)
+            Huddle(promptFocused: promptFocused, pointer: pointer, typed: typed)
+                .padding(.bottom, 16)
             heading
             Spacer(minLength: 24)
             // Starts kept for this project's stopped workspace (#691 US3, layouts.md L6a):
@@ -66,9 +73,12 @@ struct ProjectAgentsView: View {
             }
             // Its own margins, the same as in a chat. The folder is this project's and
             // not the bar's to change.
-            PromptBar(folderIsFixed: true)
+            PromptBar(folderIsFixed: true, presence: { promptFocused = $0; typed = $1 })
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onContinuousHover(coordinateSpace: .global) { phase in
+            if case let .active(location) = phase { pointer = location } else { pointer = nil }
+        }
         .navigationTitle(summary?.name ?? "Project")
         .onAppear { adopt(folder) }
         .onChange(of: folder) { _, folder in

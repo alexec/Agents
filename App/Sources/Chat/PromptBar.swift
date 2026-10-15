@@ -18,6 +18,9 @@ struct PromptBar: View {
     /// Set on a project page, where the folder is the project and changing it would
     /// start the agent under a different one.
     var folderIsFixed = false
+    /// Told whether the field has focus and how many characters it holds, for the Blobs
+    /// over a new session to look at it (#987).
+    var presence: ((_ focused: Bool, _ typed: Int) -> Void)?
     @State private var text = ""
     @State private var selectedCommand = 0
     @State private var attachments: [Attachment] = []
@@ -421,6 +424,7 @@ struct PromptBar: View {
                 .appText(.reading)
                 .lineLimit(2...12)
                 .focused($focused)
+                .onChange(of: focused) { presence?(focused, text.count) }
                 // ⌘V attaches pictures and files too, and still pastes the words (#396).
                 .modifier(PastesIntoPrompt(isFocused: focused, attachFile: attach,
                                            attachPicture: attachPicture))
@@ -493,6 +497,7 @@ struct PromptBar: View {
                     if dismissedCommandTerm != commandQuery?.term { dismissedCommandTerm = nil }
                     if dismissedMentionTerm != mentionQuery?.term { dismissedMentionTerm = nil }
                     updateMentions()
+                    presence?(focused, text.count)
                     // Typing is a prompt coming (#183).
                     if !text.isEmpty, let id = agent?.id { Task { await model.prewarm(id, .typing) } }
                 }

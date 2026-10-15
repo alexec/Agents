@@ -28,6 +28,7 @@ import type { Start } from "./chat/appViewBridge";
 import { go } from "../route";
 import { sizeWords } from "../model/worktrees";
 import { LabelField } from "./Labels";
+import { Huddle } from "./Huddle";
 import { Reach } from "./Reach";
 import { Prompt } from "./Prompt";
 import { OfflineStrip } from "./OfflineStrip";
@@ -113,6 +114,9 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   const listedFor = useRef("");
   /** Counts the offers taken: the prompt field opens afresh on each, with the view's words. */
   const filled = useSignal(0);
+  /** Whether the prompt has focus and how much it holds, for the Blobs over the page (#987). */
+  const promptFocused = useSignal(false);
+  const typed = useSignal(0);
   const placeOffered = () => {
     const offered = offeredWorktree.current;
     offeredWorktree.current = undefined;
@@ -333,6 +337,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
       {/* The same strip as over a chat: a prompt here goes to that host too (#83). */}
       {!down && <OfflineStrip store={store} host={host} />}
       <div class="scroll new-heading">
+        <Huddle focused={promptFocused.value} typed={typed.value} />
         <ProjectSwitch store={store} host={host} folder={folder} projectName={projectName} down={down} />
         {personas.value.length > 0 && (
           <div class="persona-choice">
@@ -346,7 +351,10 @@ export function NewAgent({ store, host, folder, projectName, down }: {
         <p class="quiet" title={path}>{path} · {machine}</p>
         <KeptBubbles store={store} kept={keptStarts} />
       </div>
-      <footer class="foot">
+      <footer class="foot"
+        onFocusIn={(e) => { if (isPrompt(e.target)) { promptFocused.value = true; typed.value = e.target.value.length; } }}
+        onFocusOut={(e) => { if (isPrompt(e.target)) promptFocused.value = false; }}
+        onInput={(e) => { if (isPrompt(e.target)) typed.value = e.target.value.length; }}>
         {/* A change to the project's own files that no session can be asked about (#531). */}
         <GuardedChangeCards store={store} host={host} where={{ folder }} down={down || !store.hostIsOnline(host)} />
         <Prompt key={filled.value} store={store} draftKey={draftKey} placeholder="What should it do?"
@@ -458,6 +466,11 @@ export function NewAgent({ store, host, folder, projectName, down }: {
       </footer>
     </section>
   );
+}
+
+/** The prompt's own field, not another control in the bar. */
+function isPrompt(target: EventTarget | null): target is HTMLTextAreaElement {
+  return target instanceof HTMLTextAreaElement && target.getAttribute("aria-label") === "Prompt";
 }
 
 /** What the Works in chip says: the window's words for the place. */
