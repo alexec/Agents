@@ -51,7 +51,7 @@ brings them back under, on a pull request of its own.
    cancelled runs, and note how many there were. Time to green is from the run's creation
    to its last job end; that is what the 15 minutes measures. Also note each macOS
    job's queue time (created → its start) and run time separately: macOS runners are
-   few and shared by every PR, every push to main and CodeQL, so a queue is usually
+   few and shared by every PR and every push to main, so a queue is usually
    too many macOS jobs, which the workflow files can fix (#594, #595).
 3. Also look at the last 5 `ci` runs on `main` (event `push`) the same way.
 4. Write a short table: PR, run, time-to-green minutes, the longest macOS queue, slowest job, the three
@@ -68,7 +68,7 @@ Read `.github/workflows/ci.yml` (and any scripts it calls under `scripts/`) and 
 the slow steps against it. Look first for, in this order:
 
 0. **Queued for a macOS runner**: count the macOS jobs started in the window (PR runs,
-   main pushes, CodeQL, slow tests) and how many did nothing (a few seconds' run, every
+   main pushes, slow tests) and how many did nothing (a few seconds' run, every
    step skipped) or were cancelled after starting. Move work that needs no Mac to
    `ubuntu-latest`, keep a job with nothing selected from starting, or run main-only
    work less often. Each macOS job removed shortens every other PR's queue.

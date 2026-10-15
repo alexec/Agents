@@ -101,7 +101,7 @@ itself, waiting longer each time it fails, and at once when this Mac wakes or it
 changes. When you remove the server, the tunnel closes.
 
 What the control plane passes to ssh, and how each common `~/.ssh/config` option fares, is in
-[the ssh contract](https://github.com/alexec/Agents/blob/main/specs/037-cloud-agents/contracts/ssh.md#options-from-the-persons-config-610).
+[ssh options](../reference/ssh-options.md).
 
 ### Choose its projects
 

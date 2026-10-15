@@ -32,6 +32,7 @@ PRIVATE = [
     (re.compile(r"/private/"), "a /private/ path"),
     (re.compile(r"/tmp/run-"), "a scratch-root path (/tmp/run-…)"),
     (re.compile(r"alexcollins", re.I), "a real user name"),
+    (re.compile(r"github\.com/alexec/Agents\b", re.I), "a link into the private repository (#1064)"),
     (re.compile(r"\bghp_[A-Za-z0-9]"), "a GitHub token"),
     (re.compile(r"\bgithub_pat_"), "a GitHub token"),
     (re.compile(r"\bsk-ant-"), "an Anthropic key"),

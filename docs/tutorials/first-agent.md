@@ -1,14 +1,14 @@
 ---
 diataxis: tutorial
 devices: [mac]
-description: Build Agents, add a project, and have an agent find and fix a failing test.
+description: Install Agents, add a project, and have an agent find and fix a failing test.
 ---
 
 # Your first agent
 
-In this tutorial you build Agents on your Mac, give it a small project with a failing
+In this tutorial you install Agents on your Mac, give it a small project with a failing
 test, and ask an agent to fix it. You answer the agent's questions as it works, and at the
-end you read what it changed. It takes about fifteen minutes, most of it the first build.
+end you read what it changed. It takes about fifteen minutes.
 
 **What you'll have at the end:** a finished agent, its fix in your project, and a feel for
 how every agent in the app works.
@@ -17,36 +17,31 @@ how every agent in the app works.
 
 ## Before you start
 
-- A Mac with Xcode installed.
+- A Mac, and an invitation to the Agents alpha on TestFlight.
 - One coding agent signed in on this Mac. This tutorial uses **Claude Code**, signed in
   with `claude` and `/login` in Terminal. The app talks to Claude through a small adapter:
   it runs it with your own Node if you have one, and otherwise installs its own copy in
   step 1. Codex, Gemini, Antigravity, Grok, Copilot and Cursor work too; see
   [Runtimes](../reference/runtimes.md) for what each needs.
 
-## 1. Build and open Agents
+## 1. Install and open Agents
 
-Agents is built from its source. In Terminal:
+On a Mac, Agents is two apps: **Agents** is the window you work in, and **Agents Host**
+runs your agents.
 
-```sh
-brew install xcodegen
-git clone https://github.com/alexec/Agents.git
-cd Agents
-xcodegen generate
-open Agents.xcodeproj
-```
+1. Open the invitation to the Agents alpha in **TestFlight**, and click **Install**. Open
+   Agents.
+2. The window opens on **Where should your agents run?** Under **Set one up on this Mac**,
+   click **Get Agents Host…**. Download Agents Host, drag it into `~/Applications`, and
+   open it. [Set up Agents on this Mac](../how-to/set-up-on-this-mac.md) says more about
+   this step.
+3. Agents Host asks **Where should this Mac's agents report?** Click **Run It Here**.
+   Agents Host starts this Mac's agents and its control plane, and keeps them running with
+   its window closed.
 
-On a Mac, Agents is two apps: **Agents Host** runs your agents, and **Agents** is the
-window you work in. Build and run both from Xcode, Agents Host first:
-
-1. Choose the **AgentsHost** scheme with **My Mac** as the destination, and choose
-   **Product ▸ Run**. The first build takes a few minutes. Agents Host starts this Mac's
-   agents and its control plane, and keeps them running with its window closed.
-2. Choose the **AgentsStore** scheme and choose **Product ▸ Run**. This is the window.
-
-The window opens on **Where should your agents run?** After a moment it says **Agents Host
-is running on this Mac**. Click **Pair**: Agents Host shows a code, and the window asks
-for it. Type or paste the code and click **Connect**.
+After a moment the window says **Agents Host is running on this Mac**. Click **Pair**:
+Agents Host shows a code, and the window asks for it. Type or paste the code and click
+**Connect**.
 
 You should see the Agents window, with a **Get started** card at the top of the sidebar.
 It is a checklist from here to your first agent, and each step ticks itself when it is

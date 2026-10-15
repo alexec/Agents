@@ -20,8 +20,7 @@ editor of its own. Open the same folder in yours whenever you like.
 
 Agents starts the coding tools you already use (Claude, Codex, Gemini, Antigravity, Grok,
 Copilot and Cursor), each signed in with your own account and plan. The ones it can
-install, it installs in a folder of its own. It brings no model and no bill of its own, and it is open source under the
-[MIT licence](https://github.com/alexec/Agents/blob/main/LICENSE). You can choose a different runtime, model and permission mode for each agent.
+install, it installs in a folder of its own. It brings no model and no bill of its own. You can choose a different runtime, model and permission mode for each agent.
 
 They do not all do the same things; [Runtimes](../reference/runtimes.md) lists each.
 
@@ -133,7 +132,7 @@ Compare on the runtimes you already use, leases, events, workflows, the phone an
 - **You want one assistant beside the file you are editing.** Your editor's agent is
   closer to hand.
 - **You are not on a Mac.** Agents needs a Mac. Servers and phones hang off one.
-- **You want to download and go.** Today Agents is built from source in Xcode.
+- **You want to download and go.** Today Agents is an alpha, on TestFlight by invitation.
 - **You want to reach your agents with the Mac asleep.** Agents on your Mac stop being
   reachable while it sleeps, and so does everything else if the control plane runs on it.
   To work with the Mac asleep, put the work on a server and run the control plane as

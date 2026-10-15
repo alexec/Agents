@@ -20,6 +20,8 @@ something up, not for reading through.
   and setting, and when a workflow does not run.
 - [Workspace providers](workspace-providers.md): the tools a workspace provider offers, and
   how the control plane checks and calls them.
+- [ssh options](ssh-options.md): how each option in your `~/.ssh/config` fares when the
+  control plane connects to a server.
 - [Personas](personas.md): the persona file format, where personas live, and what picking one does.
 - [Events](events.md): everything the app records, for waits, workflow triggers and the
   Events page.
