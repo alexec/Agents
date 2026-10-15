@@ -39,15 +39,18 @@ private struct AppViewInline: View {
             AppViewCaption(host: host)
             Group {
                 switch host.phase {
+                case .loading:
+                    AppViewLoading(host: host)
+                        .frame(maxWidth: .infinity, minHeight: 60)
                 case .failed(let words):
-                    Text(words).appText(.supporting).foregroundStyle(.secondary)
+                    AppViewFailure(host: host, words: words)
                         .frame(maxWidth: .infinity, minHeight: 60)
                 case .asking(let ask):
                     AppViewShowAsk(host: host, ask: ask)
                 case .gone:
                     Text("This view was closed.").appText(.supporting).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, minHeight: 40)
-                default:
+                case .ready:
                     if host.isFullscreen {
                         Button("Showing full screen. Back to the chat") { host.setFullscreen(false) }
                             .buttonStyle(.plain)
@@ -75,6 +78,33 @@ private struct AppViewInline: View {
     private func placeInline() {
         guard width > 0, !host.isFullscreen else { return }
         host.place(width: width, height: nil, theme: scheme)
+    }
+}
+
+/// A view being read (#978): it says so, rather than an empty box.
+private struct AppViewLoading: View {
+    let host: AppViewHost
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ProgressView().controlSize(.small)
+            Text("Loading \(host.title)…").appText(.supporting).foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// Why a view is not drawn, and Try Again when reading it again could help (#978).
+private struct AppViewFailure: View {
+    let host: AppViewHost
+    let words: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(words).appText(.supporting).foregroundStyle(.secondary)
+            if host.canRetry {
+                Button("Try Again") { host.retry() }.buttonStyle(.paper)
+            }
+        }
     }
 }
 
@@ -109,10 +139,12 @@ struct AppViewPage: View {
         GeometryReader { proxy in
             Group {
                 switch host.phase {
+                case .loading:
+                    AppViewLoading(host: host)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .padding(24)
                 case .failed(let words):
-                    Text(words)
-                        .appText(.supporting)
-                        .foregroundStyle(.secondary)
+                    AppViewFailure(host: host, words: words)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .padding(24)
                 case .asking(let ask):
@@ -124,7 +156,7 @@ struct AppViewPage: View {
                         .appText(.supporting)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                default:
+                case .ready:
                     AppViewWeb(host: host)
                 }
             }

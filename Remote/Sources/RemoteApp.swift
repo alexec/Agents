@@ -300,7 +300,8 @@ struct RemoteView: View {
                                    recipient: { message in
                                        model.work.project(folder).flatMap { model.recipient(of: message, in: $0.key) }
                                    },
-                                   sendTo: { id, text in await model.send(text, to: id) })
+                                   sendTo: { id, text in await model.send(text, to: id) },
+                                   connected: model.isConnected)
                         // One page per pin, so another pin gets its own store and place (#872).
                         .id(pin.path)
                         .paperGround()

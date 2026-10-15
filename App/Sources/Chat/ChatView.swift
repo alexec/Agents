@@ -88,6 +88,8 @@ struct ChatView: View {
             }
         }
         .onChange(of: agent?.id) { views.tearDownAll() }
+        // A view read when the link dropped may never be answered: read it again (#978).
+        .onChange(of: model.isConnected) { if model.isConnected { views.reconnected() } }
     }
 
     /// What a view in the chat may ask of the Mac (#187): the host the chat is on, the

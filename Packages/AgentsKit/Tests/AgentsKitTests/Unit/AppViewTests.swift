@@ -269,6 +269,40 @@ struct AppViewTests {
         #expect((long?.count ?? 0) < AppViewBridge.contextLimit + 200)
     }
 
+    // MARK: Loading (#978)
+
+    /// A `views/read` that never answers — a link that dropped while it was in flight — ends
+    /// failed, in words, so the view says why and offers Try Again rather than a blank box.
+    @Test func aReadThatNeverAnswersEndsFailed() async {
+        let outcome = await AppViewLoad.read(DaemonAPI.ViewReadRequest(agentID: UUID(), uri: "ui://agents/test"),
+                                             within: .milliseconds(50)) { _, _ in
+            try await Task.sleep(for: .seconds(30))
+            return [:]
+        }
+        guard case .failed(let words) = outcome else { Issue.record("not failed: \(outcome)"); return }
+        #expect(words.contains("could not be read"))
+        #expect(words.contains("no answer"))
+    }
+
+    @Test func aReadThatAnswersIsTheResource() async throws {
+        let resource = DaemonAPI.ViewResource(uri: "ui://agents/test", html: "<p>hi</p>", policy: .strict)
+        let value = try JSONValue.encoding(resource)
+        let outcome = await AppViewLoad.read(DaemonAPI.ViewReadRequest(agentID: UUID(), uri: resource.uri)) { method, _ in
+            #expect(method == DaemonAPI.Method.viewsRead)
+            return value
+        }
+        #expect(outcome == .resource(resource))
+    }
+
+    @Test func aViewWaitingOnShowAsks() async throws {
+        let ask = DaemonAPI.ViewAsk(server: "mine", uri: "ui://mine/v", hash: "h", isNew: true)
+        let data = try JSONValue.encoding(ask)
+        let outcome = await AppViewLoad.read(DaemonAPI.ViewReadRequest(agentID: UUID(), uri: ask.uri)) { _, _ in
+            throw JSONRPCError(code: DaemonAPI.Failure.viewNeedsShow, message: "Show?", data: data)
+        }
+        #expect(outcome == .asking(ask))
+    }
+
     // MARK: The record and the chat
 
     @Test func aViewIsDrawnOnceWhereItsCallBeganWithItsLatestState() throws {

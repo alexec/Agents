@@ -49,6 +49,8 @@ export class HostedView {
   /** A person's own server's view, waiting on Show or Don't Show (#191). */
   readonly ask = signal<ViewAsk | null>(null);
   readonly failure = signal("");
+  /** A failure that reading again could help: drawn with Try Again (#978). */
+  readonly canRetry = signal(false);
   readonly askedMessage = signal<string | null>(null);
   /** For an agents/message-agent (#837): the session it goes to, not this chat's. */
   readonly askedRecipient = signal<{ id: string; name: string } | null>(null);
@@ -69,6 +71,8 @@ export class HostedView {
   private messageID: string | number | null = null;
   private teardown: { id: string; done: () => void } | null = null;
   private next = 1;
+  /** The read running now; an answer for an older one is dropped (#978). */
+  private attempt = 0;
   slot: HTMLElement | null = null;
 
   constructor(public call: AppViewCall, public actions: ViewActions, private layer: ViewLayer) {
@@ -104,17 +108,31 @@ export class HostedView {
       hover: typeof matchMedia === "function" && matchMedia("(hover: hover)").matches,
       variables: {}, tool: call.tool,
     };
-    void this.load();
+    void this.load(++this.attempt);
   }
 
   get proxyOrigin(): string { return `http://127.0.0.1:${location.port}`; }
   owns(source: MessageEventSource | null): boolean { return !!this.frame && source === this.frame.contentWindow; }
 
-  private async load(): Promise<void> {
+  /**
+   * Try Again, or the link back: a view still loading, or whose read failed, is read afresh, as a
+   * read in flight when the link dropped may never be answered (#978). A drawn view, one asking
+   * Show, and a closed one are left.
+   */
+  retry(): void {
+    if (this.phase.value !== "loading" && !(this.phase.value === "failed" && this.canRetry.value)) return;
+    this.phase.value = "loading";
+    this.canRetry.value = false;
+    void this.load(++this.attempt);
+  }
+
+  private async load(mine: number): Promise<void> {
+    let resource: ViewResource;
     try {
-      this.resource = await this.actions.call("views/read", { agentID: this.actions.agentID, uri: this.call.resourceUri,
+      resource = await this.actions.call("views/read", { agentID: this.actions.agentID, uri: this.call.resourceUri,
         ...this.where() }) as ViewResource;
     } catch (e) {
+      if (mine !== this.attempt || this.phase.value === "gone") return;
       // Nothing of it is drawn until the person says Show.
       const ask = e instanceof CallFailed ? needsShow(e.code, e.data) : null;
       if (ask) {
@@ -123,10 +141,12 @@ export class HostedView {
         return;
       }
       this.failure.value = `This view could not be read from the server: ${describe(e)}`;
+      this.canRetry.value = true;
       this.phase.value = "failed";
       return;
     }
-    if (this.phase.value === "gone") return;
+    if (mine !== this.attempt || this.phase.value === "gone") return;
+    this.resource = resource;
     this.policy = this.resource.policy;
     this.context = { ...this.context, variables: this.resource.variables };
     const frame = document.createElement("iframe");
@@ -153,6 +173,7 @@ export class HostedView {
     if (!ask) return;
     this.ask.value = null;
     this.phase.value = "loading";
+    const mine = ++this.attempt;
     try {
       await this.actions.call("views/show", { agentID: this.actions.agentID, server: ask.server, uri: ask.uri, hash: ask.hash, show,
         ...(this.actions.project ? { project: this.actions.project } : {}) });
@@ -161,8 +182,9 @@ export class HostedView {
       this.phase.value = "failed";
       return;
     }
+    if (mine !== this.attempt || this.phase.peek() === "gone") return;
     if (show) {
-      await this.load();
+      await this.load(mine);
     } else {
       this.failure.value = `Not shown. Ask Again is on ${ask.server}'s row in the project's MCP servers.`;
       this.phase.value = "failed";
@@ -466,6 +488,11 @@ export class ViewLayer {
     for (const view of all) { view.box.hidden = true; this.closing.add(view); }
     this.fullscreen.value = null;
     await Promise.all(all.map(async (view) => { await view.tearDown(reason); this.closing.delete(view); }));
+  }
+
+  /** The link came back: every view still loading, or whose read failed, is read again (#978). */
+  reconnected(): void {
+    for (const view of this.views.values()) view.retry();
   }
 
   stop(): void {

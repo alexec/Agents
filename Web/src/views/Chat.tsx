@@ -188,6 +188,11 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   }, [layer, host, session, pinFolder]);
   useEffect(() => () => { void layer.tearDownAll("The conversation was closed."); }, [layer, host, session]);
   useEffect(() => () => layer.stop(), [layer]);
+  // A view read when the link dropped may never be answered: read it again (#978).
+  useEffect(() => {
+    const off = store.link.onState((state) => { if (state.kind === "open") layer.reconnected(); });
+    return () => { off(); };
+  }, [layer, store]);
   useLayoutEffect(() => {
     layer.scroller = scroller.current;
     layer.chat = chatColumn.current;

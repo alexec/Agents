@@ -46,7 +46,12 @@ export function AppView({ call }: { call: AppViewCall }) {
           )}
         </span>
       </p>
-      {view.phase.value === "failed" && <p class="quiet">{view.failure.value}</p>}
+      {view.phase.value === "loading" && <p class="quiet">Loading {view.title}…</p>}
+      {view.phase.value === "failed" && (
+        <p class="quiet">{view.failure.value}{" "}
+          {view.canRetry.value && <button onClick={() => view.retry()}>Try Again</button>}
+        </p>
+      )}
       {view.phase.value === "asking" && view.ask.value && (
         <div class="view-ask">
           <p>{view.ask.value.isNew ? `${view.ask.value.server} wants to show a view here.`

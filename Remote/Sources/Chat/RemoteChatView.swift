@@ -128,6 +128,8 @@ struct RemoteChatView: View {
             }
         }
         .onChange(of: agent?.id) { views.tearDownAll() }
+        // A view read when the link dropped may never be answered: read it again (#978).
+        .onChange(of: model.isConnected) { if model.isConnected { views.reconnected() } }
         .onDisappear { views.tearDownAll() }
         .navigationTitle(agent?.title ?? "Agent")
         .navigationBarTitleDisplayMode(.inline)
