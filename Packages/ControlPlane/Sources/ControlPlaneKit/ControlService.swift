@@ -401,7 +401,8 @@ public final class ControlService: @unchecked Sendable {
                     return await router.tellControl(DaemonAPI.Notification.controlProviderDraft, params, to: owner.session)
                 },
                 ownerHere: { [router] owner in await router.hasSession(owner.session) },
-                busyHost: { [weak providers] provider, workspace in await providers?.busyHost(provider, workspace) }),
+                busyHost: { [weak providers] provider, workspace in await providers?.busyHost(provider, workspace) },
+                sshConfig: { destination in await ProviderDrafts.runSSHConfig(destination, in: home) }),
                 log: { [weak self] in self?.log($0) })
             await providers.draft(with: drafts)
         }
