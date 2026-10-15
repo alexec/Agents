@@ -203,7 +203,7 @@ struct SidebarModelTests {
     }
 
     @Test func foldsStartAsTheMacsDidAndAreKeptPerScope() throws {
-        let defaults = try #require(UserDefaults(suiteName: "SidebarModelTests.\(UUID())"))
+        let defaults = MemoryDefaults()
         let folds = SidebarFolds(defaults: defaults, scope: "")
         #expect(!folds.isOpen(key), "a project starts folded")
         #expect(!folds.isOpen(key, .archivedSessions))

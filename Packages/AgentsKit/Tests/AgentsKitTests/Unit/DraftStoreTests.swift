@@ -9,13 +9,13 @@ private typealias Attachment = AgentsKitCore.Attachment
 ///
 /// The rules, tested without a window: where a draft is kept, when it goes, and what
 /// happens to a pasted picture too large to be worth keeping. Each test has a defaults
-/// domain of its own, so nothing here reads or writes the app's.
+/// store of its own, in memory, so nothing here reads or writes the app's or leaves a
+/// domain on disk (#1028).
 @Suite("Drafts")
 struct DraftStoreTests {
-    private func store() -> (DraftStore, UserDefaults, String) {
-        let suite = "AgentsDraftTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite)!
-        return (DraftStore(defaults: defaults), defaults, suite)
+    private func store() -> (DraftStore, UserDefaults) {
+        let defaults = MemoryDefaults()
+        return (DraftStore(defaults: defaults), defaults)
     }
 
     private func draft(_ text: String = "Three paragraphs about the job",
@@ -34,8 +34,7 @@ struct DraftStoreTests {
     // MARK: Kept against the conversation it was typed for
 
     @Test func aDraftComesBackForItsConversationAndNoOther() {
-        let (store, _, suite) = store()
-        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        let (store, _) = store()
         let one = UUID(), other = UUID()
         let written = draft(attachments: [aFile])
 
@@ -48,8 +47,7 @@ struct DraftStoreTests {
 
     /// Another store on the same defaults is another window, or the app next week.
     @Test func aDraftSurvivesTheStoreThatWroteIt() {
-        let (store, defaults, suite) = store()
-        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        let (store, defaults) = store()
         let id = UUID()
         store.save(draft(), for: .agent(id))
 
@@ -59,8 +57,7 @@ struct DraftStoreTests {
     /// FR-021: a draft exists only until it becomes a prompt, and an emptied field is not
     /// a draft.
     @Test func clearingOrEmptyingItLeavesNothing() {
-        let (store, defaults, suite) = store()
-        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        let (store, defaults) = store()
         let id = UUID()
         store.save(draft(), for: .agent(id))
         store.clear(.agent(id))
@@ -79,7 +76,7 @@ struct DraftStoreTests {
                                 .newAgent(folder: nil),
                                 .newAgent(folder: URL(filePath: "/tmp/somewhere/api")),
                                 .newAgent(folder: URL(filePath: "/tmp/somewhere/web"))]
-        let store = DraftStore(defaults: UserDefaults(suiteName: "unused-\(UUID().uuidString)")!)
+        let store = DraftStore(defaults: MemoryDefaults())
         #expect(Set(keys.map { store.defaultsKey(for: $0) }).count == keys.count)
         #expect(keys.allSatisfy { store.defaultsKey(for: $0).hasPrefix(DraftStore.prefix) })
         #expect(DraftKey.agent(one).name == DraftKey.agent(one).name, "stable")
@@ -91,8 +88,7 @@ struct DraftStoreTests {
     // MARK: FR-022: when a draft goes
 
     @Test func theSweepDropsADraftWhoseConversationIsArchived() {
-        let (store, _, suite) = store()
-        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        let (store, _) = store()
         let archived = UUID(), working = UUID()
         store.save(draft(), for: .agent(archived))
         store.save(draft(), for: .agent(working))
@@ -106,8 +102,7 @@ struct DraftStoreTests {
     /// The window sweeps once, then keeps the agents this names, so an agent archived
     /// later costs a look at the drafts that exist rather than another pass (#176).
     @Test func theSweepSaysWhichAgentsStillHaveADraft() {
-        let (store, _, suite) = store()
-        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        let (store, _) = store()
         let now = Date()
         let archived = UUID(), working = UUID(), old = UUID()
         store.save(draft(), for: .agent(archived))
@@ -122,8 +117,7 @@ struct DraftStoreTests {
     /// of is not evidence of anything, so it costs no draft — only "known, and archived"
     /// does, and the thirty days catches whatever is truly gone.
     @Test func anAgentTheSweepHasNotHeardOfCostsNothing() {
-        let (store, _, suite) = store()
-        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        let (store, _) = store()
         let id = UUID()
         store.save(draft(), for: .agent(id))
 
@@ -133,8 +127,7 @@ struct DraftStoreTests {
     }
 
     @Test func aDraftUntouchedForThirtyDaysGoes() {
-        let (store, _, suite) = store()
-        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        let (store, _) = store()
         let now = Date()
         let old = UUID(), recent = UUID()
         store.save(draft(at: now.addingTimeInterval(-DraftStore.horizon - 60)), for: .agent(old))
@@ -150,8 +143,7 @@ struct DraftStoreTests {
 
     /// FR-026 in the window's terms: a draft is never worth failing over.
     @Test func anEntryThatWillNotDecodeIsDiscarded() {
-        let (store, defaults, suite) = store()
-        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        let (store, defaults) = store()
         let id = UUID()
         defaults.set(Data("{ not a draft".utf8), forKey: store.defaultsKey(for: .agent(id)))
 
@@ -162,8 +154,7 @@ struct DraftStoreTests {
     // MARK: A pasted picture too large to keep
 
     @Test func inlineDataOverTheCapIsDroppedAndSaysSo() {
-        let (store, _, suite) = store()
-        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        let (store, _) = store()
         let id = UUID()
         let big = picture(bytes: DraftStore.inlineCap + 1)
         store.save(draft(attachments: [aFile, big]), for: .agent(id))
@@ -175,8 +166,7 @@ struct DraftStoreTests {
     }
 
     @Test func inlineDataUnderTheCapIsKept() {
-        let (store, _, suite) = store()
-        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        let (store, _) = store()
         let id = UUID()
         let small = picture(bytes: 2_048)
         store.save(draft(attachments: [small, aFile]), for: .agent(id))
@@ -188,8 +178,7 @@ struct DraftStoreTests {
 
     /// A draft whose only content was too big still says so rather than vanishing.
     @Test func aDraftThatWasOnlyAPictureStillSaysSo() {
-        let (store, _, suite) = store()
-        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        let (store, _) = store()
         let id = UUID()
         store.save(draft("", attachments: [picture(bytes: DraftStore.inlineCap + 1)]), for: .agent(id))
 
@@ -199,8 +188,7 @@ struct DraftStoreTests {
     // MARK: The start form
 
     @Test func theStartFormComesBack() {
-        let (store, defaults, suite) = store()
-        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        let (store, defaults) = store()
         let form = StartDraft(cwd: URL(filePath: "/tmp/somewhere/api"), runtimeID: "grok",
                               folders: [URL(filePath: "/tmp/somewhere/shared")],
                               servers: [], chosen: ["model": "grok-4"])
@@ -214,9 +202,7 @@ struct DraftStoreTests {
     /// A copy of the app on a scratch root shares the ordinary app's defaults. Neither may
     /// see, overwrite or sweep the other's drafts or start form.
     @Test func aScratchRootsDraftsAreItsOwn() {
-        let suite = "AgentsDraftTests-\(UUID().uuidString)"
-        defer { UserDefaults().removePersistentDomain(forName: suite) }
-        let defaults = UserDefaults(suiteName: suite)!
+        let defaults = MemoryDefaults()
         let ordinary = DraftStore(defaults: defaults)
         let scratch = DraftStore(defaults: defaults, scope: "run-drafts")
         let id = UUID()
