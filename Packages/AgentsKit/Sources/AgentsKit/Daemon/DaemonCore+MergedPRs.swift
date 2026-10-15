@@ -26,6 +26,9 @@ extension DaemonCore {
     /// Ask every project's `gh`, and write what they said for the days asked about. The
     /// first answer goes back as far as the Time page keeps days.
     func countMergedPRs() async {
+        // The milestones nothing tells the host of as it happens, asked as often (#984).
+        defer { checkMilestones() }
+        await checkCloudHosts()
         let days = timeLedger.hasPRsMerged ? Self.mergedPRsDaysAsked : UsageHistory.daysKept
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: now())

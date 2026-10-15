@@ -36,6 +36,9 @@ final class AppModel {
     /// An agent has run a turn on this root, once seen: archived agents are not listed,
     /// and the step stays ticked when the first one is archived.
     var hasSeenAgentRun = GetStartedStore.ranAgent
+    /// The milestones this window has shown a card for (#984); nil before its first look
+    /// on this root. See `AppModel+Milestones`.
+    var milestonesSeen: Set<String>? = MilestonesSeenStore.seen
     /// What each runtime last said about itself: signed in or not, what it takes in a
     /// prompt, which provider is answering.
     private(set) var accounts: [String: RuntimeAccount] = [:]
@@ -1569,6 +1572,14 @@ final class AppModel {
         work.replaceStoreNotes(notes)
     }
 
+    /// The milestones (#984), asked once on connecting. A host too old to know the method
+    /// leaves them nil, and the Time page shows none.
+    func refreshMilestones() async {
+        guard let milestones = try? await client.call(DaemonAPI.Method.milestonesState, Optional<String>.none,
+                                                      returning: Milestones.self) else { return }
+        takeMilestones(milestones)
+    }
+
     func refreshWakeState() async {
         guard let state = try? await client.call(DaemonAPI.Method.wakeState,
                                                  Optional<String>.none,
@@ -3007,7 +3018,9 @@ final class AppModel {
             }
             return
         case DaemonAPI.Notification.wakeChanged, DaemonAPI.Notification.modesChanged,
-             DaemonAPI.Notification.attentionChanged, DaemonAPI.Notification.storeNotesChanged:
+             DaemonAPI.Notification.attentionChanged, DaemonAPI.Notification.storeNotesChanged,
+             DaemonAPI.Notification.milestonesChanged:
+            // The milestones are the person's, kept on the Mac's own host (#984).
             return
         default:
             break
@@ -3149,6 +3162,7 @@ final class AppModel {
         async let cloning: Void = refreshClones()
         async let wake: Void = refreshWakeState()
         async let storeNotes: Void = refreshStoreNotes()
+        async let milestones: Void = refreshMilestones()
         async let leases: Void = refreshLeases()
         async let hostedMCP: Void = refreshHostedMCP()
         async let mcpHealth: Void = refreshMCPHealth()
@@ -3159,7 +3173,7 @@ final class AppModel {
         async let popped: Void = loadPoppedTranscripts()
         _ = await (popped, runtimes, accounts, workflows, pinned, permissions,
                    elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
-                   transcript, runtimeStates, sandbox, person, disk, storeNotes, hostedMCP, mcpHealth)
+                   transcript, runtimeStates, sandbox, person, disk, storeNotes, hostedMCP, mcpHealth, milestones)
         #if DEBUG
         openFromLaunchArguments()
         #endif

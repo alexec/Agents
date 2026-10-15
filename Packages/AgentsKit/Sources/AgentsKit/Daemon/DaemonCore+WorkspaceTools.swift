@@ -40,6 +40,7 @@ extension DaemonCore {
             let host = try named(request.host, "host")
             let row = try await call(DaemonAPI.Method.hostsStart, ["host": .string(host)])
             if row["state"]?.stringValue == "online" { return "\(host) is running already." }
+            earn(.firstCloudHost)
             return """
                 Starting \(host). It is up when it connects: wait for the server.online event \
                 (with wait_for_event) before you start anything there.

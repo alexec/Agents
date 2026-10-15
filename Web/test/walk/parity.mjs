@@ -350,6 +350,22 @@ for (const scene of scenes) {
       say(`recap: ${JSON.stringify(await visible(".time-recap-table tr"))}`);
       say(`records: ${JSON.stringify(await visible(".time-recap .usage-share"))}`);
       await shot("time");
+    } else if (scene === "milestones") {
+      // #984: the milestones on the Time page, then the one-time card for one earned while
+      // the page looks. The walker earns one meanwhile (a first turn, from the socket).
+      await page.eval(`location.hash = "#/a/time"`);
+      await page.waitFor(`document.querySelector(".milestones li")`, 30_000);
+      say(`milestones: ${JSON.stringify(await visible(".milestones li"))}`);
+      await shot("milestones");
+      await page.waitFor(`document.querySelector(".milestone-card")`, 300_000);
+      // Fixed in place, so it has no offsetParent and `visible` would skip it.
+      const card = () => page.eval(`[...document.querySelectorAll(".milestone-card")].map((el) => el.innerText.replace(/\\s+/g, " ").trim())`);
+      say(`card: ${JSON.stringify(await card())}`);
+      await shot("milestone-card");
+      await page.eval(`document.querySelector(".milestone-card button.close").click()`);
+      await sleep(300);
+      say(`card after ✕: ${JSON.stringify(await card())}`);
+      say(`milestones after: ${JSON.stringify(await visible(".milestones li.done"))}`);
     } else if (scene === "identity") {
       // #111: the footer names the browser, and no grant.
       say(`footer: ${JSON.stringify(await page.text(".identity"))}`);

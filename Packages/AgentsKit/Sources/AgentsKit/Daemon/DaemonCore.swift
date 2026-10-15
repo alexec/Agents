@@ -101,6 +101,9 @@ public actor DaemonCore {
     /// `DaemonCore+Devices`.
     lazy var deviceStore = DeviceStore(locations: locations)
     var loadedDevices: [UUID: Device]?
+    /// The milestones earned (#984), read from disk the first time they are wanted. See
+    /// `DaemonCore+Milestones`.
+    var loadedMilestones: Milestones?
     /// The pairing code the Mac is showing, if it is showing one: memory only, so a
     /// daemon that restarts has let it go.
     var pendingPairing: DaemonAPI.PairingCode?
@@ -1187,6 +1190,8 @@ public actor DaemonCore {
             if timeLedger.note(entry, agentID: agentID, runtime: agent.runtimeID) {
                 keepQuietly("the time history") { try timeLedger.flush() }
             }
+            // A turn starting or ending can earn the first agent or five at once (#984).
+            if case .stateChanged = entry.kind { checkMilestones() }
         }
         // Only to the connections showing it (#203): every other one draws the row, which
         // `agent/changed` keeps, and an unwatched agent's tool output went to all of them.
@@ -1461,6 +1466,8 @@ public actor DaemonCore {
         }
         clearAllowanceWaitsLeftFromBefore()
         startRetentionChecks()
+        // What was earned before milestones shipped (#984), from the records just read.
+        checkMilestones()
     }
 
     public func allAgents(includeArchived: Bool = true) -> [Agent] {

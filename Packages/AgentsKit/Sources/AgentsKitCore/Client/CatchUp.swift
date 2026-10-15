@@ -45,6 +45,8 @@ public extension DaemonAPI {
         /// Nil from a host that predates them.
         public var disk: DiskState?
         public var storeNotes: StoreNotes?
+        /// The milestones earned (#984), for the one-time card. Nil from a host that predates them.
+        public var milestones: Milestones?
         /// The parts asked for, each nil when it was not asked for or the host predates it.
         public var workflows: [WorkflowSummary]?
         public var pins: [ProjectPins]?

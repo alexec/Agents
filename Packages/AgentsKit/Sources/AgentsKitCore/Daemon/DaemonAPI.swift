@@ -395,6 +395,8 @@ public enum DaemonAPI {
         /// Where the time of running chats went by hour and by day, per runtime (#852).
         /// No params.
         public static let timeHistory = "time/history"
+        /// The milestones the person has earned (#984), for the Time page. No params.
+        public static let milestonesState = "milestones/state"
         public static let costSetLimits = "cost/setLimits"
         /// Cursor and Grok permission mode (061). Control only.
         public static let clientPermissionsState = "clientPermissions/state"
@@ -550,6 +552,8 @@ public enum DaemonAPI {
         public static let wakeChanged = "wake/changed"
         /// `StoreNotes`, whenever a file is set aside, held, or reads again (#205).
         public static let storeNotesChanged = "store/notesChanged"
+        /// A milestone was earned (#984). Carries the whole `Milestones`.
+        public static let milestonesChanged = "milestones/changed"
     }
 
     // MARK: Requests

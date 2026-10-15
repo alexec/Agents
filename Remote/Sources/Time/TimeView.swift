@@ -9,14 +9,17 @@ struct TimeView: View {
 
     var body: some View {
         ScrollView {
-            TimeChartsSection(load: { await model.timeHistory() })
-                .padding(20)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .readableWidth()
+            TimeMilestonesAround(milestones: model.work.milestones, fresh: model.freshMilestones) {
+                TimeChartsSection(load: { await model.timeHistory() })
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .readableWidth()
         }
         .paperGround()
         .navigationTitle("Time")
         .navigationBarTitleDisplayMode(.inline)
+        .onDisappear { model.sawMilestones() }
         .safeAreaInset(edge: .top, spacing: 0) { StaleBanner() }
         .markedStale(model.isStale)
     }

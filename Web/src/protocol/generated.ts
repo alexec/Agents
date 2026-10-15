@@ -722,6 +722,11 @@ export type Dropped =
   | { alwaysAllow: { count: number } }
   | { queuedSlashCommand: { _0: string } };
 
+export interface EarnedMilestone {
+  id: string;
+  at: WireDate;
+}
+
 export interface EffectiveSandbox {
   state: SandboxState;
   requested: SandboxChoice;
@@ -1196,6 +1201,10 @@ export interface MarkRuntimeAvailable {
 export interface MessageSender {
   agentID: UUID;
   title: string;
+}
+
+export interface Milestones {
+  earned: EarnedMilestone[];
 }
 
 export interface MissingFolder {
@@ -2361,6 +2370,7 @@ export interface Methods {
   "mcp/health": { params: Empty; result: MCPHealthSnapshot };
   "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
   "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
+  "milestones/state": { params: Empty; result: Milestones };
   "modes/remembered": { params: Empty; result: Record<string, JSONValue> };
   "options/remembered": { params: RememberedOptionsRequest; result: ConfigOption[] };
   "permissions/answer": { params: AnswerRequest; result: Empty };
@@ -2485,6 +2495,7 @@ export const MethodTarget = {
   "mcp/health": "host",
   "mcp/health/check": "host",
   "mcp/hosted": "host",
+  "milestones/state": "host",
   "modes/remembered": "host",
   "options/remembered": "host",
   "permissions/answer": "host",
@@ -2565,6 +2576,7 @@ export interface Notifications {
   "leases/changed": LeaseSnapshot;
   "mcp/healthChanged": MCPHealthSnapshot;
   "mcp/hostedChanged": HostedMCPSnapshot;
+  "milestones/changed": Milestones;
   "modes/changed": Record<string, JSONValue>;
   "pages/changed": PagesChangedNotification;
   "pins/changed": PinsChangedNotification;
@@ -2643,6 +2655,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DraftOptionsNotification: { required: ["draftID", "options", "commands"], optional: ["failure"] },
   DropboxPutRequest: { required: ["folder", "name", "data"], optional: ["subfolder"] },
   DropboxPutResponse: { required: ["path"], optional: [] },
+  EarnedMilestone: { required: ["id", "at"], optional: [] },
   EffectiveSandbox: { required: ["state", "requested"], optional: ["reason"] },
   ElicitationAnswer: { required: ["question", "answer"], optional: [] },
   ElicitationNotification: { required: ["agentID", "requestID"], optional: ["request"] },
@@ -2701,6 +2714,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MCPTriggerStatus: { required: ["name", "state"], optional: ["server", "lastPolledAt", "lastEventAt", "missedSince", "failure", "retryAt"] },
   MarkRuntimeAvailable: { required: ["credentialKey"], optional: [] },
   MessageSender: { required: ["agentID", "title"], optional: [] },
+  Milestones: { required: ["earned"], optional: [] },
   MissingFolder: { required: ["branchKept"], optional: [] },
   Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID"] },
   OptionsRequest: { required: ["runtimeID", "cwd", "mcpServers"], optional: [] },

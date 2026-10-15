@@ -566,6 +566,9 @@ final class RemoteModel {
     var openArchive = false
     /// The project's MCP servers (#753), a page opened from its row in the sidebar.
     var openMCPServers = false
+    /// The milestones this device has shown (#984); nil before its first look. See
+    /// `RemoteModel+Milestones`.
+    var milestonesSeen: Set<String>? = RemoteModel.keptMilestonesSeen
     /// The session opened while it was unread, kept in the sidebar's Unread until another
     /// is opened (#495), so it does not leave the list under the finger on the tap.
     private(set) var keptInUnread: UUID?
@@ -2231,6 +2234,13 @@ final class RemoteModel {
         if carried?.disk == nil { await refreshDisk() }
         // What the Mac could not read (#205, #223), at the foot of the projects list.
         if carried?.storeNotes == nil { await refreshStoreNotes() }
+        // The milestones (#984), for the Time page and the iPad's card.
+        if let milestones = carried?.milestones {
+            takeMilestones(milestones)
+        } else if let milestones = try? await client.call(DaemonAPI.Method.milestonesState, Optional<String>.none,
+                                                          returning: Milestones.self) {
+            takeMilestones(milestones)
+        }
         await settleUnsettledStart()
         settleSelection()
         // Once the counts have landed, so the widget's number is this refresh's number.
