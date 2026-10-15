@@ -36,13 +36,12 @@ added it.
    week.
 3. For each new feature, check whether Agents already has it: search `docs/`, `specs/`
    and the GitHub issues, open and closed (`gh issue list --state all --search …`).
-4. Check each remaining gap against `docs/explanation/direction.md`. Drop anything under
-   "Not now", such as new runtimes or App Store work.
+4. Drop any gap already closed as not planned (`gh issue list --state closed --search
+   "reason:not-planned …"`).
 5. Pick **at most three** gaps that users of those tools would expect from us. File each
    one with `gh issue create --label competitor --label enhancement`, after creating the
    `competitor` label if it does not exist yet. Each issue says which tool has the feature
-   (with a link), what Agents does today, and which goal in `direction.md` it serves. Do
-   not file a duplicate of an existing issue: if one already covers the gap, add a
+   (with a link) and what Agents does today. Do not file a duplicate of an existing issue: if one already covers the gap, add a
    comment to it instead.
 6. Write the report to `~/.agents/reviews/competitors/<YYYY-MM-DD>.md`. It lists each
    tool, what it shipped, whether Agents has it, the issues you filed, and the sources.

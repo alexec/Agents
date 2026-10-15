@@ -11,8 +11,7 @@ Product Owner do.
 
 Follow AGENTS.md, above all "Landing a change" (one lane per area, `.agents/areas`, when
 an issue is taken, conflicting PRs one at a time) and "Questions that already have an
-answer". The goals to rank against are in
-`docs/explanation/direction.md`. The workflows `.agents/workflows/fill-free-slots.md`
+answer". The workflows `.agents/workflows/fill-free-slots.md`
 (free slots, untried work, starting a lane) and `lead-on-idle.md` (stuck pull requests,
 archiving) say how to do each step; do the same by hand.
 

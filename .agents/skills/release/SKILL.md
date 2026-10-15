@@ -146,17 +146,15 @@ All of these, on the commit you will tag (`git rev-parse origin/main`, fetched a
    Master.
 2. **No open high:** `gh issue list --label priority:high --state open` is empty, and so
    is the list of high security advisories without their fix.
-3. **Walks:** `gh issue list --label needs-walk --state open` holds at most five
-   (`docs/explanation/direction.md`, "Signs we are in the weeds"). More than five: end
+3. **Walks:** `gh issue list --label needs-walk --state open` holds at most five. More than five: end
    with `partly_done`, naming them; walks are the Scrum Master's to start.
 
 ## 6. Version and notes
 
 1. Run `release-plan.py` again. Its `next:` is the version.
 2. Write the notes in Markdown, in plain short sentences:
-   - one heading per goal of `docs/explanation/direction.md` that has changes, with a
-     line per change, from the pull requests the plan lists (`goal:` when the issue
-     names one; otherwise choose the goal from the title). A line names the pull request:
+   - `## New` for the plan's `[enhancement]` pull requests and `## Fixed` for the rest,
+     a line per change. A line names the pull request:
      `- The sidebar shows … (#698)`. Leave out changes only agents see (CI, scripts,
      workflows) unless they change what a person does;
    - `## Security fixes` with only "This release fixes security problems found by our

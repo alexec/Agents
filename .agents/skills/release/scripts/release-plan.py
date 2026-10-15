@@ -64,13 +64,6 @@ def main():
     def labels(item):
         return {l["name"] for l in item.get("labels", [])}
 
-    def goal(numbers):
-        for n in numbers:
-            m = re.search(r"\*\*Goal:?\*\*:?\s*(.+)", issues.get(n, {}).get("body") or "")
-            if m:
-                return m.group(1).strip()[:100]
-        return "-"
-
     rows, enhancements = [], []
     for pr in sorted(merged, key=lambda p: p["number"]):
         fixed = [i["number"] for i in pr.get("closingIssuesReferences") or []]
@@ -80,7 +73,7 @@ def main():
             enhancements.append(pr["number"])
         kind = "enhancement" if is_enhancement else "-"
         rows.append(f"#{pr['number']} [{kind}] {pr['title']} | issues: "
-                    f"{', '.join(f'#{n}' for n in fixed) or '-'} | goal: {goal(fixed)}")
+                    f"{', '.join(f'#{n}' for n in fixed) or '-'}")
 
     version = bump(tag, bool(enhancements))
     if only_version:
