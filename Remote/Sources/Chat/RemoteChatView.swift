@@ -143,7 +143,7 @@ struct RemoteChatView: View {
                     RemoteMissingFolderStrip(agent: agent)
                 }
                 // Blocked (039): what it waits on, as the row says it (#341). Carry on is
-                // the toolbar's.
+                // the toolbar's, in the ··· menu on a phone (#981).
                 if let agent, model.isBlocked(agent) {
                     WaitLines(lines: model.blockLines(agent))
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -199,8 +199,9 @@ struct RemoteChatView: View {
             // Stop is the prompt's own button while the agent works, as on the Mac;
             // Pin and Archive are in the bar where there is room, as the Mac's toolbar
             // has them, and in the ··· menu on a phone (#586).
-            // Blocked (039): the card's Carry on, where the chat's own controls are.
-            if let agent, model.isBlocked(agent) {
+            // Blocked (039): the card's Carry on, where the chat's own controls are. On a
+            // phone, one ··· button and nothing else: Carry on and the panes are in it (#981).
+            if let agent, sizeClass == .regular, model.isBlocked(agent) {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         Task { await model.carryOn(agent.id) }
@@ -222,7 +223,7 @@ struct RemoteChatView: View {
                     }
                 }
             }
-            if let agent {
+            if let agent, sizeClass == .regular {
                 ToolbarItem(placement: .topBarTrailing) {
                     // The Mac's side panes: Page, Files, Terminal, Exchanged (034). One
                     // tap opens the last one used; the switch at its top reaches the rest.
@@ -230,10 +231,12 @@ struct RemoteChatView: View {
                         let state = model.panes.state(for: agent.id)
                         if state.pane == nil { state.show(state.defaultPane) } else { state.pane = nil }
                     } label: {
-                        Label("Panes", systemImage: sizeClass == .regular ? "sidebar.right" : "doc.text")
+                        Label("Panes", systemImage: "sidebar.right")
                     }
                     .accessibilityHint("Shows the page, files and terminal for this agent")
                 }
+            }
+            if let agent {
                 ToolbarItem(placement: .topBarTrailing) {
                     ChatMenu(agent: agent) { searchingFiles = true }
                 }
@@ -401,7 +404,7 @@ struct RemoteChatView: View {
 }
 
 /// The rarer things to do with this agent, and on a phone, where the bar has no room
-/// for them, Pin and Archive (#586).
+/// for them, Pin and Archive (#586), Carry on and the panes (#981).
 private struct ChatMenu: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.poppedChat) private var popped
@@ -413,6 +416,15 @@ private struct ChatMenu: View {
 
     var body: some View {
         Menu {
+            // Blocked (039): first, on a phone. The card in the chat keeps its own (#981).
+            if sizeClass != .regular, model.isBlocked(agent) {
+                Button(AgentsModel.carryOnLabel, systemImage: "play.circle") {
+                    Task { await model.carryOn(agent.id) }
+                }
+                .disabled(model.isStale(agent))
+                .accessibilityHint(AgentsModel.carryOnHelp(for: agent))
+                Divider()
+            }
             // What every turn starts at, above the chat's own actions (069, frame F).
             Picker("Turns show", selection: $turnDetail) {
                 ForEach(TurnDetail.allCases, id: \.self) { detail in
@@ -422,6 +434,16 @@ private struct ChatMenu: View {
             .pickerStyle(.inline)
             Divider()
             Button("Open File…", systemImage: "magnifyingglass", action: openFile)
+            // On a phone, the panes one item each, in place of the bar's Panes button
+            // (#981): the Page once there is one, and only what the Mac can give.
+            if sizeClass != .regular, !model.macLacksPanes {
+                let state = model.panes.state(for: agent.id)
+                if state.pagePath != nil {
+                    Button("Page", systemImage: "doc.richtext") { state.show(.page) }
+                }
+                Button("Files", systemImage: "folder") { state.show(.files) }
+                Button("Terminal", systemImage: "terminal") { state.show(.terminal) }
+            }
             Button("Exchanged", systemImage: "doc") { model.panes.state(for: agent.id).show(.exchanged) }
             // The main scene's chat, in a scene of its own (#888).
             if popped == nil { OpenInNewWindowButton(agent: agent) }

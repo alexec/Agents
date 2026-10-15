@@ -544,15 +544,19 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           ? <h1><RenameInput store={store} host={host} agent={agent} /></h1>
           : <h1>{agent?.title ?? "New session"}</h1>}
         <span class="actions">
-          <select class="detail" aria-label="Turns" title={detailSummaries[level.value]} value={level.value}
+          <select class="detail wide-only" aria-label="Turns" title={detailSummaries[level.value]} value={level.value}
             onChange={(e) => choose((e.currentTarget as HTMLSelectElement).value as TurnDetail)}>
             {turnDetails.map((d) => (
               <option key={d} value={d} title={detailSummaries[d]}>{detailTitles[d]}</option>
             ))}
           </select>
-          <button onClick={() => replace({ ...r, files: !r.files })} aria-pressed={!!r.files}>Files</button>
+          <button class="wide-only" onClick={() => replace({ ...r, files: !r.files })} aria-pressed={!!r.files}>Files</button>
           <SessionButtons store={store} host={host} agent={agent} disabled={down} />
-          <SessionMenu store={store} host={host} agent={agent} disabled={down} inChat openFile={() => (searchingFiles.value = true)} />
+          <SessionMenu store={store} host={host} agent={agent} disabled={down} inChat openFile={() => (searchingFiles.value = true)}
+            narrow={[
+              ...turnDetails.map((d) => ({ label: `Turns: ${detailTitles[d]}`, help: detailSummaries[d], checked: level.value === d, run: () => choose(d) })),
+              { label: "Files", checked: !!r.files, run: () => replace({ ...r, files: !r.files }) },
+            ]} />
         </span>
       </header>
       {hostDown && <OfflineStrip store={store} host={host} />}
