@@ -860,12 +860,44 @@ final class RemoteModel {
             startShowsParts = true
             await showing(Self.startParts)
         }
+        // A server's list is not one of the parts: asked as its page opens (#977).
+        if startHost != .mac { await refreshServerRuntimes(startHost) }
         guard startingIn == folder else { return }
-        if startRuntimeID == nil || !startAvailableRuntimeIDs.contains(startRuntimeID ?? "") {
-            // The one rule (#264): the runtime this page was last left on, kept across launches.
-            // The list is this project's host's (#240), not every runtime the Mac knows.
-            startRuntimeID = work.defaultRuntimeID(available: startAvailableRuntimeIDs,
-                                                   kept: UserDefaults.standard.string(forKey: Self.keptStartRuntime))
+        startRuntimeID = pickedStartRuntime
+        startPicked = true
+        await loadStartChoices()
+    }
+
+    /// The one rule (#264): the runtime this page is on while it can start, else the one it
+    /// was last left on, kept across launches. The list is this project's host's (#240), not
+    /// every runtime the Mac knows.
+    private var pickedStartRuntime: String? {
+        RuntimeCatalog.startFormRuntime(current: startRuntimeID,
+                                        kept: UserDefaults.standard.string(forKey: Self.keptStartRuntime),
+                                        available: startAvailableRuntimeIDs)
+    }
+
+    /// Set once the open page has picked its runtime, so a list that changes after that
+    /// picks again rather than racing the opening.
+    @ObservationIgnored private var startPicked = false
+
+    /// The page's host listed its runtimes, or could not (#977). A page that opened before
+    /// they came (during a reconnect, or just after launch) picks one now and asks it for its
+    /// choices, rather than staying on "None set up" until it is closed and opened again.
+    private func startRuntimesMoved() {
+        guard startPicked, startingIn != nil else { return }
+        let picked = pickedStartRuntime
+        // With none to pick, the page's sentence is said again, for a list that failed.
+        guard picked != startRuntimeID || picked == nil else { return }
+        startRuntimeID = picked
+        Task { await loadStartChoices() }
+    }
+
+    /// Try again on the page: with no runtime to ask, the host's list is read again first.
+    func retryStartChoices() async {
+        if startRuntimeID == nil {
+            if startHost == .mac { await refreshRuntimes() } else { await refreshServerRuntimes(startHost) }
+            startRuntimeID = pickedStartRuntime
         }
         await loadStartChoices()
     }
@@ -874,6 +906,7 @@ final class RemoteModel {
     @ObservationIgnored private var startShowsParts = false
 
     private func closeStart() {
+        startPicked = false
         if startShowsParts {
             startShowsParts = false
             notShowing(Self.startParts)
@@ -975,6 +1008,10 @@ final class RemoteModel {
         guard let runtimeID = startRuntimeID else {
             // Not "asking": there is nobody to ask.
             let host = startHost == .mac ? "the Mac" : hostName(startHost)
+            if startRuntimes.isEmpty, let failure = runtimesFailure[startHost] {
+                startChoicesState = .failed("Could not list the runtimes on \(host). \(failure)")
+                return
+            }
             startChoicesState = .failed(startRuntimes.isEmpty
                 ? "No runtimes are set up on \(host). Set one up there to start an agent."
                 : "None of \(host)'s runtimes can start right now.")
@@ -1218,22 +1255,30 @@ final class RemoteModel {
     /// Every runtime the Mac knows, in the Mac's order, startable or not. The start
     /// page lists the ones that cannot start too, with why, because a runtime that
     /// silently is not there reads as one the phone forgot.
-    private(set) var runtimes: [RuntimeStatus] = []
+    private(set) var runtimes: [RuntimeStatus] = [] { didSet { startRuntimesMoved() } }
     private var accounts: [String: RuntimeAccount] = [:]
 
     /// Each other host's runtimes, as it last listed them (#240): a server project's
     /// start page offers its server's, as the window's does (037).
-    private(set) var serverRuntimes: [HostID: [RuntimeStatus]] = [:]
+    private(set) var serverRuntimes: [HostID: [RuntimeStatus]] = [:] { didSet { startRuntimesMoved() } }
+    /// Why a host's last `runtimes/list` failed, until one is answered (#977): the start
+    /// page says that, rather than "None set up".
+    private var runtimesFailure: [HostID: String] = [:] { didSet { startRuntimesMoved() } }
 
     func runtimes(on host: HostID) -> [RuntimeStatus] {
         host == .mac ? runtimes : serverRuntimes[host] ?? []
     }
 
     private func refreshServerRuntimes(_ host: HostID) async {
-        guard let other = otherHosts[host],
-              let listed = try? await other.call(DaemonAPI.Method.runtimesList, Optional<String>.none,
-                                                 returning: [RuntimeStatus].self) else { return }
-        serverRuntimes[host] = RuntimeCatalog.sortedByName(listed)
+        guard let other = otherHosts[host] else { return }
+        do {
+            let listed = try await other.call(DaemonAPI.Method.runtimesList, Optional<String>.none,
+                                              returning: [RuntimeStatus].self)
+            serverRuntimes[host] = RuntimeCatalog.sortedByName(listed)
+            runtimesFailure[host] = nil
+        } catch {
+            runtimesFailure[host] = (error as? JSONRPCError)?.message ?? "\(hostName(host)) did not answer."
+        }
     }
 
     var availableRuntimeIDs: [String] {
@@ -3362,10 +3407,14 @@ final class RemoteModel {
     }
 
     private func refreshRuntimes() async {
-        if let listed = try? await client.call(DaemonAPI.Method.runtimesList,
+        do {
+            let listed = try await client.call(DaemonAPI.Method.runtimesList,
                                                Optional<String>.none,
-                                               returning: [RuntimeStatus].self) {
+                                               returning: [RuntimeStatus].self)
             runtimes = RuntimeCatalog.sortedByName(listed)
+            runtimesFailure[.mac] = nil
+        } catch {
+            runtimesFailure[.mac] = sentence(for: error)
         }
         if let listed = try? await client.call(DaemonAPI.Method.runtimesAccounts,
                                                Optional<Int>.none,

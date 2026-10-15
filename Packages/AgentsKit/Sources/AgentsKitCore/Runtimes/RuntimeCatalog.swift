@@ -134,6 +134,14 @@ public enum RuntimeCatalog {
         return available.first
     }
 
+    /// The runtime an open start form stays on (#977): the one it is on while that can
+    /// still start, else `newSessionRuntime`. Read again each time the host's list
+    /// changes, so a list that comes after the form opened gives it a runtime.
+    public static func startFormRuntime(current: String?, kept: String?, available: [String]) -> String? {
+        if let current, available.contains(current) { return current }
+        return newSessionRuntime(kept: kept, available: available)
+    }
+
     /// Runtimes or anything standing for one, alphabetical by the name shown: compared
     /// case-insensitively and as the person's language would (#154), with the id breaking
     /// a tie so the order is fixed. Within a runtime, models and modes keep their order.
