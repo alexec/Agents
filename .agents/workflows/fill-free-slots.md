@@ -49,8 +49,7 @@ Order them: `bug` first, then everything else; within each, oldest first.
 **Untried work first (#611).** Count the issues labelled `needs-walk` (merged UI changes
 nobody has run): `gh issue list --state all --label needs-walk --json number,title,assignees`.
 While there are more than 5, start no enhancements: after the bugs, take the unassigned
-`needs-walk` issues instead, oldest first, as walk lanes (step 3). See
-`docs/explanation/direction.md`.
+`needs-walk` issues instead, oldest first, as walk lanes (step 3).
 
 **One lane per area (#873).** An issue's area is its `area:<name>` label. If it has
 none, guess one from its text and the paths in `.agents/areas`, and add it

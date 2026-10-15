@@ -59,17 +59,10 @@ def main():
     merged = [p for p in merged if p["number"] in prs]
     issues = {i["number"]: i for i in gh_json(
         "issue", "list", "--state", "all", "--limit", "1000",
-        "--search", f"updated:>={since[:10]}", "--json", "number,labels,body")}
+        "--search", f"updated:>={since[:10]}", "--json", "number,labels")}
 
     def labels(item):
         return {l["name"] for l in item.get("labels", [])}
-
-    def goal(numbers):
-        for n in numbers:
-            m = re.search(r"\*\*Goal:?\*\*:?\s*(.+)", issues.get(n, {}).get("body") or "")
-            if m:
-                return m.group(1).strip()[:100]
-        return "-"
 
     rows, enhancements = [], []
     for pr in sorted(merged, key=lambda p: p["number"]):
@@ -78,9 +71,10 @@ def main():
             "enhancement" in labels(issues.get(n, {})) for n in fixed)
         if is_enhancement:
             enhancements.append(pr["number"])
-        kind = "enhancement" if is_enhancement else "-"
+        is_bug = "bug" in labels(pr) or any("bug" in labels(issues.get(n, {})) for n in fixed)
+        kind = "enhancement" if is_enhancement else "bug" if is_bug else "-"
         rows.append(f"#{pr['number']} [{kind}] {pr['title']} | issues: "
-                    f"{', '.join(f'#{n}' for n in fixed) or '-'} | goal: {goal(fixed)}")
+                    f"{', '.join(f'#{n}' for n in fixed) or '-'}")
 
     version = bump(tag, bool(enhancements))
     if only_version:
