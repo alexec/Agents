@@ -14,12 +14,19 @@ public struct WakeSettings: Codable, Hashable, Sendable {
     /// Beside the hold because it is the same kind of choice: what this Mac spends on
     /// agents between turns. A warm runtime never holds the Mac awake.
     public var warmRuntimes: Int
+    /// While the Mac is on power, hold it awake with no agent working too (#992), so
+    /// scheduled workflows fire at their time and the CI events are polled while the
+    /// person is away. Off by default: it changes what the Mac spends. On battery it
+    /// does nothing. Only with `keepsAwake` on.
+    public var awakeOnPower: Bool
 
     public static let hours = 0...8
     public static let warmRange = 0...8
 
-    public init(keepsAwake: Bool = true, graceHours: Int = 1, warmRuntimes: Int = 3) {
+    public init(keepsAwake: Bool = true, graceHours: Int = 1, warmRuntimes: Int = 3,
+                awakeOnPower: Bool = false) {
         self.keepsAwake = keepsAwake
+        self.awakeOnPower = awakeOnPower
         self.graceHours = Self.clamp(graceHours)
         self.warmRuntimes = min(max(warmRuntimes, Self.warmRange.lowerBound), Self.warmRange.upperBound)
     }
@@ -37,6 +44,8 @@ public struct WakeSettings: Codable, Hashable, Sendable {
         graceHours = Self.clamp((try? c.decode(Int.self, forKey: .graceHours)) ?? 1)
         let warm = (try? c.decode(Int.self, forKey: .warmRuntimes)) ?? 3
         warmRuntimes = min(max(warm, Self.warmRange.lowerBound), Self.warmRange.upperBound)
+        // Missing is off, so a file from before #992 keeps the current behaviour.
+        awakeOnPower = (try? c.decode(Bool.self, forKey: .awakeOnPower)) ?? false
     }
 }
 
@@ -54,6 +63,12 @@ public enum WakeWords {
         let day = until.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(calendar.locale ?? .current))
         return "Until \(day), \(time)"
     }
+
+    /// The sidebar row while the hold is for the power, not for an agent (#992).
+    public static let onPowerLine = "Awake while on power"
+
+    public static let onPowerHelp = "This Mac is on power, so it stays awake for scheduled workflows and new "
+        + "issues, also with no agent working. The display still sleeps."
 
     public static func graceHelp(_ until: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
         let when = untilLine(until, now: now, calendar: calendar).replacingOccurrences(of: "Until ", with: "")

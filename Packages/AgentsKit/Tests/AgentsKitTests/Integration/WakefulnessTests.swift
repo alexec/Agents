@@ -769,6 +769,117 @@ struct WakefulnessTests {
         #expect(wake.lastReason == DaemonCore.graceReason)
     }
 
+    // MARK: #992 — awake on power, with no agent working
+
+    private func onPower(_ core: DaemonCore, graceHours: Int = 1) async {
+        _ = await core.setWakeSettings(WakeSettings(keepsAwake: true, graceHours: graceHours, awakeOnPower: true))
+    }
+
+    @Test("On power, the switch holds the Mac with no agent working, and says so")
+    func onPowerHoldsWithNoWork() async throws {
+        let (locations, _) = try temporary()
+        let wake = RecordingWakefulness()
+        let core = try core(working(), locations: locations, power: FakePowerSource.mains, wakefulness: wake)
+        await onPower(core)
+
+        #expect(wake.isHolding)
+        #expect(wake.lastReason == DaemonCore.powerReason)
+        let state = await core.wakeState()
+        #expect(state.isHolding && state.onPower)
+        #expect(state.graceUntil == nil)
+
+        // A tick changes nothing: one hold, no swap.
+        await core.tickWorkflows(now: Date())
+        #expect(wake.holds == 1)
+
+        _ = await core.setWakeSettings(WakeSettings(keepsAwake: true, graceHours: 1))
+        #expect(!wake.isHolding)
+        #expect(await core.wakeState().onPower == false)
+    }
+
+    @Test("Off by default, and with the main switch off the power switch does nothing")
+    func onPowerNeedsBothSwitches() async throws {
+        let (locations, _) = try temporary()
+        let wake = RecordingWakefulness()
+        let core = try core(working(), locations: locations, power: FakePowerSource.mains, wakefulness: wake)
+        #expect(await core.readWakeSettings().awakeOnPower == false)
+        await core.tickWorkflows(now: Date())
+        #expect(!wake.isHolding)
+
+        _ = await core.setWakeSettings(WakeSettings(keepsAwake: false, graceHours: 1, awakeOnPower: true))
+        #expect(!wake.isHolding)
+    }
+
+    @Test("On battery the switch does nothing, and plugging in takes the hold up again")
+    func onPowerFollowsThePlug() async throws {
+        let (locations, _) = try temporary()
+        let power = FakePowerSource()
+        power.onBattery(80)
+        let wake = RecordingWakefulness()
+        let core = try core(working(), locations: locations, power: power, wakefulness: wake)
+        await onPower(core)
+        #expect(!wake.isHolding)
+
+        power.onMains(80)
+        await core.tickWorkflows(now: Date())
+        #expect(wake.isHolding)
+        #expect(wake.lastReason == DaemonCore.powerReason)
+
+        power.onBattery(80)
+        await core.tickWorkflows(now: Date())
+        #expect(!wake.isHolding)
+        #expect(await core.wakeState().hasSomethingToSay == false)
+    }
+
+    @Test("A turn on power holds for the work, then for the power; unplugging finds the grace")
+    func onPowerAroundATurn() async throws {
+        let clock = ManualClock()
+        let (locations, work) = try temporary()
+        let power = FakePowerSource.mains
+        let wake = RecordingWakefulness()
+        let core = try core(working(), locations: locations, power: power,
+                            wakefulness: wake, now: { clock.now() })
+        await onPower(core)
+        #expect(wake.lastReason == DaemonCore.powerReason)
+
+        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "do a thing"))
+        await eventually("held for the work") {
+            guard wake.lastReason == DaemonCore.wakeReason else { return false }
+            return await core.wakeState().onPower == false
+        }
+        await eventually("the turn ended") { await core.agent(id)?.state == .finished }
+        await eventually("held for the power again") { wake.lastReason == DaemonCore.powerReason }
+        #expect(wake.isHolding)
+
+        // Unplugged half an hour later: the grace from the stop still has half an hour.
+        clock.advance(1_800)
+        power.onBattery(80)
+        await core.tickWorkflows(now: clock.now())
+        #expect(wake.isHolding)
+        #expect(wake.lastReason == DaemonCore.graceReason)
+        let until = try #require(await core.wakeState().graceUntil)
+        #expect(abs(until.timeIntervalSince(clock.now()) - 1_800) < 2)
+
+        clock.advance(1_801)
+        await core.tickWorkflows(now: clock.now())
+        #expect(!wake.isHolding)
+    }
+
+    @Test("A hold for the power alone starts no grace when the Mac is unplugged")
+    func onPowerStartsNoGrace() async throws {
+        let (locations, _) = try temporary()
+        let power = FakePowerSource.mains
+        let wake = RecordingWakefulness()
+        let core = try core(working(), locations: locations, power: power, wakefulness: wake)
+        await onPower(core)
+        #expect(wake.isHolding)
+
+        power.onBattery(80)
+        await core.tickWorkflows(now: Date())
+        #expect(!wake.isHolding)
+        #expect(await core.wakeState().graceUntil == nil)
+    }
+
     @Test("The hours are clamped, and a new daemon reads what was saved")
     func settingsAreKept() async throws {
         let (locations, _) = try temporary()

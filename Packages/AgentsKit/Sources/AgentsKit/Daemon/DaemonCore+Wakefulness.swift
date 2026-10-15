@@ -77,38 +77,48 @@ extension DaemonCore {
             // every agent's updates would queue behind a synchronous IOKit call made on
             // behalf of another agent's token. Dropping a grace is the exception: the
             // verdict stays `.hold` and the windows still have to lose the clock.
-            if !droppingGrace, !forcePowerRead, let last = lastWakeVerdict, last != .idle { return }
+            if !droppingGrace, !forcePowerRead, !lastHoldOnPower, let last = lastWakeVerdict, last != .idle { return }
 
             let reading = power.read()
             lastPowerReading = reading
             return apply(Wake.verdict(workInFlight: true, power: reading), graceUntil: nil)
         }
 
-        // Nothing computing. Right away, or no grace running and we were not holding
-        // for work: the ordinary case, reached on every token of every stream, and it
-        // must not pay IOKit.
-        guard settings.graceHours > 0 else {
-            graceStartedAt = nil
-            return apply(.idle, graceUntil: nil)
-        }
-        if graceStartedAt == nil {
+        // Nothing computing. The grace clock runs first, also while the power holds
+        // the Mac, so unplugging later finds the grace where the last stop left it.
+        var graceUntil: Date?
+        if settings.graceHours > 0 {
             // A grace begins only from a hold this process was keeping for work.
-            // Turning the switch on while nothing is working does not start one, and
-            // neither does a daemon that has just launched.
-            guard lastWakeVerdict?.isHolding == true, lastGraceUntil == nil else {
-                return apply(.idle, graceUntil: nil)
+            // Turning the switch on while nothing is working does not start one,
+            // neither does a daemon that has just launched, and neither does a hold
+            // that was only for the power.
+            if graceStartedAt == nil, lastWakeVerdict?.isHolding == true, lastGraceUntil == nil,
+               !lastHoldOnPower {
+                graceStartedAt = now()
             }
-            graceStartedAt = now()
+            if let started = graceStartedAt {
+                let until = started.addingTimeInterval(settings.graceInterval)
+                if now() < until { graceUntil = until } else { graceStartedAt = nil }
+            }
+        } else {
+            graceStartedAt = nil
         }
 
-        let until = graceStartedAt!.addingTimeInterval(settings.graceInterval)
-        if now() >= until {
-            graceStartedAt = nil
-            return apply(.idle, graceUntil: nil)
+        // On power, with the switch on: hold with no agent working (#992). The reading
+        // is the last one taken unless the tick asks for a fresh one, so the hot path
+        // does not pay IOKit. The tick sees the plug move within 15 seconds.
+        if settings.awakeOnPower {
+            let reading = (forcePowerRead ? nil : lastPowerReading) ?? power.read()
+            lastPowerReading = reading
+            if reading.isOnMains { return apply(.hold, graceUntil: nil, onPower: true) }
         }
+
+        // No grace running and not held for the power: the ordinary case, reached on
+        // every token of every stream, and it must not pay IOKit.
+        guard let until = graceUntil else { return apply(.idle, graceUntil: nil) }
         // Inside the grace, and we already told the windows this exact time. The tick
         // is what notices the battery, and the clock, moving.
-        if !forcePowerRead, lastWakeVerdict == .hold, lastGraceUntil == until { return }
+        if !forcePowerRead, lastWakeVerdict == .hold, lastGraceUntil == until, !lastHoldOnPower { return }
 
         let reading = power.read()
         lastPowerReading = reading
@@ -129,12 +139,14 @@ extension DaemonCore {
     /// braces, because a leaked assertion is invisible until somebody's battery is
     /// flat. The clock is part of the comparison because a grace keeps the verdict
     /// at `.hold` and the windows still have to be told when it ends.
-    private func apply(_ verdict: WakeVerdict, graceUntil: Date?) {
+    private func apply(_ verdict: WakeVerdict, graceUntil: Date?, onPower: Bool = false) {
         let until = verdict.isHolding ? graceUntil : nil
-        guard verdict != lastWakeVerdict || until != lastGraceUntil else { return }
+        let forPower = verdict.isHolding && onPower
+        guard verdict != lastWakeVerdict || until != lastGraceUntil || forPower != lastHoldOnPower else { return }
         let wasHolding = lastWakeVerdict?.isHolding == true
         lastWakeVerdict = verdict
         lastGraceUntil = until
+        lastHoldOnPower = forPower
 
         if verdict.isHolding {
             // Set before the broadcast below reads it. Only moved when the hold is
@@ -142,8 +154,10 @@ extension DaemonCore {
             // means since this hold began.
             if !wasHolding { holdingSince = now() }
             let forGrace = until != nil
-            wakefulness.hold(reason: forGrace ? Self.graceReason : Self.wakeReason)
-            DaemonLog.shared.write(forGrace
+            wakefulness.hold(reason: forPower ? Self.powerReason : forGrace ? Self.graceReason : Self.wakeReason)
+            DaemonLog.shared.write(forPower
+                ? "holding the Mac awake: on power"
+                : forGrace
                 ? "holding the Mac awake: staying awake so you can reply"
                 : "holding the Mac awake: a turn is in flight")
         } else {
@@ -183,6 +197,7 @@ extension DaemonCore {
         wakefulness.release()
         lastWakeVerdict = nil
         lastGraceUntil = nil
+        lastHoldOnPower = false
         holdingSince = nil
         DaemonLog.shared.write("letting the Mac sleep: the daemon is going")
         // Any window still connected is about to lose the socket anyway, but a window
@@ -214,7 +229,8 @@ extension DaemonCore {
                                    heldBackByBattery: heldBack,
                                    batteryPercent: percent,
                                    since: verdict.isHolding ? holdingSince : nil,
-                                   graceUntil: verdict.isHolding ? lastGraceUntil : nil)
+                                   graceUntil: verdict.isHolding ? lastGraceUntil : nil,
+                                   onPower: verdict.isHolding && lastHoldOnPower)
     }
 
     /// The switch and the hours, loaded once.
@@ -229,7 +245,7 @@ extension DaemonCore {
     public func setWakeSettings(_ settings: WakeSettings) -> WakeSettings {
         loadWakeSettingsIfNeeded()
         wakeSettings = WakeSettings(keepsAwake: settings.keepsAwake, graceHours: settings.graceHours,
-                                    warmRuntimes: settings.warmRuntimes)
+                                    warmRuntimes: settings.warmRuntimes, awakeOnPower: settings.awakeOnPower)
         do { try wakeStore.save(wakeSettings) } catch {
             DaemonLog.shared.write("wake.json: could not write: \(error.localizedDescription)")
         }
@@ -279,6 +295,9 @@ extension DaemonCore {
 
     /// What `pmset` shows once the work has stopped and the grace is what holds the Mac.
     static let graceReason = "Agents: staying awake so you can reply"
+
+    /// What `pmset` shows when the Mac is held only because it is on power (#992).
+    static let powerReason = "Agents: staying awake while on power"
 
     /// Why we are not holding, for the daemon's log. FR-017's other half.
     static func wakeWords(for verdict: WakeVerdict) -> String {

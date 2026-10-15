@@ -911,6 +911,7 @@ private struct WakefulnessRow: View {
     /// The sidebar already shows which agents are working; this row says only why
     /// the Mac is awake.
     private func detail(_ state: DaemonAPI.WakeState) -> String? {
+        if state.isHolding, state.onPower { return WakeWords.onPowerLine }
         if state.isHolding, let until = state.graceUntil {
             return WakeWords.untilLine(until)
         }
@@ -918,6 +919,7 @@ private struct WakefulnessRow: View {
     }
 
     private func help(_ state: DaemonAPI.WakeState) -> String {
+        if state.isHolding, state.onPower { return WakeWords.onPowerHelp }
         if state.isHolding, let until = state.graceUntil {
             return WakeWords.graceHelp(until)
         }

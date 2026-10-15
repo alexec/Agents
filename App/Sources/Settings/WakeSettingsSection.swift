@@ -24,6 +24,11 @@ struct WakeSettingsSection: View {
                     }
                 }
                 .disabled(!(model.wakeSettings?.keepsAwake ?? false))
+                // A different rule from the hours: no agent needed, only power (#992).
+                Toggle("Stay awake on power, even with no agents", isOn: Binding(
+                    get: { model.wakeSettings?.awakeOnPower ?? false },
+                    set: { on in save { $0.awakeOnPower = on } }))
+                .disabled(!(model.wakeSettings?.keepsAwake ?? false))
                 // Runtimes kept running for the reply, so it is not a cold start (#183).
                 Picker("Keep ready for a reply", selection: Binding(
                     get: { model.wakeSettings?.warmRuntimes ?? settings.warmRuntimes },
@@ -37,6 +42,9 @@ struct WakeSettingsSection: View {
             } footer: {
                 Text(((model.wakeSettings?.keepsAwake ?? false)
                      ? "The screen can still sleep. At 20% battery or below, the Mac is allowed to sleep anyway. Once the last agent stops, the Mac stays awake for this long so you can reply."
+                       + ((model.wakeSettings?.awakeOnPower ?? false)
+                          ? " On power, the Mac stays awake all the time, so scheduled workflows and new issues run while you are away. On battery, the rules above apply. A MacBook with its lid closed and no display sleeps anyway, and the screen still locks."
+                          : "")
                      : "The Mac sleeps on its own schedule, including while an agent is working. The time above is kept for when you turn this back on.")
                      + " The sessions you are most likely to reply to keep their agent running for up to 30 minutes, so the reply starts at once. They never keep the Mac awake.")
                     .appText(.fine)
