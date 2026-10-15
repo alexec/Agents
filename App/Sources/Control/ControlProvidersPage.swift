@@ -89,19 +89,48 @@ struct ControlProvidersPage: View {
                             Text("Joining…").appText(.supporting).foregroundStyle(.secondary)
                         }
                     } else if workspace.host == nil {
-                        Button("Add as Host…") {
-                            addingHost = .init(destination: workspace.ssh ?? "", name: workspace.name,
-                                               tunnel: workspace.tunnel ?? false, provider: provider.id,
-                                               workspace: workspace.id)
+                        HStack(spacing: 8) {
+                            linkToExistingHost(workspace, of: provider)
+                            Button("Add as Host…") {
+                                addingHost = .init(destination: workspace.ssh ?? "", name: workspace.name,
+                                                   tunnel: workspace.tunnel ?? false, provider: provider.id,
+                                                   workspace: workspace.id)
+                            }
+                            .buttonStyle(.paper)
+                            .disabled(workspace.ssh == nil || workspace.state != "running")
+                            .help(workspace.ssh == nil ? "\(provider.name) gives no ssh destination for it: add it by command, then Link to Workspace… on its host."
+                                  : workspace.state == "running" ? "Installs Agents on it over ssh, and links the host to it."
+                                  : "Start it first: it has to be running to be installed.")
                         }
-                        .buttonStyle(.paper)
-                        .disabled(workspace.ssh == nil || workspace.state != "running")
-                        .help(workspace.ssh == nil ? "\(provider.name) gives no ssh destination for it: add it by command, then Link to Workspace… on its host."
-                              : workspace.state == "running" ? "Installs Agents on it over ssh, and links the host to it."
-                              : "Start it first: it has to be running to be installed.")
+                        .fixedSize()
                     }
                 }
             }
+        }
+    }
+
+    /// Link to existing host (#976): a host added by hand under the workspace's ssh alias,
+    /// such as `cws.devstack-d7539e59`, is linked to it rather than installed again.
+    @ViewBuilder
+    private func linkToExistingHost(_ workspace: DaemonAPI.WorkspaceInfo, of provider: DaemonAPI.ProviderSummary) -> some View {
+        let hosts = control.hostsThatMayBe(workspace)
+        if hosts.count == 1, let host = hosts.first {
+            Button("Link to \(host.name)") {
+                Task { await control.link(host.id, to: provider.id, workspace: workspace.id) }
+            }
+            .buttonStyle(.paper)
+            .help("\(host.name) may already be this workspace: links it, without installing again.")
+        } else if !hosts.isEmpty {
+            Menu("Link to Existing Host") {
+                ForEach(hosts) { host in
+                    Button(host.name) {
+                        Task { await control.link(host.id, to: provider.id, workspace: workspace.id) }
+                    }
+                }
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .help("These hosts may already be this workspace: links one, without installing again.")
         }
     }
 

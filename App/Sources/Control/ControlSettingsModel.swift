@@ -296,6 +296,13 @@ final class ControlSettingsModel {
         }
     }
 
+    /// The unlinked hosts that may already be `workspace`, added by hand under its ssh alias
+    /// (#976): Add as Host… offers to link one instead.
+    func hostsThatMayBe(_ workspace: DaemonAPI.WorkspaceInfo) -> [DaemonAPI.ControlHost] {
+        guard workspace.host == nil else { return [] }
+        return hosts.filter { $0.workspace == nil && $0.relay != true && workspace.mayBe(hostNamed: $0.name) }
+    }
+
     /// The workspaces no host is linked to yet, by provider, for Link to Workspace….
     var linkableWorkspaces: [(provider: DaemonAPI.ProviderSummary, workspaces: [DaemonAPI.WorkspaceInfo])] {
         providers.map { ($0, $0.workspaces) }.filter { !$0.1.isEmpty }
