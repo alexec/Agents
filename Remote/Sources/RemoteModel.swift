@@ -736,8 +736,27 @@ final class RemoteModel {
     var startingIn: URL? {
         didSet {
             guard startingIn != oldValue else { return }
-            if let startingIn { Task { await openStart(in: startingIn) } } else { closeStart() }
+            if let startingIn { Task { await openStart(in: startingIn) } } else { startPage.release(); closeStart() }
         }
+    }
+
+    /// The showing of the page that holds `startingIn` (#1044). The detail is rebuilt with
+    /// each pick, and the page it replaced can say it went after the new one said it came:
+    /// only the showing that holds the page lets it go.
+    @ObservationIgnored private var startPage = PageHold<URL>()
+
+    /// The page came on screen. Opened afresh each time, even in the same project: a
+    /// showing that went without saying so left nothing this one can trust.
+    func startPageAppeared(in folder: URL, page: UUID) {
+        startPage.appeared(folder, showing: page)
+        guard startingIn == folder else { startingIn = folder; return }
+        closeStart()
+        Task { await openStart(in: folder) }
+    }
+
+    /// The page went. Nothing, when another showing has taken it since.
+    func startPageDisappeared(_ page: UUID) {
+        if startPage.disappeared(page) { startingIn = nil }
     }
 
     /// What a ui:// view filled the page with (#834), for the page in its project to take
@@ -894,6 +913,14 @@ final class RemoteModel {
         guard picked != startRuntimeID || picked == nil else { return }
         startRuntimeID = picked
         Task { await loadStartChoices() }
+    }
+
+    /// Back in touch (#1044): a page whose choices failed, or never came, asks again, as
+    /// Try again would, rather than staying dead until the app is killed.
+    private func reopenStartChoices() async {
+        guard startPicked, startingIn != nil, !isStarting, startChoicesState != .ready else { return }
+        if startRuntimeID == nil { startRuntimeID = pickedStartRuntime }
+        await loadStartChoices()
     }
 
     /// Try again on the page: with no runtime to ask, the host's list is read again first.
@@ -1106,9 +1133,17 @@ final class RemoteModel {
     /// project cannot take a new agent. Refused by the Mac, its sentence is shown as it
     /// is. Lost on the way back, nothing is assumed: the start is kept, and settled by
     /// its request id once the Mac is heard from again.
-    func startAgent(prompt: String, attachments: [Attachment] = [], labels: [String] = []) async -> Bool {
+    func startAgent(prompt: String, attachments: [Attachment] = [], labels: [String] = [],
+                    in project: URL, page: UUID) async -> Bool {
         let words = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !words.isEmpty, !isStarting, let folder = startingIn else { return false }
+        guard !words.isEmpty, !isStarting else { return false }
+        // On screen but not held (#1044): held again, and said, rather than a Send that
+        // does nothing.
+        guard let folder = startingIn, folder == project else {
+            startPageAppeared(in: project, page: page)
+            startRefusal = "This page was opened again. Check its choices, then send."
+            return false
+        }
         if let refusal = startRefusalBeforeSending(in: folder) {
             startRefusal = refusal
             return false
@@ -2242,6 +2277,7 @@ final class RemoteModel {
             takeMilestones(milestones)
         }
         await settleUnsettledStart()
+        await reopenStartChoices()
         settleSelection()
         // Once the counts have landed, so the widget's number is this refresh's number.
         publishAttention()

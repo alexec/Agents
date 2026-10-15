@@ -25,10 +25,13 @@ struct StartAgentView: View {
     @FocusState private var focused: Bool
     /// Where an iPad's pointer is, for the Blobs to look at while the prompt has focus (#987).
     @State private var pointer: CGPoint?
+    /// This showing of the page (#1044): only it lets the page go when it goes.
+    @State private var page = UUID()
 
     var body: some View {
         form
         .onAppear {
+            model.startPageAppeared(in: project, page: page)
             let kept = StartDraftKeeper.shared.draft(in: project)
             text = kept?.text ?? ""
             attachments = kept?.attachments ?? []
@@ -51,7 +54,10 @@ struct StartAgentView: View {
         }
         .onChange(of: text) { keep() }
         .onChange(of: attachments) { keep() }
-        .onDisappear { StartDraftKeeper.shared.flush() }
+        .onDisappear {
+            StartDraftKeeper.shared.flush()
+            model.startPageDisappeared(page)
+        }
         // A start on a server with no key of its own asks for one here, over the page (#344).
         .tokenAskSheet(model)
     }
@@ -291,6 +297,6 @@ struct StartAgentView: View {
         guard canSend else { return }
         let words = text
         let attached = attachments
-        Task { _ = await model.startAgent(prompt: words, attachments: attached, labels: draftLabels) }
+        Task { _ = await model.startAgent(prompt: words, attachments: attached, labels: draftLabels, in: project, page: page) }
     }
 }
