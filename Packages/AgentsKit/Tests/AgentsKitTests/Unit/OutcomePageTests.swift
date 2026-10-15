@@ -51,6 +51,18 @@ struct OutcomePageTests {
         #expect(decoded == [.steps, .messages])
     }
 
+    /// A turn starts at Messages (#993). Closing it goes to the outcome, and opening it
+    /// again goes back to the level, or to Messages when the level is the outcome.
+    @Test func turnsStartAtMessagesAndToggleThroughTheOutcome() {
+        #expect(TurnDetail.initial == .messages)
+        let closed = TurnDetail.initial.toggled(level: .initial)
+        #expect(closed == .outcome)
+        #expect(closed.toggled(level: .initial) == .messages)
+        #expect(TurnDetail.details.toggled(level: .details) == .outcome)
+        #expect(TurnDetail.outcome.toggled(level: .details) == .details)
+        #expect(TurnDetail.outcome.toggled(level: .outcome) == .messages)
+    }
+
     @Test func aTurnIsItsAskAndEverythingAfterIt() throws {
         let turns = TranscriptEntry.display([ask("Fix it"), said("Looking."), call("1", "List files"),
                                              call("2"), said("Fixed.")]).turns()

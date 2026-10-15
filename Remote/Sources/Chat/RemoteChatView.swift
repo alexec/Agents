@@ -15,7 +15,7 @@ struct RemoteChatView: View {
     /// The subagent whose steps are open, by its id (057).
     @State private var subagentOnScreen: String?
     /// The level every turn starts at, chosen from the ··· menu (069).
-    @AppStorage(TurnDetail.phoneDefaultsKey) private var turnDetail = TurnDetail.outcome
+    @AppStorage(TurnDetail.phoneDefaultsKey) private var turnDetail = TurnDetail.initial
     @Environment(\.openURL) private var openURL
     /// The open chat's views (#187), torn down when another chat opens.
     @State private var views = AppViewStore()
@@ -409,7 +409,7 @@ private struct ChatMenu: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.poppedChat) private var popped
     @Environment(\.horizontalSizeClass) private var sizeClass
-    @AppStorage(TurnDetail.phoneDefaultsKey) private var turnDetail = TurnDetail.outcome
+    @AppStorage(TurnDetail.phoneDefaultsKey) private var turnDetail = TurnDetail.initial
     let agent: Agent
     /// Open File… (#415), over the chat.
     let openFile: () -> Void

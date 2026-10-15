@@ -113,7 +113,7 @@ The deltas are tracked by 30 issues:
 
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
-| Outcome / Messages / Steps / Details, and the chooser (069, Messages #759) | View ▸ Turns: `A/Commands/AgentsCommands.swift` | ··· ▸ Turns show: `R/Chat/RemoteChatView.swift` | A select in the chat's head, kept: `W/views/Chat.tsx` | **same** |
+| Outcome / Messages / Steps / Details, and the chooser (069, Messages #759); Messages until a level is chosen (#993, `TurnDetail.initial`) | View ▸ Turns: `A/Commands/AgentsCommands.swift`; Details for someone who had Show Thinking on: `A/Chat/TurnDisplay.swift` | ··· ▸ Turns show: `R/Chat/RemoteChatView.swift` | A select in the chat's head, kept: `W/views/Chat.tsx`, `W/model/turnDetail.ts` | **same** (#993) |
 | Messages: every step but thinking, a run of calls drawn as its last call until clicked, then as Steps draws it; *N steps* from Outcome opens to Messages (#759) | `TurnDetail.messages` in `K/Model/OutcomePage.swift`, `StepRow` in `S/Chat/TranscriptRows.swift`, toggle in `S/Chat/ChatTranscript.swift` | Shared | `StepRow` in `W/views/chat/Rows.tsx`, toggle in `W/views/Chat.tsx` | **same** (unwalked) |
 | Reconnect catch-up keeps one row per turn and entry id (#221) | `K/Client/AgentsModel.swift`; rows deduplicated in `S/Chat/ChatTranscript.swift` | Shared | `W/model/store.ts` | **same** |
 | Concise turn: prompt, *7 steps*, reply, report; no chevron (#148) | `S/Chat/TranscriptRows.swift:38-158` | Shared | `W/views/chat/Rows.tsx:345-399` (walked, #148) | **same** |

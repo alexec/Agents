@@ -39,6 +39,16 @@ public enum TurnDetail: String, CaseIterable, Codable, Hashable, Sendable {
 
     /// Where the phone keeps its choice. The Mac scopes its own by root.
     public static let phoneDefaultsKey = "turnDetail"
+
+    /// The level before anyone has chosen one, on every client (#993).
+    public static let initial = TurnDetail.messages
+
+    /// A turn opened or closed by its *N steps*, from `self` with the app at `level`.
+    /// Open is the level when it shows steps and Messages when it does not (#759);
+    /// closed is always the outcome, never a trip through Details.
+    public func toggled(level: TurnDetail) -> TurnDetail {
+        showsSteps ? .outcome : (level.showsSteps ? level : .messages)
+    }
 }
 
 /// One turn of a conversation: what the person asked, and everything up to the next ask.
