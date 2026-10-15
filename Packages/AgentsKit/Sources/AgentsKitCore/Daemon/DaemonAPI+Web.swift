@@ -84,6 +84,8 @@ public extension DaemonAPI {
                 Row(Method.usageHistory, params: Empty.self, result: UsageHistory.self, kind: .hostRequest),
                 // The Time page (#852).
                 Row(Method.timeHistory, params: Empty.self, result: TimeHistory.self, kind: .hostRequest),
+                // The Time page's milestones (#984).
+                Row(Method.milestonesState, params: Empty.self, result: Milestones.self, kind: .hostRequest),
                 Row(Method.eventsList, params: EventsListRequest.self, result: EventsPage.self, kind: .hostRequest),
                 Row(Method.leasesSnapshot, params: Empty.self, result: LeaseSnapshot.self, kind: .hostRequest),
                 // The MCP servers the host runs for every agent (#488), for the Resources page.
@@ -260,6 +262,7 @@ public extension DaemonAPI {
                     kind: .hostNotification),
                 Row(Notification.diskChanged, params: DiskState.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.worktreesSized, params: WorktreesSized.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.milestonesChanged, params: Milestones.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.storeNotesChanged, params: StoreNotes.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.pinsChanged, params: PinsChangedNotification.self, result: Empty.self,

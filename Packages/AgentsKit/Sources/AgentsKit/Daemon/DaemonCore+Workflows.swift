@@ -376,6 +376,7 @@ extension DaemonCore {
                       DaemonAPI.WorkflowRemovedNotification(folder: standardized, workflowID: id))
         }
         guard !moved.isEmpty || !gone.isEmpty else { return }
+        if !moved.isEmpty { checkMilestones() }
         // A server's event a workflow names, or no longer does (#383).
         scheduleMCPEventsReconcile()
         if !gone.isEmpty { pruneWorkflowStates() }

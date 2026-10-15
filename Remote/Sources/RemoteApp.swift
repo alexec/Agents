@@ -137,6 +137,17 @@ struct RemoteView: View {
             .id(model.sidebarItem)
         }
         .navigationSplitViewStyle(.balanced)
+        // A milestone just earned (#984), on the iPad: once, until closed or opened.
+        .overlay(alignment: .bottomTrailing) {
+            if let milestone = model.milestoneCard {
+                MilestoneCard(milestone: milestone,
+                              open: { model.dismissMilestone(milestone); model.sidebarItem = .time },
+                              dismiss: { model.dismissMilestone(milestone) })
+                    .frame(maxWidth: 320)
+                    .shadow(color: .black.opacity(0.12), radius: 8, y: 2)
+                    .padding(20)
+            }
+        }
         // Something picked, here or from a banner, a widget or a start, is shown; back to
         // the list on a phone puts it down, so the same row opens it again.
         .onChange(of: model.sidebarItem) { _, item in

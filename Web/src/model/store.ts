@@ -10,7 +10,7 @@ import type {
   StartRequest, UUID, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
   ChatProjectState, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
-  GuardedChange, GuardedChangeReading, HostJoinStatus, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory,
+  GuardedChange, GuardedChangeReading, HostJoinStatus, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized,
 } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
@@ -32,6 +32,7 @@ import { keyKind, takesKey, wantedRuntime } from "./credentials";
 import type { Method, Params, Result } from "../protocol/methods";
 import { dropboxRefusal, dropboxRequest } from "./dropbox";
 import { goOnRequest } from "./limits";
+import { milestonesSeen } from "./milestones";
 import type { ChartHint } from "./chart";
 
 export { folderKey } from "./groups";
@@ -352,6 +353,13 @@ export class Work {
   readonly worktreeSizes = signal<Record<string, Record<string, WorktreeSize>>>({});
   /** Each host's files it could not read in this run (#205, #223), replaced whole by each store/notesChanged. */
   readonly storeNotes = signal<Record<string, string[]>>({});
+  /** Each host's milestones (#984), replaced whole by each milestones/changed. */
+  readonly milestones = signal<Record<string, Milestones>>({});
+
+  protected takeMilestones(host: string, milestones: Milestones): void {
+    this.milestones.value = { ...this.milestones.value, [host]: milestones };
+    milestonesSeen.take(milestones);
+  }
   /** The control plane's machine, and how this Mac's host says its join stands (#666), from `control/status`. */
   readonly plane = signal<{ machineID: string; thisMacHost?: HostJoinStatus | undefined } | null>(null);
   /** Why this Mac's host is quiet, as the window says it (#666), or nil while it is online. */
@@ -524,6 +532,9 @@ export class Work {
       }
       case "store/notesChanged":
         this.storeNotes.value = { ...this.storeNotes.value, [host]: (params as StoreNotes).notes };
+        return true;
+      case "milestones/changed":
+        this.takeMilestones(host, params as Milestones);
         return true;
       case "modes/changed":
         this.rememberedModes.value = { ...this.rememberedModes.value, [host]: params as Record<string, JSONValue> };
@@ -1255,6 +1266,9 @@ export class Store extends Work {
     void this.link.call("store/notes", {}, host).then((state) => {
       this.storeNotes.value = { ...this.storeNotes.value, [host]: state.notes };
     }).catch(failed("store/notes"));
+    // A host from before #984 doesn't know it: the Time page shows no milestones.
+    void this.link.call("milestones/state", {}, host).then((state) => this.takeMilestones(host, state))
+      .catch(failed("milestones/state"));
     const [permissions, elicitations] = await Promise.all([
       this.link.call("permissions/pending", {}, host).catch(failed("permissions/pending")),
       this.link.call("elicitations/pending", {}, host).catch(failed("elicitations/pending")),

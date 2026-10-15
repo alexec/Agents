@@ -14,6 +14,7 @@ extension DaemonCore {
                                                  resuming: stillResuming())
         snapshot.disk = diskState()
         snapshot.storeNotes = storeNotes()
+        snapshot.milestones = milestones()
         let parts = Set(request.parts)
         if parts.contains(.workflows) { snapshot.workflows = allWorkflows() }
         if parts.contains(.pins) { snapshot.pins = pinsList() }

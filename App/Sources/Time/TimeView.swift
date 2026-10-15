@@ -10,9 +10,11 @@ struct TimeView: View {
 
     var body: some View {
         ScrollView {
-            TimeChartsSection(load: { await model.timeHistory() })
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(24)
+            TimeMilestonesAround(milestones: model.work.milestones) {
+                TimeChartsSection(load: { await model.timeHistory() })
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(24)
         }
         .navigationTitle("Time")
     }

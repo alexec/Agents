@@ -27,6 +27,7 @@ import { Sidebar } from "./Sidebar";
 import { ActivityPageView } from "./Activity";
 import { SettingsPage } from "./Settings";
 import { ContextMenu } from "./ContextMenu";
+import { MilestoneCard } from "./MilestoneCard";
 
 export function Columns({ session, store }: { session: Session; store: Store }) {
   const r = route.value;
@@ -78,6 +79,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
       <DropboxDialog store={store} />
       <TokenAskDialog store={store} />
       <ContextMenu />
+      <MilestoneCard store={store} />
     </div>
   );
 }

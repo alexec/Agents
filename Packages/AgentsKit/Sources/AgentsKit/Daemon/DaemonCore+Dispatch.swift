@@ -32,6 +32,7 @@ extension DaemonCore {
             }
         }
         if let caller { keepAppToolCall(caller, method: method, params: params, answer: answer, began: began) }
+        if case .success = answer { noteMilestones(method: method, role: role) }
         return answer
     }
 
@@ -683,6 +684,9 @@ extension DaemonCore {
                 return .success(try JSONValue.encoding(usageHistory()))
             case DaemonAPI.Method.timeHistory:
                 return .success(try JSONValue.encoding(timeHistory()))
+
+            case DaemonAPI.Method.milestonesState:
+                return .success(try JSONValue.encoding(milestones()))
 
             // Asked once by a window on connecting. A window opened while a hold was
             // already in place heard no broadcast, and would otherwise say nothing

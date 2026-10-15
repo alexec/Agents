@@ -21,6 +21,7 @@ import { refusalMessage } from "../model/workflows";
 import { dayTokenLimitReached } from "../model/limits";
 import { UsageCharts } from "./UsageCharts";
 import { TimeCharts } from "./TimeCharts";
+import { TimeMilestonesAround } from "./Milestones";
 
 function navigate(destination: { host: string; project: string; session?: string; workflow?: string }): void {
   const parts = ["h", destination.host, "p", destination.project];
@@ -465,7 +466,12 @@ function TimePage({ store }: { store: Store }) {
     return () => clearInterval(every);
   }, [host]);
   const runtimeName = (id: string) => (host && store.runtimes.value[host]?.find((s) => s.runtime.id === id)?.runtime.name) || id;
-  return host ? <TimeCharts history={store.time.value[host]} runtimeName={runtimeName} /> : <p class="quiet">No host is connected.</p>;
+  if (!host) return <p class="quiet">No host is connected.</p>;
+  return (
+    <TimeMilestonesAround milestones={store.milestones.value[host]}>
+      <TimeCharts history={store.time.value[host]} runtimeName={runtimeName} />
+    </TimeMilestonesAround>
+  );
 }
 
 /** What the work used in tokens (#956): the charts in tokens, then each host's day against its token limits. */

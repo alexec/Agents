@@ -76,6 +76,16 @@ struct ProjectListView: View {
                         .selectionDisabled()
                 }
             }
+            // A milestone just earned (#984): once, until closed or opened.
+            if let milestone = model.milestoneCard {
+                Section {
+                    MilestoneCard(milestone: milestone,
+                                  open: { model.dismissMilestone(milestone); picked = [.time] },
+                                  dismiss: { model.dismissMilestone(milestone) })
+                        .listRowSeparator(.hidden)
+                        .selectionDisabled()
+                }
+            }
 
             // What wants the person, across every project and host (#495): Things'
             // Inbox and Today, Mail's smart mailboxes, each drawn only with something in
