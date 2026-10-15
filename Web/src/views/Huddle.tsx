@@ -10,11 +10,14 @@ import { useEffect, useRef, useState } from "preact/hooks";
 
 type Look = { x: number; y: number };
 
-/** In the mark's own units (`design/logo/three-blobs/B.svg`), the two at the back first. */
+/**
+ * In the mark's own units (`design/logo/three-blobs/B.svg`), the two at the back first. Each Blob's eyes
+ * take their own time (`pace`) and wait their own beat (`lag`), in seconds, so the three never move as one.
+ */
 const BLOBS = [
-  { cx: 300, cy: 430, tilt: -8, scale: 0.5, fill: "#CFE3FF", facing: 20 },
-  { cx: 724, cy: 430, tilt: 8, scale: 0.5, fill: "#CFE3FF", facing: -20 },
-  { cx: 512, cy: 600, tilt: 0, scale: 0.62, fill: "#fff", facing: 0 },
+  { cx: 300, cy: 430, tilt: -8, scale: 0.5, fill: "#CFE3FF", facing: 20, pace: 0.55, lag: 0.12 },
+  { cx: 724, cy: 430, tilt: 8, scale: 0.5, fill: "#CFE3FF", facing: -20, pace: 0.7, lag: 0.25 },
+  { cx: 512, cy: 600, tilt: 0, scale: 0.62, fill: "#fff", facing: 0, pace: 0.4, lag: 0 },
 ];
 /** The part of the mark's 1024 square the three Blobs and their outlines cover. */
 const BOX = { x: 115, y: 249, width: 794, height: 548 };
@@ -54,14 +57,14 @@ export function Huddle({ focused, typed, height = 72 }: { focused: boolean; type
     return () => window.clearTimeout(timer);
   }, [still]);
 
-  // Mostly one at a time; now and then all three together.
+  // One at a time, never all three together.
   useEffect(() => {
     if (still) return;
     let timer = 0;
     const next = () => {
       timer = window.setTimeout(() => {
-        const which = Math.random() < 0.25 ? [0, 1, 2] : [Math.floor(Math.random() * 3)];
-        setBlinking((b) => b.map((v, i) => v || which.includes(i)));
+        const which = Math.floor(Math.random() * 3);
+        setBlinking((b) => b.map((v, i) => v || i === which));
         timer = window.setTimeout(() => {
           setBlinking([false, false, false]);
           next();
@@ -113,7 +116,8 @@ export function Huddle({ focused, typed, height = 72 }: { focused: boolean; type
           <g key={index} transform={`translate(${blob.cx} ${blob.cy}) rotate(${blob.tilt}) scale(${blob.scale})`}>
             <path d={BODY} fill="none" stroke="#3A78E6" stroke-width="56" stroke-linejoin="round" />
             <path d={BODY} fill={blob.fill} />
-            <g class="huddle-eyes" style={{ transform: `translate(${blob.facing + eyes.x * 40}px, ${eyes.y * 32}px)` }}>
+            <g class="huddle-eyes" style={{ transform: `translate(${blob.facing + eyes.x * 18}px, ${eyes.y * 32}px)`,
+              transitionDuration: `${blob.pace}s`, transitionDelay: `${blob.lag}s` }}>
               {[-92, 92].map((x) => (
                 <ellipse key={x} class={blinking[index] ? "huddle-eye shut" : "huddle-eye"} cx={x} cy={-30} rx={46} ry={62} fill="#0E1A3A" />
               ))}

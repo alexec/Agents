@@ -38,10 +38,11 @@ struct Huddle: View {
                     .frame(width: Blob.size.width * blob.scale * unit, height: Blob.size.height * blob.scale * unit)
                     .rotationEffect(.degrees(blob.tilt))
                     .position(x: (blob.centre.x - Self.box.minX) * unit, y: (blob.centre.y - Self.box.minY) * unit)
+                    // Each at its own pace and a beat apart, so the three never move as one.
+                    .animation(.spring(duration: blob.pace).delay(blob.lag), value: look(index))
             }
         }
         .frame(width: Self.box.width * unit, height: height)
-        .animation(.spring(duration: 0.45), value: gaze)
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
         .onChange(of: pointer) { pointerResting = false }
         // Each move starts the wait again; a still pointer gives the prompt back.
@@ -53,9 +54,6 @@ struct Huddle: View {
         .task(id: reduceMotion) { await blink() }
         .accessibilityHidden(true)
     }
-
-    /// What decides where the eyes are, so a change to it is what animates them.
-    private var gaze: [CGVector] { Self.blobs.indices.map(look) }
 
     /// Where blob `index` looks: x and y of at most 1, from straight ahead.
     private func look(_ index: Int) -> CGVector {
@@ -102,11 +100,11 @@ struct Huddle: View {
         while !Task.isCancelled {
             try? await Task.sleep(for: .seconds(.random(in: 2.5...5.5)))
             if Task.isCancelled { return }
-            // Mostly one at a time; now and then all three together.
-            let which = Double.random(in: 0..<1) < 0.25 ? [0, 1, 2] : [Int.random(in: 0..<3)]
-            withAnimation(.easeIn(duration: 0.07)) { for index in which { blinking[index] = true } }
+            // One at a time, never all three together.
+            let index = Int.random(in: 0..<3)
+            withAnimation(.easeIn(duration: 0.07)) { blinking[index] = true }
             try? await Task.sleep(for: .milliseconds(130))
-            withAnimation(.easeOut(duration: 0.1)) { for index in which { blinking[index] = false } }
+            withAnimation(.easeOut(duration: 0.1)) { blinking[index] = false }
         }
     }
 
@@ -118,13 +116,16 @@ struct Huddle: View {
         let fill: Color
         /// Where its face points: the two at the back look in, at the front one.
         let facing: CGFloat
+        /// How long its eyes take to get where they look, and how long they wait to start.
+        let pace: Double
+        let lag: Double
     }
 
     /// In drawing order: the two at the back, then the one in front of them.
     private static let blobs = [
-        Placed(centre: CGPoint(x: 300, y: 430), tilt: -8, scale: 0.5, fill: Blob.backFill, facing: 20),
-        Placed(centre: CGPoint(x: 724, y: 430), tilt: 8, scale: 0.5, fill: Blob.backFill, facing: -20),
-        Placed(centre: CGPoint(x: 512, y: 600), tilt: 0, scale: 0.62, fill: .white, facing: 0),
+        Placed(centre: CGPoint(x: 300, y: 430), tilt: -8, scale: 0.5, fill: Blob.backFill, facing: 20, pace: 0.55, lag: 0.12),
+        Placed(centre: CGPoint(x: 724, y: 430), tilt: 8, scale: 0.5, fill: Blob.backFill, facing: -20, pace: 0.7, lag: 0.25),
+        Placed(centre: CGPoint(x: 512, y: 600), tilt: 0, scale: 0.62, fill: .white, facing: 0, pace: 0.4, lag: 0),
     ]
 
     /// The part of the mark's 1024 square the three Blobs and their outlines cover.
@@ -150,7 +151,7 @@ struct Blob: View {
     var body: some View {
         GeometryReader { proxy in
             let unit = proxy.size.width / Self.size.width
-            let eyes = CGPoint(x: facing + look.dx * 40, y: -30 + look.dy * 32)
+            let eyes = CGPoint(x: facing + look.dx * 18, y: -30 + look.dy * 32)
             ZStack {
                 BlobShape().stroke(Self.outline, style: StrokeStyle(lineWidth: 56 * unit, lineJoin: .round))
                 BlobShape().fill(fill)
