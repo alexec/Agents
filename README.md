@@ -37,7 +37,8 @@ Linux server becomes a host by running one command the window shows. See
 [Set up Agents on this Mac](https://www.alexecollins.com/agents/how-to/set-up-on-this-mac/)
 and [The control plane](https://www.alexecollins.com/agents/explanation/control-plane/).
 
-Neither app is in the App Store yet, so today both are built from source.
+Neither app is in the App Store yet. The alpha is on TestFlight, and Agents Host is its
+own download. Building from source, below, is for working on Agents.
 
 ## Build and run
 

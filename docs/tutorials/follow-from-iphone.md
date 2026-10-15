@@ -22,21 +22,16 @@ agent started and finished from the phone without going back to the Mac.
 - Agents Host runs on your Mac, and the Agents window is paired with it. See
   [Set up Agents on this Mac](../how-to/set-up-on-this-mac.md).
 - Your iPhone and your Mac are on the same Wi-Fi network.
-- You have Xcode and a free Apple developer account, so that Xcode can put an app on
-  your own phone.
+- Your invitation to the Agents alpha on TestFlight, and the **TestFlight** app on your
+  iPhone.
 
 ## 1. Put Agents on your iPhone
 
-Agents is not in the App Store yet, so you build it onto your phone from the same copy of
-the source you built the Mac app from.
+Agents is not in the App Store yet. The alpha is on TestFlight, the same build as the Mac
+window.
 
-1. Connect your iPhone to your Mac with a cable, and unlock it.
-2. In Xcode, choose the **Remote** scheme, then choose your iPhone as the destination.
-3. Choose **Product ▸ Run**.
-
-The first time, Xcode asks you to pick a team for signing. Pick your own. Your phone may
-also ask you to trust the developer, under **Settings ▸ General ▸ VPN & Device
-Management**.
+1. On your iPhone, open **TestFlight**, choose **Agents**, and tap **Install**.
+2. Open Agents.
 
 You should see Agents open on your phone and say **Connect to your agents**.
 

@@ -55,7 +55,7 @@ configured by hand to make workspaces.
 
 The command provider is the `workspace-commands` binary. The control plane looks for it
 beside itself, then where `AGENTS_WORKSPACE_COMMANDS` says, then on its `PATH`. Its configuration is described in full in
-[its contract](https://github.com/alexec/Agents/blob/main/specs/691-workspace-providers/contracts/command-provider.md).
+[Workspace providers](../reference/workspace-providers.md#the-command-provider).
 
 ## A tool map, for a provider's own MCP server
 
