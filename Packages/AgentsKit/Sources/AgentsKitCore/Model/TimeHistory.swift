@@ -14,15 +14,51 @@ public struct TimeHistory: Codable, Sendable, Hashable {
     public var days: [String: [String: TimeBucket]]
     /// The host's hour when this was read, as `UsageHistory.now`.
     public var now: String
+    /// `yyyy-MM-dd`, then the day's recap figures (#985): kept for as many days as `days`.
+    public var recap: [String: DayRecap]
+    /// The person's records (#985): a handful of values, kept for ever.
+    public var records: TimeRecords
 
     public init(hours: [String: [String: TimeBucket]] = [:],
-                days: [String: [String: TimeBucket]] = [:], now: String = "") {
+                days: [String: [String: TimeBucket]] = [:], now: String = "",
+                recap: [String: DayRecap] = [:], records: TimeRecords = TimeRecords()) {
         self.hours = hours
         self.days = days
         self.now = now
+        self.recap = recap
+        self.records = records
     }
 
-    public var isEmpty: Bool { hours.isEmpty && days.isEmpty }
+    private enum CodingKeys: String, CodingKey { case hours, days, now, recap, records }
+
+    /// A file written before #985 has no recap or records.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        hours = try container.decode([String: [String: TimeBucket]].self, forKey: .hours)
+        days = try container.decode([String: [String: TimeBucket]].self, forKey: .days)
+        now = try container.decode(String.self, forKey: .now)
+        recap = try container.decodeIfPresent([String: DayRecap].self, forKey: .recap) ?? [:]
+        records = try container.decodeIfPresent(TimeRecords.self, forKey: .records) ?? TimeRecords()
+    }
+
+    public var isEmpty: Bool { hours.isEmpty && days.isEmpty && recap.isEmpty }
+
+    /// Change a day's recap, and take what it now says as records where they beat the
+    /// ones held.
+    public mutating func changeRecap(_ day: String, _ change: (inout DayRecap) -> Void) {
+        var recap = self.recap[day] ?? DayRecap()
+        change(&recap)
+        self.recap[day] = recap
+        records.note(recap, day: day)
+    }
+
+    /// What `gh` said about the pull requests merged on each of these days. A day it
+    /// named none of is a day with none.
+    public mutating func setPRsMerged(_ counts: [String: Int], on days: [String]) {
+        for day in days {
+            changeRecap(day) { $0.prsMerged = counts[day] ?? 0 }
+        }
+    }
 
     /// Add a stretch of one kind of time, split across the hours it covers, so no hour
     /// holds more than happened in it.
@@ -61,6 +97,8 @@ public struct TimeHistory: Codable, Sendable, Hashable {
         hours = hours.filter { hoursKept.contains($0.key) }
         let daysKept = Set(days.keys.sorted().suffix(UsageHistory.daysKept))
         days = days.filter { daysKept.contains($0.key) }
+        let recapKept = Set(recap.keys.sorted().suffix(UsageHistory.daysKept))
+        recap = recap.filter { recapKept.contains($0.key) }
     }
 }
 

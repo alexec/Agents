@@ -343,6 +343,13 @@ for (const scene of scenes) {
       say(`runtimes: ${JSON.stringify(await page.eval(`(() => { const s = document.querySelector(".new-agent select[aria-label='Runtime']");
         s.size = s.options.length; return { options: [...s.options].map((o) => o.textContent), chosen: s.value }; })()`))}`);
       await shot("runtimes");
+    } else if (scene === "time") {
+      // #985: the recap over the Time page's bars, then the records.
+      await page.eval(`location.hash = "#/a/time"`);
+      await page.waitFor(`document.querySelector(".time-recap-table")`, 30_000);
+      say(`recap: ${JSON.stringify(await visible(".time-recap-table tr"))}`);
+      say(`records: ${JSON.stringify(await visible(".time-recap .usage-share"))}`);
+      await shot("time");
     } else if (scene === "identity") {
       // #111: the footer names the browser, and no grant.
       say(`footer: ${JSON.stringify(await page.text(".identity"))}`);

@@ -623,6 +623,13 @@ export interface CredentialsOffer {
   signIns?: string[];
 }
 
+export interface DayRecap {
+  prsMerged?: number;
+  agents: number;
+  peakAgents: number;
+  longestClear: number;
+}
+
 export interface DeclaredResource {
   name: ResourceName;
   displayName: string;
@@ -1791,6 +1798,19 @@ export interface TimeHistory {
   hours: Record<string, Record<string, TimeBucket>>;
   days: Record<string, Record<string, TimeBucket>>;
   now: string;
+  recap: Record<string, DayRecap>;
+  records: TimeRecords;
+}
+
+export interface TimeRecord {
+  value: number;
+  day: string;
+}
+
+export interface TimeRecords {
+  mostAgents?: TimeRecord;
+  mostPRs?: TimeRecord;
+  longestClear?: TimeRecord;
 }
 
 export interface ToolCall {
@@ -2604,6 +2624,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   CostState: { required: ["limits", "today", "day", "tokensToday"], optional: ["note"] },
   CredentialsLend: { required: ["runtime", "kind", "secret"], optional: [] },
   CredentialsOffer: { required: ["runtimes", "ownSignInOnly"], optional: ["notRelayed", "signIns"] },
+  DayRecap: { required: ["agents", "peakAgents", "longestClear"], optional: ["prsMerged"] },
   DeclaredResource: { required: ["name", "displayName", "description", "holders"], optional: ["defaultMinutes", "maximumMinutes"] },
   DiffLine: { required: ["kind", "text"], optional: ["newLine"] },
   DirectoryEntry: { required: ["url", "name", "isDirectory"], optional: ["size", "modifiedAt"] },
@@ -2748,7 +2769,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SwitchRecord: { required: ["id", "at", "agentID", "from", "to", "reason", "carried", "dropped", "billing"], optional: ["shortened", "fromReturnsAt"] },
   SwitchRecordSide: { required: ["runtimeID"], optional: ["entryID", "model", "mode"] },
   TimeBucket: { required: ["agent", "tools", "others", "person", "turns"], optional: [] },
-  TimeHistory: { required: ["hours", "days", "now"], optional: [] },
+  TimeHistory: { required: ["hours", "days", "now", "recap", "records"], optional: [] },
+  TimeRecord: { required: ["value", "day"], optional: [] },
+  TimeRecords: { required: [], optional: ["mostAgents", "mostPRs", "longestClear"] },
   ToolCall: { required: ["title", "content", "locations"], optional: ["toolCallID", "name", "kind", "status", "rawInput", "rawOutput", "raw"] },
   ToolCallLocation: { required: ["path"], optional: ["line"] },
   TranscriptEntry: { required: ["id", "at", "kind"], optional: ["subagentID", "sender"] },
