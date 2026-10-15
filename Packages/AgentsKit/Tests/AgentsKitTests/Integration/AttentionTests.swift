@@ -192,7 +192,7 @@ struct AttentionTests {
         try await settled()
         #expect(await core.attentionPending().needs.isEmpty)
         #expect(heard.deliveries.count == 1, "told once: \(heard.deliveries.map(\.to))")
-        #expect(await core.agent(id)?.group(wantsEyes: false) == .needsAttention)
+        #expect(await core.agent(id)?.group() == .needsAttention)
         let written = try await AgentStore(locations: locations).load(id).agent
         #expect(written.reportIsSeen, "on the record, for the next daemon")
     }
@@ -630,7 +630,7 @@ struct ReadingTests {
                                        from: mac.surface, connection: mac.connection)
         if case .failure(let error) = marked { Issue.record("refused: \(error.message)") }
         #expect(await core.agent(id)?.isUnread == true)
-        #expect(await core.agent(id)?.group(wantsEyes: false) == .finished, "marking it moves nothing")
+        #expect(await core.agent(id)?.group() == .finished, "marking it moves nothing")
         await mac.report(core, watching: id, active: true)
         #expect(await core.agent(id)?.isUnread == true, "the same report again is not opening it")
         await mac.report(core, watching: nil, active: true)

@@ -124,7 +124,7 @@ struct BlockedTests {
         let note = try await finish(core, leadToken, "blocked", "Waiting on both helpers.",
                                     waitingOn: [first.uuidString, "update the tests"])
         #expect(note.contains("under \"Waiting\""))
-        #expect(await core.agent(lead)?.group(wantsEyes: false) == .waiting)
+        #expect(await core.agent(lead)?.group() == .waiting)
         try await finish(core, firstToken, "done", "Ported.")
         firstGate.open()
 
@@ -369,7 +369,7 @@ struct BlockedTests {
         let stopped = try #require(await core.agent(lead))
         #expect(stopped.state == .stopped)
         #expect(stopped.endedReason == .cancelled)
-        #expect(stopped.group(wantsEyes: false) == .stopped)
+        #expect(stopped.group() == .stopped)
         try await finish(core, helperToken, "done", "Done.")
         helperGate.open()
         await settled(core, helper)
@@ -431,7 +431,7 @@ struct BlockedTests {
         let after = try #require(await core.agent(leadID))
         #expect(after.report?.message.hasPrefix("Could not carry on after the block cleared") == true)
         #expect(after.queuedPrompts.isEmpty)
-        #expect(after.group(wantsEyes: false) == .needsAttention)
+        #expect(after.group() == .needsAttention)
     }
 
     // MARK: US4 — a time to check again
@@ -469,7 +469,7 @@ struct BlockedTests {
         await core.tickWorkflows(now: Date().addingTimeInterval(86_400 * 2))
         try await quiet()
         #expect(try await resumes(core, lead).isEmpty)
-        #expect(await core.agent(lead)?.group(wantsEyes: false) == .needsAttention)
+        #expect(await core.agent(lead)?.group() == .needsAttention)
     }
 
     // MARK: FR-020 — restarts

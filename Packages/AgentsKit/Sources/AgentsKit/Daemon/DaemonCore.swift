@@ -1290,8 +1290,8 @@ public actor DaemonCore {
             // a question, stuck, blocked, a crash — wants them again. Partly done goes
             // with it: the session asks under Needs you, and the person decides.
             let wantsThePerson = agent.report.map { next == .finished && !AfterTurn.requestArchive.goes(with: $0.outcome) }
-                ?? (agent.group(wantsEyes: false) == .needsAttention)
-            if wantsThePerson || (next == .stopped && agent.group(wantsEyes: false) == .needsAttention) {
+                ?? (agent.group() == .needsAttention)
+            if wantsThePerson || (next == .stopped && agent.group() == .needsAttention) {
                 agent.archiveRequest = nil
             } else if asked, archiveWhenDone[agentID] == nil {
                 if endedAsAsked, let note = helperArchivesWithoutAsking(agentID, agent: agent) {

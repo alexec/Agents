@@ -70,11 +70,8 @@ function settled(wantsAPerson: boolean, report: WorkReport | undefined, waitingO
   return "finished";
 }
 
-/**
- * Agent.group(wantsEyes:). `wantsEyes` is the window's own fact (a file it was asked to show);
- * the web remote is not a window, so it passes false, which is honest from anything else.
- */
-export function groupOf(agent: Agent, wantsEyes = false): AgentGroup {
+/** Agent.group(). A shown file is never a group (#1057). */
+export function groupOf(agent: Agent): AgentGroup {
   const report = agent.report;
   const wantsAnswer = report !== undefined && outcomeNeedsAPerson(report.outcome);
   const outcomeAsked = agent.outcomeAsked === true;
@@ -83,10 +80,10 @@ export function groupOf(agent: Agent, wantsEyes = false): AgentGroup {
     case "starting": return "running";
     case "waitingOnUser": return "needsAttention";
     case "running":
-      if (outcomeAsked) return settled(wantsEyes || wantsAnswer || report === undefined, report, waitingOnEvents);
-      return wantsEyes ? "needsAttention" : "running";
+      if (outcomeAsked) return settled(wantsAnswer || report === undefined, report, waitingOnEvents);
+      return "running";
     case "finished":
-      return settled(wantsEyes || wantsAnswer || (outcomeAsked && report === undefined), report, waitingOnEvents);
+      return settled(wantsAnswer || (outcomeAsked && report === undefined), report, waitingOnEvents);
     case "stopped":
       // The daemon never sends allowanceWait, so the Mac's "waiting for an allowance" arm is absent.
       return pausedEndings.includes(agent.endedReason) ? "stopped" : "needsAttention";

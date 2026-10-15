@@ -24,17 +24,17 @@ struct AgentGroupTests {
     /// never moves it.
     @Test func finishedAndUnreadIsDone() {
         var completed = agent(.finished, report: .done, endedReason: .endTurn, unread: true)
-        #expect(completed.group(wantsEyes: false) == .finished)
+        #expect(completed.group() == .finished)
         #expect(completed.showsUnread)
         completed.isUnread = false
-        #expect(completed.group(wantsEyes: false) == .finished)
+        #expect(completed.group() == .finished)
     }
 
     /// #584: a request to archive is a mark on the row too, never a group.
     @Test func askingToBeArchivedStaysInDone() {
         var asking = agent(.finished, report: .done, endedReason: .endTurn, unread: true)
         asking.archiveRequest = .requested(at: Date())
-        #expect(asking.group(wantsEyes: false) == .finished)
+        #expect(asking.group() == .finished)
         #expect(asking.asksToArchive)
         #expect(asking.showsUnread)
     }
@@ -43,13 +43,11 @@ struct AgentGroupTests {
     @Test func whatNeedsYouStaysWhetherReadOrNot() {
         for unread in [false, true] {
             var asked = agent(.finished, report: .needsAnswer, endedReason: .endTurn, unread: unread)
-            #expect(asked.group(wantsEyes: false) == .needsAttention)
+            #expect(asked.group() == .needsAttention)
             asked.report = nil
             asked.outcomeAsked = true
-            #expect(asked.group(wantsEyes: false) == .needsAttention, "an unaccounted ending")
-            #expect(agent(.waitingOnUser, unread: unread).group(wantsEyes: false) == .needsAttention)
-            #expect(agent(.finished, report: .done, endedReason: .endTurn, unread: unread)
-                .group(wantsEyes: true) == .needsAttention, "a file it asked the person to look at")
+            #expect(asked.group() == .needsAttention, "an unaccounted ending")
+            #expect(agent(.waitingOnUser, unread: unread).group() == .needsAttention)
         }
     }
 
@@ -63,32 +61,32 @@ struct AgentGroupTests {
     @Test func unaccountedOutcomesNeedReview() {
         var unknown = agent(.finished, endedReason: .endTurn)
         unknown.outcomeAsked = true
-        #expect(unknown.group(wantsEyes: false) == .needsAttention)
+        #expect(unknown.group() == .needsAttention)
     }
 
     @Test func manualBlocksNeedYouAndAutomaticWaitsDoNot() {
         var blocked = agent(.finished, report: .blocked, endedReason: .endTurn)
-        #expect(blocked.group(wantsEyes: false) == .needsAttention)
+        #expect(blocked.group() == .needsAttention)
         blocked.report = WorkReport(outcome: .blocked, message: "Waiting", at: Date(),
                                     block: Block(checkAgainAt: Date().addingTimeInterval(600)))
-        #expect(blocked.group(wantsEyes: false) == .waiting)
+        #expect(blocked.group() == .waiting)
         blocked.isUnread = true
-        #expect(blocked.group(wantsEyes: false) == .waiting, "an unread wait still carries on by itself")
+        #expect(blocked.group() == .waiting, "an unread wait still carries on by itself")
     }
 
     @Test func stoppedSessionsFollowWhoActsNext() {
-        #expect(agent(.stopped, endedReason: .cancelled).group(wantsEyes: false) == .stopped)
-        #expect(agent(.stopped, endedReason: .stoppedByAgent).group(wantsEyes: false) == .stopped)
-        #expect(agent(.stopped, endedReason: .processDied).group(wantsEyes: false) == .needsAttention)
+        #expect(agent(.stopped, endedReason: .cancelled).group() == .stopped)
+        #expect(agent(.stopped, endedReason: .stoppedByAgent).group() == .stopped)
+        #expect(agent(.stopped, endedReason: .processDied).group() == .needsAttention)
     }
 
     @Test func aRequestNeverMovesTheGroupAndAnArchivedOneShowsNoMark() {
         var finished = agent(.finished, report: .done, endedReason: .endTurn, unread: true)
         finished.archiveRequest = .requested(at: Date())
         finished.state = .waitingOnUser
-        #expect(finished.group(wantsEyes: false) == .needsAttention)
+        #expect(finished.group() == .needsAttention)
         finished.state = .archived
-        #expect(finished.group(wantsEyes: false) == .archived)
+        #expect(finished.group() == .archived)
         #expect(!finished.asksToArchive)
     }
 
@@ -96,7 +94,7 @@ struct AgentGroupTests {
         for state in AgentState.allCases {
             for outcome in [nil] + WorkOutcome.allCases.map(Optional.some) {
                 for unread in [false, true] {
-                    let group = agent(state, report: outcome, unread: unread).group(wantsEyes: false)
+                    let group = agent(state, report: outcome, unread: unread).group()
                     #expect(AgentGroup.live.contains(group) || group == .archived)
                 }
             }

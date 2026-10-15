@@ -8,7 +8,7 @@ import Testing
 /// line that breaks it does not exist yet. Two functions computing the group is how 019
 /// happened — one could see whether an agent had asked to be looked at and one could
 /// not — and one function with a defaulted argument is how it would happen quietly. So
-/// the initialiser has no defaults, `Agent.group(wantsEyes:)` is the one way to reach
+/// the initialiser has no defaults, `Agent.group()` is the one way to reach
 /// it, and this holds that nothing else calls the initialiser directly (FR-001, FR-021).
 ///
 /// The matcher is proved to bite against a sample below. A scan that matches nothing is
@@ -50,15 +50,15 @@ struct OneGroupingTests {
         code(line).contains("AgentGroup(for:")
     }
 
-    /// The one file that may: the rule's own, where `Agent.group(wantsEyes:)` lives.
+    /// The one file that may: the rule's own, where `Agent.group()` lives.
     private static let theOnePlace = "Packages/AgentsKit/Sources/AgentsKitCore/Model/AgentGroup.swift"
 
     @Test func theScanCatchesADecisionAndNotAMention() {
-        #expect(Self.decidesAGroup("        AgentGroup(for: state, wantsEyes: wantsEyes, report: report, outcomeAsked: outcomeAsked)"))
-        #expect(Self.decidesAGroup("let g = AgentGroup(for: .running, wantsEyes: false, report: nil, outcomeAsked: false)"))
+        #expect(Self.decidesAGroup("        AgentGroup(for: state, report: report, outcomeAsked: outcomeAsked)"))
+        #expect(Self.decidesAGroup("let g = AgentGroup(for: .running, report: nil, outcomeAsked: false)"))
         #expect(!Self.decidesAGroup("    /// Grouped by `AgentGroup(for:)`, so no client can put an agent under a heading"))
-        #expect(!Self.decidesAGroup("        agent.group(wantsEyes: filesToShow[agent.id] != nil)"))
-        #expect(!Self.decidesAGroup("        counts[agent.group(wantsEyes: false), default: 0] += 1"))
+        #expect(!Self.decidesAGroup("        agent.group()"))
+        #expect(!Self.decidesAGroup("        counts[agent.group(), default: 0] += 1"))
     }
 
     @Test func anAgentsGroupIsDecidedInExactlyOnePlace() throws {
@@ -75,7 +75,7 @@ struct OneGroupingTests {
         #expect(scanned > 60, "too few sources were read; the repository root is wrong")
         #expect(deciders.count == 1, """
             An agent's group is decided in \(deciders.count) places. It must be decided in \
-            exactly one — `Agent.group(wantsEyes:)` in AgentGroup.swift — and every other \
+            exactly one — `Agent.group()` in AgentGroup.swift — and every other \
             caller must go through it with the facts spelled out, because two places is \
             how the daemon's counts and the window's list came to disagree (019).
             \(deciders.joined(separator: "\n"))

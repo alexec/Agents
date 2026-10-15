@@ -83,49 +83,47 @@ struct WebFixturesTests {
 
     /// The agents the group and status cases run over: every arm of `AgentGroup.init` and
     /// `StatusShape.init`, each named for what it shows.
-    static var agents: [(String, Agent, Bool)] {
+    static var agents: [(String, Agent)] {
         let waits = Block(waits: [Wait(agentID: id(77), nameAtReport: "Build")])
         let later = Block(checkAgainAt: at(60))
         let cleared = Block(waits: [Wait(agentID: id(77), nameAtReport: "Build")], clearedAt: at(2), clearedBy: .waits)
         return [
-            ("starting", agent(1, .starting), false),
-            ("waiting on the person", agent(2, .waitingOnUser), false),
-            ("running", agent(3, .running), false),
-            ("running, wants eyes", agent(4, .running), true),
-            ("running the app's question, no report yet", agent(5, .running, outcomeAsked: true), false),
-            ("running the app's question, reported done", agent(6, .running, report: report(.done), outcomeAsked: true), false),
-            ("finished, nothing said, read", agent(7, .finished, endedReason: .endTurn), false),
-            ("finished, unread", agent(8, .finished, isUnread: true, endedReason: .endTurn), false),
-            ("finished, needs an answer", agent(9, .finished, report: report(.needsAnswer)), false),
-            ("finished, partly done", agent(10, .finished, report: report(.partlyDone)), false),
-            ("finished, stuck", agent(11, .finished, report: report(.stuck)), false),
-            ("blocked on agents", agent(12, .finished, report: report(.blocked, block: waits)), false),
-            ("blocked until a time", agent(13, .finished, report: report(.blocked, block: later)), false),
-            ("blocked on nothing named", agent(14, .finished, report: report(.blocked)), false),
-            ("blocked, cleared", agent(15, .finished, report: report(.blocked, block: cleared)), false),
-            ("finished, waiting on events", agent(16, .finished, endedReason: .endTurn, eventWait: openWait), false),
-            ("finished, wait on events ended", agent(17, .finished, endedReason: .endTurn, eventWait: endedWait), false),
-            ("asked how it went, said nothing", agent(18, .finished, endedReason: .endTurn, outcomeAsked: true), false),
-            ("done", agent(19, .finished, endedReason: .endTurn, report: report(.done)), false),
-            ("nothing to do", agent(20, .finished, report: report(.nothingToDo)), false),
-            ("done, unread", agent(21, .finished, isUnread: true, report: report(.done)), false),
-            ("done, wants eyes", agent(22, .finished, report: report(.done)), true),
-            ("done, waiting on events", agent(23, .finished, report: report(.done), eventWait: openWait), false),
-            ("stopped by the person", agent(24, .stopped, endedReason: .cancelled), false),
-            ("stopped by its starter", agent(25, .stopped, endedReason: .stoppedByAgent), false),
-            ("stopped, allowance spent", agent(26, .stopped, endedReason: .allowanceSpent), false),
-            ("stopped, the runtime crashed", agent(27, .stopped, endedReason: .processDied), false),
-            ("stopped with the daemon", agent(28, .stopped, endedReason: .daemonGone), false),
-            ("stopped, no reason", agent(29, .stopped), false),
-            ("stopped, a needs-answer report kept", agent(30, .stopped, endedReason: .cancelled, report: report(.needsAnswer)), false),
-            ("asks to archive, done", agent(31, .finished, report: report(.done), archiveRequest: .requested(at: at(5))), false),
+            ("starting", agent(1, .starting)),
+            ("waiting on the person", agent(2, .waitingOnUser)),
+            ("running", agent(3, .running)),
+            ("running the app's question, no report yet", agent(5, .running, outcomeAsked: true)),
+            ("running the app's question, reported done", agent(6, .running, report: report(.done), outcomeAsked: true)),
+            ("finished, nothing said, read", agent(7, .finished, endedReason: .endTurn)),
+            ("finished, unread", agent(8, .finished, isUnread: true, endedReason: .endTurn)),
+            ("finished, needs an answer", agent(9, .finished, report: report(.needsAnswer))),
+            ("finished, partly done", agent(10, .finished, report: report(.partlyDone))),
+            ("finished, stuck", agent(11, .finished, report: report(.stuck))),
+            ("blocked on agents", agent(12, .finished, report: report(.blocked, block: waits))),
+            ("blocked until a time", agent(13, .finished, report: report(.blocked, block: later))),
+            ("blocked on nothing named", agent(14, .finished, report: report(.blocked))),
+            ("blocked, cleared", agent(15, .finished, report: report(.blocked, block: cleared))),
+            ("finished, waiting on events", agent(16, .finished, endedReason: .endTurn, eventWait: openWait)),
+            ("finished, wait on events ended", agent(17, .finished, endedReason: .endTurn, eventWait: endedWait)),
+            ("asked how it went, said nothing", agent(18, .finished, endedReason: .endTurn, outcomeAsked: true)),
+            ("done", agent(19, .finished, endedReason: .endTurn, report: report(.done))),
+            ("nothing to do", agent(20, .finished, report: report(.nothingToDo))),
+            ("done, unread", agent(21, .finished, isUnread: true, report: report(.done))),
+            ("done, waiting on events", agent(23, .finished, report: report(.done), eventWait: openWait)),
+            ("stopped by the person", agent(24, .stopped, endedReason: .cancelled)),
+            ("stopped by its starter", agent(25, .stopped, endedReason: .stoppedByAgent)),
+            ("stopped, allowance spent", agent(26, .stopped, endedReason: .allowanceSpent)),
+            ("stopped, the runtime crashed", agent(27, .stopped, endedReason: .processDied)),
+            ("stopped with the daemon", agent(28, .stopped, endedReason: .daemonGone)),
+            ("stopped, no reason", agent(29, .stopped)),
+            ("stopped, a needs-answer report kept", agent(30, .stopped, endedReason: .cancelled, report: report(.needsAnswer))),
+            ("asks to archive, done", agent(31, .finished, report: report(.done), archiveRequest: .requested(at: at(5)))),
             ("asks to archive, partly done, unread", agent(32, .finished, isUnread: true, report: report(.partlyDone),
-                                                           archiveRequest: .requested(at: at(6))), false),
-            ("asks to archive, stopped", agent(33, .stopped, endedReason: .cancelled, archiveRequest: .requested(at: at(5))), false),
-            ("asks to archive when the turn ends, running", agent(34, .running, archiveRequest: .whenTurnEnds(since: at(4))), false),
-            ("archived", agent(35, .archived), false),
-            ("archived, a request left on it", agent(36, .archived, archiveRequest: .requested(at: at(5))), false),
-            ("queued for a place (#362)", agent(37, .queued), false),
+                                                           archiveRequest: .requested(at: at(6)))),
+            ("asks to archive, stopped", agent(33, .stopped, endedReason: .cancelled, archiveRequest: .requested(at: at(5)))),
+            ("asks to archive when the turn ends, running", agent(34, .running, archiveRequest: .whenTurnEnds(since: at(4)))),
+            ("archived", agent(35, .archived)),
+            ("archived, a request left on it", agent(36, .archived, archiveRequest: .requested(at: at(5)))),
+            ("queued for a place (#362)", agent(37, .queued)),
         ]
     }
 
@@ -283,12 +281,12 @@ struct WebFixturesTests {
     // MARK: groups/ and status/
 
     @Test func groups() throws {
-        let cases = try Self.agents.map { name, agent, eyes in
-            Case(name: name, input: .object(["agent": try Self.encode(agent), "wantsEyes": .bool(eyes)]))
+        let cases = try Self.agents.map { name, agent in
+            Case(name: name, input: .object(["agent": try Self.encode(agent)]))
         }
         try pin("groups/agents.json", cases) { input in
             let agent = try input["agent"]!.decode(Agent.self)
-            let group = agent.group(wantsEyes: input["wantsEyes"]?.boolValue ?? false)
+            let group = agent.group()
             return .object(["group": .string(group.rawValue), "title": .string(group.title),
                             "needsAPerson": .bool(agent.needsAPerson), "isWaiting": .bool(agent.isWaiting),
                             "showsUnread": .bool(agent.showsUnread), "asksToArchive": .bool(agent.asksToArchive)])
@@ -349,7 +347,7 @@ struct WebFixturesTests {
     }
 
     @Test func status() throws {
-        var cases = try Self.agents.map { name, agent, _ in
+        var cases = try Self.agents.map { name, agent in
             Case(name: name, input: .object(["agent": try Self.encode(agent), "isComingBack": .bool(false)]))
         }
         cases.append(Case(name: "coming back after a restart", input: .object([

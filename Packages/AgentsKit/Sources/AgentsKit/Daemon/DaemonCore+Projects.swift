@@ -163,7 +163,7 @@ extension DaemonCore {
                 // looked at. This is the count a surface that cannot show a file takes
                 // as complete (the phone); the Mac window completes it from its own
                 // grouping, `AgentsModel.counts(in:)`, which has the fact (FR-009).
-                counts[agent.group(wantsEyes: false), default: 0] += 1
+                counts[agent.group(), default: 0] += 1
                 for (currency, amount) in agent.costToDate {
                     costToDate[currency, default: 0] += amount
                 }

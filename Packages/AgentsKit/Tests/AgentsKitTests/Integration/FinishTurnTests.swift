@@ -93,7 +93,7 @@ struct FinishTurnTests {
         #expect(agent.report?.outcome == .done)
         #expect(agent.report?.message == "Renamed the call sites; tests pass.")
         #expect(agent.suggestedPrompts.map(\.label) == ["A"])
-        #expect(agent.group(wantsEyes: false) == .finished)
+        #expect(agent.group() == .finished)
         // One record of it, at the foot, as a report alone leaves.
         #expect(try await reported(core, id).map(\.outcome) == [.done])
     }
@@ -110,7 +110,7 @@ struct FinishTurnTests {
         let agent = try #require(await core.agent(id))
         #expect(agent.report?.outcome == .needsAnswer)
         #expect(agent.suggestedPrompts.isEmpty)
-        #expect(agent.group(wantsEyes: false) == .needsAttention)
+        #expect(agent.group() == .needsAttention)
     }
 
     /// The outcome's sentence first, so an agent that reads one line reads the half

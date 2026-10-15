@@ -154,7 +154,7 @@ struct HelperLimitTests {
         #expect(!HelperLimit.isRunning(queued))
         #expect(HelperLimit.placesInUse(in: project, agents: [queued, helper(.running)]) == 1)
         #expect(HelperLimit.running(in: project, agents: [queued]) == 0)
-        #expect(queued.group(wantsEyes: false) == .waiting)
+        #expect(queued.group() == .waiting)
         #expect(StatusShape(row: queued, isComingBack: false) == .waiting)
         #expect(StatusShape.words(row: queued, isComingBack: false) == "Queued")
     }

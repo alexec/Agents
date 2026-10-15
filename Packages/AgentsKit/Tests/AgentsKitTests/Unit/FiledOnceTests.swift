@@ -77,7 +77,8 @@ struct FiledOnceTests {
                     try JSONValue.encoding(DaemonAPI.ShowFileNotification(agentID: moved.id,
                                                                           file: ShownFile(path: "/tmp/work/web/a"))))
         expectAgreement(model, "a file to show")
-        #expect(model.agents(in: web, group: .needsAttention).contains { $0.id == moved.id })
+        #expect(model.agents(in: web, group: .running).contains { $0.id == moved.id },
+                "a shown file is not Needs you (#1057)")
         _ = model.takeFileToShow(for: moved.id)
         expectAgreement(model, "the file seen")
 

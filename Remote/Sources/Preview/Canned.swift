@@ -179,7 +179,7 @@ enum Canned {
             let mine = agents.filter { $0.cwd == folder }
             var counts: [AgentGroup: Int] = [:]
             // The preview says what the daemon says: without eyes.
-            for agent in mine { counts[agent.group(wantsEyes: false), default: 0] += 1 }
+            for agent in mine { counts[agent.group(), default: 0] += 1 }
             return DaemonAPI.ProjectSummary(
                 project: Project(folder: folder, archivedAt: archivedAt, addedAt: ago(9_000)),
                 name: name,

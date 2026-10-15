@@ -441,7 +441,7 @@ struct HelperAgentTests {
         #expect(queued.note.hasSuffix("This project now has 3 of 3 running, 3 of 5 not archived, 1 of 1 queued."))
         let delta = try #require(await core.agent(queued.agentID))
         #expect(delta.state == .queued)
-        #expect(delta.group(wantsEyes: false) == .waiting)
+        #expect(delta.group() == .waiting)
         #expect(delta.queuedPrompts.map(\.text) == ["Delta"])
         #expect(launcher.allAgents.count == spawned, "a queued agent spawns nothing")
 
@@ -899,7 +899,7 @@ struct HelperAgentTests {
 
         let asked = try #require(await core.agent(helper))
         #expect(asked.asksToArchive)
-        #expect(asked.group(wantsEyes: false) == .finished)
+        #expect(asked.group() == .finished)
         #expect(note.contains("now waits for the person to approve archiving it, which frees its running place; it keeps its other place until it is archived."))
         #expect(note.hasSuffix("This project now has 0 of 3 running, 1 of 5 not archived."))
     }
@@ -944,7 +944,7 @@ struct HelperAgentTests {
         #expect(note.hasSuffix("will wait for the person to approve archiving it when its turn ends, freeing its running place then."))
         gate.open()
         _ = await eventually("the helper finished and asks") { await core.agent(helper)?.asksToArchive == true }
-        #expect(await core.agent(helper)?.group(wantsEyes: false) == .finished)
+        #expect(await core.agent(helper)?.group() == .finished)
     }
 
     @Test func askingTwiceChangesNothing() async throws {
