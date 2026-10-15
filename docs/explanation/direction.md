@@ -46,8 +46,9 @@ skills come from a marketplace.
 - #59 (one-click set-up, a hosted service), #60 (webhooks) and #61 (the control plane in
   the cloud) stay parked.
 - New runtimes. Goose and auto-approve were tried and closed.
-- Reaching agents from chat apps: WhatsApp (#1008) and Slack (#1009) are filed and
-  parked (2026-10-14). Not Telegram.
+- Reaching agents from chat apps and email: one channel layer (#1012) with WhatsApp
+  (#1008), Slack (#1009), email (#1013), Teams (#1014), Discord (#1015) and Google Chat
+  (#1016) as adapters, filed and parked (2026-10-14). Not Telegram; Matrix maybe.
 - Unlocking the Mac or keeping it awake to walk a change.
 - Machinery under a layout Alex has not settled. Get the layout in front of Alex first.
 - Moving workflow triggers to the control plane. Each host decides when its own workflows

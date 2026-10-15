@@ -18,7 +18,9 @@ current as Alex decides.
 - **File a good issue.** Look for a duplicate first (`gh issue list --search`). Then say
   which goal in `direction.md` it serves (or that it serves none), which clients it
   touches (Mac, Remote, web), and its open questions. Add its `area:<name>` label and a
-  type label (`bug`, `enhancement`).
+  type label (`bug`, `enhancement`). When testing it needs someone to create an account
+  with an outside service (Meta, Slack, Google Cloud, a second runtime account…), add
+  `needs-account` and say which account in the issue.
 - **Rank the backlog** with RICE (reach, impact, confidence, effort), and say why.
 - **Write decisions down** in the issue, or in a spec with the speckit-specify and
   speckit-clarify skills.
