@@ -1,0 +1,60 @@
+[
+  {
+    "expected" : "WorkflowTrigger",
+    "input" : {
+      "schedule" : {
+        "_0" : {
+          "days" : [
+            "mon"
+          ],
+          "endMinute" : 30,
+          "hours" : [
+            9,
+            17
+          ],
+          "minutes" : [
+            30
+          ],
+          "startMinute" : 0
+        }
+      }
+    },
+    "name" : "schedule"
+  },
+  {
+    "expected" : "WorkflowTrigger",
+    "input" : {
+      "unrecognised" : {
+        "keys" : {
+
+        },
+        "name" : "agent.finished"
+      }
+    },
+    "name" : "agent finished"
+  },
+  {
+    "expected" : "WorkflowTrigger",
+    "input" : {
+      "unrecognised" : {
+        "keys" : {
+
+        },
+        "name" : "agent-finished"
+      }
+    },
+    "name" : "an unknown name"
+  },
+  {
+    "expected" : "WorkflowTrigger",
+    "input" : {
+      "unrecognised" : {
+        "keys" : {
+          "branch" : "main"
+        },
+        "name" : "ci.finished"
+      }
+    },
+    "name" : "event"
+  }
+]

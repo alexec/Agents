@@ -1,0 +1,4498 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agents.alexecollins.com/schema/daemon-subset.json",
+  "title": "DaemonAPI subset (spike #1125, stages 1–2)",
+  "type": "object",
+  "properties": {
+    "agent": {
+      "$ref": "#/definitions/Agent"
+    },
+    "transcriptEntry": {
+      "$ref": "#/definitions/TranscriptEntry"
+    },
+    "transcriptPage": {
+      "$ref": "#/definitions/TranscriptPage"
+    },
+    "turnsPage": {
+      "$ref": "#/definitions/TurnsPage"
+    },
+    "projectSummary": {
+      "$ref": "#/definitions/ProjectSummary"
+    },
+    "runtimeStatus": {
+      "$ref": "#/definitions/RuntimeStatus"
+    },
+    "permissionRequest": {
+      "$ref": "#/definitions/PermissionRequest"
+    },
+    "listRequest": {
+      "$ref": "#/definitions/ListRequest"
+    },
+    "startRequest": {
+      "$ref": "#/definitions/StartRequest"
+    },
+    "promptRequest": {
+      "$ref": "#/definitions/PromptRequest"
+    },
+    "optionsResponse": {
+      "$ref": "#/definitions/OptionsResponse"
+    }
+  },
+  "definitions": {
+    "AfterTurn": {
+      "enum": [
+        "request_archive",
+        "archive"
+      ],
+      "type": "string"
+    },
+    "Agent": {
+      "additionalProperties": false,
+      "properties": {
+        "additionalDirectories": {
+          "items": {
+            "$ref": "#/definitions/URLString"
+          },
+          "type": "array"
+        },
+        "advertisedOptions": {
+          "items": {
+            "$ref": "#/definitions/ConfigOption"
+          },
+          "type": "array"
+        },
+        "afterTurn": {
+          "$ref": "#/definitions/AfterTurn"
+        },
+        "archiveRequest": {
+          "$ref": "#/definitions/ArchiveRequest"
+        },
+        "archivedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "archivedReason": {
+          "$ref": "#/definitions/AgentArchivedReason"
+        },
+        "availableCommands": {
+          "items": {
+            "$ref": "#/definitions/SlashCommand"
+          },
+          "type": "array"
+        },
+        "background": {
+          "items": {
+            "$ref": "#/definitions/BackgroundItem"
+          },
+          "type": "array"
+        },
+        "chainDepth": {
+          "type": "number"
+        },
+        "costCeiling": {
+          "$ref": "#/definitions/Cost"
+        },
+        "costToDate": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "type": "object"
+        },
+        "createdAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "cwd": {
+          "$ref": "#/definitions/URLString"
+        },
+        "effectiveSandbox": {
+          "$ref": "#/definitions/EffectiveSandbox"
+        },
+        "endedReason": {
+          "$ref": "#/definitions/EndedReason"
+        },
+        "eventWait": {
+          "$ref": "#/definitions/EventWait"
+        },
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "isUnread": {
+          "type": "boolean"
+        },
+        "labels": {
+          "items": {
+            "$ref": "#/definitions/SessionLabel"
+          },
+          "type": "array"
+        },
+        "lastActivityAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "lastTurnUsage": {
+          "$ref": "#/definitions/TurnUsage"
+        },
+        "listsLeftOut": {
+          "type": "boolean"
+        },
+        "madeInRoot": {
+          "type": "string"
+        },
+        "mcpServers": {
+          "items": {
+            "$ref": "#/definitions/MCPServer"
+          },
+          "type": "array"
+        },
+        "missingFolder": {
+          "$ref": "#/definitions/MissingFolder"
+        },
+        "outcomeAsked": {
+          "type": "boolean"
+        },
+        "pendingMove": {
+          "$ref": "#/definitions/PendingMove"
+        },
+        "pendingSandboxFailure": {
+          "$ref": "#/definitions/SandboxFailureRecord"
+        },
+        "persona": {
+          "type": "string"
+        },
+        "plans": {
+          "items": {
+            "$ref": "#/definitions/Plan"
+          },
+          "type": "array"
+        },
+        "purpose": {
+          "$ref": "#/definitions/AgentPurpose"
+        },
+        "queuedPrompts": {
+          "items": {
+            "$ref": "#/definitions/QueuedPrompt"
+          },
+          "type": "array"
+        },
+        "queuedStart": {
+          "$ref": "#/definitions/QueuedStart"
+        },
+        "report": {
+          "$ref": "#/definitions/WorkReport"
+        },
+        "reportSeenAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "restartPickUps": {
+          "type": "number"
+        },
+        "runtimeID": {
+          "type": "string"
+        },
+        "runtimeSessionID": {
+          "type": "string"
+        },
+        "runtimeTitle": {
+          "type": "string"
+        },
+        "sandboxOverride": {
+          "$ref": "#/definitions/SandboxChoice"
+        },
+        "startOptions": {
+          "$ref": "#/definitions/StartOptions"
+        },
+        "startRequestID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "startedByAgent": {
+          "$ref": "#/definitions/UUID"
+        },
+        "startedByRun": {
+          "$ref": "#/definitions/UUID"
+        },
+        "startedByWorkflow": {
+          "type": "string"
+        },
+        "startingPoint": {
+          "$ref": "#/definitions/StartingPoint"
+        },
+        "state": {
+          "$ref": "#/definitions/AgentState"
+        },
+        "suggestedPrompts": {
+          "items": {
+            "$ref": "#/definitions/SuggestedPrompt"
+          },
+          "type": "array"
+        },
+        "title": {
+          "type": "string"
+        },
+        "titleIsPersons": {
+          "type": "boolean"
+        },
+        "tokenCeiling": {
+          "type": "number"
+        },
+        "tokensToDate": {
+          "type": "number"
+        },
+        "usage": {
+          "$ref": "#/definitions/Usage"
+        },
+        "worktree": {
+          "$ref": "#/definitions/AgentWorktree"
+        }
+      },
+      "required": [
+        "id",
+        "runtimeID",
+        "cwd",
+        "state",
+        "startOptions",
+        "advertisedOptions",
+        "availableCommands",
+        "createdAt",
+        "lastActivityAt"
+      ],
+      "type": "object"
+    },
+    "AgentArchivedReason": {
+      "enum": [
+        "byUser",
+        "byAgent"
+      ],
+      "type": "string"
+    },
+    "AgentPurpose": {
+      "additionalProperties": false,
+      "properties": {
+        "providerDraft": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/UUID"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "providerDraft"
+      ],
+      "type": "object"
+    },
+    "AgentState": {
+      "enum": [
+        "starting",
+        "running",
+        "waitingOnUser",
+        "finished",
+        "stopped",
+        "archived",
+        "queued"
+      ],
+      "type": "string"
+    },
+    "AgentWorktree": {
+      "additionalProperties": false,
+      "properties": {
+        "base": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "madeByApp": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "project": {
+          "$ref": "#/definitions/URLString"
+        },
+        "root": {
+          "$ref": "#/definitions/URLString"
+        }
+      },
+      "required": [
+        "name",
+        "root",
+        "project",
+        "madeByApp"
+      ],
+      "type": "object"
+    },
+    "AppViewCall": {
+      "additionalProperties": false,
+      "properties": {
+        "arguments": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "pinnable": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "resourceUri": {
+          "type": "string"
+        },
+        "result": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "server": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/AppViewCallState"
+        },
+        "tool": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "server",
+        "tool",
+        "resourceUri",
+        "state"
+      ],
+      "type": "object"
+    },
+    "AppViewCallState": {
+      "enum": [
+        "running",
+        "done",
+        "cancelled"
+      ],
+      "type": "string"
+    },
+    "Approval": {
+      "additionalProperties": false,
+      "properties": {
+        "actions": {
+          "items": {
+            "$ref": "#/definitions/ApprovalAction"
+          },
+          "type": "array"
+        },
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "digest": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/ApprovalKind"
+        },
+        "line": {
+          "type": "string"
+        },
+        "since": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "key",
+        "title",
+        "line",
+        "actions"
+      ],
+      "type": "object"
+    },
+    "ApprovalAction": {
+      "enum": [
+        "approve",
+        "deny",
+        "requestChanges",
+        "dismiss"
+      ],
+      "type": "string"
+    },
+    "ApprovalKind": {
+      "enum": [
+        "mcpServer",
+        "workflow",
+        "plugin",
+        "file",
+        "archive",
+        "workflowFailed"
+      ],
+      "type": "string"
+    },
+    "ArchiveRequest": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "whenTurnEnds": {
+              "additionalProperties": false,
+              "properties": {
+                "since": {
+                  "$ref": "#/definitions/WireDate"
+                }
+              },
+              "required": [
+                "since"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "whenTurnEnds"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "requested": {
+              "additionalProperties": false,
+              "properties": {
+                "at": {
+                  "$ref": "#/definitions/WireDate"
+                }
+              },
+              "required": [
+                "at"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "requested"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Attachment": {
+      "additionalProperties": false,
+      "properties": {
+        "block": {
+          "$ref": "#/definitions/ContentBlock"
+        },
+        "byteCount": {
+          "type": "number"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "id": {
+          "$ref": "#/definitions/UUID"
+        }
+      },
+      "required": [
+        "id",
+        "block",
+        "displayName"
+      ],
+      "type": "object"
+    },
+    "BackgroundItem": {
+      "additionalProperties": false,
+      "properties": {
+        "canStop": {
+          "type": "boolean"
+        },
+        "command": {
+          "type": "string"
+        },
+        "detail": {
+          "type": "string"
+        },
+        "endedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "id": {
+          "type": "string"
+        },
+        "isStopping": {
+          "type": "boolean"
+        },
+        "kind": {
+          "$ref": "#/definitions/BackgroundItemKind"
+        },
+        "lastToolName": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "outputFilePath": {
+          "type": "string"
+        },
+        "parentID": {
+          "type": "string"
+        },
+        "startedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "state": {
+          "$ref": "#/definitions/BackgroundItemState"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "taskType": {
+          "type": "string"
+        },
+        "toolCallID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "name",
+        "state",
+        "canStop",
+        "isStopping",
+        "startedAt"
+      ],
+      "type": "object"
+    },
+    "BackgroundItemKind": {
+      "enum": [
+        "task",
+        "subagent"
+      ],
+      "type": "string"
+    },
+    "BackgroundItemState": {
+      "enum": [
+        "running",
+        "paused",
+        "completed",
+        "failed",
+        "stopped",
+        "disconnected"
+      ],
+      "type": "string"
+    },
+    "Block": {
+      "additionalProperties": false,
+      "properties": {
+        "checkAgainAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "clearedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "clearedBy": {
+          "$ref": "#/definitions/BlockClearing"
+        },
+        "waits": {
+          "items": {
+            "$ref": "#/definitions/Wait"
+          },
+          "type": "array"
+        },
+        "wakeOn": {
+          "$ref": "#/definitions/BlockWakeOn"
+        }
+      },
+      "required": [
+        "waits"
+      ],
+      "type": "object"
+    },
+    "BlockClearing": {
+      "enum": [
+        "waits",
+        "time",
+        "dropped"
+      ],
+      "type": "string"
+    },
+    "BlockWakeOn": {
+      "enum": [
+        "any",
+        "all"
+      ],
+      "type": "string"
+    },
+    "CarriedSetting": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "name": {
+          "type": "string"
+        },
+        "optionID": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/definitions/CarriedSettingSource"
+        },
+        "to": {
+          "$ref": "#/definitions/JSONValue"
+        }
+      },
+      "required": [
+        "optionID",
+        "name",
+        "source"
+      ],
+      "type": "object"
+    },
+    "CarriedSettingSource": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "level": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "level"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "sameValue": {
+              "additionalProperties": {
+                "not": {}
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "sameValue"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "poolEntry": {
+              "additionalProperties": {
+                "not": {}
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "poolEntry"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "remembered": {
+              "additionalProperties": {
+                "not": {}
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "remembered"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "runtimeDefault": {
+              "additionalProperties": {
+                "not": {}
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "runtimeDefault"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "strictestMode": {
+              "additionalProperties": {
+                "not": {}
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "strictestMode"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "closestNoLooser": {
+              "additionalProperties": {
+                "not": {}
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "closestNoLooser"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "person": {
+              "additionalProperties": {
+                "not": {}
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "person"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ChartHint": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "type": "string"
+        },
+        "mark": {
+          "$ref": "#/definitions/ChartMark"
+        },
+        "title": {
+          "type": "string"
+        },
+        "x": {
+          "type": "string"
+        },
+        "y": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "mark",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    },
+    "ChartMark": {
+      "enum": [
+        "bar",
+        "line",
+        "point",
+        "area"
+      ],
+      "type": "string"
+    },
+    "ConfigChoice": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/definitions/JSONValue"
+        }
+      },
+      "required": [
+        "value",
+        "name"
+      ],
+      "type": "object"
+    },
+    "ConfigChoiceGroup": {
+      "additionalProperties": false,
+      "properties": {
+        "group": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/definitions/ConfigChoice"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "options"
+      ],
+      "type": "object"
+    },
+    "ConfigOption": {
+      "additionalProperties": false,
+      "description": "ConfigOption (Model/Options.swift), as its encode(to:) writes it: `type` is the kind's wire name, and `options` is a flat list for one unnamed group, else the groups.",
+      "properties": {
+        "category": {
+          "type": "string"
+        },
+        "currentValue": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "options": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/definitions/ConfigChoice"
+              },
+              "type": "array"
+            },
+            {
+              "items": {
+                "$ref": "#/definitions/ConfigChoiceGroup"
+              },
+              "type": "array"
+            }
+          ]
+        },
+        "type": {
+          "description": "\"select\", \"boolean\", or a kind this build doesn't know, carried as itself.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "type"
+      ],
+      "type": "object"
+    },
+    "ContentBlock": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "type": {
+              "const": "text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "text"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "type": "string"
+            },
+            "mimeType": {
+              "type": "string"
+            },
+            "type": {
+              "const": "image",
+              "type": "string"
+            },
+            "uri": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "mimeType",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "type": "string"
+            },
+            "mimeType": {
+              "type": "string"
+            },
+            "type": {
+              "const": "audio",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "mimeType",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "annotations": {
+              "$ref": "#/definitions/ContentBlockAnnotations"
+            },
+            "mimeType": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "size": {
+              "type": "number"
+            },
+            "type": {
+              "const": "resource_link",
+              "type": "string"
+            },
+            "uri": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "uri",
+            "name"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "annotations": {
+              "$ref": "#/definitions/ContentBlockAnnotations"
+            },
+            "resource": {
+              "additionalProperties": false,
+              "properties": {
+                "blob": {
+                  "type": "string"
+                },
+                "mimeType": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "uri": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "uri"
+              ],
+              "type": "object"
+            },
+            "type": {
+              "const": "resource",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "resource"
+          ],
+          "type": "object"
+        }
+      ],
+      "description": "ContentBlock (ACP/ContentBlock.swift): the protocol's own block shapes, as sent. A block of a kind this build doesn't know is written back as it came, so any other `type` may arrive."
+    },
+    "ContentBlockAnnotations": {
+      "additionalProperties": false,
+      "properties": {
+        "audience": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "priority": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "Cost": {
+      "additionalProperties": false,
+      "properties": {
+        "amount": {
+          "type": "number"
+        },
+        "currency": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "type": "object"
+    },
+    "DiskThresholds": {
+      "additionalProperties": false,
+      "properties": {
+        "criticalGB": {
+          "type": "number"
+        },
+        "lowGB": {
+          "type": "number"
+        },
+        "lowPercent": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "Dropped": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "extraArguments": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "extraArguments"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "alwaysAllow": {
+              "additionalProperties": false,
+              "properties": {
+                "count": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "count"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "alwaysAllow"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "queuedSlashCommand": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "queuedSlashCommand"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "EffectiveSandbox": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "type": "string"
+        },
+        "requested": {
+          "$ref": "#/definitions/SandboxChoice"
+        },
+        "state": {
+          "$ref": "#/definitions/SandboxState"
+        }
+      },
+      "required": [
+        "state",
+        "requested"
+      ],
+      "type": "object"
+    },
+    "ElicitationAnswer": {
+      "additionalProperties": false,
+      "properties": {
+        "answer": {
+          "type": "string"
+        },
+        "question": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "question",
+        "answer"
+      ],
+      "type": "object"
+    },
+    "ElicitationRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "askedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "elicitationID": {
+          "type": "string"
+        },
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "message": {
+          "type": "string"
+        },
+        "mode": {
+          "$ref": "#/definitions/ElicitationRequestMode"
+        },
+        "scope": {
+          "$ref": "#/definitions/ElicitationRequestScope"
+        }
+      },
+      "required": [
+        "id",
+        "agentID",
+        "mode",
+        "scope",
+        "askedAt"
+      ],
+      "type": "object"
+    },
+    "ElicitationRequestMode": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "form": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/ElicitationSchema"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "form"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "url": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "url"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ElicitationRequestScope": {
+      "enum": [
+        "session",
+        "request"
+      ],
+      "type": "string"
+    },
+    "ElicitationSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "properties": {
+          "items": {
+            "$ref": "#/definitions/ElicitationSchemaProperty"
+          },
+          "type": "array"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "properties"
+      ],
+      "type": "object"
+    },
+    "ElicitationSchemaProperty": {
+      "additionalProperties": false,
+      "properties": {
+        "defaultValue": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "description": {
+          "type": "string"
+        },
+        "isRequired": {
+          "type": "boolean"
+        },
+        "kind": {
+          "$ref": "#/definitions/ElicitationSchemaPropertyKind"
+        },
+        "name": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "isRequired",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "ElicitationSchemaPropertyChoice": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "title"
+      ],
+      "type": "object"
+    },
+    "ElicitationSchemaPropertyFormat": {
+      "enum": [
+        "email",
+        "uri",
+        "date",
+        "date-time"
+      ],
+      "type": "string"
+    },
+    "ElicitationSchemaPropertyKind": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "string": {
+              "additionalProperties": false,
+              "properties": {
+                "choices": {
+                  "items": {
+                    "$ref": "#/definitions/ElicitationSchemaPropertyChoice"
+                  },
+                  "type": "array"
+                },
+                "format": {
+                  "$ref": "#/definitions/ElicitationSchemaPropertyFormat"
+                },
+                "maxLength": {
+                  "type": "number"
+                },
+                "minLength": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "string"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "number": {
+              "additionalProperties": false,
+              "properties": {
+                "maximum": {
+                  "type": "number"
+                },
+                "minimum": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "number"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "integer": {
+              "additionalProperties": false,
+              "properties": {
+                "maximum": {
+                  "type": "number"
+                },
+                "minimum": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "integer"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "boolean": {
+              "additionalProperties": {
+                "not": {}
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "boolean"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "multiSelect": {
+              "additionalProperties": false,
+              "properties": {
+                "items": {
+                  "items": {
+                    "$ref": "#/definitions/ElicitationSchemaPropertyChoice"
+                  },
+                  "type": "array"
+                },
+                "maxItems": {
+                  "type": "number"
+                },
+                "minItems": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "items"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "multiSelect"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "EndedReason": {
+      "enum": [
+        "endTurn",
+        "maxTokens",
+        "maxTurnRequests",
+        "refusal",
+        "cancelled",
+        "processDied",
+        "daemonGone",
+        "costLimit",
+        "unrecognised",
+        "stoppedByAgent",
+        "signInRefused",
+        "runtimeError",
+        "allowanceSpent",
+        "rateLimited",
+        "sandboxFailed",
+        "imported"
+      ],
+      "type": "string"
+    },
+    "EventPattern": {
+      "additionalProperties": false,
+      "description": "EventPattern (Model/EventPattern.swift), as its encode(to:) writes it (073): `filters` holds every filter as one string, a list joined by `|` so an older build reads it as a value that never matches, and `anyOf` holds the lists whole. Read `anyOf` over `filters`.",
+      "properties": {
+        "anyOf": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        },
+        "filters": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "filters"
+      ],
+      "type": "object"
+    },
+    "EventWait": {
+      "additionalProperties": false,
+      "properties": {
+        "deadline": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "ending": {
+          "$ref": "#/definitions/EventWaitEnding"
+        },
+        "from": {
+          "type": "number"
+        },
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "patterns": {
+          "items": {
+            "$ref": "#/definitions/EventPattern"
+          },
+          "type": "array"
+        },
+        "resumePromptID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "serverEvents": {
+          "items": {
+            "$ref": "#/definitions/WaitServerEvent"
+          },
+          "type": "array"
+        },
+        "since": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "id",
+        "patterns",
+        "from",
+        "since"
+      ],
+      "type": "object"
+    },
+    "EventWaitEnding": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "matched": {
+              "additionalProperties": false,
+              "properties": {
+                "extraMatches": {
+                  "type": "number"
+                },
+                "position": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "position",
+                "extraMatches"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "matched"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "timedOut": {
+              "additionalProperties": {
+                "not": {}
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "timedOut"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "cancelled": {
+              "additionalProperties": false,
+              "properties": {
+                "by": {
+                  "$ref": "#/definitions/EventWaitEndingCanceller"
+                }
+              },
+              "required": [
+                "by"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "cancelled"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "couldNotWake": {
+              "additionalProperties": false,
+              "properties": {
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "reason"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "couldNotWake"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "EventWaitEndingCanceller": {
+      "enum": [
+        "agent",
+        "person",
+        "prompt",
+        "stopped",
+        "archived",
+        "archiveRequested"
+      ],
+      "type": "string"
+    },
+    "GuardedChange": {
+      "additionalProperties": false,
+      "properties": {
+        "askedIn": {
+          "$ref": "#/definitions/UUID"
+        },
+        "byGit": {
+          "type": "boolean"
+        },
+        "changedBy": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "changedByIDs": {
+          "items": {
+            "$ref": "#/definitions/UUID"
+          },
+          "type": "array"
+        },
+        "digest": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "since": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "path",
+        "changedBy",
+        "changedByIDs",
+        "byGit",
+        "since"
+      ],
+      "type": "object"
+    },
+    "HelperLimits": {
+      "additionalProperties": false,
+      "properties": {
+        "agentsMayArchive": {
+          "type": "boolean"
+        },
+        "notArchived": {
+          "type": "number"
+        },
+        "queued": {
+          "type": "number"
+        },
+        "running": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "JSONValue": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "items": {
+            "$ref": "#/definitions/JSONValue"
+          },
+          "type": "array"
+        },
+        {
+          "additionalProperties": {
+            "$ref": "#/definitions/JSONValue"
+          },
+          "type": "object"
+        }
+      ],
+      "description": "Any JSON: JSONValue in Swift."
+    },
+    "ListCursor": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "lastActivityAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "lastActivityAt",
+        "id"
+      ],
+      "type": "object"
+    },
+    "ListRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "$ref": "#/definitions/ListCursor"
+        },
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "archivedCommands": {
+          "type": "boolean"
+        },
+        "archivedOnly": {
+          "type": "boolean"
+        },
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "includeArchived": {
+          "type": "boolean"
+        },
+        "lean": {
+          "type": "boolean"
+        },
+        "limit": {
+          "type": "number"
+        },
+        "query": {
+          "type": "string"
+        },
+        "startedByWorkflow": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "includeArchived",
+        "archivedCommands",
+        "archivedOnly",
+        "lean"
+      ],
+      "type": "object"
+    },
+    "MCPEventTrigger": {
+      "additionalProperties": false,
+      "properties": {
+        "arguments": {
+          "additionalProperties": {
+            "$ref": "#/definitions/JSONValue"
+          },
+          "type": "object"
+        },
+        "event": {
+          "type": "string"
+        },
+        "servers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "event",
+        "arguments"
+      ],
+      "type": "object"
+    },
+    "MCPServer": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "transport": {
+          "$ref": "#/definitions/MCPServerTransport"
+        }
+      },
+      "required": [
+        "name",
+        "transport"
+      ],
+      "type": "object"
+    },
+    "MCPServerTransport": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "stdio": {
+              "additionalProperties": false,
+              "properties": {
+                "args": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "command": {
+                  "type": "string"
+                },
+                "env": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              },
+              "required": [
+                "command",
+                "args",
+                "env"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "stdio"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "http": {
+              "additionalProperties": false,
+              "properties": {
+                "headers": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "url",
+                "headers"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "http"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "sse": {
+              "additionalProperties": false,
+              "properties": {
+                "headers": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "url",
+                "headers"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "sse"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "MessageSender": {
+      "additionalProperties": false,
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentID",
+        "title"
+      ],
+      "type": "object"
+    },
+    "MissingFolder": {
+      "additionalProperties": false,
+      "properties": {
+        "branchKept": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "branchKept"
+      ],
+      "type": "object"
+    },
+    "MoveAsker": {
+      "enum": [
+        "agent",
+        "person"
+      ],
+      "type": "string"
+    },
+    "MoveTarget": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "newWorktree": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "newWorktree"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "existing": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/URLString"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "existing"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "projectFolder": {
+              "additionalProperties": {
+                "not": {}
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "projectFolder"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "OptionsResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "commands": {
+          "items": {
+            "$ref": "#/definitions/SlashCommand"
+          },
+          "type": "array"
+        },
+        "draftID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/definitions/ConfigOption"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "draftID",
+        "options",
+        "commands"
+      ],
+      "type": "object"
+    },
+    "Payment": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "allowance": {
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "allowance"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "freeTier": {
+              "additionalProperties": false,
+              "properties": {
+                "reset": {
+                  "$ref": "#/definitions/ResetRule"
+                }
+              },
+              "required": [
+                "reset"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "freeTier"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "freeCredit": {
+              "additionalProperties": false,
+              "properties": {
+                "amount": {
+                  "$ref": "#/definitions/Cost"
+                },
+                "expires": {
+                  "$ref": "#/definitions/WireDate"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "freeCredit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "prepaid": {
+              "additionalProperties": false,
+              "properties": {
+                "amount": {
+                  "$ref": "#/definitions/Cost"
+                },
+                "expires": {
+                  "$ref": "#/definitions/WireDate"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "prepaid"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PendingMove": {
+      "additionalProperties": false,
+      "properties": {
+        "askedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "askedBy": {
+          "$ref": "#/definitions/MoveAsker"
+        },
+        "discardChanges": {
+          "type": "boolean"
+        },
+        "removeLeft": {
+          "type": "boolean"
+        },
+        "target": {
+          "$ref": "#/definitions/MoveTarget"
+        }
+      },
+      "required": [
+        "target",
+        "removeLeft",
+        "discardChanges",
+        "askedBy",
+        "askedAt"
+      ],
+      "type": "object"
+    },
+    "PermissionOption": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/PermissionOptionKind"
+        },
+        "name": {
+          "type": "string"
+        },
+        "optionID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "optionID",
+        "name",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "PermissionOptionKind": {
+      "enum": [
+        "allow_once",
+        "allow_always",
+        "reject_once",
+        "reject_always",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "PermissionRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "askedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/definitions/PermissionOption"
+          },
+          "type": "array"
+        },
+        "subagent": {
+          "type": "string"
+        },
+        "toolCall": {
+          "$ref": "#/definitions/ToolCall"
+        }
+      },
+      "required": [
+        "id",
+        "agentID",
+        "toolCall",
+        "options",
+        "askedAt"
+      ],
+      "type": "object"
+    },
+    "Plan": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "entries": {
+          "items": {
+            "$ref": "#/definitions/PlanEntry"
+          },
+          "type": "array"
+        },
+        "planID": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/PlanState"
+        }
+      },
+      "required": [
+        "entries",
+        "state",
+        "at"
+      ],
+      "type": "object"
+    },
+    "PlanEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "type": "string"
+        },
+        "priority": {
+          "$ref": "#/definitions/PlanEntryPriority"
+        },
+        "status": {
+          "$ref": "#/definitions/PlanEntryStatus"
+        }
+      },
+      "required": [
+        "content",
+        "priority",
+        "status"
+      ],
+      "type": "object"
+    },
+    "PlanEntryPriority": {
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "type": "string"
+    },
+    "PlanEntryStatus": {
+      "enum": [
+        "pending",
+        "in_progress",
+        "completed"
+      ],
+      "type": "string"
+    },
+    "PlanState": {
+      "enum": [
+        "current",
+        "withdrawn"
+      ],
+      "type": "string"
+    },
+    "Project": {
+      "additionalProperties": false,
+      "properties": {
+        "addedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "archivedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "diskSpace": {
+          "$ref": "#/definitions/DiskThresholds"
+        },
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "helperLimits": {
+          "$ref": "#/definitions/HelperLimits"
+        },
+        "laidOutAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "layoutVersion": {
+          "type": "number"
+        },
+        "pinned": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "folder",
+        "addedAt"
+      ],
+      "type": "object"
+    },
+    "ProjectSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "approvals": {
+          "items": {
+            "$ref": "#/definitions/Approval"
+          },
+          "type": "array"
+        },
+        "costToDate": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "type": "object"
+        },
+        "counts": {
+          "additionalProperties": false,
+          "properties": {
+            "archived": {
+              "type": "number"
+            },
+            "blocked": {
+              "type": "number"
+            },
+            "finished": {
+              "type": "number"
+            },
+            "needsAttention": {
+              "type": "number"
+            },
+            "running": {
+              "type": "number"
+            },
+            "stopped": {
+              "type": "number"
+            },
+            "waiting": {
+              "type": "number"
+            }
+          },
+          "type": "object"
+        },
+        "exists": {
+          "type": "boolean"
+        },
+        "guardedChanges": {
+          "items": {
+            "$ref": "#/definitions/GuardedChange"
+          },
+          "type": "array"
+        },
+        "isChat": {
+          "type": "boolean"
+        },
+        "lastActivityAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "name": {
+          "type": "string"
+        },
+        "project": {
+          "$ref": "#/definitions/Project"
+        },
+        "retiredCount": {
+          "type": "number"
+        },
+        "unmeasuredAgents": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "project",
+        "name",
+        "exists",
+        "lastActivityAt",
+        "counts",
+        "costToDate",
+        "unmeasuredAgents",
+        "retiredCount"
+      ],
+      "type": "object"
+    },
+    "PromptOrigin": {
+      "enum": [
+        "person",
+        "app",
+        "agent"
+      ],
+      "type": "string"
+    },
+    "PromptRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "attachments": {
+          "items": {
+            "$ref": "#/definitions/Attachment"
+          },
+          "type": "array"
+        },
+        "from": {
+          "$ref": "#/definitions/PromptOrigin"
+        },
+        "sendID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentID",
+        "text",
+        "attachments",
+        "from"
+      ],
+      "type": "object"
+    },
+    "QueuedPrompt": {
+      "additionalProperties": false,
+      "properties": {
+        "attachments": {
+          "items": {
+            "$ref": "#/definitions/Attachment"
+          },
+          "type": "array"
+        },
+        "from": {
+          "$ref": "#/definitions/PromptOrigin"
+        },
+        "hops": {
+          "type": "number"
+        },
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "preface": {
+          "type": "string"
+        },
+        "queuedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "sender": {
+          "$ref": "#/definitions/MessageSender"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "text",
+        "attachments",
+        "queuedAt",
+        "from"
+      ],
+      "type": "object"
+    },
+    "QueuedStart": {
+      "additionalProperties": false,
+      "properties": {
+        "labels": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "model": {
+          "type": "string"
+        },
+        "permissionMode": {
+          "type": "string"
+        },
+        "runtimeID": {
+          "type": "string"
+        },
+        "worktree": {
+          "$ref": "#/definitions/WorktreeChoice"
+        }
+      },
+      "required": [
+        "labels"
+      ],
+      "type": "object"
+    },
+    "ResetRule": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "dailyAt": {
+              "additionalProperties": false,
+              "properties": {
+                "hour": {
+                  "type": "number"
+                },
+                "timeZone": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "hour",
+                "timeZone"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "dailyAt"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "unknown": {
+              "additionalProperties": {
+                "not": {}
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "unknown"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Runtime": {
+      "additionalProperties": false,
+      "properties": {
+        "arguments": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "executable": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "install": {
+          "$ref": "#/definitions/RuntimeInstall"
+        },
+        "installPage": {
+          "$ref": "#/definitions/URLString"
+        },
+        "name": {
+          "type": "string"
+        },
+        "usesAppCopyOnly": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "executable",
+        "arguments",
+        "installPage",
+        "usesAppCopyOnly"
+      ],
+      "type": "object"
+    },
+    "RuntimeAvailability": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "available": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "supportsResume": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "path",
+                "supportsResume"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "available"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "missing": {
+              "additionalProperties": false,
+              "properties": {
+                "lookedIn": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "lookedIn"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "missing"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "needsSignIn": {
+              "additionalProperties": false,
+              "properties": {
+                "authMethods": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "fixCommand": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "authMethods"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "needsSignIn"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "failed": {
+              "additionalProperties": false,
+              "properties": {
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "reason"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "failed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "installing": {
+              "additionalProperties": false,
+              "properties": {
+                "progress": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "installing"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "installFailed": {
+              "additionalProperties": false,
+              "properties": {
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "reason"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "installFailed"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "RuntimeInstall": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "toolset": {
+              "additionalProperties": false,
+              "properties": {
+                "runtimeID": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "runtimeID"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "toolset"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "script": {
+              "additionalProperties": false,
+              "properties": {
+                "shell": {
+                  "type": "string"
+                },
+                "url": {
+                  "$ref": "#/definitions/URLString"
+                }
+              },
+              "required": [
+                "url",
+                "shell"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "script"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "npmGlobal": {
+              "additionalProperties": false,
+              "properties": {
+                "package": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "package"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "npmGlobal"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "RuntimeStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "availability": {
+          "$ref": "#/definitions/RuntimeAvailability"
+        },
+        "checkedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "isOut": {
+          "type": "boolean"
+        },
+        "outdated": {
+          "type": "boolean"
+        },
+        "poolNote": {
+          "type": "string"
+        },
+        "runtime": {
+          "$ref": "#/definitions/Runtime"
+        }
+      },
+      "required": [
+        "runtime",
+        "availability",
+        "checkedAt",
+        "outdated"
+      ],
+      "type": "object"
+    },
+    "SandboxChoice": {
+      "enum": [
+        "runtime",
+        "on",
+        "off"
+      ],
+      "type": "string"
+    },
+    "SandboxFailureRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "completedToolCalls": {
+          "type": "number"
+        },
+        "detail": {
+          "type": "string"
+        },
+        "hang": {
+          "type": "boolean"
+        },
+        "recoveryOffered": {
+          "type": "boolean"
+        },
+        "runtimeID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "detail",
+        "hang",
+        "recoveryOffered",
+        "completedToolCalls"
+      ],
+      "type": "object"
+    },
+    "SandboxState": {
+      "enum": [
+        "on",
+        "off",
+        "runtimeControlled",
+        "none"
+      ],
+      "type": "string"
+    },
+    "ServedRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/ServedRequestKind"
+        },
+        "outcome": {
+          "$ref": "#/definitions/ServedRequestOutcome"
+        }
+      },
+      "required": [
+        "kind",
+        "outcome"
+      ],
+      "type": "object"
+    },
+    "ServedRequestKind": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "readFile": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "readFile"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "writeFile": {
+              "additionalProperties": false,
+              "properties": {
+                "byteCount": {
+                  "type": "number"
+                },
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "byteCount"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "writeFile"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "runCommand": {
+              "additionalProperties": false,
+              "properties": {
+                "args": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "command": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "command",
+                "args"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "runCommand"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ServedRequestOutcome": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "served": {
+              "additionalProperties": {
+                "not": {}
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "served"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "refused": {
+              "additionalProperties": false,
+              "properties": {
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "reason"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "refused"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "failed": {
+              "additionalProperties": false,
+              "properties": {
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "message"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "failed"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "SessionLabel": {
+      "additionalProperties": false,
+      "properties": {
+        "addedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "owner": {
+          "$ref": "#/definitions/SessionLabelOwner"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "owner",
+        "addedAt"
+      ],
+      "type": "object"
+    },
+    "SessionLabelOwner": {
+      "enum": [
+        "person",
+        "agent"
+      ],
+      "type": "string"
+    },
+    "SessionNotice": {
+      "additionalProperties": false,
+      "properties": {
+        "detail": {
+          "type": "string"
+        },
+        "severity": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "severity",
+        "title"
+      ],
+      "type": "object"
+    },
+    "ShownFile": {
+      "additionalProperties": false,
+      "properties": {
+        "chart": {
+          "$ref": "#/definitions/ChartHint"
+        },
+        "line": {
+          "type": "number"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "SlashCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "inputHint": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "StartOptions": {
+      "additionalProperties": false,
+      "properties": {
+        "extraArguments": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "values": {
+          "additionalProperties": {
+            "$ref": "#/definitions/JSONValue"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "values",
+        "extraArguments"
+      ],
+      "type": "object"
+    },
+    "StartRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "additionalDirectories": {
+          "items": {
+            "$ref": "#/definitions/URLString"
+          },
+          "type": "array"
+        },
+        "attachments": {
+          "items": {
+            "$ref": "#/definitions/Attachment"
+          },
+          "type": "array"
+        },
+        "cwd": {
+          "$ref": "#/definitions/URLString"
+        },
+        "draftID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "labels": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "mcpServers": {
+          "items": {
+            "$ref": "#/definitions/MCPServer"
+          },
+          "type": "array"
+        },
+        "persona": {
+          "type": "string"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "purpose": {
+          "$ref": "#/definitions/AgentPurpose"
+        },
+        "requestID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "runtimeID": {
+          "type": "string"
+        },
+        "sandbox": {
+          "$ref": "#/definitions/SandboxChoice"
+        },
+        "startOptions": {
+          "$ref": "#/definitions/StartOptions"
+        },
+        "worktree": {
+          "$ref": "#/definitions/WorktreeChoice"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "cwd",
+        "prompt",
+        "attachments",
+        "startOptions",
+        "additionalDirectories",
+        "mcpServers",
+        "labels"
+      ],
+      "type": "object"
+    },
+    "StartingPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "commit": {
+          "type": "string"
+        },
+        "repository": {
+          "$ref": "#/definitions/URLString"
+        }
+      },
+      "required": [
+        "repository",
+        "commit"
+      ],
+      "type": "object"
+    },
+    "SuggestedPrompt": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "label": {
+          "type": "string"
+        },
+        "prompt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "prompt"
+      ],
+      "type": "object"
+    },
+    "SwitchRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "billing": {
+          "$ref": "#/definitions/Payment"
+        },
+        "carried": {
+          "items": {
+            "$ref": "#/definitions/CarriedSetting"
+          },
+          "type": "array"
+        },
+        "dropped": {
+          "items": {
+            "$ref": "#/definitions/Dropped"
+          },
+          "type": "array"
+        },
+        "from": {
+          "$ref": "#/definitions/SwitchRecordSide"
+        },
+        "fromReturnsAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "reason": {
+          "$ref": "#/definitions/SwitchRecordReason"
+        },
+        "shortened": {
+          "type": "number"
+        },
+        "to": {
+          "$ref": "#/definitions/SwitchRecordSide"
+        }
+      },
+      "required": [
+        "id",
+        "at",
+        "agentID",
+        "from",
+        "to",
+        "reason",
+        "carried",
+        "dropped",
+        "billing"
+      ],
+      "type": "object"
+    },
+    "SwitchRecordReason": {
+      "enum": [
+        "allowanceSpent",
+        "overage",
+        "creditUsedUp",
+        "rateLimitPersisted",
+        "runtimeFailed",
+        "everyoneOutResumed",
+        "byHand"
+      ],
+      "type": "string"
+    },
+    "SwitchRecordSide": {
+      "additionalProperties": false,
+      "properties": {
+        "entryID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "mode": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "model": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "runtimeID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtimeID"
+      ],
+      "type": "object"
+    },
+    "ToolCall": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "items": {
+            "$ref": "#/definitions/ToolCallContent"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "locations": {
+          "items": {
+            "$ref": "#/definitions/ToolCallLocation"
+          },
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        },
+        "raw": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "rawInput": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "rawOutput": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "status": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "toolCallID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "content",
+        "locations"
+      ],
+      "type": "object"
+    },
+    "ToolCallContent": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "content": {
+              "$ref": "#/definitions/ContentBlock"
+            },
+            "type": {
+              "const": "content",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "content"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "newText": {
+              "type": "string"
+            },
+            "oldText": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "type": {
+              "const": "diff",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "path",
+            "newText"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "terminalId": {
+              "type": "string"
+            },
+            "type": {
+              "const": "terminal",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "terminalId"
+          ],
+          "type": "object"
+        }
+      ],
+      "description": "ToolCallContent (ACP/ToolCallContent.swift): the protocol's shapes, as sent. Anything else is written back as it came, so another `type` may arrive."
+    },
+    "ToolCallLocation": {
+      "additionalProperties": false,
+      "properties": {
+        "line": {
+          "type": "number"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "TranscriptEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "kind": {
+          "$ref": "#/definitions/TranscriptEntryKind"
+        },
+        "sender": {
+          "$ref": "#/definitions/MessageSender"
+        },
+        "subagentID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "at",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "TranscriptEntryKind": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "userMessage": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "type": "string"
+                },
+                "blocks": {
+                  "items": {
+                    "$ref": "#/definitions/ContentBlock"
+                  },
+                  "type": "array"
+                },
+                "from": {
+                  "$ref": "#/definitions/PromptOrigin"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "userMessage"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "agentMessage": {
+              "additionalProperties": false,
+              "properties": {
+                "blocks": {
+                  "items": {
+                    "$ref": "#/definitions/ContentBlock"
+                  },
+                  "type": "array"
+                },
+                "messageID": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "agentMessage"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "agentThought": {
+              "additionalProperties": false,
+              "properties": {
+                "messageID": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "agentThought"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "toolCall": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/ToolCall"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "toolCall"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "toolCallUpdate": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/ToolCall"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "toolCallUpdate"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "planUpdated": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/Plan"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "planUpdated"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "usageRecorded": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/TurnUsage"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "usageRecorded"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "servedRequest": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/ServedRequest"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "servedRequest"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "elicitationAsked": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/ElicitationRequest"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "elicitationAsked"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "elicitationAnswered": {
+              "additionalProperties": false,
+              "properties": {
+                "answers": {
+                  "items": {
+                    "$ref": "#/definitions/ElicitationAnswer"
+                  },
+                  "type": "array"
+                },
+                "id": {
+                  "$ref": "#/definitions/UUID"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "summary"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "elicitationAnswered"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "compaction": {
+              "additionalProperties": false,
+              "properties": {
+                "error": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "summary": {
+                  "items": {
+                    "$ref": "#/definitions/ContentBlock"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "status",
+                "summary"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "compaction"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "notice": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/SessionNotice"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "notice"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "permissionAsked": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/PermissionRequest"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "permissionAsked"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "permissionAnswered": {
+              "additionalProperties": false,
+              "properties": {
+                "optionID": {
+                  "type": "string"
+                },
+                "optionName": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "optionID"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "permissionAnswered"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "optionChanged": {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "value": {
+                  "$ref": "#/definitions/JSONValue"
+                }
+              },
+              "required": [
+                "id",
+                "value"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "optionChanged"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "stateChanged": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/AgentState"
+                },
+                "reason": {
+                  "$ref": "#/definitions/EndedReason"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "stateChanged"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "background": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/BackgroundItem"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "background"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "workReported": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/WorkReport"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "workReported"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "runtimeNote": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "runtimeNote"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "poolSwitch": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/SwitchRecord"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "poolSwitch"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "sandboxFailure": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/SandboxFailureRecord"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "sandboxFailure"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "handoff": {
+              "additionalProperties": false,
+              "properties": {
+                "characters": {
+                  "type": "number"
+                },
+                "markdown": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "markdown",
+                "characters"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "handoff"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "settingsChanged": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/SwitchRecord"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "settingsChanged"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "appView": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/AppViewCall"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "appView"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "fileShown": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/ShownFile"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "fileShown"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "TranscriptPage": {
+      "additionalProperties": false,
+      "properties": {
+        "entries": {
+          "items": {
+            "$ref": "#/definitions/TranscriptEntry"
+          },
+          "type": "array"
+        },
+        "firstIndex": {
+          "type": "number"
+        },
+        "total": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "firstIndex",
+        "total",
+        "entries"
+      ],
+      "type": "object"
+    },
+    "TurnSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "ask": {
+          "$ref": "#/definitions/TranscriptEntry"
+        },
+        "concise": {
+          "items": {
+            "$ref": "#/definitions/TranscriptEntry"
+          },
+          "type": "array"
+        },
+        "end": {
+          "type": "number"
+        },
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "last": {
+          "$ref": "#/definitions/TranscriptEntry"
+        },
+        "outcome": {
+          "items": {
+            "$ref": "#/definitions/TranscriptEntry"
+          },
+          "type": "array"
+        },
+        "start": {
+          "type": "number"
+        },
+        "steps": {
+          "type": "number"
+        },
+        "usage": {
+          "$ref": "#/definitions/TurnUsage"
+        }
+      },
+      "required": [
+        "id",
+        "start",
+        "end"
+      ],
+      "type": "object"
+    },
+    "TurnUsage": {
+      "additionalProperties": false,
+      "properties": {
+        "cachedReadTokens": {
+          "type": "number"
+        },
+        "cachedWriteTokens": {
+          "type": "number"
+        },
+        "cost": {
+          "$ref": "#/definitions/Cost"
+        },
+        "inputTokens": {
+          "type": "number"
+        },
+        "outputTokens": {
+          "type": "number"
+        },
+        "thoughtTokens": {
+          "type": "number"
+        },
+        "totalTokens": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "totalTokens",
+        "inputTokens",
+        "outputTokens"
+      ],
+      "type": "object"
+    },
+    "TurnsPage": {
+      "additionalProperties": false,
+      "properties": {
+        "firstTurn": {
+          "type": "number"
+        },
+        "openStart": {
+          "type": "number"
+        },
+        "turns": {
+          "items": {
+            "$ref": "#/definitions/TurnSummary"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "turns",
+        "firstTurn",
+        "openStart"
+      ],
+      "type": "object"
+    },
+    "URLString": {
+      "description": "An absolute URL as text: URL in Swift.",
+      "type": "string"
+    },
+    "UUID": {
+      "description": "Upper case, as Swift's uuidString writes it.",
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$"
+    },
+    "Usage": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "cost": {
+          "$ref": "#/definitions/Cost"
+        },
+        "size": {
+          "type": "number"
+        },
+        "used": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "used",
+        "size",
+        "at"
+      ],
+      "type": "object"
+    },
+    "Wait": {
+      "additionalProperties": false,
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "ending": {
+          "$ref": "#/definitions/WaitEnding"
+        },
+        "nameAtReport": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentID",
+        "nameAtReport"
+      ],
+      "type": "object"
+    },
+    "WaitEnding": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "how": {
+          "$ref": "#/definitions/WaitEndingHow"
+        }
+      },
+      "required": [
+        "at",
+        "how"
+      ],
+      "type": "object"
+    },
+    "WaitEndingHow": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "finished": {
+              "additionalProperties": false,
+              "properties": {
+                "message": {
+                  "type": "string"
+                },
+                "outcome": {
+                  "$ref": "#/definitions/WorkOutcome"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "finished"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "stopped": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/EndedReason"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "stopped"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "archived": {
+              "additionalProperties": {
+                "not": {}
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "archived"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "gone": {
+              "additionalProperties": {
+                "not": {}
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "gone"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "WaitServerEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "servers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "trigger": {
+          "$ref": "#/definitions/MCPEventTrigger"
+        }
+      },
+      "required": [
+        "trigger",
+        "servers"
+      ],
+      "type": "object"
+    },
+    "WireDate": {
+      "description": "Seconds since 2001-01-01T00:00:00Z: Date in Swift, through a plain JSONEncoder.",
+      "type": "number",
+      "x-swift-type": "Date"
+    },
+    "WorkOutcome": {
+      "enum": [
+        "done",
+        "nothing_to_do",
+        "needs_answer",
+        "partly_done",
+        "stuck",
+        "blocked"
+      ],
+      "type": "string"
+    },
+    "WorkReport": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "block": {
+          "$ref": "#/definitions/Block"
+        },
+        "message": {
+          "type": "string"
+        },
+        "outcome": {
+          "$ref": "#/definitions/WorkOutcome"
+        }
+      },
+      "required": [
+        "outcome",
+        "message",
+        "at"
+      ],
+      "type": "object"
+    },
+    "WorktreeChoice": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "new": {
+              "additionalProperties": {
+                "not": {}
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "new"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "existing": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/URLString"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "existing"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "named": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "named"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "branch": {
+              "additionalProperties": false,
+              "properties": {
+                "_0": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "branch"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  }
+}

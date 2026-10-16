@@ -1,0 +1,4 @@
+.quicktype.schema.json
+bootstrap/
+ts/generated.ts
+swift-check/.build/

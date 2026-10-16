@@ -1,0 +1,652 @@
+[
+  {
+    "expected" : {
+      "line" : "Queued, 1st"
+    },
+    "input" : {
+      "agentID" : "00000000-0000-0000-0000-000000000081",
+      "agents" : [
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500120,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000083",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "startedByAgent" : "00000000-0000-0000-0000-000000000001",
+          "state" : "queued",
+          "title" : "Session 83"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000085",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "running",
+          "title" : "Session 85"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/other/",
+          "id" : "00000000-0000-0000-0000-000000000084",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "startedByAgent" : "00000000-0000-0000-0000-000000000001",
+          "state" : "queued",
+          "title" : "Session 84"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500120,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000082",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "startedByAgent" : "00000000-0000-0000-0000-000000000001",
+          "state" : "queued",
+          "title" : "Session 82"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500060,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000081",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "startedByAgent" : "00000000-0000-0000-0000-000000000001",
+          "state" : "queued",
+          "title" : "Session 81"
+        }
+      ]
+    },
+    "name" : "Session 81"
+  },
+  {
+    "expected" : {
+      "line" : "Queued, 2nd"
+    },
+    "input" : {
+      "agentID" : "00000000-0000-0000-0000-000000000082",
+      "agents" : [
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500120,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000083",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "startedByAgent" : "00000000-0000-0000-0000-000000000001",
+          "state" : "queued",
+          "title" : "Session 83"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000085",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "running",
+          "title" : "Session 85"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/other/",
+          "id" : "00000000-0000-0000-0000-000000000084",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "startedByAgent" : "00000000-0000-0000-0000-000000000001",
+          "state" : "queued",
+          "title" : "Session 84"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500120,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000082",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "startedByAgent" : "00000000-0000-0000-0000-000000000001",
+          "state" : "queued",
+          "title" : "Session 82"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500060,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000081",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "startedByAgent" : "00000000-0000-0000-0000-000000000001",
+          "state" : "queued",
+          "title" : "Session 81"
+        }
+      ]
+    },
+    "name" : "Session 82"
+  },
+  {
+    "expected" : {
+      "line" : "Queued, 3rd"
+    },
+    "input" : {
+      "agentID" : "00000000-0000-0000-0000-000000000083",
+      "agents" : [
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500120,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000083",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "startedByAgent" : "00000000-0000-0000-0000-000000000001",
+          "state" : "queued",
+          "title" : "Session 83"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000085",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "running",
+          "title" : "Session 85"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/other/",
+          "id" : "00000000-0000-0000-0000-000000000084",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "startedByAgent" : "00000000-0000-0000-0000-000000000001",
+          "state" : "queued",
+          "title" : "Session 84"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500120,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000082",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "startedByAgent" : "00000000-0000-0000-0000-000000000001",
+          "state" : "queued",
+          "title" : "Session 82"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500060,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000081",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "startedByAgent" : "00000000-0000-0000-0000-000000000001",
+          "state" : "queued",
+          "title" : "Session 81"
+        }
+      ]
+    },
+    "name" : "Session 83"
+  },
+  {
+    "expected" : {
+      "line" : "Queued, 1st"
+    },
+    "input" : {
+      "agentID" : "00000000-0000-0000-0000-000000000084",
+      "agents" : [
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500120,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000083",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "startedByAgent" : "00000000-0000-0000-0000-000000000001",
+          "state" : "queued",
+          "title" : "Session 83"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000085",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "running",
+          "title" : "Session 85"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/other/",
+          "id" : "00000000-0000-0000-0000-000000000084",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "startedByAgent" : "00000000-0000-0000-0000-000000000001",
+          "state" : "queued",
+          "title" : "Session 84"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500120,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000082",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "startedByAgent" : "00000000-0000-0000-0000-000000000001",
+          "state" : "queued",
+          "title" : "Session 82"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500060,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000081",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "startedByAgent" : "00000000-0000-0000-0000-000000000001",
+          "state" : "queued",
+          "title" : "Session 81"
+        }
+      ]
+    },
+    "name" : "Session 84"
+  },
+  {
+    "expected" : {
+      "line" : null
+    },
+    "input" : {
+      "agentID" : "00000000-0000-0000-0000-000000000085",
+      "agents" : [
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500120,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000083",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "startedByAgent" : "00000000-0000-0000-0000-000000000001",
+          "state" : "queued",
+          "title" : "Session 83"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000085",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "running",
+          "title" : "Session 85"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/other/",
+          "id" : "00000000-0000-0000-0000-000000000084",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "startedByAgent" : "00000000-0000-0000-0000-000000000001",
+          "state" : "queued",
+          "title" : "Session 84"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500120,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000082",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "startedByAgent" : "00000000-0000-0000-0000-000000000001",
+          "state" : "queued",
+          "title" : "Session 82"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500060,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000081",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "startedByAgent" : "00000000-0000-0000-0000-000000000001",
+          "state" : "queued",
+          "title" : "Session 81"
+        }
+      ]
+    },
+    "name" : "Session 85"
+  }
+]

@@ -450,28 +450,28 @@ type CarriedSetting struct {
 
 type CarriedSettingSource struct {
 	// ClosestNoLooser corresponds to the JSON schema field "closestNoLooser".
-	ClosestNoLooser CarriedSettingSource_6ClosestNoLooser `json:"closestNoLooser,omitempty,omitzero" yaml:"closestNoLooser,omitempty" mapstructure:"closestNoLooser,omitempty"`
+	ClosestNoLooser *CarriedSettingSource_6ClosestNoLooser `json:"closestNoLooser,omitempty,omitzero" yaml:"closestNoLooser,omitempty" mapstructure:"closestNoLooser,omitempty"`
 
 	// Level corresponds to the JSON schema field "level".
 	Level *CarriedSettingSource_0Level `json:"level,omitempty,omitzero" yaml:"level,omitempty" mapstructure:"level,omitempty"`
 
 	// Person corresponds to the JSON schema field "person".
-	Person CarriedSettingSource_7Person `json:"person,omitempty,omitzero" yaml:"person,omitempty" mapstructure:"person,omitempty"`
+	Person *CarriedSettingSource_7Person `json:"person,omitempty,omitzero" yaml:"person,omitempty" mapstructure:"person,omitempty"`
 
 	// PoolEntry corresponds to the JSON schema field "poolEntry".
-	PoolEntry CarriedSettingSource_2PoolEntry `json:"poolEntry,omitempty,omitzero" yaml:"poolEntry,omitempty" mapstructure:"poolEntry,omitempty"`
+	PoolEntry *CarriedSettingSource_2PoolEntry `json:"poolEntry,omitempty,omitzero" yaml:"poolEntry,omitempty" mapstructure:"poolEntry,omitempty"`
 
 	// Remembered corresponds to the JSON schema field "remembered".
-	Remembered CarriedSettingSource_3Remembered `json:"remembered,omitempty,omitzero" yaml:"remembered,omitempty" mapstructure:"remembered,omitempty"`
+	Remembered *CarriedSettingSource_3Remembered `json:"remembered,omitempty,omitzero" yaml:"remembered,omitempty" mapstructure:"remembered,omitempty"`
 
 	// RuntimeDefault corresponds to the JSON schema field "runtimeDefault".
-	RuntimeDefault CarriedSettingSource_4RuntimeDefault `json:"runtimeDefault,omitempty,omitzero" yaml:"runtimeDefault,omitempty" mapstructure:"runtimeDefault,omitempty"`
+	RuntimeDefault *CarriedSettingSource_4RuntimeDefault `json:"runtimeDefault,omitempty,omitzero" yaml:"runtimeDefault,omitempty" mapstructure:"runtimeDefault,omitempty"`
 
 	// SameValue corresponds to the JSON schema field "sameValue".
-	SameValue CarriedSettingSource_1SameValue `json:"sameValue,omitempty,omitzero" yaml:"sameValue,omitempty" mapstructure:"sameValue,omitempty"`
+	SameValue *CarriedSettingSource_1SameValue `json:"sameValue,omitempty,omitzero" yaml:"sameValue,omitempty" mapstructure:"sameValue,omitempty"`
 
 	// StrictestMode corresponds to the JSON schema field "strictestMode".
-	StrictestMode CarriedSettingSource_5StrictestMode `json:"strictestMode,omitempty,omitzero" yaml:"strictestMode,omitempty" mapstructure:"strictestMode,omitempty"`
+	StrictestMode *CarriedSettingSource_5StrictestMode `json:"strictestMode,omitempty,omitzero" yaml:"strictestMode,omitempty" mapstructure:"strictestMode,omitempty"`
 }
 
 type CarriedSettingSource_0 struct {
@@ -731,6 +731,41 @@ type Cost struct {
 	Currency string `json:"currency" yaml:"currency" mapstructure:"currency"`
 }
 
+type DaemonSchemaJson struct {
+	// Agent corresponds to the JSON schema field "agent".
+	Agent *Agent `json:"agent,omitempty,omitzero" yaml:"agent,omitempty" mapstructure:"agent,omitempty"`
+
+	// ListRequest corresponds to the JSON schema field "listRequest".
+	ListRequest *ListRequest `json:"listRequest,omitempty,omitzero" yaml:"listRequest,omitempty" mapstructure:"listRequest,omitempty"`
+
+	// OptionsResponse corresponds to the JSON schema field "optionsResponse".
+	OptionsResponse *OptionsResponse `json:"optionsResponse,omitempty,omitzero" yaml:"optionsResponse,omitempty" mapstructure:"optionsResponse,omitempty"`
+
+	// PermissionRequest corresponds to the JSON schema field "permissionRequest".
+	PermissionRequest *PermissionRequest `json:"permissionRequest,omitempty,omitzero" yaml:"permissionRequest,omitempty" mapstructure:"permissionRequest,omitempty"`
+
+	// ProjectSummary corresponds to the JSON schema field "projectSummary".
+	ProjectSummary *ProjectSummary `json:"projectSummary,omitempty,omitzero" yaml:"projectSummary,omitempty" mapstructure:"projectSummary,omitempty"`
+
+	// PromptRequest corresponds to the JSON schema field "promptRequest".
+	PromptRequest *PromptRequest `json:"promptRequest,omitempty,omitzero" yaml:"promptRequest,omitempty" mapstructure:"promptRequest,omitempty"`
+
+	// RuntimeStatus corresponds to the JSON schema field "runtimeStatus".
+	RuntimeStatus *RuntimeStatus `json:"runtimeStatus,omitempty,omitzero" yaml:"runtimeStatus,omitempty" mapstructure:"runtimeStatus,omitempty"`
+
+	// StartRequest corresponds to the JSON schema field "startRequest".
+	StartRequest *StartRequest `json:"startRequest,omitempty,omitzero" yaml:"startRequest,omitempty" mapstructure:"startRequest,omitempty"`
+
+	// TranscriptEntry corresponds to the JSON schema field "transcriptEntry".
+	TranscriptEntry *TranscriptEntry `json:"transcriptEntry,omitempty,omitzero" yaml:"transcriptEntry,omitempty" mapstructure:"transcriptEntry,omitempty"`
+
+	// TranscriptPage corresponds to the JSON schema field "transcriptPage".
+	TranscriptPage *TranscriptPage `json:"transcriptPage,omitempty,omitzero" yaml:"transcriptPage,omitempty" mapstructure:"transcriptPage,omitempty"`
+
+	// TurnsPage corresponds to the JSON schema field "turnsPage".
+	TurnsPage *TurnsPage `json:"turnsPage,omitempty,omitzero" yaml:"turnsPage,omitempty" mapstructure:"turnsPage,omitempty"`
+}
+
 type DiskThresholds struct {
 	// CriticalGB corresponds to the JSON schema field "criticalGB".
 	CriticalGB *float64 `json:"criticalGB,omitempty,omitzero" yaml:"criticalGB,omitempty" mapstructure:"criticalGB,omitempty"`
@@ -909,7 +944,7 @@ const ElicitationSchemaPropertyFormatUri ElicitationSchemaPropertyFormat = "uri"
 
 type ElicitationSchemaPropertyKind struct {
 	// Boolean corresponds to the JSON schema field "boolean".
-	Boolean ElicitationSchemaPropertyKind_3Boolean `json:"boolean,omitempty,omitzero" yaml:"boolean,omitempty" mapstructure:"boolean,omitempty"`
+	Boolean *ElicitationSchemaPropertyKind_3Boolean `json:"boolean,omitempty,omitzero" yaml:"boolean,omitempty" mapstructure:"boolean,omitempty"`
 
 	// Integer corresponds to the JSON schema field "integer".
 	Integer *ElicitationSchemaPropertyKind_2Integer `json:"integer,omitempty,omitzero" yaml:"integer,omitempty" mapstructure:"integer,omitempty"`
@@ -1067,7 +1102,7 @@ type EventWaitEnding struct {
 	Matched *EventWaitEnding_0Matched `json:"matched,omitempty,omitzero" yaml:"matched,omitempty" mapstructure:"matched,omitempty"`
 
 	// TimedOut corresponds to the JSON schema field "timedOut".
-	TimedOut EventWaitEnding_1TimedOut `json:"timedOut,omitempty,omitzero" yaml:"timedOut,omitempty" mapstructure:"timedOut,omitempty"`
+	TimedOut *EventWaitEnding_1TimedOut `json:"timedOut,omitempty,omitzero" yaml:"timedOut,omitempty" mapstructure:"timedOut,omitempty"`
 }
 
 type EventWaitEndingCanceller string
@@ -1305,7 +1340,7 @@ type MoveTarget struct {
 	NewWorktree *MoveTarget_0NewWorktree `json:"newWorktree,omitempty,omitzero" yaml:"newWorktree,omitempty" mapstructure:"newWorktree,omitempty"`
 
 	// ProjectFolder corresponds to the JSON schema field "projectFolder".
-	ProjectFolder MoveTarget_2ProjectFolder `json:"projectFolder,omitempty,omitzero" yaml:"projectFolder,omitempty" mapstructure:"projectFolder,omitempty"`
+	ProjectFolder *MoveTarget_2ProjectFolder `json:"projectFolder,omitempty,omitzero" yaml:"projectFolder,omitempty" mapstructure:"projectFolder,omitempty"`
 }
 
 type MoveTarget_0 struct {
@@ -1661,7 +1696,7 @@ type ResetRule struct {
 	DailyAt *ResetRule_0DailyAt `json:"dailyAt,omitempty,omitzero" yaml:"dailyAt,omitempty" mapstructure:"dailyAt,omitempty"`
 
 	// Unknown corresponds to the JSON schema field "unknown".
-	Unknown ResetRule_1Unknown `json:"unknown,omitempty,omitzero" yaml:"unknown,omitempty" mapstructure:"unknown,omitempty"`
+	Unknown *ResetRule_1Unknown `json:"unknown,omitempty,omitzero" yaml:"unknown,omitempty" mapstructure:"unknown,omitempty"`
 }
 
 type ResetRule_0 struct {
@@ -1950,7 +1985,7 @@ type ServedRequestOutcome struct {
 	Refused *ServedRequestOutcome_1Refused `json:"refused,omitempty,omitzero" yaml:"refused,omitempty" mapstructure:"refused,omitempty"`
 
 	// Served corresponds to the JSON schema field "served".
-	Served ServedRequestOutcome_0Served `json:"served,omitempty,omitzero" yaml:"served,omitempty" mapstructure:"served,omitempty"`
+	Served *ServedRequestOutcome_0Served `json:"served,omitempty,omitzero" yaml:"served,omitempty" mapstructure:"served,omitempty"`
 }
 
 type ServedRequestOutcome_0 struct {
@@ -2755,13 +2790,13 @@ type WaitEnding struct {
 
 type WaitEndingHow struct {
 	// Archived corresponds to the JSON schema field "archived".
-	Archived WaitEndingHow_2Archived `json:"archived,omitempty,omitzero" yaml:"archived,omitempty" mapstructure:"archived,omitempty"`
+	Archived *WaitEndingHow_2Archived `json:"archived,omitempty,omitzero" yaml:"archived,omitempty" mapstructure:"archived,omitempty"`
 
 	// Finished corresponds to the JSON schema field "finished".
 	Finished *WaitEndingHow_0Finished `json:"finished,omitempty,omitzero" yaml:"finished,omitempty" mapstructure:"finished,omitempty"`
 
 	// Gone corresponds to the JSON schema field "gone".
-	Gone WaitEndingHow_3Gone `json:"gone,omitempty,omitzero" yaml:"gone,omitempty" mapstructure:"gone,omitempty"`
+	Gone *WaitEndingHow_3Gone `json:"gone,omitempty,omitzero" yaml:"gone,omitempty" mapstructure:"gone,omitempty"`
 
 	// Stopped corresponds to the JSON schema field "stopped".
 	Stopped *WaitEndingHow_1Stopped `json:"stopped,omitempty,omitzero" yaml:"stopped,omitempty" mapstructure:"stopped,omitempty"`
@@ -2849,7 +2884,7 @@ type WorktreeChoice struct {
 	Named *WorktreeChoice_2Named `json:"named,omitempty,omitzero" yaml:"named,omitempty" mapstructure:"named,omitempty"`
 
 	// New corresponds to the JSON schema field "new".
-	New WorktreeChoice_0New `json:"new,omitempty,omitzero" yaml:"new,omitempty" mapstructure:"new,omitempty"`
+	New *WorktreeChoice_0New `json:"new,omitempty,omitzero" yaml:"new,omitempty" mapstructure:"new,omitempty"`
 }
 
 type WorktreeChoice_0 struct {

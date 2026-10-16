@@ -1,0 +1,71 @@
+[
+  {
+    "expected" : "ConfigOption",
+    "input" : {
+      "category" : "model",
+      "currentValue" : "a",
+      "description" : "Which model",
+      "id" : "model",
+      "name" : "Model",
+      "options" : [
+        {
+          "description" : "First",
+          "name" : "A",
+          "value" : "a"
+        }
+      ],
+      "type" : "select"
+    },
+    "name" : "select"
+  },
+  {
+    "expected" : "ConfigOption",
+    "input" : {
+      "id" : "mode",
+      "name" : "Mode",
+      "options" : [
+        {
+          "group" : "Safe",
+          "name" : "Safe",
+          "options" : [
+            {
+              "name" : "Ask",
+              "value" : "ask"
+            }
+          ]
+        },
+        {
+          "group" : "Fast",
+          "name" : "Fast",
+          "options" : [
+            {
+              "name" : "Auto",
+              "value" : "auto"
+            }
+          ]
+        }
+      ],
+      "type" : "select"
+    },
+    "name" : "grouped"
+  },
+  {
+    "expected" : "ConfigOption",
+    "input" : {
+      "currentValue" : true,
+      "id" : "fast",
+      "name" : "Fast",
+      "type" : "boolean"
+    },
+    "name" : "boolean"
+  },
+  {
+    "expected" : "ConfigOption",
+    "input" : {
+      "id" : "x",
+      "name" : "X",
+      "type" : "slider"
+    },
+    "name" : "unsupported"
+  }
+]

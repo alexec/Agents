@@ -1,0 +1,1449 @@
+[
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "running",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Working"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000001",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "starting",
+        "title" : "Session 1"
+      }
+    },
+    "name" : "starting"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "needsAttention",
+      "isWaiting" : false,
+      "needsAPerson" : true,
+      "showsUnread" : false,
+      "title" : "Needs you"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000002",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "waitingOnUser",
+        "title" : "Session 2"
+      }
+    },
+    "name" : "waiting on the person"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "running",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Working"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000003",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "running",
+        "title" : "Session 3"
+      }
+    },
+    "name" : "running"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "needsAttention",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Needs you"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000005",
+        "lastActivityAt" : 812500000,
+        "outcomeAsked" : true,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "running",
+        "title" : "Session 5"
+      }
+    },
+    "name" : "running the app's question, no report yet"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "finished",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Done"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000006",
+        "lastActivityAt" : 812500000,
+        "outcomeAsked" : true,
+        "report" : {
+          "at" : 812500060,
+          "message" : "It went.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "running",
+        "title" : "Session 6"
+      }
+    },
+    "name" : "running the app's question, reported done"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "finished",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Done"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "endedReason" : "endTurn",
+        "id" : "00000000-0000-0000-0000-000000000007",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Session 7"
+      }
+    },
+    "name" : "finished, nothing said, read"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "finished",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : true,
+      "title" : "Done"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "endedReason" : "endTurn",
+        "id" : "00000000-0000-0000-0000-000000000008",
+        "isUnread" : true,
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Session 8"
+      }
+    },
+    "name" : "finished, unread"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "needsAttention",
+      "isWaiting" : false,
+      "needsAPerson" : true,
+      "showsUnread" : false,
+      "title" : "Needs you"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000009",
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "It went.",
+          "outcome" : "needs_answer"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Session 9"
+      }
+    },
+    "name" : "finished, needs an answer"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "needsAttention",
+      "isWaiting" : false,
+      "needsAPerson" : true,
+      "showsUnread" : false,
+      "title" : "Needs you"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000010",
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "It went.",
+          "outcome" : "partly_done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Session 10"
+      }
+    },
+    "name" : "finished, partly done"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "needsAttention",
+      "isWaiting" : false,
+      "needsAPerson" : true,
+      "showsUnread" : false,
+      "title" : "Needs you"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000011",
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "It went.",
+          "outcome" : "stuck"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Session 11"
+      }
+    },
+    "name" : "finished, stuck"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "waiting",
+      "isWaiting" : true,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Waiting"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000012",
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "block" : {
+            "waits" : [
+              {
+                "agentID" : "00000000-0000-0000-0000-000000000077",
+                "nameAtReport" : "Build"
+              }
+            ]
+          },
+          "message" : "It went.",
+          "outcome" : "blocked"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Session 12"
+      }
+    },
+    "name" : "blocked on agents"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "waiting",
+      "isWaiting" : true,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Waiting"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000013",
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "block" : {
+            "checkAgainAt" : 812503600,
+            "waits" : [
+
+            ]
+          },
+          "message" : "It went.",
+          "outcome" : "blocked"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Session 13"
+      }
+    },
+    "name" : "blocked until a time"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "needsAttention",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Needs you"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000014",
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "It went.",
+          "outcome" : "blocked"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Session 14"
+      }
+    },
+    "name" : "blocked on nothing named"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "finished",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Done"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000015",
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "block" : {
+            "clearedAt" : 812500120,
+            "clearedBy" : "waits",
+            "waits" : [
+              {
+                "agentID" : "00000000-0000-0000-0000-000000000077",
+                "nameAtReport" : "Build"
+              }
+            ]
+          },
+          "message" : "It went.",
+          "outcome" : "blocked"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Session 15"
+      }
+    },
+    "name" : "blocked, cleared"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "waiting",
+      "isWaiting" : true,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Waiting"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "endedReason" : "endTurn",
+        "eventWait" : {
+          "from" : 4,
+          "id" : "00000000-0000-0000-0000-000000000900",
+          "patterns" : [
+            {
+              "filters" : {
+
+              },
+              "name" : "ci.finished"
+            }
+          ],
+          "since" : 812500000
+        },
+        "id" : "00000000-0000-0000-0000-000000000016",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Session 16"
+      }
+    },
+    "name" : "finished, waiting on events"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "finished",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Done"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "endedReason" : "endTurn",
+        "eventWait" : {
+          "ending" : {
+            "timedOut" : {
+
+            }
+          },
+          "from" : 4,
+          "id" : "00000000-0000-0000-0000-000000000901",
+          "patterns" : [
+            {
+              "filters" : {
+
+              },
+              "name" : "ci.finished"
+            }
+          ],
+          "since" : 812500000
+        },
+        "id" : "00000000-0000-0000-0000-000000000017",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Session 17"
+      }
+    },
+    "name" : "finished, wait on events ended"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "needsAttention",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Needs you"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "endedReason" : "endTurn",
+        "id" : "00000000-0000-0000-0000-000000000018",
+        "lastActivityAt" : 812500000,
+        "outcomeAsked" : true,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Session 18"
+      }
+    },
+    "name" : "asked how it went, said nothing"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "finished",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Done"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "endedReason" : "endTurn",
+        "id" : "00000000-0000-0000-0000-000000000019",
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "It went.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Session 19"
+      }
+    },
+    "name" : "done"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "finished",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Done"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000020",
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "It went.",
+          "outcome" : "nothing_to_do"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Session 20"
+      }
+    },
+    "name" : "nothing to do"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "finished",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : true,
+      "title" : "Done"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000021",
+        "isUnread" : true,
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "It went.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Session 21"
+      }
+    },
+    "name" : "done, unread"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "waiting",
+      "isWaiting" : true,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Waiting"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "eventWait" : {
+          "from" : 4,
+          "id" : "00000000-0000-0000-0000-000000000900",
+          "patterns" : [
+            {
+              "filters" : {
+
+              },
+              "name" : "ci.finished"
+            }
+          ],
+          "since" : 812500000
+        },
+        "id" : "00000000-0000-0000-0000-000000000023",
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "It went.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Session 23"
+      }
+    },
+    "name" : "done, waiting on events"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "stopped",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Paused"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "endedReason" : "cancelled",
+        "id" : "00000000-0000-0000-0000-000000000024",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "stopped",
+        "title" : "Session 24"
+      }
+    },
+    "name" : "stopped by the person"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "stopped",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Paused"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "endedReason" : "stoppedByAgent",
+        "id" : "00000000-0000-0000-0000-000000000025",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "stopped",
+        "title" : "Session 25"
+      }
+    },
+    "name" : "stopped by its starter"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "stopped",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Paused"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "endedReason" : "allowanceSpent",
+        "id" : "00000000-0000-0000-0000-000000000026",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "stopped",
+        "title" : "Session 26"
+      }
+    },
+    "name" : "stopped, allowance spent"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "needsAttention",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Needs you"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "endedReason" : "processDied",
+        "id" : "00000000-0000-0000-0000-000000000027",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "stopped",
+        "title" : "Session 27"
+      }
+    },
+    "name" : "stopped, the runtime crashed"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "needsAttention",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Needs you"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "endedReason" : "daemonGone",
+        "id" : "00000000-0000-0000-0000-000000000028",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "stopped",
+        "title" : "Session 28"
+      }
+    },
+    "name" : "stopped with the daemon"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "needsAttention",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Needs you"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000029",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "stopped",
+        "title" : "Session 29"
+      }
+    },
+    "name" : "stopped, no reason"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "stopped",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Paused"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "endedReason" : "cancelled",
+        "id" : "00000000-0000-0000-0000-000000000030",
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "It went.",
+          "outcome" : "needs_answer"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "stopped",
+        "title" : "Session 30"
+      }
+    },
+    "name" : "stopped, a needs-answer report kept"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : true,
+      "group" : "finished",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Done"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "archiveRequest" : {
+          "requested" : {
+            "at" : 812500300
+          }
+        },
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000031",
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "It went.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Session 31"
+      }
+    },
+    "name" : "asks to archive, done"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : true,
+      "group" : "needsAttention",
+      "isWaiting" : false,
+      "needsAPerson" : true,
+      "showsUnread" : true,
+      "title" : "Needs you"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "archiveRequest" : {
+          "requested" : {
+            "at" : 812500360
+          }
+        },
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000032",
+        "isUnread" : true,
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "It went.",
+          "outcome" : "partly_done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Session 32"
+      }
+    },
+    "name" : "asks to archive, partly done, unread"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : true,
+      "group" : "stopped",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Paused"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "archiveRequest" : {
+          "requested" : {
+            "at" : 812500300
+          }
+        },
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "endedReason" : "cancelled",
+        "id" : "00000000-0000-0000-0000-000000000033",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "stopped",
+        "title" : "Session 33"
+      }
+    },
+    "name" : "asks to archive, stopped"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "running",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Working"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "archiveRequest" : {
+          "whenTurnEnds" : {
+            "since" : 812500240
+          }
+        },
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000034",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "running",
+        "title" : "Session 34"
+      }
+    },
+    "name" : "asks to archive when the turn ends, running"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "archived",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Archived"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000035",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "archived",
+        "title" : "Session 35"
+      }
+    },
+    "name" : "archived"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "archived",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Archived"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "archiveRequest" : {
+          "requested" : {
+            "at" : 812500300
+          }
+        },
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000036",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "archived",
+        "title" : "Session 36"
+      }
+    },
+    "name" : "archived, a request left on it"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "waiting",
+      "isWaiting" : false,
+      "needsAPerson" : false,
+      "showsUnread" : false,
+      "title" : "Waiting"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000037",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "queued",
+        "title" : "Session 37"
+      }
+    },
+    "name" : "queued for a place (#362)"
+  }
+]

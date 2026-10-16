@@ -1,0 +1,159 @@
+[
+  {
+    "expected" : {
+      "file" : "/Users/a/.claude/plans/tidy.md",
+      "text" : null
+    },
+    "input" : {
+      "content" : [
+
+      ],
+      "kind" : "switch_mode",
+      "locations" : [
+
+      ],
+      "rawInput" : {
+        "planFilePath" : "/Users/a/.claude/plans/tidy.md"
+      },
+      "title" : "Ready to code?"
+    },
+    "name" : "a file"
+  },
+  {
+    "expected" : {
+      "file" : "/p/plan.MD",
+      "text" : "1. Do it"
+    },
+    "input" : {
+      "content" : [
+
+      ],
+      "kind" : "switch_mode",
+      "locations" : [
+
+      ],
+      "rawInput" : {
+        "plan" : "1. Do it",
+        "planFilePath" : " /p/./x/../plan.MD "
+      },
+      "title" : "Ready to code?"
+    },
+    "name" : "a file and its text"
+  },
+  {
+    "expected" : {
+      "file" : null,
+      "text" : "## Plan\n- one"
+    },
+    "input" : {
+      "content" : [
+
+      ],
+      "kind" : "switch_mode",
+      "locations" : [
+
+      ],
+      "rawInput" : {
+        "plan" : "## Plan\n- one"
+      },
+      "title" : "Ready to code?"
+    },
+    "name" : "text only"
+  },
+  {
+    "expected" : {
+      "file" : null,
+      "text" : null
+    },
+    "input" : {
+      "content" : [
+
+      ],
+      "kind" : "switch_mode",
+      "locations" : [
+
+      ],
+      "rawInput" : {
+        "plan" : "  \n "
+      },
+      "title" : "Ready to code?"
+    },
+    "name" : "blank text"
+  },
+  {
+    "expected" : {
+      "file" : null,
+      "text" : "x"
+    },
+    "input" : {
+      "content" : [
+
+      ],
+      "kind" : "switch_mode",
+      "locations" : [
+
+      ],
+      "rawInput" : {
+        "plan" : "x",
+        "planFilePath" : "plans/tidy.md"
+      },
+      "title" : "Ready to code?"
+    },
+    "name" : "relative path"
+  },
+  {
+    "expected" : {
+      "file" : null,
+      "text" : null
+    },
+    "input" : {
+      "content" : [
+
+      ],
+      "kind" : "switch_mode",
+      "locations" : [
+
+      ],
+      "rawInput" : {
+        "planFilePath" : "/p/plan.txt"
+      },
+      "title" : "Ready to code?"
+    },
+    "name" : "not markdown"
+  },
+  {
+    "expected" : {
+      "file" : null,
+      "text" : null
+    },
+    "input" : {
+      "content" : [
+
+      ],
+      "kind" : "switch_mode",
+      "locations" : [
+
+      ],
+      "title" : "Ready to code?"
+    },
+    "name" : "nothing"
+  },
+  {
+    "expected" : null,
+    "input" : {
+      "content" : [
+
+      ],
+      "kind" : "edit",
+      "locations" : [
+
+      ],
+      "rawInput" : {
+        "plan" : "x",
+        "planFilePath" : "/p/plan.md"
+      },
+      "title" : "Ready to code?"
+    },
+    "name" : "not a plan"
+  }
+]

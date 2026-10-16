@@ -1,0 +1,174 @@
+[
+  {
+    "expected" : "Macintosh HD is running low: 12.3 GB free (2%).",
+    "input" : {
+      "level" : "low",
+      "reading" : {
+        "freeBytes" : 12345000000,
+        "mount" : "/",
+        "totalBytes" : 500000000000,
+        "volume" : "Macintosh HD"
+      },
+      "threshold" : 25000000000,
+      "worktrees" : [
+
+      ]
+    },
+    "name" : "low, no worktrees"
+  },
+  {
+    "expected" : "Macintosh HD is running low: 20.0 GB free (3%).",
+    "input" : {
+      "level" : "low",
+      "reading" : {
+        "freeBytes" : 19960000000,
+        "mount" : "/",
+        "totalBytes" : 500000000000,
+        "volume" : "Macintosh HD"
+      },
+      "threshold" : 25000000000,
+      "worktrees" : [
+
+      ]
+    },
+    "name" : "low, rounding up"
+  },
+  {
+    "expected" : "Macintosh HD is running low: 12.2 GB free (2%).",
+    "input" : {
+      "level" : "low",
+      "reading" : {
+        "freeBytes" : 12250000000,
+        "mount" : "/",
+        "totalBytes" : 500000000000,
+        "volume" : "Macintosh HD"
+      },
+      "threshold" : 25000000000,
+      "worktrees" : [
+
+      ]
+    },
+    "name" : "an exact tie rounds to even"
+  },
+  {
+    "expected" : "Macintosh HD is running low: 12.8 GB free (2%).",
+    "input" : {
+      "level" : "low",
+      "reading" : {
+        "freeBytes" : 12750000000,
+        "mount" : "/",
+        "totalBytes" : 500000000000,
+        "volume" : "Macintosh HD"
+      },
+      "threshold" : 25000000000,
+      "worktrees" : [
+
+      ]
+    },
+    "name" : "an exact tie rounds up to even"
+  },
+  {
+    "expected" : "Macintosh HD is running low: 12.3 GB free (2%).",
+    "input" : {
+      "level" : "low",
+      "reading" : {
+        "freeBytes" : 12350000000,
+        "mount" : "/",
+        "totalBytes" : 500000000000,
+        "volume" : "Macintosh HD"
+      },
+      "threshold" : 25000000000,
+      "worktrees" : [
+
+      ]
+    },
+    "name" : "not quite a tie"
+  },
+  {
+    "expected" : "Macintosh HD is almost full: 850 MB free. Agents’ commands will start failing.",
+    "input" : {
+      "level" : "critical",
+      "reading" : {
+        "freeBytes" : 850400000,
+        "mount" : "/",
+        "totalBytes" : 500000000000,
+        "volume" : "Macintosh HD"
+      },
+      "threshold" : 2000000000,
+      "worktrees" : [
+
+      ]
+    },
+    "name" : "critical, in MB"
+  },
+  {
+    "expected" : "Macintosh HD is almost full: 0 MB free. Agents’ commands will start failing.",
+    "input" : {
+      "level" : "critical",
+      "reading" : {
+        "freeBytes" : 0,
+        "mount" : "/",
+        "totalBytes" : 500000000000,
+        "volume" : "Macintosh HD"
+      },
+      "threshold" : 2000000000,
+      "worktrees" : [
+
+      ]
+    },
+    "name" : "critical, nothing free"
+  },
+  {
+    "expected" : "Macintosh HD is running low: 15.0 GB free (3%). Largest worktrees: fix-github-issue-196 12.3 GB, perf-lane over 8.0 GB, ui-lane 640 MB.",
+    "input" : {
+      "level" : "low",
+      "reading" : {
+        "freeBytes" : 15000000000,
+        "mount" : "/",
+        "totalBytes" : 500000000000,
+        "volume" : "Macintosh HD"
+      },
+      "threshold" : 25000000000,
+      "worktrees" : [
+        {
+          "bytes" : 12300000000,
+          "name" : "fix-github-issue-196",
+          "partial" : false
+        },
+        {
+          "bytes" : 8000000000,
+          "name" : "perf-lane",
+          "partial" : true
+        },
+        {
+          "bytes" : 640000000,
+          "name" : "ui-lane",
+          "partial" : false
+        },
+        {
+          "bytes" : 1000000,
+          "name" : "small",
+          "partial" : false
+        }
+      ]
+    },
+    "name" : "low, four worktrees, one over"
+  },
+  {
+    "expected" : "Data is almost full: 0 MB free. Agents’ commands will start failing.",
+    "input" : {
+      "level" : "critical",
+      "reading" : {
+        "freeBytes" : 0,
+        "mount" : "/Volumes/Data",
+        "totalBytes" : 0,
+        "volume" : "Data"
+      },
+      "threshold" : 2000000000,
+      "worktrees" : [
+
+      ]
+    },
+    "name" : "an empty volume"
+  }
+]

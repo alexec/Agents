@@ -1,0 +1,914 @@
+[
+  {
+    "expected" : {
+      "choices" : [
+        "runtime",
+        "on",
+        "off"
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off)",
+        "on" : "Use runtime default (On)",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Commands run with your own access. Claude still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, and Claude asks before they reach a new website. Its permission mode is a separate choice.",
+        "runtime" : "Claude’s own settings decide. The app adds nothing."
+      },
+      "states" : {
+        "off" : "Sandbox off",
+        "on" : "Sandbox on",
+        "runtime" : "Sandbox: runtime controlled"
+      },
+      "why" : null,
+      "words" : {
+        "off" : "Off",
+        "on" : "On",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : null,
+      "runtimeID" : "claude"
+    },
+    "name" : "claude no mode"
+  },
+  {
+    "expected" : {
+      "choices" : [
+        "runtime",
+        "on",
+        "off"
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off)",
+        "on" : "Use runtime default (On)",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Commands run with your own access. Claude still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, and Claude asks before they reach a new website. Its permission mode is a separate choice.",
+        "runtime" : "Claude’s own settings decide. The app adds nothing."
+      },
+      "states" : {
+        "off" : "Sandbox off",
+        "on" : "Sandbox on",
+        "runtime" : "Sandbox: runtime controlled"
+      },
+      "why" : null,
+      "words" : {
+        "off" : "Off",
+        "on" : "On",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : "agent-full-access",
+      "runtimeID" : "claude"
+    },
+    "name" : "claude agent-full-access"
+  },
+  {
+    "expected" : {
+      "choices" : [
+        "runtime",
+        "on",
+        "off"
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off)",
+        "on" : "Use runtime default (On)",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Commands run with your own access. Claude still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, and Claude asks before they reach a new website. Its permission mode is a separate choice.",
+        "runtime" : "Claude’s own settings decide. The app adds nothing."
+      },
+      "states" : {
+        "off" : "Sandbox off",
+        "on" : "Sandbox on",
+        "runtime" : "Sandbox: runtime controlled"
+      },
+      "why" : null,
+      "words" : {
+        "off" : "Off",
+        "on" : "On",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : "read-only",
+      "runtimeID" : "claude"
+    },
+    "name" : "claude read-only"
+  },
+  {
+    "expected" : {
+      "choices" : [
+        "runtime",
+        "on",
+        "off"
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off (Full access))",
+        "on" : "Use runtime default (On (Ask or Approve for me))",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Full access: commands run with your own access, and Codex stops asking for approval.",
+        "on" : "Commands can write only in the project and cannot reach the network. The mode still decides when Codex asks.",
+        "runtime" : "The mode decides: Full access has no sandbox, the other modes do."
+      },
+      "states" : {
+        "off" : "Sandbox on",
+        "on" : "Sandbox on",
+        "runtime" : "Sandbox on"
+      },
+      "why" : null,
+      "words" : {
+        "off" : "Off (Full access)",
+        "on" : "On (Ask or Approve for me)",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : null,
+      "runtimeID" : "codex"
+    },
+    "name" : "codex no mode"
+  },
+  {
+    "expected" : {
+      "choices" : [
+        "runtime",
+        "on",
+        "off"
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off (Full access))",
+        "on" : "Use runtime default (On (Ask or Approve for me))",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Full access: commands run with your own access, and Codex stops asking for approval.",
+        "on" : "Commands can write only in the project and cannot reach the network. The mode still decides when Codex asks.",
+        "runtime" : "The mode decides: Full access has no sandbox, the other modes do."
+      },
+      "states" : {
+        "off" : "Sandbox off",
+        "on" : "Sandbox off",
+        "runtime" : "Sandbox off"
+      },
+      "why" : null,
+      "words" : {
+        "off" : "Off (Full access)",
+        "on" : "On (Ask or Approve for me)",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : "agent-full-access",
+      "runtimeID" : "codex"
+    },
+    "name" : "codex agent-full-access"
+  },
+  {
+    "expected" : {
+      "choices" : [
+        "runtime",
+        "on",
+        "off"
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off (Full access))",
+        "on" : "Use runtime default (On (Ask or Approve for me))",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Full access: commands run with your own access, and Codex stops asking for approval.",
+        "on" : "Commands can write only in the project and cannot reach the network. The mode still decides when Codex asks.",
+        "runtime" : "The mode decides: Full access has no sandbox, the other modes do."
+      },
+      "states" : {
+        "off" : "Sandbox on",
+        "on" : "Sandbox on",
+        "runtime" : "Sandbox on"
+      },
+      "why" : null,
+      "words" : {
+        "off" : "Off (Full access)",
+        "on" : "On (Ask or Approve for me)",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : "read-only",
+      "runtimeID" : "codex"
+    },
+    "name" : "codex read-only"
+  },
+  {
+    "expected" : {
+      "choices" : [
+        "runtime",
+        "on",
+        "off"
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off)",
+        "on" : "Use runtime default (On)",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Commands run with your own access. Grok still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, its temporary folders and Grok’s own folder. Its permission mode is a separate choice.",
+        "runtime" : "Grok’s own settings decide. The app adds nothing."
+      },
+      "states" : {
+        "off" : "Sandbox off",
+        "on" : "Sandbox on",
+        "runtime" : "Sandbox: runtime controlled"
+      },
+      "why" : null,
+      "words" : {
+        "off" : "Off",
+        "on" : "On",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : null,
+      "runtimeID" : "grok"
+    },
+    "name" : "grok no mode"
+  },
+  {
+    "expected" : {
+      "choices" : [
+        "runtime",
+        "on",
+        "off"
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off)",
+        "on" : "Use runtime default (On)",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Commands run with your own access. Grok still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, its temporary folders and Grok’s own folder. Its permission mode is a separate choice.",
+        "runtime" : "Grok’s own settings decide. The app adds nothing."
+      },
+      "states" : {
+        "off" : "Sandbox off",
+        "on" : "Sandbox on",
+        "runtime" : "Sandbox: runtime controlled"
+      },
+      "why" : null,
+      "words" : {
+        "off" : "Off",
+        "on" : "On",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : "agent-full-access",
+      "runtimeID" : "grok"
+    },
+    "name" : "grok agent-full-access"
+  },
+  {
+    "expected" : {
+      "choices" : [
+        "runtime",
+        "on",
+        "off"
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off)",
+        "on" : "Use runtime default (On)",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Commands run with your own access. Grok still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, its temporary folders and Grok’s own folder. Its permission mode is a separate choice.",
+        "runtime" : "Grok’s own settings decide. The app adds nothing."
+      },
+      "states" : {
+        "off" : "Sandbox off",
+        "on" : "Sandbox on",
+        "runtime" : "Sandbox: runtime controlled"
+      },
+      "why" : null,
+      "words" : {
+        "off" : "Off",
+        "on" : "On",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : "read-only",
+      "runtimeID" : "grok"
+    },
+    "name" : "grok read-only"
+  },
+  {
+    "expected" : {
+      "choices" : [
+        "runtime",
+        "off"
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off)",
+        "on" : "Use runtime default (On)",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Commands run with your own access. Gemini still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, its temporary folders and Gemini’s own folder. Its permission mode is a separate choice.",
+        "runtime" : "Gemini’s own settings decide. The app adds nothing."
+      },
+      "states" : {
+        "off" : "Sandbox off",
+        "on" : "Sandbox on",
+        "runtime" : "Sandbox: runtime controlled"
+      },
+      "why" : "Gemini’s own sandbox cannot start when the app runs it, so On is not offered.",
+      "words" : {
+        "off" : "Off",
+        "on" : "On",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : null,
+      "runtimeID" : "gemini"
+    },
+    "name" : "gemini no mode"
+  },
+  {
+    "expected" : {
+      "choices" : [
+        "runtime",
+        "off"
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off)",
+        "on" : "Use runtime default (On)",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Commands run with your own access. Gemini still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, its temporary folders and Gemini’s own folder. Its permission mode is a separate choice.",
+        "runtime" : "Gemini’s own settings decide. The app adds nothing."
+      },
+      "states" : {
+        "off" : "Sandbox off",
+        "on" : "Sandbox on",
+        "runtime" : "Sandbox: runtime controlled"
+      },
+      "why" : "Gemini’s own sandbox cannot start when the app runs it, so On is not offered.",
+      "words" : {
+        "off" : "Off",
+        "on" : "On",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : "agent-full-access",
+      "runtimeID" : "gemini"
+    },
+    "name" : "gemini agent-full-access"
+  },
+  {
+    "expected" : {
+      "choices" : [
+        "runtime",
+        "off"
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off)",
+        "on" : "Use runtime default (On)",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Commands run with your own access. Gemini still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, its temporary folders and Gemini’s own folder. Its permission mode is a separate choice.",
+        "runtime" : "Gemini’s own settings decide. The app adds nothing."
+      },
+      "states" : {
+        "off" : "Sandbox off",
+        "on" : "Sandbox on",
+        "runtime" : "Sandbox: runtime controlled"
+      },
+      "why" : "Gemini’s own sandbox cannot start when the app runs it, so On is not offered.",
+      "words" : {
+        "off" : "Off",
+        "on" : "On",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : "read-only",
+      "runtimeID" : "gemini"
+    },
+    "name" : "gemini read-only"
+  },
+  {
+    "expected" : {
+      "choices" : [
+
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off)",
+        "on" : "Use runtime default (On)",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Commands run with your own access. Cursor still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, its temporary folders and Cursor’s own folder. Its permission mode is a separate choice.",
+        "runtime" : "Cursor’s own settings decide. The app adds nothing."
+      },
+      "states" : {
+        "off" : "Sandbox: runtime controlled",
+        "on" : "Sandbox: runtime controlled",
+        "runtime" : "Sandbox: runtime controlled"
+      },
+      "why" : "Cursor’s own sandbox setting decides. The app cannot change it.",
+      "words" : {
+        "off" : "Off",
+        "on" : "On",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : null,
+      "runtimeID" : "cursor"
+    },
+    "name" : "cursor no mode"
+  },
+  {
+    "expected" : {
+      "choices" : [
+
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off)",
+        "on" : "Use runtime default (On)",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Commands run with your own access. Cursor still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, its temporary folders and Cursor’s own folder. Its permission mode is a separate choice.",
+        "runtime" : "Cursor’s own settings decide. The app adds nothing."
+      },
+      "states" : {
+        "off" : "Sandbox: runtime controlled",
+        "on" : "Sandbox: runtime controlled",
+        "runtime" : "Sandbox: runtime controlled"
+      },
+      "why" : "Cursor’s own sandbox setting decides. The app cannot change it.",
+      "words" : {
+        "off" : "Off",
+        "on" : "On",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : "agent-full-access",
+      "runtimeID" : "cursor"
+    },
+    "name" : "cursor agent-full-access"
+  },
+  {
+    "expected" : {
+      "choices" : [
+
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off)",
+        "on" : "Use runtime default (On)",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Commands run with your own access. Cursor still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, its temporary folders and Cursor’s own folder. Its permission mode is a separate choice.",
+        "runtime" : "Cursor’s own settings decide. The app adds nothing."
+      },
+      "states" : {
+        "off" : "Sandbox: runtime controlled",
+        "on" : "Sandbox: runtime controlled",
+        "runtime" : "Sandbox: runtime controlled"
+      },
+      "why" : "Cursor’s own sandbox setting decides. The app cannot change it.",
+      "words" : {
+        "off" : "Off",
+        "on" : "On",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : "read-only",
+      "runtimeID" : "cursor"
+    },
+    "name" : "cursor read-only"
+  },
+  {
+    "expected" : {
+      "choices" : [
+
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off)",
+        "on" : "Use runtime default (On)",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Commands run with your own access. Copilot still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, its temporary folders and Copilot’s own folder. Its permission mode is a separate choice.",
+        "runtime" : "Copilot’s own settings decide. The app adds nothing."
+      },
+      "states" : {
+        "off" : "Sandbox: runtime controlled",
+        "on" : "Sandbox: runtime controlled",
+        "runtime" : "Sandbox: runtime controlled"
+      },
+      "why" : "Copilot’s own sandbox setting decides. The app cannot change it yet.",
+      "words" : {
+        "off" : "Off",
+        "on" : "On",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : null,
+      "runtimeID" : "copilot"
+    },
+    "name" : "copilot no mode"
+  },
+  {
+    "expected" : {
+      "choices" : [
+
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off)",
+        "on" : "Use runtime default (On)",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Commands run with your own access. Copilot still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, its temporary folders and Copilot’s own folder. Its permission mode is a separate choice.",
+        "runtime" : "Copilot’s own settings decide. The app adds nothing."
+      },
+      "states" : {
+        "off" : "Sandbox: runtime controlled",
+        "on" : "Sandbox: runtime controlled",
+        "runtime" : "Sandbox: runtime controlled"
+      },
+      "why" : "Copilot’s own sandbox setting decides. The app cannot change it yet.",
+      "words" : {
+        "off" : "Off",
+        "on" : "On",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : "agent-full-access",
+      "runtimeID" : "copilot"
+    },
+    "name" : "copilot agent-full-access"
+  },
+  {
+    "expected" : {
+      "choices" : [
+
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off)",
+        "on" : "Use runtime default (On)",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Commands run with your own access. Copilot still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, its temporary folders and Copilot’s own folder. Its permission mode is a separate choice.",
+        "runtime" : "Copilot’s own settings decide. The app adds nothing."
+      },
+      "states" : {
+        "off" : "Sandbox: runtime controlled",
+        "on" : "Sandbox: runtime controlled",
+        "runtime" : "Sandbox: runtime controlled"
+      },
+      "why" : "Copilot’s own sandbox setting decides. The app cannot change it yet.",
+      "words" : {
+        "off" : "Off",
+        "on" : "On",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : "read-only",
+      "runtimeID" : "copilot"
+    },
+    "name" : "copilot read-only"
+  },
+  {
+    "expected" : {
+      "choices" : [
+
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off)",
+        "on" : "Use runtime default (On)",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Commands run with your own access. Antigravity still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, its temporary folders and Antigravity’s own folder. Its permission mode is a separate choice.",
+        "runtime" : "Antigravity’s own settings decide. The app adds nothing."
+      },
+      "states" : {
+        "off" : "No sandbox",
+        "on" : "No sandbox",
+        "runtime" : "No sandbox"
+      },
+      "why" : "Antigravity sandboxes commands only when a business account’s admin turns Sandbox mode on.",
+      "words" : {
+        "off" : "Off",
+        "on" : "On",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : null,
+      "runtimeID" : "antigravity"
+    },
+    "name" : "antigravity no mode"
+  },
+  {
+    "expected" : {
+      "choices" : [
+
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off)",
+        "on" : "Use runtime default (On)",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Commands run with your own access. Antigravity still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, its temporary folders and Antigravity’s own folder. Its permission mode is a separate choice.",
+        "runtime" : "Antigravity’s own settings decide. The app adds nothing."
+      },
+      "states" : {
+        "off" : "No sandbox",
+        "on" : "No sandbox",
+        "runtime" : "No sandbox"
+      },
+      "why" : "Antigravity sandboxes commands only when a business account’s admin turns Sandbox mode on.",
+      "words" : {
+        "off" : "Off",
+        "on" : "On",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : "agent-full-access",
+      "runtimeID" : "antigravity"
+    },
+    "name" : "antigravity agent-full-access"
+  },
+  {
+    "expected" : {
+      "choices" : [
+
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off)",
+        "on" : "Use runtime default (On)",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Commands run with your own access. Antigravity still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, its temporary folders and Antigravity’s own folder. Its permission mode is a separate choice.",
+        "runtime" : "Antigravity’s own settings decide. The app adds nothing."
+      },
+      "states" : {
+        "off" : "No sandbox",
+        "on" : "No sandbox",
+        "runtime" : "No sandbox"
+      },
+      "why" : "Antigravity sandboxes commands only when a business account’s admin turns Sandbox mode on.",
+      "words" : {
+        "off" : "Off",
+        "on" : "On",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : "read-only",
+      "runtimeID" : "antigravity"
+    },
+    "name" : "antigravity read-only"
+  },
+  {
+    "expected" : {
+      "choices" : [
+
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off)",
+        "on" : "Use runtime default (On)",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Commands run with your own access. OpenCode still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, its temporary folders and OpenCode’s own folder. Its permission mode is a separate choice.",
+        "runtime" : "OpenCode’s own settings decide. The app adds nothing."
+      },
+      "states" : {
+        "off" : "No sandbox",
+        "on" : "No sandbox",
+        "runtime" : "No sandbox"
+      },
+      "why" : "OpenCode has no command sandbox. It asks before running commands unless set to Always-approve.",
+      "words" : {
+        "off" : "Off",
+        "on" : "On",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : null,
+      "runtimeID" : "opencode"
+    },
+    "name" : "opencode no mode"
+  },
+  {
+    "expected" : {
+      "choices" : [
+
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off)",
+        "on" : "Use runtime default (On)",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Commands run with your own access. OpenCode still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, its temporary folders and OpenCode’s own folder. Its permission mode is a separate choice.",
+        "runtime" : "OpenCode’s own settings decide. The app adds nothing."
+      },
+      "states" : {
+        "off" : "No sandbox",
+        "on" : "No sandbox",
+        "runtime" : "No sandbox"
+      },
+      "why" : "OpenCode has no command sandbox. It asks before running commands unless set to Always-approve.",
+      "words" : {
+        "off" : "Off",
+        "on" : "On",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : "agent-full-access",
+      "runtimeID" : "opencode"
+    },
+    "name" : "opencode agent-full-access"
+  },
+  {
+    "expected" : {
+      "choices" : [
+
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off)",
+        "on" : "Use runtime default (On)",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Commands run with your own access. OpenCode still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, its temporary folders and OpenCode’s own folder. Its permission mode is a separate choice.",
+        "runtime" : "OpenCode’s own settings decide. The app adds nothing."
+      },
+      "states" : {
+        "off" : "No sandbox",
+        "on" : "No sandbox",
+        "runtime" : "No sandbox"
+      },
+      "why" : "OpenCode has no command sandbox. It asks before running commands unless set to Always-approve.",
+      "words" : {
+        "off" : "Off",
+        "on" : "On",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : "read-only",
+      "runtimeID" : "opencode"
+    },
+    "name" : "opencode read-only"
+  },
+  {
+    "expected" : {
+      "choices" : [
+
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off)",
+        "on" : "Use runtime default (On)",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Commands run with your own access. unknown still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, its temporary folders and unknown’s own folder. Its permission mode is a separate choice.",
+        "runtime" : "unknown’s own settings decide. The app adds nothing."
+      },
+      "states" : {
+        "off" : "Sandbox: runtime controlled",
+        "on" : "Sandbox: runtime controlled",
+        "runtime" : "Sandbox: runtime controlled"
+      },
+      "why" : null,
+      "words" : {
+        "off" : "Off",
+        "on" : "On",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : null,
+      "runtimeID" : "unknown"
+    },
+    "name" : "unknown no mode"
+  },
+  {
+    "expected" : {
+      "choices" : [
+
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off)",
+        "on" : "Use runtime default (On)",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Commands run with your own access. unknown still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, its temporary folders and unknown’s own folder. Its permission mode is a separate choice.",
+        "runtime" : "unknown’s own settings decide. The app adds nothing."
+      },
+      "states" : {
+        "off" : "Sandbox: runtime controlled",
+        "on" : "Sandbox: runtime controlled",
+        "runtime" : "Sandbox: runtime controlled"
+      },
+      "why" : null,
+      "words" : {
+        "off" : "Off",
+        "on" : "On",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : "agent-full-access",
+      "runtimeID" : "unknown"
+    },
+    "name" : "unknown agent-full-access"
+  },
+  {
+    "expected" : {
+      "choices" : [
+
+      ],
+      "defaults" : {
+        "off" : "Use runtime default (Off)",
+        "on" : "Use runtime default (On)",
+        "runtime" : "Use runtime default (As configured by runtime)"
+      },
+      "explanations" : {
+        "off" : "Commands run with your own access. unknown still asks as its permission mode says.",
+        "on" : "Commands can write only in the project, its temporary folders and unknown’s own folder. Its permission mode is a separate choice.",
+        "runtime" : "unknown’s own settings decide. The app adds nothing."
+      },
+      "states" : {
+        "off" : "Sandbox: runtime controlled",
+        "on" : "Sandbox: runtime controlled",
+        "runtime" : "Sandbox: runtime controlled"
+      },
+      "why" : null,
+      "words" : {
+        "off" : "Off",
+        "on" : "On",
+        "runtime" : "As configured by runtime"
+      }
+    },
+    "input" : {
+      "codexMode" : "read-only",
+      "runtimeID" : "unknown"
+    },
+    "name" : "unknown read-only"
+  }
+]

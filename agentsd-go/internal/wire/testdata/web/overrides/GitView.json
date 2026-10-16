@@ -1,0 +1,51 @@
+[
+  {
+    "expected" : "GitView",
+    "input" : {
+      "owned" : {
+        "since" : "abc123"
+      }
+    },
+    "name" : "owned"
+  },
+  {
+    "expected" : "GitView",
+    "input" : {
+      "shared" : {
+        "since" : "abc123"
+      }
+    },
+    "name" : "shared"
+  },
+  {
+    "expected" : "GitView",
+    "input" : {
+      "sharedFromHead" : {
+
+      }
+    },
+    "name" : "shared from head"
+  },
+  {
+    "expected" : "GitView",
+    "input" : {
+      "unavailable" : {
+        "notARepository" : {
+
+        }
+      }
+    },
+    "name" : "unavailable"
+  },
+  {
+    "expected" : "GitView",
+    "input" : {
+      "unavailable" : {
+        "failed" : {
+          "message" : "no"
+        }
+      }
+    },
+    "name" : "failed"
+  }
+]

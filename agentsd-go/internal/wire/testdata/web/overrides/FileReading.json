@@ -1,0 +1,53 @@
+[
+  {
+    "expected" : "FileReading",
+    "input" : {
+      "isTruncated" : false,
+      "kind" : "text",
+      "size" : 5,
+      "stamp" : {
+        "modifiedAt" : 812500000,
+        "size" : 12
+      },
+      "text" : "hello"
+    },
+    "name" : "text"
+  },
+  {
+    "expected" : "FileReading",
+    "input" : {
+      "bytes" : "aGk=",
+      "describedAs" : "PNG image, 1 × 1",
+      "kind" : "image",
+      "stamp" : {
+        "modifiedAt" : 812500000,
+        "size" : 12
+      }
+    },
+    "name" : "image"
+  },
+  {
+    "expected" : "FileReading",
+    "input" : {
+      "describedAs" : "Binary file",
+      "kind" : "other",
+      "size" : 12,
+      "stamp" : {
+        "modifiedAt" : 812500000,
+        "size" : 12
+      }
+    },
+    "name" : "other"
+  },
+  {
+    "expected" : "FileReading",
+    "input" : {
+      "kind" : "unchanged",
+      "stamp" : {
+        "modifiedAt" : 812500000,
+        "size" : 12
+      }
+    },
+    "name" : "unchanged"
+  }
+]

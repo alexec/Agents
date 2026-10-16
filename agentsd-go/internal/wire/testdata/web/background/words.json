@@ -1,0 +1,220 @@
+[
+  {
+    "expected" : {
+      "mark" : null,
+      "rows" : [
+
+      ]
+    },
+    "input" : {
+      "items" : [
+
+      ],
+      "now" : 812500120
+    },
+    "name" : "nothing"
+  },
+  {
+    "expected" : {
+      "mark" : "1 shell in the background",
+      "rows" : [
+        {
+          "age" : "2:00",
+          "ended" : null,
+          "ending" : "Shell “Tick” is running in the background",
+          "id" : "a",
+          "isRunning" : true,
+          "noun" : "Shell"
+        }
+      ]
+    },
+    "input" : {
+      "items" : [
+        {
+          "canStop" : false,
+          "id" : "a",
+          "isStopping" : false,
+          "kind" : "task",
+          "name" : "Tick",
+          "startedAt" : 812500000,
+          "state" : "running",
+          "taskType" : "shell"
+        }
+      ],
+      "now" : 812500120
+    },
+    "name" : "one shell"
+  },
+  {
+    "expected" : {
+      "mark" : "2 shells, 1 subagent, 1 task in the background",
+      "rows" : [
+        {
+          "age" : "2:00",
+          "ended" : null,
+          "ending" : "Shell “Tick” is running in the background",
+          "id" : "a",
+          "isRunning" : true,
+          "noun" : "Shell"
+        },
+        {
+          "age" : "2:00",
+          "ended" : null,
+          "ending" : "Shell “Two” is running in the background",
+          "id" : "d",
+          "isRunning" : true,
+          "noun" : "Shell"
+        },
+        {
+          "age" : "2:00",
+          "ended" : null,
+          "ending" : "Subagent “Count files” is running in the background",
+          "id" : "c",
+          "isRunning" : true,
+          "noun" : "Subagent"
+        },
+        {
+          "age" : "2:00",
+          "ended" : null,
+          "ending" : "Monitor “Watch” is running in the background",
+          "id" : "b",
+          "isRunning" : true,
+          "noun" : "Monitor"
+        }
+      ]
+    },
+    "input" : {
+      "items" : [
+        {
+          "canStop" : false,
+          "id" : "a",
+          "isStopping" : false,
+          "kind" : "task",
+          "name" : "Tick",
+          "startedAt" : 812500000,
+          "state" : "running",
+          "taskType" : "shell"
+        },
+        {
+          "canStop" : false,
+          "id" : "d",
+          "isStopping" : false,
+          "kind" : "task",
+          "name" : "Two",
+          "startedAt" : 812500000,
+          "state" : "running",
+          "taskType" : "shell"
+        },
+        {
+          "canStop" : false,
+          "id" : "c",
+          "isStopping" : false,
+          "kind" : "subagent",
+          "name" : "Count files",
+          "startedAt" : 812500000,
+          "state" : "running"
+        },
+        {
+          "canStop" : false,
+          "id" : "b",
+          "isStopping" : false,
+          "kind" : "task",
+          "name" : "Watch",
+          "startedAt" : 812500000,
+          "state" : "paused",
+          "taskType" : "monitor"
+        }
+      ],
+      "now" : 812500120
+    },
+    "name" : "two shells, a subagent and a task"
+  },
+  {
+    "expected" : {
+      "mark" : null,
+      "rows" : [
+        {
+          "age" : "0:36",
+          "ended" : "Finished",
+          "ending" : "Shell “Tick” finished",
+          "id" : "a",
+          "isRunning" : false,
+          "noun" : "Shell"
+        },
+        {
+          "age" : "1:15:00",
+          "ended" : "Failed",
+          "ending" : "Subagent “Count files” failed",
+          "id" : "c",
+          "isRunning" : false,
+          "noun" : "Subagent"
+        },
+        {
+          "age" : "12:04",
+          "ended" : "Stopped",
+          "ending" : "Monitor “Watch” stopped",
+          "id" : "b",
+          "isRunning" : false,
+          "noun" : "Monitor"
+        },
+        {
+          "age" : "1:00",
+          "ended" : "Ended with the turn",
+          "ending" : "Workflow “W” ended with the turn",
+          "id" : "e",
+          "isRunning" : false,
+          "noun" : "Workflow"
+        }
+      ]
+    },
+    "input" : {
+      "items" : [
+        {
+          "canStop" : false,
+          "endedAt" : 812500036,
+          "id" : "a",
+          "isStopping" : false,
+          "kind" : "task",
+          "name" : "Tick",
+          "startedAt" : 812500000,
+          "state" : "completed",
+          "taskType" : "shell"
+        },
+        {
+          "canStop" : false,
+          "endedAt" : 812504500,
+          "id" : "c",
+          "isStopping" : false,
+          "kind" : "subagent",
+          "name" : "Count files",
+          "startedAt" : 812500000,
+          "state" : "failed"
+        },
+        {
+          "canStop" : false,
+          "endedAt" : 812500724.2,
+          "id" : "b",
+          "isStopping" : false,
+          "kind" : "task",
+          "name" : "Watch",
+          "startedAt" : 812500000,
+          "state" : "stopped",
+          "taskType" : "monitor"
+        },
+        {
+          "canStop" : false,
+          "endedAt" : 812500060,
+          "id" : "e",
+          "isStopping" : false,
+          "kind" : "task",
+          "name" : "W",
+          "startedAt" : 812500000,
+          "state" : "disconnected",
+          "taskType" : "workflow"
+        }
+      ],
+      "now" : 812500120
+    },
+    "name" : "every ending"
+  }
+]

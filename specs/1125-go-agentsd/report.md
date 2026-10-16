@@ -7,7 +7,41 @@ Throwaway code in `agentsd-go/`. Not for merge. The test note is [test.md](test.
 | Stage | Status | Commit | What works |
 |---|---|---|---|
 | 1. Base | done (socket); window look waits for an unlocked screen | 3acff3f2 | Joins with a v2 host code over today's wire. A real Claude turn over `coder/acp-go-sdk`, with this Mac's sign-in lent through the control plane. |
-| 2. Everyday turn | done (socket); window look waits | (this commit) | Permission cards both ways; the app's tools (`list_sessions`, `read_session`, `start_session`) on `modelcontextprotocol/go-sdk`; terminals on `creack/pty`; files browse/list/read/write; Codex with the Mac's ChatGPT sign-in lent; stop. |
+| 2. Everyday turn | done (socket); window look waits | 91657767 | Permission cards both ways; the app's tools (`list_sessions`, `read_session`, `start_session`) on `modelcontextprotocol/go-sdk`; terminals on `creack/pty`; files browse/list/read/write; Codex with the Mac's ChatGPT sign-in lent; stop. |
+| 3. Schema-first wire | done | (this commit) | `schema/daemon.schema.json`, 118 definitions, with Go, Swift and TypeScript generated from it. Go and Swift round-trip all 316 records today's Swift encoder writes in the fixtures. Today's TypeScript types fit the schema's. The Go host's own records fit it too. |
+
+## Stage 3: a schema-first wire
+
+**What was done** (`agentsd-go/schema/`; `bootstrap.sh`, `gen.sh` and `check.sh` remake and check all of it)
+- **The schema.** `daemon.schema.json` is JSON Schema draft-07: 118 definitions, everything reachable from the 11 types stages 1–2 put on the wire (`Agent`, `TranscriptEntry`, `TranscriptPage`, `TurnsPage`, `ProjectSummary`, `RuntimeStatus`, `PermissionRequest`, `ListRequest`, `StartRequest`, `PromptRequest`, `OptionsResponse`).
+  - It was not typed by hand. `Packages/WebTypes` already reads the Swift source into `Web/src/protocol/generated.ts`, and `ts-json-schema-generator` turned all of that into a schema: every one of the 364 exported types, as 361 definitions with none missing (3 are aliases).
+  - So the first schema is today's Swift exactly. From here the schema would be the source, and WebTypes would go.
+- **Go** (`atombender/go-jsonschema` v0.24.1, into `internal/wire/types_gen.go`, 2925 lines). An enum with associated values (`anyOf` of one-key objects) becomes a struct of optional pointers, one per case. That reads and writes Swift's `{"case":{…}}` as it is.
+  - One fix after generation: a case with no values (`{"timedOut":{}}`) was typed as a map, and `omitempty` dropped it. `gen.sh` makes those fields pointers.
+- **Swift** (quicktype 23, into `swift-check/Sources/WireTypes/Wire.swift`, 9.4k lines) and **TypeScript** (quicktype, `ts/wire.ts`, 1.2k lines).
+  - quicktype overflows its stack on the recursive `JSONValue`, so it reads a copy where `JSONValue` is "any".
+  - Its `JSONAny` cannot be `Equatable`.
+  - Its names are poor where the TS had none (`WPurpleConfigChoice`).
+- **Checks** (`check.sh`), all passing:
+  - **Go:** the 316 Agent, TranscriptEntry, RuntimeStatus and PermissionRequest records in AgentsKit's Swift-encoded fixtures decode with unknown fields refused, and encode back to the same JSON (`internal/wire/roundtrip_test.go`). 310 passed before the empty-case fix and 316 after.
+  - **Swift:** `swift-check` depends on `Packages/AgentsKit` and changes none of it. Each fixture is decoded into today's `AgentsKitCore` type and encoded with today's encoder (a plain `JSONEncoder`, as `JSONValue.encoding` uses). That output is decoded into the generated `W…` type and encoded again: 316 of 316 are the same.
+  - **The Go host's own records** (an agent; 11 entry kinds, from text to permissions; a project; the runtimes) decode strictly into the generated Go (`internal/daemon/schema_test.go`).
+  - **TypeScript:** `tsc --strict` checks that every one of the 11 types in today's `generated.ts` can be assigned to the type made from the schema. The reverse does not hold (see below).
+
+**How much of `DaemonAPI` and `Model` a schema can carry**
+- **All of the shapes.** Every type the web page reaches, which is every one a client reads, went into the schema with nothing left out: records, requests, results, string enums, enums with associated values, optional against required, `[AgentGroup: Int]` maps, and nesting and recursion (`JSONValue`).
+- **It cannot carry these:**
+  - **What a value means.** `Date` is seconds since 2001, `UUID` is upper case, `Data` is base64 and a file `URL` is a URL. In the schema they are a number and strings, with a description, a `format`/`pattern` for UUIDs and an `x-swift-type`, and no generator reads those. The generated Swift has `Double` and `String` where the product has `Date`, `UUID` and `URL`; the Go has `float64`. A real switch needs a type map for the generators, or small hand-written types for these five.
+  - **Decoders that forgive.**
+    - `TranscriptEntry`'s unknown kind is kept as `unrecognised`; `AgentState`'s unknown value reads as `stopped`.
+    - `WorkflowSummary` defaults most of its fields.
+    - `EndedReason` has no forgiving decode: an unknown value fails the whole agent.
+    A schema can say "one of these, or anything else" (`anyOf` with a fallback), but generated code does not then *do* what the hand-written `init(from:)` does.
+  - **Which method takes what.** The schema has types, not methods: nothing says `agents/start` takes a `StartRequest` and answers a UUID, or which notifications exist. OpenRPC (a JSON Schema document per method) is the standard way to add that. `DaemonAPI.WebSignatures` already lists the methods.
+  - **Behaviour.** The lean `agent/changed`, `index`/`oversized` on `agent/entry`, paging rules, the error codes and their meaning, and the order of a turn's notifications. These are rules in prose, not shapes.
+- **The TypeScript the schema gives is wider than today's.** `UUID`, `WireDate` and `Base64` are branded types in `generated.ts` and plain `string`/`number` in `wire.ts`. So today's types fit the schema's, but not the other way round. The brands would need a hand-written prelude, as `generated.ts` has.
+
+**Verdict:** a schema carries the wire's shapes completely, and three generators turned it into working Go, Swift and TypeScript in a day, checked against today's encoder. The cost is the five meaning-types, the forgiving decoders and the method list. Those are small and hand-written once. I would make the schema the source for a Go control plane and hosts, with OpenRPC for the methods, and keep Swift `Model` types hand-written but checked against the schema in CI (as `swift-check` does) rather than generated.
 
 ## Stage 2: an everyday turn on Linux
 

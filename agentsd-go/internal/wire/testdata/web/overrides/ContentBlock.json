@@ -1,0 +1,52 @@
+[
+  {
+    "expected" : "ContentBlock",
+    "input" : {
+      "text" : "Hello",
+      "type" : "text"
+    },
+    "name" : "text"
+  },
+  {
+    "expected" : "ContentBlock",
+    "input" : {
+      "data" : "aGk=",
+      "mimeType" : "image/png",
+      "type" : "image",
+      "uri" : "file:///a.png"
+    },
+    "name" : "image"
+  },
+  {
+    "expected" : "ContentBlock",
+    "input" : {
+      "data" : "aGk=",
+      "mimeType" : "audio/wav",
+      "type" : "audio"
+    },
+    "name" : "audio"
+  },
+  {
+    "expected" : "ContentBlock",
+    "input" : {
+      "mimeType" : "text/plain",
+      "name" : "a.txt",
+      "size" : 2,
+      "type" : "resource_link",
+      "uri" : "file:///a.txt"
+    },
+    "name" : "resource link"
+  },
+  {
+    "expected" : "ContentBlock",
+    "input" : {
+      "resource" : {
+        "mimeType" : "text/plain",
+        "text" : "b",
+        "uri" : "file:///b.txt"
+      },
+      "type" : "resource"
+    },
+    "name" : "resource"
+  }
+]

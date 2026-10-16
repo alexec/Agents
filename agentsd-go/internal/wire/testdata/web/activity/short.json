@@ -1,0 +1,66 @@
+[
+  {
+    "expected" : "now",
+    "input" : {
+      "lastActivityAt" : 813099980,
+      "now" : 813100000
+    },
+    "name" : "just now"
+  },
+  {
+    "expected" : "now",
+    "input" : {
+      "lastActivityAt" : 813100090,
+      "now" : 813100000
+    },
+    "name" : "ahead of now"
+  },
+  {
+    "expected" : "1m",
+    "input" : {
+      "lastActivityAt" : 813099940,
+      "now" : 813100000
+    },
+    "name" : "a minute"
+  },
+  {
+    "expected" : "59m",
+    "input" : {
+      "lastActivityAt" : 813096401,
+      "now" : 813100000
+    },
+    "name" : "under the hour"
+  },
+  {
+    "expected" : "1h",
+    "input" : {
+      "lastActivityAt" : 813096400,
+      "now" : 813100000
+    },
+    "name" : "an hour"
+  },
+  {
+    "expected" : "23h",
+    "input" : {
+      "lastActivityAt" : 813013601,
+      "now" : 813100000
+    },
+    "name" : "under a day"
+  },
+  {
+    "expected" : "1d",
+    "input" : {
+      "lastActivityAt" : 813013600,
+      "now" : 813100000
+    },
+    "name" : "a day"
+  },
+  {
+    "expected" : "40d",
+    "input" : {
+      "lastActivityAt" : 809644000,
+      "now" : 813100000
+    },
+    "name" : "weeks"
+  }
+]
