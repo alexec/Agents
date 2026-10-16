@@ -3,10 +3,9 @@
 // bars, and a bar picked to read its own figures. The bars are worked out in model/time.ts.
 import { useSignal } from "@preact/signals";
 import type { TimeHistory } from "../protocol/generated";
-import { stampDate, usageRanges, type UsageRange } from "../model/usage";
+import { usageRanges, type UsageRange } from "../model/usage";
 import {
-  type RecapFigures, type TimeBar, type TimeKind, leverage, leverageWords, timeChart, timeKinds, timeKindTitles,
-  timePercent, timeRecap, timeTotal, timeWords,
+  type TimeBar, type TimeKind, timeChart, timeKinds, timeKindTitles, timePercent, timeTotal, timeWords,
 } from "../model/time";
 
 const width = 600;
@@ -28,7 +27,6 @@ export function TimeCharts({ history, runtimeName }: { history: TimeHistory | un
 
   return (
     <section class="usage-charts time-charts">
-      <TimeRecapSection history={history} />
       <div class="segmented" role="radiogroup" aria-label="Range">
         {usageRanges.map((r) => (
           <button key={r} role="radio" aria-checked={range.value === r} class={range.value === r ? "on" : ""}
@@ -99,57 +97,6 @@ export function TimeCharts({ history, runtimeName }: { history: TimeHistory | un
       )}
       <p class="quiet small">Chats run side by side, so an hour can hold more than an hour of chat time. Time between turns is not counted.</p>
     </section>
-  );
-}
-
-// Today and the last seven days side by side, then the person's records (#985): the window's and
-// the Remote's TimeRecapSection. No streaks, nothing about tokens or cost.
-function TimeRecapSection({ history }: { history: TimeHistory }) {
-  const recap = timeRecap(history);
-  const prs = (f: RecapFigures) => (f.prsMerged === undefined ? "–" : String(f.prsMerged));
-  const rows: [string, (f: RecapFigures) => string, string?][] = [
-    ["PRs merged", prs, "Pull requests merged from agents' branches, as gh says"],
-    ["Turns finished", (f) => String(f.turns)],
-    ["Agents run", (f) => String(f.agents), "Agents that ran a turn, counted on each day they ran"],
-    ["Leverage", (f) => leverageWords(leverage(f)), "Agent hours for each hour the agents waited for you"],
-    ["Peak agents at once", (f) => String(f.peakAgents)],
-  ];
-  const { mostAgents, mostPRs, longestClear } = recap.records;
-  return (
-    <div class="time-recap">
-      <table class="time-recap-table">
-        <thead>
-          <tr><th class="quiet small strong">Recap</th><th class="quiet small strong">Today</th><th class="quiet small strong">Last 7 days</th></tr>
-        </thead>
-        <tbody>
-          {rows.map(([title, value, help]) => (
-            <tr key={title} title={help}>
-              <td>{title}</td><td>{value(recap.today)}</td><td>{value(recap.week)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {(mostAgents || mostPRs || longestClear) && (
-        <>
-          <h2 class="section-head">Records</h2>
-          {mostAgents && <RecordRow title="Most agents at once" value={String(mostAgents.value)} day={mostAgents.day} />}
-          {mostPRs && <RecordRow title="Most PRs merged in a day" value={String(mostPRs.value)} day={mostPRs.day} />}
-          {longestClear && (
-            <RecordRow title="Longest stretch with no agent waiting for you" value={timeWords(longestClear.value)} day={longestClear.day} />
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-function RecordRow({ title, value, day }: { title: string; value: string; day: string }) {
-  const date = stampDate(day);
-  const words = date ? date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : day;
-  return (
-    <p class="usage-share">
-      <span>{title}</span><span>{value} <span class="quiet">{words}</span></span>
-    </p>
   );
 }
 
