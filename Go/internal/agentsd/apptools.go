@@ -70,6 +70,8 @@ func appToolCalls() []appTool {
 		{"list_sessions", (*Daemon).listSessions},
 		{"read_session", (*Daemon).readSession},
 		{"message_session", (*Daemon).messageSession},
+		{"archive_session", (*Daemon).archiveSession},
+		{"stop_session", (*Daemon).stopSession},
 	}
 }
 
