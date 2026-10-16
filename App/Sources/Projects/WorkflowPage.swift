@@ -26,6 +26,9 @@ import SwiftUI
 /// row you cannot open is a row that can only tell you that something is wrong.
 struct WorkflowPage: View {
     @Environment(AppModel.self) private var model
+    /// The project it is in, and how it leaves and opens a session: the main window's
+    /// selection, or a project's own window's (#1090).
+    private var place = WindowPlace()
     /// `Workflow.id`, not the workflow itself: the file on disk is the truth, and
     /// holding a copy would leave this page showing what the file used to say.
     let workflowID: Workflow.ID
@@ -51,7 +54,7 @@ struct WorkflowPage: View {
     private static let runsPerMore = 6
 
     private var summary: WorkflowSummary? {
-        model.workflows(in: model.selectedProject).first { $0.id == workflowID }
+        model.workflows(in: place.folder).first { $0.id == workflowID }
     }
 
     var body: some View {
@@ -83,7 +86,7 @@ struct WorkflowPage: View {
             if let summary {
                 Button("Delete", role: .destructive) {
                     Task {
-                        if await model.deleteWorkflow(summary) { model.openWorkflow = nil }
+                        if await model.deleteWorkflow(summary) { place.leave() }
                     }
                 }
             }
@@ -95,15 +98,15 @@ struct WorkflowPage: View {
         // — going back during the first draw would take the reader out of a page they
         // had only just opened.
         .onChange(of: summary == nil) { _, gone in
-            guard gone, !model.workflows(in: model.selectedProject).isEmpty else { return }
-            model.openWorkflow = nil
+            guard gone, !model.workflows(in: place.folder).isEmpty else { return }
+            place.leave()
         }
         .onChange(of: workflowID) { shownRuns = Self.runsAtFirst }
         // Its runs, archived ones too, asked of the host: the window holds only the live
         // agents (#165). One more than shown, so Show more knows there is more.
         .task(id: RunsWanted(workflowID: workflowID, shown: shownRuns)) {
             guard let workflow = summary?.workflow else { return }
-            let host = model.selectedProjectHost
+            let host = place.host
             let next = RunsHeld(workflowID: workflow.workflowID, folder: workflow.folder, host: host)
             if let held = runsHeld, held.workflowID != next.workflowID || held.folder != next.folder
                 || held.host != next.host {
@@ -274,7 +277,7 @@ struct WorkflowPage: View {
                 // Pinned at the top of the sidebar (#432, #495), as a session can be.
                 let pinned = model.isPinned(summary)
                 Button {
-                    Task { await model.setPinned(summary, !pinned, on: model.selectedProjectHost) }
+                    Task { await model.setPinned(summary, !pinned, on: place.host) }
                 } label: {
                     Label(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin")
                 }
@@ -286,7 +289,7 @@ struct WorkflowPage: View {
                 Button {
                     Task {
                         await model.setWorkflowArchived(summary, true)
-                        model.openWorkflow = nil
+                        place.leave()
                     }
                 } label: {
                     Label("Archive", systemImage: "archivebox")
@@ -351,8 +354,7 @@ struct WorkflowPage: View {
             Spacer(minLength: 12)
             if let agentID = line.agentID {
                 Button {
-                    model.openWorkflow = nil
-                    model.selection = agentID
+                    place.open(session: agentID)
                 } label: {
                     HStack(spacing: 2) {
                         Text("Open the agent")
@@ -548,9 +550,9 @@ struct WorkflowPage: View {
     /// as a whole. A schedule says whose clock, since a server's may not be this Mac's.
     private func scopeLine(_ trigger: WorkflowTrigger) -> String? {
         // "this Mac" mid-sentence, as the project page's own line writes it.
-        let host = model.isOnThisMac(model.selectedProjectHost)
-            ? "this Mac" : model.hosts.label(model.selectedProjectHost)
-        let project = model.selectedProject?.lastPathComponent ?? "this project"
+        let host = model.isOnThisMac(place.host)
+            ? "this Mac" : model.hosts.label(place.host)
+        let project = place.folder?.lastPathComponent ?? "this project"
         if trigger.schedule != nil { return "By the clock on \(host)" }
         switch trigger.listensIn {
         case .project?: return "In \(project), on \(host)"
@@ -690,8 +692,7 @@ struct WorkflowPage: View {
         if let id = summary.standingAgentID,
            let kept = model.work.agent(id), kept.archivedAt == nil {
             Button {
-                model.openWorkflow = nil
-                model.selection = kept.id
+                place.open(session: kept.id)
             } label: {
                 HStack(spacing: 2) {
                     Text(kept.title ?? "Untitled")
@@ -719,13 +720,13 @@ struct WorkflowPage: View {
                     .appText(.fine)
                     .foregroundStyle(.secondary)
                 LabelTagField(labels: labels.map { SessionLabel(value: $0, owner: .person) },
-                              suggestions: model.labelSuggestions(in: summary.folder, on: model.selectedProjectHost),
+                              suggestions: model.labelSuggestions(in: summary.folder, on: place.host),
                               add: { values in setLabels(summary, labels + values) },
                               remove: { value in
                                   setLabels(summary, labels.filter { SessionLabelPolicy.key($0) != SessionLabelPolicy.key(value) })
                               })
-                .task(id: ProjectKey(host: model.selectedProjectHost, folder: summary.folder)) {
-                    await model.loadLabelVocabulary(in: summary.folder, on: model.selectedProjectHost)
+                .task(id: ProjectKey(host: place.host, folder: summary.folder)) {
+                    await model.loadLabelVocabulary(in: summary.folder, on: place.host)
                 }
             }
             note(summary.workflow.labelsNote)
@@ -776,11 +777,11 @@ struct WorkflowPage: View {
     private func fileAndRuntime(_ summary: WorkflowSummary) -> some View {
         let workflow = summary.workflow
         let file = url(workflow)
-        let here = model.isOnThisMac(model.selectedProjectHost)
+        let here = model.isOnThisMac(place.host)
         return HStack(spacing: 12) {
             if here {
                 Button {
-                    model.reveal(file, on: model.selectedProjectHost)
+                    model.reveal(file, on: place.host)
                 } label: {
                     Label(file.lastPathComponent, systemImage: "doc.text")
                         .lineLimit(1)
@@ -793,7 +794,7 @@ struct WorkflowPage: View {
                 Label(file.lastPathComponent, systemImage: "doc.text")
                     .appText(.fine)
                     .lineLimit(1)
-                    .help("On \(model.hosts.label(model.selectedProjectHost)). Open it there.")
+                    .help("On \(model.hosts.label(place.host)). Open it there.")
             }
             Spacer(minLength: 8)
             runtimeControl(summary)
@@ -1006,8 +1007,7 @@ struct WorkflowPage: View {
             lastRan(summary)
             ForEach(started.prefix(shownRuns)) { agent in
                 Button {
-                    model.openWorkflow = nil
-                    model.selection = agent.id
+                    place.open(session: agent.id)
                 } label: {
                     AgentRow(agent: agent)
                         .padding(.horizontal, 16)
@@ -1064,6 +1064,30 @@ struct WorkflowPage: View {
 
     /// The file as its host reads it (058, R11), this Mac's included.
     private func readRaw(_ workflow: Workflow) async -> String? {
-        await model.readText(url(workflow), on: model.selectedProjectHost)
+        await model.readText(url(workflow), on: place.host)
+    }
+}
+
+/// Where a page about one project is (#1090): the main window, whose selection says the
+/// project and opens what is picked, or a project's own window (#1089), which says both itself.
+@MainActor
+struct WindowPlace: DynamicProperty {
+    @Environment(AppModel.self) private var model
+    @Environment(\.windowProject) private var windowProject
+    @Environment(\.windowOpen) private var windowOpen
+
+    var folder: URL? { windowProject?.folder ?? model.selectedProject }
+    var host: HostID { windowProject?.host ?? model.selectedProjectHost }
+
+    /// Back to the project, from a page over it.
+    func leave() {
+        if let windowOpen { windowOpen(nil) } else { model.openWorkflow = nil }
+    }
+
+    /// A session, in this window.
+    func open(session id: UUID) {
+        if let windowOpen { return windowOpen(.session(id)) }
+        model.openWorkflow = nil
+        model.selection = id
     }
 }

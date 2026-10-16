@@ -9,10 +9,16 @@ import type { Store } from "../model/store";
 import { describe } from "../model/errors";
 import { smartRows, smartTitles } from "../model/sidebar";
 import { setSmartGroup, smartGroupsOn } from "../model/smartGroups";
+import { homeWindow, homeWindowTitles, setHomeWindow, type HomeWindow } from "../model/launcher";
 import { BackToList } from "./BackToList";
 import { celebrationsOn, setCelebrations } from "../model/celebrations";
 
 /** The words under the Sidebar section, as the window's and the Remote's (#846). */
+/** Under Home window, as the window's and the Remote's (#1090). */
+export const homeWindowFooter = "All projects is the sidebar of every project. Launcher is a small window of project cards, "
+  + "with each project in a window of its own.";
+/** Under the smart groups with Launcher on: they are kept, and do nothing there. */
+export const launcherSmartGroupsFooter = "The launcher has no smart groups. Choose All projects to use them.";
 export const sidebarSettingsFooter = "A group that is off is not shown. Its sessions go to the next group they fit, "
   + "or under their project. With Needs You off, approvals are not listed in the sidebar.";
 
@@ -134,14 +140,25 @@ export function SettingsPage({ store }: { store: Store }) {
           </section>
           <section aria-labelledby="settings-sidebar">
             <h2 class="section-head" id="settings-sidebar">Sidebar</h2>
+            {/* The main page's style (#1090), the same on every client (#1033). */}
+            <label class="setting">
+              <span>Home window</span>
+              <select value={homeWindow.value} onChange={(e) => setHomeWindow(e.currentTarget.value as HomeWindow)}>
+                {(Object.keys(homeWindowTitles) as HomeWindow[]).map((home) => (
+                  <option key={home} value={home}>{homeWindowTitles[home]}</option>
+                ))}
+              </select>
+            </label>
+            <p class="hint">{homeWindowFooter}</p>
             {smartRows.map((row) => (
               <label class="setting" key={row}>
                 <span>{smartTitles[row]}</span>
-                <input type="checkbox" role="switch" checked={on.has(row)}
+                {/* The launcher has no smart groups (Alex, #1090): kept as they are, greyed. */}
+                <input type="checkbox" role="switch" checked={on.has(row)} disabled={homeWindow.value === "launcher"}
                   onChange={(e) => setSmartGroup(row, e.currentTarget.checked)} />
               </label>
             ))}
-            <p class="hint">{sidebarSettingsFooter}</p>
+            <p class="hint">{homeWindow.value === "launcher" ? launcherSmartGroupsFooter : sidebarSettingsFooter}</p>
           </section>
           <SlackSection store={store} />
         </div>

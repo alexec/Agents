@@ -9,6 +9,9 @@ import SwiftUI
 /// opens the workflow's page or the session's chat, as it did from the fold.
 struct ProjectWorkPage: View {
     @Environment(AppModel.self) private var model
+    /// In a project's own window, its pick and how it opens one (#1090).
+    @Environment(\.windowOpen) private var windowOpen
+    @Environment(\.windowPick) private var windowPick
     let page: AppModel.ProjectPage
     let project: ProjectKey
     /// Whether the host answered the ask for this project's archive: nil while it is on
@@ -23,7 +26,9 @@ struct ProjectWorkPage: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
                 .padding(.bottom, 8)
-            List(selection: $model.sidebarItem) {
+            List(selection: windowOpen.map { open in
+                Binding(get: { windowPick }, set: { if let item = $0 { open(item) } })
+            } ?? $model.sidebarItem) {
                 archive
             }
             .listStyle(.inset)

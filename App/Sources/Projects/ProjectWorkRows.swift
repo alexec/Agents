@@ -145,6 +145,13 @@ private struct WorkRow<Leading: View, Detail: View, Trailing: View>: View {
 /// selection lights it, as it does a session's row (066).
 struct WorkflowListRow: View {
     @Environment(AppModel.self) private var model
+    /// In a project's own window, how it opens what is picked (#1090).
+    @Environment(\.windowOpen) private var windowOpen
+
+    /// In this window: a project's own, or the main window's selection.
+    private func open(_ item: SidebarItem) {
+        if let windowOpen { windowOpen(item) } else { model.sidebarItem = item }
+    }
     let summary: WorkflowSummary
     let project: ProjectKey
     /// In its project's Workflows fold: one level in, under the word Workflows (#1079).
@@ -194,7 +201,7 @@ struct WorkflowListRow: View {
             }
         }
         .contextMenu {
-            Button("Open") { model.sidebarItem = .workflow(summary.id, in: project) }
+            Button("Open") { open(.workflow(summary.id, in: project)) }
             if summary.isArchived {
                 Button("Bring Back") { Task { await model.setWorkflowArchived(summary, false) } }
             } else if summary.isUnapproved {

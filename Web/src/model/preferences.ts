@@ -14,6 +14,7 @@ export const preferenceKeys = {
   showsUsage: "showsUsage",
   startRuntimeID: "startRuntimeID",
   startChoices: "startChoices",
+  homeWindow: "homeWindow",
 } as const;
 
 /** The Mac's map, as last heard; empty until it is, which is every choice at its default. */

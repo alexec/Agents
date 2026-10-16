@@ -660,6 +660,8 @@ final class AppModel {
     /// Brings a project's window forward, or opens it: the scene's own action, handed
     /// over by the first window to draw, for what is not a view (a notification).
     @ObservationIgnored var openProjectWindow: ((ProjectKey) -> Void)?
+    /// What a project's window opens on once it has opened (#1090), by project.
+    @ObservationIgnored var pendingProjectPicks: [ProjectKey: SidebarItem] = [:]
 
     func scrollToEnd() { scrollToEndToken += 1 }
 
@@ -858,7 +860,12 @@ final class AppModel {
         // From the start, not once connected: a banner tapped to launch the app arrives
         // before then, and was dropped (#1055).
         notifier.open = { [weak self] agentID in
-            // In its project's own window when one is open (#1089, Alex).
+            // In its project's own window when one is open (#1089, Alex), and with
+            // Launcher on, in its project's window whether or not it is (#1090, Alex).
+            if HomeWindow(stored: WindowDefaults.store.string(forKey: HomeWindow.defaultsKey)) == .launcher {
+                self?.openInProjectWindow(agentID)
+                return
+            }
             if self?.showInProjectWindow(agentID) == true { return }
             // Its own project first, because picking a project empties the selection:
             // a chat opened from a banner under some other project's heading is a
