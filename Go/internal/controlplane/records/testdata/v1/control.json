@@ -1,0 +1,26 @@
+{
+  "controlKey" : "BOOxPKa33xtljLHxbn75Xv6F3mK+nBJomu90IDeYoJmfSrcMKPgDgpiT60HhjWbfCyuBmVT9Z/HgcAozdheM4k4=",
+  "created" : "2026-10-14T02:58:29.633Z",
+  "endpoints" : [
+    {
+      "pin" : "68pJOOtmq-dhsJdha_txtRqkMHL-HsskodMb3odpx3s",
+      "url" : "https://test.local:50515"
+    }
+  ],
+  "epoch" : 1,
+  "homeHost" : "mac",
+  "machineID" : "0A0B0C0D-0000-4000-8000-000000000001",
+  "name" : "run-test",
+  "owner" : "53910528-71fe-4df0-aa5f-a8f8e92b9638",
+  "pin" : "68pJOOtmq-dhsJdha_txtRqkMHL-HsskodMb3odpx3s",
+  "port" : 8790,
+  "projectDetection" : {
+    "enabled" : true,
+    "paths" : [
+      "~",
+      "~/src"
+    ]
+  },
+  "rev" : 3,
+  "url" : "https://test.local:50515"
+}
