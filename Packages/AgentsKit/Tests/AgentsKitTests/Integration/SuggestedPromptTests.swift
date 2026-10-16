@@ -440,8 +440,11 @@ struct SuggestedPromptTests {
         try await settle(core, started.id)
         #expect(started.startedByWorkflow == "check-build")
         let sent = await prompts(launcher)
-        #expect(sent == [[Briefing.asSent(to: started.runtimeID),
-                          "Check the build."]])
+        // Claude is briefed in its system prompt (#1080), and hears the workflow's words alone.
+        #expect(started.runtimeID == "claude")
+        #expect(sent == [["Check the build."]])
+        #expect(await launcher.lastAgent?.newSessionParams?["_meta"]?["systemPrompt"]?["append"]?.stringValue
+                == Briefing.asSent(to: started.runtimeID))
     }
 
     /// Ours is a block of its own and not part of what was said. The transcript is a

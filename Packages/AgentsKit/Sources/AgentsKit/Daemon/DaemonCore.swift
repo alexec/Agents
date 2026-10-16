@@ -218,6 +218,10 @@ public actor DaemonCore {
     /// runtime loses one and we have to begin a new one — the briefing lives in the
     /// runtime's history, so that is the only time it is gone.
     var needsBriefing: Set<UUID> = []
+    /// Agents whose prompt in flight carried the briefing, on a runtime that takes no
+    /// system prompt (#1080). A title the runtime sends before the next prompt is made
+    /// from our words, not the person's, and is not taken.
+    var titleHeldOff: Set<UUID> = []
     /// The passages the person changed on a live page since the agent last took a
     /// turn, keyed by agent. Handed to the agent as a block before the person's next
     /// words, then cleared. Not persisted: the edit itself is on disk in the file,
@@ -950,6 +954,10 @@ public actor DaemonCore {
         /// The sandbox choice its runtime was started with (064). A start that resolves to
         /// another cannot use it: the choice is fixed when the process starts.
         var sandbox: SandboxChoice = .runtime
+        /// The briefing and persona its system prompt was made with (#1080), nil for a
+        /// runtime that takes none. A start whose words differ — a persona picked in the
+        /// form — cannot use it: the system prompt is fixed at `session/new`.
+        var standing: String?
         /// The connection that asked for it (029). `nil` for a draft the daemon made
         /// for itself — a workflow's — which no connection going can orphan.
         var connection: UUID?
@@ -1596,6 +1604,11 @@ public actor DaemonCore {
             // The runtime names the conversation: Claude's adapter, Cursor, Gemini and
             // Grok each send one, mostly once per session. One that sends none keeps
             // the title cut from the first prompt. A person's rename outlasts it (#751).
+            // One made from a prompt that began with our briefing is not taken (#1080).
+            guard !titleHeldOff.contains(agentID) else {
+                DaemonLog.shared.write("agent \(agentID): runtime title held off until the next prompt")
+                return
+            }
             agent.takeRuntimeTitle(title)
             changed(agent)
 

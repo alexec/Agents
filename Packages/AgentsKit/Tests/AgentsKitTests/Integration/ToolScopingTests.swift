@@ -129,7 +129,8 @@ struct ToolScopingTests {
             await launcher.allAgents.first?.promptContent != nil
         }
 
-        let text = await launcher.allAgents.first?.promptContent?.arrayValue?.first?["text"]?.stringValue ?? ""
+        // Grok's briefing is in its rules, its system prompt (#1080).
+        let text = await launcher.allAgents.first?.newSessionParams?["_meta"]?["rules"]?.stringValue ?? ""
         #expect(text.contains(Briefing.naming(.init(runtime: "Grok", person: "Sam", pronouns: "she/her"))))
         #expect(text.contains("\"Grok (this agent) will…\""))
         #expect(text.contains("\"Sam, do you want…?\""))

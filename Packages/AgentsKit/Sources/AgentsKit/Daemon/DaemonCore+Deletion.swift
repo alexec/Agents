@@ -180,6 +180,7 @@ extension DaemonCore {
         resuming.remove(id)
         sending.remove(id)
         needsBriefing.remove(id)
+        titleHeldOff.remove(id)
         held.remove(id)
         pendingPermissions = pendingPermissions.filter { $0.value.agentID != id }
         elicitations = elicitations.filter { $0.value.agentID != id }
@@ -227,6 +228,7 @@ extension DaemonCore {
         if resuming.contains(id) { held.append("resuming") }
         if sending.contains(id) { held.append("sending") }
         if needsBriefing.contains(id) { held.append("needsBriefing") }
+        if titleHeldOff.contains(id) { held.append("titleHeldOff") }
         if self.held.contains(id) { held.append("held") }
         if pendingPermissions.values.contains(where: { $0.agentID == id }) { held.append("pendingPermissions") }
         if elicitations.values.contains(where: { $0.agentID == id }) { held.append("elicitations") }
