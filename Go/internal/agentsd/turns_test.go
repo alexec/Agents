@@ -18,7 +18,7 @@ import (
 
 // The test binary is also a fake ACP runtime: with AGENTS_FAKE_ACP=1 it serves one on its
 // stdin and stdout. A prompt with "ask" in it asks for permission before it answers; one
-// with "wait" waits to be cancelled.
+// with "wait for me" waits to be cancelled.
 func TestMain(m *testing.M) {
 	if os.Getenv("AGENTS_FAKE_ACP") == "1" {
 		f := &fakeRuntime{ready: make(chan struct{})}
@@ -38,7 +38,16 @@ type fakeRuntime struct {
 }
 
 func (f *fakeRuntime) Initialize(context.Context, sdk.InitializeRequest) (sdk.InitializeResponse, error) {
-	return sdk.InitializeResponse{ProtocolVersion: sdk.ProtocolVersionNumber}, nil
+	return sdk.InitializeResponse{ProtocolVersion: sdk.ProtocolVersionNumber,
+		AgentCapabilities: sdk.AgentCapabilities{SessionCapabilities: sdk.SessionCapabilities{Resume: &sdk.SessionResumeCapabilities{}}}}, nil
+}
+
+// ResumeSession has its own conversation, and no other.
+func (f *fakeRuntime) ResumeSession(_ context.Context, r sdk.ResumeSessionRequest) (sdk.ResumeSessionResponse, error) {
+	if r.SessionId != "fake-session" {
+		return sdk.ResumeSessionResponse{}, fmt.Errorf("no session %s", r.SessionId)
+	}
+	return sdk.ResumeSessionResponse{}, nil
 }
 func (f *fakeRuntime) NewSession(context.Context, sdk.NewSessionRequest) (sdk.NewSessionResponse, error) {
 	return sdk.NewSessionResponse{SessionId: "fake-session"}, nil
@@ -57,16 +66,16 @@ func (f *fakeRuntime) Prompt(ctx context.Context, p sdk.PromptRequest) (sdk.Prom
 	say := func(s string) {
 		f.conn.SessionUpdate(ctx, sdk.SessionNotification{SessionId: p.SessionId, Update: sdk.UpdateAgentMessageText(s)})
 	}
-	if strings.Contains(text, "wait") {
+	if strings.Contains(text, "wait for me") {
 		<-ctx.Done()
 		return sdk.PromptResponse{StopReason: sdk.StopReasonCancelled}, nil
 	}
-	if strings.Contains(text, "form") {
+	if strings.Contains(text, "a form") {
 		return f.form(ctx, p.SessionId, strings.Contains(text, "withdraw"), say)
 	}
 	f.conn.SessionUpdate(ctx, sdk.SessionNotification{SessionId: p.SessionId, Update: sdk.StartToolCall("call_1", "Write hi.txt",
 		sdk.WithStartKind(sdk.ToolKindEdit), sdk.WithStartStatus(sdk.ToolCallStatusPending))})
-	if strings.Contains(text, "ask") {
+	if strings.Contains(text, "Please ask") {
 		r, _ := f.conn.RequestPermission(ctx, sdk.RequestPermissionRequest{SessionId: p.SessionId,
 			ToolCall: sdk.ToolCallUpdate{ToolCallId: "call_1", Title: sdk.Ptr("Write hi.txt")},
 			Options: []sdk.PermissionOption{{Kind: sdk.PermissionOptionKindAllowOnce, Name: "Allow", OptionId: "allow"},

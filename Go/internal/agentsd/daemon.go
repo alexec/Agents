@@ -39,6 +39,7 @@ type Daemon struct {
 	leaseState
 	attentionState
 	worktreeState
+	recoveryState
 	// SettingsDir is the person's settings on this host (StoreLocations.personalSettings):
 	// <root>/settings, or $HOME/.agents/settings for a server, as the Swift host's --serve.
 	SettingsDir string
@@ -56,6 +57,7 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 		SettingsDir: filepath.Join(st.Loc.Root, "settings")}
 	d.register()
 	d.loadAttention()
+	d.recover()
 	d.watchDisk()
 	return d, nil
 }
@@ -103,6 +105,7 @@ func (d *Daemon) Shutdown() {
 	}
 	d.attentionMu.Unlock()
 	d.stopAll()
+	d.clearPickUps()
 	d.stopShells()
 }
 

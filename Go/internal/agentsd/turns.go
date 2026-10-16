@@ -340,7 +340,11 @@ func (l *live) turn() bool {
 			return false
 		}
 		d.record(l.id, wire.TranscriptEntryKind{RuntimeNote: &wire.TranscriptEntryKindRuntimeNote{Value: "Starting " + rt.Name + "…"}})
-		s, err := acp.Start(ctx, launch, l, d.mcpServersFor(l.id), sessionMeta(a.RuntimeID))
+		continuing := ""
+		if a.RuntimeSessionID != nil {
+			continuing = *a.RuntimeSessionID
+		}
+		s, err := acp.Start(ctx, launch, l, d.mcpServersFor(l.id), sessionMeta(a.RuntimeID), continuing)
 		if err != nil && ctx.Err() != nil {
 			d.end(l, wire.AgentStateStopped, wire.EndedReasonCancelled)
 			return false
@@ -354,6 +358,12 @@ func (l *live) turn() bool {
 		l.mu.Lock()
 		l.session = s
 		l.mu.Unlock()
+		switch {
+		case s.Continued:
+			d.record(l.id, runtimeNote("Picked the conversation back up."))
+		case s.Lost:
+			d.record(l.id, runtimeNote(rt.Name+" no longer has this conversation. Carrying on in a new one; everything above is kept."))
+		}
 		sessionID := string(s.ID)
 		d.change(l.id, func(a *wire.Agent) {
 			a.RuntimeSessionID = &sessionID
@@ -496,6 +506,7 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 	l.mu.Unlock()
 	d.change(l.id, func(a *wire.Agent) {
 		a.State, a.EndedReason = s, reason(why)
+		a.RestartPickUps = nil // any ending but the daemon's going clears the count
 		unread := s == wire.AgentStateFinished
 		a.IsUnread = &unread
 		if s == wire.AgentStateFinished {

@@ -75,8 +75,7 @@ func (d *Daemon) registerAgents() {
 		return d.touchedPaths(r.AgentID), nil
 	})
 	On(d, wire.CallAgentsResuming, func(ctx context.Context, c *Client, _ wire.Empty) (wire.ResumingResponse, error) {
-		// Agents being picked up after a restart; this host picks none up yet.
-		return wire.ResumingResponse{AgentIDs: []wire.UUID{}}, nil
+		return wire.ResumingResponse{AgentIDs: d.resumingNow()}, nil
 	})
 	On(d, wire.CallAgentsContinueInProject, func(ctx context.Context, c *Client, r wire.ContinueInProjectRequest) (wire.UUID, error) {
 		return d.continueInProject(r)
@@ -99,6 +98,9 @@ func (d *Daemon) prompt(r wire.PromptRequest) error {
 	a := d.Store.Agent(r.AgentID)
 	if a == nil {
 		return noSuchAgent()
+	}
+	if err := d.refuseToRun(a); err != nil {
+		return err
 	}
 	if err := d.needsSignIn(a.RuntimeID); err != nil {
 		return err
