@@ -605,7 +605,7 @@ func agentDetails(a *wire.Agent) map[string]string {
 		title = *a.Title
 	}
 	return map[string]string{"agent": string(a.ID), "agent_title": title, "labels": strings.Join(labels, ","),
-		"runtime": string(a.RuntimeID), "started_by": startedBy}
+		"runtime": a.RuntimeID, "started_by": startedBy}
 }
 
 // raiseAgentEvent is an event about one agent, in its project; a writer raises nothing.

@@ -345,6 +345,9 @@ func (l *live) turn() bool {
 			continuing = *a.RuntimeSessionID
 		}
 		s, err := acp.Start(ctx, launch, l, d.mcpServersFor(l.id), sessionMeta(a.RuntimeID), continuing)
+		if err != nil {
+			d.dropAppTokens(l.id)
+		}
 		if err != nil && ctx.Err() != nil {
 			d.end(l, wire.AgentStateStopped, wire.EndedReasonCancelled)
 			return false
@@ -374,10 +377,15 @@ func (l *live) turn() bool {
 		safe.Go("session watch", func() {
 			<-s.Done()
 			l.mu.Lock()
-			if l.session == s {
+			ours := l.session == s
+			if ours {
 				l.session = nil
 			}
 			l.mu.Unlock()
+			// A new process is a new MCP server, with a token of its own.
+			if ours {
+				d.dropAppTokens(l.id)
+			}
 		})
 		// The start options the window chose (model, mode) go first.
 		for k, v := range a.StartOptions.Values {

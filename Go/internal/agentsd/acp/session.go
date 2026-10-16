@@ -111,9 +111,16 @@ func Start(ctx context.Context, l Launch, sink Sink, mcp []sdk.McpServer, meta m
 		s.Stop()
 		return nil, fmt.Errorf("initialize: %w%s", err, stderr.say())
 	}
-	if mcp == nil {
-		mcp = []sdk.McpServer{}
+	// A server over http only to a runtime that takes one (SessionServers.noHTTPRefusal).
+	kept := []sdk.McpServer{}
+	for _, m := range mcp {
+		if m.Http != nil && !s.Init.AgentCapabilities.McpCapabilities.Http {
+			log.Printf("%s does not take MCP servers over http: %s is left out", l.Command, m.Http.Name)
+			continue
+		}
+		kept = append(kept, m)
 	}
+	mcp = kept
 	if continuing != "" {
 		if err := s.continueSession(ictx, continuing, l.Dir, mcp, meta); err == nil {
 			s.Continued = true
