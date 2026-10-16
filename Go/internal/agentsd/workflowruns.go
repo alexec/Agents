@@ -736,6 +736,9 @@ func (d *Daemon) runningOf(folder, id string) bool {
 func (d *Daemon) restoreRuns() {
 	d.workflowMu.Lock()
 	defer d.workflowMu.Unlock()
+	// The host's first look, at start-up as the Swift host's is: what is there now is
+	// approved if approval has not begun, and a file that comes after waits for the person.
+	d.scanLocked()
 	rec := d.recordsLocked()
 	kept := rec.Runs[:0]
 	for _, r := range rec.Runs {
