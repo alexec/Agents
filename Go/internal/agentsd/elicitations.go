@@ -52,6 +52,7 @@ func (l *live) Elicitation(ctx context.Context, params json.RawMessage) (string,
 	d.record(l.id, wire.TranscriptEntryKind{ElicitationAsked: &wire.TranscriptEntryKindElicitationAsked{Value: req}})
 	d.moveIf(l.id, wire.AgentStateRunning, wire.AgentStateWaitingOnUser)
 	Broadcast(d, wire.NotifyAgentElicitation, wire.ElicitationNotification{AgentID: l.id, RequestID: req.ID, Request: &req})
+	d.raiseAgentEvent("agent.asked_form", l.id, "is asking for a form to be filled in.", nil)
 	d.reconsider()
 
 	var r elicitationReply

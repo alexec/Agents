@@ -308,20 +308,52 @@ func (d *Daemon) checkDisk() {
 	}
 	d.diskMu.Lock()
 	if d.diskLevels == nil {
+		// How each stood at the last look, kept in events-state.json, so a crossing is
+		// raised once and a restart does not raise it again.
 		d.diskLevels = map[string]wire.DiskLevel{}
+		d.eventMu.Lock()
+		for k, v := range d.eventStateNow.DiskLevels {
+			d.diskLevels[k] = wire.DiskLevel(v)
+		}
+		d.eventMu.Unlock()
 	}
 	var alarms []wire.DiskAlarm
-	for key, m := range mounts {
+	var crossedLow []wire.DiskAlarm
+	type crossedOK struct {
+		reading   wire.DiskReading
+		threshold int64
+	}
+	var crossedBack []crossedOK
+	rank := map[wire.DiskLevel]int{"": 0, wire.DiskLevelOk: 0, wire.DiskLevelLow: 1, wire.DiskLevelCritical: 2}
+	keys := make([]string, 0, len(mounts))
+	for key := range mounts {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		m := mounts[key]
 		low, critical := m.t.lowLine(m.reading.TotalBytes), m.t.criticalLine()
-		level := nextDiskLevel(d.diskLevels[key], m.reading.FreeBytes, low, critical)
+		was := d.diskLevels[key]
+		level := nextDiskLevel(was, m.reading.FreeBytes, low, critical)
 		d.diskLevels[key] = level
-		if level != wire.DiskLevelOk {
-			threshold := low
-			if level == wire.DiskLevelCritical {
-				threshold = critical
-			}
-			alarms = append(alarms, wire.DiskAlarm{Reading: m.reading, Level: level, Threshold: threshold, Worktrees: []wire.DiskWorktree{}})
+		threshold := low
+		if level == wire.DiskLevelCritical {
+			threshold = critical
 		}
+		alarm := wire.DiskAlarm{Reading: m.reading, Level: level, Threshold: threshold, Worktrees: []wire.DiskWorktree{}}
+		if level != wire.DiskLevelOk {
+			alarms = append(alarms, alarm)
+		}
+		switch {
+		case rank[level] > rank[was]:
+			crossedLow = append(crossedLow, alarm)
+		case level == wire.DiskLevelOk && rank[was] > 0:
+			crossedBack = append(crossedBack, crossedOK{m.reading, low})
+		}
+	}
+	levels := map[string]string{}
+	for k, v := range d.diskLevels {
+		levels[k] = string(v)
 	}
 	sort.Slice(alarms, func(i, j int) bool {
 		if alarms[i].Level != alarms[j].Level {
@@ -335,6 +367,16 @@ func (d *Daemon) checkDisk() {
 	}
 	d.diskAlarms = alarms
 	d.diskMu.Unlock()
+	d.eventMu.Lock()
+	d.eventStateNow.DiskLevels = levels
+	d.saveEventStateLocked()
+	d.eventMu.Unlock()
+	for _, a := range crossedLow {
+		d.raiseDiskLow(a)
+	}
+	for _, c := range crossedBack {
+		d.raiseDiskOK(c.reading, c.threshold)
+	}
 	if changed {
 		Broadcast(d, wire.NotifyDiskChanged, wire.DiskState{Alarms: alarms})
 	}

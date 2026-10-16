@@ -82,6 +82,9 @@ func main() {
 		log.Fatal(err)
 	}
 	d.Quit = stop // daemon/quit
+	// events/raise, as a debug build on a scratch root has it: never on a root a person
+	// uses, nor in a release.
+	d.RaiseByHand = buildinfo.Version == "dev" && !ordinaryRoot(cl.root)
 	if cl.serve {
 		// A server's settings are the person's, in their home (Daemon.swift's --serve).
 		if home, err := os.UserHomeDir(); err == nil {
@@ -284,4 +287,17 @@ func machineID() string {
 func isTerminal() bool {
 	fi, err := os.Stdout.Stat()
 	return err == nil && fi.Mode()&os.ModeCharDevice != 0
+}
+
+// ordinaryRoot is StoreLocations.isStandard: the root a person's host uses, where an
+// invented event would be a lie (Application Support/Agents, or an installed server's).
+func ordinaryRoot(root string) bool {
+	home, _ := os.UserHomeDir()
+	for _, r := range []string{filepath.Join(home, ".local", "share", "Agents"),
+		filepath.Join(home, "Library", "Application Support", "Agents"), filepath.Join(home, ".agents-server", "root")} {
+		if filepath.Clean(root) == r {
+			return true
+		}
+	}
+	return false
 }

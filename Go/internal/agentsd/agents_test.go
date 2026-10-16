@@ -103,6 +103,13 @@ func TestSendNow(t *testing.T) {
 	}
 	c.call(t, 4, "agents/stop", map[string]any{"agentID": id})
 	waitFor(t, "stopped", func() bool { return d.Store.Agent(id).State == wire.AgentStateStopped })
+	// The state says stopped a moment before the turn has ended.
+	waitFor(t, "its turn over", func() bool {
+		l := d.live(id)
+		l.mu.Lock()
+		defer l.mu.Unlock()
+		return !l.inTurn && !l.running
+	})
 	c.call(t, 5, "agents/sendNow", map[string]any{"agentID": id, "promptID": q.ID})
 	waitFor(t, "finished", func() bool { return d.Store.Agent(id).State == wire.AgentStateFinished })
 	if got := userMessages(d, id); got[len(got)-1] != "now please" {

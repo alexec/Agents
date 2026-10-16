@@ -53,6 +53,8 @@ var (
 	CallElicitationsPending            = Method[Empty, []ElicitationRequest]{"elicitations/pending"}
 	CallEventsCancelWait               = Method[CancelWaitRequest, []WaitingAgent]{"events/cancelWait"}
 	CallEventsList                     = Method[EventsListRequest, EventsPage]{"events/list"}
+	CallEventsRaise                    = Method[EventRaiseRequest, Event]{"events/raise"}
+	CallEventsServer                   = Method[ServerReachabilityChange, Event]{"events/server"}
 	CallFilesBrowse                    = Method[FilesBrowseRequest, DirectoryListing]{"files/browse"}
 	CallFilesList                      = Method[FilesListRequest, DirectoryListing]{"files/list"}
 	CallFilesMention                   = Method[FileMentionRequest, []FileMentionDTO]{"files/mention"}
@@ -160,6 +162,7 @@ var (
 	NotifyAttentionChanged             = Notification[AttentionNotification]{"attention/changed"}
 	NotifyCloneChanged                 = Notification[CloneNotification]{"clone/changed"}
 	NotifyDiskChanged                  = Notification[DiskState]{"disk/changed"}
+	NotifyEventsChanged                = Notification[EventsChange]{"events/changed"}
 	NotifyFilesChanged                 = Notification[FilesChangedNotification]{"files/changed"}
 	NotifyLeasesChanged                = Notification[LeaseSnapshot]{"leases/changed"}
 	NotifyMCPHealthChanged             = Notification[MCPHealthSnapshot]{"mcp/healthChanged"}

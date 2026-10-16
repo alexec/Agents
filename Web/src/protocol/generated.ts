@@ -886,6 +886,16 @@ export interface Event {
   consequences: Consequence[];
 }
 
+export interface EventDraft {
+  name: string;
+  at: WireDate;
+  scope: EventScope;
+  sentence: string;
+  details: Record<string, string>;
+  message?: string;
+  chainDepth: number;
+}
+
 export type EventGroup = "agents" | "workflows" | "branches" | "dropbox" | "mac";
 
 /**
@@ -902,6 +912,11 @@ export interface EventPattern {
 export interface EventPublisher {
   agentID: UUID;
   title: string;
+}
+
+export interface EventRaiseRequest {
+  draft: EventDraft;
+  consequences?: Consequence[];
 }
 
 export type EventScope =
@@ -926,6 +941,11 @@ export type EventWaitEnding =
   | { couldNotWake: { reason: string } };
 
 export type EventWaitEndingCanceller = "agent" | "person" | "prompt" | "stopped" | "archived" | "archiveRequested";
+
+export interface EventsChange {
+  event?: Event;
+  waiting: WaitingAgent[];
+}
 
 export interface EventsListRequest {
   before?: number;
@@ -1841,6 +1861,11 @@ export type ServedRequestOutcome =
   | { served: Record<string, never> }
   | { refused: { reason: string } }
   | { failed: { message: string } };
+
+export interface ServerReachabilityChange {
+  server: string;
+  online: boolean;
+}
 
 export interface SessionLabel {
   value: string;
@@ -2978,9 +3003,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Empty: { required: [], optional: [] },
   EntryNotification: { required: ["agentID", "entry"], optional: ["index", "oversized"] },
   Event: { required: ["position", "name", "at", "count", "scope", "sentence", "details", "chainDepth", "consequences"], optional: ["lastAt", "publisher", "message"] },
+  EventDraft: { required: ["name", "at", "scope", "sentence", "details", "chainDepth"], optional: ["message"] },
   EventPattern: { required: ["name", "filters"], optional: ["anyOf"] },
   EventPublisher: { required: ["agentID", "title"], optional: [] },
+  EventRaiseRequest: { required: ["draft"], optional: ["consequences"] },
   EventWait: { required: ["id", "patterns", "from", "since"], optional: ["deadline", "ending", "resumePromptID", "serverEvents"] },
+  EventsChange: { required: ["waiting"], optional: ["event"] },
   EventsListRequest: { required: ["limit"], optional: ["before", "scope", "groups"] },
   EventsPage: { required: ["events", "waiting", "hasMore"], optional: [] },
   FileMentionDTO: { required: ["path", "relativePath"], optional: [] },
@@ -3103,6 +3131,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SandboxFailureRecord: { required: ["runtimeID", "detail", "hang", "recoveryOffered", "completedToolCalls"], optional: [] },
   SandboxSettings: { required: ["defaults"], optional: [] },
   ServedRequest: { required: ["kind", "outcome"], optional: [] },
+  ServerReachabilityChange: { required: ["server", "online"], optional: [] },
   SessionLabel: { required: ["value", "owner", "addedAt"], optional: [] },
   SessionNotice: { required: ["severity", "title"], optional: ["detail"] },
   SetCeilingRequest: { required: ["agentID"], optional: ["ceiling", "tokenCeiling"] },

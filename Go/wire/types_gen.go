@@ -1156,6 +1156,16 @@ type Event struct {
 	Consequences []Consequence     `json:"consequences"`
 }
 
+type EventDraft struct {
+	Name       string            `json:"name"`
+	At         Date              `json:"at"`
+	Scope      EventScope        `json:"scope"`
+	Sentence   string            `json:"sentence"`
+	Details    map[string]string `json:"details"`
+	Message    *string           `json:"message,omitzero"`
+	ChainDepth int64             `json:"chainDepth"`
+}
+
 type EventGroup string
 
 const (
@@ -1176,6 +1186,11 @@ type EventPattern struct {
 type EventPublisher struct {
 	AgentID UUID   `json:"agentID"`
 	Title   string `json:"title"`
+}
+
+type EventRaiseRequest struct {
+	Draft        EventDraft    `json:"draft"`
+	Consequences []Consequence `json:"consequences,omitzero"`
 }
 
 type EventScope struct {
@@ -1228,6 +1243,11 @@ const (
 	EventWaitEndingCancellerArchived         EventWaitEndingCanceller = "archived"
 	EventWaitEndingCancellerArchiveRequested EventWaitEndingCanceller = "archiveRequested"
 )
+
+type EventsChange struct {
+	Event   *Event         `json:"event,omitzero"`
+	Waiting []WaitingAgent `json:"waiting"`
+}
 
 type EventsListRequest struct {
 	Before *int64       `json:"before,omitzero"`
@@ -2468,6 +2488,11 @@ type ServedRequestOutcomeRefused struct {
 
 type ServedRequestOutcomeFailed struct {
 	Message string `json:"message"`
+}
+
+type ServerReachabilityChange struct {
+	Server string `json:"server"`
+	Online bool   `json:"online"`
 }
 
 type SessionLabel struct {
