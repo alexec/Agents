@@ -48,6 +48,10 @@ type held[T any] struct {
 type Records struct {
 	Store store.Store
 
+	// writing makes one change at a time, as the Swift actor does: two changes from this
+	// copy never write against the same tag, so only another copy's change conflicts.
+	writing sync.Mutex
+
 	mu       sync.Mutex
 	clients  map[string]held[ClientRecord]
 	hosts    map[string]held[HostRecord]
@@ -77,6 +81,12 @@ func (r *Records) OnUnreadable(say func(string)) {
 // Load reads everything from the store: at start-up, and as the backstop every 15 s
 // (R4). Only objects whose tag changed are read again (#174).
 func (r *Records) Load(ctx context.Context) error {
+	r.writing.Lock()
+	defer r.writing.Unlock()
+	return r.load(ctx)
+}
+
+func (r *Records) load(ctx context.Context) error {
 	listed, err := r.Store.List(ctx, ClientsPrefix)
 	if err != nil {
 		return err
@@ -338,6 +348,8 @@ func (r *Records) Settings() *Settings {
 // Settings that are there and cannot be read are never made afresh over: they hold the
 // owner and the key every member was paired against. Start-up stops and says so (#171).
 func (r *Records) SettingsOrMake(ctx context.Context, makeSettings func() Settings) (*Settings, error) {
+	r.writing.Lock()
+	defer r.writing.Unlock()
 	for attempt := 1; ; attempt++ {
 		if s := r.Settings(); s != nil {
 			return s, nil
@@ -389,6 +401,8 @@ func (r *Records) SettingsOrMake(ctx context.Context, makeSettings func() Settin
 // same store may have written them since (it writes its own address when it starts,
 // T128): the change is made again on what is there now, a few times at most.
 func (r *Records) ChangeSettings(ctx context.Context, change func(*Settings)) (*Settings, error) {
+	r.writing.Lock()
+	defer r.writing.Unlock()
 	for attempt := 1; attempt <= 3; attempt++ {
 		r.mu.Lock()
 		h := r.settings
@@ -449,6 +463,8 @@ func overTombstone(etag string, ok bool) store.Condition {
 // SaveClient saves a client that paired, or one seen again: created if new, else
 // updated against the version read.
 func (r *Records) SaveClient(ctx context.Context, c ClientRecord) error {
+	r.writing.Lock()
+	defer r.writing.Unlock()
 	r.mu.Lock()
 	c.ID = strings.ToUpper(c.ID)
 	if c.Owner == nil {
@@ -479,9 +495,11 @@ func (r *Records) SaveClient(ctx context.Context, c ClientRecord) error {
 // ForgetClient is clients/forget: a tombstone against the version read. Nothing happens
 // for a client that is not known. The last client may go too (#111).
 func (r *Records) ForgetClient(ctx context.Context, id string) error {
+	r.writing.Lock()
+	defer r.writing.Unlock()
 	id = strings.ToUpper(id)
 	if r.Client(id) == nil {
-		if err := r.Load(ctx); err != nil {
+		if err := r.load(ctx); err != nil {
 			return err
 		}
 	}
@@ -509,6 +527,8 @@ func (r *Records) ForgetClient(ctx context.Context, id string) error {
 // SaveHost saves a host: created if new, else updated against the version read, and
 // not written at all if nothing but its revision would change.
 func (r *Records) SaveHost(ctx context.Context, h HostRecord) error {
+	r.writing.Lock()
+	defer r.writing.Unlock()
 	r.mu.Lock()
 	if h.Owner == nil {
 		h.Owner = r.owner()
@@ -543,8 +563,10 @@ func (r *Records) SaveHost(ctx context.Context, h HostRecord) error {
 
 // RemoveHost is hosts/remove: a tombstone. It says whether there was such a host.
 func (r *Records) RemoveHost(ctx context.Context, id string) (bool, error) {
+	r.writing.Lock()
+	defer r.writing.Unlock()
 	if r.Host(id) == nil {
-		if err := r.Load(ctx); err != nil {
+		if err := r.load(ctx); err != nil {
 			return false, err
 		}
 	}

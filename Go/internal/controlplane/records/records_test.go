@@ -255,3 +255,40 @@ func TestIDs(t *testing.T) {
 		t.Fatal(id)
 	}
 }
+
+// Changes from one copy never conflict with each other, as the Swift actor's do not:
+// only another copy's change does.
+func TestChangesHereDoNotConflictWithEachOther(t *testing.T) {
+	r := New(store.NewMemory())
+	id := NewUUID()
+	r.SaveClient(ctx, ClientRecord{ID: id, Name: "Phone", Kind: KindIPhone, PublicKey: []byte{4}, Paired: Now()})
+	var wg sync.WaitGroup
+	errs := make(chan error, 40)
+	for n := range 20 {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			c := r.Client(id)
+			if c == nil {
+				return
+			}
+			epoch := n
+			c.KnownEpoch = &epoch
+			errs <- r.SaveClient(ctx, *c)
+		}()
+		go func() {
+			defer wg.Done()
+			errs <- r.Load(ctx)
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := r.ForgetClient(ctx, id); err != nil {
+		t.Fatal(err)
+	}
+}

@@ -2,7 +2,10 @@ package controlplane
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -15,6 +18,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/internal/controlplane/web"
 )
 
 // A control plane in this process, over plain HTTP on loopback, with the Go host's and a
@@ -358,4 +362,129 @@ func TestStampedLines(t *testing.T) {
 	if len(lines) != 2 || !strings.HasSuffix(lines[1], " two") || !strings.HasPrefix(lines[0], "2026-10-16T09:00:00.123") {
 		t.Fatal(got)
 	}
+}
+
+// A browser pairs and connects through the loopback listener only, bound to its origin;
+// a window's code and key are refused there, and a browser's code over TLS (071).
+func TestABrowserThroughTheLoopbackListener(t *testing.T) {
+	dist := t.TempDir()
+	index := []byte("<html></html>")
+	sum := sha256.Sum256(index)
+	os.WriteFile(filepath.Join(dist, "index.html"), index, 0o644)
+	os.WriteFile(filepath.Join(dist, "MANIFEST"), []byte("agents-web 1\nout "+hex.EncodeToString(sum[:])+" Web/dist/index.html\n"), 0o644)
+
+	port := freePort(t)
+	url := "http://127.0.0.1:" + itoa(port)
+	var webChanged []web.Status
+	s, err := New(Config{Store: store.NewMemory(), PrivateKey: controllink.NewPrivateKey(), URL: url, Bind: "127.0.0.1",
+		Port: port, Name: "Test plane", Web: &WebConfig{Folder: dist, Port: 0},
+		WebChanged: func(st web.Status) { webChanged = append(webChanged, st) }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	defer s.Stop()
+	if len(webChanged) != 1 || !webChanged[0].Served || s.WebPort() == 0 {
+		t.Fatalf("%+v", webChanged)
+	}
+	origin := web.OriginFor(s.WebPort())
+
+	pair := func(browser bool, kind string, at string) (string, []byte, error) {
+		shown, err := s.Codes().Issue(context.Background(), false, browser, time.Minute)
+		if err != nil {
+			t.Fatal(err)
+		}
+		code, _ := controllink.ParseCode(shown.Text)
+		l, err := dialBrowser(at, origin)
+		if err != nil {
+			return "", nil, err
+		}
+		defer l.Close()
+		auth, _, err := answerHello(l, controllink.Identity{Kind: 'p', ID: code.ID()}, controllink.CodeKey(code.Secret), at, "browser")
+		if err != nil {
+			return "", nil, err
+		}
+		_ = auth
+		private := controllink.NewPrivateKey()
+		public, _ := controllink.PublicKey(private)
+		id := records.NewUUID()
+		params, _ := json.Marshal(clientAnnounce{ID: id, PublicKey: public, Name: "Safari", Kind: kind})
+		l.Write(context.Background(), `{"jsonrpc":"2.0","id":1,"method":"clients/announce","params":`+string(params)+`}`)
+		line, err := l.Read(context.Background())
+		if err != nil {
+			return "", nil, err
+		}
+		if !strings.Contains(line, `"result"`) {
+			return "", nil, fmt.Errorf("%s", line)
+		}
+		return id, private, nil
+	}
+	// A window's code is no good at the loopback listener.
+	if _, _, err := pair(false, records.KindBrowser, origin); err == nil || !strings.Contains(err.Error(), "That code is for a window or a phone") {
+		t.Fatal(err)
+	}
+	id, private, err := pair(true, records.KindBrowser, origin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c := s.Records().Client(id); c == nil || !strings.HasPrefix(c.Name, "Safari on ") || c.Kind != records.KindBrowser {
+		t.Fatal(c)
+	}
+	// The browser's key proves itself at the loopback listener, bound to its origin…
+	public, _ := controllink.PublicKey(s.cfg.PrivateKey)
+	key, _ := controllink.ClientKey(private, public, id)
+	l, err := dialBrowser(origin, origin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := answerHello(l, controllink.Identity{Kind: 'c', ID: id}, key, origin, "browser"); err != nil || ok == nil {
+		t.Fatal(err)
+	}
+	l.Close()
+	// …and nowhere else: not over the TLS listener's door.
+	l, err = controllink.Dial(context.Background(), url, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	if _, _, err := answerHello(l, controllink.Identity{Kind: 'c', ID: id}, key, url, "browser"); err == nil {
+		t.Fatal("a browser's key worked over the TLS listener")
+	}
+}
+
+// dialBrowser opens the loopback listener's socket as the page does, with its Origin.
+func dialBrowser(base, origin string) (*controllink.Lines, error) {
+	return controllink.DialOrigin(context.Background(), base, origin)
+}
+
+// answerHello goes through the exchange by hand: it returns the auth sent and the ok, or
+// the refusal.
+func answerHello(l *controllink.Lines, id controllink.Identity, key []byte, at, kind string) (*controllink.Auth, *controllink.OK, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	line, err := l.Read(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	m, _ := controllink.ParseMessage(line)
+	if m.Hello == nil {
+		return nil, nil, fmt.Errorf("no hello: %s", line)
+	}
+	origin, _ := controllink.Origin(at)
+	auth, expect, err := controllink.Answer(m.Hello, id, key, origin, kind, nil, "", nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	l.Write(ctx, controllink.Message{Auth: auth}.Line())
+	line, err = l.Read(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	m, _ = controllink.ParseMessage(line)
+	if m.OK == nil {
+		return nil, nil, fmt.Errorf("refused: %s", line)
+	}
+	return auth, m.OK, controllink.Check(m.OK, expect)
 }

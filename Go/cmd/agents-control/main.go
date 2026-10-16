@@ -5,6 +5,8 @@
 //	agents-control serve --home DIR [--no-bonjour] [--key-fd N]
 //	agents-control serve … [--host-root DIR]    this Mac's host's root: its join in control/status (#113)
 //	agents-control serve … [--log FILE]         stamped lines into FILE, rolled at 4 MB (#174)
+//	agents-control serve … [--web DIR] [--web-port N] [--no-web]
+//	agents-control serve … [--store-credentials-fd N]
 //	agents-control code (--client [--browser] | --host) [--minutes N] [--home DIR] [--command]
 //	agents-control hosts | clients
 //	agents-control install-script               the script a server runs to become a host
@@ -14,9 +16,15 @@
 // --home is Agents Host's single copy (T057): its certificate and store in DIR, port 8791,
 // this Mac's .local name, and Bonjour. Anything below still overrides it.
 //
+// The web remote (071): with --web DIR (the built Web/dist) and a port, a second listener
+// on 127.0.0.1 and ::1 only serves it at http://localhost:<port>. --home defaults the port
+// to 8792; without --home there is none unless given. --no-web turns it off.
+//
 // Where things are comes from the environment, as the Swift one reads it:
 //
-//	AGENTS_STORE                file:///path
+//	AGENTS_STORE                file:///path, or s3://bucket/prefix (an option)
+//	AGENTS_STORE_ENDPOINT, AGENTS_STORE_PATH_STYLE=1, AWS_*: the bucket (contracts/store.md)
+//	AGENTS_CONTROL_WEB_PORT     the web remote's loopback port, when --web-port is not given
 //	AGENTS_CONTROL_URL          the one address clients and hosts are given
 //	AGENTS_CONTROL_KEY_FILE     the control plane's private key, raw, 0600 (made if missing)
 //	AGENTS_CONTROL_KEY          or the key itself, base64url
@@ -28,6 +36,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/url"
@@ -46,6 +55,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/internal/controlplane/web"
 )
 
 var (
@@ -123,11 +133,55 @@ func openStore(given string) store.Store {
 	if text == "" {
 		fail("say where the store is: AGENTS_STORE=file:///path or s3://bucket/prefix")
 	}
-	s, err := controlplane.OpenStore(text, os.Getenv)
+	s, err := controlplane.OpenStore(text, os.Getenv, storeCredentials())
 	if err != nil {
 		fail("%v", err)
 	}
 	return s
+}
+
+var givenCredentials *controlplane.StoreCredentials
+
+// storeCredentials are the bucket's keys, read once from the descriptor Agents Host
+// handed over (T058a): they are never in a plist, a file or the environment.
+func storeCredentials() *controlplane.StoreCredentials {
+	fd := value("--store-credentials-fd")
+	if fd == "" || givenCredentials != nil {
+		return givenCredentials
+	}
+	n, err := strconv.Atoi(fd)
+	if err != nil {
+		fail("no bucket keys on descriptor %s", fd)
+	}
+	f := os.NewFile(uintptr(n), "credentials")
+	data, _ := io.ReadAll(io.LimitReader(f, 64<<10))
+	f.Close()
+	var c controlplane.StoreCredentials
+	if json.Unmarshal(data, &c) != nil || c.AccessKey == "" {
+		fail("no bucket keys on descriptor %s", fd)
+	}
+	givenCredentials = &c
+	return givenCredentials
+}
+
+// webConfig is the web remote's listener, or nil: a folder and a port both, and no
+// --no-web (071).
+func webConfig() *controlplane.WebConfig {
+	folder := value("--web")
+	if has("--no-web") || folder == "" {
+		return nil
+	}
+	port, err := strconv.Atoi(value("--web-port"))
+	if err != nil {
+		port, err = strconv.Atoi(os.Getenv("AGENTS_CONTROL_WEB_PORT"))
+	}
+	if err != nil {
+		if home() == "" {
+			return nil
+		}
+		port = web.DefaultPort
+	}
+	return &controlplane.WebConfig{Folder: expand(folder), Port: port}
 }
 
 func privateKey() []byte {
@@ -228,6 +282,19 @@ func serve() {
 	if root := value("--host-root"); root != "" {
 		cfg.HostJoinFile = filepath.Join(expand(root), "control-join.json")
 	}
+	cfg.Web = webConfig()
+	// Whether the page is served, for Agents Host to read (071 R3): this run's, or none.
+	if home() != "" {
+		file := filepath.Join(home(), "web.json")
+		os.Remove(file)
+		cfg.WebChanged = func(status web.Status) {
+			data, _ := json.Marshal(map[string]any{"pid": os.Getpid(), "status": status})
+			tmp := file + ".tmp"
+			if os.WriteFile(tmp, data, 0o644) == nil {
+				os.Rename(tmp, file)
+			}
+		}
+	}
 	cfg.Store = openStore("")
 	cfg.PrivateKey = privateKey()
 	s, err := controlplane.New(cfg)
@@ -249,6 +316,14 @@ func serve() {
 			say("advertised as " + cfg.Name)
 		}
 	}
+	// SIGUSR1: try the web remote's listener again (Agents Host's Try Again, 071 R3).
+	retry := make(chan os.Signal, 1)
+	signal.Notify(retry, syscall.SIGUSR1)
+	go func() {
+		for range retry {
+			s.RetryWeb()
+		}
+	}()
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
 	<-stop
@@ -361,7 +436,7 @@ func list(hosts bool) {
 const usage = `usage: agents-control serve [--port N] [--bind ADDR] [--self-signed DIR] [--name NAME] [--key-fd N]
        agents-control code (--client [--browser] | --host) [--minutes N]
        agents-control serve --home DIR [--no-bonjour]
-       agents-control serve … [--host-root DIR] [--log FILE]
+       agents-control serve … [--host-root DIR] [--log FILE] [--web DIR] [--web-port N] [--no-web]
        agents-control hosts | clients
        agents-control install-script
        agents-control store check [--store URL]`

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controlplane/records"
+	"github.com/alexec/agents/Go/internal/controlplane/web"
 )
 
 // The shapes the control plane's methods answer with, as Swift's default JSONEncoder
@@ -61,14 +62,6 @@ func clientOnWire(c records.ClientRecord) clientWire {
 		c.MayNotify, c.Owner, c.Rev, c.Forgotten, refDate(c.ForgottenAt), c.KnownEpoch}
 }
 
-// WebRemoteStatus is DaemonAPI.WebRemoteStatus: the web remote's listener as it stands.
-type WebRemoteStatus struct {
-	Port   int     `json:"port"`
-	Served bool    `json:"served"`
-	Reason *string `json:"reason,omitempty"`
-	Detail *string `json:"detail,omitempty"`
-}
-
 // HostJoinStatus is DaemonAPI.HostJoinStatus: how this Mac's host's join stands (#113).
 type HostJoinStatus struct {
 	Member    bool    `json:"member"`
@@ -88,7 +81,7 @@ type controlStatus struct {
 	AwayFromHome     *bool             `json:"awayFromHome,omitempty"`
 	You              string            `json:"you,omitempty"`
 	RelayKey         []byte            `json:"relayKey,omitempty"`
-	Web              *WebRemoteStatus  `json:"web,omitempty"`
+	Web              *web.Status       `json:"web,omitempty"`
 	ThisMacHost      *HostJoinStatus   `json:"thisMacHost,omitempty"`
 	ProjectDetection json.RawMessage   `json:"projectDetection,omitempty"`
 	UnjoinedTunnels  []json.RawMessage `json:"unjoinedTunnels,omitempty"`
