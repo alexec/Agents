@@ -73,6 +73,9 @@ type Router struct {
 	presence map[string]notedPresence
 	// Told when a host's real uplink here ends.
 	localEnded func(host string)
+	// Told each host's answer to a whole list (#962), for hosts/lastHeard: host, method,
+	// the reply line. Nil where none is kept.
+	copier     func(host, method, reply string)
 	log        func(string)
 	generation int64
 }
@@ -87,6 +90,8 @@ type clientSession struct {
 	// Requests sent to each host and not answered yet, so a host that goes answers them
 	// with hostOffline rather than leaving the client to wait for ever (#77).
 	inFlight map[string]map[string]bool
+	// Of those, the whole lists whose answer is kept for when the host is offline (#962).
+	copying map[string]map[string]string
 }
 
 // target is who a channel on a host's uplink is for: a client session here, or the other
@@ -369,6 +374,7 @@ func (r *Router) dropHostLocked(host string, gen int64, newState *hostState) {
 			delete(s.channels, host)
 			waiting := s.inFlight[host]
 			delete(s.inFlight, host)
+			delete(s.copying, host)
 			// What was asked of it is answered, not lost (#77).
 			for id := range waiting {
 				r.writeLocked(t.session, s.wrap(host, replyError(json.RawMessage(id), fail(hostOffline, "That host went offline before it answered."))))
@@ -566,6 +572,12 @@ func (r *Router) hostLine(line, host string) {
 	if len(s.inFlight[host]) > 0 {
 		if id := answeredID(f.msg); id != "" {
 			delete(s.inFlight[host], id)
+			if method, ok := s.copying[host][id]; ok {
+				delete(s.copying[host], id)
+				if r.copier != nil {
+					go r.copier(host, method, f.msg)
+				}
+			}
 		}
 	}
 	if s.wrapped {
@@ -690,7 +702,8 @@ func (r *Router) AttachClient(client *records.ClientRecord, conn *Conn, relayed 
 	id := records.NewUUID()
 	r.mu.Lock()
 	r.clients[id] = &clientSession{caller: Caller{Session: id, Client: client.ID, Kind: client.Kind, Relayed: relayed},
-		conn: conn, channels: map[string]int{}, inFlight: map[string]map[string]bool{}}
+		conn: conn, channels: map[string]int{}, inFlight: map[string]map[string]bool{},
+		copying: map[string]map[string]string{}}
 	for host := range r.hosts {
 		r.openChannelLocked(id, host)
 	}
@@ -958,6 +971,19 @@ func (r *Router) toHostLocked(host, msg, sessionID string) {
 		s.inFlight[host] = map[string]bool{}
 	}
 	s.inFlight[host][idKey(m.ID)] = true
+	if r.copier != nil && keepsList(m.Method, m.Params) {
+		if s.copying[host] == nil {
+			s.copying[host] = map[string]string{}
+		}
+		s.copying[host][idKey(m.ID)] = m.Method
+	}
+}
+
+// SetCopier says where each host's answer to a whole list goes (#962).
+func (r *Router) SetCopier(f func(host, method, reply string)) {
+	r.mu.Lock()
+	r.copier = f
+	r.mu.Unlock()
 }
 
 // toControl answers on its own goroutine: hosts/install takes minutes, and nothing else

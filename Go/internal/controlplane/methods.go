@@ -237,6 +237,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			return nil, fail(noSuchHost, "No host is called %s.", request.Host)
 		}
 		m.router.ForgetHost(request.Host)
+		m.s.copies.forget(request.Host)
 		m.s.log("host " + request.Host + " removed")
 		return map[string]any{}, nil
 	case "hosts/lastHeard":
@@ -247,7 +248,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		if m.records.Host(request.Host) == nil {
 			return nil, fail(noSuchHost, "No host is called %s.", request.Host)
 		}
-		return map[string]any{"host": request.Host}, nil
+		return m.s.copies.lastHeard(request.Host), nil
 	case "channels/get":
 		return channelsUnavailable, nil
 	case "channels/set":

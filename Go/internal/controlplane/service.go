@@ -83,6 +83,8 @@ type Service struct {
 	started time.Time
 	// What this copy has told its relay host for each need (T097).
 	desk *notices.Desk
+	// What each host last listed (#962), for hosts/lastHeard.
+	copies *hostCopies
 	// hosts/install, detect and sshHosts (T072, #429, #610): with the person's own ssh.
 	installer *hostinstall.Installer
 
@@ -120,6 +122,8 @@ func New(cfg Config) (*Service, error) {
 	s.router = NewRouter(nil, s.log)
 	s.methods = newMethods(s)
 	s.router.handler = s.methods
+	s.copies = newHostCopies(cfg.Store)
+	s.router.SetCopier(s.copies.take)
 	s.installer = &hostinstall.Installer{Codes: s.codes, ServerFolder: cfg.ServerFolder,
 		Progress: func(name, step string) {
 			s.router.BroadcastControl("control/installProgress", map[string]string{"name": name, "step": step})
@@ -176,6 +180,7 @@ func (s *Service) Start(ctx context.Context) (int, error) {
 		s.startWeb()
 	}
 	go s.refreshEvery(15 * time.Second)
+	go s.sweepEveryHour()
 	go s.watchJoinFile()
 	s.log(fmt.Sprintf("listening on %s:%d for %s", s.cfg.Bind, port, s.cfg.URL))
 	return port, nil
