@@ -53,14 +53,16 @@
 /* A project's rows sit at the sidebar's edge under its heading, as a group's do (#495). */
 .with-sidebar .fold-body { margin-bottom: 6px; }
 /* A project's Workflows fold (#885), as a mailbox with sub-mailboxes in Mail: a row with a chevron
-   and a grey count, and its workflows one level in. */
+   and a grey count, and its workflows one level in. Measured from a session's row (#1079): its 8px
+   edge, then the chevron in the 18px mark column, the word at the title (8px on), and each
+   workflow's mark under the word. */
 .with-sidebar details.workflows > summary { display: flex; align-items: baseline; list-style: none; cursor: pointer;
-  padding: 5px 8px 5px 10px; font-size: 0.75rem; color: color-mix(in srgb, currentColor 60%, transparent); }
+  padding: 5px 8px; font-size: 0.75rem; color: color-mix(in srgb, currentColor 60%, transparent); }
 .with-sidebar details.workflows > summary::-webkit-details-marker { display: none; }
 .with-sidebar details.workflows > summary::before { content: "›"; display: inline-block; width: 18px; margin-right: 8px; text-align: center; opacity: 0.7; }
 .with-sidebar details.workflows[open] > summary::before { content: "⌄"; }
 .with-sidebar details.workflows > summary .count { margin-left: auto; font-variant-numeric: tabular-nums; }
-.with-sidebar details.workflows .row.workflow .pick { padding-left: calc(10px + 26px); }
+.with-sidebar details.workflows .row.workflow .pick { padding-left: calc(8px + 26px); }
 
 /* The groups at the top (#495): Pinned, Needs You, Working, Unread, headed and folding as Activity
    is, the count on the right, Needs You's in the attention tint. */
@@ -219,7 +221,7 @@
 
 /* Sessions under the session that started them (#835): a child one indent in, under the mark's
    column; a parent's count and fold at its end, after the time. */
-.with-sidebar .nav-item.child > .row.session { padding-left: calc(10px + 26px); }
+.with-sidebar .nav-item.child > .row.session { padding-left: calc(8px + 26px); }
 .with-sidebar .nav-item.parent { display: flex; align-items: flex-start; }
 .with-sidebar .nav-item.parent > .row { flex: 1; min-width: 0; }
 .with-sidebar .fold-count { border: none; background: none; padding: 8px 6px; font: inherit; color: inherit; cursor: pointer;

@@ -256,7 +256,11 @@ struct SidebarWorkflowRow: View {
     @Environment(RemoteModel.self) private var model
     let summary: WorkflowSummary
     let project: ProjectKey
+    /// In its project's Workflows fold: one level in, under the word Workflows (#1079).
+    var isNested = false
     @State private var confirmsDelete = false
+    /// The mark's well and the gap after it, as a session's row has them (#750).
+    @ScaledMetric private var scale: CGFloat = 1
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -274,6 +278,7 @@ struct SidebarWorkflowRow: View {
                 ActivityTime(date: at)
             }
         }
+        .padding(.leading, isNested ? 20 * scale + 10 : 0)
         .accessibilityElement(children: .combine)
         .accessibilityValue(!summary.isEnabled && !summary.isArchived ? "turned off" : "")
         .tag(SidebarItem.workflow(summary.id, in: project))

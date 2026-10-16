@@ -548,26 +548,17 @@ private struct RemoteProjectFold: View {
 
     /// The project's live workflows, under a Workflows row with a chevron and a grey
     /// count (Alex, #885). Closed until opened, kept per project; a search opens it to
-    /// show what matched. The Mac's `ProjectWorkflowRows`.
+    /// show what matched. The Mac's `ProjectWorkflowRows`: a plain row rather than a
+    /// `DisclosureGroup`, whose chevron the list puts at the row's end (#1079).
+    @ViewBuilder
     private func workflowsFold(_ fold: SidebarProjectFold) -> some View {
         let isOpen = fold.isSearching || folds.isOpen(key, .workflows)
-        return DisclosureGroup(isExpanded: Binding(get: { isOpen },
-                                                   set: { folds.set(key, .workflows, open: $0) })) {
-            // A closed fold has no rows at all (#237).
-            ForEach(isOpen ? fold.workflows : []) { summary in
-                SidebarWorkflowRow(summary: summary, project: key)
-            }
-        } label: {
-            HStack(spacing: 6) {
-                Text("Workflows").lineLimit(1)
-                Spacer(minLength: 4)
-                Text("\(fold.workflows.count)")
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-            }
-            .appText(.supporting)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Workflows, \(fold.workflows.count)")
+        WorkflowsFoldRow(count: fold.workflows.count, isOpen: isOpen) {
+            folds.set(key, .workflows, open: !isOpen)
+        }
+        // A closed fold has no rows at all (#237).
+        ForEach(isOpen ? fold.workflows : []) { summary in
+            SidebarWorkflowRow(summary: summary, project: key, isNested: true)
         }
     }
 
@@ -618,6 +609,42 @@ private struct ProjectPageRow: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel([title, value ?? count.map(String.init)].compactMap { $0 }.joined(separator: ", "))
         .tag(item)
+    }
+}
+
+/// The Workflows row of a project's fold (#885): the chevron in the session rows' mark
+/// well, the word where their titles start, and the count at the end (#1079). A tap
+/// anywhere on it folds or unfolds it.
+private struct WorkflowsFoldRow: View {
+    let count: Int
+    let isOpen: Bool
+    let toggle: () -> Void
+
+    /// The well grows with the text beside it (#750), as a session's mark does.
+    @ScaledMetric private var scale: CGFloat = 1
+
+    var body: some View {
+        Button(action: toggle) {
+            HStack(spacing: 10) {
+                Image(systemName: "chevron.right")
+                    .rotationEffect(.degrees(isOpen ? 90 : 0))
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 20 * scale)
+                Text("Workflows").lineLimit(1)
+                Spacer(minLength: 4)
+                Text("\(count)")
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            .appText(.supporting)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Workflows, \(count)")
+        .accessibilityValue(isOpen ? "open" : "folded")
+        .accessibilityAddTraits(.isButton)
     }
 }
 

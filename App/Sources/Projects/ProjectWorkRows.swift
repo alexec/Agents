@@ -25,16 +25,44 @@ struct ProjectWorkflowRows: View {
             let workflowsFold = Binding(
                 get: { isOpen },
                 set: { folds.set(project, .workflows, open: $0) })
-            DisclosureGroup(isExpanded: workflowsFold) {
-                // A closed fold has no rows at all (#237).
-                ForEach(FoldedRow.rows(isOpen ? workflows : [], in: .workflows)) { row in
-                    WorkflowListRow(summary: row.item, project: project)
-                }
-            } label: {
-                SidebarSubheading(title: "Workflows", count: workflows.count)
-                    .togglesFold(workflowsFold)
+            // A plain row rather than a `DisclosureGroup`, whose chevron the list puts by
+            // its own indent (#1079): the chevron in the session rows' mark column, the
+            // word at their titles, and the workflows one level in, under the word.
+            WorkflowsFoldRow(count: workflows.count, isOpen: workflowsFold)
+            // A closed fold has no rows at all (#237).
+            ForEach(FoldedRow.rows(isOpen ? workflows : [], in: .workflows)) { row in
+                WorkflowListRow(summary: row.item, project: project, isNested: true)
             }
         }
+    }
+}
+
+/// The Workflows row of a project's fold (#885): a chevron in the sidebar's icon column,
+/// 16 wide and 6 to the title as a session's mark, then the subheading. A click anywhere
+/// on it folds or unfolds it (#440); VoiceOver has it as one button that says which.
+private struct WorkflowsFoldRow: View {
+    let count: Int
+    @Binding var isOpen: Bool
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "chevron.right")
+                .rotationEffect(.degrees(isOpen ? 90 : 0))
+                .appText(.fine)
+                .foregroundStyle(.secondary)
+                .frame(width: 16)
+            SidebarSubheading(title: "Workflows", count: count)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        // Beside the list's own handling, as `togglesFold` (#440).
+        .simultaneousGesture(TapGesture().onEnded { isOpen.toggle() })
+        // One label, over children it ignores: one stacked on the subheading's crashes AppKit.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Workflows, \(count)")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityValue(isOpen ? "open" : "folded")
+        .accessibilityAction { isOpen.toggle() }
     }
 }
 
@@ -119,6 +147,8 @@ struct WorkflowListRow: View {
     @Environment(AppModel.self) private var model
     let summary: WorkflowSummary
     let project: ProjectKey
+    /// In its project's Workflows fold: one level in, under the word Workflows (#1079).
+    var isNested = false
     @State private var confirmsDelete = false
 
     var body: some View {
@@ -137,6 +167,7 @@ struct WorkflowListRow: View {
                 ActivityTime(date: at)
             }
         }
+        .padding(.leading, isNested ? 22 : 0)
         .listRowInsets(.vertical, 2)
         .help(!summary.isEnabled && !summary.isArchived ? "Turned off. \(summary.workflow.summary)" : summary.workflow.summary)
         .sidebarInk(.workflow(summary.id, in: project))
