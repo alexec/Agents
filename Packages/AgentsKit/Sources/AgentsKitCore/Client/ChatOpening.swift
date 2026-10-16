@@ -31,24 +31,42 @@ public enum ChatOpening {
         public var turnsFailure: String?
     }
 
+    /// The most of the turn in progress an opening takes whole (#1130): what one page
+    /// of `agents/transcript` gives by default, and what the Mac and the web ask for.
+    public static let wholeTurn = 200
+
     /// The opening page. Throws when the transcript itself did not come.
     ///
     /// A host too old to keep turns gives the lot, which is not a failure. Any other
     /// failure of the turns used to be the same silent empty list, and the chat then
     /// showed its last page with nothing before it and no word why.
-    public static func load(turns: () async throws -> TurnsPage,
-                            transcript: (_ from: Int) async throws -> TranscriptPage,
+    ///
+    /// `limit` is how many entries the client asks for first. A page is the end of the
+    /// turn in progress, so a turn longer than it lost its start: the ask and the first
+    /// lines of the reply, under the summaries where nothing showed they were missing,
+    /// until the reader scrolled to the top (#1130). Such a turn is asked for again
+    /// whole, up to `wholeTurn`.
+    public static func load(limit: Int = wholeTurn,
+                            turns: () async throws -> TurnsPage,
+                            transcript: (_ from: Int, _ limit: Int) async throws -> TranscriptPage,
                             describe: (any Error) -> String = { String(describing: $0) },
                             isolation: isolated (any Actor)? = #isolation) async throws -> Loaded {
         let opening: TurnsPage
         var turnsFailure: String?
+        var turnsKnown = true
         do {
             opening = try await turns()
         } catch {
             if (error as? JSONRPCError)?.code != JSONRPCError.methodNotFound { turnsFailure = describe(error) }
             opening = TurnsPage(turns: [], firstTurn: 0, openStart: 0)
+            turnsKnown = false
         }
-        let page = try await transcript(opening.openStart)
+        var page = try await transcript(opening.openStart, limit)
+        // Without turns the page is the end of the whole transcript, not of one turn.
+        let turnLength = page.total - opening.openStart
+        if turnsKnown, page.firstIndex > opening.openStart, page.entries.count < min(turnLength, wholeTurn) {
+            page = try await transcript(opening.openStart, min(turnLength, wholeTurn))
+        }
         return Loaded(turns: opening, page: page, turnsFailure: turnsFailure)
     }
 }
