@@ -29,6 +29,7 @@ struct PoppedChatWindow: View {
                     ChatView()
                 }
                 .environment(\.poppedChat, chat)
+                .environment(\.windowHasInspector, false)
             } else if chat?.looked == true || id == nil {
                 ContentUnavailableView("This session was deleted", systemImage: "trash",
                                        description: Text("There is nothing left of it to show. Close this window."))
@@ -130,11 +131,17 @@ extension AppModel {
     /// steps in the inspector (#826).
     func showInMainWindow(_ id: UUID) {
         openAgent(id)
+        bringMainWindowForward()
+    }
+
+    /// The main window, in front: Window ▸ Agents (All Projects), ⌘0 (#1089).
+    func bringMainWindowForward() {
         NSApp.windows.first { MainWindow.isMain($0) }?.makeKeyAndOrderFront(nil)
     }
 }
 
-/// Which of the app's windows is the main one: not Settings, and not a session's own.
+/// Which of the app's windows is the main one: not Settings, not a session's own, and not
+/// a project's own (#1089).
 enum MainWindow {
     /// The scene id of a session's own window (`AgentsApp`).
     static let poppedSceneID = "session"
@@ -142,5 +149,6 @@ enum MainWindow {
     static func isMain(_ window: NSWindow) -> Bool {
         guard let identifier = window.identifier?.rawValue, window.canBecomeMain else { return false }
         return identifier.contains("AppWindow") && !identifier.hasPrefix(poppedSceneID)
+            && !identifier.hasPrefix(ProjectWindowScene.id)
     }
 }

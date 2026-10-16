@@ -26,7 +26,7 @@ import { keepsInUnread, newSessionProject, ownCount, pinnedSessions, pinnedWorkf
 import { namedRelative, workflowSummary } from "../model/workflows";
 import { fromWireDate } from "../protocol/dates";
 import type { Agent, ControlHost, ProjectSummary, WorkflowSummary } from "../protocol/generated";
-import { go, route, type ActivityPage } from "../route";
+import { alone, aloneURL, go, route, showAll, type ActivityPage } from "../route";
 import { browserName, type Session } from "../session";
 import { ActivityRows } from "./Activity";
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
@@ -127,8 +127,12 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
   useEffect(() => {
     if (r.host && r.project && r.compose) rememberProject(storage, { host: r.host, folder: r.project });
   }, [r.host, r.project, r.compose]);
-  const projects = orderedProjects(store.hosts.value, store.projects.value);
-  const archived = archivedProjects(store.hosts.value, store.projects.value);
+  // A tab holding one project alone (#1089): its sidebar is that project's only.
+  const held = alone.value;
+  const every = orderedProjects(store.hosts.value, store.projects.value);
+  const projects = held ? every.filter(({ host, project }) => host.id === held.host
+    && folderKey(project.project.folder) === folderKey(held.folder)) : every;
+  const archived = held ? [] : archivedProjects(store.hosts.value, store.projects.value);
   const showsArchived = folds.showsArchivedProjects.value;
   const offline = store.hosts.value.filter((h) => h.state !== "online");
   const macHost = store.hosts.value.find((h) => h.id === "mac");
@@ -138,7 +142,10 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
     <nav class="sidebar" aria-label="Sidebar">
       <header class="column-head sidebar-head">
         {/* The root list's title at a phone's width, as the iPhone's (#235). */}
-        <h1 class="narrow-only">Agents</h1>
+        {held ? <>
+          <button class="link back-all" aria-label="All projects" onClick={showAll}>‹ All</button>
+          <h1 class="alone-title">{projects[0] ? projectLabel(projects[0].host, projects[0].project) : "Project"}</h1>
+        </> : <h1 class="narrow-only">Agents</h1>}
         <input class="search" type="search" placeholder="Search" aria-label="Search sessions and workflows"
           value={search.value} onInput={(e) => (search.value = (e.currentTarget as HTMLInputElement).value)} />
         {/* New project, which the window has in its File menu (#115): the page has no menu bar. */}
@@ -149,6 +156,7 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
         {/* Pages about all the work rather than one project, above the smart groups, as the
             window's (#495): Status, what goes on now, and Usage, the past (#915). Each folds, as
             a project does, and stays while searching, as the window's and the Remote's do (#547). */}
+        {!held && <>
         <details class="activity" aria-label="Status" open={folds.showsStatus.value}
           onToggle={(e) => folds.setShowsStatus((e.currentTarget as HTMLDetailsElement).open)}>
           <summary class="sidebar-head-label" data-fold="status">Status</summary>
@@ -159,17 +167,19 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
           <summary class="sidebar-head-label" data-fold="usage">Usage</summary>
           <ActivityRows group="usage" store={store} chosen={r.activity} onPick={(page: ActivityPage) => go({ activity: page })} />
         </details>
+        </>}
         {/* Pinned, Needs You, Working, Unread: a group each across every project and host (#495, #773),
             each that is on in this browser's Settings (#846). */}
-        {projects.length > 0 && smartRows.filter((row) => smartGroupsOn.value.has(row)).map((row) => (
+        {projects.length > 0 && smartRows.filter((row) => smartGroupsOn.value.has(row) && (!held || aloneRows.has(row))).map((row) => (
           <SmartFold key={row} row={row} store={store} projects={projects} query={query} linkDown={linkDown} />
         ))}
         {/* One group per project (#495), its name the group's heading, its sessions the rows. */}
         <section class="project-list" aria-label="Projects">
           {projects.map(({ host, project }) => (
             <ProjectFold key={`${host.id}|${project.project.folder}`} store={store} host={host} project={project}
-              query={query} linkDown={linkDown} />
+              query={query} linkDown={linkDown} alone={!!held} />
           ))}
+          {held && <Elsewhere store={store} projects={every.filter((p) => !projects.includes(p))} />}
           {/* A host had more matches than its page: the next page, on asking (#176). */}
           {query && Object.keys(store.searchNext.value).length > 0 && (
             <button class="link more-matches" onClick={() => void store.searchMore()}>More matches…</button>
@@ -455,14 +465,16 @@ function SmartFold({ row, store, projects, query, linkDown }: {
  * project's agents alone, so a change to an agent draws one fold again, and a folded one reads
  * nothing of its sessions (#170). `query` is the search's words, already trimmed.
  */
-const ProjectFold = memo(function ProjectFold({ store, host, project, query, linkDown }: {
+const ProjectFold = memo(function ProjectFold({ store, host, project, query, linkDown, alone: isAlone = false }: {
   store: Store; host: ControlHost; project: ProjectSummary; query: string; linkDown: boolean;
+  /** In a tab holding this project alone (#1089): its rows under a Sessions heading, always open. */
+  alone?: boolean;
 }) {
   const r = route.value;
   const folder = project.project.folder;
   const label = projectLabel(host, project);
   const searching = query !== "";
-  const unfolded = searching || folds.isOpen(host.id, folder);
+  const unfolded = searching || isAlone || folds.isOpen(host.id, folder);
   const down = linkDown || !store.hostIsOnline(host.id);
   // Every match on show, past the first few; a new search shows the few again.
   const showsAllMatches = useSignal(false);
@@ -514,6 +526,9 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   const projectMenu: MenuItem[] = [
     { label: "New Session", disabled: down, help: "Start a new session in this project",
       run: () => go({ host: host.id, project: folder, compose: true }) },
+    // The project alone, in a tab of its own (#1089), as the window opens it in a window of its own.
+    { label: "Open in New Tab", help: "Open this project alone in a new browser tab",
+      run: () => void window.open(aloneURL(host.id, folder), "_blank", "noopener") },
     { label: "Put Files in Drop Box…", disabled: down, help: "Put files into this project's .agents/dropbox/ (#231)",
       run: () => putFilesInDropbox(host.id, folder, label) },
     // To the top of the sidebar, as the window's Pin.
@@ -545,6 +560,10 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   return (
     <div class={`project-fold${down && !linkDown ? " greyed" : ""}`} role="group" aria-label={label}
       data-host={host.id} data-folder={folder}>
+      {isAlone ? (
+        // The tab is the project, so its name is the tab's title and not a heading (#1089).
+        <p class={`sidebar-head-label alone-sessions${drop.targeted ? " drop-target" : ""}`} {...drop.props}>Sessions</p>
+      ) : (
       <div class={`row project${drop.targeted ? " drop-target" : ""}`} {...drop.props}>
         <button class="disclosure" aria-label={unfolded ? `Fold ${label}` : `Unfold ${label}`} aria-expanded={unfolded}
           tabIndex={-1} disabled={searching} onClick={() => fold(!unfolded)}>{unfolded ? "⌄" : "›"}</button>
@@ -564,6 +583,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
         </button>
         {own > 0 && <span class="count" aria-label={`${own} sessions`}>{own}</span>}
       </div>
+      )}
       <DropNote note={drop.note} />
       {unfolded && (
         <div class="fold-body">
@@ -817,5 +837,35 @@ function ChatMark() {
       <path d="M2 3.5h7.5v5H5L2.5 10.5V8.5H2z" />
       <path d="M11 6h3v5h-.5v2L11 11H7.5V9.5" />
     </svg>
+  );
+}
+
+/** The groups a tab holding one project draws (#1089): Working and Unread are its sessions, in its list. */
+const aloneRows = new Set<SmartRow>(["pinned", "needsYou"]);
+
+/**
+ * "✋ N elsewhere" (#1089): sessions in other projects need the person. A click shows every project
+ * again, at the first of them.
+ */
+function Elsewhere({ store, projects }: { store: Store; projects: Placed[] }) {
+  const on = smartGroupsOn.value;
+  let count = 0;
+  let first: { host: string; folder: string; id: string } | undefined;
+  for (const { host, project } of projects) {
+    const folder = project.project.folder;
+    const failed = failedRuns(project.approvals);
+    const asking = smartAgents("needsYou", liveSessions(store, host.id, folder), undefined, store.sessionPinsIn(host.id, folder), on)
+      .filter((a) => !failed.has(a.id));
+    count += asking.length;
+    if (!first && asking[0]) first = { host: host.id, folder, id: asking[0].id };
+  }
+  count += smartApprovals(projects.map((placed) => ({ project: placed, approvals: placed.project.approvals }))).length;
+  if (count === 0) return null;
+  return (
+    <button class="link elsewhere" title="Sessions in other projects need you"
+      onClick={() => {
+        showAll();
+        if (first) go({ host: first.host, project: first.folder, session: first.id });
+      }}>✋ {count} elsewhere</button>
   );
 }

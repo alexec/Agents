@@ -412,8 +412,12 @@ struct ProjectListView: View {
 /// its pages: MCP Servers and Archived.
 ///
 /// A search unfolds every project with something that matches and hides the rest.
-private struct ProjectFold: View {
+///
+/// In a project's own window (#1089) the same rows go under a Sessions heading: the
+/// window is the project, so its name is the window's title and not a heading.
+struct ProjectFold: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
     @AppStorage(SidebarSmartRow.offDefaultsKey, store: WindowDefaults.store) private var smartOff = SidebarSmartRow.offAtFirst
     @Environment(WindowRequests.self) private var requests
     let summary: DaemonAPI.ProjectSummary
@@ -422,6 +426,11 @@ private struct ProjectFold: View {
     let query: String
     var showsAllMatches = false
     var showAllMatches: () -> Void = {}
+    /// The smart groups this list draws, when not the ones Settings ▸ Sidebar turns on:
+    /// a project's window has Pinned and Needs You only (#1089).
+    var smartGroups: Set<SidebarSmartRow>? = nil
+    /// Drawn in a project's own window (#1089).
+    var inWindow = false
 
     private var key: ProjectKey { summary.key }
 
@@ -431,7 +440,7 @@ private struct ProjectFold: View {
         // heading is the shared model's, which the Remote draws too (#226).
         let fold = SidebarProjectFold(key, label: label, in: model.work, query: query,
                                       isOpen: folds.isOpen(key), keptInUnread: model.keptInUnread,
-                                      on: SidebarSmartRow.on(off: smartOff))
+                                      on: smartGroups ?? SidebarSmartRow.on(off: smartOff))
         let isOpen = fold.isUnfolded
         if fold.isShown {
             Section(isExpanded: Binding(
@@ -476,22 +485,33 @@ private struct ProjectFold: View {
                     }
                 }
             } header: {
-                ProjectRow(summary: summary, label: label, isFolded: !isOpen, asHeading: true) {
-                    // A search holds every match open.
-                    if !fold.isSearching { folds.set(key, open: !isOpen) }
+                if inWindow {
+                    Text("Sessions").appText(.supporting)
+                } else {
+                    heading(fold, isOpen: isOpen)
                 }
-                    .appText(.supporting)
-                    // As tall as its one or two lines and a little air (#104).
-                    .listRowInsets(.vertical, 3)
-                    // Last known, not current: the server is not answering (037).
-                    .foregroundStyle(model.hostUnreachable(summary.host) ? .secondary : .primary)
-                    .contextMenu { ProjectMenu(summary: summary) }
-                    // A file dropped here goes into the project's drop box (#231).
-                    .dropsIntoDropbox(of: key)
-                    // No tag: the row is not something to open (#375). The project's
-                    // `.project` item is its New session row.
             }
         }
+    }
+
+    /// The project's row, as the main window's sidebar heads its group with it.
+    private func heading(_ fold: SidebarProjectFold, isOpen: Bool) -> some View {
+        ProjectRow(summary: summary, label: label, isFolded: !isOpen, asHeading: true) {
+            // A search holds every match open.
+            if !fold.isSearching { folds.set(key, open: !isOpen) }
+        }
+            .appText(.supporting)
+            // As tall as its one or two lines and a little air (#104).
+            .listRowInsets(.vertical, 3)
+            // Last known, not current: the server is not answering (037).
+            .foregroundStyle(model.hostUnreachable(summary.host) ? .secondary : .primary)
+            .contextMenu { ProjectMenu(summary: summary) }
+            // A file dropped here goes into the project's drop box (#231).
+            .dropsIntoDropbox(of: key)
+            // No tag: the row is not something to open (#375). The project's
+            // `.project` item is its New session row.
+            // A double-click opens the project in a window of its own (#1089).
+            .simultaneousGesture(TapGesture(count: 2).onEnded { openWindow(id: ProjectWindowScene.id, value: key) })
     }
 
     /// A server's project says which server (Alex, #145): no heading for each host, so
@@ -682,9 +702,14 @@ private extension View {
 private struct ProjectMenu: View {
     @Environment(AppModel.self) private var model
     @Environment(WindowRequests.self) private var requests
+    @Environment(\.openWindow) private var openWindow
     let summary: DaemonAPI.ProjectSummary
 
     var body: some View {
+        // The project alone, in a window of its own (#1089); its key is the Window menu's.
+        Button("Open in New Window") { openWindow(id: ProjectWindowScene.id, value: summary.key) }
+            .keyboardShortcut("o", modifiers: [.command, .option])
+        Divider()
         Button("New Session") {
             model.showProject(summary.key)
             requests.focusPrompt()

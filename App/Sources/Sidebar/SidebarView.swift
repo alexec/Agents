@@ -11,6 +11,10 @@ struct SidebarView: View {
     @Environment(AppModel.self) private var model
     @Environment(SidebarFrame.self) private var frame
     @Environment(SidebarStates.self) private var states
+    /// A project's window shows its own session here, not the main window's (#1089).
+    @Environment(\.poppedChat) private var popped
+
+    private var agent: Agent? { popped.map { model.work.agent($0.id) } ?? model.selectedAgent }
 
     /// The width of the whole window, so the column can refuse to take more than its
     /// share.
@@ -33,7 +37,7 @@ struct SidebarView: View {
         VStack(spacing: 0) {
             header
             Divider()
-            if let agent = model.selectedAgent {
+            if let agent {
                 pane(for: agent)
                     // Rebuilt per agent: switching agents switches what the sidebar
                     // shows, which is FR-002. The state each pane returns to is kept

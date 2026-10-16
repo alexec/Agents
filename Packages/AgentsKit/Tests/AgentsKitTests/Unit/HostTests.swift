@@ -68,6 +68,15 @@ struct HostTests {
         #expect(ProjectKey(stored: key.stored) == key)
     }
 
+    /// A project's own window is restored with its key (#1089): one string, as it is kept.
+    @Test func aProjectKeyIsCodedAsItsStoredString() throws {
+        let key = ProjectKey(host: HostID(rawValue: "ab12cd34"), folder: URL(filePath: "/home/alex/src/api"))
+        let data = try JSONEncoder().encode(key)
+        #expect(String(decoding: data, as: UTF8.self) == "\"ab12cd34|\\/home\\/alex\\/src\\/api\"")
+        #expect(try JSONDecoder().decode(ProjectKey.self, from: data) == key)
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(ProjectKey.self, from: Data("\"/bare/path\"".utf8)) }
+    }
+
     /// What a window kept before servers (037) is past the cut-off (#58): no project.
     @Test func aBarePathIsNoProject() {
         #expect(ProjectKey(stored: "/Users/alex/src/api") == nil)

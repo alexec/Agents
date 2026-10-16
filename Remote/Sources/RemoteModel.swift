@@ -68,6 +68,16 @@ final class RemoteModel {
     /// The sessions open in scenes of their own on an iPad (#888), each with its own page
     /// of its transcript. See `PoppedChat`.
     var popouts: [UUID: PoppedChat] = [:]
+    /// The projects open on their own (#1089): a scene each on an iPad, the screen on an
+    /// iPhone. Each with what it has picked, so a notification can open a session in it.
+    var projectScenes: [ProjectKey: RemoteProjectState] = [:]
+    /// The project an iPhone shows alone, over the sidebar of every project (#1089).
+    var phoneProject: ProjectKey?
+    /// The project whose own scene's start page the start form is for, while one is (#1089).
+    var composingScene: ProjectKey?
+    /// Brings a project's scene forward, or opens it: handed over by a view that has the
+    /// scene's action, for what is not a view (a notification).
+    @ObservationIgnored var openProjectScene: ((ProjectKey) -> Void)?
     /// The one of them in the key window, if one is: what the person is watching.
     @ObservationIgnored var popoutInFront: UUID?
 
@@ -269,7 +279,13 @@ final class RemoteModel {
         pictures = PhonePictures(files: files)
         // From the start, not once connected: a banner tapped to launch or wake the app
         // arrives before then, and was dropped (#1045).
-        notifier.open = { [weak self] agentID in self?.open(agentID) }
+        notifier.open = { [weak self] agentID in
+            // In its project's own scene or screen when one is open (#1089, Alex).
+            if self?.showInProjectScene(agentID) == true { return }
+            // Not in the project an iPhone shows alone: back to every project, to it.
+            self?.phoneProject = nil
+            self?.open(agentID)
+        }
         notifier.openNeed = { [weak self] token in self?.open(needToken: token) }
         // The oldest of a long conversation go from the page as it runs on; what they
         // say the agent touched is kept with the rest of the history read for Files.
@@ -1265,6 +1281,11 @@ final class RemoteModel {
         startDraftID = nil
         await loadWholeAgent(id)
         startingIn = nil
+        // Started in a project's own scene: it opens there (#1089).
+        if let scene = composingScene.flatMap({ projectScenes[$0] }), scene.key.folder == folder {
+            scene.pick = .session(id)
+            return
+        }
         selectedProject = folder
         openWorkflow = nil
         // In the start page's place, which is the detail's own: no sheet to wait out (#366).

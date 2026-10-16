@@ -6,6 +6,7 @@
 // `(N) Agents` when N sessions need the person, counted as the window counts its Dock badge.
 import { effect } from "@preact/signals";
 import type { Store } from "./model/store";
+import { alone } from "./route";
 
 const settle = 500;
 
@@ -25,8 +26,10 @@ export function needsPersonCount(store: Store): number {
   return total;
 }
 
-export function titleFor(count: number): string {
-  return count > 0 ? `(${count}) Agents` : "Agents";
+/** The tab's title: Agents, or the project a tab holds alone (#1089), after how many need the person. */
+export function titleFor(count: number, project?: string): string {
+  const name = project ?? "Agents";
+  return count > 0 ? `(${count}) ${name}` : name;
 }
 
 export function startPresence(store: Store): void {
@@ -69,6 +72,7 @@ export function startPresence(store: Store): void {
     report();
   });
   effect(() => {
-    document.title = titleFor(needsPersonCount(store));
+    const held = alone.value;
+    document.title = titleFor(needsPersonCount(store), held && decodeURIComponent(held.folder.replace(/\/+$/, "").split("/").pop() ?? ""));
   });
 }

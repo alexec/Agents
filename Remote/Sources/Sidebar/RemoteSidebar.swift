@@ -251,7 +251,7 @@ struct RemoteSidebar: View {
 /// or Unread, across every project and host, each row naming its project. The window's
 /// `SmartFold`. Folded, it reads its count off each project's shelf and lists nothing
 /// (#356).
-private struct RemoteSmartFold: View {
+struct RemoteSmartFold: View {
     @Environment(RemoteModel.self) private var model
     let row: SidebarSmartRow
     /// The projects in the sidebar, in its order.
@@ -262,7 +262,10 @@ private struct RemoteSmartFold: View {
     /// The smart groups turned off in Settings ▸ Sidebar (#846): their sessions are listed
     /// by the next group they fit.
     @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = SidebarSmartRow.offAtFirst
-    private var on: Set<SidebarSmartRow> { SidebarSmartRow.on(off: smartOff) }
+    /// The groups drawn, when not those Settings ▸ Sidebar turns on: a project's own
+    /// scene has Pinned and Needs You only (#1089).
+    var groups: Set<SidebarSmartRow>? = nil
+    private var on: Set<SidebarSmartRow> { groups ?? SidebarSmartRow.on(off: smartOff) }
 
     var body: some View {
         let keys = projects.map(\.key)
@@ -473,7 +476,10 @@ private struct SmartHeading: View {
 /// Workflows fold (#885), then one Archived row opening a page. Its pinned sessions and
 /// workflows are in Pinned at the top. The Mac's `ProjectFold`, drawn from the same
 /// `SidebarProjectFold`.
-private struct RemoteProjectFold: View {
+///
+/// In a project's own scene (#1089) the same rows go under a Sessions heading: the scene
+/// is the project, so its name is the title and not a heading.
+struct RemoteProjectFold: View {
     @Environment(RemoteModel.self) private var model
     let summary: DaemonAPI.ProjectSummary
     let folds: SidebarFolds
@@ -486,12 +492,17 @@ private struct RemoteProjectFold: View {
     @State private var fillingDropbox = false
     /// The smart groups turned off in Settings ▸ Sidebar (#846).
     @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = SidebarSmartRow.offAtFirst
+    /// The smart groups the list draws, when not those Settings turns on (#1089).
+    var smartGroups: Set<SidebarSmartRow>? = nil
+    /// Drawn in a project's own scene (#1089).
+    var inScene = false
 
     private var key: ProjectKey { summary.key }
 
     var body: some View {
         let fold = SidebarProjectFold(key, label: label, in: model.work, query: query, isOpen: folds.isOpen(key),
-                                      keptInUnread: model.keptInUnread, on: SidebarSmartRow.on(off: smartOff))
+                                      keptInUnread: model.keptInUnread,
+                                      on: smartGroups ?? SidebarSmartRow.on(off: smartOff))
         let isOpen = fold.isUnfolded
         if fold.isShown {
             // A search holds every match open.
@@ -530,20 +541,32 @@ private struct RemoteProjectFold: View {
                     }
                 }
             } header: {
-                ProjectRow(summary: summary, label: label, isFolded: !isOpen, asHeading: true)
-                    .foregroundStyle(model.hostIsOffline(summary.host) ? .secondary : .primary)
-                    .contextMenu { ProjectMenuItems(summary: summary) { fillingDropbox = true } }
-                    .sheet(isPresented: $fillingDropbox) {
-                        DropboxSheet(project: key, label: label)
-                    }
-                    .accessibilityHint(isOpen ? "Folds the project" : "Unfolds the project")
-                    // The rest of its live sessions when the first page did not hold them
-                    // all. On the heading, which is always there, not on every row.
-                    .task(id: isOpen) {
-                        if isOpen { await model.fillProject(summary.folder) }
-                    }
+                if inScene {
+                    Text("Sessions")
+                        .task(id: isOpen) {
+                            if isOpen { await model.fillProject(summary.folder) }
+                        }
+                } else {
+                    heading(isOpen)
+                }
             }
         }
+    }
+
+    /// The project's row, heading its group in the sidebar of every project.
+    private func heading(_ isOpen: Bool) -> some View {
+        ProjectRow(summary: summary, label: label, isFolded: !isOpen, asHeading: true)
+            .foregroundStyle(model.hostIsOffline(summary.host) ? .secondary : .primary)
+            .contextMenu { ProjectMenuItems(summary: summary) { fillingDropbox = true } }
+            .sheet(isPresented: $fillingDropbox) {
+                DropboxSheet(project: key, label: label)
+            }
+            .accessibilityHint(isOpen ? "Folds the project" : "Unfolds the project")
+            // The rest of its live sessions when the first page did not hold them
+            // all. On the heading, which is always there, not on every row.
+            .task(id: isOpen) {
+                if isOpen { await model.fillProject(summary.folder) }
+            }
     }
 
     /// The project's live workflows, under a Workflows row with a chevron and a grey
@@ -742,6 +765,8 @@ private struct ProjectMenuItems: View {
 
     var body: some View {
         NewSessionButton(folder: summary.folder)
+        // The project alone (#1089): a scene of its own on an iPad, a screen on an iPhone.
+        OpenProjectButton(key: summary.key)
         Button(action: putInDropbox) {
             Label("Put Files in Drop Box…", systemImage: "tray.and.arrow.down")
         }

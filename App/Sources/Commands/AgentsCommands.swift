@@ -60,12 +60,30 @@ struct AgentsCommands: Commands {
     @AppStorage(TurnDisplay.defaultsKey, store: WindowDefaults.store) private var turnDetail = TurnDisplay.initial
     /// The session in the key window when that is a window of its own (#826).
     @FocusedValue(\.poppedChat) private var popped
+    /// The project in the key window when that is a project's own (#1089).
+    @FocusedValue(\.projectWindow) private var projectWindow
     @Environment(\.openWindow) private var openWindow
 
     /// What the Session menu acts on: the key window's session, which is the main
-    /// window's selection unless a session's own window is in front (#826).
+    /// window's selection unless a session's (#826) or a project's (#1089) own window is
+    /// in front.
     private var sessionAgent: Agent? {
-        popped.map { model.work.agent($0.id) } ?? model.selectedAgent
+        if let popped { return model.work.agent(popped.id) }
+        if let projectWindow {
+            guard case .session(let id)? = projectWindow.pick else { return nil }
+            return model.work.agent(id)
+        }
+        return model.selectedAgent
+    }
+
+    /// The key window's inspector, shell and sheets: a project's window has its own.
+    private var keyFrame: SidebarFrame { projectWindow?.frame ?? frame }
+    private var keyTerminal: ProjectTerminalFrame { projectWindow?.terminal ?? terminal }
+    private var keyRequests: WindowRequests { projectWindow?.requests ?? requests }
+    /// The key window's project: a project's own window's, or the main window's selected one.
+    private var keyProject: DaemonAPI.ProjectSummary? {
+        guard let projectWindow else { return model.selectedProjectSummary }
+        return model.liveProjects.first { $0.key == projectWindow.key }
     }
 
     static let helpURL = URL(string: "https://alexec.github.io/Agents/")!
@@ -121,28 +139,28 @@ struct AgentsCommands: Commands {
             Button("Show in Finder") { showInFinder() }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
                 .disabled(folderForFinder == nil)
-            Button("Project Settings…") { requests.projectSettings = .general }
+            Button("Project Settings…") { keyRequests.projectSettings = .general }
                 .keyboardShortcut(",", modifiers: [.command, .option])
-                .disabled(model.selectedProjectSummary == nil)
+                .disabled(keyProject == nil)
         }
 
         CommandGroup(after: .sidebar) {
-            Button(frame.isOpen ? "Hide Inspector" : "Show Inspector") { toggleInspector() }
+            Button(keyFrame.isOpen ? "Hide Inspector" : "Show Inspector") { toggleInspector() }
                 .keyboardShortcut("i", modifiers: [.command, .option])
-                .disabled(model.selectedAgent == nil || (!frame.isOpen && !inspectorFits))
+                .disabled(sessionAgent == nil || popped != nil || (!keyFrame.isOpen && !inspectorFits))
             Divider()
             ForEach(Array(SidebarPane.allCases.enumerated()), id: \.element) { index, pane in
                 Button(pane.title) { show(pane) }
                     .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")))
                     // Off while a question card is up: ⌘1…n answer that card instead. A
                     // session's own window has no inspector (#826).
-                    .disabled(model.selectedAgent == nil || !inspectorFits || answeringCard || popped != nil)
+                    .disabled(sessionAgent == nil || !inspectorFits || answeringCard || popped != nil)
             }
             // The project's own shell (#418), the editor's key for a terminal. ⌘J,
             // the usual panel key, is Next Needing Attention.
-            Button(terminal.isOpen ? "Hide Project Terminal" : "Project Terminal") { terminal.toggle() }
+            Button(keyTerminal.isOpen ? "Hide Project Terminal" : "Project Terminal") { keyTerminal.toggle() }
                 .keyboardShortcut("`", modifiers: .control)
-                .disabled(!terminal.isOpen && model.selectedProjectSummary?.exists != true)
+                .disabled(!keyTerminal.isOpen && keyProject?.exists != true)
             Divider()
             Button("Events") { model.showEvents() }
                 .keyboardShortcut("e", modifiers: [.command, .option])
@@ -218,13 +236,35 @@ struct AgentsCommands: Commands {
                 .disabled(agent == nil || agent?.state == .archived)
             Divider()
             // Beside the main window or on another screen (#826). Its own window is
-            // already one.
+            // already one. ⇧ since ⌥⌘O opens the project's window (#1089).
             Button("Open in New Window") {
                 guard let agent else { return }
                 openWindow(id: MainWindow.poppedSceneID, value: agent.id)
             }
-            .keyboardShortcut("o", modifiers: [.command, .option])
+            .keyboardShortcut("o", modifiers: [.command, .option, .shift])
             .disabled(agent == nil || popped != nil)
+        }
+
+        // The main window, and a project's own (#1089). The windows open are listed
+        // below these by the system, by title.
+        CommandGroup(before: .windowList) {
+            Button("Agents (All Projects)") { model.bringMainWindowForward() }
+                .keyboardShortcut("0")
+            Button("Open Project in New Window") {
+                guard let key = model.selectedProjectKey else { return }
+                openWindow(id: ProjectWindowScene.id, value: key)
+            }
+            .keyboardShortcut("o", modifiers: [.command, .option])
+            .disabled(projectWindow != nil || model.selectedProjectKey == nil)
+            Menu("Open Project Window") {
+                ForEach(projectsInListOrder, id: \.key) { summary in
+                    Button(SidebarOrder.label(summary) { model.hosts.label($0) }) {
+                        openWindow(id: ProjectWindowScene.id, value: summary.key)
+                    }
+                }
+            }
+            .disabled(projectsInListOrder.isEmpty)
+            Divider()
         }
 
         CommandMenu("Go") {
@@ -311,13 +351,15 @@ struct AgentsCommands: Commands {
 
     // MARK: View
 
-    private var inspectorFits: Bool { SidebarFrame.fits(inWindowOf: frame.windowWidth) }
+    private var inspectorFits: Bool { SidebarFrame.fits(inWindowOf: keyFrame.windowWidth) }
 
     private func toggleInspector() {
+        let frame = keyFrame
         if frame.isOpen { frame.isOpen = false } else if inspectorFits { frame.open() }
     }
 
     private func show(_ pane: SidebarPane) {
+        let frame = keyFrame
         frame.pane = pane
         if !frame.isOpen, inspectorFits { frame.open() }
     }

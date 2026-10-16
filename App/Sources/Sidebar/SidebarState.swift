@@ -55,10 +55,10 @@ final class SidebarFrame {
     /// see research section 8.
     static let minimumConversationWidth: Double = 520
 
-    private enum Key {
-        static let width = "sidebar.width"
-        static let pane = "sidebar.pane"
-    }
+    /// Where the width and the pane are kept: `sidebar.width`, `sidebar.pane` for the
+    /// main window, and a key of its own for each project's window (#1089).
+    private let widthKey: String
+    private let paneKey: String
 
     private let defaults: UserDefaults
 
@@ -69,11 +69,11 @@ final class SidebarFrame {
     var isOpen = false
 
     var width: Double {
-        didSet { defaults.set(width, forKey: Key.width) }
+        didSet { defaults.set(width, forKey: widthKey) }
     }
 
     var pane: SidebarPane {
-        didSet { defaults.set(pane.rawValue, forKey: Key.pane) }
+        didSet { defaults.set(pane.rawValue, forKey: paneKey) }
     }
 
     /// How wide the window and the pane beside the project list are. Measured by the
@@ -81,8 +81,12 @@ final class SidebarFrame {
     var windowWidth: Double = 0
     var paneWidth: Double = 0
 
-    init(defaults: UserDefaults = WindowDefaults.store) {
+    /// `keyedBy` names a project's window, whose inspector is its own (#1089, Alex).
+    init(defaults: UserDefaults = WindowDefaults.store, keyedBy window: String? = nil) {
         self.defaults = defaults
+        let prefix = window.map { "sidebar.\($0)" } ?? "sidebar"
+        widthKey = "\(prefix).width"
+        paneKey = "\(prefix).pane"
         // Kept through #358, and read back into every launch since.
         defaults.removeObject(forKey: "sidebar.isOpen")
         // Clamped on the way in as well as on the way out. A width stored on a larger
@@ -93,8 +97,8 @@ final class SidebarFrame {
         // the app's `reading` step now, and 60 characters of it needs about 406 points
         // of text plus its padding. `PageMetrics.comfortablePane` is the same number for
         // the same reason.
-        width = Self.clamp((defaults.object(forKey: Key.width) as? Double) ?? Self.readableWidth)
-        pane = (defaults.string(forKey: Key.pane).flatMap(SidebarPane.init(rawValue:))) ?? .files
+        width = Self.clamp((defaults.object(forKey: widthKey) as? Double) ?? Self.readableWidth)
+        pane = (defaults.string(forKey: paneKey).flatMap(SidebarPane.init(rawValue:))) ?? .files
     }
 
     /// The width at which the document pane clears the 60-character floor at the

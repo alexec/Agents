@@ -4,6 +4,7 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
     /// The app's, so the menu bar can reach them too. Passed in rather than set on the
     /// scene's content: see the note in `AgentsApp`.
     let requests: WindowRequests
@@ -319,6 +320,12 @@ struct ContentView: View {
             return .handled
         })
         .task { await model.stayConnected() }
+        // What opens a project's own window from outside a view: a notification, the
+        // Dock's menu (#1089).
+        .onAppear {
+            AgentsAppDelegate.model = model
+            model.openProjectWindow = { [openWindow] in openWindow(id: ProjectWindowScene.id, value: $0) }
+        }
         // No tabs: the only way left to a second window, and a second window would be a
         // mirror of the first, because what is selected lives on the one model.
         .onAppear { NSWindow.allowsAutomaticWindowTabbing = false }

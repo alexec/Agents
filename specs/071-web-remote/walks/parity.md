@@ -15,12 +15,12 @@
 
 ## Counts
 
-Of 225 rows: **152 same**, **46 by design**, **27 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888, #982). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 226 rows: **153 same**, **46 by design**, **27 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888, #982, #1089). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
 | Sidebar and project list | 13 | 5 | 5 |
-| Session rows and states | 16 | 2 | 6 |
+| Session rows and states | 17 | 2 | 6 |
 | Chat turns and turn detail | 24 | 4 | 2 |
 | Prompt bar and queued prompts | 20 | 3 | 0 |
 | Question and permission cards | 14 | 3 | 0 |
@@ -111,6 +111,7 @@ The deltas are tracked by 30 issues:
 | Mark Read / Unread reaches the agent's host | Per host | Per host: `R/RemoteModel.swift:2493-2507` | Per host: `W/views/SessionMenu.tsx:78` | **same** (#238) |
 | Rename | None | None | None | **same** |
 | A session in a window of its own (#826) | Session ▸ Open in New Window (⌥⌘O) and the row's menu: `A/Sessions/PoppedChatWindow.swift`, its own page of the transcript in `A/Sessions/PoppedChat.swift`, `alsoShowing` in the presence report | A scene of its own on the iPad (#888): Open in New Window in the row's menu and the chat's ···, or a drag out of the sidebar; its own page of the transcript in `R/Chat/PoppedChat.swift`, `alsoShowing` in the presence report. None on the iPhone, by design | Open in New Tab in the row's menu, the page's own address for one session: `W/views/SessionMenu.tsx` (`sessionTabURL`) | **same**; iPhone **by design**; unwalked on the iPad |
+| A project in a window of its own (#1089) | Open in New Window on the project heading's menu, a double-click on the heading, Window ▸ Open Project in New Window (⌥⌘O) and Open Project Window, and the Dock's menu: `A/Projects/ProjectWindow.swift`. Only this project: New Session, its Pinned and Needs You, Sessions, Workflows, Archived, Project Settings… at the foot; "✋ N elsewhere", the project's shell and its own inspector in the toolbar. Window ▸ Agents (All Projects) is ⌘0. A notification opens in it when it is open | A scene of its own on the iPad: Open in New Window in the heading's menu; on the iPhone, Open Project Alone, a screen of only that project with ‹ All and "✋ N elsewhere": `R/Sidebar/RemoteProjectScene.swift`. A notification opens in it when it is open | Open in New Tab in the heading's menu: a tab at `#/o/1/h/…/p/…` that holds the project alone, with ‹ All and "✋ N elsewhere", titled with its name: `W/route.ts` (`alone`), `W/views/Sidebar.tsx` | **same**; the Remote and web pages a project's window does not hold (workflows, archive) open from every project, the Mac's in the main window; unwalked on the iPad and iPhone |
 
 ## Chat turns and turn detail
 
