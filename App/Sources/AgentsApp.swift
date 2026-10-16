@@ -24,6 +24,10 @@ struct AgentsApp: App {
         HangReporter.install()
         // The defaults of scratch copies that have gone (#1029).
         Task.detached(priority: .utility) { WindowDefaults.sweep() }
+        #if DEBUG
+        // A scratch copy's walk socket (#1172), for run-app's walk.py; only with --walk.
+        WalkServer.startIfWalking()
+        #endif
     }
 
     var body: some Scene {

@@ -34,6 +34,8 @@ enum ControlConfig {
     /// Where a walk's window writes the page Open in Browser would open (#109), for the
     /// walk's headless browser to go to: a walk never opens the person's own browser.
     static var walkOpenedURL: URL? { walk == nil ? nil : folder.appendingPathComponent("opened-url") }
+    /// A walk's own folder, where its walk socket is (#1172); nil for the person's window.
+    static var walkFolder: URL? { walk == nil ? nil : folder }
     /// Not backed up (#1031): a restored Mac pairs again.
     private static var membershipFile: URL { folder.appendingPathComponent("control-client.json") }
     /// The window's key in the keychain; a walk's window has its own, as it has its own pairing.
