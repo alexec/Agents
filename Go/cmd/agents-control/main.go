@@ -7,6 +7,7 @@
 //	agents-control serve … [--log FILE]         stamped lines into FILE, rolled at 4 MB (#174)
 //	agents-control serve … [--web DIR] [--web-port N] [--no-web]
 //	agents-control serve … [--store-credentials-fd N]
+//	agents-control serve … [--secrets-home DIR] DIR/.agents-secrets holds the channels' tokens (#1009)
 //	agents-control code (--client [--browser] | --host) [--minutes N] [--home DIR] [--command]
 //	agents-control hosts | clients
 //	agents-control install-script               the script a server runs to become a host
@@ -311,6 +312,20 @@ func serve() {
 	if cfg.MachineID == "" {
 		cfg.MachineID = controlplane.MachineID()
 	}
+	// Chat apps' tokens (#1009) in .agents-secrets under this home (#1035): --secrets-home,
+	// AGENTS_CONTROL_SECRETS_HOME, else --home's folder (a scratch set-up never reads the
+	// person's own), else $HOME on a server.
+	cfg.SecretsHome = value("--secrets-home")
+	if cfg.SecretsHome == "" {
+		cfg.SecretsHome = os.Getenv("AGENTS_CONTROL_SECRETS_HOME")
+	}
+	if cfg.SecretsHome == "" {
+		cfg.SecretsHome = home()
+	}
+	if cfg.SecretsHome == "" {
+		cfg.SecretsHome, _ = os.UserHomeDir()
+	}
+	cfg.SecretsHome = expand(cfg.SecretsHome)
 	if root := value("--host-root"); root != "" {
 		cfg.HostJoinFile = filepath.Join(expand(root), "control-join.json")
 	}

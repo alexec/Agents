@@ -69,6 +69,8 @@ type Router struct {
 	toldLinks map[string]bool
 	// Requests of a host on its channel 0 (#1122), by their id, until it answers.
 	asks map[string]*hostAsk
+	// Kept requests on their way to a host, by their delivery, until it answers.
+	keptWaits map[string]chan *message
 	// Where each session last said the person was, keyed by the session.
 	presence map[string]notedPresence
 	// Told when a host's real uplink here ends.
@@ -100,6 +102,8 @@ type target struct {
 	session      string
 	tunnelHost   string
 	tunnelOthers int
+	// A kept request being delivered (#691 US3, channels), waiting on its reply.
+	kept string
 }
 
 type hostSession struct {
@@ -145,7 +149,7 @@ func NewRouter(h Handler, log func(string)) *Router {
 	}
 	return &Router{handler: h, clients: map[string]*clientSession{}, hosts: map[string]*hostSession{},
 		known: map[string]bool{}, relays: map[string]bool{}, states: map[string]hostState{},
-		toldLinks: map[string]bool{}, asks: map[string]*hostAsk{}, presence: map[string]notedPresence{}, log: log}
+		toldLinks: map[string]bool{}, asks: map[string]*hostAsk{}, keptWaits: map[string]chan *message{}, presence: map[string]notedPresence{}, log: log}
 }
 
 // MARK: What it knows
@@ -385,6 +389,9 @@ func (r *Router) dropHostLocked(host string, gen int64, newState *hostState) {
 			if !s.wrapped && host == r.homeHost {
 				bareGone = append(bareGone, t.session)
 			}
+		case t.kept != "":
+			// Not answered: it stays kept for the next time the host is up.
+			r.endKeptLocked(t.kept, nil)
 		case t.tunnelHost != "":
 			// A tunnel ends at both hosts with either.
 			if other := r.hosts[t.tunnelHost]; other != nil {
@@ -548,11 +555,22 @@ func (r *Router) hostLine(line, host string) {
 		// The host hung up on a client (a device it was told to forget, say): the
 		// client's whole connection goes, as it would have today.
 		delete(h.channels, f.channel)
-		if t.session != "" {
+		if t.kept != "" {
+			r.endKeptLocked(t.kept, nil)
+		} else if t.session != "" {
 			r.detachLocked(t.session, 0)
 		} else if other := r.hosts[t.tunnelHost]; other != nil {
 			delete(other.channels, t.tunnelOthers)
 			other.conn.Send(closeFrame(t.tunnelOthers))
+		}
+		return
+	}
+	if t.kept != "" {
+		// A kept request's reply ends its channel; anything else said there is for nobody.
+		if m, ok := decode(f.msg); ok && m.Method == "" && (m.Result != nil || m.Error != nil) {
+			delete(h.channels, f.channel)
+			h.conn.Send(closeFrame(f.channel))
+			r.endKeptLocked(t.kept, m)
 		}
 		return
 	}
@@ -691,6 +709,57 @@ func (r *Router) Ask(host, method string, params any, patience time.Duration) *m
 		delete(r.asks, id)
 		r.mu.Unlock()
 		return nil
+	}
+}
+
+// DeliverKept is ControlRouter.deliverKept: a request to a host on a channel of its own,
+// bound to the client that asked, and its reply. Nil when the host is not here, goes
+// before it answers, or takes longer than patience: the request stays kept.
+func (r *Router) DeliverKept(method string, params any, client, kind, host string, patience time.Duration) *message {
+	r.mu.Lock()
+	h := r.hosts[host]
+	if _, relay := r.relays[host]; relay || h == nil {
+		r.mu.Unlock()
+		return nil
+	}
+	delivery := records.NewUUID()
+	c := h.next
+	h.next++
+	h.channels[c] = target{kept: delivery}
+	open := channelOpen{Client: client}
+	if kind != records.KindMac {
+		open.Device = &client
+	}
+	wait := make(chan *message, 1)
+	r.keptWaits[delivery] = wait
+	if !h.conn.Send(openFrame(c, open)) || !h.conn.Send(channelFrame(c, request("kept-"+delivery, method, params))) {
+		delete(h.channels, c)
+		delete(r.keptWaits, delivery)
+		r.mu.Unlock()
+		return nil
+	}
+	r.mu.Unlock()
+	select {
+	case m := <-wait:
+		return m
+	case <-time.After(patience):
+		r.mu.Lock()
+		if h := r.hosts[host]; h != nil {
+			if _, open := h.channels[c]; open {
+				delete(h.channels, c)
+				h.conn.Send(closeFrame(c))
+			}
+		}
+		delete(r.keptWaits, delivery)
+		r.mu.Unlock()
+		return nil
+	}
+}
+
+func (r *Router) endKeptLocked(delivery string, m *message) {
+	if wait, ok := r.keptWaits[delivery]; ok {
+		delete(r.keptWaits, delivery)
+		wait <- m
 	}
 }
 

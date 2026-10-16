@@ -110,7 +110,7 @@ func (p *plane) host(machine string) *fakeHost {
 			switch m.Method {
 			case "daemon/ping":
 				c.Write(reply(m.ID, map[string]any{"pong": member.Host}))
-			case "agents/list":
+			case "agents/list", "elicitations/pending":
 				c.Write(reply(m.ID, []any{}))
 			default:
 				c.Write(replyError(m.ID, notFound(m.Method)))
@@ -595,5 +595,43 @@ func TestANeedGoesToTheRelayHost(t *testing.T) {
 	p.s.methods.HostSaid(box.member.Host, "attention/need", json.RawMessage(`{"withdraw":{"permission":"E0000000-0000-4000-8000-000000000005"}}`))
 	if line := readUntil(t, relay, "relay/deliver"); strings.Contains(line, "headline") {
 		t.Fatal(line)
+	}
+}
+
+// A kept request goes to a host on a channel of its own and comes back with its reply;
+// one for a host that is not here is nil (ControlRouter.deliverKept).
+func TestAKeptRequestIsDelivered(t *testing.T) {
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	box := p.host("MACHINE-2")
+	m := p.s.Router().DeliverKept("elicitations/pending", map[string]any{}, channelClient, records.KindUnknown, box.member.Host, 5*time.Second)
+	if m == nil || string(m.Result) != "[]" {
+		t.Fatal(m)
+	}
+	if n := p.s.Router().Channels(box.member.Host); n != 0 {
+		t.Fatalf("%d channels left open", n)
+	}
+	if p.s.Router().DeliverKept("x", nil, channelClient, records.KindUnknown, "nobody", time.Second) != nil {
+		t.Fatal("delivered to nobody")
+	}
+}
+
+// channels/get says Swift's words where channels can't run, and the state where they can.
+func TestChannelsAnswer(t *testing.T) {
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	_, window := p.client("Window")
+	var state struct {
+		Slack struct {
+			Status    string  `json:"status"`
+			Available bool    `json:"available"`
+			Detail    *string `json:"detail"`
+		} `json:"slack"`
+	}
+	json.Unmarshal(call(t, window, "", "channels/get", nil), &state)
+	if state.Slack.Status != "off" || state.Slack.Available || state.Slack.Detail == nil ||
+		*state.Slack.Detail != "Channels need a control plane with one copy, for now." {
+		t.Fatalf("%+v", state)
+	}
+	if e := callError(t, window, "", "channels/set", map[string]any{"slack": map[string]any{"enabled": true}}); !strings.Contains(e, "-32009") {
+		t.Fatal(e)
 	}
 }
