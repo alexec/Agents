@@ -911,6 +911,7 @@ final class RemoteModel {
     private static let startParts: Set<CatchUpPart> = [.runtimes, .allowances, .modes, .sandbox]
 
     private func openStart(in folder: URL) async {
+        startOpenedAt = .now
         startAsks.opened()
         startRefusal = nil
         startWorktree = nil
@@ -931,9 +932,12 @@ final class RemoteModel {
             }
             if startRuntimes.isEmpty { await parts.value }
         }
-        // A server's list is not one of the parts: asked as its page opens (#977).
+        // A server's list is not one of the parts: asked as its page opens (#977), and
+        // waited on only when the page has none of its runtimes yet (#1171).
         if startHost != .mac {
-            await DaemonClient.$patience.withValue(listPatience) { await refreshServerRuntimes(startHost) }
+            let host = startHost
+            let listed = Task { await DaemonClient.$patience.withValue(listPatience) { await refreshServerRuntimes(host) } }
+            if startRuntimes.isEmpty { await listed.value }
         }
         guard startingIn == folder else { return }
         startRuntimeID = pickedStartRuntime
@@ -983,6 +987,12 @@ final class RemoteModel {
 
     /// What the page has been answered since it opened (#1096).
     @ObservationIgnored private var startAsks = StartPageAsks()
+
+    /// What each runtime offered the page last time, on each host (#1171): the page is
+    /// drawn from it at once and put right by the draft's answer.
+    @ObservationIgnored private var startMemory = StartChoicesMemory()
+    /// When the page opened, until its rows are drawn: said in the log as how long that took.
+    @ObservationIgnored private var startOpenedAt: ContinuousClock.Instant?
 
     /// One of the page's own calls (#1096): with a deadline, failed at once when the link
     /// drops under it, and said in the log with how long it took, so a page that stays on
@@ -1128,8 +1138,10 @@ final class RemoteModel {
     }
 
     /// A runtime is started behind the form so its choices are real ones; the start
-    /// that follows uses it. Answered from what it offered last time when the Mac has
-    /// that, and put right by `agents/draftOptions` if it has moved.
+    /// that follows uses it. Drawn at once from what it offered this page last time
+    /// (#1171), then from the host's answer, and put right by `agents/draftOptions` if
+    /// it has moved. A Send before the answer starts without the draft, with the
+    /// choices on the page.
     func loadStartChoices() async {
         guard let folder = startOptionsFolder else { return }
         guard let runtimeID = startRuntimeID else {
@@ -1148,10 +1160,15 @@ final class RemoteModel {
         let generation = startGeneration
         startAsks.asking(.choices)
         discardStartDraft()
-        startOptions = []
-        startChosen = displayMirror.preferences[DisplayPreference.startChoices]?.objectValue?[runtimeID]?.objectValue ?? [:]
-        startChoicesState = .loading
         let host = startHost
+        startChosen = displayMirror.preferences[DisplayPreference.startChoices]?.objectValue?[runtimeID]?.objectValue ?? [:]
+        let remembered = startMemory.options(for: runtimeID, on: host)
+        if let remembered {
+            showStart(remembered, opening: true, answered: false)
+        } else {
+            startOptions = []
+            startChoicesState = .loading
+        }
         do {
             // Made on the project's own host, where the agent will start (#240).
             let request = DaemonAPI.OptionsRequest(runtimeID: runtimeID, cwd: folder)
@@ -1160,7 +1177,9 @@ final class RemoteModel {
             guard generation == startGeneration else { discard(draft: response.draftID, on: host); return }
             startDraftID = response.draftID
             startDraftHost = host
-            showStart(response.options, opening: true)
+            startMemory.remember(response.options, for: runtimeID, on: host)
+            // Over choices made from memory meanwhile: only the first draw opens.
+            showStart(response.options, opening: remembered == nil)
         } catch {
             guard generation == startGeneration else { return }
             startChoicesState = .failed(sentence(for: error))
@@ -1173,17 +1192,11 @@ final class RemoteModel {
     /// On the first draw only, the mode opens on the one last chosen for this runtime
     /// on any device, as the Mac's form does: a correction arriving behind a form drawn
     /// from memory must not undo a mode chosen since.
-    private func showStart(_ options: [ConfigOption], opening: Bool = false) {
+    ///
+    /// `answered` is false for a draw from memory: the host has still to say.
+    private func showStart(_ options: [ConfigOption], opening: Bool = false, answered: Bool = true) {
         startOptions = PromptControlsState.drawable(agentOptions: nil, draftOptions: options)
-        var kept: [String: JSONValue] = [:]
-        for option in startOptions {
-            if let chosen = startChosen[option.id],
-               option.isBoolean || (option.options ?? []).contains(where: { $0.value == chosen }) {
-                kept[option.id] = chosen
-            } else if let current = option.currentValue {
-                kept[option.id] = current
-            }
-        }
+        var kept = StartChoicesMemory.kept(startChosen, in: startOptions)
         if opening, let runtimeID = startRuntimeID, let mode = ModeMemory.modeOption(in: startOptions),
            let value = ModeMemory.startingValue(remembered: work.rememberedMode(for: runtimeID), for: mode) {
             kept[mode.id] = value
@@ -1195,7 +1208,11 @@ final class RemoteModel {
         }
         startChosen = kept
         startChoicesState = .ready
-        startAsks.answered(.choices)
+        if let openedAt = startOpenedAt {
+            startOpenedAt = nil
+            note("start: page ready \(answered ? "from the host" : "from memory") in \(ContinuousClock.now - openedAt)")
+        }
+        if answered { startAsks.answered(.choices) }
     }
 
     private func settleStartDraft(_ notification: DaemonAPI.DraftOptionsNotification) {
@@ -1207,6 +1224,9 @@ final class RemoteModel {
             startChoicesState = .failed(failure)
             startAsks.asking(.choices)
             return
+        }
+        if let runtimeID = startRuntimeID {
+            startMemory.remember(notification.options, for: runtimeID, on: startDraftHost)
         }
         showStart(notification.options)
     }
@@ -1318,6 +1338,9 @@ final class RemoteModel {
         unsettledStart = request
         do {
             let id = try await sendOnce(DaemonAPI.Method.agentsStart, request).decode(UUID.self)
+            // Taken by the start. One that answered after the Send (#1171) is let go as the
+            // page closes.
+            if startDraftID == request.draftID { startDraftID = nil }
             await started(id, in: request.cwd)
             return true
         } catch let refused as JSONRPCError {
@@ -1350,7 +1373,6 @@ final class RemoteModel {
         // Only now: a draft is kept until the agent it was typed for exists (FR-017).
         StartDraftKeeper.shared.clear(in: folder)
         guard open else { return }
-        startDraftID = nil
         await loadWholeAgent(id)
         startingIn = nil
         // Started in a project's own scene: it opens there (#1089).

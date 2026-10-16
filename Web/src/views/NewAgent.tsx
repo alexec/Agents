@@ -16,7 +16,8 @@ import { useEffect, useRef } from "preact/hooks";
 import type { Attachment, BranchSummary, ConfigOption, JSONValue, Persona, RuntimeStatus, SandboxChoice, SlashCommand, StartRequest, UUID, WorktreeSize,
   WorktreeSummary } from "../protocol/generated";
 import type { SandboxWillNotStart, Store } from "../model/store";
-import { drawable, modeOption, modeStartsOn, choices, same } from "../model/options";
+import { drawable, modeOption, modeStartsOn } from "../model/options";
+import { keep, rememberOptions, rememberedOptions } from "../model/startMemory";
 import { folderKey } from "../model/groups";
 import { formRuntime, newSessionRuntime, runtimeRuns, unavailableReason } from "../model/runtimes";
 import { formFor, keepForm, keptForm } from "../model/startForm";
@@ -50,17 +51,6 @@ interface Form {
   commands?: SlashCommand[];
   chosen: Record<string, JSONValue>;
   state: "loading" | "ready" | { failed: string };
-}
-
-/** Choices still offered are kept; the rest open on the runtime's current value. */
-function keep(options: ConfigOption[], chosen: Record<string, JSONValue>): Record<string, JSONValue> {
-  const kept: Record<string, JSONValue> = {};
-  for (const option of options) {
-    const was = chosen[option.id];
-    if (was !== undefined && (option.type === "boolean" || choices(option).some((c) => same(c.value, was)))) kept[option.id] = was;
-    else if (option.currentValue !== undefined) kept[option.id] = option.currentValue;
-  }
-  return kept;
 }
 
 export function NewAgent({ store, host, folder, projectName, down }: {
@@ -184,12 +174,36 @@ export function NewAgent({ store, host, folder, projectName, down }: {
     if (listedFor.current === `${host}|${folderKey(folder)}`) placeOffered();
   }, [offered, host, folder]);
 
-  // A draft runtime for the folder it will work in, asked again when either changes.
+  // A draft runtime for the folder it will work in, asked again when either changes. Drawn at
+  // once from what the runtime offered last time (#1171), and put right by the draft's answer;
+  // a Send before that answer starts with the choices on the form, without the draft.
   const cwd = where.value.kind === "existing" ? where.value.root : folder;
   useEffect(() => {
     if (!chosenRuntime) return;
     let current = true;
-    form.value = { options: [], chosen: {}, state: "loading" };
+    // The first draw opens on the choices left; a later one keeps what was chosen since.
+    const draw = (offered: ConfigOption[], opening: boolean) => {
+      const options = drawable(undefined, offered);
+      let chosen: Record<string, JSONValue>;
+      if (opening) {
+        const mode = modeOption(options);
+        const value = mode ? modeStartsOn(store.rememberedModes.value[host]?.[chosenRuntime], mode) : undefined;
+        // The choices left on this runtime, where they are still choices; the mode remembered otherwise.
+        const left = kept.peek().runtimeID === chosenRuntime ? kept.peek().chosen : {};
+        chosen = keep(options, mode && value !== undefined && left[mode.id] === undefined ? { ...left, [mode.id]: value } : left);
+      } else {
+        chosen = keep(options, form.peek().chosen);
+      }
+      // Over the mode remembered, because the persona was picked after it (#760).
+      const waiting = pendingPersona.current;
+      if (waiting && options.length) {
+        chosen = { ...chosen, ...personaChoices(waiting, options) };
+        pendingPersona.current = undefined;
+      }
+      return { options, chosen };
+    };
+    const remembered = rememberedOptions(host, chosenRuntime);
+    form.value = remembered ? { ...draw(remembered, true), state: "ready" } : { options: [], chosen: {}, state: "loading" };
     void store.draft(host, chosenRuntime, cwd).then((answer) => {
       if (!current) {
         if ("draftID" in answer) store.discardDraft(host, answer.draftID);
@@ -199,19 +213,8 @@ export function NewAgent({ store, host, folder, projectName, down }: {
         form.value = { options: [], chosen: {}, state: { failed: answer.failure } };
         return;
       }
-      const options = drawable(undefined, answer.options);
-      const mode = modeOption(options);
-      const value = mode ? modeStartsOn(store.rememberedModes.value[host]?.[chosenRuntime], mode) : undefined;
-      // The choices left on this runtime, where they are still choices; the mode remembered otherwise.
-      const left = kept.peek().runtimeID === chosenRuntime ? kept.peek().chosen : {};
-      let chosen = keep(options, mode && value !== undefined && left[mode.id] === undefined ? { ...left, [mode.id]: value } : left);
-      // Over the mode remembered, because the persona was picked after it (#760).
-      const waiting = pendingPersona.current;
-      if (waiting && options.length) {
-        chosen = { ...chosen, ...personaChoices(waiting, options) };
-        pendingPersona.current = undefined;
-      }
-      form.value = { draftID: answer.draftID, options, commands: answer.commands, chosen, state: "ready" };
+      rememberOptions(host, chosenRuntime, answer.options);
+      form.value = { draftID: answer.draftID, ...draw(answer.options, !remembered), commands: answer.commands, state: "ready" };
     });
     return () => {
       current = false;
@@ -239,6 +242,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
       form.value = { options: [], chosen: {}, state: { failed: correction.failure } };
       return;
     }
+    if (chosenRuntime) rememberOptions(host, chosenRuntime, correction.options);
     const options = drawable(undefined, correction.options);
     form.value = { ...form.peek(), options, commands: correction.commands, chosen: keep(options, form.peek().chosen), state: "ready" };
   }, [correction]);
