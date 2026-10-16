@@ -2,6 +2,44 @@
 
 Throwaway code in `agentsd-go/`. Not for merge. The test note is [test.md](test.md).
 
+**In one line:** a Go `agentsd` joined today's control plane over today's wire with no change to any Swift. It ran real Claude and Codex turns on Linux and on this Mac, with cards, the app's tools, terminals, files, workflows, Landlock and hosted MCP. `coder/acp-go-sdk` and `modelcontextprotocol/go-sdk` needed no fork. The stages were all done in one night, and the screen was locked throughout, so what the window *shows* is proved only by its calls and by the notifications; the on-screen walk is still to do.
+
+**Recommendation: go on.** Order:
+1. **Linux hosts first.** A 9 MB binary that builds in 13 s, against a 78 MB one that needs the swift.org toolchain and its Static Linux SDK. Landlock is new ground there.
+2. **Then the control plane (#1126),** schema-first with OpenRPC for the methods.
+3. **The Mac daemon last.** It works, but its surface is the widest, and the Mac-only parts are the fiddliest.
+
+Keep the Swift window and the Remote, and check their types against the schema in CI. The size of the job is the gap, not the risk: the Go host serves 54 of the 286 `DaemonAPI` methods (5.5k lines of Go, against 110k lines of Swift on the daemon side, client code included). See "What it would take" at the end.
+
+## Numbers
+
+| | Go `agentsd` | Swift `agentsd` |
+|---|---|---|
+| Hand-written lines | 5,524 (control 973, daemon 3,498, runtime 385, sandbox 186, cmds 451, demo 31) + 234 of tests | 110k in AgentsKit + AgentsKitCore + ControlDial + Daemon (with client code) |
+| Generated lines | 2,925 Go (`internal/wire`), plus 9.4k Swift and 1.2k TS for the checks | — |
+| Methods served | 54 of 286 | 286 |
+| Linux arm64 binary | 9.4 MB static, stripped (6.4 MB at stage 1) | 78 MB static (`agentsd-linux-aarch64`) |
+| macOS arm64 binary | 9.6 MB stripped (14 MB not) | 77 MB (Debug build in `Agents Host.app`) |
+| Linux build, cold (modules cached) | 13 s in `golang:1.25` on this Mac | 336 s for `agentsd` alone, one architecture (`scripts/build-linux-agentsd.sh --check aarch64`, packages from the shared cache; 362 s with `ci-watcher`) |
+| Rebuild after a change | under 1 s | |
+| Toolchain | the `golang` image; cross-builds darwin and linux from one place | the swift.org toolchain + Static Linux SDK for Linux; Xcode for the Mac |
+
+## Libraries: what they did and what they missed
+
+| Library | Used for | Missed |
+|---|---|---|
+| `coder/acp-go-sdk` v0.13.5 | the whole ACP client: initialize, session/new with MCP servers and `_meta`, prompt, cancel, set_config_option, permission requests, fs, terminals, every standard update | AIR extensions (async tasks, subagents), compaction and notices are not in its update union. Vendor methods (`_session/steering`) need `CallExtension`. No fork needed. |
+| `modelcontextprotocol/go-sdk` v1.8.0 | the app's tools endpoint (server, streamable HTTP, JSON replies); hosted MCP (a client for stdio + a server to sessions); the demo stdio server | Nothing for this. A typed proxy narrows what passes (tools only): Swift forwards raw JSON-RPC. |
+| `coder/websocket` v1.8.15 | the uplink, and agentsctl's client socket | nothing |
+| standard library `crypto/ecdh`, `crypto/hkdf`, `crypto/hmac`, `crypto/tls` | the HMAC exchange, P-256, HKDF, the SPKI pin | nothing: the MACs matched Swift's at the first try |
+| `creack/pty` v1.1.24 | `shell/*` | nothing |
+| `robfig/cron` v3.0.1 | workflow schedules | Swift's schedule is not cron. It maps to cron lines, plus an edge check. |
+| `landlock-lsm/go-landlock` v0.10.1 | the Linux sandbox | nothing; needs the `psx` module (pure Go here) |
+| `atombender/go-jsonschema` v0.24.1 | Go from the schema | Cases with no values lost under `omitempty`, fixed after generation |
+| quicktype 23 | Swift and TypeScript from the schema | Overflows on the recursive `JSONValue`; no `Equatable` with `JSONAny`; poor names |
+| `ts-json-schema-generator` 2 | the schema from today's `generated.ts` | nothing |
+| `gopkg.in/yaml.v3` | workflow front matter | nothing |
+
 ## Stages
 
 | Stage | Status | Commit | What works |
@@ -10,7 +48,7 @@ Throwaway code in `agentsd-go/`. Not for merge. The test note is [test.md](test.
 | 2. Everyday turn | done (socket); window look waits | 91657767 | Permission cards both ways; the app's tools (`list_sessions`, `read_session`, `start_session`) on `modelcontextprotocol/go-sdk`; terminals on `creack/pty`; files browse/list/read/write; Codex with the Mac's ChatGPT sign-in lent; stop. |
 | 3. Schema-first wire | done | 614aa5ea | `schema/daemon.schema.json`, 118 definitions, with Go, Swift and TypeScript generated from it. Go and Swift round-trip all 316 records today's Swift encoder writes in the fixtures. Today's TypeScript types fit the schema's. The Go host's own records fit it too. |
 | 4. More of the daemon | done (socket); the window's Workflows page waits for a look | 8889e20d | Workflows: today's front matter and schedule, run by `robfig/cron`; one run by its schedule, one by hand. Every runtime under Landlock (`go-landlock`), proved on a real turn. A hosted stdio MCP server shared by two sessions (one pid, calls 1 and 2). |
-| 5. Go agentsd on this Mac | done (socket); the window look waits for an unlocked screen | (this commit) | `agentsd-go/mac.sh up` makes a scratch control plane, the Go host as this Mac's own host `mac`, and a scratch window. A real Claude turn ran, signed in through the Keychain. `caffeinate` held while it ran; `sandbox-exec` confined writes. |
+| 5. Go agentsd on this Mac | done (socket); the window look waits for an unlocked screen | dd67f41e | `agentsd-go/mac.sh up` makes a scratch control plane, the Go host as this Mac's own host `mac`, and a scratch window. A real Claude turn ran, signed in through the Keychain. `caffeinate` held while it ran; `sandbox-exec` confined writes. |
 
 ## Stage 5: the Go agentsd on this Mac
 
@@ -191,7 +229,25 @@ The window was connected to the Go host the whole time (its `refreshServer` call
 |---|---|---|
 | Binary, Linux arm64 | 6.4 MB | 78 MB (`agentsd-linux-aarch64`, static) |
 | Binary, Linux x86-64 | 6.9 MB | 83 MB |
-| Cold build (modules cached) | 13 s | the Swift static-SDK cross-build (not timed again here) |
+| Cold build (modules cached) | 13 s | 336 s (see Numbers) |
 | Rebuild | under 1 s | |
 
 **Libraries:** `coder/acp-go-sdk` v0.13.5, `coder/websocket` v1.8.15, and the standard library's `crypto/ecdh`, `crypto/hkdf`, `crypto/hmac` and `crypto/tls`. The pin is `VerifyPeerCertificate` over the leaf's SPKI. Nothing was missing.
+
+## What it would take
+
+To replace the Swift Linux host, roughly in this order. Each is ordinary Go now that the wire, ACP and MCP are known to work.
+- **Parity on what a window shows:**
+  - elicitations (question cards);
+  - `files/changed` with watches;
+  - turn summaries (`agents/turns`);
+  - lean `agent/changed` and `presence/report`-filtered `agent/entry`;
+  - fan-out frames (#167);
+  - picking agents back up after a restart (`session/resume`/`load`, which the SDK has).
+- **The toolset installer**, which nothing does for a control-plane host today, for Swift or Go.
+- **The rest of the methods a server host gets:** workflows in full (queue, cooldown, approvals, standing and triggering agents, events), `mcp.json` approvals, worktrees and changes, pins, leases, events, cost and usage. That is most of the 232 methods not yet served; many are small.
+- **Tests.** Port the daemon's behaviour tests that matter, and keep the schema checks of stage 3 in CI against the Swift encoder.
+- **Then the control plane (#1126).** `internal/control` already holds the client and host sides of the exchange.
+
+For the Mac daemon, add the lending relay (`relay/grant`: Keychain read + TLS relay), the code-signature check on `daemon.sock`, launchd, and the Mac-only methods (19 were called on connect). Decide then whether `caffeinate`/`sandbox-exec` are enough, or whether cgo for IOKit is worth it.
+
