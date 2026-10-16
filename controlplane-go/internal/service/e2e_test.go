@@ -334,3 +334,31 @@ func TestAForgottenClientIsClosedAndRefused(t *testing.T) {
 		}
 	}
 }
+
+// A sign-in lent between two hosts (T091): a channel on each, joined, bytes untouched.
+func TestATunnelJoinsTwoHosts(t *testing.T) {
+	w := start(t)
+	lender, _ := w.enrolHost(t, "this-mac")
+	borrower, bID := w.enrolHost(t, "server")
+	client, _ := w.pairClient(t, "mac")
+	lender.readUntil(t, `"open"`)
+	borrower.readUntil(t, `"open"`)
+	borrower.send(t, `{"c":0,"m":{"jsonrpc":"2.0","id":5,"method":"tunnel/open","params":{"runtime":"claude","ref":"r1"}}}`)
+	if l := borrower.readUntil(t, `"id":5`); !strings.Contains(l, "-32045") {
+		t.Fatalf("not lent yet: %s", l)
+	}
+	client.send(t, `{"m":{"jsonrpc":"2.0","id":1,"method":"hosts/lendSignIn","params":{"host":"`+bID+`","from":"mac","runtime":"claude","allowed":true}}}`)
+	client.readUntil(t, `"id":1`)
+	borrower.send(t, `{"c":0,"m":{"jsonrpc":"2.0","id":6,"method":"tunnel/open","params":{"runtime":"claude","ref":"r1"}}}`)
+	near := borrower.readUntil(t, `"tunnelRef":"r1"`)
+	far := lender.readUntil(t, `"tunnel":"claude"`)
+	var n, f struct{ C int }
+	json.Unmarshal([]byte(near), &n)
+	json.Unmarshal([]byte(far), &f)
+	borrower.send(t, fmt.Sprintf(`{"c":%d,"m":"aGVsbG8="}`, n.C))
+	if l := lender.readUntil(t, "aGVsbG8="); l != fmt.Sprintf(`{"c":%d,"m":"aGVsbG8="}`, f.C) {
+		t.Fatalf("far end: %s", l)
+	}
+	lender.send(t, fmt.Sprintf(`{"c":%d,"close":true}`, f.C))
+	borrower.readUntil(t, fmt.Sprintf(`{"c":%d,"close":true}`, n.C))
+}
