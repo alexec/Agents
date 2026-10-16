@@ -164,4 +164,7 @@ func TestRootIDFileIsSwifts(t *testing.T) {
 	if !strings.HasPrefix(string(b), "{\n  \"id\" : \""+s.RootID+"\",\n  \"madeAt\" : \"") {
 		t.Fatalf("root-id.json %s", b)
 	}
+	if !strings.Contains(string(b), `"path" : "\/`) {
+		t.Fatalf("slashes not escaped as Swift escapes them: %s", b)
+	}
 }

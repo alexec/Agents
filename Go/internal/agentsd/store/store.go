@@ -369,7 +369,7 @@ func loadOrMakeRootID(file, root string) (string, bool) {
 		}
 	}
 	made := rootIdentity{ID: newUUID(), MadeAt: time.Now().UTC().Format("2006-01-02T15:04:05Z"), Path: here}
-	// Swift's JSONEncoder with .prettyPrinted and .sortedKeys.
+	// Swift's JSONEncoder with .prettyPrinted and .sortedKeys, which escapes slashes.
 	text := fmt.Sprintf("{\n  \"id\" : %s,\n  \"madeAt\" : %s,\n  \"path\" : %s\n}", quote(made.ID), quote(made.MadeAt), quote(made.Path))
 	if err := WriteAtomically(file, []byte(text), 0o644); err != nil {
 		log.Printf("could not write %s: %v", file, err)
@@ -382,7 +382,7 @@ func quote(s string) string {
 	e := json.NewEncoder(&buf)
 	e.SetEscapeHTML(false)
 	e.Encode(s)
-	return strings.TrimSuffix(buf.String(), "\n")
+	return strings.ReplaceAll(strings.TrimSuffix(buf.String(), "\n"), "/", `\/`)
 }
 
 func newUUID() string {
