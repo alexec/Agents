@@ -54,9 +54,15 @@ type appTool struct {
 	call func(d *Daemon, agent wire.UUID, args map[string]json.RawMessage) (string, error)
 }
 
-// appToolCalls is every tool this host does, by name.
-var appToolCalls = []appTool{
-	{"set_session_labels", (*Daemon).setSessionLabels},
+// appToolCalls is every tool this host does, by name. A function, as the tools reach back
+// into what starts the endpoint.
+func appToolCalls() []appTool {
+	return []appTool{
+		{"set_session_labels", (*Daemon).setSessionLabels},
+		{"lease_resource", (*Daemon).leaseResource},
+		{"release_resource", (*Daemon).releaseResource},
+		{"list_resources", (*Daemon).listResources},
+	}
 }
 
 // startAppTools listens on loopback, once, for every session's tools.
@@ -319,7 +325,7 @@ func offeredTools(movesItself bool) []json.RawMessage {
 		return nil
 	}
 	done := map[string]bool{}
-	for _, t := range appToolCalls {
+	for _, t := range appToolCalls() {
 		done[t.name] = true
 	}
 	out := []json.RawMessage{}
@@ -370,9 +376,10 @@ func (d *Daemon) appToolsHandle(ctx context.Context, g *appGrant, method string,
 		json.Unmarshal(params, &p)
 		// Matched by the end of the name: a runtime is free to put its own prefix on it.
 		var tool *appTool
-		for i := range appToolCalls {
-			if strings.HasSuffix(p.Name, appToolCalls[i].name) && (tool == nil || len(appToolCalls[i].name) > len(tool.name)) {
-				tool = &appToolCalls[i]
+		calls := appToolCalls()
+		for i := range calls {
+			if strings.HasSuffix(p.Name, calls[i].name) && (tool == nil || len(calls[i].name) > len(tool.name)) {
+				tool = &calls[i]
 			}
 		}
 		if tool == nil {
