@@ -635,3 +635,44 @@ func TestChannelsAnswer(t *testing.T) {
 		t.Fatal(e)
 	}
 }
+
+// Workspace providers answer on a single copy with a home for their secrets, and say
+// why not anywhere else (#691).
+func TestProvidersAnswerWhereTheyCanRun(t *testing.T) {
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	_, window := p.client("Window")
+	if e := callError(t, window, "", "providers/list", nil); !strings.Contains(e, "-32064") {
+		t.Fatal(e)
+	}
+
+	port := freePort(t)
+	url := "http://127.0.0.1:" + itoa(port)
+	s, err := New(Config{Store: store.NewMemory(), PrivateKey: controllink.NewPrivateKey(), URL: url, Bind: "127.0.0.1",
+		Port: port, Name: "With providers", ProviderHome: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	defer s.Stop()
+	shown, _ := s.Codes().Issue(context.Background(), false, false, time.Minute)
+	code, _ := controllink.ParseCode(shown.Text)
+	member, err := controllink.PairClient(context.Background(), code, "Window")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, err := controllink.DialClient(context.Background(), member)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	var listed struct {
+		Providers []any `json:"providers"`
+	}
+	if err := json.Unmarshal(call(t, w, "", "providers/list", nil), &listed); err != nil || listed.Providers == nil {
+		t.Fatalf("%v %+v", err, listed)
+	}
+	// A kept request's list is there, and empty.
+	call(t, w, "", "hosts/listKept", map[string]any{})
+}
