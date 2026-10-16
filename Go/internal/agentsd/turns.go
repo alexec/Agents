@@ -414,6 +414,14 @@ func (l *live) turn() bool {
 		um.Blocks = bs
 	}
 	d.record(l.id, wire.TranscriptEntryKind{UserMessage: um})
+	// What was suggested has been answered, taken or typed past; only by the person.
+	if from == wire.PromptOriginPerson {
+		d.change(l.id, func(a *wire.Agent) {
+			if len(a.SuggestedPrompts) > 0 {
+				a.SuggestedPrompts = nil
+			}
+		})
+	}
 	l.mu.Lock()
 	l.lastMessageID = ""
 	l.lastMessage.Reset()

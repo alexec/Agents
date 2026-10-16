@@ -83,7 +83,7 @@ func TestTheAppsToolsAreServedToEachRuntime(t *testing.T) {
 		} `json:"tools"`
 	}
 	json.Unmarshal(list["result"], &tools)
-	if len(tools.Tools) != len(appToolCalls()) || tools.Tools[0].Name != "set_session_labels" || tools.Tools[0].Description == "" ||
+	if len(tools.Tools) != len(appToolCalls()) || tools.Tools[0].Name != "show_file" || tools.Tools[0].Description == "" ||
 		!strings.Contains(string(tools.Tools[0].InputSchema["properties"]), `"description"`) {
 		t.Fatalf("%s", list["result"])
 	}
