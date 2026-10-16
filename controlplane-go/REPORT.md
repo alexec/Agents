@@ -24,3 +24,115 @@ One line for each stage, written when the stage was committed.
   - `s3blob.Delete` does a HEAD before each DELETE: one more request for each delete.
 - **gocloud.dev/secrets** (`localsecrets`, `gcpkms`): did what I needed. It wraps and unwraps bytes, nothing more. The envelope (data key, AES-GCM, where to keep it) is 150 lines of my own. `gcpkms` pulls in the Google Cloud client libraries: the binary went from 30.6 MB to 35.7 MB (debug symbols in; the Swift `agents-control` in a Debug build is 97 MB).
 - **Colima** (not a library): on 2026-10-16 it did not forward a new container's port to the Mac. The devbox's older port still worked. `minio.sh` reaches MinIO through an ssh tunnel over the devbox's sshd. Restarting Colima would probably fix it, but that is Alex's to do.
+
+## Numbers
+
+| | Go (this spike) | Swift (today) |
+|---|---|---|
+| Lines, not counting tests | 4,050 for the control plane (`internal/`, `cmd/agents-control`), plus 430 for tools (`webcheck`, scripts not counted) | About 6,800 for the same parts: `ControlStore`, `ControlAuth`, `ControlCode`, `ControlWire`, `ControlRouter`, `ControlRecords`, `ControlMethods`, `Grant`, `ControlAgreement`, `ControlService`, `LoopbackListener`, `S3Store`, `agents-control`. The whole of `Packages/ControlPlane` is 8,541, and 5,900 of those are parts not ported (providers 2,862, ssh hosts 1,365, channels 785, copies 457, handover 410). |
+| Lines of tests | 797 | — |
+| Binary | 24 MB for Linux arm64, stripped (35.7 MB for macOS with symbols) | The `agents-control` image is 107 MB; the Debug macOS helper is 97 MB |
+| Build | 32 s with an empty build cache (modules cached), 20 s warm, both in the `golang:1.25` container | Minutes. The #1125 lane timed the Swift Linux `agentsd` at 336 s for one architecture |
+| Memory, idle | 26 MB, with three hosts and two clients | 30 MB, with one host and no window |
+
+## What the clients would need
+
+Nothing so far. Today's Mac window, Swift `agentsd`, the #1125 Go `agentsd`, and the web page's wire (as `webcheck` speaks it) all worked unchanged. The window has not been seen on screen (the Mac was locked), so how it *looks* with a Go control plane behind it is the first thing to check. Methods the Go control plane answers with "cannot do that" are listed under "Known broken" below. The window shows those errors where it shows them for a control plane of several copies.
+
+## For Alex's test (evening of 2026-10-17)
+
+Everything runs on scratch roots (`/tmp/run-<slug>`), MinIO in a container of its own, and the agents-devbox container. Nothing touches the live control plane or Agents Host. Work from the worktree:
+
+```sh
+cd ~/Agents/.agents/worktrees/do-spike-github-issue-2/controlplane-go
+```
+
+**Before you start.** The scratch build of Agents Host and the window is already in this worktree's `build/DD`, and the Go binaries are in `out/` (not checked in). To make the binaries again, using the "build" lease:
+
+```sh
+GOOS=darwin ./go.sh build -o out/darwin/agents-control ./cmd/agents-control
+GOOS=darwin ./go.sh build -o out/darwin/webcheck ./cmd/webcheck
+./gohosts.sh build      # the #1125 Go agentsd and agentsctl, from a copy of that worktree
+```
+
+**A. The Go control plane, today's Swift host and the window** (stages 2 and 3):
+
+```sh
+./run.sh up cpgo --lan          # prints ROOT, CONTROL_URL, WEB_URL, the pids
+tail -f /tmp/run-cpgo/control/control.log
+```
+
+In the scratch window (its title says `run-cpgo`). I have not seen it on screen, so these are the things to look at, not steps I have walked:
+1. The control plane's page in Settings shows "run-cpgo (Go)", version 0.1, and this Mac's host connected.
+2. Add a project on this Mac's host, start a Claude session in it, and allow its permission card.
+3. Pair another client from the window (its code comes from the Go control plane), then forget it. Its sockets close with 4403.
+4. Join another host by hand with `./run.sh code cpgo --host` (see B).
+
+**B. The Go hosts at the same time** (stage 3):
+
+```sh
+./gohosts.sh up cpgo     # the #1125 Go agentsd on this Mac (/tmp/run-cpgo-g) and on the devbox (~/.agents-cpgo)
+```
+
+The window now lists three hosts: this Mac (Swift), "This Mac (Go host)" and "devbox (Go host)". Start a Claude session on the devbox host, in `/home/agents/src/cpgo`. The window asks to lend this Mac's Claude sign-in: say yes. The lend goes through the Go router's tunnel.
+
+**C. The web page** (stage 5). Open `WEB_URL` (printed by `run.sh`) in Safari, then pair with `./run.sh code cpgo --client --browser`. Check the hosts, a chat, and a turn. Without a browser:
+
+```sh
+./out/darwin/webcheck <web port> "$(./run.sh code cpgo --client --browser)"
+```
+
+**D. A bucket and a KMS** (stages 1 and 4):
+
+```sh
+./minio.sh up                          # MinIO on 127.0.0.1:19100, through the devbox's ssh
+./run.sh up cpgok --s3 --kms --no-window
+ls /tmp/run-cpgok/control              # no control-key: it is sealed in the bucket
+curl -s --aws-sigv4 aws:amz:us-east-1:s3 --user spike:spike-secret-key \
+  "http://127.0.0.1:19100/cpgo?list-type=2&prefix=cpgok/" | grep -o '<Key>[^<]*</Key>'
+```
+
+**E. Without the screen.** The same calls the window makes, with `agentsctl` from #1125:
+
+```sh
+C=~/Library/Caches/Agents-build/cpgo-agentsd-go/out/darwin/agentsctl; export AGENTSCTL=/tmp/run-cpgo/ctl.json
+$C pair "$(./run.sh code cpgo --client)"
+$C call hosts/list
+$C turn -host mac -runtime claude -cwd /tmp/run-cpgo/work -allow 'Write hello.txt.'   # mkdir and git init the folder first
+```
+
+**F. The tests**, using the "build" lease:
+
+```sh
+./minio.sh up; eval "$(./minio.sh env)"; ./go.sh test ./...
+```
+
+**Clean up:**
+
+```sh
+./gohosts.sh down cpgo; ./run.sh down cpgo; ./run.sh down cpgok; ./minio.sh down
+```
+
+## Recommendation: go on
+
+**Go on, with the control plane second, after the Linux host (#1125), as that lane recommends.** These are the reasons:
+
+- **The wire held.** Today's window and Swift host, and the #1125 Go host, worked with no change and on the first try once the bytes matched. The Swift vectors (`Web/test/vectors.json`) and the record JSON were enough to find every difference. Keep them, and the #1125 schema, as the shared contract while two languages speak it.
+- **It is a server, and Go is good at servers.** The binary is 24 MB, against a 107 MB image. It builds in 20–30 s in a stock container, against minutes for Swift on Linux. It holds what it needs with `net/http`, `crypto/*` and one WebSocket library. The cloud copy (#61) is where this pays.
+- **The libraries were thinner than hoped, but none of them blocked.** `gocloud.dev/blob` needed three workarounds for conditional writes (If-Match, the write's tag, and 409). `secrets` is only wrap and unwrap. Count on writing about as much code round them as in Swift's own S3 signer.
+- **What is left is the bulk.** The parts ported here are about 6,800 lines of Swift. The parts not ported (workspace providers, ssh installs and tunnels, Slack, copies and handover) are about 5,900 more, and they are the parts with the most behaviour. Port them by area, each with its Swift tests, while the Swift control plane stays the one that ships.
+
+**Before going on:** find out whether DigitalOcean Spaces honours If-Match and If-None-Match (#61). Both control planes depend on it, and a store that ignores them is refused at start.
+
+## Known broken or left out
+
+- **Several copies over one store.** Not ported: no peer links, no leases, no handover, no forwarding. A Go copy is a single copy, like Agents Host's today.
+- **Add a Server, Detect Servers, Update and Check Again** (`hosts/install`, `hosts/detect`, `hosts/sshHosts`, `hosts/update`, `hosts/checkAgain`): these answer "This control plane cannot do that yet." The command a host code carries names `/v1/install.sh`, which this spike does not serve. Join a server with a host code by hand instead, as `gohosts.sh` does.
+- **Workspace providers, kept requests, Write It for Me** (`providers/*`, `hosts/start`, …): these answer "Workspace providers need a control plane with one copy, for now." The words are wrong here (it *is* one copy), but they are what the window already shows.
+- **Channels (Slack).** `channels/get` says it is unavailable, and `channels/set` refuses.
+- **Notices to phones.** `attention/need` is acknowledged and dropped: no relay host is told, and nothing is sealed to a device.
+- **`hosts/lastHeard`** answers with nothing kept, so a window that opens while a host is offline sees its lists empty until the host is back.
+- **Bonjour.** A window on another Mac can't find the control plane by itself. Use a code.
+- **The MCP Apps sandbox proxy** (#187) is served with a fixed CSP, not the view's own.
+- **The window was never seen on screen** (the Mac was locked), and neither was the page in a real browser.
+- **SSE-KMS buckets on AWS** would break conditional writes (see gocloud above). DigitalOcean Spaces (#61) was not tried. Whether it honours If-Match at all is the first thing to find out, for Swift as much as for Go.
