@@ -12,6 +12,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/notices"
+	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 )
 
@@ -83,6 +84,13 @@ type Router struct {
 	linkChanged func(client string, relayed *bool)
 	// Told each presence report a client here makes.
 	presenceHeard func(client string, device bool, report json.RawMessage)
+	// A linked host's workspace (#691), laid over its state: a host whose workspace is
+	// stopped is shown stopped, not offline.
+	workspaces map[string]*providers.HostWorkspace
+	// Keeps a prompt or agent start for a stopped host (#691 US3); nil where nothing is.
+	keeper keeper
+	// Kept requests asked, in the order they came.
+	keeping chan func()
 	// Told each host's answer to a whole list (#962), for hosts/lastHeard: host, method,
 	// the reply line. Nil where none is kept.
 	copier     func(host, method, reply string)
@@ -163,7 +171,8 @@ func NewRouter(h Handler, log func(string)) *Router {
 	return &Router{handler: h, clients: map[string]*clientSession{}, hosts: map[string]*hostSession{},
 		known: map[string]bool{}, relays: map[string]bool{}, states: map[string]hostState{},
 		toldLinks: map[string]bool{}, asks: map[string]*hostAsk{}, keptWaits: map[string]chan *message{}, presence: map[string]notedPresence{}, log: log,
-		peers: map[string]func(string){}, peerLinks: map[string]map[string]bool{}}
+		peers: map[string]func(string){}, peerLinks: map[string]map[string]bool{},
+		workspaces: map[string]*providers.HostWorkspace{}}
 }
 
 // MARK: What it knows
@@ -218,13 +227,90 @@ func describe(host string, s hostState) map[string]any {
 	return params
 }
 
-// Described is a host's state as hosts/list and control/hostChanged say it.
+// Described is a host's state as hosts/list and control/hostChanged say it, with its
+// workspace laid over it (#691).
 func (r *Router) Described(host string) map[string]any {
-	s, ok := r.State(host)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.describedLocked(host)
+}
+
+func (r *Router) describedLocked(host string) map[string]any {
+	s, ok := r.states[host]
 	if !ok {
 		s = hostState{State: "offline", Since: time.Now()}
 	}
-	return describe(host, s)
+	return providers.Overlay(describe(host, s), s.online(), r.workspaces[host])
+}
+
+// keeper is KeptHandling: what keeps a request for a stopped host, and is told when a
+// host attaches.
+type keeper interface {
+	Keep(host, method string, params json.RawMessage, caller providers.Caller) *providers.Failure
+	Attached(host string)
+}
+
+// SetKeeper says what keeps a prompt or a start for a stopped workspace (#691 US3).
+func (r *Router) SetKeeper(k keeper) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.keeper = k
+	if r.keeping == nil {
+		r.keeping = make(chan func(), 256)
+		go func() {
+			for keep := range r.keeping {
+				keep()
+			}
+		}()
+	}
+}
+
+// Workspace is a linked host's workspace, or nil.
+func (r *Router) Workspace(host string) *providers.HostWorkspace {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.workspaces[host]
+}
+
+// SetWorkspace is ControlRouter.setWorkspace: a linked host's workspace changed (its
+// state, a start's phase), or the link went; said to every client when it differs.
+func (r *Router) SetWorkspace(host string, ws *providers.HostWorkspace) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	old := r.workspaces[host]
+	a, _ := json.Marshal(old)
+	b, _ := json.Marshal(ws)
+	if string(a) == string(b) {
+		return
+	}
+	if ws == nil {
+		delete(r.workspaces, host)
+	} else {
+		r.workspaces[host] = ws
+	}
+	if r.known[host] {
+		r.broadcastControlLocked("control/hostChanged", r.describedLocked(host))
+	}
+}
+
+// TellControl tells one client session that speaks the wrapped wire; false when it has
+// gone (#858).
+func (r *Router) TellControl(session, method string, params any) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	s := r.clients[session]
+	if s == nil || !s.wrapped {
+		return false
+	}
+	r.writeLocked(session, wrap("", notification(method, params)))
+	return r.clients[session] != nil
+}
+
+// HasSession says a client session is still here.
+func (r *Router) HasSession(session string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.clients[session] != nil
 }
 
 func (r *Router) setStateLocked(host string, s hostState) {
@@ -233,7 +319,7 @@ func (r *Router) setStateLocked(host string, s hostState) {
 		return
 	}
 	r.states[host] = s
-	r.broadcastControlLocked("control/hostChanged", describe(host, s))
+	r.broadcastControlLocked("control/hostChanged", r.describedLocked(host))
 }
 
 // Holds says this copy has the host's real uplink.
@@ -344,6 +430,10 @@ func (r *Router) attachHost(host string, conn Uplink, local bool) {
 	r.setStateLocked(host, hostState{State: "online"})
 	for id := range r.clients {
 		r.openChannelLocked(id, host)
+	}
+	if local && r.keeper != nil {
+		k := r.keeper
+		go k.Attached(host)
 	}
 	r.mu.Unlock()
 	go func() {
@@ -1293,7 +1383,31 @@ func (r *Router) toHostLocked(host, msg, sessionID string) {
 	}
 	c, ok := s.channels[host]
 	h := r.hosts[host]
-	if !ok || h == nil || !h.conn.Send(channelFrame(c, msg)) {
+	if !ok || h == nil {
+		refusal := providers.OfflineRefusal(r.workspaces[host])
+		// A prompt or a start for a stopped workspace may be kept, and start it (#691 US3).
+		if r.keeper != nil && providers.KeptMethods[m.Method] {
+			k, caller, id, wrapped, method, params := r.keeper, s.caller, m.ID, s.wrapped, m.Method, m.Params
+			r.keeping <- func() {
+				answer := k.Keep(host, method, params, providers.Caller{Session: caller.Session, Client: caller.Client, Kind: caller.Kind})
+				var err error = refusal
+				if answer != nil {
+					err = answer
+				}
+				line := replyError(id, err)
+				if wrapped {
+					line = wrap(host, line)
+				}
+				r.mu.Lock()
+				r.writeLocked(sessionID, line)
+				r.mu.Unlock()
+			}
+			return
+		}
+		r.writeLocked(sessionID, s.wrap(host, replyError(m.ID, refusal)))
+		return
+	}
+	if !h.conn.Send(channelFrame(c, msg)) {
 		// An uplink that has ended but is not yet dropped takes nothing: said, not lost (#62).
 		r.writeLocked(sessionID, s.wrap(host, replyError(m.ID, fail(hostOffline, "That host is offline."))))
 		return

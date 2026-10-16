@@ -28,6 +28,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/hostinstall"
 	"github.com/alexec/agents/Go/internal/controlplane/hosttunnels"
 	"github.com/alexec/agents/Go/internal/controlplane/notices"
+	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/internal/controlplane/web"
@@ -70,6 +71,13 @@ type Config struct {
 	// How often a copy beats, looks for the others and renews its leases; shorter in
 	// tests. 0 is 10 s.
 	CopyBeat time.Duration
+	// Where workspace providers keep their secrets (#691, research R3): the control
+	// plane's own home, never the store. "" for none, and no providers.
+	ProviderHome string
+	// The command provider's binary, when not beside agents-control (tests).
+	CommandProvider string
+	// How long provider calls, starts and lists take; shorter in tests. Zero is standard.
+	ProviderTiming providers.Timing
 	// Start empty, for a handover to fill (R16): no settings made, every member refused,
 	// only the copy handing over answered, until it says take over.
 	Receive bool
@@ -108,6 +116,8 @@ type Service struct {
 	tunnels *hosttunnels.Tunnels
 	// Chat apps that answer Needs You (#1012): only with a home for their secrets.
 	channels *channels.Channels
+	// Workspace providers (#691): only on a single copy with a home for their secrets.
+	providers *providers.Providers
 	// The other copies over this store, and the leases (US3); nil for a single copy.
 	mesh *mesh
 	// The origin peers dial, which a copy's key exchange is bound to.
@@ -185,6 +195,9 @@ func New(cfg Config) (*Service, error) {
 			}
 			return names
 		}}
+	if cfg.ProviderHome != "" && s.mesh == nil {
+		s.providers = s.makeProviders(cfg.ProviderHome)
+	}
 	return s, nil
 }
 
@@ -266,6 +279,9 @@ func (s *Service) Start(ctx context.Context) (int, error) {
 	}
 	if s.channels != nil {
 		s.channels.Apply()
+	}
+	if s.providers != nil && s.phase.now() != phaseReceiving {
+		s.providers.Start()
 	}
 	go s.watchJoinFile()
 	s.log(fmt.Sprintf("listening on %s:%d for %s", s.cfg.Bind, port, s.cfg.URL))
@@ -368,6 +384,9 @@ func (s *Service) Stop() {
 	}
 	if s.channels != nil {
 		s.channels.Stop()
+	}
+	if s.providers != nil {
+		s.providers.Stop()
 	}
 	if s.mesh != nil {
 		s.mesh.stop()

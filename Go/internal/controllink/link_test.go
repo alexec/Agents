@@ -2,9 +2,9 @@ package controllink
 
 import (
 	"context"
-	"errors"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"

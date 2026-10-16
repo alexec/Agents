@@ -329,6 +329,11 @@ func serve() {
 		cfg.SecretsHome, _ = os.UserHomeDir()
 	}
 	cfg.SecretsHome = expand(cfg.SecretsHome)
+	// Workspace providers (#691) keep their secrets beside the control plane's own key.
+	cfg.ProviderHome = home()
+	if cfg.ProviderHome == "" && os.Getenv("AGENTS_CONTROL_PROVIDER_HOME") != "" {
+		cfg.ProviderHome = expand(os.Getenv("AGENTS_CONTROL_PROVIDER_HOME"))
+	}
 	if root := value("--host-root"); root != "" {
 		cfg.HostJoinFile = filepath.Join(expand(root), "control-join.json")
 	}

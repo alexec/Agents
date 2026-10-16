@@ -5,13 +5,14 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"github.com/alexec/agents/Go/internal/controlplane/hosttunnels"
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"unicode"
 
+	"github.com/alexec/agents/Go/internal/controlplane/hosttunnels"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 )
 
@@ -395,4 +396,36 @@ func knownHostsOverride(resolved string) []string {
 		}
 	}
 	return []string{"-o", "UserKnownHostsFile=~/.ssh/known_hosts ~/.ssh/known_hosts2"}
+}
+
+// StartDaemon is the workspace providers' sshStart hook (#691, #965): a host's agentsd
+// started over ssh as an install leaves it, without installing. knownHosts is the key
+// trusted at the install, in known_hosts form, when it was installed over this
+// destination; "" reads the person's own known_hosts. A failure is said in the install's
+// words, for the person.
+func (i *Installer) StartDaemon(ctx context.Context, destination, knownHosts, name string) error {
+	ssh := sshCommand{executable: i.sshExecutable(), name: destination, env: i.env(true)}
+	file := ""
+	if knownHosts != "" {
+		folder, err := os.MkdirTemp("", "agents-start-")
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(folder)
+		file = filepath.Join(folder, "known_hosts")
+		if err := os.WriteFile(file, []byte(knownHosts), 0o600); err != nil {
+			return err
+		}
+	}
+	ssh.options = join(i.configFile(), options("", file))
+	if file == "" {
+		ssh.options = append(ssh.options, personsKnownHostsOptions(ctx, ssh)...)
+	}
+	if err := (installer{ssh}).startDaemon(ctx, "--control-network", "--host-name", name); err != nil {
+		if p, ok := err.(*Problem); ok {
+			return errors.New(Say(p, false))
+		}
+		return err
+	}
+	return nil
 }

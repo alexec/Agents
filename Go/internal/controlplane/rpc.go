@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/alexec/agents/Go/internal/controlplane/hostinstall"
+	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 )
 
@@ -59,6 +60,14 @@ func asRPC(err error) *RPCError {
 	var e *RPCError
 	if errors.As(err, &e) {
 		return e
+	}
+	var workspace *providers.Failure
+	if errors.As(err, &workspace) {
+		return &RPCError{Code: workspace.Code, Message: workspace.Message, Data: workspace.Data}
+	}
+	var provider *providers.ProviderFailure
+	if errors.As(err, &provider) {
+		return &RPCError{Code: providers.CodeProviderFailed, Message: provider.Words}
 	}
 	var install *hostinstall.Failure
 	if errors.As(err, &install) {

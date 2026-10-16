@@ -33,11 +33,11 @@ type HostHello struct {
 }
 
 type hostAnnounce struct {
-	PublicKey []byte `json:"publicKey"`
-	Name      string `json:"name"`
-	Platform  string `json:"platform"`
-	Version   string `json:"version"`
-	MachineID string `json:"machineID"`
+	PublicKey      []byte `json:"publicKey"`
+	Name           string `json:"name"`
+	Platform       string `json:"platform"`
+	Version        string `json:"version"`
+	MachineID      string `json:"machineID"`
 	Implementation string `json:"implementation,omitempty"`
 }
 

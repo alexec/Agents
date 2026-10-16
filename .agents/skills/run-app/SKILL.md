@@ -77,6 +77,9 @@ Then it:
    user's own window's pairing, which lives in the same container.
 
 `--no-window` leaves the window out, for work the socket proves on its own.
+`CONTROL_BIN=<path>` runs another `agents-control` in place of the Swift one, such as the
+Go one (#1137): `GOOS=darwin Go/scripts/go.sh build -o out/darwin/agents-control
+./cmd/agents-control`, then `CONTROL_BIN=$PWD/Go/out/darwin/agents-control launch.sh …`.
 `--host-first` starts the host while the control plane is down, with the host code left in
 its root as Agents Host leaves it, waits until it has failed to join (`HOST_FIRST_WAIT`
 seconds more, 5 by default), then starts the control plane and waits for the host to join

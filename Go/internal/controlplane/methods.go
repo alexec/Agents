@@ -13,6 +13,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/channels"
+	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/web"
 )
@@ -268,6 +269,9 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		}
 		m.router.ForgetHost(request.Host)
 		m.s.copies.forget(request.Host)
+		if m.s.providers != nil && m.s.providers.Kept() != nil {
+			m.s.providers.Kept().Forget(request.Host)
+		}
 		m.s.announce("hostRemoved", request.Host, from.Client)
 		m.s.log("host " + request.Host + " removed")
 		return map[string]any{}, nil
@@ -301,21 +305,16 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return state, err
 	}
 	if workspaceMethods[method] {
-		return nil, fail(providersNeedOneCopy, "Workspace providers need a control plane with one copy, for now.")
+		if m.s.providers == nil {
+			return nil, fail(providersNeedOneCopy, "Workspace providers need a control plane with one copy, for now.")
+		}
+		return m.s.providers.Answer(method, params, providersCaller(from))
 	}
 	return nil, notFound(method)
 }
 
 // workspaceMethods is DaemonAPI.Method.workspaceMethods: workspace providers (#691).
-var workspaceMethods = map[string]bool{
-	"providers/list": true, "providers/add": true, "providers/create": true, "providers/update": true,
-	"providers/remove": true, "providers/refresh": true, "providers/options": true, "providers/runtimes": true,
-	"providers/draftStart": true, "providers/draftAnswer": true, "providers/draftCancel": true,
-	"hosts/link": true, "hosts/unlink": true, "hosts/start": true, "hosts/stop": true,
-	"hosts/deleteWorkspace": true, "hosts/setWorkspaceOptions": true,
-	"hosts/keep": true, "hosts/listKept": true, "hosts/dropKept": true, "hosts/retryKept": true,
-	"workspaces/forAgent": true,
-}
+var workspaceMethods = providers.WorkspaceMethods
 
 func (m *Methods) status(from Caller) controlStatus {
 	settings := m.records.Settings()
@@ -382,6 +381,9 @@ func (m *Methods) hostRow(h records.HostRecord) controlHost {
 	}
 	m.mu.Unlock()
 	sort.Slice(row.GitAsks, func(i, j int) bool { return row.GitAsks[i].Server < row.GitAsks[j].Server })
+	if ws := m.router.Workspace(h.ID); ws != nil {
+		row.Workspace, _ = json.Marshal(ws)
+	}
 	if m.s.tunnels != nil {
 		if tunnel := m.s.tunnels.State(h.ID); tunnel != nil {
 			row.Tunnel, _ = json.Marshal(tunnel)
@@ -525,10 +527,14 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 			}
 		}
 		return map[string]any{}, nil
-	case "host/workspaces", "host/providerDraft":
-		return nil, fail(providersNeedOneCopy, "Workspace providers need a control plane with one copy, for now.")
-	case "host/status":
-		return map[string]any{}, nil
+	case "host/workspaces", "host/providerDraft", "host/status":
+		if m.s.providers == nil {
+			if method == "host/status" {
+				return map[string]any{}, nil
+			}
+			return nil, fail(providersNeedOneCopy, "Workspace providers need a control plane with one copy, for now.")
+		}
+		return m.s.providers.HostSaid(host, method, params)
 	case "git/credential":
 		request, err := require[gitCredentialRequest](params, "GitCredentialRequest")
 		if err != nil {
