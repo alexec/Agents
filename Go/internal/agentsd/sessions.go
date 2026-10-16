@@ -130,6 +130,9 @@ func (d *Daemon) listSessions(caller wire.UUID, args map[string]json.RawMessage)
 	if me == nil {
 		return "", &Error{Code: CodeNoSuchAgent, Message: "That conversation is not open any more, so nothing was read."}
 	}
+	if strings.EqualFold(strings.TrimSpace(argString(args, "started_by")), "me") {
+		return d.listHelpers(me), nil
+	}
 	size := sessionPageSize
 	if n, ok := argInt(args, "limit"); ok {
 		size = n

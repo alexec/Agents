@@ -164,6 +164,13 @@ func (d *Daemon) stopSession(caller wire.UUID, args map[string]json.RawMessage) 
 		return "", err
 	}
 	name, folder := quotedTitle(t.Title), projectFolder(t)
+	if t.State == wire.AgentStateQueued {
+		d.change(t.ID, func(a *wire.Agent) {
+			a.State, a.EndedReason = wire.AgentStateStopped, reason(wire.EndedReasonCancelled)
+		})
+		d.record(t.ID, stateChanged(wire.AgentStateStopped, reason(wire.EndedReasonCancelled)))
+		return "Took " + name + " off the queue; it will not start. This project now has " + d.helperPlaces(folder) + ".", nil
+	}
 	l := d.live(t.ID)
 	l.mu.Lock()
 	busy := l.running || l.inTurn
@@ -182,6 +189,7 @@ func (d *Daemon) stopSession(caller wire.UUID, args map[string]json.RawMessage) 
 	for i := 0; i < 100 && !waitFor(); i++ {
 		time.Sleep(50 * time.Millisecond)
 	}
+	d.checkQueueSoon(folder)
 	return "Stopped " + name + ", freeing its running place; it keeps its other place until it is archived. This project now has " +
 		d.helperPlaces(folder) + ".", nil
 }

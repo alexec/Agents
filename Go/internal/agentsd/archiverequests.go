@@ -83,6 +83,7 @@ func (d *Daemon) afterArchiveRequest(id wire.UUID, requested, archiveNow bool) {
 		d.endWait(id, "archiveRequested", false)
 		d.raiseAgentEvent("agent.archive_requested", id, "asked to be archived.", outcome)
 		d.reconsider()
+		d.checkQueueSoon(projectFolder(a))
 	}
 	if archiveNow {
 		safe.Go("archive when done", func() {

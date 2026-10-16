@@ -128,6 +128,18 @@ func reason(r wire.EndedReason) *wire.EndedReason { return &r }
 
 // start makes an agent and queues its first turn.
 func (d *Daemon) start(r wire.StartRequest) (wire.UUID, error) {
+	return d.startFor(r, startedBy{owner: wire.SessionLabelOwnerPerson})
+}
+
+// startedBy is who a start is for: an agent that started it (a helper), the owner its
+// labels are given, and the queued record it takes the place of.
+type startedBy struct {
+	agent  *wire.UUID
+	owner  wire.SessionLabelOwner
+	queued *wire.Agent
+}
+
+func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) {
 	rt := runtimeByID(r.RuntimeID)
 	if rt == nil {
 		return "", &Error{Code: CodeRuntimeNotFound, Message: "no runtime " + r.RuntimeID}
@@ -170,12 +182,19 @@ func (d *Daemon) start(r wire.StartRequest) (wire.UUID, error) {
 		StartOptions:      wire.StartOptions{Values: values, ExtraArguments: extra},
 		AdvertisedOptions: []wire.ConfigOption{}, AvailableCommands: []wire.SlashCommand{},
 		CreatedAt: t, LastActivityAt: t, MadeInRoot: &d.Store.RootID, StartRequestID: r.RequestID,
+		StartedByAgent: by.agent,
 	}
-	if title != "" {
+	if q := by.queued; q != nil {
+		// Out of the queue, the same agent: its id, its title and when it was asked for.
+		a.ID, a.CreatedAt, a.Title, a.Labels = q.ID, q.CreatedAt, q.Title, q.Labels
+	}
+	if title != "" && a.Title == nil {
 		a.Title = &title
 	}
-	for _, l := range r.Labels {
-		a.Labels = append(a.Labels, wire.SessionLabel{Value: l, Owner: wire.SessionLabelOwnerPerson, AddedAt: t})
+	if by.queued == nil {
+		for _, l := range r.Labels {
+			a.Labels = append(a.Labels, wire.SessionLabel{Value: l, Owner: by.owner, AddedAt: t})
+		}
 	}
 	a.Worktree = wt
 	if err := d.Store.Save(a); err != nil {
@@ -566,6 +585,10 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 	d.afterArchiveRequest(l.id, requested, archiveNow)
 	// What the turn did to the app's own files is looked at as it ends (guardedTurnEnded).
 	d.guardedTurnEnded(l.id)
+	// A place may have come free for a queued helper.
+	if a := d.Store.Agent(l.id); a != nil {
+		d.checkQueueSoon(projectFolder(a))
+	}
 }
 
 func firstSentence(s string) string {
