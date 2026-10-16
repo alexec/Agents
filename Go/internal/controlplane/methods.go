@@ -141,13 +141,28 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return map[string]any{}, nil
 	case "hosts/startEnroll":
 		return m.s.codes.Issue(ctx, true, false, controllink.CodeLifetime)
-	case "hosts/install", "hosts/detect", "hosts/sshHosts", "hosts/update":
-		return nil, notHere
-	case "hosts/checkAgain":
-		if _, err := require[hostRequest](params, "HostRequest"); err != nil {
+	case "hosts/install":
+		return m.s.installer.Install(ctx, params)
+	case "hosts/detect":
+		return m.s.installer.Detect(ctx)
+	case "hosts/sshHosts":
+		var p struct {
+			Destination string `json:"destination"`
+		}
+		json.Unmarshal(params, &p)
+		return m.s.installer.SSHHosts(ctx, strings.TrimSpace(p.Destination))
+	case "hosts/update":
+		request, err := require[hostRequest](params, "HostRequest")
+		if err != nil {
 			return nil, err
 		}
-		return map[string]any{}, nil
+		return map[string]any{}, m.s.installer.Update(ctx, request.Host)
+	case "hosts/checkAgain":
+		request, err := require[hostRequest](params, "HostRequest")
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{}, m.s.installer.CheckAgain(ctx, request.Host)
 	case "control/setProjectDetection":
 		request, err := require[projectDetection](params, "ProjectDetection")
 		if err != nil {

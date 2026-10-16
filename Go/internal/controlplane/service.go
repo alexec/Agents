@@ -23,6 +23,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/buildinfo"
 	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/alexec/agents/Go/internal/controlplane/hostinstall"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/internal/controlplane/web"
@@ -78,6 +79,8 @@ type Service struct {
 	router  *Router
 	methods *Methods
 	started time.Time
+	// hosts/install, detect and sshHosts (T072, #429, #610): with the person's own ssh.
+	installer *hostinstall.Installer
 
 	mu          sync.Mutex
 	readAgainAt time.Time
@@ -113,6 +116,17 @@ func New(cfg Config) (*Service, error) {
 	s.router = NewRouter(nil, s.log)
 	s.methods = newMethods(s)
 	s.router.handler = s.methods
+	s.installer = &hostinstall.Installer{Codes: s.codes, ServerFolder: cfg.ServerFolder,
+		Progress: func(name, step string) {
+			s.router.BroadcastControl("control/installProgress", map[string]string{"name": name, "step": step})
+		},
+		KnownNames: func(context.Context) []string {
+			var names []string
+			for _, h := range s.records.Hosts() {
+				names = append(names, h.Name)
+			}
+			return names
+		}}
 	return s, nil
 }
 

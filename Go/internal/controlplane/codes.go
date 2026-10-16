@@ -83,6 +83,19 @@ func (c *Codes) issue(ctx context.Context, host, browser bool, lifetime time.Dur
 	return shown, id, nil
 }
 
+// HostCode is what hosts/install needs of the codes (hostinstall.CodeIssuer): a host
+// code naming url ("" for this control plane's own address), and its id.
+func (c *Codes) HostCode(ctx context.Context, url string) (string, string, error) {
+	if url == "" {
+		url = c.URL
+	}
+	shown, id, err := c.issue(ctx, true, false, controllink.CodeLifetime, url)
+	if err != nil {
+		return "", "", err
+	}
+	return shown.Text, id, nil
+}
+
 // Stored is a code as stored, refused if unknown, expired or (unless spentToo) spent;
 // spentToo lets a spent one through, for Spend to tell a replayed join from another.
 func (c *Codes) Stored(ctx context.Context, id string, spentToo bool) (*storedCode, error) {
