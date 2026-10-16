@@ -171,6 +171,8 @@ fi
 DAEMON_PID="$(tr -d '[:space:]' < "$ROOT/daemon.lock" 2>/dev/null || true)"
 
 APP_PID=""
+WINDOW_ID=""
+WINDOW_ON=""
 PAIR_CODE=""
 if [ "$WINDOW" = 1 ]; then
   # The window pairs on its own (AGENTS_CONTROL), into a folder of its own in
@@ -190,11 +192,31 @@ if [ "$WINDOW" = 1 ]; then
     [ -n "$APP_PID" ] && break
     sleep 0.1
   done
+  # Wait for its window, on any Space. Opened behind while the person's front app is full
+  # screen, it goes to the desktop's Space and is "off" (#1131): screenshots still work,
+  # AX presses do not. A process with no window at all is the other failure, said apart.
+  if [ -n "$APP_PID" ]; then
+    swiftc -O -o "$ROOT/.ui" "$(dirname "${BASH_SOURCE[0]}")/ui.swift" 2>/dev/null || true
+    for _ in $(seq 1 60); do
+      read -r WINDOW_ID WINDOW_ON < <("$ROOT/.ui" windows "$APP_PID" 2>/dev/null | awk -F'\t' '
+        { split($2, d, "x"); area = d[1] * d[2]; if (area > best) { best = area; id = $1; on = $4 } }
+        END { if (best > 40000) print id, on }') || true
+      [ -n "${WINDOW_ID:-}" ] && break
+      sleep 0.5
+    done
+    if [ -z "${WINDOW_ID:-}" ]; then
+      echo "the window process $APP_PID has no window after 30s (see the scratch-app-opens-no-window note)" >&2
+    elif [ "$WINDOW_ON" = off ]; then
+      echo "the window is on another Space (a full-screen app is in front): shot.sh works, ui.swift dump/find/press/set do not" >&2
+    fi
+  fi
 fi
 
 cat <<EOF
 ROOT=$ROOT
 APP_PID=${APP_PID:-none}
+WINDOW_ID=${WINDOW_ID:-none}
+WINDOW_ON=${WINDOW_ON:-}
 DAEMON_PID=${DAEMON_PID:-unknown}
 CONTROL_PID=$(cat "$ROOT/control/control.pid")
 CONTROL_URL=$URL
