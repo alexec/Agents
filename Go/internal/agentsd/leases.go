@@ -100,10 +100,10 @@ type leaseBook struct {
 
 // leaseEvent is what the book did, for settle to say.
 type leaseEvent struct {
-	granted, released bool
-	lease             wire.Lease
-	waiter            *waiter
-	ending            string // released: released, expired, endedByPerson, holderStopped, holderArchived, couldNotStart
+	granted, released, extended bool
+	lease                       wire.Lease
+	waiter                      *waiter
+	ending                      string // released: released, expired, endedByPerson, holderStopped, holderArchived, couldNotStart
 }
 
 type leaseState struct {
@@ -111,6 +111,8 @@ type leaseState struct {
 	book      *leaseBook
 	declared  []wire.DeclaredResource
 	leaseTick *time.Timer
+	// openLeaseCalls is the lease calls waiting in line, by their wait id.
+	openLeaseCalls map[wire.UUID]*openLeaseCall
 }
 
 func resourceName(given string) (wire.ResourceName, bool) {
@@ -299,8 +301,14 @@ func (d *Daemon) settle(events []leaseEvent) {
 		d.raiseLeaseEvent(e)
 		l := e.lease
 		switch {
+		case e.granted && e.waiter != nil && d.answerLeaseCall(e.waiter, l, false):
+			// Its call was still open, and has its answer.
+			d.record(l.Holder, runtimeNote("Leased "+l.DisplayName+" until "+clock(l.ExpiresAt)+"."))
 		case e.granted && e.waiter != nil:
+			// Its call has returned: started again, not in this call.
 			safe.Go("lease wake", func() { d.wake(l, e.waiter.AskedAt) })
+		case e.extended:
+			d.record(l.Holder, runtimeNote("Extended the lease on "+l.DisplayName+" to "+clock(l.ExpiresAt)+"."))
 		case e.granted:
 			d.record(l.Holder, runtimeNote("Leased "+l.DisplayName+" until "+clock(l.ExpiresAt)+"."))
 		case e.released:
@@ -409,10 +417,12 @@ func (d *Daemon) leaseSnapshot() wire.LeaseSnapshot {
 		places := int64(1)
 		if e != nil {
 			r.DisplayName = e.DisplayName
-			r.Holds = e.Leases
+			// A copy: the snapshot is sent off this lock while the book moves on.
+			r.Holds = append([]wire.Lease{}, e.Leases...)
 			places = max(1, e.Rules.Holders)
 			for _, w := range e.Line {
-				r.Line = append(r.Line, wire.LineMember{AgentID: w.AgentID, AskedAt: w.AskedAt, IsCallOpen: false})
+				open := w.WaitID != nil && d.openLeaseCalls[*w.WaitID] != nil
+				r.Line = append(r.Line, wire.LineMember{AgentID: w.AgentID, AskedAt: w.AskedAt, IsCallOpen: open})
 			}
 			for _, l := range e.Leases {
 				if l.ExpiresAt > at && l.ExpiresAt.Time().Sub(at.Time()) <= leaseWarning {
