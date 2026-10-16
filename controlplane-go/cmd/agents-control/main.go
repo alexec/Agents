@@ -10,6 +10,7 @@
 // Environment, as the Swift one reads it: AGENTS_STORE (file:///path or s3://bucket/prefix,
 // with AGENTS_STORE_ENDPOINT, AGENTS_STORE_PATH_STYLE=1 and AWS_*), AGENTS_CONTROL_URL,
 // AGENTS_CONTROL_KEY_FILE or AGENTS_CONTROL_KEY, AGENTS_CONTROL_TLS_CERT/_KEY,
+// AGENTS_CONTROL_KMS (a gocloud.dev/secrets keeper URL: the key sealed in the store),
 // AGENTS_CONTROL_PIN, AGENTS_CONTROL_NAME, AGENTS_CONTROL_MACHINE_ID, AGENTS_CONTROL_WEB_PORT.
 package main
 
@@ -26,6 +27,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/controlplane-go/internal/auth"
+	"github.com/alexec/agents/controlplane-go/internal/kms"
 	"github.com/alexec/agents/controlplane-go/internal/records"
 	"github.com/alexec/agents/controlplane-go/internal/service"
 	"github.com/alexec/agents/controlplane-go/internal/store"
@@ -88,7 +90,26 @@ func openStore(given string) store.Store {
 	return s
 }
 
-func privateKey() []byte {
+// privateKey is the control plane's key. With AGENTS_CONTROL_KMS it lives in the store,
+// sealed (stage 4): a key file or AGENTS_CONTROL_KEY, if there is one, is sealed the first
+// time; otherwise a new key is made, and no file is written.
+func privateKey(st store.Store) []byte {
+	if keeper := os.Getenv("AGENTS_CONTROL_KMS"); keeper != "" {
+		k, err := kms.ControlKey(context.Background(), st, keeper, func() []byte {
+			if given := plainKey(false); given != nil {
+				return given
+			}
+			return auth.NewPrivateKey()
+		})
+		if err != nil {
+			fail("the control key: %v", err)
+		}
+		return k
+	}
+	return plainKey(true)
+}
+
+func plainKey(makeFile bool) []byte {
 	if text := os.Getenv("AGENTS_CONTROL_KEY"); text != "" {
 		k, err := auth.B64URL(text)
 		if err != nil || len(k) != 32 {
@@ -101,10 +122,16 @@ func privateKey() []byte {
 		file = filepath.Join(home(), "control-key")
 	}
 	if file == "" {
-		fail("say where the control plane's key is: AGENTS_CONTROL_KEY_FILE or AGENTS_CONTROL_KEY")
+		if !makeFile {
+			return nil
+		}
+		fail("say where the control plane's key is: AGENTS_CONTROL_KEY_FILE, AGENTS_CONTROL_KEY or AGENTS_CONTROL_KMS")
 	}
 	if b, err := os.ReadFile(file); err == nil && len(b) == 32 {
 		return b
+	}
+	if !makeFile {
+		return nil
 	}
 	k := auth.NewPrivateKey()
 	os.MkdirAll(filepath.Dir(file), 0o700)
@@ -135,7 +162,8 @@ func serve() {
 	if value("--port") == "" && u.Port() != "" {
 		port, _ = strconv.Atoi(u.Port())
 	}
-	cfg := service.Config{Store: openStore(""), PrivateKey: privateKey(), URL: text, Bind: value("--bind"), Port: port,
+	st := openStore("")
+	cfg := service.Config{Store: st, PrivateKey: privateKey(st), URL: text, Bind: value("--bind"), Port: port,
 		HostRoot: value("--host-root"), Log: func(l string) { logger.Println(l) }}
 	dir := value("--self-signed")
 	if dir == "" && home() != "" {
@@ -212,7 +240,7 @@ func code() {
 	if settings == nil || settings.URL == nil {
 		fail("this store has no control plane yet: start one with `agents-control serve` first")
 	}
-	key := privateKey()
+	key := privateKey(st)
 	pub, _ := auth.PublicKey(key)
 	if string(pub) != string(settings.ControlKey) {
 		fail("that key is not this control plane's")

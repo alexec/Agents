@@ -55,14 +55,14 @@ if [ "$LAN" = 1 ]; then
   URL="https://$ADDRESS:$PORT"
 fi
 if [ "$S3" = 1 ]; then
-  printf '%s\n' "AGENTS_STORE=s3://cpgo/$SLUG" AGENTS_STORE_ENDPOINT=http://127.0.0.1:9100 AGENTS_STORE_PATH_STYLE=1 \
+  printf '%s\n' "AGENTS_STORE=s3://cpgo/$SLUG" AGENTS_STORE_ENDPOINT=http://127.0.0.1:19100 AGENTS_STORE_PATH_STYLE=1 \
     AWS_ACCESS_KEY_ID=spike AWS_SECRET_ACCESS_KEY=spike-secret-key AWS_REGION=us-east-1 >"$ROOT/control/store.env"
 fi
 if [ "$KMS" = 1 ]; then
   # The local keeper's key, beside the sealed control key: in a real set-up it would be
   # Google Cloud KMS's (gcpkms://…), and this file would not exist.
   [ -f "$ROOT/control/kek" ] || head -c 32 /dev/urandom | base64 >"$ROOT/control/kek"
-  echo "AGENTS_CONTROL_KMS=base64key://$(tr '+/' '-_' <"$ROOT/control/kek" | tr -d '=\n')" >>"$ROOT/control/store.env"
+  echo "AGENTS_CONTROL_KMS=base64key://$(tr '+/' '-_' <"$ROOT/control/kek" | tr -d '\n')" >>"$ROOT/control/store.env"
 fi
 STORE_ENV=()
 if [ -f "$ROOT/control/store.env" ]; then while read -r l; do STORE_ENV+=("$l"); done <"$ROOT/control/store.env"; fi
