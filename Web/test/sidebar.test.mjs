@@ -521,28 +521,3 @@ test("a tab holding one project is titled with its name (#1089)", async () => {
   assert.equal(titleFor(0), "Agents");
   assert.equal(titleFor(2, "alpha"), "(2) alpha");
 });
-
-test("the launcher home: the choice as kept, and a project card's line (#1090)", async () => {
-  const { homeWindowOf, launcherLine } = await load("src/model/launcher.ts");
-  assert.equal(homeWindowOf(undefined), "allProjects");
-  assert.equal(homeWindowOf("launcher"), "launcher");
-  assert.equal(homeWindowOf("tabs"), "allProjects", "anything else is the first state");
-  assert.equal(launcherLine(3, 1, 2), "3 working · 1 needs you · 2 unread");
-  assert.equal(launcherLine(0, 1, 0), "1 needs you");
-  assert.equal(launcherLine(0, 0, 0), "idle");
-});
-
-test("‹ All goes back to the launcher's cards with Launcher on (#1090)", async () => {
-  globalThis.location = { hash: "#/o/1/h/mac/p/file%3A%2F%2F%2Fw%2Fa/n/1", pathname: "/", search: "" };
-  globalThis.addEventListener = () => {};
-  const went = [];
-  try {
-    const { showAll } = await load("src/route.ts");
-    Object.defineProperty(globalThis.location, "hash", { get: () => "", set: (h) => went.push(h), configurable: true });
-    showAll(true);
-    assert.deepEqual(went, ["#/"]);
-  } finally {
-    delete globalThis.location;
-    delete globalThis.addEventListener;
-  }
-});

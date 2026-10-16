@@ -20,8 +20,6 @@ struct ContentView: View {
     @State private var offeringMove = false
     /// Settings ▸ Appearance ▸ Celebrations (#986), per Mac.
     @AppStorage(Celebration.defaultsKey, store: WindowDefaults.store) private var celebrations = true
-    /// Settings ▸ Sidebar ▸ Home window (#1090): the sidebar of every project, or the launcher.
-    @AppStorage(HomeWindow.defaultsKey, store: WindowDefaults.store) private var home = HomeWindow.initial
 
     /// Put the file the selected agent asked about in front of the user.
     ///
@@ -277,9 +275,6 @@ struct ContentView: View {
                 // No control plane and nothing of the old way: one question, and no
                 // sidebar or toolbar until it is answered (058, frame A).
                 FirstRunView()
-            } else if home == .launcher {
-                // A small launcher, each project in a window of its own (#1090).
-                LauncherView()
             } else {
                 // Two columns (#145): the one sidebar, then what is being read, with the
                 // inspector beside a chat.

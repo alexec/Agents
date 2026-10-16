@@ -78,8 +78,6 @@ final class RemoteModel {
     /// Brings a project's scene forward, or opens it: handed over by a view that has the
     /// scene's action, for what is not a view (a notification).
     @ObservationIgnored var openProjectScene: ((ProjectKey) -> Void)?
-    /// What a project's scene or screen opens on once it is open (#1090), by project.
-    @ObservationIgnored var pendingProjectPicks: [ProjectKey: SidebarItem] = [:]
     /// The one of them in the key window, if one is: what the person is watching.
     @ObservationIgnored var popoutInFront: UUID?
 
@@ -282,13 +280,8 @@ final class RemoteModel {
         // From the start, not once connected: a banner tapped to launch or wake the app
         // arrives before then, and was dropped (#1045).
         notifier.open = { [weak self] agentID in
-            // In its project's own scene or screen when one is open (#1089, Alex), and with
-            // Launcher on, in its project's screen whether or not it is (#1090, Alex).
+            // In its project's own scene or screen when one is open (#1089, Alex).
             if self?.showInProjectScene(agentID) == true { return }
-            if HomeWindow(stored: UserDefaults.standard.string(forKey: HomeWindow.defaultsKey)) == .launcher {
-                self?.openInProjectScreen(agentID)
-                return
-            }
             // Not in the project an iPhone shows alone: back to every project, to it.
             self?.phoneProject = nil
             self?.open(agentID)

@@ -22,8 +22,6 @@ extension RemoteModel {
         let state = projectScenes[key] ?? RemoteProjectState(key: key)
         state.scenes += 1
         if projectScenes[key] == nil { projectScenes[key] = state }
-        // What it was opened to show (#1090): a session from the launcher or a notification.
-        if let pick = pendingProjectPicks.removeValue(forKey: key) { state.pick = pick }
         return state
     }
 
@@ -42,16 +40,6 @@ extension RemoteModel {
         state.pick = .session(id)
         if phoneProject != state.key { openProjectScene?(state.key) }
         return true
-    }
-
-    /// A session in its project's screen, opened for it (#1090): what the launcher's cards,
-    /// and a notification with Launcher on, do.
-    func openInProjectScreen(_ id: UUID) {
-        if showInProjectScene(id) { return }
-        guard let agent = work.agent(id) else { return open(id) }
-        let key = ProjectKey(host: agent.host, folder: agent.projectFolder)
-        pendingProjectPicks[key] = .session(id)
-        phoneProject = key
     }
 
     /// The sessions in other projects that need the person (#1089): what "elsewhere" counts.
