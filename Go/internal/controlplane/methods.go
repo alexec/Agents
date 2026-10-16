@@ -3,6 +3,7 @@ package controlplane
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"sort"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/alexec/agents/Go/internal/controlplane/channels"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/web"
 )
@@ -250,24 +252,30 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		}
 		return m.s.copies.lastHeard(request.Host), nil
 	case "channels/get":
-		return channelsUnavailable, nil
+		if m.s.channels == nil {
+			return channels.Unavailable(), nil
+		}
+		return m.s.channels.State(), nil
 	case "channels/set":
-		if _, err := require[map[string]json.RawMessage](params, "ChannelsSet"); err != nil {
+		request, err := require[channels.ChannelsSet](params, "ChannelsSet")
+		if err != nil {
 			return nil, err
 		}
-		return nil, fail(notSupported, "%s", channelsUnavailableWords)
+		if m.s.channels == nil {
+			return nil, fail(notSupported, "%s", *channels.Unavailable().Slack.Detail)
+		}
+		state, err := m.s.channels.Set(request)
+		var refused *channels.RPCError
+		if errors.As(err, &refused) {
+			return nil, fail(refused.Code, "%s", refused.Message)
+		}
+		return state, err
 	}
 	if workspaceMethods[method] {
 		return nil, fail(providersNeedOneCopy, "Workspace providers need a control plane with one copy, for now.")
 	}
 	return nil, notFound(method)
 }
-
-// channelsUnavailable is DaemonAPI.ChannelsState.unavailable: what a control plane with
-// no channels says.
-const channelsUnavailableWords = "Chat apps need a control plane with one copy and a home for their tokens."
-
-var channelsUnavailable = map[string]any{"slack": map[string]any{"state": "unavailable", "detail": channelsUnavailableWords}}
 
 // workspaceMethods is DaemonAPI.Method.workspaceMethods: workspace providers (#691).
 var workspaceMethods = map[string]bool{
@@ -473,6 +481,12 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 		return map[string]any{}, m.setRelay(ctx, hostRelayRequest{Host: host, Relay: request.Relay})
 	case "attention/need":
 		m.s.heard(params)
+		if m.s.channels != nil {
+			var need channels.AttentionNeed
+			if json.Unmarshal(params, &need) == nil {
+				m.s.channels.Desk.Post(host, need)
+			}
+		}
 		return map[string]any{}, nil
 	case "host/workspaces", "host/providerDraft":
 		return nil, fail(providersNeedOneCopy, "Workspace providers need a control plane with one copy, for now.")
