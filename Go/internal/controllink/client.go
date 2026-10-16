@@ -69,6 +69,8 @@ type Session struct {
 	mu      sync.Mutex
 	waiting map[int64]chan json.RawMessage
 	Notes   chan Note
+	// done is closed when the socket ends: a call waiting then fails at once.
+	done chan struct{}
 }
 
 type Note struct {
@@ -87,12 +89,13 @@ func DialClient(ctx context.Context, m *ClientMembership) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := &Session{l: l, waiting: map[int64]chan json.RawMessage{}, Notes: make(chan Note, 4096)}
+	s := &Session{l: l, waiting: map[int64]chan json.RawMessage{}, Notes: make(chan Note, 4096), done: make(chan struct{})}
 	safe.Go("client read", func() { s.read(ctx) })
 	return s, nil
 }
 
 func (s *Session) read(ctx context.Context) {
+	defer close(s.done)
 	defer close(s.Notes)
 	for {
 		line, err := s.l.Read(ctx)
@@ -163,6 +166,8 @@ func (s *Session) Call(ctx context.Context, host, method string, params any) (js
 			return nil, fmt.Errorf("%s", r.Error)
 		}
 		return r.Result, nil
+	case <-s.done:
+		return nil, errors.New("the control plane closed the connection")
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case <-time.After(120 * time.Second):

@@ -12,6 +12,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
+	"github.com/alexec/agents/Go/internal/controlplane/web"
 )
 
 // Methods is ControlMethods: the methods the control plane answers itself (058,
@@ -23,7 +24,7 @@ type Methods struct {
 
 	mu sync.Mutex
 	// The web remote's listener as it stands (071 R3), set as it binds.
-	web *WebRemoteStatus
+	web *web.Status
 	// A host's git waiting on a person's answer, by host and git server (#1122).
 	gitAsks map[string]map[string]*gitAskWaiting
 	// How long a git command waits for a person, and the lender to read its access.
@@ -294,7 +295,7 @@ func (m *Methods) status(from Caller) controlStatus {
 }
 
 // SetWeb says how the web remote's listener stands, for control/status.
-func (m *Methods) SetWeb(status *WebRemoteStatus) {
+func (m *Methods) SetWeb(status *web.Status) {
 	m.mu.Lock()
 	m.web = status
 	m.mu.Unlock()

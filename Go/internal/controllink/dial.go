@@ -39,7 +39,15 @@ func (l *Lines) Close() { l.ws.Close(websocket.StatusNormalClosure, "") }
 
 // Dial opens wss://…/v1/connect. With a pin, only a certificate whose SPKI hashes to it is
 // taken and no trust store is read (R6); without one, the system roots decide.
-func Dial(ctx context.Context, base, pin string) (*Lines, error) {
+func Dial(ctx context.Context, base, pin string) (*Lines, error) { return dial(ctx, base, pin, "") }
+
+// DialOrigin opens the web remote's socket as the page does: plain ws on loopback, with
+// the page's own Origin, which the loopback listener checks (071).
+func DialOrigin(ctx context.Context, base, origin string) (*Lines, error) {
+	return dial(ctx, base, "", origin)
+}
+
+func dial(ctx context.Context, base, pin, origin string) (*Lines, error) {
 	u, err := url.Parse(base)
 	if err != nil {
 		return nil, err
@@ -72,7 +80,11 @@ func Dial(ctx context.Context, base, pin string) (*Lines, error) {
 	client := &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}
 	dctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	ws, _, err := websocket.Dial(dctx, u.String(), &websocket.DialOptions{HTTPClient: client})
+	options := &websocket.DialOptions{HTTPClient: client}
+	if origin != "" {
+		options.HTTPHeader = http.Header{"Origin": []string{origin}}
+	}
+	ws, _, err := websocket.Dial(dctx, u.String(), options)
 	if err != nil {
 		return nil, err
 	}

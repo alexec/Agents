@@ -25,6 +25,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/internal/controlplane/web"
 )
 
 // Config is ControlService.Configuration.
@@ -47,9 +48,23 @@ type Config struct {
 	HostJoinFile string
 	// Where the Linux hosts it hands out are (ServerFiles.folder).
 	ServerFolder string
+	// The web remote's loopback listener (071): Web/dist and the port, or nil for none,
+	// which is a container's default.
+	Web *WebConfig
+	// Told whenever the web remote's listener starts or fails to (071 R3): serve --home
+	// writes it beside the log for Agents Host.
+	WebChanged func(web.Status)
 	// Where each log line goes, already marked with this copy. No line may hold a code,
 	// a key, a MAC or a message (071 FR-033).
 	Log func(string)
+}
+
+// WebConfig is ControlService.Configuration.Web.
+type WebConfig struct {
+	// Folder is Web/dist, with its MANIFEST.
+	Folder string
+	// Port is 0 to let the system choose (tests); Agents Host's copy uses 8792.
+	Port int
 }
 
 // Service is ControlService.
@@ -70,6 +85,7 @@ type Service struct {
 	sockets     map[*Conn]bool
 	stop        chan struct{}
 	ready       bool
+	loopback    *web.Listener
 }
 
 // New makes a service; Start opens the store and listens.
@@ -138,6 +154,9 @@ func (s *Service) Start(ctx context.Context) (int, error) {
 		}
 	}
 	s.setReady(true)
+	if s.cfg.Web != nil {
+		s.startWeb()
+	}
 	go s.refreshEvery(15 * time.Second)
 	go s.watchJoinFile()
 	s.log(fmt.Sprintf("listening on %s:%d for %s", s.cfg.Bind, port, s.cfg.URL))
@@ -223,6 +242,13 @@ func (s *Service) Stop() {
 	s.mu.Unlock()
 	for _, srv := range servers {
 		srv.Close()
+	}
+	s.mu.Lock()
+	loopback := s.loopback
+	s.loopback = nil
+	s.mu.Unlock()
+	if loopback != nil {
+		loopback.Stop()
 	}
 	for c := range sockets {
 		c.Close()
@@ -379,7 +405,7 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return
 		}
-		go s.accept(s.adopt(newConn(ws, r.RemoteAddr)))
+		go s.accept(s.adopt(newConn(ws, r.RemoteAddr)), "")
 	default:
 		plain(w, http.StatusNotFound, "not here\n")
 	}
@@ -405,10 +431,53 @@ func (s *Service) adopt(c *Conn) *Conn {
 	return c
 }
 
+// startWeb starts the loopback listener. A build that doesn't match its manifest, or a
+// port that's taken, leaves it off and says so (071 R3): in the log, in control/status
+// and to WebChanged; the TLS listener and hosts carry on.
+func (s *Service) startWeb() {
+	listener, err := web.Start(web.Config{Folder: s.cfg.Web.Folder, Port: s.cfg.Web.Port, Log: s.log,
+		Accept: func(ws *websocket.Conn, remote, origin string) {
+			s.accept(s.adopt(newConn(ws, remote)), origin)
+		}})
+	status := web.StatusOf(s.cfg.Web.Port, listener, err)
+	s.mu.Lock()
+	s.loopback = listener
+	s.mu.Unlock()
+	s.methods.SetWeb(&status)
+	if s.cfg.WebChanged != nil {
+		s.cfg.WebChanged(status)
+	}
+	s.router.BroadcastControl("control/webChanged", status)
+}
+
+// RetryWeb tries the loopback listener again when it isn't serving (071 R3): Agents
+// Host's Try Again, once whatever held the port has let it go.
+func (s *Service) RetryWeb() {
+	s.mu.Lock()
+	serving := s.loopback != nil
+	s.mu.Unlock()
+	if s.cfg.Web == nil || serving {
+		return
+	}
+	s.startWeb()
+}
+
+// WebPort is the loopback listener's port once it is up, or 0.
+func (s *Service) WebPort() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.loopback == nil {
+		return 0
+	}
+	return s.loopback.Port()
+}
+
 // accept is the server's side of the key exchange, then the socket goes where its
 // identity says: a client to the router, a host's uplink to the router, a code holder to
-// a one-time announce.
-func (s *Service) accept(conn *Conn) {
+// a one-time announce. webOrigin is the loopback listener's own origin for a socket that
+// came in there, or "" for the TLS listener: the exchange is bound to the listener's
+// origin, never to anything the peer says (071, FR-006).
+func (s *Service) accept(conn *Conn, webOrigin string) {
 	serverNonce := controllink.Nonce()
 	hello := controllink.Hello{V: controllink.Version, Name: s.cfg.Name, Control: controllink.B64URL(s.public),
 		Nonce: controllink.B64URL(serverNonce), Copy: s.copyID}
@@ -440,7 +509,16 @@ func (s *Service) accept(conn *Conn) {
 	var client *records.ClientRecord
 	var host string
 	var admittedAny bool
-	id, mac, err := controllink.Verify(auth, serverNonce, s.origins(), func(id controllink.Identity) ([]byte, error) {
+	bound := s.origins()
+	if webOrigin != "" {
+		// On the loopback listener only a browser or its code may prove anything (071).
+		if !strings.HasPrefix(auth.ID, "c:") && !strings.HasPrefix(auth.ID, "p:") {
+			refuse(controllink.Refuse(controllink.Unknown))
+			return
+		}
+		bound = []string{webOrigin}
+	}
+	id, mac, err := controllink.Verify(auth, serverNonce, bound, func(id controllink.Identity) ([]byte, error) {
 		key, c, h, err := s.key(id)
 		client, host, admittedAny = c, h, err == nil
 		return key, err
@@ -456,7 +534,7 @@ func (s *Service) accept(conn *Conn) {
 	}
 	// A browser's key works only through the loopback listener, and nothing else's does
 	// there (071).
-	if client != nil && client.Kind == records.KindBrowser {
+	if client != nil && (client.Kind == records.KindBrowser) != (webOrigin != "") {
 		refuse(controllink.Refuse(controllink.Unknown))
 		return
 	}
@@ -506,7 +584,7 @@ func (s *Service) accept(conn *Conn) {
 	case 'h':
 		s.hostArrived(host, conn)
 	case 'p', 'e':
-		s.announce(conn, id.ID, false)
+		s.announce(conn, id.ID, webOrigin != "")
 	}
 }
 
