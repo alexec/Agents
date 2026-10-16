@@ -13,6 +13,7 @@ not move.
 | `cmd/agentsd/`, `internal/agentsd/` | The host daemon | hosts |
 | `cmd/agents-control/`, `internal/controlplane/` | The control plane | control-plane |
 | `internal/controllink/` | Both sides of the host ↔ control plane exchange | control-plane |
+| `internal/safe/` | Recover helpers: one panic never takes a host or the control plane down | build |
 
 ## Building and testing
 
