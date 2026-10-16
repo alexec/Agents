@@ -41,7 +41,7 @@ $S/rpc.py $ROOT start claude $ROOT/work "Write hello.txt with one line in it." 1
 #   ^ starts a real agent, says yes to its permissions, and follows it to the end
 
 # 4. look at it, if the change is visual
-$S/shot.sh $ROOT /tmp/run-mychange-1.png        # then Read the png
+$S/walk.py $ROOT shot /tmp/run-mychange-1.png    # then Read the png; works on a locked screen
 
 # 5. always, at the end
 $S/stop.sh $ROOT
@@ -196,25 +196,58 @@ when what you are testing is not the conversation.
 
 ## Looking at it
 
+**Walk with the walk socket first (#1172).** A Debug window launched with `--walk` (every
+`launch.sh` window) draws and presses itself, in its own process, through `walk.py`. Nothing
+goes through the window server, the AX server, focus or HID, so it works on a **locked** or
+sleeping screen, it cannot click or type into the person's own window, and it needs no
+Accessibility permission and no `screen` lease. Two lanes walk at once, each on its own root.
+
 ```sh
-$S/shot.sh $ROOT out.png            # captures the window even behind the user's
+$S/walk.py $ROOT shot /tmp/run-mychange-1.png   # the window, its sheet over it; then Read the png
+$S/walk.py $ROOT tree 20                        # the accessibility tree, frames as in the shot
+$S/walk.py $ROOT find "Not now"                 # every element whose label holds the text
+$S/walk.py $ROOT press "=Not now"               # AXPress the innermost match (=: whole label)
+$S/walk.py $ROOT unfold proj00                  # a sidebar project, as its chevron does
+$S/walk.py $ROOT select "Fix the build"         # a sidebar row, as a click selects it
+$S/walk.py $ROOT set "What do you want to do" "Write hello.txt"   # a field, by label or placeholder
+$S/walk.py $ROOT click proj00                   # a click on a label's middle, for a tap gesture
+$S/walk.py $ROOT key return                     # a key to the window's first responder
+$S/walk.py $ROOT wait "P00 seeded live 0" 10    # until it is there (gone: until it has left)
+$S/walk.py $ROOT size 1500 900                  # the window's frame, for wide-window walks
+$S/walk.py $ROOT menu Session                   # a menu's items; menu Session Stop chooses one
+```
+
+`walk.py` with no arguments lists every command, `--window N` for another window, `--first`
+for the first match, and `info`, `views` and `layers` for when a shot or a press goes
+wrong. The socket is at `walk.sock` in the walk's folder in the window's container;
+`walk.py` links `$ROOT/walk.sock` to it. Only a Debug build has it, and only a window with
+`--walk`: the person's window has neither.
+
+What the walk socket does not do, and stays with `ui.swift`, `shot.sh` and the `screen`
+lease while the person is away and the screen unlocked: real trackpad gestures (a row
+swipe, swiping a pane in) and scroll phases (`.cghidEventTap`), animation and feel, and
+menu items that need the key window (most are off in a window launched behind; use the
+button or the row instead). A shot draws what the window would draw: the glass and
+materials as plain fills, the selected row in the grey of a window that is not key, and
+no traffic lights.
+
+```sh
+$S/shot.sh $ROOT out.png            # window server capture, behind the user's window; unlocked only
 swift $S/ui.swift windows <APP_PID> # window ids, sizes, names, on|off this Space
 swift $S/ui.swift selftest          # `windows` still finds a window not on screen
-swift $S/ui.swift dump <APP_PID> 14 # the accessibility tree: roles and labels
+swift $S/ui.swift dump <APP_PID> 14 # the accessibility tree through the AX server
 swift $S/ui.swift find <APP_PID> "Start"
 swift $S/ui.swift press <APP_PID> "Start"   # AXPress, no pointer, no focus stolen
 swift $S/ui.swift select <APP_PID> "Agents"  # AXSelected on a list row: picks it
 swift $S/ui.swift unfold <APP_PID> "Agents"  # AXDisclosing on a sidebar project (or fold)
 ```
 
-`ui.swift` needs Accessibility permission for whatever process runs it; if it
-says it has none, screenshots and the socket still work and are usually enough.
-`screencapture -l <window id>` and AX actions both work on a window that is not
-in front, which is what makes this safe while somebody is working. A card in
-this app is usually the `Button` itself, so `press` walks up from a matching
-label to the nearest pressable ancestor. Typing is the weak spot: keystrokes go
-wherever focus is, so use `ui.swift set` on a field, or the socket, rather than
-`cliclick`-style synthetic keys.
+`ui.swift` needs Accessibility permission for whatever process runs it, and the AX server
+shows no window while the screen is locked. A card in this app is usually the `Button`
+itself, so `press` (here and in `walk.py`) walks up from a matching label to the nearest
+pressable ancestor. Typing is its weak spot: keystrokes go
+wherever focus is, so use `walk.py set` or `walk.py key`, never `cliclick`-style synthetic
+keys.
 
 ### When a full-screen app is in front
 
@@ -230,31 +263,20 @@ the keyboard (`--front`, rule 5).
 
 ### When the screen is locked
 
-A locked Mac stops the looking, not the testing. With the lock screen up,
-`shot.sh` says "could not create image from window" (or captures only after the
-display is woken), `ui.swift dump` shows the menu bar and no window, and `press`
-matches nothing. Nothing unlocks it: macOS keeps synthetic keys off the lock
-screen, and no agent is given the password. Do not change the Mac's sleep or
-lock settings, and do not hold the display awake to stop it locking.
-
-Check before you plan a look — `1` is locked:
+A lock no longer stops a walk: `walk.py` draws, reads and presses on a locked screen with
+the display asleep, so do not wait for `person.back` to look. Check before you plan a
+walk that needs the screen anyway (`1` is locked):
 
 ```sh
 ioreg -n Root -d1 -a | grep -c CGSSessionScreenIsLocked
 ```
 
-If it is locked, do everything the socket can prove first, then wait for the
-user to unlock with `wait_for_event` on `person.back` with an `until_minutes`
-(its `why` is `locked` for an unlock; every wait needs a time limit, #572) and do the look when you are started again. Check the lock once more
-before you shoot. Keep the scratch root with `stop.sh $ROOT --keep` if you
-stop meanwhile, so the look is quick to redo with `launch.sh --no-build`.
-A locked screen is a wait, not a failure: end the turn waiting and say what is
-already proved rather than reporting that you could not test.
-
-What you genuinely cannot do: tap iOS in the Simulator (there is no Simulator
-GUI on this Mac — boot and screenshot only), and judge anything about animation
-or feel. Those are the user's, and are worth asking for by name once the rest is
-done.
+Only the out-of-scope walks above (gestures, scroll phases, feel) wait for an unlock, with
+`wait_for_event` on `person.back` and an `until_minutes`. Nothing unlocks the Mac: macOS
+keeps synthetic keys off the lock screen, and no agent is given the password. Do not
+change the Mac's sleep or lock settings, and do not hold the display awake. iOS taps in
+the Simulator (there is no Simulator GUI on this Mac) and anything about animation or feel
+are the user's, worth asking for by name once the rest is done.
 
 ## Two windows on one root
 
@@ -280,10 +302,10 @@ control plane; the phone's look is the user's.
 ## The web remote in a browser (071)
 
 `WEB_URL` is the scratch control plane's web remote. Walk it in headless Chrome with a
-throwaway profile, never Alex's own browser: `node Web/test/walk/cdp.mjs` is a dependency-free
+throwaway profile, never Alex's own browser (it draws on a locked screen too, #1172): `node Web/test/walk/cdp.mjs` is a dependency-free
 DevTools client (launch, open, set the viewport, press by accessible name, type, screenshot,
 read the console and network). Pair it with a code made as above (`code --client --browser`).
-Safari is walked only with Alex's go-ahead, asked with the question tool.
+Safari is walked only with Alex's go-ahead, asked with the question tool; on a locked screen its WebDriver session timed out (#1172, with Alex's Safari open), so a locked walk is headless Chrome.
 **Open in Browser** (#109) in a walk's window opens no browser: it writes the address, with
 `#code=…` when it pairs, to `walks/run-<slug>/opened-url` in the window's container, and takes
 Chrome as the default browser. `node Web/test/walk/openinbrowser.mjs <that file> <profile> <out.png>`
