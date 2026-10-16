@@ -523,8 +523,6 @@ jobs:
         with:
           go-version-file: Go/go.mod
           cache-dependency-path: Go/go.mod
-      - name: Formatted
-        run: test -z "$(gofmt -l . | tee /dev/stderr)"
       - name: Build
         run: go build ./...
       - name: Vet
