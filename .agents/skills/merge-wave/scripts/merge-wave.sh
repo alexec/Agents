@@ -63,6 +63,7 @@ check_command() { # name [filter]
 	test-codetext) echo "$CACHED swift test --package-path Packages/CodeText${2:+ --filter '$2'}" ;;
 	test-controlplane) echo "$CACHED swift test --package-path Packages/ControlPlane" ;;
 	test-webtypes) echo "$CACHED swift test --package-path Packages/WebTypes" ;;
+	test-go) echo "Go/scripts/go.sh vet ./... && Go/scripts/go.sh test ./..." ;;
 	smoke) echo "smoke" ;;
 	*) die "no check called $1" ;;
 	esac
@@ -89,7 +90,7 @@ shippable() {
 	grep -Eq '^(App|Host|Daemon|Packages|Shared|Remote|RemoteNotify|RemoteWidget|Web)/|^project\.yml$' && echo yes || echo no
 }
 
-# The swift test runs CI would choose for base...HEAD, as "name filter" lines.
+# The swift (and Go, #1135) test runs CI would choose for base...HEAD, as "name filter" lines.
 tests_since() { # dir base
 	local out
 	out=$(cd "$1" && GITHUB_OUTPUT=/dev/stdout bash scripts/select-test-suites.sh "$2")
@@ -98,6 +99,7 @@ tests_since() { # dir base
 	[ "$(val codetext)" = skip ] || echo "test-codetext $(val codetext_filter)"
 	[ "$(val controlplane)" = skip ] || echo "test-controlplane"
 	[ "$(val webtypes)" = skip ] || echo "test-webtypes"
+	[ "$(val go)" = skip ] || echo "test-go"
 }
 
 # --- checks that passed before --------------------------------------------------------

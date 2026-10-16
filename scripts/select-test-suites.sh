@@ -16,7 +16,9 @@
 # runs on any change to it, on Linux: it depends on nothing else here. `linux` builds the
 # Linux agentsd and ci-watcher (#805) on any change to what they are built from (Daemon/,
 # AgentsKit, MCPServers) or to the script and job that build them: AgentsKit code behind
-# a Mac-only guard used from unguarded code breaks only that build (#788, #799).
+# a Mac-only guard used from unguarded code breaks only that build (#788, #799). `go`
+# builds and tests the Go module at Go/ (#1135), on Linux, on any change under it; a change
+# under Go/ alone runs no Swift suite and no macOS job.
 #
 # CI's macOS jobs are chosen here as well (#594): `apps` is skip only when every changed
 # path is prose or agent config that no build reads, and `packages` (the job that runs
@@ -32,6 +34,7 @@ webtypes=skip
 controlplane=skip
 mcpservers=skip
 linux=skip
+go=skip
 agentskit_filter=
 codetext_filter=
 apps=build
@@ -43,6 +46,7 @@ full_both() {
 	controlplane=run
 	mcpservers=run
 	linux=build
+	go=run
 	agentskit_filter=
 	codetext_filter=
 }
@@ -73,7 +77,7 @@ else
 
 		while IFS= read -r -d '' path; do
 			case "$path" in
-				docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|*.md|scripts/pr-areas.py|scripts/replay-conflicts.py|scripts/rerun-cancelled-ci.py) ;;
+				docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|*.md|Go/*|scripts/pr-areas.py|scripts/replay-conflicts.py|scripts/rerun-cancelled-ci.py) ;;
 				*) apps=build ;;
 			esac
 			case "$path" in
@@ -122,6 +126,9 @@ else
 				Packages/MCPServers/*)
 					mcpservers=run
 					linux=build
+					;;
+				Go/*)
+					go=run
 					;;
 				Web/*)
 					webtypes=run
@@ -245,6 +252,7 @@ fi
 	printf 'controlplane=%s\n' "$controlplane"
 	printf 'mcpservers=%s\n' "$mcpservers"
 	printf 'linux=%s\n' "$linux"
+	printf 'go=%s\n' "$go"
 	printf 'agentsd=%s\n' "$agentsd"
 	printf 'apps=%s\n' "$apps"
 	if [[ "$webtypes" == skip && "$controlplane" == skip ]]; then

@@ -27,6 +27,8 @@ project.yml                                            build
 scripts/                                               build
 Web/package*.json                                      build
 Web/.node-version                                      build
+# The Go module (#1135): its tooling and the wire types the daemon and control plane share.
+Go/                                                    build
 
 # docs: the docs site and the specs, where no feature below claims a page.
 docs/                                                  docs
@@ -391,6 +393,9 @@ docs/explanation/control-plane.md                      control-plane
 docs/how-to/run-the-control-plane-in-the-cloud.md      control-plane
 docs/how-to/move-an-existing-set-up.md                 control-plane
 specs/058-*/                                           control-plane
+Go/cmd/agents-control/                                 control-plane
+Go/internal/controlplane/                              control-plane
+Go/internal/controllink/                               control-plane
 
 # hosts: the machines agents run on: Agents Host, agentsd, servers over ssh, Linux
 # hosts, wakefulness and lending.
@@ -423,6 +428,8 @@ scripts/build-linux-agentsd.sh                         hosts
 scripts/host-install.sh                                hosts
 scripts/release-host.sh                                hosts
 .agents/skills/test-servers/                           hosts
+Go/cmd/agentsd/                                        hosts
+Go/internal/agentsd/                                   hosts
 docs/how-to/add-a-server.md                            hosts
 docs/how-to/fix-agents-host-not-starting.md            hosts
 docs/how-to/release-agents-host.md                     hosts
