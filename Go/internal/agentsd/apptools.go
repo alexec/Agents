@@ -143,9 +143,14 @@ func (d *Daemon) mcpServersFor(id wire.UUID) []sdk.McpServer {
 	}
 	d.appTokens[token] = &appGrant{agent: id, movesItself: a != nil && runtimeCanMove(a.RuntimeID), sessions: map[string]chan struct{}{}}
 	d.appMu.Unlock()
-	return []sdk.McpServer{{Http: &sdk.McpServerHttpInline{Name: appServerName, Type: "http",
+	servers := []sdk.McpServer{{Http: &sdk.McpServerHttpInline{Name: appServerName, Type: "http",
 		Url:     "http://127.0.0.1:" + strconv.Itoa(port) + appToolsPath,
 		Headers: []sdk.HttpHeader{{Name: "Authorization", Value: "Bearer " + token}}}}}
+	// Then the project's approved servers and the person's own (SessionServers.plan).
+	if a != nil {
+		servers = append(servers, d.sessionMCP(projectFolder(a))...)
+	}
+	return servers
 }
 
 // dropAppTokens takes back every token an agent holds: its runtime has ended.
