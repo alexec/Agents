@@ -26,6 +26,10 @@ type Daemon struct {
 	lives   map[wire.UUID]*live
 	relays  map[string]*relay
 	sent    map[wire.UUID]bool
+	// watches is each watched agent folder's inotify, and interests who watches it.
+	watches   map[string]*folderWatch
+	interests map[string][]interest
+	shells    map[shellKey]*shell
 	// agentMu orders every read-change-save of an agent record.
 	agentMu sync.Mutex
 }
@@ -37,7 +41,8 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 		return nil, err
 	}
 	d := &Daemon{ctx: ctx, Store: st, handlers: map[string]Handler{}, clients: map[int64]*Client{}, unknown: map[string]int{},
-		lives: map[wire.UUID]*live{}, relays: map[string]*relay{}, sent: map[wire.UUID]bool{}}
+		lives: map[wire.UUID]*live{}, relays: map[string]*relay{}, sent: map[wire.UUID]bool{},
+		watches: map[string]*folderWatch{}, interests: map[string][]interest{}, shells: map[shellKey]*shell{}}
 	d.register()
 	return d, nil
 }
@@ -52,6 +57,7 @@ func (d *Daemon) removeClient(c *Client) {
 	d.mu.Lock()
 	delete(d.clients, c.ID)
 	d.mu.Unlock()
+	d.forgetWatches(c)
 }
 
 // Broadcast sends a notification to every client.
@@ -74,7 +80,10 @@ func Broadcast[P any](d *Daemon, n wire.Notification[P], params P) {
 }
 
 // Shutdown ends what the host runs: every runtime it started.
-func (d *Daemon) Shutdown() { d.stopAll() }
+func (d *Daemon) Shutdown() {
+	d.stopAll()
+	d.stopShells()
+}
 
 // once is true the first time a sendID is seen: a window sends a prompt again for 30 s
 // until it hears it was taken, and it must run once.

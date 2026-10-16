@@ -18,7 +18,9 @@ func (d *Daemon) register() {
 	})
 	// What the window pushes or reports on connecting, which this host has no use for yet.
 	Quiet(d, wire.CallPresenceReport.Name, wire.CallCredentialsOffer.Name, wire.CallAgentsPrewarm.Name,
-		wire.CallAgentsDiscardDraft.Name, wire.CallFilesWatch.Name, wire.CallFilesUnwatch.Name)
+		wire.CallAgentsDiscardDraft.Name)
+	d.registerFiles()
+	d.registerShells()
 	On(d, wire.CallPermissionsPending, func(ctx context.Context, c *Client, _ wire.Empty) ([]wire.PermissionRequest, error) {
 		return d.pendingPermissions(), nil
 	})

@@ -3779,6 +3779,47 @@
       ],
       "additionalProperties": false
     },
+    "FilesSaveTextRequest": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "onlyIfAbsent": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "path",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "FilesText": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "FilesTextRequest": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "additionalProperties": false
+    },
     "FilesWatchRequest": {
       "type": "object",
       "properties": {
@@ -3792,6 +3833,38 @@
       "required": [
         "agentID",
         "folder"
+      ],
+      "additionalProperties": false
+    },
+    "FilesWriteRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "name": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/definitions/Base64"
+        }
+      },
+      "required": [
+        "agentID",
+        "name",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    "FilesWriteResponse": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
       ],
       "additionalProperties": false
     },
@@ -7259,6 +7332,300 @@
       "required": [
         "agentID",
         "unread"
+      ],
+      "additionalProperties": false
+    },
+    "ShellAttachRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "shell": {
+          "type": "integer"
+        },
+        "rows": {
+          "type": "integer"
+        },
+        "cols": {
+          "type": "integer"
+        },
+        "since": {
+          "type": "integer"
+        },
+        "startedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        }
+      },
+      "required": [
+        "agentID"
+      ],
+      "additionalProperties": false
+    },
+    "ShellAttachResponse": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "$ref": "#/definitions/ShellState"
+        },
+        "scrollback": {
+          "$ref": "#/definitions/Base64"
+        },
+        "dropped": {
+          "type": "integer"
+        },
+        "startedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "offset": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "state",
+        "scrollback",
+        "dropped",
+        "startedAt"
+      ],
+      "additionalProperties": false
+    },
+    "ShellInputRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "shell": {
+          "type": "integer"
+        },
+        "bytes": {
+          "$ref": "#/definitions/Base64"
+        },
+        "rows": {
+          "type": "integer"
+        },
+        "cols": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "agentID",
+        "bytes"
+      ],
+      "additionalProperties": false
+    },
+    "ShellListResponse": {
+      "type": "object",
+      "properties": {
+        "shells": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      },
+      "required": [
+        "shells"
+      ],
+      "additionalProperties": false
+    },
+    "ShellOpenResponse": {
+      "type": "object",
+      "properties": {
+        "shell": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "shell"
+      ],
+      "additionalProperties": false
+    },
+    "ShellOutputNotification": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "shell": {
+          "type": "integer"
+        },
+        "bytes": {
+          "$ref": "#/definitions/Base64"
+        },
+        "offset": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "agentID",
+        "shell",
+        "bytes"
+      ],
+      "additionalProperties": false
+    },
+    "ShellRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "shell": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "agentID"
+      ],
+      "additionalProperties": false
+    },
+    "ShellResizeRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "shell": {
+          "type": "integer"
+        },
+        "rows": {
+          "type": "integer"
+        },
+        "cols": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "agentID",
+        "rows",
+        "cols"
+      ],
+      "additionalProperties": false
+    },
+    "ShellSignalRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "shell": {
+          "type": "integer"
+        },
+        "signal": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "agentID",
+        "signal"
+      ],
+      "additionalProperties": false
+    },
+    "ShellState": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "live": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "live"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "exited": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "status"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "exited"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "failed": {
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "failed"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "released": {
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "released"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ShellStateNotification": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "shell": {
+          "type": "integer"
+        },
+        "state": {
+          "$ref": "#/definitions/ShellState"
+        }
+      },
+      "required": [
+        "agentID",
+        "shell",
+        "state"
       ],
       "additionalProperties": false
     },

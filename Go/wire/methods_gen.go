@@ -52,8 +52,11 @@ var (
 	CallFilesList                      = Method[FilesListRequest, DirectoryListing]{"files/list"}
 	CallFilesMention                   = Method[FileMentionRequest, []FileMentionDTO]{"files/mention"}
 	CallFilesRead                      = Method[FilesReadRequest, FileReading]{"files/read"}
+	CallFilesReadText                  = Method[FilesTextRequest, FilesText]{"files/readText"}
+	CallFilesSaveText                  = Method[FilesSaveTextRequest, Empty]{"files/saveText"}
 	CallFilesUnwatch                   = Method[FilesWatchRequest, Empty]{"files/unwatch"}
 	CallFilesWatch                     = Method[FilesWatchRequest, Empty]{"files/watch"}
+	CallFilesWrite                     = Method[FilesWriteRequest, FilesWriteResponse]{"files/write"}
 	CallLeasesSnapshot                 = Method[Empty, LeaseSnapshot]{"leases/snapshot"}
 	CallMCPHealth                      = Method[Empty, MCPHealthSnapshot]{"mcp/health"}
 	CallMCPHealthCheck                 = Method[MCPHealthCheckRequest, MCPHealthSnapshot]{"mcp/health/check"}
@@ -97,6 +100,15 @@ var (
 	CallRuntimesList                   = Method[Empty, []RuntimeStatus]{"runtimes/list"}
 	CallRuntimesMarkAvailable          = Method[MarkRuntimeAvailable, RuntimeAllowances]{"runtimes/markAvailable"}
 	CallSandboxState                   = Method[Empty, SandboxSettings]{"sandbox/state"}
+	CallShellAttach                    = Method[ShellAttachRequest, ShellAttachResponse]{"shell/attach"}
+	CallShellClose                     = Method[ShellRequest, Empty]{"shell/close"}
+	CallShellDetach                    = Method[ShellRequest, Empty]{"shell/detach"}
+	CallShellInput                     = Method[ShellInputRequest, Empty]{"shell/input"}
+	CallShellList                      = Method[AgentRequest, ShellListResponse]{"shell/list"}
+	CallShellOpen                      = Method[ShellAttachRequest, ShellOpenResponse]{"shell/open"}
+	CallShellResize                    = Method[ShellResizeRequest, Empty]{"shell/resize"}
+	CallShellRestart                   = Method[ShellAttachRequest, ShellAttachResponse]{"shell/restart"}
+	CallShellSignal                    = Method[ShellSignalRequest, Empty]{"shell/signal"}
 	CallStoreNotes                     = Method[Empty, StoreNotes]{"store/notes"}
 	CallSurfaceIdentify                = Method[SurfaceIdentification, Empty]{"surface/identify"}
 	CallTimeHistory                    = Method[Empty, TimeHistory]{"time/history"}
@@ -142,6 +154,8 @@ var (
 	NotifyPreferencesChanged           = Notification[map[string]JSONValue]{"preferences/changed"}
 	NotifyProjectChanged               = Notification[ProjectSummary]{"project/changed"}
 	NotifyProjectRemoved               = Notification[ProjectRemovedNotification]{"project/removed"}
+	NotifyShellOutput                  = Notification[ShellOutputNotification]{"shell/output"}
+	NotifyShellStateChanged            = Notification[ShellStateNotification]{"shell/stateChanged"}
 	NotifyStorageWriteFailed           = Notification[WriteFailure]{"storage/writeFailed"}
 	NotifyStoreNotesChanged            = Notification[StoreNotes]{"store/notesChanged"}
 	NotifyWorkflowChanged              = Notification[WorkflowSummary]{"workflow/changed"}
