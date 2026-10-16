@@ -29,6 +29,8 @@ type Methods struct {
 	web *web.Status
 	// A host's git waiting on a person's answer, by host and git server (#1122).
 	gitAsks map[string]map[string]*gitAskWaiting
+	// Frozen for a handover (R16): records are not to change until it is done.
+	frozen bool
 	// How long a git command waits for a person, and the lender to read its access.
 	gitAskPatience  time.Duration
 	gitFillPatience time.Duration
@@ -67,8 +69,29 @@ func (m *Methods) Handles(method string) bool {
 	return method != "daemon/ping" && (own[method] || workspaceMethods[method])
 }
 
+func (m *Methods) setFrozen(frozen bool) {
+	m.mu.Lock()
+	m.frozen = frozen
+	m.mu.Unlock()
+}
+
+// writes is ControlMethods.writes: what changes records, refused while frozen.
+var writes = map[string]bool{
+	"hosts/startEnroll": true, "hosts/install": true, "hosts/update": true, "hosts/remove": true,
+	"hosts/setRelay": true, "hosts/lendSignIn": true, "hosts/lendGit": true, "hosts/detect": true,
+	"control/setProjectDetection": true, "clients/startPairing": true, "clients/forget": true,
+	"devices/startPairing": true, "devices/forget": true, "channels/set": true,
+}
+
 func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (any, error) {
 	ctx := context.Background()
+	m.mu.Lock()
+	frozen := m.frozen
+	m.mu.Unlock()
+	readsOnly := method == "providers/list" || method == "providers/refresh" || method == "hosts/listKept"
+	if frozen && (writes[method] || workspaceMethods[method] && !readsOnly) {
+		return nil, fail(storeUnavailable, "The control plane is moving to another machine. Nothing was changed; try again in a minute.")
+	}
 	switch method {
 	case "daemon/ping":
 		return map[string]any{}, nil

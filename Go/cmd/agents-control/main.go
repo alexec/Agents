@@ -7,6 +7,8 @@
 //	agents-control serve … [--log FILE]         stamped lines into FILE, rolled at 4 MB (#174)
 //	agents-control serve … [--web DIR] [--web-port N] [--no-web]
 //	agents-control serve … [--store-credentials-fd N]
+//	agents-control serve … [--receive]          empty, for a handover to fill (AGENTS_CONTROL_RECEIVE=1)
+//	agents-control serve … [--no-forwarding]    serve, even if this copy was forwarding
 //	agents-control serve … [--secrets-home DIR] DIR/.agents-secrets holds the channels' tokens (#1009)
 //	agents-control code (--client [--browser] | --host) [--minutes N] [--home DIR] [--command]
 //	agents-control hosts | clients
@@ -332,6 +334,10 @@ func serve() {
 	}
 	// Where other copies reach this one: several copies over one store (US3).
 	cfg.PeerURL = os.Getenv("AGENTS_CONTROL_PEER_URL")
+	// Empty, for a handover to fill (R16); and forwarding again after a restart unless
+	// told to serve.
+	cfg.Receive = has("--receive") || os.Getenv("AGENTS_CONTROL_RECEIVE") == "1"
+	cfg.NoForwarding = has("--no-forwarding") || os.Getenv("AGENTS_CONTROL_FORWARDING") == "0"
 	cfg.Web = webConfig()
 	// Whether the page is served, for Agents Host to read (071 R3): this run's, or none.
 	if home() != "" {

@@ -70,6 +70,11 @@ type Config struct {
 	// How often a copy beats, looks for the others and renews its leases; shorter in
 	// tests. 0 is 10 s.
 	CopyBeat time.Duration
+	// Start empty, for a handover to fill (R16): no settings made, every member refused,
+	// only the copy handing over answered, until it says take over.
+	Receive bool
+	// Serve, even if this copy was forwarding when it stopped (--no-forwarding).
+	NoForwarding bool
 	// Where each log line goes, already marked with this copy. No line may hold a code,
 	// a key, a MAC or a message (071 FR-033).
 	Log func(string)
@@ -107,6 +112,8 @@ type Service struct {
 	mesh *mesh
 	// The origin peers dial, which a copy's key exchange is bound to.
 	peerOrigin string
+	// Where this copy is in a handover (R16): serving, receiving, frozen or forwarding.
+	phase *phaseBox
 	// hosts/install, detect and sshHosts (T072, #429, #610): with the person's own ssh.
 	installer *hostinstall.Installer
 
@@ -139,7 +146,7 @@ func New(cfg Config) (*Service, error) {
 		cfg.Bind = "0.0.0.0"
 	}
 	s := &Service{cfg: cfg, public: public, origin: origin, copyID: strings.ToLower(records.NewUUID()[:8]),
-		records: records.New(cfg.Store), started: time.Now(), desk: notices.NewDesk(), sockets: map[*Conn]bool{}, stop: make(chan struct{})}
+		records: records.New(cfg.Store), started: time.Now(), desk: notices.NewDesk(), phase: &phaseBox{phase: phaseServing}, sockets: map[*Conn]bool{}, stop: make(chan struct{})}
 	s.codes = &Codes{Store: cfg.Store, Private: cfg.PrivateKey, Public: public, URL: cfg.URL, Pin: cfg.Pin, Name: cfg.Name}
 	s.router = NewRouter(nil, s.log)
 	s.methods = newMethods(s)
@@ -199,8 +206,35 @@ func (s *Service) Start(ctx context.Context) (int, error) {
 	if err := store.Probe(ctx, s.cfg.Store, s.copyID); err != nil {
 		return 0, fmt.Errorf("the store can't be used: %w", err)
 	}
-	if err := s.takeUp(ctx); err != nil {
-		return 0, err
+	if s.cfg.Receive {
+		s.phase.set(phaseReceiving)
+		if object, err := s.cfg.Store.Get(ctx, records.SettingsKey); err != nil {
+			return 0, err
+		} else if object != nil {
+			// Started again after it took over: it serves, as any copy would. A store with
+			// records that it never took is a handover that didn't finish. Or it took over,
+			// then handed over again and forwards.
+			var settings records.Settings
+			first := ""
+			if json.Unmarshal(object.Data, &settings) == nil {
+				if list := currentEndpoints(&settings); len(list) > 0 {
+					first = list[0].URL
+				}
+			}
+			forwarded, _ := s.cfg.Store.Get(ctx, s.forwardingKey())
+			if first != s.cfg.URL && forwarded == nil {
+				return 0, errors.New("this store holds records from a handover that didn't finish; empty it and receive again")
+			}
+			s.phase.set(phaseServing)
+		}
+	}
+	if s.phase.now() != phaseReceiving {
+		if err := s.takeUp(ctx); err != nil {
+			return 0, err
+		}
+		if err := s.resumeForwardingIfMarked(ctx); err != nil {
+			return 0, err
+		}
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.serveHTTP)
@@ -227,7 +261,7 @@ func (s *Service) Start(ctx context.Context) (int, error) {
 	if s.tunnels != nil {
 		s.tunnels.Start(0)
 	}
-	if s.mesh != nil {
+	if s.mesh != nil && s.phase.now() != phaseReceiving {
 		s.startMesh()
 	}
 	if s.channels != nil {
@@ -362,6 +396,9 @@ func (s *Service) refreshEvery(every time.Duration) {
 }
 
 func (s *Service) refresh() {
+	if s.phase.now() == phaseReceiving {
+		return
+	}
 	if err := s.records.Load(context.Background()); err != nil {
 		s.setReady(false)
 		s.log("store: " + err.Error())
@@ -742,8 +779,9 @@ func (s *Service) accept(conn *Conn, webOrigin string) {
 	var host string
 	var admittedAny bool
 	bound := s.origins()
-	// A peer copy dials the address copies reach each other at, and proves that.
-	if strings.HasPrefix(auth.ID, "x:") && s.peerOrigin != "" {
+	// A peer copy dials the address copies reach each other at, and proves that. Anyone
+	// else (a handover's driver too) may have dialled any place the control plane answers.
+	if strings.HasPrefix(auth.ID, "x:") && !strings.HasPrefix(auth.ID, "x:"+handoverPrefix) && s.peerOrigin != "" {
 		bound = []string{s.peerOrigin}
 	}
 	if webOrigin != "" {
@@ -764,6 +802,22 @@ func (s *Service) accept(conn *Conn, webOrigin string) {
 		return
 	}
 	if !admittedAny {
+		refuse(controllink.Refuse(controllink.Unknown))
+		return
+	}
+	// In a handover (R16): a receiving copy answers only the copy filling it, and no code
+	// is used while records can't be written.
+	phase := s.phase.now()
+	switch {
+	case phase == phaseReceiving && id.Kind != 'x':
+		// Being filled, so its records are not whole yet: not a verdict on anyone (#81).
+		refuse(controllink.Refuse(controllink.Unavailable))
+		return
+	case (phase == phaseFrozen || phase == phaseForwarding) && (id.Kind == 'p' || id.Kind == 'e'):
+		refuse(controllink.Refuse(controllink.Unknown))
+		return
+	case phase == phaseForwarding && (id.Kind == 'c' || id.Kind == 'h') && s.phase.forwardingUntil().Before(time.Now()):
+		// Forwarding ended (30 days at most): anyone still to hear pairs again.
 		refuse(controllink.Refuse(controllink.Unknown))
 		return
 	}
@@ -805,6 +859,11 @@ func (s *Service) accept(conn *Conn, webOrigin string) {
 		}
 		go s.methods.NoteEpoch(context.Background(), id, epoch)
 	}
+	// A forwarding copy's ok gave the new list; that is all it has to say.
+	if phase == phaseForwarding && (id.Kind == 'c' || id.Kind == 'h') {
+		conn.Close()
+		return
+	}
 	switch id.Kind {
 	case 'c':
 		s.router.AttachClient(client, conn, relayed)
@@ -821,6 +880,14 @@ func (s *Service) accept(conn *Conn, webOrigin string) {
 	case 'p', 'e':
 		s.spend(conn, id.ID, webOrigin != "")
 	case 'x':
+		if strings.HasPrefix(id.ID, handoverPrefix) {
+			s.handoverSession(conn)
+			return
+		}
+		if s.mesh == nil {
+			conn.Close()
+			return
+		}
 		s.mesh.accepted(id.ID, conn)
 	}
 }
@@ -871,6 +938,11 @@ func currentEndpoints(settings *records.Settings) []records.Endpoint {
 
 // key is the key an identity proves, and what it is admitted as.
 func (s *Service) key(id controllink.Identity) ([]byte, *records.ClientRecord, string, error) {
+	// Being filled by a handover, its records are not whole yet: try again, which says
+	// nothing about the member (#81), where unknown would have a browser forget its key.
+	if id.Kind != 'x' && s.phase.now() == phaseReceiving {
+		return nil, nil, "", controllink.Refuse(controllink.Unavailable)
+	}
 	switch id.Kind {
 	case 'c':
 		// Paired at another copy moments ago: this one reads the store again. A store that
@@ -928,8 +1000,9 @@ func (s *Service) key(id controllink.Identity) ([]byte, *records.ClientRecord, s
 		}
 		return controllink.CodeKey(secret), nil, "", nil
 	case 'x':
-		// Copies link with each other only on a control plane of several copies.
-		if s.mesh == nil {
+		// Copies link with each other only on a control plane of several copies; a
+		// handover's driver proves the copies' key at any.
+		if s.mesh == nil && !strings.HasPrefix(id.ID, handoverPrefix) {
 			return nil, nil, "", controllink.Refuse(controllink.Unknown)
 		}
 		return controllink.CopyKey(s.cfg.PrivateKey), nil, "", nil

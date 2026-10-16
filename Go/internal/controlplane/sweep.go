@@ -211,7 +211,12 @@ func (s *Service) sweepEveryHour() {
 	t := time.NewTicker(sweepEvery)
 	defer t.Stop()
 	for {
-		report, err := sweep(context.Background(), s.records, time.Now(), mostPerSweep)
+		// Only while serving: a receiving or forwarding copy leaves the store alone.
+		var report sweepReport
+		var err error
+		if s.phase.now() == phaseServing {
+			report, err = sweep(context.Background(), s.records, time.Now(), mostPerSweep)
+		}
 		switch {
 		case err != nil:
 			s.log("store: sweep stopped: " + err.Error())
