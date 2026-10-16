@@ -36,6 +36,10 @@ struct HostSettings: Codable, Sendable, Equatable {
     /// through iCloud when away, and posts their notices. Off until turned on (Alex).
     var relay: Bool?
     var relaysForDevices: Bool { relay ?? false }
+    /// Which `agents-control` runs (#1137): `"go"` for the Go one, carried beside the Swift
+    /// one until Alex switches; absent, or anything else, for the Swift one. Not in the
+    /// window: set in `host.json`, and the control plane restarted.
+    var controlImplementation: String?
 
     /// This Mac's entry in `host.json`: its Bonjour name, which the person sees in Sharing.
     private static func key(_ paths: HostPaths) -> String {

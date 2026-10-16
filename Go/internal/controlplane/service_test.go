@@ -2,7 +2,10 @@ package controlplane
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -15,6 +18,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/internal/controlplane/web"
 )
 
 // A control plane in this process, over plain HTTP on loopback, with the Go host's and a
@@ -106,7 +110,7 @@ func (p *plane) host(machine string) *fakeHost {
 			switch m.Method {
 			case "daemon/ping":
 				c.Write(reply(m.ID, map[string]any{"pong": member.Host}))
-			case "agents/list":
+			case "agents/list", "elicitations/pending":
 				c.Write(reply(m.ID, []any{}))
 			default:
 				c.Write(replyError(m.ID, notFound(m.Method)))
@@ -357,5 +361,277 @@ func TestStampedLines(t *testing.T) {
 	lines := strings.Split(strings.TrimSuffix(got, "\n"), "\n")
 	if len(lines) != 2 || !strings.HasSuffix(lines[1], " two") || !strings.HasPrefix(lines[0], "2026-10-16T09:00:00.123") {
 		t.Fatal(got)
+	}
+}
+
+// A browser pairs and connects through the loopback listener only, bound to its origin;
+// a window's code and key are refused there, and a browser's code over TLS (071).
+func TestABrowserThroughTheLoopbackListener(t *testing.T) {
+	dist := t.TempDir()
+	index := []byte("<html></html>")
+	sum := sha256.Sum256(index)
+	os.WriteFile(filepath.Join(dist, "index.html"), index, 0o644)
+	os.WriteFile(filepath.Join(dist, "MANIFEST"), []byte("agents-web 1\nout "+hex.EncodeToString(sum[:])+" Web/dist/index.html\n"), 0o644)
+
+	port := freePort(t)
+	url := "http://127.0.0.1:" + itoa(port)
+	var webChanged []web.Status
+	s, err := New(Config{Store: store.NewMemory(), PrivateKey: controllink.NewPrivateKey(), URL: url, Bind: "127.0.0.1",
+		Port: port, Name: "Test plane", Web: &WebConfig{Folder: dist, Port: 0},
+		WebChanged: func(st web.Status) { webChanged = append(webChanged, st) }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	defer s.Stop()
+	if len(webChanged) != 1 || !webChanged[0].Served || s.WebPort() == 0 {
+		t.Fatalf("%+v", webChanged)
+	}
+	origin := web.OriginFor(s.WebPort())
+
+	pair := func(browser bool, kind string, at string) (string, []byte, error) {
+		shown, err := s.Codes().Issue(context.Background(), false, browser, time.Minute)
+		if err != nil {
+			t.Fatal(err)
+		}
+		code, _ := controllink.ParseCode(shown.Text)
+		l, err := dialBrowser(at, origin)
+		if err != nil {
+			return "", nil, err
+		}
+		defer l.Close()
+		auth, _, err := answerHello(l, controllink.Identity{Kind: 'p', ID: code.ID()}, controllink.CodeKey(code.Secret), at, "browser")
+		if err != nil {
+			return "", nil, err
+		}
+		_ = auth
+		private := controllink.NewPrivateKey()
+		public, _ := controllink.PublicKey(private)
+		id := records.NewUUID()
+		params, _ := json.Marshal(clientAnnounce{ID: id, PublicKey: public, Name: "Safari", Kind: kind})
+		l.Write(context.Background(), `{"jsonrpc":"2.0","id":1,"method":"clients/announce","params":`+string(params)+`}`)
+		line, err := l.Read(context.Background())
+		if err != nil {
+			return "", nil, err
+		}
+		if !strings.Contains(line, `"result"`) {
+			return "", nil, fmt.Errorf("%s", line)
+		}
+		return id, private, nil
+	}
+	// A window's code is no good at the loopback listener.
+	if _, _, err := pair(false, records.KindBrowser, origin); err == nil || !strings.Contains(err.Error(), "That code is for a window or a phone") {
+		t.Fatal(err)
+	}
+	id, private, err := pair(true, records.KindBrowser, origin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c := s.Records().Client(id); c == nil || !strings.HasPrefix(c.Name, "Safari on ") || c.Kind != records.KindBrowser {
+		t.Fatal(c)
+	}
+	// The browser's key proves itself at the loopback listener, bound to its origin…
+	public, _ := controllink.PublicKey(s.cfg.PrivateKey)
+	key, _ := controllink.ClientKey(private, public, id)
+	l, err := dialBrowser(origin, origin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := answerHello(l, controllink.Identity{Kind: 'c', ID: id}, key, origin, "browser"); err != nil || ok == nil {
+		t.Fatal(err)
+	}
+	l.Close()
+	// …and nowhere else: not over the TLS listener's door.
+	l, err = controllink.Dial(context.Background(), url, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	if _, _, err := answerHello(l, controllink.Identity{Kind: 'c', ID: id}, key, url, "browser"); err == nil {
+		t.Fatal("a browser's key worked over the TLS listener")
+	}
+}
+
+// dialBrowser opens the loopback listener's socket as the page does, with its Origin.
+func dialBrowser(base, origin string) (*controllink.Lines, error) {
+	return controllink.DialOrigin(context.Background(), base, origin)
+}
+
+// answerHello goes through the exchange by hand: it returns the auth sent and the ok, or
+// the refusal.
+func answerHello(l *controllink.Lines, id controllink.Identity, key []byte, at, kind string) (*controllink.Auth, *controllink.OK, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	line, err := l.Read(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	m, _ := controllink.ParseMessage(line)
+	if m.Hello == nil {
+		return nil, nil, fmt.Errorf("no hello: %s", line)
+	}
+	origin, _ := controllink.Origin(at)
+	auth, expect, err := controllink.Answer(m.Hello, id, key, origin, kind, nil, "", nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	l.Write(ctx, controllink.Message{Auth: auth}.Line())
+	line, err = l.Read(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	m, _ = controllink.ParseMessage(line)
+	if m.OK == nil {
+		return nil, nil, fmt.Errorf("refused: %s", line)
+	}
+	return auth, m.OK, controllink.Check(m.OK, expect)
+}
+
+// hosts/install is answered by the installer, in its words, through the router.
+func TestHostsInstallAnswersInItsWords(t *testing.T) {
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	_, window := p.client("Window")
+	if e := callError(t, window, "", "hosts/install", map[string]string{"destination": " "}); !strings.Contains(e, "Say which server.") {
+		t.Fatal(e)
+	}
+	if e := callError(t, window, "", "hosts/update", map[string]string{"host": "x"}); !strings.Contains(e, "-32009") {
+		t.Fatal(e)
+	}
+	call(t, window, "", "hosts/checkAgain", map[string]string{"host": "x"})
+}
+
+// rawHost enrols and connects a host by hand, and returns its uplink's lines: for a
+// relay host (agents-relay), whose channel 0 the test reads itself.
+func (p *plane) rawHost(name string, relay bool) (string, *controllink.Lines) {
+	ctx := context.Background()
+	code := p.code(true)
+	private := controllink.NewPrivateKey()
+	public, _ := controllink.PublicKey(private)
+	l, _, err := controllink.Join(ctx, code.URL, "", controllink.Credentials{Identity: "e:" + code.ID(),
+		Key: controllink.CodeKey(code.Secret), Kind: "host", ControlKey: code.ControlKey})
+	if err != nil {
+		p.t.Fatal(err)
+	}
+	params, _ := json.Marshal(hostAnnounce{PublicKey: public, Name: name, Platform: "macOS arm64", Version: "1",
+		MachineID: "RELAY-MAC", Relay: &relay})
+	l.Write(ctx, `{"jsonrpc":"2.0","id":1,"method":"hosts/announce","params":`+string(params)+`}`)
+	line, err := l.Read(ctx)
+	if err != nil {
+		p.t.Fatal(err)
+	}
+	l.Close()
+	var answer struct {
+		Result admitted `json:"result"`
+	}
+	json.Unmarshal([]byte(line), &answer)
+	host := answer.Result.Host
+	key, _ := controllink.HostKey(private, code.ControlKey, host)
+	l, _, err = controllink.Join(ctx, code.URL, "", controllink.Credentials{Identity: "h:" + host, Key: key,
+		Kind: "host", ControlKey: code.ControlKey})
+	if err != nil {
+		p.t.Fatal(err)
+	}
+	hello, _ := json.Marshal(hostHello{Version: "1", Platform: "macOS arm64", MachineID: "RELAY-MAC", Relay: &relay})
+	l.Write(ctx, channelFrame(0, `{"jsonrpc":"2.0","id":1,"method":"host/hello","params":`+string(hello)+`}`))
+	p.t.Cleanup(l.Close)
+	return host, l
+}
+
+// readUntil reads a host's lines until one holds want.
+func readUntil(t *testing.T, l *controllink.Lines, want string) string {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	for {
+		line, err := l.Read(ctx)
+		if err != nil {
+			t.Fatalf("no %s: %v", want, err)
+		}
+		if strings.Contains(line, want) {
+			return line
+		}
+	}
+}
+
+// A need a host raises goes to the relay host, sealed to the device the ladder picks
+// (T097): the iPhone that may notify, then taken back when the need is met.
+func TestANeedGoesToTheRelayHost(t *testing.T) {
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	relayID, relay := p.rawHost("relay mac", true)
+	if relayID == "mac" {
+		t.Fatal("a relay was made the home host")
+	}
+	box := p.host("MACHINE-2")
+	// A phone pairs and says it may notify; the relay host hears the devices.
+	m, err := controllink.PairClient(context.Background(), p.code(false), "phone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := p.s.Records().Client(m.Client)
+	client.Kind = records.KindIPhone
+	yes := true
+	client.MayNotify = &yes
+	if err := p.s.Records().SaveClient(context.Background(), *client); err != nil {
+		t.Fatal(err)
+	}
+	p.s.tellRelayDevices()
+	readUntil(t, relay, m.Client)
+	// The window was given no channel on the relay host.
+	if n := p.s.Router().Channels(relayID); n != 0 {
+		t.Fatal(n)
+	}
+
+	need := `{"need":{"id":{"permission":"E0000000-0000-4000-8000-000000000005"},"agentID":"A0000000-0000-4000-8000-000000000001",` +
+		`"folder":"file:///work","kind":"permission","raisedAt":800000000,"headline":{"h1":"work","h2":"Fix","h3":"may run"}},"buzz":true}`
+	if _, err := p.s.methods.HostSaid(box.member.Host, "attention/need", json.RawMessage(need)); err != nil {
+		t.Fatal(err)
+	}
+	line := readUntil(t, relay, "relay/deliver")
+	if !strings.Contains(line, `"device":"`+m.Client+`"`) || !strings.Contains(line, `"alert":true`) || !strings.Contains(line, `"h2":"Fix"`) {
+		t.Fatal(line)
+	}
+	p.s.methods.HostSaid(box.member.Host, "attention/need", json.RawMessage(`{"withdraw":{"permission":"E0000000-0000-4000-8000-000000000005"}}`))
+	if line := readUntil(t, relay, "relay/deliver"); strings.Contains(line, "headline") {
+		t.Fatal(line)
+	}
+}
+
+// A kept request goes to a host on a channel of its own and comes back with its reply;
+// one for a host that is not here is nil (ControlRouter.deliverKept).
+func TestAKeptRequestIsDelivered(t *testing.T) {
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	box := p.host("MACHINE-2")
+	m := p.s.Router().DeliverKept("elicitations/pending", map[string]any{}, channelClient, records.KindUnknown, box.member.Host, 5*time.Second)
+	if m == nil || string(m.Result) != "[]" {
+		t.Fatal(m)
+	}
+	if n := p.s.Router().Channels(box.member.Host); n != 0 {
+		t.Fatalf("%d channels left open", n)
+	}
+	if p.s.Router().DeliverKept("x", nil, channelClient, records.KindUnknown, "nobody", time.Second) != nil {
+		t.Fatal("delivered to nobody")
+	}
+}
+
+// channels/get says Swift's words where channels can't run, and the state where they can.
+func TestChannelsAnswer(t *testing.T) {
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	_, window := p.client("Window")
+	var state struct {
+		Slack struct {
+			Status    string  `json:"status"`
+			Available bool    `json:"available"`
+			Detail    *string `json:"detail"`
+		} `json:"slack"`
+	}
+	json.Unmarshal(call(t, window, "", "channels/get", nil), &state)
+	if state.Slack.Status != "off" || state.Slack.Available || state.Slack.Detail == nil ||
+		*state.Slack.Detail != "Channels need a control plane with one copy, for now." {
+		t.Fatalf("%+v", state)
+	}
+	if e := callError(t, window, "", "channels/set", map[string]any{"slack": map[string]any{"enabled": true}}); !strings.Contains(e, "-32009") {
+		t.Fatal(e)
 	}
 }

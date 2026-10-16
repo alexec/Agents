@@ -5,6 +5,11 @@
 //	agents-control serve --home DIR [--no-bonjour] [--key-fd N]
 //	agents-control serve … [--host-root DIR]    this Mac's host's root: its join in control/status (#113)
 //	agents-control serve … [--log FILE]         stamped lines into FILE, rolled at 4 MB (#174)
+//	agents-control serve … [--web DIR] [--web-port N] [--no-web]
+//	agents-control serve … [--store-credentials-fd N]
+//	agents-control serve … [--receive]          empty, for a handover to fill (AGENTS_CONTROL_RECEIVE=1)
+//	agents-control serve … [--no-forwarding]    serve, even if this copy was forwarding
+//	agents-control serve … [--secrets-home DIR] DIR/.agents-secrets holds the channels' tokens (#1009)
 //	agents-control code (--client [--browser] | --host) [--minutes N] [--home DIR] [--command]
 //	agents-control hosts | clients
 //	agents-control install-script               the script a server runs to become a host
@@ -14,20 +19,30 @@
 // --home is Agents Host's single copy (T057): its certificate and store in DIR, port 8791,
 // this Mac's .local name, and Bonjour. Anything below still overrides it.
 //
+// The web remote (071): with --web DIR (the built Web/dist) and a port, a second listener
+// on 127.0.0.1 and ::1 only serves it at http://localhost:<port>. --home defaults the port
+// to 8792; without --home there is none unless given. --no-web turns it off.
+//
 // Where things are comes from the environment, as the Swift one reads it:
 //
-//	AGENTS_STORE                file:///path
+//	AGENTS_STORE                file:///path, or s3://bucket/prefix (an option)
+//	AGENTS_STORE_ENDPOINT, AGENTS_STORE_PATH_STYLE=1, AWS_*: the bucket (contracts/store.md)
+//	AGENTS_CONTROL_WEB_PORT     the web remote's loopback port, when --web-port is not given
 //	AGENTS_CONTROL_URL          the one address clients and hosts are given
 //	AGENTS_CONTROL_KEY_FILE     the control plane's private key, raw, 0600 (made if missing)
 //	AGENTS_CONTROL_KEY          or the key itself, base64url
+//	AGENTS_CONTROL_KMS          or sealed in the store by a keeper (an option): base64key://…,
+//	                            hashivault://…, gcpkms://… (gocloud.dev/secrets)
 //	AGENTS_CONTROL_TLS_CERT/_KEY  when this copy terminates TLS itself
 //	AGENTS_CONTROL_PIN          the load balancer's certificate pin, when it terminates TLS
+//	AGENTS_CONTROL_PEER_URL     where other copies reach this one (several copies, US3)
 //	AGENTS_CONTROL_NAME, AGENTS_CONTROL_MACHINE_ID, AGENTS_CONTROL_SERVERS
 package main
 
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/url"
@@ -44,8 +59,10 @@ import (
 	"github.com/alexec/agents/Go/internal/buildinfo"
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane"
+	"github.com/alexec/agents/Go/internal/controlplane/kms"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/internal/controlplane/web"
 )
 
 var (
@@ -123,14 +140,81 @@ func openStore(given string) store.Store {
 	if text == "" {
 		fail("say where the store is: AGENTS_STORE=file:///path or s3://bucket/prefix")
 	}
-	s, err := controlplane.OpenStore(text, os.Getenv)
+	s, err := controlplane.OpenStore(text, os.Getenv, storeCredentials())
 	if err != nil {
 		fail("%v", err)
 	}
 	return s
 }
 
-func privateKey() []byte {
+var givenCredentials *controlplane.StoreCredentials
+
+// storeCredentials are the bucket's keys, read once from the descriptor Agents Host
+// handed over (T058a): they are never in a plist, a file or the environment.
+func storeCredentials() *controlplane.StoreCredentials {
+	fd := value("--store-credentials-fd")
+	if fd == "" || givenCredentials != nil {
+		return givenCredentials
+	}
+	n, err := strconv.Atoi(fd)
+	if err != nil {
+		fail("no bucket keys on descriptor %s", fd)
+	}
+	f := os.NewFile(uintptr(n), "credentials")
+	data, _ := io.ReadAll(io.LimitReader(f, 64<<10))
+	f.Close()
+	var c controlplane.StoreCredentials
+	if json.Unmarshal(data, &c) != nil || c.AccessKey == "" {
+		fail("no bucket keys on descriptor %s", fd)
+	}
+	givenCredentials = &c
+	return givenCredentials
+}
+
+// webConfig is the web remote's listener, or nil: a folder and a port both, and no
+// --no-web (071).
+func webConfig() *controlplane.WebConfig {
+	folder := value("--web")
+	if has("--no-web") || folder == "" {
+		return nil
+	}
+	port, err := strconv.Atoi(value("--web-port"))
+	if err != nil {
+		port, err = strconv.Atoi(os.Getenv("AGENTS_CONTROL_WEB_PORT"))
+	}
+	if err != nil {
+		if home() == "" {
+			return nil
+		}
+		port = web.DefaultPort
+	}
+	return &controlplane.WebConfig{Folder: expand(folder), Port: port}
+}
+
+// privateKey is the control plane's key: a key file (control/control-key, the default),
+// AGENTS_CONTROL_KEY or --key-fd. With AGENTS_CONTROL_KMS (an option) it is sealed in the
+// store instead: a key given or found in a file is sealed the first time, otherwise a new
+// one is made, and any copy with the store and the use of the keeper opens it.
+func privateKey(st store.Store) []byte {
+	keeper := os.Getenv("AGENTS_CONTROL_KMS")
+	if keeper == "" {
+		return plainKey(true)
+	}
+	key, err := kms.ControlKey(context.Background(), st, keeper, func() []byte {
+		if given := plainKey(false); given != nil {
+			return given
+		}
+		return controllink.NewPrivateKey()
+	})
+	if err != nil {
+		fail("the control key: %v", err)
+	}
+	return key
+}
+
+// plainKey is the key given, or with makeFile the key file's, made if missing; nil when
+// there is none and none is to be made.
+func plainKey(makeFile bool) []byte {
 	if fd := value("--key-fd"); fd != "" {
 		n, err := strconv.Atoi(fd)
 		if err != nil {
@@ -154,6 +238,12 @@ func privateKey() []byte {
 	file := os.Getenv("AGENTS_CONTROL_KEY_FILE")
 	if file == "" && home() != "" {
 		file = filepath.Join(home(), "control-key")
+	}
+	if !makeFile {
+		if data, err := os.ReadFile(file); file != "" && err == nil && controllink.ValidPrivateKey(data) {
+			return data
+		}
+		return nil
 	}
 	if file == "" {
 		fail("say where the control plane's key is: AGENTS_CONTROL_KEY_FILE, AGENTS_CONTROL_KEY or --key-fd")
@@ -225,11 +315,44 @@ func serve() {
 	if cfg.MachineID == "" {
 		cfg.MachineID = controlplane.MachineID()
 	}
+	// Chat apps' tokens (#1009) in .agents-secrets under this home (#1035): --secrets-home,
+	// AGENTS_CONTROL_SECRETS_HOME, else --home's folder (a scratch set-up never reads the
+	// person's own), else $HOME on a server.
+	cfg.SecretsHome = value("--secrets-home")
+	if cfg.SecretsHome == "" {
+		cfg.SecretsHome = os.Getenv("AGENTS_CONTROL_SECRETS_HOME")
+	}
+	if cfg.SecretsHome == "" {
+		cfg.SecretsHome = home()
+	}
+	if cfg.SecretsHome == "" {
+		cfg.SecretsHome, _ = os.UserHomeDir()
+	}
+	cfg.SecretsHome = expand(cfg.SecretsHome)
 	if root := value("--host-root"); root != "" {
 		cfg.HostJoinFile = filepath.Join(expand(root), "control-join.json")
 	}
+	// Where other copies reach this one: several copies over one store (US3).
+	cfg.PeerURL = os.Getenv("AGENTS_CONTROL_PEER_URL")
+	// Empty, for a handover to fill (R16); and forwarding again after a restart unless
+	// told to serve.
+	cfg.Receive = has("--receive") || os.Getenv("AGENTS_CONTROL_RECEIVE") == "1"
+	cfg.NoForwarding = has("--no-forwarding") || os.Getenv("AGENTS_CONTROL_FORWARDING") == "0"
+	cfg.Web = webConfig()
+	// Whether the page is served, for Agents Host to read (071 R3): this run's, or none.
+	if home() != "" {
+		file := filepath.Join(home(), "web.json")
+		os.Remove(file)
+		cfg.WebChanged = func(status web.Status) {
+			data, _ := json.Marshal(map[string]any{"pid": os.Getpid(), "status": status})
+			tmp := file + ".tmp"
+			if os.WriteFile(tmp, data, 0o644) == nil {
+				os.Rename(tmp, file)
+			}
+		}
+	}
 	cfg.Store = openStore("")
-	cfg.PrivateKey = privateKey()
+	cfg.PrivateKey = privateKey(cfg.Store)
 	s, err := controlplane.New(cfg)
 	if err != nil {
 		fail("%v", err)
@@ -249,6 +372,14 @@ func serve() {
 			say("advertised as " + cfg.Name)
 		}
 	}
+	// SIGUSR1: try the web remote's listener again (Agents Host's Try Again, 071 R3).
+	retry := make(chan os.Signal, 1)
+	signal.Notify(retry, syscall.SIGUSR1)
+	go func() {
+		for range retry {
+			s.RetryWeb()
+		}
+	}()
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
 	<-stop
@@ -291,7 +422,7 @@ func code() {
 	if settings == nil || settings.URL == nil {
 		fail("this store has no control plane yet: start one with `agents-control serve` first")
 	}
-	key := privateKey()
+	key := privateKey(st)
 	public, err := controllink.PublicKey(key)
 	if err != nil || !bytes.Equal(public, settings.ControlKey) {
 		fail("that key is not this control plane's")
@@ -361,7 +492,7 @@ func list(hosts bool) {
 const usage = `usage: agents-control serve [--port N] [--bind ADDR] [--self-signed DIR] [--name NAME] [--key-fd N]
        agents-control code (--client [--browser] | --host) [--minutes N]
        agents-control serve --home DIR [--no-bonjour]
-       agents-control serve … [--host-root DIR] [--log FILE]
+       agents-control serve … [--host-root DIR] [--log FILE] [--web DIR] [--web-port N] [--no-web]
        agents-control hosts | clients
        agents-control install-script
        agents-control store check [--store URL]`

@@ -3,6 +3,7 @@ package controlplane
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"sort"
 	"strings"
@@ -11,7 +12,9 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/alexec/agents/Go/internal/controlplane/channels"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
+	"github.com/alexec/agents/Go/internal/controlplane/web"
 )
 
 // Methods is ControlMethods: the methods the control plane answers itself (058,
@@ -23,9 +26,11 @@ type Methods struct {
 
 	mu sync.Mutex
 	// The web remote's listener as it stands (071 R3), set as it binds.
-	web *WebRemoteStatus
+	web *web.Status
 	// A host's git waiting on a person's answer, by host and git server (#1122).
 	gitAsks map[string]map[string]*gitAskWaiting
+	// Frozen for a handover (R16): records are not to change until it is done.
+	frozen bool
 	// How long a git command waits for a person, and the lender to read its access.
 	gitAskPatience  time.Duration
 	gitFillPatience time.Duration
@@ -64,8 +69,29 @@ func (m *Methods) Handles(method string) bool {
 	return method != "daemon/ping" && (own[method] || workspaceMethods[method])
 }
 
+func (m *Methods) setFrozen(frozen bool) {
+	m.mu.Lock()
+	m.frozen = frozen
+	m.mu.Unlock()
+}
+
+// writes is ControlMethods.writes: what changes records, refused while frozen.
+var writes = map[string]bool{
+	"hosts/startEnroll": true, "hosts/install": true, "hosts/update": true, "hosts/remove": true,
+	"hosts/setRelay": true, "hosts/lendSignIn": true, "hosts/lendGit": true, "hosts/detect": true,
+	"control/setProjectDetection": true, "clients/startPairing": true, "clients/forget": true,
+	"devices/startPairing": true, "devices/forget": true, "channels/set": true,
+}
+
 func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (any, error) {
 	ctx := context.Background()
+	m.mu.Lock()
+	frozen := m.frozen
+	m.mu.Unlock()
+	readsOnly := method == "providers/list" || method == "providers/refresh" || method == "hosts/listKept"
+	if frozen && (writes[method] || workspaceMethods[method] && !readsOnly) {
+		return nil, fail(storeUnavailable, "The control plane is moving to another machine. Nothing was changed; try again in a minute.")
+	}
 	switch method {
 	case "daemon/ping":
 		return map[string]any{}, nil
@@ -131,22 +157,39 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		if err := m.forget(ctx, strings.ToUpper(id), 0); err != nil {
 			return nil, err
 		}
+		m.s.announce("clientForgotten", strings.ToUpper(id), from.Client)
 		return map[string]any{}, nil
 	case "clients/forgetSelf":
 		// Only itself. The reply goes before the sockets close, so the caller hears it.
 		if err := m.forget(ctx, from.Client, 200*time.Millisecond); err != nil {
 			return nil, err
 		}
+		m.s.announce("clientForgotten", from.Client, from.Client)
 		return map[string]any{}, nil
 	case "hosts/startEnroll":
 		return m.s.codes.Issue(ctx, true, false, controllink.CodeLifetime)
-	case "hosts/install", "hosts/detect", "hosts/sshHosts", "hosts/update":
-		return nil, notHere
-	case "hosts/checkAgain":
-		if _, err := require[hostRequest](params, "HostRequest"); err != nil {
+	case "hosts/install":
+		return m.s.installer.Install(ctx, params)
+	case "hosts/detect":
+		return m.s.installer.Detect(ctx)
+	case "hosts/sshHosts":
+		var p struct {
+			Destination string `json:"destination"`
+		}
+		json.Unmarshal(params, &p)
+		return m.s.installer.SSHHosts(ctx, strings.TrimSpace(p.Destination))
+	case "hosts/update":
+		request, err := require[hostRequest](params, "HostRequest")
+		if err != nil {
 			return nil, err
 		}
-		return map[string]any{}, nil
+		return map[string]any{}, m.s.installer.Update(ctx, request.Host)
+	case "hosts/checkAgain":
+		request, err := require[hostRequest](params, "HostRequest")
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{}, m.s.installer.CheckAgain(ctx, request.Host)
 	case "control/setProjectDetection":
 		request, err := require[projectDetection](params, "ProjectDetection")
 		if err != nil {
@@ -189,6 +232,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		if err := m.records.SaveHost(ctx, *record); err != nil {
 			return nil, err
 		}
+		m.s.announce("hostEnrolled", request.Host, from.Client)
 		return map[string]any{}, nil
 	case "hosts/lendGit":
 		request, err := require[lendGit](params, "LendGit")
@@ -198,6 +242,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		if err := m.lendGit(ctx, request); err != nil {
 			return nil, err
 		}
+		m.s.announce("hostEnrolled", request.Host, from.Client)
 		return map[string]any{}, nil
 	case "hosts/setRelay":
 		request, err := require[hostRelayRequest](params, "HostRelayRequest")
@@ -207,6 +252,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		if err := m.setRelay(ctx, request); err != nil {
 			return nil, err
 		}
+		m.s.announce("hostEnrolled", request.Host, from.Client)
 		return map[string]any{}, nil
 	case "hosts/remove":
 		request, err := require[hostRequest](params, "HostRequest")
@@ -221,6 +267,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			return nil, fail(noSuchHost, "No host is called %s.", request.Host)
 		}
 		m.router.ForgetHost(request.Host)
+		m.s.copies.forget(request.Host)
+		m.s.announce("hostRemoved", request.Host, from.Client)
 		m.s.log("host " + request.Host + " removed")
 		return map[string]any{}, nil
 	case "hosts/lastHeard":
@@ -231,26 +279,32 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		if m.records.Host(request.Host) == nil {
 			return nil, fail(noSuchHost, "No host is called %s.", request.Host)
 		}
-		return map[string]any{"host": request.Host}, nil
+		return m.s.copies.lastHeard(request.Host), nil
 	case "channels/get":
-		return channelsUnavailable, nil
+		if m.s.channels == nil {
+			return channels.Unavailable(), nil
+		}
+		return m.s.channels.State(), nil
 	case "channels/set":
-		if _, err := require[map[string]json.RawMessage](params, "ChannelsSet"); err != nil {
+		request, err := require[channels.ChannelsSet](params, "ChannelsSet")
+		if err != nil {
 			return nil, err
 		}
-		return nil, fail(notSupported, "%s", channelsUnavailableWords)
+		if m.s.channels == nil {
+			return nil, fail(notSupported, "%s", *channels.Unavailable().Slack.Detail)
+		}
+		state, err := m.s.channels.Set(request)
+		var refused *channels.RPCError
+		if errors.As(err, &refused) {
+			return nil, fail(refused.Code, "%s", refused.Message)
+		}
+		return state, err
 	}
 	if workspaceMethods[method] {
 		return nil, fail(providersNeedOneCopy, "Workspace providers need a control plane with one copy, for now.")
 	}
 	return nil, notFound(method)
 }
-
-// channelsUnavailable is DaemonAPI.ChannelsState.unavailable: what a control plane with
-// no channels says.
-const channelsUnavailableWords = "Chat apps need a control plane with one copy and a home for their tokens."
-
-var channelsUnavailable = map[string]any{"slack": map[string]any{"state": "unavailable", "detail": channelsUnavailableWords}}
 
 // workspaceMethods is DaemonAPI.Method.workspaceMethods: workspace providers (#691).
 var workspaceMethods = map[string]bool{
@@ -276,6 +330,12 @@ func (m *Methods) status(from Caller) controlStatus {
 	status.Web = m.web
 	m.mu.Unlock()
 	status.ThisMacHost = m.s.thisMacHost()
+	if m.s.tunnels != nil {
+		for _, unjoined := range m.s.tunnels.Unjoined() {
+			raw, _ := json.Marshal(unjoined)
+			status.UnjoinedTunnels = append(status.UnjoinedTunnels, raw)
+		}
+	}
 	status.ProjectDetection = settings.ProjectDetection
 	if len(status.ProjectDetection) == 0 {
 		status.ProjectDetection, _ = json.Marshal(standardDetection)
@@ -294,7 +354,7 @@ func (m *Methods) status(from Caller) controlStatus {
 }
 
 // SetWeb says how the web remote's listener stands, for control/status.
-func (m *Methods) SetWeb(status *WebRemoteStatus) {
+func (m *Methods) SetWeb(status *web.Status) {
 	m.mu.Lock()
 	m.web = status
 	m.mu.Unlock()
@@ -322,6 +382,11 @@ func (m *Methods) hostRow(h records.HostRecord) controlHost {
 	}
 	m.mu.Unlock()
 	sort.Slice(row.GitAsks, func(i, j int) bool { return row.GitAsks[i].Server < row.GitAsks[j].Server })
+	if m.s.tunnels != nil {
+		if tunnel := m.s.tunnels.State(h.ID); tunnel != nil {
+			row.Tunnel, _ = json.Marshal(tunnel)
+		}
+	}
 	return row
 }
 
@@ -446,9 +511,19 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{}, m.setRelay(ctx, hostRelayRequest{Host: host, Relay: request.Relay})
+		if err := m.setRelay(ctx, hostRelayRequest{Host: host, Relay: request.Relay}); err != nil {
+			return nil, err
+		}
+		m.s.announce("hostEnrolled", host, host)
+		return map[string]any{}, nil
 	case "attention/need":
-		// Notices to phones go through the relay host, which comes with the relay's port.
+		m.s.heard(params)
+		if m.s.channels != nil {
+			var need channels.AttentionNeed
+			if json.Unmarshal(params, &need) == nil {
+				m.s.channels.Desk.Post(host, need)
+			}
+		}
 		return map[string]any{}, nil
 	case "host/workspaces", "host/providerDraft":
 		return nil, fail(providersNeedOneCopy, "Workspace providers need a control plane with one copy, for now.")

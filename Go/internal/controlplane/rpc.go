@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/alexec/agents/Go/internal/controlplane/hostinstall"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 )
 
@@ -58,6 +59,10 @@ func asRPC(err error) *RPCError {
 	var e *RPCError
 	if errors.As(err, &e) {
 		return e
+	}
+	var install *hostinstall.Failure
+	if errors.As(err, &install) {
+		return &RPCError{Code: install.Code, Message: install.Message}
 	}
 	var conflict *store.ConflictError
 	if errors.As(err, &conflict) {

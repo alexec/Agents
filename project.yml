@@ -451,6 +451,18 @@ targets:
       - name: Build the web remote
         script: sh "$SRCROOT/scripts/web.sh" dist
         basedOnDependencyAnalysis: false
+      # The Go control plane (#1137), beside the Swift one until Alex switches: with no
+      # Docker or Go it is left out, and Agents Host runs the Swift one.
+      - name: Build the Go control plane
+        script: sh "$SRCROOT/scripts/go-control.sh"
+        basedOnDependencyAnalysis: false
+    # Carried into Contents/Helpers and signed here, not by a copy phase, which would try
+    # to strip it (a Go binary is already stripped, and strip refuses it). Run only when
+    # this Mac's host settings say "controlImplementation": "go".
+    postBuildScripts:
+      - name: Carry the Go control plane
+        script: sh "$SRCROOT/scripts/go-control.sh" --carry
+        basedOnDependencyAnalysis: false
     sources:
       - path: Host/Sources
       # The pairing sheet's QR code, drawn as the window draws it.

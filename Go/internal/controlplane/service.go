@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -23,8 +24,13 @@ import (
 
 	"github.com/alexec/agents/Go/internal/buildinfo"
 	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/alexec/agents/Go/internal/controlplane/channels"
+	"github.com/alexec/agents/Go/internal/controlplane/hostinstall"
+	"github.com/alexec/agents/Go/internal/controlplane/hosttunnels"
+	"github.com/alexec/agents/Go/internal/controlplane/notices"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/internal/controlplane/web"
 )
 
 // Config is ControlService.Configuration.
@@ -47,9 +53,39 @@ type Config struct {
 	HostJoinFile string
 	// Where the Linux hosts it hands out are (ServerFiles.folder).
 	ServerFolder string
+	// The web remote's loopback listener (071): Web/dist and the port, or nil for none,
+	// which is a container's default.
+	Web *WebConfig
+	// The home whose .agents-secrets holds the channels' tokens (#1009, #1035). "" for
+	// none, and no channels.
+	SecretsHome string
+	// How Slack is reached: Slack itself, or a fake one in tests.
+	SlackTransport channels.SlackTransport
+	// Told whenever the web remote's listener starts or fails to (071 R3): serve --home
+	// writes it beside the log for Agents Host.
+	WebChanged func(web.Status)
+	// Where other copies reach this one (several copies over one store, US3). "" for a
+	// single copy (Agents Host's), which links with nobody and takes no leases (#206).
+	PeerURL string
+	// How often a copy beats, looks for the others and renews its leases; shorter in
+	// tests. 0 is 10 s.
+	CopyBeat time.Duration
+	// Start empty, for a handover to fill (R16): no settings made, every member refused,
+	// only the copy handing over answered, until it says take over.
+	Receive bool
+	// Serve, even if this copy was forwarding when it stopped (--no-forwarding).
+	NoForwarding bool
 	// Where each log line goes, already marked with this copy. No line may hold a code,
 	// a key, a MAC or a message (071 FR-033).
 	Log func(string)
+}
+
+// WebConfig is ControlService.Configuration.Web.
+type WebConfig struct {
+	// Folder is Web/dist, with its MANIFEST.
+	Folder string
+	// Port is 0 to let the system choose (tests); Agents Host's copy uses 8792.
+	Port int
 }
 
 // Service is ControlService.
@@ -63,6 +99,23 @@ type Service struct {
 	router  *Router
 	methods *Methods
 	started time.Time
+	// What this copy has told its relay host for each need (T097).
+	desk *notices.Desk
+	// What each host last listed (#962), for hosts/lastHeard.
+	copies *hostCopies
+	// The reverse tunnels this copy holds for servers behind a bastion (#435): a single
+	// copy's, whose ssh is the person's on this machine.
+	tunnels *hosttunnels.Tunnels
+	// Chat apps that answer Needs You (#1012): only with a home for their secrets.
+	channels *channels.Channels
+	// The other copies over this store, and the leases (US3); nil for a single copy.
+	mesh *mesh
+	// The origin peers dial, which a copy's key exchange is bound to.
+	peerOrigin string
+	// Where this copy is in a handover (R16): serving, receiving, frozen or forwarding.
+	phase *phaseBox
+	// hosts/install, detect and sshHosts (T072, #429, #610): with the person's own ssh.
+	installer *hostinstall.Installer
 
 	mu          sync.Mutex
 	readAgainAt time.Time
@@ -70,6 +123,7 @@ type Service struct {
 	sockets     map[*Conn]bool
 	stop        chan struct{}
 	ready       bool
+	loopback    *web.Listener
 }
 
 // New makes a service; Start opens the store and listens.
@@ -92,11 +146,45 @@ func New(cfg Config) (*Service, error) {
 		cfg.Bind = "0.0.0.0"
 	}
 	s := &Service{cfg: cfg, public: public, origin: origin, copyID: strings.ToLower(records.NewUUID()[:8]),
-		records: records.New(cfg.Store), started: time.Now(), sockets: map[*Conn]bool{}, stop: make(chan struct{})}
+		records: records.New(cfg.Store), started: time.Now(), desk: notices.NewDesk(), phase: &phaseBox{phase: phaseServing}, sockets: map[*Conn]bool{}, stop: make(chan struct{})}
 	s.codes = &Codes{Store: cfg.Store, Private: cfg.PrivateKey, Public: public, URL: cfg.URL, Pin: cfg.Pin, Name: cfg.Name}
 	s.router = NewRouter(nil, s.log)
 	s.methods = newMethods(s)
 	s.router.handler = s.methods
+	s.copies = newHostCopies(cfg.Store)
+	if cfg.PeerURL != "" {
+		if s.peerOrigin, err = controllink.Origin(cfg.PeerURL); err != nil {
+			return nil, fmt.Errorf("%s is not an address copies can dial", cfg.PeerURL)
+		}
+		s.mesh = newMesh(s, cfg.PeerURL, cfg.CopyBeat)
+	}
+	// Tunnels and channels belong to a single copy: its ssh is the person's on this
+	// machine, and Slack's Socket Mode gives one connection's events to one copy.
+	if cfg.SecretsHome != "" && s.mesh == nil {
+		s.channels = s.makeChannels(cfg.SecretsHome)
+	}
+	if cfg.PeerURL == "" {
+		s.tunnels = hosttunnels.New(hosttunnels.Config{Store: cfg.Store, Port: cfg.Port, Log: s.log,
+			Hosts:   func(context.Context) []records.HostRecord { return s.records.Hosts() },
+			Changed: func(change hosttunnels.Changed) { s.router.BroadcastControl("control/tunnelChanged", change) }})
+	}
+	s.router.SetCopier(s.copies.take)
+	var tunnels hostinstall.Tunnels
+	if s.tunnels != nil {
+		tunnels = s.tunnels
+	}
+	s.installer = &hostinstall.Installer{Codes: s.codes, ServerFolder: cfg.ServerFolder,
+		Progress: func(name, step string) {
+			s.router.BroadcastControl("control/installProgress", map[string]string{"name": name, "step": step})
+		},
+		Tunnels: tunnels,
+		KnownNames: func(context.Context) []string {
+			var names []string
+			for _, h := range s.records.Hosts() {
+				names = append(names, h.Name)
+			}
+			return names
+		}}
 	return s, nil
 }
 
@@ -118,8 +206,35 @@ func (s *Service) Start(ctx context.Context) (int, error) {
 	if err := store.Probe(ctx, s.cfg.Store, s.copyID); err != nil {
 		return 0, fmt.Errorf("the store can't be used: %w", err)
 	}
-	if err := s.takeUp(ctx); err != nil {
-		return 0, err
+	if s.cfg.Receive {
+		s.phase.set(phaseReceiving)
+		if object, err := s.cfg.Store.Get(ctx, records.SettingsKey); err != nil {
+			return 0, err
+		} else if object != nil {
+			// Started again after it took over: it serves, as any copy would. A store with
+			// records that it never took is a handover that didn't finish. Or it took over,
+			// then handed over again and forwards.
+			var settings records.Settings
+			first := ""
+			if json.Unmarshal(object.Data, &settings) == nil {
+				if list := currentEndpoints(&settings); len(list) > 0 {
+					first = list[0].URL
+				}
+			}
+			forwarded, _ := s.cfg.Store.Get(ctx, s.forwardingKey())
+			if first != s.cfg.URL && forwarded == nil {
+				return 0, errors.New("this store holds records from a handover that didn't finish; empty it and receive again")
+			}
+			s.phase.set(phaseServing)
+		}
+	}
+	if s.phase.now() != phaseReceiving {
+		if err := s.takeUp(ctx); err != nil {
+			return 0, err
+		}
+		if err := s.resumeForwardingIfMarked(ctx); err != nil {
+			return 0, err
+		}
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.serveHTTP)
@@ -138,7 +253,20 @@ func (s *Service) Start(ctx context.Context) (int, error) {
 		}
 	}
 	s.setReady(true)
+	if s.cfg.Web != nil {
+		s.startWeb()
+	}
 	go s.refreshEvery(15 * time.Second)
+	go s.sweepEveryHour()
+	if s.tunnels != nil {
+		s.tunnels.Start(0)
+	}
+	if s.mesh != nil && s.phase.now() != phaseReceiving {
+		s.startMesh()
+	}
+	if s.channels != nil {
+		s.channels.Apply()
+	}
 	go s.watchJoinFile()
 	s.log(fmt.Sprintf("listening on %s:%d for %s", s.cfg.Bind, port, s.cfg.URL))
 	return port, nil
@@ -218,14 +346,31 @@ func (s *Service) Stop() {
 	}
 	servers := s.servers
 	s.servers = nil
+	tunnels := s.tunnels
 	sockets := s.sockets
 	s.sockets = map[*Conn]bool{}
 	s.mu.Unlock()
 	for _, srv := range servers {
 		srv.Close()
 	}
+	s.mu.Lock()
+	loopback := s.loopback
+	s.loopback = nil
+	s.mu.Unlock()
+	if loopback != nil {
+		loopback.Stop()
+	}
 	for c := range sockets {
 		c.Close()
+	}
+	if tunnels != nil {
+		tunnels.Stop()
+	}
+	if s.channels != nil {
+		s.channels.Stop()
+	}
+	if s.mesh != nil {
+		s.mesh.stop()
 	}
 }
 
@@ -251,6 +396,9 @@ func (s *Service) refreshEvery(every time.Duration) {
 }
 
 func (s *Service) refresh() {
+	if s.phase.now() == phaseReceiving {
+		return
+	}
 	if err := s.records.Load(context.Background()); err != nil {
 		s.setReady(false)
 		s.log("store: " + err.Error())
@@ -347,6 +495,153 @@ func (s *Service) tellRelayDevices() {
 	}
 }
 
+// startMesh starts the copies (T063–T066): leases let go when a host's uplink here ends
+// or another copy takes it, presence and links told to the others.
+func (s *Service) startMesh() {
+	m := s.mesh
+	s.router.OnLocalEnded(func(host string) {
+		s.log("host " + host + " disconnected")
+		if epoch := m.leases.release(context.Background(), host); epoch != 0 {
+			m.released(host, epoch)
+		}
+	})
+	m.leases.lost = func(host string, epoch int) {
+		s.log("another copy took " + host + "; closing its uplink here")
+		s.router.CloseLocal(host)
+		m.released(host, epoch)
+	}
+	s.router.OnPresence(func(client string, device bool, report json.RawMessage) {
+		grant := records.LegacyGrant
+		if device {
+			grant = "device"
+		}
+		m.broadcast(encodePeer("presence", map[string]any{"client": client, "grant": grant, "report": report}))
+	})
+	s.router.OnLinkChanged(func(client string, relayed *bool) {
+		if relayed == nil {
+			s.log("client " + client + " disconnected")
+		}
+		m.broadcast(peerLinkLine(client, relayed))
+	})
+	m.start()
+}
+
+// channelClient is ControlService.channelClient: who a channel's answers come from on a
+// host, one client of its own for every channel.
+const channelClient = "C4A77E15-0000-4000-8000-000000001009"
+
+// makeChannels is ControlService.makeChannels: the desk asks and answers a host's
+// questions through kept requests, and control.json keeps how the channels are set.
+func (s *Service) makeChannels(home string) *channels.Channels {
+	deliver := func(method string, params any, host string, patience time.Duration) (json.RawMessage, error) {
+		m := s.router.DeliverKept(method, params, channelClient, records.KindUnknown, host, patience)
+		if m == nil {
+			return nil, fmt.Errorf("%s didn't answer", host)
+		}
+		if len(m.Error) > 0 {
+			var e channels.RPCError
+			json.Unmarshal(m.Error, &e)
+			return nil, &e
+		}
+		return m.Result, nil
+	}
+	desk := channels.NewDesk(channels.DeskHooks{
+		Pending: func(_ context.Context, host string) ([]channels.ElicitationRequest, error) {
+			result, err := deliver("elicitations/pending", map[string]any{}, host, 20*time.Second)
+			if err != nil {
+				return nil, err
+			}
+			var pending []channels.ElicitationRequest
+			return pending, json.Unmarshal(result, &pending)
+		},
+		Answer: func(_ context.Context, host string, answer channels.AnswerElicitationRequest) error {
+			_, err := deliver("elicitations/answer", answer, host, 30*time.Second)
+			return err
+		},
+	}, s.log)
+	transport := s.cfg.SlackTransport
+	if transport == nil {
+		transport = channels.SlackHTTP{}
+	}
+	return channels.New(home, desk, channels.Hooks{
+		Settings: func() *channels.ChannelSettings {
+			settings := s.records.Settings()
+			if settings == nil || len(settings.Channels) == 0 {
+				return nil
+			}
+			var set channels.ChannelSettings
+			if json.Unmarshal(settings.Channels, &set) != nil {
+				return nil
+			}
+			return &set
+		},
+		Save: func(set channels.ChannelSettings) error {
+			raw, err := json.Marshal(set)
+			if err != nil {
+				return err
+			}
+			_, err = s.records.ChangeSettings(context.Background(), func(settings *records.Settings) { settings.Channels = raw })
+			return err
+		},
+		Changed: func(state channels.ChannelsState) { s.router.BroadcastControl("control/channelsChanged", state) },
+		Slack: func(tokens channels.SlackTokens, member string) channels.NeedsChannel {
+			return channels.NewSlackChannel(tokens, member, transport, nil, s.log)
+		},
+	})
+}
+
+// heard is a host's attention/need (R6): what to post where, told to the relay host held
+// here. With no relay host here, a need reaches only the clients connected to its host,
+// over their own channels.
+func (s *Service) heard(params json.RawMessage) {
+	var need notices.AttentionNeed
+	if json.Unmarshal(params, &need) != nil {
+		return
+	}
+	s.deliver(need, false)
+}
+
+// deliver posts a need through the relay host if it is held here, otherwise tells the
+// other copies, one of which may hold it.
+func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool) {
+	relays := s.router.RelaysHeldHere()
+	if len(relays) == 0 {
+		if !fromPeer && s.mesh != nil {
+			s.mesh.broadcast(encodePeer("need", need))
+		}
+		return
+	}
+	sort.Strings(relays)
+	relay := relays[0]
+	flags := s.router.NotifyFlags()
+	var devices []notices.Device
+	for _, c := range s.records.Clients() {
+		if !c.IsDevice() || len(c.PublicKey) == 0 {
+			continue
+		}
+		kind := notices.Unknown
+		if c.Kind == records.KindIPhone || c.Kind == records.KindIPad {
+			kind = c.Kind
+		}
+		d := notices.Device{ID: c.ID, PublicKey: c.PublicKey, Kind: kind, MayNotify: c.MayNotify}
+		if c.LastSeen != nil {
+			d.LastSeen = c.LastSeen.Time
+		}
+		if may, ok := flags[c.ID]; ok {
+			d.MayNotify = &may
+		}
+		devices = append(devices, d)
+	}
+	for _, delivery := range s.desk.Heard(need, s.router.FoldedPresences(), devices, time.Now()) {
+		s.router.Tell(relay, "relay/deliver", delivery)
+		did := "sent"
+		if delivery.Headline == nil {
+			did = "withdrew"
+		}
+		s.log(fmt.Sprintf("notice: %s %s for %s to relay %s", did, delivery.NeedID, delivery.Device, relay))
+	}
+}
+
 // serveHTTP answers the TLS listener: the WebSocket at /v1/connect, the probes, and what
 // a server installs itself from (T070).
 func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
@@ -379,7 +674,7 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return
 		}
-		go s.accept(s.adopt(newConn(ws, r.RemoteAddr)))
+		go s.accept(s.adopt(newConn(ws, r.RemoteAddr)), "")
 	default:
 		plain(w, http.StatusNotFound, "not here\n")
 	}
@@ -405,10 +700,53 @@ func (s *Service) adopt(c *Conn) *Conn {
 	return c
 }
 
+// startWeb starts the loopback listener. A build that doesn't match its manifest, or a
+// port that's taken, leaves it off and says so (071 R3): in the log, in control/status
+// and to WebChanged; the TLS listener and hosts carry on.
+func (s *Service) startWeb() {
+	listener, err := web.Start(web.Config{Folder: s.cfg.Web.Folder, Port: s.cfg.Web.Port, Log: s.log,
+		Accept: func(ws *websocket.Conn, remote, origin string) {
+			s.accept(s.adopt(newConn(ws, remote)), origin)
+		}})
+	status := web.StatusOf(s.cfg.Web.Port, listener, err)
+	s.mu.Lock()
+	s.loopback = listener
+	s.mu.Unlock()
+	s.methods.SetWeb(&status)
+	if s.cfg.WebChanged != nil {
+		s.cfg.WebChanged(status)
+	}
+	s.router.BroadcastControl("control/webChanged", status)
+}
+
+// RetryWeb tries the loopback listener again when it isn't serving (071 R3): Agents
+// Host's Try Again, once whatever held the port has let it go.
+func (s *Service) RetryWeb() {
+	s.mu.Lock()
+	serving := s.loopback != nil
+	s.mu.Unlock()
+	if s.cfg.Web == nil || serving {
+		return
+	}
+	s.startWeb()
+}
+
+// WebPort is the loopback listener's port once it is up, or 0.
+func (s *Service) WebPort() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.loopback == nil {
+		return 0
+	}
+	return s.loopback.Port()
+}
+
 // accept is the server's side of the key exchange, then the socket goes where its
 // identity says: a client to the router, a host's uplink to the router, a code holder to
-// a one-time announce.
-func (s *Service) accept(conn *Conn) {
+// a one-time announce. webOrigin is the loopback listener's own origin for a socket that
+// came in there, or "" for the TLS listener: the exchange is bound to the listener's
+// origin, never to anything the peer says (071, FR-006).
+func (s *Service) accept(conn *Conn, webOrigin string) {
 	serverNonce := controllink.Nonce()
 	hello := controllink.Hello{V: controllink.Version, Name: s.cfg.Name, Control: controllink.B64URL(s.public),
 		Nonce: controllink.B64URL(serverNonce), Copy: s.copyID}
@@ -440,7 +778,21 @@ func (s *Service) accept(conn *Conn) {
 	var client *records.ClientRecord
 	var host string
 	var admittedAny bool
-	id, mac, err := controllink.Verify(auth, serverNonce, s.origins(), func(id controllink.Identity) ([]byte, error) {
+	bound := s.origins()
+	// A peer copy dials the address copies reach each other at, and proves that. Anyone
+	// else (a handover's driver too) may have dialled any place the control plane answers.
+	if strings.HasPrefix(auth.ID, "x:") && !strings.HasPrefix(auth.ID, "x:"+handoverPrefix) && s.peerOrigin != "" {
+		bound = []string{s.peerOrigin}
+	}
+	if webOrigin != "" {
+		// On the loopback listener only a browser or its code may prove anything (071).
+		if !strings.HasPrefix(auth.ID, "c:") && !strings.HasPrefix(auth.ID, "p:") {
+			refuse(controllink.Refuse(controllink.Unknown))
+			return
+		}
+		bound = []string{webOrigin}
+	}
+	id, mac, err := controllink.Verify(auth, serverNonce, bound, func(id controllink.Identity) ([]byte, error) {
 		key, c, h, err := s.key(id)
 		client, host, admittedAny = c, h, err == nil
 		return key, err
@@ -449,14 +801,29 @@ func (s *Service) accept(conn *Conn) {
 		refuse(err)
 		return
 	}
-	if !admittedAny || id.Kind == 'x' {
-		// Copies link with each other only on a control plane of several copies.
+	if !admittedAny {
+		refuse(controllink.Refuse(controllink.Unknown))
+		return
+	}
+	// In a handover (R16): a receiving copy answers only the copy filling it, and no code
+	// is used while records can't be written.
+	phase := s.phase.now()
+	switch {
+	case phase == phaseReceiving && id.Kind != 'x':
+		// Being filled, so its records are not whole yet: not a verdict on anyone (#81).
+		refuse(controllink.Refuse(controllink.Unavailable))
+		return
+	case (phase == phaseFrozen || phase == phaseForwarding) && (id.Kind == 'p' || id.Kind == 'e'):
+		refuse(controllink.Refuse(controllink.Unknown))
+		return
+	case phase == phaseForwarding && (id.Kind == 'c' || id.Kind == 'h') && s.phase.forwardingUntil().Before(time.Now()):
+		// Forwarding ended (30 days at most): anyone still to hear pairs again.
 		refuse(controllink.Refuse(controllink.Unknown))
 		return
 	}
 	// A browser's key works only through the loopback listener, and nothing else's does
 	// there (071).
-	if client != nil && client.Kind == records.KindBrowser {
+	if client != nil && (client.Kind == records.KindBrowser) != (webOrigin != "") {
 		refuse(controllink.Refuse(controllink.Unknown))
 		return
 	}
@@ -492,6 +859,11 @@ func (s *Service) accept(conn *Conn) {
 		}
 		go s.methods.NoteEpoch(context.Background(), id, epoch)
 	}
+	// A forwarding copy's ok gave the new list; that is all it has to say.
+	if phase == phaseForwarding && (id.Kind == 'c' || id.Kind == 'h') {
+		conn.Close()
+		return
+	}
 	switch id.Kind {
 	case 'c':
 		s.router.AttachClient(client, conn, relayed)
@@ -506,19 +878,38 @@ func (s *Service) accept(conn *Conn) {
 	case 'h':
 		s.hostArrived(host, conn)
 	case 'p', 'e':
-		s.announce(conn, id.ID, false)
+		s.spend(conn, id.ID, webOrigin != "")
+	case 'x':
+		if strings.HasPrefix(id.ID, handoverPrefix) {
+			s.handoverSession(conn)
+			return
+		}
+		if s.mesh == nil {
+			conn.Close()
+			return
+		}
+		s.mesh.accepted(id.ID, conn)
 	}
 }
 
 // origins is every origin a member may have dialled: this copy's own, and each endpoint
-// announced (R16), in that order and once each.
+// announced (R16), in that order and once each. A copy that holds ssh tunnels also
+// answers at its loopback: a server through one dials https://127.0.0.1:<port> on its
+// own end, which is this listener (#435, #610).
 func (s *Service) origins() []string {
 	out := []string{s.origin}
+	var urls []string
 	if settings := s.records.Settings(); settings != nil {
 		for _, e := range settings.Endpoints {
-			if o, err := controllink.Origin(e.URL); err == nil && !contains(out, o) {
-				out = append(out, o)
-			}
+			urls = append(urls, e.URL)
+		}
+	}
+	if s.tunnels != nil {
+		urls = append(urls, fmt.Sprintf("https://127.0.0.1:%d", s.tunnels.Port()))
+	}
+	for _, u := range urls {
+		if o, err := controllink.Origin(u); err == nil && !contains(out, o) {
+			out = append(out, o)
 		}
 	}
 	return out
@@ -547,6 +938,11 @@ func currentEndpoints(settings *records.Settings) []records.Endpoint {
 
 // key is the key an identity proves, and what it is admitted as.
 func (s *Service) key(id controllink.Identity) ([]byte, *records.ClientRecord, string, error) {
+	// Being filled by a handover, its records are not whole yet: try again, which says
+	// nothing about the member (#81), where unknown would have a browser forget its key.
+	if id.Kind != 'x' && s.phase.now() == phaseReceiving {
+		return nil, nil, "", controllink.Refuse(controllink.Unavailable)
+	}
 	switch id.Kind {
 	case 'c':
 		// Paired at another copy moments ago: this one reads the store again. A store that
@@ -603,6 +999,13 @@ func (s *Service) key(id controllink.Identity) ([]byte, *records.ClientRecord, s
 			return nil, nil, "", controllink.Refuse(controllink.Unknown)
 		}
 		return controllink.CodeKey(secret), nil, "", nil
+	case 'x':
+		// Copies link with each other only on a control plane of several copies; a
+		// handover's driver proves the copies' key at any.
+		if s.mesh == nil && !strings.HasPrefix(id.ID, handoverPrefix) {
+			return nil, nil, "", controllink.Refuse(controllink.Unknown)
+		}
+		return controllink.CopyKey(s.cfg.PrivateKey), nil, "", nil
 	}
 	return nil, nil, "", controllink.Refuse(controllink.Unknown)
 }
@@ -640,6 +1043,14 @@ func (s *Service) hostArrived(host string, conn *Conn) {
 		return
 	}
 	s.router.AttachHost(host, conn)
+	// This copy holds the host now (T063): every peer reaches it through here.
+	if s.mesh != nil {
+		if epoch, err := s.mesh.leases.take(context.Background(), host); err == nil {
+			s.mesh.holding(host, epoch)
+		} else {
+			s.log("the store would not give " + host + "'s lease to this copy; serving it anyway")
+		}
+	}
 	result, err := s.methods.HostSaid(host, "host/hello", m.Params)
 	if err != nil {
 		conn.Send(channelFrame(0, replyError(m.ID, err)))
@@ -652,9 +1063,9 @@ func (s *Service) hostArrived(host string, conn *Conn) {
 // spentWords is a code used already, as the page says it (Web/src/session.ts).
 const spentWords = "This code has been used. Ask for a new one."
 
-// announce is someone holding a code saying who they are, once, before it hangs up
+// spend is someone holding a code saying who they are, once, before it hangs up
 // (wire.md).
-func (s *Service) announce(conn *Conn, id string, loopback bool) {
+func (s *Service) spend(conn *Conn, id string, loopback bool) {
 	defer func() {
 		// Give the reply time to leave before the socket closes.
 		time.Sleep(200 * time.Millisecond)
@@ -740,6 +1151,8 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, loopback 
 			return nil, err
 		}
 		s.log(name + " paired (" + a.Kind + ")")
+		// Known at every copy at once: the relay host may be held at another.
+		s.announce("clientPaired", client, "code")
 		return result, nil
 	case stored.Purpose == "host" && method == "hosts/announce":
 		var a hostAnnounce
@@ -784,6 +1197,8 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, loopback 
 		if relay {
 			s.router.SetRelay(host, &relay)
 		}
+		// Every other copy knows it at once.
+		s.announce("hostEnrolled", host, "code")
 		s.router.Know(host)
 		s.log("host " + a.Name + " enrolled as " + host)
 		return result, nil

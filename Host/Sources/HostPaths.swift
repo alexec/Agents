@@ -96,6 +96,16 @@ struct HostPaths: Sendable, Equatable {
 
     var helpers: URL { Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers", isDirectory: true) }
     var agentsControl: URL { helpers.appendingPathComponent("agents-control") }
+    /// The Go `agents-control` (#1137), when this build carries one.
+    var agentsControlGo: URL { helpers.appendingPathComponent("agents-control-go") }
+
+    /// The `agents-control` the settings pick: the Go one only when asked for and carried,
+    /// otherwise the Swift one. Both read and write the same `control/` folder.
+    func agentsControl(for settings: HostSettings) -> URL {
+        guard settings.controlImplementation == "go",
+              FileManager.default.isExecutableFile(atPath: agentsControlGo.path) else { return agentsControl }
+        return agentsControlGo
+    }
     /// The built web remote, Web/dist, built and copied in by project.yml (071 research R8, #473).
     var webRemote: URL { Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/dist", isDirectory: true) }
     var agentsd: URL { helpers.appendingPathComponent("agentsd") }
