@@ -260,11 +260,23 @@ func (d *Daemon) archive(id wire.UUID) error {
 	return nil
 }
 
+// listed is one agent as agents/list gives it: lean when asked, and an archived agent's
+// commands left out unless asked for.
+func listed(a wire.Agent, r wire.ListRequest) wire.Agent {
+	if r.Lean {
+		return leaned(a)
+	}
+	if a.State == wire.AgentStateArchived && !r.ArchivedCommands {
+		a.AvailableCommands = []wire.SlashCommand{}
+	}
+	return a
+}
+
 // listAgents is agents/list: newest activity first, a page after a cursor.
 func (d *Daemon) listAgents(r wire.ListRequest) []wire.Agent {
 	if r.AgentID != nil {
 		if a := d.Store.Agent(*r.AgentID); a != nil {
-			return []wire.Agent{*a}
+			return []wire.Agent{listed(*a, r)}
 		}
 		return []wire.Agent{}
 	}
@@ -287,7 +299,7 @@ func (d *Daemon) listAgents(r wire.ListRequest) []wire.Agent {
 		if c := r.After; c != nil && (a.LastActivityAt > c.LastActivityAt || a.LastActivityAt == c.LastActivityAt && a.ID <= c.ID) {
 			continue
 		}
-		out = append(out, a)
+		out = append(out, listed(a, r))
 		if int64(len(out)) == limit {
 			break
 		}
