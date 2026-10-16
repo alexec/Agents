@@ -3,7 +3,9 @@ package acp
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -28,6 +30,12 @@ type Sink interface {
 	Permission(ctx context.Context, req sdk.RequestPermissionRequest) string
 	// Served is a file read or write, or a terminal, the client did for the runtime.
 	Served(kind, detail string)
+	// Elicitation blocks until the person answers a form (elicitation/create), and returns
+	// the action, accept, decline or cancel, with the content of an accept. params is the
+	// request as the runtime sent it.
+	Elicitation(ctx context.Context, params json.RawMessage) (action string, content map[string]any)
+	// ElicitationComplete is the runtime taking a form down (elicitation/complete).
+	ElicitationComplete(elicitationID string)
 }
 
 // Launch is how one runtime starts.
@@ -78,7 +86,7 @@ func Start(ctx context.Context, l Launch, sink Sink, mcp []sdk.McpServer, meta m
 	}
 	s := &Session{cmd: cmd, stderr: stderr, done: make(chan struct{})}
 	s.client = &client{sink: sink, dir: l.Dir, terminals: map[string]*terminal{}}
-	s.conn = sdk.NewClientSideConnection(s.client, stdin, stdout)
+	s.conn = sdk.NewClientSideConnection(s.client, stdin, &rawElicitations{r: bufio.NewReader(stdout), c: s.client})
 	safe.Go("runtime wait", func() { _ = cmd.Wait(); close(s.done) })
 
 	ictx, cancel := context.WithTimeout(ctx, 60*time.Second)
@@ -88,6 +96,9 @@ func Start(ctx context.Context, l Launch, sink Sink, mcp []sdk.McpServer, meta m
 		ClientCapabilities: sdk.ClientCapabilities{
 			Fs:       sdk.FileSystemCapabilities{ReadTextFile: true, WriteTextFile: true},
 			Terminal: true,
+			// Forms and links (ClientCapabilities.app): {"elicitation":{"form":{},"url":{}}}.
+			Elicitation: &sdk.ElicitationCapabilities{Form: &sdk.ElicitationFormCapabilities{},
+				Url: &sdk.ElicitationUrlCapabilities{}},
 		},
 	})
 	if err != nil {
@@ -155,6 +166,9 @@ type client struct {
 	mu        sync.Mutex
 	terminals map[string]*terminal
 	next      int
+	// raw is each elicitation/create's params as the runtime sent them, oldest first. The
+	// SDK's typed request drops what the form is drawn from (propertyOrder, requestId).
+	raw []json.RawMessage
 }
 
 var _ sdk.Client = (*client)(nil)
@@ -166,6 +180,93 @@ func (c *client) RequestPermission(ctx context.Context, p sdk.RequestPermissionR
 		return sdk.RequestPermissionResponse{Outcome: sdk.RequestPermissionOutcome{Cancelled: &sdk.RequestPermissionOutcomeCancelled{}}}, nil
 	}
 	return sdk.RequestPermissionResponse{Outcome: sdk.RequestPermissionOutcome{Selected: &sdk.RequestPermissionOutcomeSelected{OptionId: sdk.PermissionOptionId(option)}}}, nil
+}
+
+func (c *client) UnstableCreateElicitation(ctx context.Context, p sdk.UnstableCreateElicitationRequest) (_ sdk.UnstableCreateElicitationResponse, err error) {
+	defer safe.Err("acp CreateElicitation", &err)
+	action, content := c.sink.Elicitation(ctx, c.takeRaw(p))
+	switch action {
+	case "accept":
+		if content == nil {
+			content = map[string]any{}
+		}
+		return sdk.UnstableCreateElicitationResponse{Accept: &sdk.UnstableCreateElicitationAccept{Action: "accept", Content: content}}, nil
+	case "decline":
+		return sdk.UnstableCreateElicitationResponse{Decline: &sdk.UnstableCreateElicitationDecline{Action: "decline"}}, nil
+	default:
+		return sdk.UnstableCreateElicitationResponse{Cancel: &sdk.UnstableCreateElicitationCancel{Action: "cancel"}}, nil
+	}
+}
+
+func (c *client) UnstableCompleteElicitation(ctx context.Context, p sdk.UnstableCompleteElicitationNotification) (err error) {
+	defer safe.Err("acp CompleteElicitation", &err)
+	c.sink.ElicitationComplete(string(p.ElicitationId))
+	return nil
+}
+
+// takeRaw is the raw params of the request the SDK typed as p: the oldest kept with the
+// same message, or p itself when none was kept.
+func (c *client) takeRaw(p sdk.UnstableCreateElicitationRequest) json.RawMessage {
+	message := ""
+	if p.Form != nil {
+		message = p.Form.Message
+	} else if p.Url != nil {
+		message = p.Url.Message
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for i, raw := range c.raw {
+		var m struct {
+			Message string `json:"message"`
+		}
+		if json.Unmarshal(raw, &m) == nil && m.Message == message {
+			c.raw = append(c.raw[:i], c.raw[i+1:]...)
+			return raw
+		}
+	}
+	b, _ := json.Marshal(p)
+	return b
+}
+
+// rawElicitations reads the runtime's output for the SDK, keeping a copy of each
+// elicitation/create's params on the way (at most 16, the oldest dropped).
+type rawElicitations struct {
+	r       *bufio.Reader
+	c       *client
+	pending []byte
+}
+
+func (e *rawElicitations) Read(b []byte) (int, error) {
+	if len(e.pending) == 0 {
+		line, err := e.r.ReadBytes('\n')
+		if len(line) == 0 {
+			return 0, err
+		}
+		e.keep(line)
+		e.pending = line
+	}
+	n := copy(b, e.pending)
+	e.pending = e.pending[n:]
+	return n, nil
+}
+
+func (e *rawElicitations) keep(line []byte) {
+	if !bytes.Contains(line, []byte(`"elicitation/create"`)) {
+		return
+	}
+	var m struct {
+		Method string          `json:"method"`
+		Params json.RawMessage `json:"params"`
+	}
+	if json.Unmarshal(line, &m) != nil || m.Method != sdk.ClientMethodElicitationCreate {
+		return
+	}
+	e.c.mu.Lock()
+	defer e.c.mu.Unlock()
+	e.c.raw = append(e.c.raw, m.Params)
+	if len(e.c.raw) > 16 {
+		e.c.raw = e.c.raw[1:]
+	}
 }
 
 func (c *client) SessionUpdate(ctx context.Context, n sdk.SessionNotification) (err error) {

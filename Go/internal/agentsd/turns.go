@@ -28,7 +28,11 @@ type live struct {
 	queue   []string
 	running bool
 	pending map[wire.UUID]*pendingPermission
-	stop    context.CancelFunc
+	// elicitations is the forms it is waiting on (elicitations.go).
+	elicitations map[wire.UUID]*pendingElicitation
+	stop         context.CancelFunc
+	// inTurn is whether a turn is in flight: a form is asked only in one.
+	inTurn bool
 	// messageText is the text of the agent's last message this turn, for its report.
 	lastMessageID string
 	lastMessage   strings.Builder
@@ -49,7 +53,8 @@ func (d *Daemon) live(id wire.UUID) *live {
 	defer d.mu.Unlock()
 	l := d.lives[id]
 	if l == nil {
-		l = &live{d: d, id: id, pending: map[wire.UUID]*pendingPermission{}, toolCalls: map[string]bool{}}
+		l = &live{d: d, id: id, pending: map[wire.UUID]*pendingPermission{}, elicitations: map[wire.UUID]*pendingElicitation{},
+			toolCalls: map[string]bool{}}
 		l.seen = sync.NewCond(&l.mu)
 		d.lives[id] = l
 	}
@@ -212,8 +217,14 @@ func (l *live) turn(text string) {
 	ctx, cancel := context.WithCancel(d.ctx)
 	l.mu.Lock()
 	l.stop = cancel
+	l.inTurn = true
 	l.mu.Unlock()
 	defer cancel()
+	defer func() {
+		l.mu.Lock()
+		l.inTurn = false
+		l.mu.Unlock()
+	}()
 
 	if l.session == nil {
 		rt := runtimeByID(a.RuntimeID)
@@ -270,6 +281,7 @@ func (l *live) turn(text string) {
 			return
 		}
 		log.Printf("agent %s: prompt: %v", l.id, err)
+		l.closeForms()
 		d.record(l.id, notice("error", "The turn failed", err.Error()))
 		select {
 		case <-s.Done():
@@ -624,6 +636,7 @@ func (l *live) answer(permissionID wire.UUID, option string) bool {
 
 // cancel stops the turn: session/cancel to the runtime, and every open card let go.
 func (l *live) cancel() {
+	l.closeForms()
 	l.mu.Lock()
 	s, stop := l.session, l.stop
 	l.queue = nil

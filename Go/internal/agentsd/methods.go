@@ -39,7 +39,13 @@ func (d *Daemon) register() {
 		return wire.Empty{}, Invalid("no such question is waiting")
 	})
 	On(d, wire.CallElicitationsPending, func(ctx context.Context, c *Client, _ wire.Empty) ([]wire.ElicitationRequest, error) {
-		return []wire.ElicitationRequest{}, nil
+		return d.pendingElicitations(), nil
+	})
+	On(d, wire.CallElicitationsAnswer, func(ctx context.Context, c *Client, r wire.AnswerElicitationRequest) (wire.Empty, error) {
+		if !d.once(r.SendID) {
+			return wire.Empty{}, nil
+		}
+		return wire.Empty{}, d.answerElicitation(r)
 	})
 	On(d, wire.CallRuntimesList, func(ctx context.Context, c *Client, _ wire.Empty) ([]wire.RuntimeStatus, error) {
 		return d.runtimeStatuses(), nil

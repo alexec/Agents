@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/alexec/agents/Go/wire"
 )
 
 func file() string {
@@ -61,7 +62,7 @@ func main() {
 	from := fs.String("from", "mac", "the host that lends")
 	rt := fs.String("runtime", "claude", "the runtime")
 	cwd := fs.String("cwd", "", "the agent's folder on the host")
-	allow := fs.Bool("allow", false, "answer every permission card with its first allow option")
+	allow := fs.Bool("allow", false, "answer every permission card with its first allow option, and every form with its first choices")
 	wait := fs.Int("wait", 300, "seconds to follow a turn")
 	fs.Parse(args)
 	rest := fs.Args()
@@ -236,6 +237,40 @@ func turn(ctx context.Context, s *controllink.Session, host, rt, cwd, prompt str
 						}
 						break
 					}
+				}
+			case "agent/elicitation":
+				var f struct {
+					AgentID string                   `json:"agentID"`
+					Request *wire.ElicitationRequest `json:"request"`
+				}
+				json.Unmarshal(n.Params, &f)
+				if f.Request == nil || !strings.EqualFold(f.AgentID, id) {
+					continue
+				}
+				b, _ := json.Marshal(f.Request.Mode)
+				fmt.Printf("\n[form] %s\n", b)
+				if !allow || f.Request.Mode.Form == nil {
+					fmt.Printf("[form] waiting for an answer in the window (form %s)\n", f.Request.ID)
+					continue
+				}
+				// The first choice of each question; yes to a yes or no.
+				content := map[string]any{}
+				for _, p := range f.Request.Mode.Form.Value.Properties {
+					switch k := p.Kind; {
+					case k.String != nil && len(k.String.Choices) > 0:
+						content[p.Name] = k.String.Choices[0].Value
+					case k.MultiSelect != nil && len(k.MultiSelect.Items) > 0:
+						content[p.Name] = []string{k.MultiSelect.Items[0].Value}
+					case k.Boolean != nil:
+						content[p.Name] = true
+					case p.IsRequired:
+						content[p.Name] = "yes"
+					}
+				}
+				fmt.Printf("[form] answering %v\n", content)
+				if _, err := s.Call(ctx, host, "elicitations/answer", map[string]any{"requestID": f.Request.ID, "action": "accept",
+					"content": content}); err != nil {
+					fmt.Fprintf(os.Stderr, "elicitations/answer: %v\n", err)
 				}
 			case "agent/changed":
 				var a struct {
