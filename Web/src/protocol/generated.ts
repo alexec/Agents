@@ -1385,6 +1385,10 @@ export interface PinWriteRequest {
   text: string;
 }
 
+export interface PingResponse {
+  ok: boolean;
+}
+
 export type PinnerKind = "person" | "agent" | "workflow";
 
 export interface PinnerView {
@@ -2798,6 +2802,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PinSessionRequest: { required: ["folder", "agentID"], optional: [] },
   PinView: { required: ["path", "title", "kind", "missing", "pinnedBy"], optional: ["view", "missingReason"] },
   PinWriteRequest: { required: ["folder", "path", "text"], optional: [] },
+  PingResponse: { required: ["ok"], optional: [] },
   PinnerView: { required: ["kind", "id", "name"], optional: [] },
   PinsChangedNotification: { required: ["folder", "pins"], optional: ["sessions", "workflows"] },
   Plan: { required: ["entries", "state", "at"], optional: ["planID"] },

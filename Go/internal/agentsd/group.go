@@ -1,0 +1,59 @@
+package agentsd
+
+import "github.com/alexec/agents/Go/wire"
+
+// Group is the sidebar heading an agent is under (AgentGroup.init(for:…)), for a
+// project's counts.
+func Group(a *wire.Agent) string {
+	outcomeAsked := a.OutcomeAsked != nil && *a.OutcomeAsked
+	waitingOnEvents := a.EventWait != nil && a.EventWait.Ending == nil
+	wantsAnswer := a.Report != nil && needsAPerson(a.Report.Outcome)
+	switch a.State {
+	case wire.AgentStateStarting:
+		return "running"
+	case wire.AgentStateWaitingOnUser:
+		return "needsAttention"
+	case wire.AgentStateRunning:
+		if outcomeAsked {
+			return settled(wantsAnswer || a.Report == nil, a.Report, waitingOnEvents)
+		}
+		return "running"
+	case wire.AgentStateFinished:
+		return settled(wantsAnswer || (outcomeAsked && a.Report == nil), a.Report, waitingOnEvents)
+	case wire.AgentStateStopped:
+		if a.EndedReason != nil {
+			switch *a.EndedReason {
+			case wire.EndedReasonCancelled, wire.EndedReasonStoppedByAgent, wire.EndedReasonAllowanceSpent:
+				return "stopped"
+			}
+		}
+		return "needsAttention"
+	case wire.AgentStateArchived:
+		return "archived"
+	case wire.AgentStateQueued:
+		return "waiting"
+	}
+	return "stopped"
+}
+
+func needsAPerson(o wire.WorkOutcome) bool {
+	switch o {
+	case wire.WorkOutcomeNeedsAnswer, wire.WorkOutcomePartlyDone, wire.WorkOutcomeStuck:
+		return true
+	}
+	return false
+}
+
+func settled(wantsAPerson bool, r *wire.WorkReport, waitingOnEvents bool) string {
+	if wantsAPerson {
+		return "needsAttention"
+	}
+	open := r != nil && r.Outcome == wire.WorkOutcomeBlocked && (r.Block == nil || r.Block.ClearedAt == nil)
+	if open && r.Block != nil && (len(r.Block.Waits) > 0 || r.Block.CheckAgainAt != nil) || waitingOnEvents {
+		return "waiting"
+	}
+	if open {
+		return "needsAttention"
+	}
+	return "finished"
+}

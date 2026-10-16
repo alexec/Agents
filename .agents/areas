@@ -428,6 +428,9 @@ Packages/AgentsKit/Sources/AgentsKitCore/Control/Host*.swift  hosts
 Packages/ControlPlane/Sources/ControlPlaneKit/Hosts/   hosts
 Packages/ControlPlane/Tests/ControlPlaneKitTests/*Host*Tests.swift  hosts
 scripts/build-linux-agentsd.sh                         hosts
+Go/cmd/agentsd/                                        hosts
+Go/cmd/agentsctl/                                      hosts
+Go/internal/agentsd/                                   hosts
 scripts/host-install.sh                                hosts
 scripts/release-host.sh                                hosts
 .agents/skills/test-servers/                           hosts

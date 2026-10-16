@@ -10,7 +10,8 @@ not move.
 | `wire/` | The wire types: `*_gen.go` made from `Packages/Wire/` by `scripts/wire.sh gen`, the meaning-types by hand | build |
 | `cmd/wiregen/` | Makes `wire/*_gen.go` and `Web/src/protocol/generated.ts` from `Packages/Wire/` | build |
 | `internal/buildinfo/` | The version and the implementation (`go`) | build |
-| `cmd/agentsd/`, `internal/agentsd/` | The host daemon | hosts |
+| `cmd/agentsd/`, `internal/agentsd/` | The host daemon (#1136): `store/` is the root as Swift lays it out, `diskjson/` its encoding | hosts |
+| `cmd/agentsctl/` | A client of a control plane for walks without the screen; not shipped | hosts |
 | `cmd/agents-control/`, `internal/controlplane/` | The control plane | control-plane |
 | `internal/controllink/` | Both sides of the host ↔ control plane exchange | control-plane |
 | `internal/safe/` | Recover helpers: one panic never takes a host or the control plane down | build |

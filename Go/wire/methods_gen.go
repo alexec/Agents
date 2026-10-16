@@ -41,6 +41,7 @@ var (
 	CallCostState                      = Method[Empty, CostState]{"cost/state"}
 	CallCredentialsLend                = Method[CredentialsLend, Empty]{"credentials/lend"}
 	CallCredentialsOffer               = Method[CredentialsOffer, Empty]{"credentials/offer"}
+	CallDaemonPing                     = Method[Empty, PingResponse]{"daemon/ping"}
 	CallDiskState                      = Method[Empty, DiskState]{"disk/state"}
 	CallDropboxPut                     = Method[DropboxPutRequest, DropboxPutResponse]{"dropbox/put"}
 	CallElicitationsAnswer             = Method[AnswerElicitationRequest, Empty]{"elicitations/answer"}
