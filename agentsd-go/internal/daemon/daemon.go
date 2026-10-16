@@ -6,6 +6,7 @@ import (
 	acp "github.com/coder/acp-go-sdk"
 	"encoding/json"
 	"log"
+	"os/exec"
 	"sync"
 )
 
@@ -34,6 +35,25 @@ type Daemon struct {
 	hosted    *hostedServers
 	shells    map[shellKey]*shell
 	wf        *workflows
+	turns     int
+	caffeinate *exec.Cmd
+}
+
+// turnRunning counts the turns that run, and keeps the Mac awake while any does.
+func (d *Daemon) turnRunning(started bool) {
+	d.mu.Lock()
+	if started {
+		d.turns++
+	} else {
+		d.turns--
+	}
+	n := d.turns
+	d.mu.Unlock()
+	if started && n == 1 {
+		d.awake(true)
+	} else if !started && n == 0 {
+		d.awake(false)
+	}
 }
 
 func New(ctx context.Context, root string) (*Daemon, error) {

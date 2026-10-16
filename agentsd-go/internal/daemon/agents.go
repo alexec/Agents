@@ -170,6 +170,8 @@ func (l *live) run() {
 
 func (l *live) turn(text string) {
 	d := l.d
+	d.turnRunning(true)
+	defer d.turnRunning(false)
 	d.record(l.id, entry("userMessage", map[string]any{"_0": text}))
 	d.setState(l.id, "running", "")
 	a := d.store.Agent(l.id)

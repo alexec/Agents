@@ -9,7 +9,37 @@ Throwaway code in `agentsd-go/`. Not for merge. The test note is [test.md](test.
 | 1. Base | done (socket); window look waits for an unlocked screen | 3acff3f2 | Joins with a v2 host code over today's wire. A real Claude turn over `coder/acp-go-sdk`, with this Mac's sign-in lent through the control plane. |
 | 2. Everyday turn | done (socket); window look waits | 91657767 | Permission cards both ways; the app's tools (`list_sessions`, `read_session`, `start_session`) on `modelcontextprotocol/go-sdk`; terminals on `creack/pty`; files browse/list/read/write; Codex with the Mac's ChatGPT sign-in lent; stop. |
 | 3. Schema-first wire | done | 614aa5ea | `schema/daemon.schema.json`, 118 definitions, with Go, Swift and TypeScript generated from it. Go and Swift round-trip all 316 records today's Swift encoder writes in the fixtures. Today's TypeScript types fit the schema's. The Go host's own records fit it too. |
-| 4. More of the daemon | done (socket); the window's Workflows page waits for a look | (this commit) | Workflows: today's front matter and schedule, run by `robfig/cron`; one run by its schedule, one by hand. Every runtime under Landlock (`go-landlock`), proved on a real turn. A hosted stdio MCP server shared by two sessions (one pid, calls 1 and 2). |
+| 4. More of the daemon | done (socket); the window's Workflows page waits for a look | 8889e20d | Workflows: today's front matter and schedule, run by `robfig/cron`; one run by its schedule, one by hand. Every runtime under Landlock (`go-landlock`), proved on a real turn. A hosted stdio MCP server shared by two sessions (one pid, calls 1 and 2). |
+| 5. Go agentsd on this Mac | done (socket); the window look waits for an unlocked screen | (this commit) | `agentsd-go/mac.sh up` makes a scratch control plane, the Go host as this Mac's own host `mac`, and a scratch window. A real Claude turn ran, signed in through the Keychain. `caffeinate` held while it ran; `sandbox-exec` confined writes. |
+
+## Stage 5: the Go agentsd on this Mac
+
+**What was done** (`agentsd-go/mac.sh`; scratch root `/tmp/run-go1125m`, never the live Agents Host)
+- **The set-up.** `mac.sh up` does what run-app's `launch.sh` does, with the Go host (`out/darwin/agentsd`, cross-built in the container) in place of the Swift one:
+  - a scratch `agents-control` from this worktree's `build/DD`;
+  - the Go host joining with a host code;
+  - the scratch window, paired with `AGENTS_CONTROL` into a walk folder of its own.
+  `mac.sh down` is run-app's `stop.sh`. The Go binary is named `agentsd`, so `stop.sh` knows it by its lock pid.
+- **The home host.** The control plane makes the host on its own machine its home host, `mac` (`ControlService.swift:930-937`, by machine id). The Go host reads the hardware UUID from `ioreg` (the Swift host uses `gethostuuid`). It joined as `mac`, "This Mac (Go)", `macOS arm64`.
+- **The window took it as this Mac's own host.** It called the Mac-only methods the Go host does not have, and went on:
+  - `agents/resuming`, `attention/pending`, `clientPermissions/state`, `disk/state`, `events/list`, `leases/snapshot`, `milestones/state`, `modes/remembered`;
+  - `person/state`, `pins/list`, `preferences/get`, `projects/clones`, `retention/state`, `runtimes/accounts|allowances`, `sandbox/state`, `store/notes`, `wake/state`.
+  That is 19 methods, all `-32601`. How the window looks with them missing is for the unlocked-screen walk.
+- **A real Claude turn** on the Go Mac host, through the control plane: it read README.md and ran `uname -sm` ("Darwin arm64"), then ended `finished`/`endTurn`.
+
+**Mac-only, and how it was done**
+- **Keychain.** Nothing was needed for a turn. `claude-agent-acp`, run as this user, reads Claude Code's `Claude Code-credentials` item from the login Keychain itself.
+  - The Go host only asks whether the item is there (`security find-generic-password -s …` with no `-w`, so it never reads the secret), so that it does not ask to borrow a sign-in it has.
+  - **Not done: lending this Mac's sign-in to a Linux host** (`relay/grant` and `MacSignInRelay`). That would read the token with `security … -w` and serve it from a TLS relay on loopback. It is mechanical in Go (`crypto/tls`, a self-made CA, `net/http/httputil.ReverseProxy`). In the spike, the Swift Mac host of `run-go1125` lends to the Go Linux host.
+- **Power.** The Swift host holds `ProcessInfo.beginActivity(.idleSystemSleepDisabled)` while turns run. With no cgo for `IOPMAssertionCreateWithName`, the Go host runs `/usr/bin/caffeinate -i -w <its own pid>` from the first running turn to the last. The log shows "kept awake while turns run (caffeinate 13617)" and then "idle sleep allowed". A cgo build could call IOKit directly; `caffeinate` is enough and needs no cgo.
+- **sandbox-exec.** The same `agentsd sandbox-exec` re-exec as on Linux, with `/usr/bin/sandbox-exec -p <profile>`: allow by default, deny `file-write*`, then allow writes under the agent's folder, `/dev`, `/private/var/folders` and the runtime's own state.
+  - Proved on a real turn: Claude's Bash wrote `inside.txt` in the work folder, and the write to another scratch folder outside was refused.
+  - The first try failed, and taught something: Claude Code on a Mac keeps its Bash state in `/private/tmp/claude-<uid>`. Each runtime's own places have to be learnt, on each OS.
+  - `sandbox-exec` is deprecated, but it works on macOS 27. The Swift host makes no sandbox profile of its own (064).
+- **Not needed, or not done:**
+  - The code-signature check on `daemon.sock`'s callers (the Swift host checks the audit token). The Go host's socket is mode 0600 in the root, and that is all.
+  - launchd: run as a plain process here.
+  - `mac/open` and the other Mac-only methods.
 
 ## Stage 4: more of the daemon
 

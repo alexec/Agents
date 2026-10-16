@@ -167,6 +167,8 @@ func ownClaudeSignIn() bool {
 		return true
 	}
 	home, _ := os.UserHomeDir()
-	_, err := os.Stat(filepath.Join(home, ".claude", ".credentials.json"))
-	return err == nil
+	if _, err := os.Stat(filepath.Join(home, ".claude", ".credentials.json")); err == nil {
+		return true
+	}
+	return keychainSignIn()
 }

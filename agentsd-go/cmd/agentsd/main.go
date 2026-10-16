@@ -49,6 +49,9 @@ func main() {
 	flag.Parse()
 	_ = serve
 	if *root == "" {
+		*root = os.Getenv("AGENTS_ROOT")
+	}
+	if *root == "" {
 		home, _ := os.UserHomeDir()
 		*root = filepath.Join(home, ".agents-go", "root")
 	}
@@ -162,6 +165,19 @@ func platform() string {
 func machineID() string {
 	if id := os.Getenv("AGENTS_MACHINE_ID"); id != "" {
 		return id
+	}
+	if runtime.GOOS == "darwin" {
+		// The hardware UUID, as gethostuuid gives the Swift host: the control plane's home
+		// host is the one on its own machine.
+		if out, err := exec.Command("/usr/sbin/ioreg", "-rd1", "-c", "IOPlatformExpertDevice").Output(); err == nil {
+			for _, line := range strings.Split(string(out), "\n") {
+				if strings.Contains(line, "IOPlatformUUID") {
+					if f := strings.Split(line, "\""); len(f) >= 4 {
+						return f[3]
+					}
+				}
+			}
+		}
 	}
 	for _, f := range []string{"/etc/machine-id", "/var/lib/dbus/machine-id"} {
 		if b, err := os.ReadFile(f); err == nil && len(strings.TrimSpace(string(b))) > 0 {

@@ -28,7 +28,7 @@ func Exec(args []string) error {
 	}
 	var b strings.Builder
 	b.WriteString("(version 1)\n(allow default)\n(deny file-write*)\n(allow file-write*\n")
-	for _, p := range append(write, "/dev", "/private/var/folders", "/private/tmp") {
+	for _, p := range append(write, "/dev", "/private/var/folders") {
 		if real, err := evalSymlinks(p); err == nil {
 			p = real
 		}
