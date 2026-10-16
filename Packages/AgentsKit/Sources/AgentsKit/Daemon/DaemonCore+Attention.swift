@@ -94,12 +94,14 @@ extension DaemonCore {
         for (id, pending) in pendingPermissions {
             guard let agent = agents[pending.agentID], inALiveProject(agent) else { continue }
             found.append(need(.permission(id), for: agent, kind: .permission,
-                              wanted: "Wants to \(pending.request.toolCall.line)", now: now))
+                              wanted: "Wants to \(pending.request.toolCall.line)",
+                              answers: QuickAnswer.answers(for: pending.request), now: now))
         }
         for (id, pending) in elicitations {
             guard let agent = agents[pending.agentID], inALiveProject(agent) else { continue }
             found.append(need(.elicitation(id), for: agent, kind: .elicitation,
-                              wanted: "Asks: \(pending.request.title)", now: now))
+                              wanted: "Asks: \(pending.request.title)",
+                              answers: QuickAnswer.answers(for: pending.request), now: now))
         }
         // Live agents only: an archived one is never finished (#164).
         for agent in agents.live.values where agent.state == .finished && inALiveProject(agent) {
@@ -141,14 +143,16 @@ extension DaemonCore {
         return found
     }
 
-    private func need(_ id: NeedID, for agent: Agent, kind: Need.Kind, wanted: String, now: Date) -> Need {
+    /// `answers`: what the banner can answer with itself (#1170), nil when only the card can.
+    private func need(_ id: NeedID, for agent: Agent, kind: Need.Kind, wanted: String,
+                      answers: [QuickAnswer]? = nil, now: Date) -> Need {
         let raisedAt = needRaisedAt[id] ?? now
         needRaisedAt[id] = raisedAt
         return Need(id: id, agentID: agent.id, folder: agent.projectFolder, kind: kind,
                     raisedAt: raisedAt,
                     headline: Headline(h1: agent.projectFolder.lastPathComponent,
                                        h2: agent.title ?? "",
-                                       h3: wanted).truncating())
+                                       h3: wanted, answers: answers).truncating())
     }
 
     // MARK: Where the person is

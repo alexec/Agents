@@ -47,7 +47,26 @@ final class NotificationService: UNNotificationServiceExtension {
         content.body = headline.h3
         content.threadIdentifier = pushed.token
         content.userInfo["needToken"] = pushed.token
-        contentHandler(content)
+        // Its buttons (#1170), made here from the opened envelope: what they say is as
+        // sealed as the rest. The app answers a press, woken in the background.
+        guard let answers = headline.answers, !answers.isEmpty,
+              let value = QuickAnswer.userInfoValue(answers) else {
+            contentHandler(content)
+            return
+        }
+        let delivery = Delivery(content: content, handler: contentHandler)
+        Task {
+            delivery.content.categoryIdentifier = await BannerAnswers.category(for: answers)
+            delivery.content.userInfo[QuickAnswer.userInfoKey] = value
+            delivery.handler(delivery.content)
+        }
+    }
+
+    /// The banner and its handler, handed to the task that registers its buttons, and
+    /// touched by nothing else until the handler has it.
+    private struct Delivery: @unchecked Sendable {
+        let content: UNMutableNotificationContent
+        let handler: (UNNotificationContent) -> Void
     }
 
     override func serviceExtensionTimeWillExpire() {

@@ -866,6 +866,7 @@ final class AppModel {
             self?.openAgent(agentID)
         }
         notifier.openProject = { [weak self] folder in self?.openProject(ProjectKey(host: .mac, folder: folder)) }
+        notifier.answer = { [weak self] token, quick, typed in await self?.answerFromBanner(token, quick, typed: typed) }
         #if DEBUG
         openFromLaunchArguments()
         #endif
@@ -4941,6 +4942,33 @@ final class AppModel {
         } catch {
             problem = describe(error)
         }
+    }
+
+    /// An answer pressed on a banner (#1170): the card's own answer, through the same call.
+    /// A question no longer held was answered somewhere else, and nothing is sent: the
+    /// daemon would refuse it, and its banner goes with the next sweep.
+    func answerFromBanner(_ token: String, _ quick: QuickAnswer, typed: String?) async {
+        let parts = token.split(separator: ":", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else { return }
+        let sent: Bool
+        switch parts[0] {
+        case "permission":
+            guard let request = permissions.first(where: { $0.id.uuidString == parts[1] }) else {
+                note("banner: \(token) is over, nothing sent")
+                return
+            }
+            sent = await answer(request, optionID: quick.id)
+        case "elicitation":
+            guard let request = elicitations.first(where: { $0.id.uuidString == parts[1] }),
+                  let content = quick.content(typed: typed) else {
+                note("banner: \(token) is over, or nothing typed; nothing sent")
+                return
+            }
+            sent = await answerElicitation(request, action: .accept, content: content)
+        default:
+            return
+        }
+        note("banner: \(token) \(quick.kind.rawValue) \(sent ? "answered" : "not sent")")
     }
 
     // MARK: Forms

@@ -989,6 +989,7 @@ export interface Headline {
   h1: string;
   h2: string;
   h3: string;
+  answers?: QuickAnswer[];
 }
 
 export interface HelperLimits {
@@ -1520,6 +1521,16 @@ export interface QueuedStart {
   worktree?: WorktreeChoice;
   labels: string[];
 }
+
+export interface QuickAnswer {
+  kind: QuickAnswerKind;
+  id: string;
+  title: string;
+  field?: string;
+  isDestructive: boolean;
+}
+
+export type QuickAnswerKind = "choice" | "reply";
 
 export interface RateLimitInfo {
   status?: string;
@@ -2756,7 +2767,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   GuardedChangeReading: { required: ["path", "lines"], optional: ["digest", "approved", "current"] },
   GuardedChangeRequest: { required: ["folder", "path"], optional: ["digest"] },
   GuardedDiffLine: { required: ["kind", "text"], optional: [] },
-  Headline: { required: ["h1", "h2", "h3"], optional: [] },
+  Headline: { required: ["h1", "h2", "h3"], optional: ["answers"] },
   HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive"] },
   HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
   HostLastHeard: { required: ["host"], optional: ["projects", "agents", "heardAt"] },
@@ -2827,6 +2838,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PromptRequest: { required: ["agentID", "text", "attachments", "from"], optional: ["sendID"] },
   QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface", "sender", "hops"] },
   QueuedStart: { required: ["labels"], optional: ["runtimeID", "permissionMode", "model", "worktree"] },
+  QuickAnswer: { required: ["kind", "id", "title", "isDestructive"], optional: ["field"] },
   RateLimitInfo: { required: [], optional: ["status", "resetsAt", "rateLimitType", "utilization", "overageStatus", "overageResetsAt", "isUsingOverage", "overageInUse", "overageDisabledReason"] },
   RelayOffer: { required: ["runtime", "socketPath", "caCertificate", "standIn"], optional: [] },
   RememberedOptionsRequest: { required: ["runtimeID", "cwd"], optional: [] },

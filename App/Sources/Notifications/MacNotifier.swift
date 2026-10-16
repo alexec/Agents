@@ -23,6 +23,9 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
     var open: @MainActor (UUID) -> Void = { _ in }
     /// A project's page, for a question asked of the project rather than a session (#531).
     var openProject: @MainActor (URL) -> Void = { _ in }
+    /// One of the banner's own buttons (#1170): the need's token, the answer, and the line
+    /// typed for a reply.
+    var answer: @MainActor (String, QuickAnswer, String?) async -> Void = { _, _, _ in }
 
     private let center = UNUserNotificationCenter.current()
     private var showing: [String: NeedID] = [:]
@@ -90,22 +93,27 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
         content.subtitle = headline.h1
         content.body = headline.h3
         content.sound = alert ? .default : nil
+        content.userInfo = ["needToken": token]
         if let agentID = need.agentID {
-            content.userInfo = ["agentID": agentID.uuidString]
+            content.userInfo["agentID"] = agentID.uuidString
             content.threadIdentifier = agentID.uuidString
         } else {
             // The project's own question (#531): its token names the project.
             content.threadIdentifier = token
         }
-        let request = UNNotificationRequest(identifier: token, content: content, trigger: nil)
         showing[token] = need.id
         Self.log.info("showing \(token, privacy: .public), alert \(alert)")
-        note("notifier: showing \(token) alert=\(alert)")
-        center.add(request) { [weak self] error in
-            guard let error else { return }
-            Self.log.error("could not show \(token, privacy: .public): \(error, privacy: .public)")
-            note("notifier: could not show \(token): \(error)")
-            Task { @MainActor in self?.showing.removeValue(forKey: token) }
+        note("notifier: showing \(token) alert=\(alert) answers=\(headline.answers?.count ?? 0)")
+        Task { [weak self, center] in
+            // Its buttons first (#1170): a category must be known before the banner is.
+            await BannerAnswers.apply(headline.answers, to: content)
+            do {
+                try await center.add(UNNotificationRequest(identifier: token, content: content, trigger: nil))
+            } catch {
+                Self.log.error("could not show \(token, privacy: .public): \(error, privacy: .public)")
+                note("notifier: could not show \(token): \(error)")
+                self?.showing.removeValue(forKey: token)
+            }
         }
     }
 
@@ -151,9 +159,14 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
         [.banner, .list, .sound]
     }
 
-    /// Opening it selects that conversation. It answers nothing itself (FR-019).
+    /// Opening it selects that conversation (FR-019). One of its buttons answers the
+    /// question as the card would, without bringing the window forward (#1170).
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
                                             didReceive response: UNNotificationResponse) async {
+        if let chosen = BannerAnswers.chosen(in: response) {
+            await Task { @MainActor in await answer(chosen.token, chosen.answer, chosen.typed) }.value
+            return
+        }
         let request = response.notification.request
         if let text = request.content.userInfo["agentID"] as? String, let agentID = UUID(uuidString: text) {
             await MainActor.run {

@@ -1,5 +1,6 @@
 import AgentsKitCore
 import Foundation
+import UIKit
 import UserNotifications
 
 /// This device's banner for a need the Mac has routed here — a **local** notification
@@ -19,6 +20,9 @@ final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
     var open: @MainActor (UUID) -> Void = { _ in }
     /// The same, from a pushed banner that names only the need.
     var openNeed: @MainActor (String) -> Void = { _ in }
+    /// One of the banner's own buttons (#1170): the need's token, the answer, and the line
+    /// typed for a reply. Whether it went.
+    var answer: @MainActor (String, QuickAnswer, String?) async -> Bool = { _, _, _ in false }
     /// The permission was asked, or refused; the presence report should say so.
     var authorisationChanged: @MainActor () -> Void = {}
 
@@ -98,12 +102,24 @@ final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
         if let agentID { content.userInfo["agentID"] = agentID.uuidString }
         content.threadIdentifier = agentID?.uuidString ?? token
         showing[token] = needID
-        note("notifier: showing \(token) alert=\(alert)")
-        center.add(UNNotificationRequest(identifier: token, content: content, trigger: nil)) { [weak self] error in
-            guard let error else { return }
-            note("notifier: could not show \(token): \(error)")
-            Task { @MainActor in self?.showing.removeValue(forKey: token) }
+        note("notifier: showing \(token) alert=\(alert) answers=\(headline.answers?.count ?? 0)")
+        Task { [weak self, center] in
+            // Its buttons first (#1170): a category must be known before the banner is.
+            await BannerAnswers.apply(headline.answers, to: content)
+            do {
+                try await center.add(UNNotificationRequest(identifier: token, content: content, trigger: nil))
+            } catch {
+                note("notifier: could not show \(token): \(error)")
+                self?.showing.removeValue(forKey: token)
+            }
         }
+    }
+
+    /// A banner whose answer did not go (#1170), shown again without a sound: pressing a
+    /// button took it away, and the question is still asked.
+    func showAgain(_ need: Need) {
+        showing.removeValue(forKey: need.id.token)
+        show(need.headline, needID: need.id, alert: false, agentID: need.agentID)
     }
 
     func withdraw(_ token: String) {
@@ -157,6 +173,19 @@ final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
         let userInfo = response.notification.request.content.userInfo
         let agentID = (userInfo["agentID"] as? String).flatMap(UUID.init(uuidString:))
         let token = userInfo["needToken"] as? String
+        // One of its buttons (#1170): answered from here, with the app in the background,
+        // for as long as iOS lets it finish.
+        if let chosen = BannerAnswers.chosen(in: response) {
+            Task { @MainActor in
+                let task = UIApplication.shared.beginBackgroundTask(withName: "banner answer") {
+                    note("banner: \(chosen.token) out of background time")
+                }
+                _ = await answer(chosen.token, chosen.answer, chosen.typed)
+                UIApplication.shared.endBackgroundTask(task)
+                completionHandler()
+            }
+            return
+        }
         Task { @MainActor in
             if let agentID {
                 open(agentID)

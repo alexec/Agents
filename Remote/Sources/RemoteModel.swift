@@ -297,6 +297,9 @@ final class RemoteModel {
             self?.open(agentID)
         }
         notifier.openNeed = { [weak self] token in self?.open(needToken: token) }
+        notifier.answer = { [weak self] token, quick, typed in
+            await self?.answerFromBanner(token, quick, typed: typed) ?? false
+        }
         // The oldest of a long conversation go from the page as it runs on; what they
         // say the agent touched is kept with the rest of the history read for Files.
         work.onTrimmed = { [weak self] dropped in
@@ -3937,6 +3940,71 @@ final class RemoteModel {
             problem = (error as? JSONRPCError)?.message ?? away(error, "that could not be sent.")
                 ?? "That question could not be answered."
             return false
+        }
+    }
+
+    /// An answer pressed on a banner (#1170): the card's own answer, the same call to the
+    /// same host, sent with the app in the background, perhaps just woken for it.
+    ///
+    /// Back in touch first, as a background refresh is, and caught up when the question
+    /// is not held yet. A question no longer asked was answered somewhere else: nothing
+    /// is sent, and the catch-up's sweep takes its banner away. An answer that did not go
+    /// puts the banner back, silently, so the question is not lost with it. The log says
+    /// the need, the button and how it went, never what was typed.
+    @discardableResult
+    func answerFromBanner(_ token: String, _ quick: QuickAnswer, typed: String?) async -> Bool {
+        let began = ContinuousClock.now
+        note("banner: \(token) \(quick.kind.rawValue) pressed")
+        if !isConnected {
+            if !reconnect.isRunning { Task { await connect() } }
+            await goBackNow(.wake)
+            let deadline = ContinuousClock.now + Self.bannerPatience
+            while !isConnected, ContinuousClock.now < deadline {
+                try? await Task.sleep(for: .milliseconds(250))
+            }
+        }
+        if bannerQuestion(token) == nil { await catchUp() }
+        let sent: Bool
+        switch bannerQuestion(token) {
+        case .permission(let request):
+            sent = await answer(request, optionID: quick.id)
+        case .elicitation(let request):
+            guard let content = quick.content(typed: typed) else {
+                note("banner: \(token) nothing to send")
+                return false
+            }
+            sent = await answer(request, action: .accept, content: content)
+        case nil:
+            note("banner: \(token) is over, nothing sent, in \(ContinuousClock.now - began)")
+            return false
+        }
+        note("banner: \(token) \(sent ? "answered" : "not sent"), in \(ContinuousClock.now - began)")
+        if !sent, let need = work.needs.first(where: { $0.key.token == token })?.value {
+            notifier.showAgain(need)
+        }
+        return sent
+    }
+
+    /// How long a banner's answer waits for the link: inside the half minute iOS gives an
+    /// app woken for a notification's button.
+    static let bannerPatience: Duration = .seconds(20)
+
+    private enum BannerQuestion {
+        case permission(PermissionRequest)
+        case elicitation(ElicitationRequest)
+    }
+
+    /// The question a banner's token names, while it is still asked.
+    private func bannerQuestion(_ token: String) -> BannerQuestion? {
+        let parts = token.split(separator: ":", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else { return nil }
+        switch parts[0] {
+        case "permission":
+            return work.permissions.first { $0.id.uuidString == parts[1] }.map(BannerQuestion.permission)
+        case "elicitation":
+            return work.elicitations.first { $0.id.uuidString == parts[1] }.map(BannerQuestion.elicitation)
+        default:
+            return nil
         }
     }
 

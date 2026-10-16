@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 228 rows: **155 same**, **46 by design**, **27 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888, #982, #1089, #1109, #1122). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 229 rows: **155 same**, **47 by design**, **27 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888, #982, #1089, #1109, #1122). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -31,7 +31,7 @@ Of 228 rows: **155 same**, **46 by design**, **27 delta** (after #188, #189, #19
 | Settings and Project Settings | 4 | 8 | 0 |
 | Pool, runtimes and spending | 8 | 1 | 2 |
 | Events and resources | 2 | 1 | 2 |
-| Notifications and badges | 3 | 1 | 0 |
+| Notifications and badges | 3 | 2 | 0 |
 | Disk strip | 2 | 1 | 0 |
 | Hosts, connection and pairing | 4 | 3 | 0 |
 | MCP Apps views | 5 | 1 | 0 |
@@ -352,6 +352,8 @@ The deltas are tracked by 30 issues:
 |---|---|---|---|---|
 | Notifications | `A/Notifications/MacNotifier.swift:37-79` | Local and push: `R/Notifications/DeviceNotifier.swift:34-98` | None: `W/presence.ts:5` | **by design** (071: the page takes no notices) |
 | The needs-you count | Dock badge: `A/ContentView.swift:267-268`; live, so no time. The daemon sends its count to the control plane for the devices (#1163): `K/Daemon/DaemonCore+Attention.swift` (`waitingCount`) | App icon badge and widget, from the widget's count; away, from the Mac's count on each push, and a silent count push when it moves (#1163); Needs You says "Updated 14:02" when not live, the widget always: `R/RemoteModel.swift`, `R/Sidebar/RemoteSidebar.swift` (`SmartHeading`), `RemoteWidget/Sources/AttentionEntryView.swift` | The tab's title: `W/presence.ts:16-30`; Needs You says "Updated 14:02" while the link is lost (#1163): `W/views/Sidebar.tsx`, `W/model/updated.ts` | **same** (#1163); unwalked on a device |
+| Answering from the banner (#1170): a permission's own options as buttons (reject ones red), a question's one choice of 2–4 options as buttons, a one-field question as Reply; every button asks for an unlock; a form opens the card. The answers ride in the sealed headline (`K/Remote/QuickAnswer.swift`, `K/Remote/BannerAnswers.swift`) | `A/Notifications/MacNotifier.swift`, `answerFromBanner` in `A/AppModel.swift` | Local and push (`RemoteNotify/Sources/NotificationService.swift`), answered in the background: `R/Notifications/DeviceNotifier.swift`, `answerFromBanner` in `R/RemoteModel.swift` | None: no notifications | **by design** (071: the page takes no notices); unwalked |
+| The needs-you count | Dock badge: `A/ContentView.swift:267-268` | App icon badge, from the widget's count: `R/RemoteModel.swift` | The tab's title: `W/presence.ts:16-30` | **same** |
 | Installed as an app (#791) | A native app | A native app | A manifest, the Blob icons and light/dark theme-color: `Web/index.html`, `Web/assets/manifest.webmanifest`; installs from Chrome or Safari, from a phone once the page is served at a public address (#61) | **by design** (Mac and Remote are native apps) |
 | Presence: watching and active | Every host; *watching* to the owner: `A/AppModel.swift:2531-2549` | The same: `R/RemoteModel.swift:1604-1618` | The same: `W/presence.ts:36-47` | **same** (#203, checked in #238) |
 | Unread counts on project rows and folds (#70) | Yes | Yes | Yes | **same** |

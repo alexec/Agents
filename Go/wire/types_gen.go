@@ -1277,9 +1277,10 @@ const (
 )
 
 type Headline struct {
-	H1 string `json:"h1"`
-	H2 string `json:"h2"`
-	H3 string `json:"h3"`
+	H1      string        `json:"h1"`
+	H2      string        `json:"h2"`
+	H3      string        `json:"h3"`
+	Answers []QuickAnswer `json:"answers,omitzero"`
 }
 
 type HelperLimits struct {
@@ -1988,6 +1989,21 @@ type QueuedStart struct {
 	Worktree       *WorktreeChoice `json:"worktree,omitzero"`
 	Labels         []string        `json:"labels"`
 }
+
+type QuickAnswer struct {
+	Kind          QuickAnswerKind `json:"kind"`
+	ID            string          `json:"id"`
+	Title         string          `json:"title"`
+	Field         *string         `json:"field,omitzero"`
+	IsDestructive bool            `json:"isDestructive"`
+}
+
+type QuickAnswerKind string
+
+const (
+	QuickAnswerKindChoice QuickAnswerKind = "choice"
+	QuickAnswerKindReply  QuickAnswerKind = "reply"
+)
 
 type RateLimitInfo struct {
 	Status                *string  `json:"status,omitzero"`
