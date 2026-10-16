@@ -10,8 +10,6 @@ import (
 	"strings"
 	"time"
 
-	sdk "github.com/coder/acp-go-sdk"
-
 	"github.com/alexec/agents/Go/internal/agentsd/acp"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -252,7 +250,3 @@ func sessionMeta(runtimeID string) map[string]any {
 		"Workflow", "CronCreate", "CronList", "CronDelete", "ScheduleWakeup", "Monitor", "RemoteTrigger", "PushNotification",
 		"EnterWorktree", "ExitWorktree"}}}}
 }
-
-// mcpServersFor is the MCP servers a session is given. None yet: the app's own tools
-// come in a later step.
-func (d *Daemon) mcpServersFor(wire.UUID) []sdk.McpServer { return nil }

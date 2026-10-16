@@ -250,6 +250,15 @@ func cleanedLabel(v string) (string, error) {
 
 // changeLabels is SessionLabelPolicy.change for the person.
 func changeLabels(current []wire.SessionLabel, add, remove []string, project []wire.SessionLabel) ([]wire.SessionLabel, error) {
+	return changeLabelsAs(wire.SessionLabelOwnerPerson, current, add, remove, project)
+}
+
+// changeLabelsAs is SessionLabelPolicy.change by an actor: an agent cannot change a label
+// the person gave.
+func changeLabelsAs(actor wire.SessionLabelOwner, current []wire.SessionLabel, add, remove []string, project []wire.SessionLabel) ([]wire.SessionLabel, error) {
+	ownedByPerson := func(v string) error {
+		return Invalid("The label %s belongs to the person, so an agent cannot change it.", v)
+	}
 	var adding, removing []string
 	for _, v := range add {
 		c, err := cleanedLabel(v)
@@ -276,6 +285,9 @@ func changeLabels(current []wire.SessionLabel, add, remove []string, project []w
 	for _, v := range removing {
 		for i, l := range result {
 			if labelKey(l.Value) == labelKey(v) {
+				if actor == wire.SessionLabelOwnerAgent && l.Owner == wire.SessionLabelOwnerPerson {
+					return nil, ownedByPerson(l.Value)
+				}
 				result = append(result[:i], result[i+1:]...)
 				break
 			}
@@ -285,7 +297,13 @@ func changeLabels(current []wire.SessionLabel, add, remove []string, project []w
 		found := false
 		for i, l := range result {
 			if labelKey(l.Value) == labelKey(v) {
-				result[i].Owner, found = wire.SessionLabelOwnerPerson, true
+				if actor == wire.SessionLabelOwnerAgent && l.Owner == wire.SessionLabelOwnerPerson {
+					return nil, ownedByPerson(l.Value)
+				}
+				if actor == wire.SessionLabelOwnerPerson {
+					result[i].Owner = wire.SessionLabelOwnerPerson
+				}
+				found = true
 				break
 			}
 		}
@@ -302,7 +320,7 @@ func changeLabels(current []wire.SessionLabel, add, remove []string, project []w
 				break
 			}
 		}
-		result = append(result, wire.SessionLabel{Value: canonical, Owner: wire.SessionLabelOwnerPerson, AddedAt: now()})
+		result = append(result, wire.SessionLabel{Value: canonical, Owner: actor, AddedAt: now()})
 	}
 	return result, nil
 }
@@ -398,6 +416,7 @@ func (d *Daemon) delete(id wire.UUID) error {
 			s.Stop()
 		}
 	}
+	d.dropAppTokens(a.ID)
 	if err := d.Store.Delete(a.ID); err != nil {
 		return &Error{Code: wire.FailureCouldNotSave, Message: "The agent could not be deleted: " + err.Error()}
 	}

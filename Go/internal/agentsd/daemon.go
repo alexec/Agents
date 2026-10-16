@@ -38,6 +38,7 @@ type Daemon struct {
 	quitState
 	leaseState
 	eventBook
+	appToolsState
 	attentionState
 	worktreeState
 	recoveryState
@@ -113,6 +114,7 @@ func (d *Daemon) Shutdown() {
 	d.stopAll()
 	d.clearPickUps()
 	d.stopEvents()
+	d.stopAppTools()
 	d.stopShells()
 }
 

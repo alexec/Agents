@@ -24,6 +24,10 @@ const (
 	GoTypes    = "Go/wire/types_gen.go"
 	GoMethods  = "Go/wire/methods_gen.go"
 	TypeScript = "Web/src/protocol/generated.ts"
+	// The app's own tools, as Swift's AppService lists them (AppToolsFileTests), copied in
+	// beside the types so a Go host can embed them.
+	AppTools   = "Packages/Wire/app-tools.json"
+	GoAppTools = "Go/wire/app-tools.json"
 )
 
 func main() {
@@ -36,7 +40,7 @@ func main() {
 		os.Exit(1)
 	}
 	stale := false
-	for _, path := range []string{GoTypes, GoMethods, TypeScript} {
+	for _, path := range []string{GoTypes, GoMethods, TypeScript, GoAppTools} {
 		full := filepath.Join(*root, path)
 		current, _ := os.ReadFile(full)
 		if bytes.Equal(current, []byte(files[path])) {
@@ -95,5 +99,9 @@ func generate(root string) (map[string]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", GoMethods, err)
 	}
-	return map[string]string{GoTypes: types, GoMethods: methods, TypeScript: typescript(doc, rpcs)}, nil
+	tools, err := read(AppTools)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]string{GoTypes: types, GoMethods: methods, TypeScript: typescript(doc, rpcs), GoAppTools: string(tools)}, nil
 }
