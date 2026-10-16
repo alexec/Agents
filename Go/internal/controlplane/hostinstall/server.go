@@ -263,9 +263,10 @@ var shippedServers = []string{"ci-watcher"}
 
 // serverFileNames is ServerFiles.names: the only files read from the server folder.
 var serverFileNames = func() map[string]bool {
-	names := map[string]bool{"VERSION": true}
+	// agentsd-go and VERSION-go: the Go host (#1136), beside the Swift one.
+	names := map[string]bool{"VERSION": true, "VERSION-go": true}
 	for _, arch := range []string{"x86_64", "aarch64"} {
-		for _, program := range append([]string{"agentsd"}, shippedServers...) {
+		for _, program := range append([]string{"agentsd", "agentsd-go"}, shippedServers...) {
 			names[program+"-linux-"+arch] = true
 			names[program+"-linux-"+arch+".sha256"] = true
 		}
@@ -287,16 +288,21 @@ func readServerFile(name, folder string) (string, bool) {
 // version beside them.
 type serverBinary struct{ file, sha256, version string }
 
-func binaryFor(arch, folder string) (serverBinary, bool) {
-	sha, ok := readServerFile("agentsd-linux-"+arch+".sha256", folder)
+func binaryFor(arch, implementation, folder string) (serverBinary, bool) {
+	// The Swift host, or with implementation "go" the Go one (#1136), as ServerFiles.binary.
+	program, versionFile := "agentsd", "VERSION"
+	if implementation == "go" {
+		program, versionFile = "agentsd-go", "VERSION-go"
+	}
+	sha, ok := readServerFile(program+"-linux-"+arch+".sha256", folder)
 	if !ok {
 		return serverBinary{}, false
 	}
-	version, ok := readServerFile("VERSION", folder)
+	version, ok := readServerFile(versionFile, folder)
 	if !ok {
 		version = "0"
 	}
-	return serverBinary{filepath.Join(folder, "agentsd-linux-"+arch), strings.TrimSpace(sha), strings.TrimSpace(version)}, true
+	return serverBinary{filepath.Join(folder, program+"-linux-"+arch), strings.TrimSpace(sha), strings.TrimSpace(version)}, true
 }
 
 // shippedFor is ServerFiles.shippedServers(for:in:): the shipped servers the folder has
