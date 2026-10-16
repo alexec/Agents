@@ -150,6 +150,14 @@ func (d *Daemon) start(r wire.StartRequest) (wire.UUID, error) {
 	if extra == nil {
 		extra = []string{}
 	}
+	// A worktree asked for is made before anything else, and taken back if the start fails.
+	var wt *wire.AgentWorktree
+	if r.Worktree != nil {
+		var err error
+		if wt, path, err = d.prepareWorktree(path, *r.Worktree, r.Prompt); err != nil {
+			return "", err
+		}
+	}
 	t := now()
 	title := titleFrom(r.Prompt)
 	a := wire.Agent{
@@ -164,11 +172,21 @@ func (d *Daemon) start(r wire.StartRequest) (wire.UUID, error) {
 	for _, l := range r.Labels {
 		a.Labels = append(a.Labels, wire.SessionLabel{Value: l, Owner: wire.SessionLabelOwnerPerson, AddedAt: t})
 	}
+	a.Worktree = wt
 	if err := d.Store.Save(a); err != nil {
+		if wt != nil {
+			undoWorktree(*r.Worktree, wt)
+		}
 		return "", err
 	}
 	Broadcast(d, wire.NotifyAgentChanged, a)
-	d.projectChanged(path)
+	d.projectChanged(projectFolder(&a))
+	if wt != nil {
+		d.record(a.ID, runtimeNote(worktreeNote(*wt)))
+	}
+	if r.Purpose == nil {
+		safe.Go("starting point", func() { d.takeStartingPoint(a.ID, path) })
+	}
 	if err := d.enqueue(a.ID, wire.QueuedPrompt{ID: store.NewUUID(), Text: r.Prompt, Attachments: r.Attachments,
 		QueuedAt: t, From: wire.PromptOriginPerson}, false); err != nil {
 		return "", err
