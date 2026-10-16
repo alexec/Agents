@@ -23,5 +23,7 @@ Follow AGENTS.md, above all "Keeping the three clients in step" and "Landing a c
 - **Write decisions down** in the issue, or in a spec with the speckit-specify and
   speckit-clarify skills.
 
-Ask Alex with a form, the recommended option first, and name people in questions
-("Claude (Product Owner) will…", "Alex, do you want…?").
+Decide an easy-to-undo choice that has a recommended option and tell Alex (AGENTS.md,
+"Decide and tell"). Ask Alex with a form only for the rest, the recommended option
+first, and name people in questions ("Claude (Product Owner) will…", "Alex, do you
+want…?").

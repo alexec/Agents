@@ -157,6 +157,19 @@ struct BriefingTests {
         #expect(line.contains("twice"))
     }
 
+    /// An easy-to-undo choice with a recommended answer is taken, also for scope or
+    /// design, and written down (#1083): half the forms answered changed nothing. What
+    /// is hard to undo is still asked.
+    @Test func theEscalationLineDecidesAndTells() {
+        let line = Briefing.escalation(named: "AskUserQuestion")
+        #expect(line.contains("scope or design"))
+        #expect(line.contains("`Decided: <what>, because <why>.`"))
+        #expect(line.contains("overrule"))
+        #expect(line.contains("hard to undo"))
+        #expect(line.contains("no clear best answer"))
+        #expect(AppService.askFormTool["description"]?.stringValue?.contains("Decided:") == true)
+    }
+
     /// And names the tool on top of it where the policy has one. Claude's question
     /// arrives as a held elicitation, so an agent that knows the name can raise one.
     @Test func andNamesTheToolWhereThePolicyKnowsIt() {
@@ -252,12 +265,15 @@ struct BriefingTests {
     /// same change, to 2,700 and 2,450, for what landed meanwhile: what not to ask
     /// about (#601) and moving into worktrees (#615). Measured then at 2,621 for the
     /// longest (Copilot, with a long name and a helper's starter).
+    ///
+    /// Raised in #1083, to 3,000: the escalation line lists what is still asked and says
+    /// how to write down a choice taken instead. Measured then at 2,905 (Copilot).
     @Test func itStaysShortEnoughToBeRead() {
         let naming = Briefing.Naming(runtime: "Antigravity", person: "Alexandra", pronouns: "they/them",
                                      startedBy: "#121 agent names and questions")
         for policy in ToolPolicyCatalog.builtIn {
             let text = Briefing.text(for: policy, naming: naming)
-            #expect(text.count < 2_700, "\(policy.runtimeID): \(text.count)")
+            #expect(text.count < 3_000, "\(policy.runtimeID): \(text.count)")
             #expect(Briefing.lines(for: policy, naming: naming).count <= 10, "\(policy.runtimeID)")
         }
     }

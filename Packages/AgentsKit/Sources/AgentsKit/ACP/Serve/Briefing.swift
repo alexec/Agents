@@ -200,8 +200,16 @@ public enum Briefing {
     /// person's uncommitted edits alone, discard the agent's own scratch, carry on to the
     /// next step of what was asked. The person also skipped questions that were really
     /// reports, and questions asking them to look at something the agent could have
-    /// looked at itself. Where they picked something else, it was scope or design, and
-    /// that is still theirs.
+    /// looked at itself. Where they picked something else, it was scope or design.
+    ///
+    /// And then scope and design went to the agent too (#1083). Of 196 forms answered
+    /// by 2026-10-15, 97 took the recommended option for every question and so changed
+    /// nothing, and agents waited 65 hours on them. Per question, 79% took the
+    /// recommended option. So an easy-to-undo choice with a recommended answer is
+    /// taken, whatever it is about, and written down where the person sees it, so that
+    /// overruling it costs one change. What still waits for the person is listed: what
+    /// is hard to undo, what costs money or makes an outside account, a restart or an
+    /// install, a missing credential, and a choice with no best answer.
     public static func escalation(named tool: String?) -> String {
         let named: String
         if let tool, tool != AppTool.askForm {
@@ -210,13 +218,16 @@ public enum Briefing {
             named = "`\(AppTool.askForm)`"
         }
         return """
-            When something is mine to decide (a real choice, a missing credential, \
-            anything hard to undo), ask me with \(named) rather than guessing or asking \
-            in your reply. That question reaches me anywhere and waits for me; a question \
-            inside a reply may go unread. But when one answer is the one you would mark \
-            recommended and it is easy to undo, take it, say so, and carry on. Do not ask \
-            about the next step of what I asked for, a report with nothing to choose, \
-            anything you can find out yourself, or the same thing twice.
+            When something is mine to decide (anything hard to undo, money or an outside \
+            account, a restart or an install on my devices, a missing credential, a \
+            choice with no clear best answer), ask me with \(named) rather than guessing \
+            or asking in your reply. That question reaches me anywhere and waits for me; \
+            a question inside a reply may go unread. Any other choice, scope or design \
+            included, whose answer you would mark recommended and is easy to undo: take \
+            it, write `Decided: <what>, because <why>.` (I can overrule it) in the issue \
+            or pull request and in your reply, and carry on. Do not ask about the next \
+            step of what I asked for, a report with nothing to choose, anything you can \
+            find out yourself, or the same thing twice.
             """
     }
 
