@@ -272,6 +272,9 @@ func (d *Daemon) archiveBy(id wire.UUID, by wire.AgentArchivedReason) error {
 	}
 	d.dropLeases(id, "holderArchived")
 	d.endWait(id, "archived", false)
+	if a := d.Store.Agent(id); a != nil {
+		d.checkQueueSoon(projectFolder(a))
+	}
 	// An archived session is not kept pinned (unpinArchived).
 	if a := d.Store.Agent(id); a != nil {
 		d.unpinSession(projectFolder(a), id)

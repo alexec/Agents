@@ -41,6 +41,7 @@ type Daemon struct {
 	appToolsState
 	eventWaitState
 	messageState
+	helperQueueState
 	attentionState
 	worktreeState
 	recoveryState
@@ -68,6 +69,7 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	d.loadEvents()
 	d.recover()
 	d.resumeEventWaits()
+	d.checkEveryQueue()
 	d.watchDisk()
 	return d, nil
 }
