@@ -314,7 +314,7 @@ struct PinsTests {
         #expect(!FileManager.default.fileExists(atPath: s.project.appending(path: PinsFile.path).path))
     }
 
-    @Test func archivingUnpinsAndBringingBackDoesNotPinAgain() async throws {
+    @Test func archivingUnpinsAndUnarchivingDoesNotPinAgain() async throws {
         let s = try await setUp(["Lead", "Intake"])
         let (lead, intake) = (try #require(s.ids["Lead"]), try #require(s.ids["Intake"]))
         try await pinSession(s, lead)
@@ -385,7 +385,7 @@ struct PinsTests {
         #expect(missing == "Nothing was pinned: there is no workflow called nothing-here in this project.")
     }
 
-    @Test func archivingAWorkflowUnpinsItAndBringingItBackDoesNotPinAgain() async throws {
+    @Test func archivingAWorkflowUnpinsItAndUnarchivingItDoesNotPinAgain() async throws {
         let s = try await setUp([])
         try writeWorkflow(s, "release-notes")
         try writeWorkflow(s, "triage")

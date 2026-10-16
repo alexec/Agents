@@ -1668,7 +1668,7 @@ export class Store extends Work {
   }
 
   /**
-   * An archived project brought back (#343), as the window's Unarchive does: a project again,
+   * An archived project unarchived (#343), as the window's Unarchive does: a project again,
    * with its new-session form open.
    */
   async unarchiveProject(host: string, folder: string): Promise<ProjectSummary | null> {
@@ -1931,7 +1931,7 @@ export class Store extends Work {
   }
 
   /**
-   * What is on its way to each agent (#87; AgentsModel's acting): stop, archive, bring back or
+   * What is on its way to each agent (#87; AgentsModel's acting): stop, archive, unarchive or
    * Send now, one at a time. Every control that would send a second sees the first is going.
    */
   readonly onItsWay = signal<Record<string, AgentAct>>({});

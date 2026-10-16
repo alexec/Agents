@@ -648,7 +648,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
 /**
  * An archived project, with when it was put away, Unarchive and Delete…, as the window's
  * ArchivedProjectRow (#343, #677), named as its live row was: `server:Project` on a server.
- * Brought back, it is a project again and its new-session form opens.
+ * Unarchived, it is a project again and its new-session form opens.
  */
 function ArchivedProjectRow({ store, host, project, down }: {
   store: Store; host: ControlHost; project: ProjectSummary; down: boolean;
