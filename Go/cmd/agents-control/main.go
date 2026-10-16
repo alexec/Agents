@@ -33,6 +33,7 @@
 //	                            hashivault://…, gcpkms://… (gocloud.dev/secrets)
 //	AGENTS_CONTROL_TLS_CERT/_KEY  when this copy terminates TLS itself
 //	AGENTS_CONTROL_PIN          the load balancer's certificate pin, when it terminates TLS
+//	AGENTS_CONTROL_PEER_URL     where other copies reach this one (several copies, US3)
 //	AGENTS_CONTROL_NAME, AGENTS_CONTROL_MACHINE_ID, AGENTS_CONTROL_SERVERS
 package main
 
@@ -329,6 +330,8 @@ func serve() {
 	if root := value("--host-root"); root != "" {
 		cfg.HostJoinFile = filepath.Join(expand(root), "control-join.json")
 	}
+	// Where other copies reach this one: several copies over one store (US3).
+	cfg.PeerURL = os.Getenv("AGENTS_CONTROL_PEER_URL")
 	cfg.Web = webConfig()
 	// Whether the page is served, for Agents Host to read (071 R3): this run's, or none.
 	if home() != "" {

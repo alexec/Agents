@@ -134,12 +134,14 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		if err := m.forget(ctx, strings.ToUpper(id), 0); err != nil {
 			return nil, err
 		}
+		m.s.announce("clientForgotten", strings.ToUpper(id), from.Client)
 		return map[string]any{}, nil
 	case "clients/forgetSelf":
 		// Only itself. The reply goes before the sockets close, so the caller hears it.
 		if err := m.forget(ctx, from.Client, 200*time.Millisecond); err != nil {
 			return nil, err
 		}
+		m.s.announce("clientForgotten", from.Client, from.Client)
 		return map[string]any{}, nil
 	case "hosts/startEnroll":
 		return m.s.codes.Issue(ctx, true, false, controllink.CodeLifetime)
@@ -207,6 +209,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		if err := m.records.SaveHost(ctx, *record); err != nil {
 			return nil, err
 		}
+		m.s.announce("hostEnrolled", request.Host, from.Client)
 		return map[string]any{}, nil
 	case "hosts/lendGit":
 		request, err := require[lendGit](params, "LendGit")
@@ -216,6 +219,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		if err := m.lendGit(ctx, request); err != nil {
 			return nil, err
 		}
+		m.s.announce("hostEnrolled", request.Host, from.Client)
 		return map[string]any{}, nil
 	case "hosts/setRelay":
 		request, err := require[hostRelayRequest](params, "HostRelayRequest")
@@ -225,6 +229,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		if err := m.setRelay(ctx, request); err != nil {
 			return nil, err
 		}
+		m.s.announce("hostEnrolled", request.Host, from.Client)
 		return map[string]any{}, nil
 	case "hosts/remove":
 		request, err := require[hostRequest](params, "HostRequest")
@@ -240,6 +245,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		}
 		m.router.ForgetHost(request.Host)
 		m.s.copies.forget(request.Host)
+		m.s.announce("hostRemoved", request.Host, from.Client)
 		m.s.log("host " + request.Host + " removed")
 		return map[string]any{}, nil
 	case "hosts/lastHeard":
@@ -301,9 +307,11 @@ func (m *Methods) status(from Caller) controlStatus {
 	status.Web = m.web
 	m.mu.Unlock()
 	status.ThisMacHost = m.s.thisMacHost()
-	for _, unjoined := range m.s.tunnels.Unjoined() {
-		raw, _ := json.Marshal(unjoined)
-		status.UnjoinedTunnels = append(status.UnjoinedTunnels, raw)
+	if m.s.tunnels != nil {
+		for _, unjoined := range m.s.tunnels.Unjoined() {
+			raw, _ := json.Marshal(unjoined)
+			status.UnjoinedTunnels = append(status.UnjoinedTunnels, raw)
+		}
 	}
 	status.ProjectDetection = settings.ProjectDetection
 	if len(status.ProjectDetection) == 0 {
@@ -351,8 +359,10 @@ func (m *Methods) hostRow(h records.HostRecord) controlHost {
 	}
 	m.mu.Unlock()
 	sort.Slice(row.GitAsks, func(i, j int) bool { return row.GitAsks[i].Server < row.GitAsks[j].Server })
-	if tunnel := m.s.tunnels.State(h.ID); tunnel != nil {
-		row.Tunnel, _ = json.Marshal(tunnel)
+	if m.s.tunnels != nil {
+		if tunnel := m.s.tunnels.State(h.ID); tunnel != nil {
+			row.Tunnel, _ = json.Marshal(tunnel)
+		}
 	}
 	return row
 }
@@ -478,7 +488,11 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{}, m.setRelay(ctx, hostRelayRequest{Host: host, Relay: request.Relay})
+		if err := m.setRelay(ctx, hostRelayRequest{Host: host, Relay: request.Relay}); err != nil {
+			return nil, err
+		}
+		m.s.announce("hostEnrolled", host, host)
+		return map[string]any{}, nil
 	case "attention/need":
 		m.s.heard(params)
 		if m.s.channels != nil {

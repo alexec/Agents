@@ -37,6 +37,10 @@ func (l *Lines) Read(ctx context.Context) (string, error) {
 
 func (l *Lines) Close() { l.ws.Close(websocket.StatusNormalClosure, "") }
 
+// Socket is the WebSocket under the lines, for a caller that keeps its own queue on it:
+// the control plane's link to another copy.
+func (l *Lines) Socket() *websocket.Conn { return l.ws }
+
 // Dial opens wss://…/v1/connect. With a pin, only a certificate whose SPKI hashes to it is
 // taken and no trust store is read (R6); without one, the system roots decide.
 func Dial(ctx context.Context, base, pin string) (*Lines, error) { return dial(ctx, base, pin, "") }
