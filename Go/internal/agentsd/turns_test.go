@@ -39,7 +39,12 @@ type fakeRuntime struct {
 
 func (f *fakeRuntime) Initialize(context.Context, sdk.InitializeRequest) (sdk.InitializeResponse, error) {
 	return sdk.InitializeResponse{ProtocolVersion: sdk.ProtocolVersionNumber,
-		AgentCapabilities: sdk.AgentCapabilities{SessionCapabilities: sdk.SessionCapabilities{Resume: &sdk.SessionResumeCapabilities{}}}}, nil
+		AgentCapabilities: sdk.AgentCapabilities{SessionCapabilities: sdk.SessionCapabilities{Resume: &sdk.SessionResumeCapabilities{},
+			Fork: &sdk.SessionForkCapabilities{}}}}, nil
+}
+
+func (f *fakeRuntime) UnstableForkSession(_ context.Context, r sdk.UnstableForkSessionRequest) (sdk.UnstableForkSessionResponse, error) {
+	return sdk.UnstableForkSessionResponse{SessionId: "forked-" + r.SessionId}, nil
 }
 
 // ResumeSession has its own conversation, and no other.

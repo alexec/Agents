@@ -586,3 +586,33 @@ func (t *tail) say() string {
 }
 
 var _ io.Writer = (*tail)(nil)
+
+// ErrCannotFork is a runtime that does not say it can branch a conversation.
+var ErrCannotFork = errors.New("the runtime cannot branch a conversation")
+
+// ErrConversationGone is a conversation the runtime no longer has.
+var ErrConversationGone = errors.New("the runtime no longer has this conversation")
+
+// Fork is agents/fork's handshake (DaemonCore.fork): a runtime of its own, the
+// conversation continued, then session/fork; the process goes once it has answered.
+func Fork(ctx context.Context, l Launch, sink Sink, sessionID, cwd string, meta map[string]any) (string, error) {
+	l.Dir = cwd
+	s, err := Start(ctx, l, sink, nil, meta, sessionID)
+	if err != nil {
+		return "", err
+	}
+	defer s.Stop()
+	if s.Init.AgentCapabilities.SessionCapabilities.Fork == nil {
+		return "", ErrCannotFork
+	}
+	if !s.Continued {
+		return "", ErrConversationGone
+	}
+	fctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	r, err := s.conn.UnstableForkSession(fctx, sdk.UnstableForkSessionRequest{SessionId: sdk.SessionId(sessionID), Cwd: cwd, Meta: meta})
+	if err != nil {
+		return "", err
+	}
+	return string(r.SessionId), nil
+}
