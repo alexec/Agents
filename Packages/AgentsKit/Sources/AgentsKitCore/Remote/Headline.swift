@@ -15,11 +15,16 @@ public struct Headline: Hashable, Sendable, Codable {
     public var h1: String
     public var h2: String
     public var h3: String
+    /// What the banner itself can answer with (#1170): one tap, or one line of text. Nil
+    /// when the question needs the card. Sealed with the three lines, so a push says
+    /// what the buttons are only to the device it is for.
+    public var answers: [QuickAnswer]?
 
-    public init(h1: String, h2: String, h3: String) {
+    public init(h1: String, h2: String, h3: String, answers: [QuickAnswer]? = nil) {
         self.h1 = h1
         self.h2 = h2
         self.h3 = h3
+        self.answers = answers
     }
 
     /// The most a field may carry, in characters. Research §11's figure, with room.
@@ -41,7 +46,8 @@ public struct Headline: Hashable, Sendable, Codable {
         }
         return Headline(h1: cut(h1, or: Self.placeholder.h1),
                         h2: cut(h2, or: Self.placeholder.h2),
-                        h3: cut(h3, or: Self.placeholder.h3))
+                        h3: cut(h3, or: Self.placeholder.h3),
+                        answers: answers?.map { $0.truncating() })
     }
 
     /// Whether every field is within the budget, which is what may be sealed.
