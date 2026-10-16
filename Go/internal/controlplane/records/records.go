@@ -503,19 +503,32 @@ func (r *Records) ForgetClient(ctx context.Context, id string) error {
 			return err
 		}
 	}
-	r.mu.Lock()
-	h, ok := r.clients[id]
-	r.mu.Unlock()
-	if !ok {
-		return nil
-	}
-	tombstone := h.record
-	yes, now := true, Now()
-	tombstone.Forgotten, tombstone.ForgottenAt = &yes, &now
-	tombstone.Rev++
-	_, etag, err := write(ctx, r.Store, tombstone, ClientKey(id), store.Matching(h.etag))
-	if err != nil {
-		return err
+	// Another copy may have noted the client connecting since it was read: a forget means
+	// the same whatever changed, so it is read again and tried once more.
+	var etag string
+	for attempt := 1; ; attempt++ {
+		r.mu.Lock()
+		h, ok := r.clients[id]
+		r.mu.Unlock()
+		if !ok {
+			return nil
+		}
+		tombstone := h.record
+		yes, now := true, Now()
+		tombstone.Forgotten, tombstone.ForgottenAt = &yes, &now
+		tombstone.Rev++
+		var err error
+		_, etag, err = write(ctx, r.Store, tombstone, ClientKey(id), store.Matching(h.etag))
+		if store.IsConflict(err) && attempt < 2 {
+			if err := r.load(ctx); err != nil {
+				return err
+			}
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		break
 	}
 	r.mu.Lock()
 	r.tombstones[ClientKey(id)] = etag

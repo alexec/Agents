@@ -64,6 +64,12 @@ type Config struct {
 	// Told whenever the web remote's listener starts or fails to (071 R3): serve --home
 	// writes it beside the log for Agents Host.
 	WebChanged func(web.Status)
+	// Where other copies reach this one (several copies over one store, US3). "" for a
+	// single copy (Agents Host's), which links with nobody and takes no leases (#206).
+	PeerURL string
+	// How often a copy beats, looks for the others and renews its leases; shorter in
+	// tests. 0 is 10 s.
+	CopyBeat time.Duration
 	// Where each log line goes, already marked with this copy. No line may hold a code,
 	// a key, a MAC or a message (071 FR-033).
 	Log func(string)
@@ -97,6 +103,10 @@ type Service struct {
 	tunnels *hosttunnels.Tunnels
 	// Chat apps that answer Needs You (#1012): only with a home for their secrets.
 	channels *channels.Channels
+	// The other copies over this store, and the leases (US3); nil for a single copy.
+	mesh *mesh
+	// The origin peers dial, which a copy's key exchange is bound to.
+	peerOrigin string
 	// hosts/install, detect and sshHosts (T072, #429, #610): with the person's own ssh.
 	installer *hostinstall.Installer
 
@@ -135,18 +145,32 @@ func New(cfg Config) (*Service, error) {
 	s.methods = newMethods(s)
 	s.router.handler = s.methods
 	s.copies = newHostCopies(cfg.Store)
-	if cfg.SecretsHome != "" {
+	if cfg.PeerURL != "" {
+		if s.peerOrigin, err = controllink.Origin(cfg.PeerURL); err != nil {
+			return nil, fmt.Errorf("%s is not an address copies can dial", cfg.PeerURL)
+		}
+		s.mesh = newMesh(s, cfg.PeerURL, cfg.CopyBeat)
+	}
+	// Tunnels and channels belong to a single copy: its ssh is the person's on this
+	// machine, and Slack's Socket Mode gives one connection's events to one copy.
+	if cfg.SecretsHome != "" && s.mesh == nil {
 		s.channels = s.makeChannels(cfg.SecretsHome)
 	}
-	s.tunnels = hosttunnels.New(hosttunnels.Config{Store: cfg.Store, Port: cfg.Port, Log: s.log,
-		Hosts:   func(context.Context) []records.HostRecord { return s.records.Hosts() },
-		Changed: func(change hosttunnels.Changed) { s.router.BroadcastControl("control/tunnelChanged", change) }})
+	if cfg.PeerURL == "" {
+		s.tunnels = hosttunnels.New(hosttunnels.Config{Store: cfg.Store, Port: cfg.Port, Log: s.log,
+			Hosts:   func(context.Context) []records.HostRecord { return s.records.Hosts() },
+			Changed: func(change hosttunnels.Changed) { s.router.BroadcastControl("control/tunnelChanged", change) }})
+	}
 	s.router.SetCopier(s.copies.take)
+	var tunnels hostinstall.Tunnels
+	if s.tunnels != nil {
+		tunnels = s.tunnels
+	}
 	s.installer = &hostinstall.Installer{Codes: s.codes, ServerFolder: cfg.ServerFolder,
 		Progress: func(name, step string) {
 			s.router.BroadcastControl("control/installProgress", map[string]string{"name": name, "step": step})
 		},
-		Tunnels: s.tunnels,
+		Tunnels: tunnels,
 		KnownNames: func(context.Context) []string {
 			var names []string
 			for _, h := range s.records.Hosts() {
@@ -200,7 +224,12 @@ func (s *Service) Start(ctx context.Context) (int, error) {
 	}
 	go s.refreshEvery(15 * time.Second)
 	go s.sweepEveryHour()
-	s.tunnels.Start(0)
+	if s.tunnels != nil {
+		s.tunnels.Start(0)
+	}
+	if s.mesh != nil {
+		s.startMesh()
+	}
 	if s.channels != nil {
 		s.channels.Apply()
 	}
@@ -305,6 +334,9 @@ func (s *Service) Stop() {
 	}
 	if s.channels != nil {
 		s.channels.Stop()
+	}
+	if s.mesh != nil {
+		s.mesh.stop()
 	}
 }
 
@@ -426,6 +458,37 @@ func (s *Service) tellRelayDevices() {
 	}
 }
 
+// startMesh starts the copies (T063–T066): leases let go when a host's uplink here ends
+// or another copy takes it, presence and links told to the others.
+func (s *Service) startMesh() {
+	m := s.mesh
+	s.router.OnLocalEnded(func(host string) {
+		s.log("host " + host + " disconnected")
+		if epoch := m.leases.release(context.Background(), host); epoch != 0 {
+			m.released(host, epoch)
+		}
+	})
+	m.leases.lost = func(host string, epoch int) {
+		s.log("another copy took " + host + "; closing its uplink here")
+		s.router.CloseLocal(host)
+		m.released(host, epoch)
+	}
+	s.router.OnPresence(func(client string, device bool, report json.RawMessage) {
+		grant := records.LegacyGrant
+		if device {
+			grant = "device"
+		}
+		m.broadcast(encodePeer("presence", map[string]any{"client": client, "grant": grant, "report": report}))
+	})
+	s.router.OnLinkChanged(func(client string, relayed *bool) {
+		if relayed == nil {
+			s.log("client " + client + " disconnected")
+		}
+		m.broadcast(peerLinkLine(client, relayed))
+	})
+	m.start()
+}
+
 // channelClient is ControlService.channelClient: who a channel's answers come from on a
 // host, one client of its own for every channel.
 const channelClient = "C4A77E15-0000-4000-8000-000000001009"
@@ -498,8 +561,17 @@ func (s *Service) heard(params json.RawMessage) {
 	if json.Unmarshal(params, &need) != nil {
 		return
 	}
+	s.deliver(need, false)
+}
+
+// deliver posts a need through the relay host if it is held here, otherwise tells the
+// other copies, one of which may hold it.
+func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool) {
 	relays := s.router.RelaysHeldHere()
 	if len(relays) == 0 {
+		if !fromPeer && s.mesh != nil {
+			s.mesh.broadcast(encodePeer("need", need))
+		}
 		return
 	}
 	sort.Strings(relays)
@@ -670,6 +742,10 @@ func (s *Service) accept(conn *Conn, webOrigin string) {
 	var host string
 	var admittedAny bool
 	bound := s.origins()
+	// A peer copy dials the address copies reach each other at, and proves that.
+	if strings.HasPrefix(auth.ID, "x:") && s.peerOrigin != "" {
+		bound = []string{s.peerOrigin}
+	}
 	if webOrigin != "" {
 		// On the loopback listener only a browser or its code may prove anything (071).
 		if !strings.HasPrefix(auth.ID, "c:") && !strings.HasPrefix(auth.ID, "p:") {
@@ -687,8 +763,7 @@ func (s *Service) accept(conn *Conn, webOrigin string) {
 		refuse(err)
 		return
 	}
-	if !admittedAny || id.Kind == 'x' {
-		// Copies link with each other only on a control plane of several copies.
+	if !admittedAny {
 		refuse(controllink.Refuse(controllink.Unknown))
 		return
 	}
@@ -744,7 +819,9 @@ func (s *Service) accept(conn *Conn, webOrigin string) {
 	case 'h':
 		s.hostArrived(host, conn)
 	case 'p', 'e':
-		s.announce(conn, id.ID, webOrigin != "")
+		s.spend(conn, id.ID, webOrigin != "")
+	case 'x':
+		s.mesh.accepted(id.ID, conn)
 	}
 }
 
@@ -850,6 +927,12 @@ func (s *Service) key(id controllink.Identity) ([]byte, *records.ClientRecord, s
 			return nil, nil, "", controllink.Refuse(controllink.Unknown)
 		}
 		return controllink.CodeKey(secret), nil, "", nil
+	case 'x':
+		// Copies link with each other only on a control plane of several copies.
+		if s.mesh == nil {
+			return nil, nil, "", controllink.Refuse(controllink.Unknown)
+		}
+		return controllink.CopyKey(s.cfg.PrivateKey), nil, "", nil
 	}
 	return nil, nil, "", controllink.Refuse(controllink.Unknown)
 }
@@ -887,6 +970,14 @@ func (s *Service) hostArrived(host string, conn *Conn) {
 		return
 	}
 	s.router.AttachHost(host, conn)
+	// This copy holds the host now (T063): every peer reaches it through here.
+	if s.mesh != nil {
+		if epoch, err := s.mesh.leases.take(context.Background(), host); err == nil {
+			s.mesh.holding(host, epoch)
+		} else {
+			s.log("the store would not give " + host + "'s lease to this copy; serving it anyway")
+		}
+	}
 	result, err := s.methods.HostSaid(host, "host/hello", m.Params)
 	if err != nil {
 		conn.Send(channelFrame(0, replyError(m.ID, err)))
@@ -899,9 +990,9 @@ func (s *Service) hostArrived(host string, conn *Conn) {
 // spentWords is a code used already, as the page says it (Web/src/session.ts).
 const spentWords = "This code has been used. Ask for a new one."
 
-// announce is someone holding a code saying who they are, once, before it hangs up
+// spend is someone holding a code saying who they are, once, before it hangs up
 // (wire.md).
-func (s *Service) announce(conn *Conn, id string, loopback bool) {
+func (s *Service) spend(conn *Conn, id string, loopback bool) {
 	defer func() {
 		// Give the reply time to leave before the socket closes.
 		time.Sleep(200 * time.Millisecond)
@@ -987,6 +1078,8 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, loopback 
 			return nil, err
 		}
 		s.log(name + " paired (" + a.Kind + ")")
+		// Known at every copy at once: the relay host may be held at another.
+		s.announce("clientPaired", client, "code")
 		return result, nil
 	case stored.Purpose == "host" && method == "hosts/announce":
 		var a hostAnnounce
@@ -1031,6 +1124,8 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, loopback 
 		if relay {
 			s.router.SetRelay(host, &relay)
 		}
+		// Every other copy knows it at once.
+		s.announce("hostEnrolled", host, "code")
 		s.router.Know(host)
 		s.log("host " + a.Name + " enrolled as " + host)
 		return result, nil
