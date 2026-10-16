@@ -146,5 +146,5 @@ In the window, everything on this Mac's host now goes through two copies. Stop c
 - **`hosts/lastHeard`** answers with nothing kept, so a window that opens while a host is offline sees its lists empty until the host is back.
 - **Bonjour.** A window on another Mac can't find the control plane by itself. Use a code.
 - **The MCP Apps sandbox proxy** (#187) is served with a fixed CSP, not the view's own.
-- **The window was never seen on screen** (the Mac was locked), and neither was the page in a real browser.
+- **The window was never seen on screen.** After the unlock, a scratch window launched behind still opened no window, with the Swift control plane as much as with the Go one: that is #1131, in today's app, not this spike. The page has not been tried in a real browser either.
 - **SSE-KMS buckets on AWS** would break conditional writes (see gocloud above). DigitalOcean Spaces (#61) was not tried. Whether it honours If-Match at all is the first thing to find out, for Swift as much as for Go.
