@@ -4034,6 +4034,12 @@
         },
         "h3": {
           "type": "string"
+        },
+        "answers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/QuickAnswer"
+          }
         }
       },
       "required": [
@@ -6163,6 +6169,40 @@
         "labels"
       ],
       "additionalProperties": false
+    },
+    "QuickAnswer": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/QuickAnswerKind"
+        },
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "isDestructive": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "title",
+        "isDestructive"
+      ],
+      "additionalProperties": false
+    },
+    "QuickAnswerKind": {
+      "type": "string",
+      "enum": [
+        "choice",
+        "reply"
+      ]
     },
     "RateLimitInfo": {
       "type": "object",
