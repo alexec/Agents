@@ -94,6 +94,10 @@ if [ "$BUILD" = 1 ]; then
 fi
 
 CONTROL="$HOSTAPP/Contents/Helpers/agents-control"
+# CONTROL_BIN: another agents-control in its place, such as the Go one (#1137):
+#   GOOS=darwin Go/scripts/go.sh build -o out/darwin/agents-control ./cmd/agents-control
+#   CONTROL_BIN=$PWD/Go/out/darwin/agents-control launch.sh …
+[ -n "${CONTROL_BIN:-}" ] && CONTROL="$CONTROL_BIN"
 AGENTSD="$HOSTAPP/Contents/Helpers/agentsd"
 [ -x "$CONTROL" ] && [ -x "$AGENTSD" ] || { echo "no helpers in $HOSTAPP — run without --no-build" >&2; exit 1; }
 [ "$WINDOW" = 0 ] || [ -d "$APP" ] || { echo "no window at $APP — run without --no-build" >&2; exit 1; }
