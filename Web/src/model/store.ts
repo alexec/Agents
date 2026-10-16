@@ -2296,9 +2296,11 @@ export class Store extends Work {
     return (await this.link.call("agents/labelVocabulary", { folder: folder as never }, host).catch(() => null)) ?? [];
   }
 
-  /** The personas a start in this project can pick (#760); none from a host too old to know them. */
-  async personas(host: string, folder: string): Promise<Persona[]> {
-    return (await this.link.call("personas/list", { folder: folder as never }, host).catch(() => null)) ?? [];
+  /** The personas a start in this project can pick (#760); none from a host too old to know them,
+   *  and null when the host did not answer, so the page asks again once it does (#1096). */
+  async personas(host: string, folder: string): Promise<Persona[] | null> {
+    return this.link.call("personas/list", { folder: folder as never }, host)
+      .catch((error: unknown) => (error instanceof CallFailed && error.code === methodNotFound ? [] : null));
   }
 
   async worktrees(host: string, folder: string): Promise<WorktreesListResponse | null> {
