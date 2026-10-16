@@ -60,7 +60,33 @@ func start(t *testing.T, root string) (*Daemon, *conn) {
 	c := newConn()
 	go d.Accept(c)
 	t.Cleanup(func() { close(c.in) })
+	// A stopped runtime's turn still records how it ended: wait for that before the
+	// root's TempDir goes, or the removal races a write into it.
+	t.Cleanup(func() {
+		for deadline := time.Now().Add(2 * time.Second); d.anyLive() && time.Now().Before(deadline); {
+			time.Sleep(10 * time.Millisecond)
+		}
+	})
 	return d, c
+}
+
+// anyLive is whether an agent's run loop is still running or in a turn.
+func (d *Daemon) anyLive() bool {
+	d.mu.Lock()
+	ls := make([]*live, 0, len(d.lives))
+	for _, l := range d.lives {
+		ls = append(ls, l)
+	}
+	d.mu.Unlock()
+	for _, l := range ls {
+		l.mu.Lock()
+		busy := l.running || l.inTurn
+		l.mu.Unlock()
+		if busy {
+			return true
+		}
+	}
+	return false
 }
 
 func TestPingAndAnUnknownMethod(t *testing.T) {
