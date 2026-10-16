@@ -42,12 +42,13 @@ func (d *Daemon) StartAppTools() error {
 		}
 		handler.ServeHTTP(w, r)
 	}))
+	hosted := d.hostedFor()
 	mux.Handle("/mcp/hosted/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if e.agent(r) == "" || d.hosted == nil {
+		if e.agent(r) == "" {
 			http.NotFound(w, r)
 			return
 		}
-		d.hosted.ServeHTTP(w, r)
+		hosted.ServeHTTP(w, r)
 	}))
 	go http.Serve(ln, mux)
 	d.appTools = e.serversFor
@@ -85,10 +86,10 @@ func (e *appToolsEndpoint) serversFor(agentID string) []acp.McpServer {
 	header := []acp.HttpHeader{{Name: "Authorization", Value: "Bearer " + token}}
 	out := []acp.McpServer{{Http: &acp.McpServerHttpInline{Type: "http", Name: "agents",
 		Url: fmt.Sprintf("http://127.0.0.1:%d/mcp/agents", e.port), Headers: header}}}
-	if e.d.hosted != nil {
-		for _, h := range e.d.hosted.routes() {
-			out = append(out, acp.McpServer{Http: &acp.McpServerHttpInline{Type: "http", Name: h,
-				Url: fmt.Sprintf("http://127.0.0.1:%d/mcp/hosted/%s", e.port, h), Headers: header}})
+	if a := e.d.store.Agent(agentID); a != nil {
+		for _, h := range e.d.hostedFor().routesFor(folderPath(a.Cwd)) {
+			out = append(out, acp.McpServer{Http: &acp.McpServerHttpInline{Type: "http", Name: h.Name,
+				Url: fmt.Sprintf("http://127.0.0.1:%d/mcp/hosted/%s", e.port, h.route), Headers: header}})
 		}
 	}
 	return out

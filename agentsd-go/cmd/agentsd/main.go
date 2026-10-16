@@ -17,6 +17,7 @@ import (
 
 	"github.com/alexec/agents/agentsd-go/internal/control"
 	"github.com/alexec/agents/agentsd-go/internal/daemon"
+	"github.com/alexec/agents/agentsd-go/internal/demo"
 	"github.com/alexec/agents/agentsd-go/internal/sandbox"
 )
 
@@ -27,6 +28,13 @@ func main() {
 		if err := sandbox.Exec(os.Args[2:]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(126)
+		}
+		return
+	}
+	if len(os.Args) > 1 && os.Args[1] == "mcp-demo" {
+		if err := demo.Serve(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
 		}
 		return
 	}

@@ -58,6 +58,9 @@ type Agent struct {
 	IsUnread          bool            `json:"isUnread,omitempty"`
 	ArchivedAt        *Date           `json:"archivedAt,omitempty"`
 	Usage             json.RawMessage `json:"usage,omitempty"`
+	StartedByWorkflow string          `json:"startedByWorkflow,omitempty"`
+	StartedByRun      string          `json:"startedByRun,omitempty"`
+	Labels            json.RawMessage `json:"labels,omitempty"`
 }
 
 // Entry is a TranscriptEntry: kind is an object with one key, the case.

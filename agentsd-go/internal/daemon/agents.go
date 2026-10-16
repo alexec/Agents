@@ -97,6 +97,19 @@ func (d *Daemon) setState(id, state, reason string) {
 
 // Start makes an agent and runs its first turn.
 func (d *Daemon) Start(runtimeID, cwd, prompt string, options map[string]any) (string, error) {
+	return d.startAs(runtimeID, cwd, prompt, func(a *Agent) { a.StartOptions.Values = orValues(options) })
+}
+
+func orValues(v map[string]any) map[string]any {
+	if v == nil {
+		return map[string]any{}
+	}
+	return v
+}
+
+// startAs makes an agent, lets the caller set what it was started as, and runs its first turn.
+func (d *Daemon) startAs(runtimeID, cwd, prompt string, as func(*Agent)) (string, error) {
+	var options map[string]any
 	rt := d.catalog(runtimeID)
 	if rt == nil {
 		return "", &RPCError{Code: -32602, Message: "no runtime " + runtimeID}
@@ -110,6 +123,9 @@ func (d *Daemon) Start(runtimeID, cwd, prompt string, options map[string]any) (s
 		StartOptions: StartOptions{Values: options, ExtraArguments: []string{}},
 		AdvertisedOptions: json.RawMessage("[]"), AvailableCommands: json.RawMessage("[]"),
 		CreatedAt: Now(), LastActivityAt: Now(),
+	}
+	if as != nil {
+		as(a)
 	}
 	d.changed(a)
 	l := d.live(a.ID)
@@ -263,6 +279,7 @@ func (d *Daemon) end(id, state, reason, last string) {
 	d.changed(a)
 	body := map[string]any{"_0": state, "reason": reason}
 	d.record(id, entry("stateChanged", body))
+	d.workflowAgentEnded(a)
 }
 
 func firstSentence(s string) string {
@@ -483,6 +500,13 @@ func (l *live) answer(permissionID, option string) bool {
 	pp := l.pending[permissionID]
 	l.mu.Unlock()
 	if pp == nil {
+		return false
+	}
+	known := false
+	for _, o := range pp.req.Options {
+		known = known || o.OptionID == option
+	}
+	if !known {
 		return false
 	}
 	select {

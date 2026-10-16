@@ -8,7 +8,54 @@ Throwaway code in `agentsd-go/`. Not for merge. The test note is [test.md](test.
 |---|---|---|---|
 | 1. Base | done (socket); window look waits for an unlocked screen | 3acff3f2 | Joins with a v2 host code over today's wire. A real Claude turn over `coder/acp-go-sdk`, with this Mac's sign-in lent through the control plane. |
 | 2. Everyday turn | done (socket); window look waits | 91657767 | Permission cards both ways; the app's tools (`list_sessions`, `read_session`, `start_session`) on `modelcontextprotocol/go-sdk`; terminals on `creack/pty`; files browse/list/read/write; Codex with the Mac's ChatGPT sign-in lent; stop. |
-| 3. Schema-first wire | done | (this commit) | `schema/daemon.schema.json`, 118 definitions, with Go, Swift and TypeScript generated from it. Go and Swift round-trip all 316 records today's Swift encoder writes in the fixtures. Today's TypeScript types fit the schema's. The Go host's own records fit it too. |
+| 3. Schema-first wire | done | 614aa5ea | `schema/daemon.schema.json`, 118 definitions, with Go, Swift and TypeScript generated from it. Go and Swift round-trip all 316 records today's Swift encoder writes in the fixtures. Today's TypeScript types fit the schema's. The Go host's own records fit it too. |
+| 4. More of the daemon | done (socket); the window's Workflows page waits for a look | (this commit) | Workflows: today's front matter and schedule, run by `robfig/cron`; one run by its schedule, one by hand. Every runtime under Landlock (`go-landlock`), proved on a real turn. A hosted stdio MCP server shared by two sessions (one pid, calls 1 and 2). |
+
+## Stage 4: more of the daemon
+
+**Workflows** (`internal/daemon/workflows.go`, `robfig/cron` v3.0.1, `gopkg.in/yaml.v3`)
+- **The files.** Today's files: `<project>/.agents/workflows/<id>.md`, YAML front matter, and the body as the prompt.
+  - Read: `name`, `on`, `agent`, `runtime`, `labels`, `enabled`, `archived`. Every other key is kept in `unknownFields`, as Swift keeps them.
+  - They are read when a project is added and every 15 s after; a changed digest is a changed workflow.
+- **Schedules** are Swift's half-hour slots (`at: [":00", ":30"]`, `between: "HH:MM-HH:MM"`, `days`), not cron. Each slot becomes a cron line (`0,30 H1-H2 * * MON-FRI`), and `matches` checks the half-hours at the two ends.
+  - `robfig/cron` gives `nextFireAt` for nothing.
+  - `cron:` is a key only the Go host reads. The Swift host keeps it as an unknown field and does nothing with it. It is there so a test need not wait half an hour.
+- **One run** is an ordinary agent start in the project folder, with the body as its prompt. The agent gets the workflow's name as its title, `startedByWorkflow`/`startedByRun`, and the file's labels, owned by the agent.
+  - The run sets `lastOutcome {"ran":…}`, `lastFiredAt` and `lastFiredBy` (`byHand`, or `{"trigger":…}`).
+  - `isRunning` is true until that agent's turn ends.
+  - Methods: `workflows/list|run|enable` (an off switch is kept in the root), `workflows/limit|setLimit` (stubs).
+- **The window** never asks a server for its workflows: `refreshWorkflows` asks the Mac's daemon only (`AppModel.swift:1311-1319`, and so says `specs/037-cloud-agents/tasks.md:127`). It does apply `workflow/changed` from a server. So the Go host sends each client every workflow after its `projects/list`, and sends every change to everyone. That this shows on the Workflows page is still to be looked at, on an unlocked screen.
+- **Proved** (2026-10-16 01:06–01:08):
+  - `clock-check` had `cron: "*/2 * * * *"` and a weekday 08:00–18:00 half-hour schedule. It fired by itself at 08:06 UTC, as "Clock check" with the label `go-spike`. Its run stopped on a card for the hosted tool, and ended `finished` once answered; `isRunning` went back to false.
+  - Then it was switched off, and `workflows/run` by hand still ran it, as in Swift.
+
+**Landlock** (`internal/sandbox`, `landlock-lsm/go-landlock` v0.10.1)
+- **New ground: the Swift daemon makes no sandbox of its own.** 064 only switches each runtime's own sandbox: Claude's through `_meta`, Codex's through its mode. So nothing here replaces Swift code.
+- **The design.** With `--sandbox` (or `AGENTS_SANDBOX=1`), every runtime starts as `agentsd sandbox-exec --write <paths> -- <runtime argv>`. That re-exec restricts itself with Landlock ABI v5, best effort, then `exec`s the runtime, so the runtime and everything it starts (node, Bash, git) inherit the rules.
+  - Read and execute: the whole filesystem.
+  - Write: the agent's folder, the temp folders, `/dev/null` and the ptys, and the runtime's own state: `~/.claude`, `~/.claude.json`, `~/.cache` and `~/.npm` for Claude; `~/.codex` for Codex.
+  - The network is not confined: a runtime must reach its provider, and here also the relay gate.
+- **Proved:**
+  - The launcher alone, on the Colima kernel: a write inside is allowed, a write outside is "Permission denied", and reads work.
+  - A real Claude turn under it: Claude's Bash wrote `inside.txt` in the project. `echo … > /home/agents/outside-landlock.txt` failed with "Permission denied", and Claude said so itself.
+  - The relayed sign-in and the app's MCP tools work inside it (loopback TCP).
+- **Not done:**
+  - No `sandboxFailure` record or `sandboxFailed` ending when a runtime breaks under the rules.
+  - The rules are fixed, not per agent; there is no `agents/setSandbox`.
+  - Network rules (Landlock ABI 4+ can confine TCP ports) are left out on purpose.
+
+**Hosted MCP servers** (`internal/daemon/hosted.go`, `modelcontextprotocol/go-sdk` at both ends)
+- **The files.** Entries with `"hosted": true` in `~/.agents/mcp.json` and `<project>/.agents/mcp.json`, in today's shape.
+- **Running them.** Each entry gets one stdio process, started on the first call, through go-sdk's `Client` + `CommandTransport`. The process is shared by every session in its scope. A go-sdk `Server` offers the process's tools to the sessions at `/mcp/hosted/<32 hex>` on the app-tools port, with the session's own bearer (404 otherwise; GET is 405), and with JSON replies.
+- **The session's side.** Each session's `mcpServers` gets `{"type":"http","name":"<the key>",…}`, as in Swift. `mcp/hosted` and `mcp/health` answer with the snapshot.
+- **Proved** with `agentsd mcp-demo`, a stdio server whose `host_facts` tool reports its own pid and its count of calls:
+  - the workflow's run got "pid 1735 … call number 1";
+  - a second session got "pid 1735, up 45s, call number 2";
+  - `ps` shows one `mcp-demo` process.
+- **Not done:**
+  - Project entries are not approved by digest; every entry is served.
+  - No restart after a crash, no 8-process limit, and the process is not stopped when its last user goes.
+  - Proxying tools only: resources, prompts and `list_changed` are not passed on. Swift forwards raw JSON-RPC. go-sdk's typed proxy is less code, but it narrows what passes.
 
 ## Stage 3: a schema-first wire
 

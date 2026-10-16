@@ -18,5 +18,5 @@ if [ "$1" = join ]; then join="--control '$2'"; fi
 ssh_ "set -e; R=\$HOME/.agents-go/root; if [ -f \$R/daemon.lock ]; then kill \$(cat \$R/daemon.lock) 2>/dev/null || true; sleep 1; fi
   mv ~/agentsd-go.new ~/agentsd-go; chmod 700 ~/agentsd-go
   [ -n \"$join\" ] && rm -f \$R/control-host.json
-  AGENTS_MACHINE_ID=go-devbox ~/agentsd-go --root \$R --serve --detach --control-network $join --host-name 'devbox (Go)'
+  AGENTS_SANDBOX=${SANDBOX:-0} AGENTS_MACHINE_ID=go-devbox ~/agentsd-go --root \$R --serve --detach --control-network $join --host-name 'devbox (Go)'
   sleep 2; tail -n 5 \$R/daemon.log"

@@ -4,4 +4,6 @@ package daemon
 func (d *Daemon) registerMore() {
 	d.registerShells()
 	d.registerFiles()
+	d.registerWorkflows()
+	d.registerHosted()
 }

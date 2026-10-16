@@ -33,6 +33,7 @@ type Daemon struct {
 	toolsPort int
 	hosted    *hostedServers
 	shells    map[shellKey]*shell
+	wf        *workflows
 }
 
 func New(ctx context.Context, root string) (*Daemon, error) {
@@ -43,6 +44,7 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	}
 	d.store = st
 	d.register()
+	d.startWorkflows()
 	return d, nil
 }
 

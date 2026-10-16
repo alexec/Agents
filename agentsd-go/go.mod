@@ -8,6 +8,8 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/landlock-lsm/go-landlock v0.10.1
 	github.com/modelcontextprotocol/go-sdk v1.8.0
+	github.com/robfig/cron/v3 v3.0.1
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

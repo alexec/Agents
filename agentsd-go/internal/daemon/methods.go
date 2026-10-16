@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 func decode[T any](params json.RawMessage) (T, error) {
@@ -40,7 +41,7 @@ func (d *Daemon) register() {
 		return map[string]any{"ok": true}, nil
 	})
 	for _, m := range []string{"credentials/offer", "presence/report", "agents/prewarm", "agents/discardDraft",
-		"retention/set", "clientPermissions/set", "workflows/setLimit", "person/set", "sandbox/set", "pool/applyAllowances",
+		"retention/set", "clientPermissions/set", "person/set", "sandbox/set", "pool/applyAllowances",
 		"files/watch", "files/unwatch"} {
 		d.Handle(m, func(ctx context.Context, c *Client, p json.RawMessage) (any, error) { return empty(), nil })
 	}
@@ -66,6 +67,8 @@ func (d *Daemon) register() {
 		for _, pr := range d.store.Projects() {
 			out = append(out, *d.summary(pr))
 		}
+		// The window learns a server's workflows only from workflow/changed.
+		go func() { time.Sleep(300 * time.Millisecond); d.tellWorkflows(c) }()
 		return out, nil
 	})
 	d.Handle("projects/add", func(ctx context.Context, c *Client, p json.RawMessage) (any, error) {
@@ -81,6 +84,9 @@ func (d *Daemon) register() {
 		}
 		s := d.summary(d.store.AddProject(folderURL(path)))
 		d.Broadcast("project/changed", s)
+		if d.wf != nil {
+			go d.rescanWorkflows()
+		}
 		return s, nil
 	})
 	d.Handle("projects/remove", func(ctx context.Context, c *Client, p json.RawMessage) (any, error) {
