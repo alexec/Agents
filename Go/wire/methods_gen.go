@@ -93,6 +93,7 @@ var (
 	CallPinsUnpinSession               = Method[PinSessionRequest, Empty]{"pins/unpinSession"}
 	CallPinsUnpinWorkflow              = Method[WorkflowRequest, Empty]{"pins/unpinWorkflow"}
 	CallPinsWrite                      = Method[PinWriteRequest, Empty]{"pins/write"}
+	CallPoolApplyAllowances            = Method[ApplyAllowancesRequest, Changed]{"pool/applyAllowances"}
 	CallPreferencesGet                 = Method[Empty, map[string]JSONValue]{"preferences/get"}
 	CallPreferencesSet                 = Method[map[string]JSONValue, map[string]JSONValue]{"preferences/set"}
 	CallPresenceReport                 = Method[PresenceReport, Empty]{"presence/report"}
@@ -176,6 +177,8 @@ var (
 	NotifyPreferencesChanged           = Notification[map[string]JSONValue]{"preferences/changed"}
 	NotifyProjectChanged               = Notification[ProjectSummary]{"project/changed"}
 	NotifyProjectRemoved               = Notification[ProjectRemovedNotification]{"project/removed"}
+	NotifyRuntimeAccount               = Notification[RuntimeAccount]{"runtime/account"}
+	NotifyRuntimesAllowancesChanged    = Notification[RuntimeAllowances]{"runtimes/allowancesChanged"}
 	NotifyShellOutput                  = Notification[ShellOutputNotification]{"shell/output"}
 	NotifyShellStateChanged            = Notification[ShellStateNotification]{"shell/stateChanged"}
 	NotifyStorageWriteFailed           = Notification[WriteFailure]{"storage/writeFailed"}

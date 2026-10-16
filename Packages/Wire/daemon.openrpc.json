@@ -2092,6 +2092,25 @@
       }
     },
     {
+      "name": "pool/applyAllowances",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ApplyAllowancesRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Changed"
+        }
+      }
+    },
+    {
       "name": "preferences/get",
       "tags": [
         {
@@ -3908,6 +3927,34 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/ProjectRemovedNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "runtime/account",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/RuntimeAccount"
+          }
+        }
+      ]
+    },
+    {
+      "name": "runtimes/allowancesChanged",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/RuntimeAllowances"
           }
         }
       ]

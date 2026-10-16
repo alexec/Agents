@@ -783,6 +783,21 @@
       ],
       "additionalProperties": false
     },
+    "ApplyAllowancesRequest": {
+      "type": "object",
+      "properties": {
+        "states": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AllowanceState"
+          }
+        }
+      },
+      "required": [
+        "states"
+      ],
+      "additionalProperties": false
+    },
     "Approval": {
       "type": "object",
       "properties": {
@@ -1529,6 +1544,9 @@
         "renamed",
         "untracked"
       ]
+    },
+    "Changed": {
+      "type": "boolean"
     },
     "ChangedFile": {
       "type": "object",

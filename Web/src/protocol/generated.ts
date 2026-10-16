@@ -279,6 +279,10 @@ export interface AppViewPolicy {
   refused: string[];
 }
 
+export interface ApplyAllowancesRequest {
+  states: AllowanceState[];
+}
+
 export interface Approval {
   kind: ApprovalKind;
   key: string;
@@ -447,6 +451,8 @@ export interface CatchUpSnapshot {
 export type ChangeSource = "reported" | "reportedAndSeen" | "seen";
 
 export type ChangeState = "modified" | "added" | "deleted" | "binary" | "renamed" | "untracked";
+
+export type Changed = boolean;
 
 export interface ChangedFile {
   path: string;
@@ -2940,6 +2946,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AnswerSandboxRequest: { required: ["agentID", "carryOn"], optional: [] },
   AppViewCall: { required: ["id", "server", "tool", "resourceUri", "state"], optional: ["arguments", "result", "reason", "pinnable"] },
   AppViewPolicy: { required: ["connectDomains", "resourceDomains", "frameDomains", "baseUriDomains", "refused"], optional: [] },
+  ApplyAllowancesRequest: { required: ["states"], optional: [] },
   Approval: { required: ["kind", "key", "title", "line", "actions"], optional: ["digest", "since", "agentID"] },
   ApprovalAnswer: { required: ["folder", "kind", "key", "action"], optional: ["digest", "note"] },
   ApprovalReadRequest: { required: ["folder", "kind", "key"], optional: [] },
