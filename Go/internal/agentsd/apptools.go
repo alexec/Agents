@@ -62,6 +62,8 @@ func appToolCalls() []appTool {
 		{"lease_resource", (*Daemon).leaseResource},
 		{"release_resource", (*Daemon).releaseResource},
 		{"list_resources", (*Daemon).listResources},
+		{"wait_for_event", (*Daemon).waitForEvent},
+		{"cancel_wait", (*Daemon).cancelWait},
 	}
 }
 

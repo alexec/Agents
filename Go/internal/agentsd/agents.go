@@ -115,12 +115,18 @@ func (d *Daemon) prompt(r wire.PromptRequest) error {
 	if from == "" {
 		from = wire.PromptOriginPerson
 	}
+	var preface *string
 	if from == wire.PromptOriginPerson {
 		// The person's words take back an archive asked for and a question for after the turn.
 		d.change(a.ID, func(a *wire.Agent) { a.ArchiveRequest, a.AfterTurn = nil, nil })
+		// And a wait: the runtime is told, ahead of the words.
+		if w := d.endWait(a.ID, "prompt", false); w != nil {
+			p := "(Your wait for " + waitLabel(w) + " was cancelled by this message. Wait again if you still need to.)"
+			preface = &p
+		}
 	}
 	return d.enqueue(a.ID, wire.QueuedPrompt{ID: store.NewUUID(), Text: r.Text, Attachments: r.Attachments,
-		QueuedAt: now(), From: from}, false)
+		QueuedAt: now(), From: from, Preface: preface}, false)
 }
 
 // sendNow is DaemonCore.sendNow: a queued prompt goes at once, into the running turn
