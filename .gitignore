@@ -30,3 +30,4 @@ Web/dist/
 
 # Go builds for walks and the Go host (#1136).
 Go/out/
+__pycache__/

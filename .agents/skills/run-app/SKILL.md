@@ -85,6 +85,8 @@ its root as Agents Host leaves it, waits until it has failed to join (`HOST_FIRS
 seconds more, 5 by default), then starts the control plane and waits for the host to join
 with the same code (#113). The control plane is always given `--host-root $ROOT`, so
 `control/status` carries the host's join as `thisMacHost`.
+`--outside-checkout` opens a copy of the window from `$ROOT/app`, so its title does not start
+with the worktree's name, for pictures and videos (#1078).
 `--first-run` opens the window unpaired, on frame K, and prints `PAIR_CODE` to paste
 into **Connect…**. To walk Agents Host itself, open a scratch build of it with
 `AGENTS_ROOT=$ROOT` (its plists and jobs are the root's, and `stop.sh` boots them out). Make
