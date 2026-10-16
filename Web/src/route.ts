@@ -16,7 +16,7 @@ export const activityPages: readonly ActivityPage[] = ["events", "resources", "r
 export type SettingsPage = "channels" | "slack";
 
 export interface Route {
-  /** This browser's Settings (#846): Celebrations and which smart groups are on. */
+  /** This browser's Settings (#846): which smart groups are on, and Channels (#1109). */
   settings?: boolean | undefined;
   /** With settings: a page under it (#1109), in Settings' place. */
   settingsPage?: SettingsPage | undefined;

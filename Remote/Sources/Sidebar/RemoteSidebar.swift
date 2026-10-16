@@ -688,8 +688,8 @@ private extension View {
     }
 }
 
-/// Settings (#846): Appearance and Sidebar, both kept on this device only, as the window's
-/// Settings panes of the same names and the page's Settings keep theirs. Channels (#1109),
+/// Settings (#846): Sidebar, the same on every client (#1033), as the window's Settings
+/// pane of the same name and the page's Settings keep it. Channels (#1109),
 /// Slack (#1009) first, are the control plane's. Everything else follows the Mac.
 private struct RemoteSettings: View {
     @Environment(\.dismiss) private var dismiss
@@ -698,14 +698,6 @@ private struct RemoteSettings: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    CelebrationsRow()
-                } header: {
-                    Text("Appearance")
-                } footer: {
-                    Text("Celebrations: the Blob hops when a pull request lands, with confetti for the day's first and for a milestone. No sound; Reduce Motion keeps it still.")
-                }
-                .paperListRow()
                 SidebarSettingsSection()
                 // Nil from a control plane too old to know channels: no row at all.
                 if model.slack != nil {
@@ -725,17 +717,6 @@ private struct RemoteSettings: View {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
         }
-    }
-}
-
-/// Celebrations (#986): the Blob's hop for a landed pull request, on by default, kept on
-/// this device only, as the window's Settings ▸ Appearance and the page's Settings keep theirs.
-private struct CelebrationsRow: View {
-    @AppStorage(Celebration.defaultsKey) private var celebrations = true
-
-    var body: some View {
-        Toggle("Celebrations", isOn: $celebrations)
-            .appText(.supporting)
     }
 }
 

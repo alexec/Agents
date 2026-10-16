@@ -308,9 +308,6 @@ public final class AgentsModel {
     /// The milestones the person has earned (#984); nil until the host has said, or from
     /// a host that predates them.
     public private(set) var milestones: Milestones?
-    /// The Blob's next celebration (#986): a pull request landed or a milestone earned,
-    /// heard as it happened. A client plays it when nothing is in the way, and lets go.
-    public private(set) var celebration: Celebration?
 
     /// What each command the agent on screen ran has printed (033, #203).
     ///
@@ -402,7 +399,6 @@ public final class AgentsModel {
         case wakeChanged(DaemonAPI.WakeState)
         case storeNotesChanged(DaemonAPI.StoreNotes)
         case milestonesChanged(Milestones)
-        case prsLanded(PRsLanded)
         case showFile(DaemonAPI.ShowFileNotification)
         case resuming(DaemonAPI.ResumingNotification)
         case terminalOutput(DaemonAPI.TerminalOutputNotification)
@@ -462,7 +458,6 @@ public final class AgentsModel {
         case DaemonAPI.Notification.wakeChanged: return decode(DaemonAPI.WakeState.self, Update.wakeChanged)
         case DaemonAPI.Notification.storeNotesChanged: return decode(DaemonAPI.StoreNotes.self, Update.storeNotesChanged)
         case DaemonAPI.Notification.milestonesChanged: return decode(Milestones.self, Update.milestonesChanged)
-        case DaemonAPI.Notification.prsLanded: return decode(PRsLanded.self, Update.prsLanded)
         case DaemonAPI.Notification.agentShowFile: return decode(DaemonAPI.ShowFileNotification.self, Update.showFile)
         case DaemonAPI.Notification.agentResuming: return decode(DaemonAPI.ResumingNotification.self, Update.resuming)
         case DaemonAPI.Notification.agentTerminalOutput: return decode(DaemonAPI.TerminalOutputNotification.self, Update.terminalOutput)
@@ -670,12 +665,7 @@ public final class AgentsModel {
             storeNotes = notes.notes
 
         case .milestonesChanged(let milestones):
-            // One earned while this client looked: confetti (#986).
-            if let held = self.milestones, milestones.earned.count > held.earned.count { celebrate(confetti: true) }
             self.milestones = milestones
-
-        case .prsLanded(let landed):
-            celebrate(confetti: landed.firstToday)
 
         case .showFile(let notification):
             filesToShow[notification.agentID] = notification.file
@@ -1130,17 +1120,6 @@ public final class AgentsModel {
     public func replaceWakeState(_ state: DaemonAPI.WakeState) { wakeState = state }
     public func replaceStoreNotes(_ notes: DaemonAPI.StoreNotes) { storeNotes = notes.notes }
     public func replaceMilestones(_ milestones: Milestones) { self.milestones = milestones }
-
-    /// A celebration still waiting merges with the next: one Blob, with confetti if
-    /// either had it.
-    private func celebrate(confetti: Bool) {
-        celebration = Celebration(id: (celebration?.id ?? 0) + 1, confetti: confetti || celebration?.confetti == true)
-    }
-
-    /// Played, or let go: the next is a new one.
-    public func celebrated(_ celebration: Celebration) {
-        if self.celebration?.id == celebration.id { self.celebration = nil }
-    }
 
     // MARK: Choices in flight
 

@@ -125,7 +125,7 @@ export function Huddle({ focused, typed, height = 72 }: { focused: boolean; type
 
 /**
  * One Blob's body, outline, eyes and smile, centred on 0 0 in its own units of 600 by 580, as
- * `Blob` in Swift: the Huddle draws it three times, and a celebration (#986) once.
+ * `Blob` in Swift: the Huddle draws it three times.
  */
 function BlobParts({ fill, facing = 0, look, shut, pace, lag }: {
   fill: string; facing?: number; look: Look; shut: boolean; pace?: number; lag?: number;
@@ -143,14 +143,5 @@ function BlobParts({ fill, facing = 0, look, shut, pace, lag }: {
       <path d={`M${facing - 64} 80 Q${facing} 150 ${facing + 64} 80`} fill="none" stroke="#0E1A3A"
         stroke-width="28" stroke-linecap="round" />
     </>
-  );
-}
-
-/** One Blob alone, white, `height` high, its outline inside the box. */
-export function Blob({ look = AHEAD, shut = false, height }: { look?: Look; shut?: boolean; height: number }) {
-  return (
-    <svg class="blob" aria-hidden="true" viewBox="-328 -318 656 636" height={height} width={(height * 656) / 636}>
-      <BlobParts fill="#fff" look={look} shut={shut} />
-    </svg>
   );
 }

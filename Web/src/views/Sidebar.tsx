@@ -231,8 +231,8 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
         )))}
         <div class="identity">
           <span>{browserName()} on this Mac</span>
-          {/* This browser's Settings (#846): Celebrations and which smart groups are on,
-              as the window's Settings ▸ Appearance and ▸ Sidebar. */}
+          {/* This browser's Settings (#846): which smart groups are on, as the window's
+              Settings ▸ Sidebar. */}
           <button class="link" aria-current={!!r.settings} onClick={() => go({ settings: true })}>Settings</button>
           {/* What forgetting does, beside the confirm, in the Remote's words (#935). */}
           {confirming.value ? (

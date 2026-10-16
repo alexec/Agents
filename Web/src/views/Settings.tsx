@@ -1,6 +1,5 @@
 // This browser's Settings (#846), opened from the sidebar's foot, in the chat's place: what the
-// window has in Settings ▸ Appearance and Settings ▸ Sidebar. Celebrations (#986) is this
-// browser's alone, in its localStorage; which smart groups are on is the person's, kept on their
+// window has in Settings ▸ Sidebar. Which smart groups are on is the person's, kept on their
 // Mac and the same on every client (#1033). Channels (#1109), Slack (#1009) first, are the
 // control plane's: where agents' questions go when the person is away from their Mac. Each has a
 // page of its own under Settings ▸ Channels.
@@ -13,15 +12,10 @@ import { smartRows, smartTitles } from "../model/sidebar";
 import { setSmartGroup, smartGroupsOn } from "../model/smartGroups";
 import { BackToList } from "./BackToList";
 import { go, route } from "../route";
-import { celebrationsOn, setCelebrations } from "../model/celebrations";
 
 /** The words under the Sidebar section, as the window's and the Remote's (#846). */
 export const sidebarSettingsFooter = "A group that is off is not shown. Its sessions go to the next group they fit, "
   + "or under their project. With Needs You off, approvals are not listed in the sidebar.";
-
-/** The words under Celebrations (#986), as the window's and the Remote's. */
-export const celebrationsFooter = "Celebrations: the Blob hops when a pull request lands, with confetti for the day's first "
-  + "and for a milestone. No sound; Reduce Motion keeps it still.";
 
 /** The line under the Slack heading (#1009). */
 export const slackSettingsFooter = "Answer agents' questions from Slack. Questions go to your direct messages when you are away from your Mac.";
@@ -180,15 +174,6 @@ export function SettingsPage({ store }: { store: Store }) {
       <header class="column-head"><BackToList /><h1>Settings</h1></header>
       <div class="scroll">
         <div class="activity-body settings-body">
-          <section aria-labelledby="settings-appearance">
-            <h2 class="section-head" id="settings-appearance">Appearance</h2>
-            <label class="setting">
-              <span>Celebrations</span>
-              <input type="checkbox" role="switch" checked={celebrationsOn.value}
-                onChange={(e) => setCelebrations(e.currentTarget.checked)} />
-            </label>
-            <p class="hint">{celebrationsFooter}</p>
-          </section>
           <section aria-labelledby="settings-sidebar">
             <h2 class="section-head" id="settings-sidebar">Sidebar</h2>
             {smartRows.map((row) => (

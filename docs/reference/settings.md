@@ -20,7 +20,7 @@ same pages under the same heading, for the project's `.agents`, between its own 
 and **Worktrees**. The window opens at one size and stays there whichever pane you choose,
 so it never jumps. You can resize it larger; it will not go smaller than the size it opens
 at. Agents on iPhone and iPad, and the web page, each have a **Settings** screen with
-**Appearance** (Celebrations) and **Sidebar**; everything else follows the Mac they are paired
+**Sidebar**; everything else follows the Mac they are paired
 with.
 
 The settings that are yours rather than this Mac's (the spending limits, how long archived

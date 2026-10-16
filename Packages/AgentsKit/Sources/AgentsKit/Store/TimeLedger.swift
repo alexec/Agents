@@ -136,17 +136,13 @@ public final class TimeLedger: @unchecked Sendable {
         unwritten = true
     }
 
-    /// What `gh` said about the pull requests merged on these days. Returns what it adds
-    /// to the last count, for the Blob to celebrate (#986).
-    @discardableResult
-    public func setPRsMerged(_ counts: [String: Int], on days: [String], today: String = "") -> PRsLanded? {
+    /// What `gh` said about the pull requests merged on these days.
+    public func setPRsMerged(_ counts: [String: Int], on days: [String]) {
         lock.withLock {
             var history = readLocked()
-            let landed = history.landed(counts, on: days, today: today)
             history.setPRsMerged(counts, on: days)
             held = history
             unwritten = true
-            return landed
         }
     }
 

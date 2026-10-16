@@ -11,7 +11,7 @@ import type {
   StartRequest, UUID, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
   ChatProjectState, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
-  GuardedChange, GuardedChangeReading, HostJoinStatus, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones, PRsLanded,
+  GuardedChange, GuardedChangeReading, HostJoinStatus, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, ChannelsSet, ChannelsState, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized,
 } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
@@ -34,7 +34,6 @@ import type { Method, Params, Result } from "../protocol/methods";
 import { dropboxRefusal, dropboxRequest } from "./dropbox";
 import { goOnRequest } from "./limits";
 import { milestonesSeen } from "./milestones";
-import { type Celebration, celebrate, earnedMore } from "./celebrations";
 import type { ChartHint } from "./chart";
 
 /** The person's Mac: the host that keeps their display choices (#1033). */
@@ -361,11 +360,7 @@ export class Work {
   /** Each host's milestones (#984), replaced whole by each milestones/changed. */
   readonly milestones = signal<Record<string, Milestones>>({});
 
-  /** The Blob's next celebration (#986): a pull request landed or a milestone earned. Celebration.tsx plays it. */
-  readonly celebration = signal<Celebration | null>(null);
-
   protected takeMilestones(host: string, milestones: Milestones): void {
-    if (earnedMore(this.milestones.peek()[host], milestones)) this.celebration.value = celebrate(this.celebration.peek(), true);
     this.milestones.value = { ...this.milestones.value, [host]: milestones };
     milestonesSeen.take(milestones);
   }
@@ -551,9 +546,6 @@ export class Work {
         return true;
       case "milestones/changed":
         this.takeMilestones(host, params as Milestones);
-        return true;
-      case "prs/landed":
-        this.celebration.value = celebrate(this.celebration.peek(), (params as PRsLanded).firstToday);
         return true;
       case "preferences/changed":
         if (host === macHost) preferencesSaid(params as Record<string, JSONValue>);
