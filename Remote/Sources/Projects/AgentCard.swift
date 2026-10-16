@@ -185,7 +185,7 @@ struct AgentCard: View {
         .contextMenu { AgentMenuItems(agent: agent) }
         .swipeActions(edge: .leading) {
             if agent.state == .archived {
-                BringBackAgentButton(agent: agent).tint(Paper.accent)
+                UnarchiveAgentButton(agent: agent).tint(Paper.accent)
             } else {
                 PinAgentButton(agent: agent).tint(Paper.accent)
             }
@@ -194,7 +194,7 @@ struct AgentCard: View {
         // is a `swipeActionsContainer`.
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             if agent.state == .archived {
-                BringBackAgentButton(agent: agent).tint(Paper.accent)
+                UnarchiveAgentButton(agent: agent).tint(Paper.accent)
             } else {
                 ArchiveAgentButton(agent: agent).tint(.gray)
             }
@@ -227,7 +227,7 @@ struct AgentCard: View {
 }
 
 /// A session's long-press menu, wherever its row is drawn: Carry on, Mark as Read
-/// or Unread, Pin and where among the pinned, Branch, Archive, or Bring Back and Delete.
+/// or Unread, Pin and where among the pinned, Branch, Archive, or Unarchive and Delete.
 /// The Mac's row menu, less what the phone leaves to the Mac (Show in Finder).
 struct AgentMenuItems: View {
     @Environment(RemoteModel.self) private var model
@@ -282,7 +282,7 @@ struct AgentMenuItems: View {
                 .disabled(model.isStale(agent))
             }
         } else {
-            BringBackAgentButton(agent: agent)
+            UnarchiveAgentButton(agent: agent)
             Button("Delete…", systemImage: "trash", role: .destructive) { model.askingToDelete = agent }
                 .disabled(model.isStale(agent))
         }
@@ -358,8 +358,8 @@ struct ArchiveAgentButton: View {
     }
 }
 
-/// Bring Back an archived session, as the Mac's row and its swipe do.
-struct BringBackAgentButton: View {
+/// Unarchive an archived session, as the Mac's row and its swipe do.
+struct UnarchiveAgentButton: View {
     @Environment(RemoteModel.self) private var model
     let agent: Agent
 
@@ -367,7 +367,7 @@ struct BringBackAgentButton: View {
         Button {
             Task { await model.unarchive(agent.id) }
         } label: {
-            Label("Bring Back", systemImage: "arrow.uturn.backward")
+            Label("Unarchive", systemImage: "arrow.uturn.backward")
         }
         .disabled(model.isStale(agent))
     }

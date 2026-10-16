@@ -202,18 +202,18 @@ struct ChatView: View {
         if agent.missingFolder != nil, agent.state != .archived {
             MissingFolderStrip(agent: agent)
         } else if agent.state == .archived {
-            // Matching the phone: an archived chat's own page is where Bring Back lives,
+            // Matching the phone: an archived chat's own page is where Unarchive lives,
             // not only on the row you left it from.
             HStack(spacing: 8) {
                 Spacer(minLength: 0)
                 Button {
                     Task { await model.unarchive(agent.id) }
                 } label: {
-                    Label("Bring Back", systemImage: "tray.and.arrow.up")
+                    Label("Unarchive", systemImage: "tray.and.arrow.up")
                 }
                 .buttonStyle(.paper)
                 .appText(.fine)
-                .help("Bring this session back from the archive (⌥⌘⌫)")
+                .help("Unarchive this session (⌥⌘⌫)")
             }
             .chatColumn()
             .padding(.vertical, 8)

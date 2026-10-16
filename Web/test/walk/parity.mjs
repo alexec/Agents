@@ -314,7 +314,7 @@ for (const scene of scenes) {
       // Bring it back, so the session is as it was.
       await page.eval(`document.querySelector(".session-menu > button").click()`);
       await sleep(200);
-      await page.press("Bring Back").catch(() => {});
+      await page.press("Unarchive").catch(() => {});
     } else if (scene === "starting") {
       // #87: a new session's words stay, held, under "Starting — telling your Mac".
       await openProject();

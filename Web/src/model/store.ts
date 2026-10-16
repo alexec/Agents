@@ -1012,7 +1012,7 @@ export type AgentAct = "agents/stop" | "agents/archive" | "agents/unarchive"
 /** What the pending mark says it is doing, before "telling your Mac" (AgentAct.doing). */
 export function actDoing(act: AgentAct): string {
   if (typeof act !== "string") return "Sending";
-  return { "agents/stop": "Stopping", "agents/archive": "Archiving", "agents/unarchive": "Bringing back" }[act];
+  return { "agents/stop": "Stopping", "agents/archive": "Archiving", "agents/unarchive": "Unarchiving" }[act];
 }
 
 /** Telling.words: "Archiving — telling your Mac", or "telling your Mac" beside a button that says what. */
@@ -1668,7 +1668,7 @@ export class Store extends Work {
   }
 
   /**
-   * An archived project brought back (#343), as the window's Bring Back does: a project again,
+   * An archived project brought back (#343), as the window's Unarchive does: a project again,
    * with its new-session form open.
    */
   async unarchiveProject(host: string, folder: string): Promise<ProjectSummary | null> {
@@ -2183,7 +2183,7 @@ export class Store extends Work {
     if (changed) this.placeWorkflow(changed, host);
   }
 
-  /** Archive or Bring Back (#142), as the window's page has them. */
+  /** Archive or Unarchive (#142), as the window's page has them. */
   async setWorkflowArchived(host: string, summary: WorkflowSummary, archived: boolean): Promise<void> {
     const changed = await this.act("workflows/archive",
       { folder: summary.workflow.folder, workflowID: summary.workflow.workflowID, archived }, host);

@@ -1,6 +1,6 @@
 // One workflow, opened in the chat's place (#98, #100, #142; the window's WorkflowPage and the
 // Remote's), in their order: its name and what it is; Run Now or Approve, the Enabled switch and
-// Archive or Bring Back; the status card, why it is or isn't running; a file that cannot be read,
+// Archive or Unarchive; the status card, why it is or isn't running; a file that cannot be read,
 // as it is (#540); what it does (who gets the prompt and, for a standing one, its agent; the
 // prompt; its settings; its labels); what makes it run, a line a trigger, its cooldown, and which
 // computers run it; what its file says that this version does not know; and the sessions it
@@ -100,7 +100,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
           </div>
           {summary.isArchived ? (
             <div class="controls">
-              <button class="run-now prominent" disabled={down} onClick={() => void store.setWorkflowArchived(host, summary, false)}>Bring Back</button>
+              <button class="run-now prominent" disabled={down} onClick={() => void store.setWorkflowArchived(host, summary, false)}>Unarchive</button>
               <button class="archive" disabled={down} title="Delete this workflow file from disk" onClick={() => void deleteWorkflow()}>Delete…</button>
             </div>
           ) : (

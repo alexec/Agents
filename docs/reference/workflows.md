@@ -47,7 +47,7 @@ Check the build and say whether it is green.
 | `labels:` | A list of up to five names, each 1–24 characters | Each newly started workflow session gets these agent-owned labels. A standing or triggering run reusing an existing session keeps that session’s labels. |
 | `options:` | Any other option the runtime offers, by its id, such as `fast: true` | Sets that option for the agent. |
 | `enabled:` | `true` or `false` | Its **Enabled** switch. `false` is turned off: none of its triggers run it, and **Run now** still does. Without it, or with `true`, it is on. The switch, **Turn Off** and **Turn On** write this line and nothing else: off adds `enabled: false`, on takes the line out. So the switch goes wherever the file goes, to another clone or another Mac or server, and shows in a commit. An agent cannot turn on a workflow whose file says `false` unless an agent turned it off, on this Mac or server, and the file has not changed since; only you can. Anything else stops the workflow running, and its page says what is wrong. |
-| `archived:` | `true` or `false` | Whether it is archived. **Archive** adds `archived: true` and **Bring Back** takes the line out, so it is archived wherever the file goes. See [Off and archived](#off-and-archived). Anything else stops the workflow running, and its page says what is wrong. |
+| `archived:` | `true` or `false` | Whether it is archived. **Archive** adds `archived: true` and **Unarchive** takes the line out, so it is archived wherever the file goes. See [Off and archived](#off-and-archived). Anything else stops the workflow running, and its page says what is wrong. |
 | `cooldown:` | A length of time in minutes, hours or days, such as `15m`, `2h`, `1h30m` or `1d`; at least a minute | The least time from the start of one run to the start of the next. See [Cooldown](#cooldown). A value that is not a length of time stops the workflow running, and its page says what is wrong. |
 | `hosts:` | A list of machine ids | Which computers run it. Without it, or with an empty list, every host that has the project runs it and lists it. With ids, only those hosts do, on a schedule, on an event, or from **Run now**. An id is the computer's: a Mac's hardware UUID, or on Linux the contents of `/etc/machine-id`. The host name is used only when neither of those exists. The workflow's page offers the computers it knows by the names already on screen and writes the id, so renaming a computer does not unpin the workflow. A value that is not a list of ids stops the workflow running, and its page says what is wrong. |
 | `when-done:` | `keep`, `archive-allowed` or `archive` | What a run may do with its session when it is done. Without it, `keep`: every run stays in the list. `park`, the word before #584, is read as `keep`. See [When a run is done](#when-a-run-is-done). Anything else stops the workflow running, and its page says what is wrong. |
@@ -217,7 +217,7 @@ A workflow does not run, and its page says why, when:
 
 On the Mac, each workflow on the project page has **Open**, **Run now** (**Approve** and
 **Deny on This Host** while it is waiting for your OK), **Turn Off** (**Turn On** once off), **Archive**
-(**Bring Back** once archived) and **Show in Finder**. Its page has the **Enabled** switch
+(**Unarchive** once archived) and **Show in Finder**. Its page has the **Enabled** switch
 beside **Run now**, and a **Triggers** section listing each trigger on its own line: the
 filters on it, whether it listens in this project or on the whole Mac or server, which
 agent a `triggering` run resumes, when a schedule is next due, and a trigger this
@@ -419,7 +419,7 @@ They differ in what else they do:
 | Its triggers | Do not run it; each one skipped is counted on its row | Do not run it; nothing is recorded |
 | **Run now** | Runs it, to try it | Refuses |
 | The [limits](#limits) | Frees its place among the ones that run; turning it on again is refused when they are all taken | Frees its place |
-| Turned back on by | **Enabled**, **Turn On**, the phone, or an agent if an agent turned it off (not one an agent wrote, or one whose file says `enabled: false`) | **Bring Back** |
+| Turned back on by | **Enabled**, **Turn On**, the phone, or an agent if an agent turned it off (not one an agent wrote, or one whose file says `enabled: false`) | **Unarchive** |
 
 A new workflow an agent writes with `manage_workflows` starts turned off, whatever its
 file says, so you turn it on knowingly once you have approved it: the app writes

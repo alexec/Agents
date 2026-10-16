@@ -8,7 +8,7 @@ import SwiftUI
 /// what the file says that this version does not understand, and the agents it has run.
 /// The same things change here as change there — the runtime, the permission mode, the
 /// model, the effort and the runtime's other options, the labels, which computers run
-/// it, Run now or Approve, and Archive or Bring Back — and the same things do not. The prompt, the triggers
+/// it, Run now or Approve, and Archive or Unarchive — and the same things do not. The prompt, the triggers
 /// and the agent mode are the author's, and are shown, not edited.
 ///
 /// Laid out as a column rather than the Mac's prompt-bar shape: three menus side by
@@ -208,7 +208,7 @@ struct WorkflowPage: View {
         .padding(.vertical, 11)
     }
 
-    /// Run now, full width under the title where a thumb finds it, or Bring Back when
+    /// Run now, full width under the title where a thumb finds it, or Unarchive when
     /// it is put away. Offered even on a workflow that cannot fire on its own: a refusal
     /// says why, which is better than nothing happening.
     @ViewBuilder
@@ -216,7 +216,7 @@ struct WorkflowPage: View {
         Group {
             if summary.isArchived {
                 Button { Task { await model.setWorkflowArchived(summary, false) } } label: {
-                    Text("Bring Back").frame(maxWidth: .infinity)
+                    Text("Unarchive").frame(maxWidth: .infinity)
                 }
             } else {
                 VStack(spacing: 12) {

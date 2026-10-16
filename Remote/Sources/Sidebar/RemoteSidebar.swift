@@ -6,7 +6,7 @@ import UIKit
 /// then Status and Usage, then what wants the person across every project — Pinned, Needs You,
 /// Working, Unread — then a group per project, its sessions newest first with their state
 /// the row's mark, its workflows, and one Archived row opening a page; then the archived
-/// projects, folded, each with Bring Back (#343). Never more than two levels deep (#495).
+/// projects, folded, each with Unarchive (#343). Never more than two levels deep (#495).
 ///
 /// The rules are the Mac's own, from `SidebarProjectFold`, `SidebarSmartRow`,
 /// `SidebarOrder` and `SidebarFolds` in AgentsKitCore: the same groups, order, pins and
@@ -134,7 +134,7 @@ struct RemoteSidebar: View {
                         ArchivedProjectRow(summary: summary,
                                            label: SidebarOrder.label(summary) { model.hostLabel($0) },
                                            isDisabled: model.isStale || model.hostIsOffline(summary.host),
-                                           bringBack: { await model.unarchiveProject(summary) },
+                                           unarchive: { await model.unarchiveProject(summary) },
                                            delete: { model.askingToDeleteProject = summary })
                         .appText(.supporting)
                     }

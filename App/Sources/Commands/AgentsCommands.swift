@@ -210,7 +210,7 @@ struct AgentsCommands: Commands {
                 .keyboardShortcut(.return, modifiers: [.command, .shift])
                 .disabled(agent.map { !model.isBlocked($0) } ?? true)
             if agent?.state == .archived {
-                Button("Bring Back") { act { await model.unarchive($0.id) } }
+                Button("Unarchive") { act { await model.unarchive($0.id) } }
                     .keyboardShortcut(.delete, modifiers: [.command, .option])
             } else {
                 Button("Archive") { archive() }

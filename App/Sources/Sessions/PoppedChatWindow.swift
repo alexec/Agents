@@ -6,7 +6,7 @@ import SwiftUI
 /// nothing of the main window's sidebar or inspector. The main window's selection is
 /// not touched by it.
 ///
-/// It follows the session: archived, it says so and offers Bring Back, as the main
+/// It follows the session: archived, it says so and offers Unarchive, as the main
 /// window's chat does; deleted, it says that instead of showing an empty chat.
 struct PoppedChatWindow: View {
     @Environment(AppModel.self) private var model
@@ -102,9 +102,9 @@ struct PoppedChatWindow: View {
                     Button {
                         Task { await model.unarchive(agent.id) }
                     } label: {
-                        Label("Bring Back", systemImage: "tray.and.arrow.up")
+                        Label("Unarchive", systemImage: "tray.and.arrow.up")
                     }
-                    .help("Bring this session back from the archive (⌥⌘⌫)")
+                    .help("Unarchive this session (⌥⌘⌫)")
                 } else {
                     // Archived, it stays open here, saying so: the window is closed by
                     // the person, not from under them.

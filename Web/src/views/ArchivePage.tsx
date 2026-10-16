@@ -2,7 +2,7 @@
 // (#495, #498): its archived sessions, then its workflows, in their order (#547). They used to be
 // folds inside the project's fold in the sidebar; one Archived row there now opens this, so the
 // sidebar is never more than two levels deep. The sidebar's own rows, each opening its chat or
-// page, with their menus: Bring Back among them.
+// page, with their menus: Unarchive among them.
 import { useEffect } from "preact/hooks";
 import type { Store } from "../model/store";
 import { route, go } from "../route";

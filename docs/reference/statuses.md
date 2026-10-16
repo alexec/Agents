@@ -33,7 +33,7 @@ colour. Session labels appear beneath the title on Mac rows and phone cards; age
 | **Nothing to do** | Done | The agent found nothing that needed doing. | Reply in the prompt. **Mark as Unread**, **Archive**, **Branch**. |
 | **Stopped by you** or **Stopped by the agent that started it** | Paused | The turn was deliberately cut short. | Reply in the prompt to start a new turn. **Archive**, **Branch**. |
 | **Its allowance ran out** | Paused | The runtime refused the turn because its plan's allowance, or a key's credit, is spent. The chat stays on that runtime, and nothing carries it on. | Start a new chat on another runtime and ask it to continue this one; see [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md). Or reply here once the runtime is back. **Archive**, **Branch**. |
-| **Archived** | Archived | You, the agent that started it, or a workflow's run allowed to, put it away. If the app made a worktree for it and everything in it is committed, the worktree is removed; its branch is deleted too if it was merged. | **Bring Back**. |
+| **Archived** | Archived | You, the agent that started it, or a workflow's run allowed to, put it away. If the app made a worktree for it and everything in it is committed, the worktree is removed; its branch is deleted too if it was merged. | **Unarchive**. |
 
 **Show in Finder** is on every agent's menu on the Mac.
 

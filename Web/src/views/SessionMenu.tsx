@@ -1,6 +1,6 @@
 // A session's actions (071 FR-027): Carry on while it sits in an open block (#250), Stop while it
 // holds a runtime or a block, Branch (#342), and Archive, with Keep Session while an agent asks to
-// have it archived (#773), or Bring Back and Delete (#398). In the chat header's ··· menu, and the
+// have it archived (#773), or Unarchive and Delete (#398). In the chat header's ··· menu, and the
 // sidebar row's menu. The chat's has Open File… first, as the Remote's ··· menu does (#543), for a
 // page with no keyboard to press ⌘P on. Below 760 it has the header's Turns and Files too, so the
 // header's right is the ··· alone, as on the iPhone (#981).
@@ -59,7 +59,7 @@ export function sessionActions(agent: Agent, pinned?: boolean, started: readonly
     found.push({ action: "fork", label: "Branch", help: "A new session that carries this one's history so far" });
   }
   if (agent.state === "archived") {
-    found.push({ action: "agents/unarchive", label: "Bring Back", help: "Bring this session back from the archive" });
+    found.push({ action: "agents/unarchive", label: "Unarchive", help: "Unarchive this session" });
     found.push({ action: "delete", label: "Delete…", help: "Delete this session and its conversation for good" });
   } else {
     found.push({ action: "agents/archive", label: "Archive", help: started.length > 0
@@ -73,12 +73,12 @@ export function sessionActions(agent: Agent, pinned?: boolean, started: readonly
 }
 
 /**
- * Pin or Unpin, and Archive or Bring Back: the buttons in the chat's header beside its ···
+ * Pin or Unpin, and Archive or Unarchive: the buttons in the chat's header beside its ···
  * menu (#586), as the window's toolbar has them. No Pin on an archived session.
  */
 export function headerActions(agent: Agent, pinned: boolean): { action: Action; label: string; help: string }[] {
   if (agent.state === "archived") {
-    return [{ action: "agents/unarchive", label: "Bring Back", help: "Bring this session back from the archive" }];
+    return [{ action: "agents/unarchive", label: "Unarchive", help: "Unarchive this session" }];
   }
   return [
     pinned

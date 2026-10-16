@@ -134,9 +134,9 @@ await menu("Archive");
 await until("archived", async () => (await record(id)).state === "archived", 15);
 say("Archive: archived on the record");
 await page.shot(`${out}/us3-5-archived.png`);
-await menu("Bring Back");
+await menu("Unarchive");
 await until("brought back", async () => (await record(id)).state !== "archived", 15);
-say(`Bring Back: ${(await record(id)).state}`);
+say(`Unarchive: ${(await record(id)).state}`);
 
 // 5. A label added, then removed.
 await page.focus(".labels .label-field");

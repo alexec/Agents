@@ -225,7 +225,7 @@ struct WorkflowPage: View {
                 Button {
                     Task { await model.setWorkflowArchived(summary, false) }
                 } label: {
-                    Label("Bring Back", systemImage: "tray.and.arrow.up")
+                    Label("Unarchive", systemImage: "tray.and.arrow.up")
                 }
                 .help("Take this workflow out of the archive. Takes archived: true out of its file")
             } else {

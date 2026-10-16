@@ -203,7 +203,7 @@ extension DaemonCore {
         try writePins(file, in: project)
     }
 
-    /// Archiving a workflow unpins it, as archiving a session does; Bring Back does not
+    /// Archiving a workflow unpins it, as archiving a session does; Unarchive does not
     /// pin it again.
     func unpinArchivedWorkflow(_ workflowID: String, in folder: URL) {
         let project = Project.standardize(folder)

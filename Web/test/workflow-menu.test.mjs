@@ -22,7 +22,7 @@ test("one waiting for its OK is approved or denied here, not run (#391)", () => 
 });
 
 test("an archived one can be brought back or deleted (#605)", () => {
-  assert.deepEqual(workflowActions(summary({ isArchived: true }), false), ["open", "bringBack", "delete"]);
+  assert.deepEqual(workflowActions(summary({ isArchived: true }), false), ["open", "unarchive", "delete"]);
 });
 
 test("the row's end says when it last ran, and nothing for one that never has (#755)", () => {

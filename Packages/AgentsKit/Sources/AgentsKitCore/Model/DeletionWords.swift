@@ -101,5 +101,5 @@ public enum ProjectArchiveWords {
     }
 
     public static let confirmMessage = "It moves to Archived projects with its sessions, and its workflows stop. "
-        + "Bring Back returns it. Its folder and files are not touched."
+        + "Unarchive returns it. Its folder and files are not touched."
 }
