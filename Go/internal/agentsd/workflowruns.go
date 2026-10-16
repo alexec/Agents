@@ -462,8 +462,11 @@ func (d *Daemon) runPrompt(w wire.Workflow, fr fireRequest) string {
 func (d *Daemon) recordOutcome(fr fireRequest, name string, o wire.WorkflowOutcome, agent *wire.UUID) {
 	d.workflowMu.Lock()
 	st := d.stateLocked(fr.folder, fr.id, true)
-	if o.Refused != nil && st.LastOutcome != nil && st.LastOutcome.Refused != nil && sameReason(st.LastOutcome.Refused.Value, o.Refused.Value) {
-		o.Refused.Repeats = st.LastOutcome.Refused.Repeats + 1
+	if o.Refused != nil {
+		o.Refused.Repeats = 1
+		if st.LastOutcome != nil && st.LastOutcome.Refused != nil && sameReason(st.LastOutcome.Refused.Value, o.Refused.Value) {
+			o.Refused.Repeats = st.LastOutcome.Refused.Repeats + 1
+		}
 	}
 	st.LastOutcome, st.LastCausingEvent = &o, fr.causingEvent
 	if o.Ran != nil {
