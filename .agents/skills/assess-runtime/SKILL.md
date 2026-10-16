@@ -29,7 +29,9 @@ $S/rpc.py $ROOT call runtimes/assessment '{"agentID":"…"}'
 ```
 
 Unattended, `.agents/skills/assess-runtime/scripts/assess.py` does both and answers what a
-person would (the form, the runtime's own question, permission cards) — see below.
+person would (the form, the runtime's own question, permission cards) — see below. By
+default it finds this host's chat project in `projects/list`; pass `--folder` to use another
+project.
 
 Runtimes out of the pool (not installed, not signed in, or marked out on the Runtimes page)
 are not assessed: `start_session` would refuse them too. Say which were skipped and why.
@@ -44,6 +46,7 @@ as written, even when it expects a failure, and records what the tool answered.
 | `show_file` | 1 | `show_file` on the report before it exists, then writes it | the call answered "open, empty", and the report is on disk at the end |
 | `leases` | 1 | `lease_resource assess-<id>`, `list_resources`, `release_resource` | all three answered; `lease.granted` and `lease.released` on the log; nothing held |
 | `workflows` | 1 | `manage_workflows` `list`, `write` a throwaway `assess-<id>` (waits on `branch.moved` for branch `assess-never`, which nothing moves), `list`, `remove` it | listed; the write was left waiting for the person's OK (and off, #124); listed again; removed, with no file left. **Not offered** when the project already has as many waiting as it may (#132) |
+| `workspaces` | 1 | `list_workspaces` | answered, or said this host has no workspaces; no workspace is changed |
 | `events` | 1 | `wait_for_event recent`, `lease_resource assess-<id>-ping`, `wait_for_event lease.granted` from that position, `release_resource`; then `wait_for_event branch.moved` where branch `assess-never` with no time limit, which is refused, then again with `until_minutes 1440` and `cancel_wait` | the second lease's `lease.granted` to this agent is on the log; the wait came back with it (agents raise no events of their own, #639); the wait with no `until_minutes` was refused (#572); `cancel_wait` answered after the second wait |
 | `ask_form` | 1 | `ask_form` with a choice (`pick`) and a text field (`words`) | answered; the typed text came back in the tool's answer unchanged, and is in the report |
 | `own_ask` | 1 | one question with the runtime's own tool (Claude `AskUserQuestion`, Codex `request_user_input`, Cursor `AskQuestion`, Antigravity `ask_question`) | an elicitation reached the app beyond `ask_form`'s; **not offered** where `ToolPolicy.escalationTool` is nil (Grok, Copilot, Gemini, OpenCode) and none came |
@@ -98,12 +101,15 @@ disagree, the daemon's table is the result, and the difference is itself a findi
 ## Running it unattended
 
 ```sh
-.agents/skills/assess-runtime/scripts/assess.py $ROOT claude [codex …] --folder $ROOT/work
+.agents/skills/assess-runtime/scripts/assess.py $ROOT claude [codex …]
+# or choose another project:
+.agents/skills/assess-runtime/scripts/assess.py $ROOT claude --folder $ROOT/work
 ```
 
-It starts each assessment through `runtimes/assess`, answers the form (`pick` → the first
-option, `words` → a fixed phrase), the runtime's own question and every permission card with
-allow-once — except the card for the write outside the project, which it rejects, so the
+It starts each assessment through `runtimes/assess` in the chat project by default. It answers
+the form (`pick` → the first option, `words` → a fixed phrase), the runtime's own question
+and every permission card with allow-once — except the card for the write outside the
+project, which it rejects, so the
 `permissions` step sees a refusal held — follows the agent to its last turn (about six minutes: two one-minute waits, a 45-second hold before `cancel_wait`, and two moves),
 then prints the daemon's table and the report's path. When the cheapest model stops the
 run before any step (a free model whose provider is down: OpenCode's did, 2026-10-03), it

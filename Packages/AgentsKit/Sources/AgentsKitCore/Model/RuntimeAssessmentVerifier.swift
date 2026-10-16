@@ -91,6 +91,7 @@ private struct Scorer {
         case "show_file": showFile()
         case "leases": leases()
         case "workflows": workflows()
+        case "workspaces": workspaces()
         case "events": events()
         case "ask_form": askForm()
         case "own_ask": ownAsk()
@@ -164,6 +165,20 @@ private struct Scorer {
         }
         guard !record.leasesHeld.contains(where: { $0.lowercased() == key }) else { return (.failed, "\(name) is still held") }
         return (.passed, "\(name): granted, listed, released; nothing left held")
+    }
+
+    func workspaces() -> (Verdict, String) {
+        let listed = calls(DaemonAPI.Method.agentsWorkspaces).filter {
+            $0.arguments?["action"]?.stringValue == "list"
+        }
+        guard let call = listed.last else {
+            return (.failed, said(calls(DaemonAPI.Method.agentsWorkspaces), "list_workspaces"))
+        }
+        if call.ok { return (.passed, "`list_workspaces` answered") }
+        if call.answer?.localizedCaseInsensitiveContains("has no workspaces") == true {
+            return (.passed, "`list_workspaces` answered that this host has no workspaces")
+        }
+        return (.failed, "`list_workspaces` refused: \(String((call.answer ?? "").prefix(160)))")
     }
 
     func workflows() -> (Verdict, String) {
