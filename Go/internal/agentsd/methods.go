@@ -2,7 +2,6 @@ package agentsd
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"sort"
@@ -14,10 +13,9 @@ import (
 // register is every method this host serves. One it does not answers -32601, which the
 // window copes with: a pane that needs it stays empty (#1125, stage 5).
 func (d *Daemon) register() {
-	// Not in the OpenRPC document (the web page never calls it): {"ok":true}, as Swift.
-	d.handlers["daemon/ping"] = func(context.Context, *Client, json.RawMessage) (any, error) {
-		return map[string]bool{"ok": true}, nil
-	}
+	On(d, wire.CallDaemonPing, func(context.Context, *Client, wire.Empty) (wire.PingResponse, error) {
+		return wire.PingResponse{Ok: true}, nil
+	})
 	// What the window pushes or reports on connecting, which this host has no use for yet.
 	Quiet(d, wire.CallPresenceReport.Name, wire.CallCredentialsOffer.Name, wire.CallAgentsPrewarm.Name,
 		wire.CallAgentsDiscardDraft.Name, wire.CallFilesWatch.Name, wire.CallFilesUnwatch.Name)

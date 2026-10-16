@@ -1807,6 +1807,10 @@ type PinWriteRequest struct {
 	Text   string `json:"text"`
 }
 
+type PingResponse struct {
+	Ok bool `json:"ok"`
+}
+
 type PinnerKind string
 
 const (

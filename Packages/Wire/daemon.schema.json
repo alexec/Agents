@@ -5655,6 +5655,18 @@
       ],
       "additionalProperties": false
     },
+    "PingResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "additionalProperties": false
+    },
     "PinnerKind": {
       "type": "string",
       "enum": [

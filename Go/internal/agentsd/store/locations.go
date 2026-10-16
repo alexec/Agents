@@ -75,15 +75,17 @@ func PathHash(path string) string {
 	return s
 }
 
-func (l Locations) Agents() string            { return filepath.Join(l.Root, "agents") }
-func (l Locations) Agent(id string) string     { return filepath.Join(l.Agents(), strings.ToUpper(id)) }
-func (l Locations) Record(id string) string    { return filepath.Join(l.Agent(id), "agent.json") }
-func (l Locations) Transcript(id string) string { return filepath.Join(l.Agent(id), "transcript.jsonl") }
-func (l Locations) Projects() string          { return filepath.Join(l.Root, "projects.json") }
-func (l Locations) RootIdentity() string      { return filepath.Join(l.Root, "root-id.json") }
-func (l Locations) Socket() string            { return filepath.Join(l.Root, "daemon.sock") }
-func (l Locations) Lock() string              { return filepath.Join(l.Root, "daemon.lock") }
-func (l Locations) Log() string               { return filepath.Join(l.Logs, "daemon.log") }
+func (l Locations) Agents() string          { return filepath.Join(l.Root, "agents") }
+func (l Locations) Agent(id string) string  { return filepath.Join(l.Agents(), strings.ToUpper(id)) }
+func (l Locations) Record(id string) string { return filepath.Join(l.Agent(id), "agent.json") }
+func (l Locations) Transcript(id string) string {
+	return filepath.Join(l.Agent(id), "transcript.jsonl")
+}
+func (l Locations) Projects() string     { return filepath.Join(l.Root, "projects.json") }
+func (l Locations) RootIdentity() string { return filepath.Join(l.Root, "root-id.json") }
+func (l Locations) Socket() string       { return filepath.Join(l.Root, "daemon.sock") }
+func (l Locations) Lock() string         { return filepath.Join(l.Root, "daemon.lock") }
+func (l Locations) Log() string          { return filepath.Join(l.Logs, "daemon.log") }
 
 // ArchiveIndex is the Swift daemon's index of archived agents (051), a cache.
 func (l Locations) ArchiveIndex() string { return filepath.Join(l.Cache, "archive.json") }

@@ -907,6 +907,25 @@
       }
     },
     {
+      "name": "daemon/ping",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/PingResponse"
+        }
+      }
+    },
+    {
       "name": "disk/state",
       "tags": [
         {
