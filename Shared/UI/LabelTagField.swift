@@ -13,6 +13,10 @@ struct LabelTagField: View {
     var suggestions: [String] = []
     let add: ([String]) -> Void
     let remove: (String) -> Void
+    /// Opened from a folded line (#1107): the field takes the focus at once, and
+    /// `onEndEditing` is called when it loses it.
+    var focusFirst = false
+    var onEndEditing: (() -> Void)?
 
     @State private var text = ""
     @State private var selection: TextSelection?
@@ -44,6 +48,7 @@ struct LabelTagField: View {
             #endif
         }
         .appText(.fine)
+        .onAppear { if focusFirst { focused = true } }
     }
 
     private var field: some View {
@@ -70,6 +75,7 @@ struct LabelTagField: View {
                 chosen = nil
                 commit([text])
                 text = ""
+                onEndEditing?()
             }
             .onKeyPress(.delete) { removeAtCursor() }
             .onKeyPress(.deleteForward) {

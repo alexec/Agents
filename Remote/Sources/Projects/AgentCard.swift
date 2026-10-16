@@ -19,7 +19,7 @@ struct RemoteSessionLabels: View {
     }
 }
 
-private struct RemoteCompactLabelRow: View {
+struct RemoteCompactLabelRow: View {
     let labels: [SessionLabel]
 
     var body: some View {
