@@ -33,6 +33,7 @@ func (d *Daemon) register() {
 	d.registerEvents()
 	d.registerEventWaits()
 	d.registerCost()
+	d.registerWorkflows()
 	d.registerShells()
 	On(d, wire.CallPermissionsPending, func(ctx context.Context, c *Client, _ wire.Empty) ([]wire.PermissionRequest, error) {
 		return d.pendingPermissions(), nil

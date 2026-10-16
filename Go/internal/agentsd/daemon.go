@@ -43,6 +43,7 @@ type Daemon struct {
 	messageState
 	helperQueueState
 	costBook
+	workflowBook
 	attentionState
 	worktreeState
 	recoveryState
