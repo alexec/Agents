@@ -1326,6 +1326,14 @@ type FolderHunk struct {
 	Lines          []DiffLine `json:"lines"`
 }
 
+type FoundFolder struct {
+	Typed        *string `json:"typed,omitzero"`
+	Folder       URL     `json:"folder"`
+	Exists       bool    `json:"exists"`
+	IsRepository bool    `json:"isRepository"`
+	IsProject    bool    `json:"isProject"`
+}
+
 type GitAsk struct {
 	Server string `json:"server"`
 	From   HostID `json:"from"`
@@ -2087,6 +2095,11 @@ type ProjectWorktrees struct {
 	Worktrees []WorktreeSummary `json:"worktrees"`
 }
 
+type ProjectsFindRequest struct {
+	Paths   []string `json:"paths,omitzero"`
+	Folders []string `json:"folders,omitzero"`
+}
+
 type ProjectsListRequest struct {
 	IncludeArchived bool `json:"includeArchived"`
 }
@@ -2474,6 +2487,16 @@ type SetCeilingRequest struct {
 	AgentID      UUID   `json:"agentID"`
 	Ceiling      *Cost  `json:"ceiling,omitzero"`
 	TokenCeiling *int64 `json:"tokenCeiling,omitzero"`
+}
+
+type SetDiskSpaceRequest struct {
+	Folder    URL            `json:"folder"`
+	DiskSpace DiskThresholds `json:"diskSpace"`
+}
+
+type SetHelperLimitsRequest struct {
+	Folder URL          `json:"folder"`
+	Limits HelperLimits `json:"limits"`
 }
 
 type SetLabelsRequest struct {

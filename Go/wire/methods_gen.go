@@ -99,9 +99,12 @@ var (
 	CallProjectsClone                  = Method[CloneRequest, ProjectSummary]{"projects/clone"}
 	CallProjectsClones                 = Method[Empty, []CloneSummary]{"projects/clones"}
 	CallProjectsDelete                 = Method[ProjectRequest, Empty]{"projects/delete"}
+	CallProjectsFind                   = Method[ProjectsFindRequest, []FoundFolder]{"projects/find"}
 	CallProjectsKeepGuardedChange      = Method[GuardedChangeRequest, ProjectSummary]{"projects/keepGuardedChange"}
 	CallProjectsList                   = Method[ProjectsListRequest, []ProjectSummary]{"projects/list"}
 	CallProjectsReadGuardedChange      = Method[GuardedChangeRequest, GuardedChangeReading]{"projects/readGuardedChange"}
+	CallProjectsSetDiskSpace           = Method[SetDiskSpaceRequest, ProjectSummary]{"projects/setDiskSpace"}
+	CallProjectsSetHelperLimits        = Method[SetHelperLimitsRequest, ProjectSummary]{"projects/setHelperLimits"}
 	CallProjectsSetPinned              = Method[SetPinnedRequest, ProjectSummary]{"projects/setPinned"}
 	CallProjectsUnarchive              = Method[ProjectRequest, ProjectSummary]{"projects/unarchive"}
 	CallProjectsUndoGuardedChange      = Method[GuardedChangeRequest, ProjectSummary]{"projects/undoGuardedChange"}

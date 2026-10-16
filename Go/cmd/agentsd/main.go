@@ -86,6 +86,7 @@ func main() {
 		// A server's settings are the person's, in their home (Daemon.swift's --serve).
 		if home, err := os.UserHomeDir(); err == nil {
 			d.SettingsDir = filepath.Join(home, ".agents", "settings")
+			d.ChatHome = home
 		}
 	}
 	safe.Go("socket", func() {
@@ -97,6 +98,7 @@ func main() {
 		join(ctx, cl, d)
 	}
 	log.Printf("agentsd %s on %s, root %s", buildinfo.String(), platform(), cl.root)
+	d.EnsureChatProject()
 	d.PickUpAfterRestart()
 	<-ctx.Done()
 	log.Printf("shutting down")

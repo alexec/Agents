@@ -28,6 +28,7 @@ func (d *Daemon) register() {
 	d.registerAttention()
 	d.registerWorktrees()
 	d.registerChanges()
+	d.registerProjects()
 	d.registerShells()
 	On(d, wire.CallPermissionsPending, func(ctx context.Context, c *Client, _ wire.Empty) ([]wire.PermissionRequest, error) {
 		return d.pendingPermissions(), nil
@@ -132,6 +133,7 @@ func (d *Daemon) projects(includeArchived bool) []wire.ProjectSummary {
 		if !includeArchived && s.Project.ArchivedAt != nil {
 			continue
 		}
+		d.dress(&s)
 		out = append(out, s)
 	}
 	sort.Slice(out, func(i, j int) bool {

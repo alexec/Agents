@@ -4089,6 +4089,33 @@
       ],
       "additionalProperties": false
     },
+    "FoundFolder": {
+      "type": "object",
+      "properties": {
+        "typed": {
+          "type": "string"
+        },
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "exists": {
+          "type": "boolean"
+        },
+        "isRepository": {
+          "type": "boolean"
+        },
+        "isProject": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "folder",
+        "exists",
+        "isRepository",
+        "isProject"
+      ],
+      "additionalProperties": false
+    },
     "GitAsk": {
       "type": "object",
       "properties": {
@@ -6421,6 +6448,25 @@
       ],
       "additionalProperties": false
     },
+    "ProjectsFindRequest": {
+      "type": "object",
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "folders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
     "ProjectsListRequest": {
       "type": "object",
       "properties": {
@@ -7593,6 +7639,38 @@
       },
       "required": [
         "agentID"
+      ],
+      "additionalProperties": false
+    },
+    "SetDiskSpaceRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "diskSpace": {
+          "$ref": "#/definitions/DiskThresholds"
+        }
+      },
+      "required": [
+        "folder",
+        "diskSpace"
+      ],
+      "additionalProperties": false
+    },
+    "SetHelperLimitsRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "limits": {
+          "$ref": "#/definitions/HelperLimits"
+        }
+      },
+      "required": [
+        "folder",
+        "limits"
       ],
       "additionalProperties": false
     },
