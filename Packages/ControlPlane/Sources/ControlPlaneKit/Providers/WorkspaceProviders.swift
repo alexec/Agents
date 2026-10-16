@@ -303,7 +303,8 @@ public actor WorkspaceProviders: WorkspaceHandling {
             }
             return try JSONValue.encoding(DaemonAPI.ProviderOptions(schema: try await providerCall(id) { try await $0.options() }))
         case DaemonAPI.Method.providersCreate:
-            return try JSONValue.encoding(try await create(try Self.require(params, as: DaemonAPI.ProviderCreate.self), by: who))
+            return try JSONValue.encoding(try await create(try Self.require(params, as: DaemonAPI.ProviderCreate.self), by: who,
+                                                           caller: caller))
         case DaemonAPI.Method.hostsDeleteWorkspace:
             try await deleteWorkspace(try Self.require(params, as: DaemonAPI.HostRequest.self).host, by: who, caller: caller)
             return [:]
@@ -687,12 +688,24 @@ public actor WorkspaceProviders: WorkspaceHandling {
 
     /// Workspaces made here that will install on their first boot, by the host name they will
     /// join as, until they join and are linked.
-    private var joining: [String: (provider: ProviderID, workspace: String)] = [:]
+    private var joining: [String: Joining] = [:]
+
+    private struct Joining {
+        var provider: ProviderID
+        var workspace: String
+        /// What it clones once it has joined (#1122), as the client that made it.
+        var clones: [String] = []
+        var caller: ControlRouter.Caller?
+    }
+
+    /// How long one clone on a new host may take before the next is sent.
+    static let clonePatience: Duration = .seconds(3600)
 
     /// Makes a workspace (FR-040, FR-041): with a one-time install command and host code for
     /// its first boot, so it joins by itself and is linked. A provider that can't run it says
     /// so, and the person adds it over ssh as Add as Host… does.
-    private func create(_ request: DaemonAPI.ProviderCreate, by who: String) async throws -> DaemonAPI.ProviderCreated {
+    private func create(_ request: DaemonAPI.ProviderCreate, by who: String,
+                        caller: ControlRouter.Caller? = nil) async throws -> DaemonAPI.ProviderCreated {
         guard let provider = providers[request.id]?.record else {
             throw JSONRPCError(code: JSONRPCError.invalidParams, message: "There is no such provider.")
         }
@@ -724,7 +737,8 @@ public actor WorkspaceProviders: WorkspaceHandling {
         }
         log("workspace: create \(name) (\(request.id)/\(workspace.id)) by \(who): ok in \(Self.seconds(since: began))\(made.1 ? ", joining on first boot" : "")")
         if made.1 {
-            joining[name] = (request.id, workspace.id)
+            let clones = (request.clones ?? []).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+            joining[name] = Joining(provider: request.id, workspace: workspace.id, clones: clones, caller: caller)
             Task { await self.linkWhenJoined(name) }
         }
         return DaemonAPI.ProviderCreated(workspace: workspace, joining: made.1)
@@ -737,12 +751,33 @@ public actor WorkspaceProviders: WorkspaceHandling {
             if let host = await records.hosts.first(where: { $0.name == name && $0.workspace == nil }) {
                 joining[name] = nil
                 _ = try? await link(DaemonAPI.HostLink(host: host.id, provider: wanted.provider, workspace: wanted.workspace))
+                await clone(wanted.clones, on: host.id, named: name, as: wanted.caller)
                 return
             }
             try? await Task.sleep(for: timing.lookEvery)
         }
         if joining.removeValue(forKey: name) != nil {
             log("workspace: \(name) was made but didn't join in \(Self.words(timing.giveUp))")
+        }
+    }
+
+    /// Clone these projects (#1122): each sent to the new host as File ▸ Clone Project sends
+    /// it, one after another, as the client that made the workspace. A private repository
+    /// clones with the git access a Mac lends the host, asked of the person the first time.
+    /// The URLs are not logged: one may hold a token.
+    private func clone(_ urls: [String], on host: HostID, named name: String, as caller: ControlRouter.Caller?) async {
+        for (index, url) in urls.enumerated() {
+            let reply = await router.deliverKept(DaemonAPI.Method.projectsClone,
+                                                 params: try? JSONValue.encoding(DaemonAPI.CloneRequest(url: url)),
+                                                 as: caller?.client ?? UUID(), kind: caller?.kind ?? .mac,
+                                                 to: host, patience: Self.clonePatience)
+            let outcome = switch reply {
+            case .success?: "ok"
+            // Its code only: the host's words may name the URL.
+            case .failure(_, let error)?: "failed (\(error.code))"
+            default: "not answered"
+            }
+            log("workspace: \(name) clone \(index + 1) of \(urls.count): \(outcome)")
         }
     }
 

@@ -89,7 +89,7 @@ public final class GitProcess: @unchecked Sendable {
         // `GIT_SSH_COMMAND` is left alone because it would override their own
         // `core.sshCommand`.
         self.init(executable: git, arguments: Self.hardenedArguments(arguments), in: folder,
-                  environment: Self.hardenedEnvironment.merging(extra) { _, new in new },
+                  environment: GitLending.applied(to: Self.hardenedEnvironment.merging(extra) { _, new in new }),
                   input: input)
     }
 

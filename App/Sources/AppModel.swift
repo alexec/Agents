@@ -926,6 +926,8 @@ final class AppModel {
     var tokenAsk: TokenAsk?
     /// A server asked for a sign-in this Mac relays; the window asks the person (T091).
     var signInLendAsk: SignInLendAsk?
+    /// Git asks answered here, until the control plane's list drops them (#1122).
+    var gitAsksAnswered: Set<String> = []
     /// What a server with no connection answers through: nothing, at once.
     private static let unreachable = DaemonClient(link: UnreachableLink())
 
@@ -3035,6 +3037,8 @@ final class AppModel {
               let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
         else { return }
         controlPlaneHosts = listed
+        // An ask no longer waiting may be asked again later, once taken back (#1122).
+        gitAsksAnswered.formIntersection(GitLendAsk.waiting(in: listed))
         controlPlaneListed = true
         controlPlaneName = status.name
         macHostJoin = status.thisMacHost

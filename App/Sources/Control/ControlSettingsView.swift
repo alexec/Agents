@@ -426,6 +426,15 @@ struct ControlHostsPage: View {
                     Button("Link to Workspace…") { linking = host }.disabled(control.providers.isEmpty)
                 }
             }
+            // Git access it uses of a Mac's, each taken back on its own (#1122).
+            if let lent = host.gitFrom, !lent.isEmpty {
+                Divider()
+                ForEach(lent.keys.sorted(), id: \.self) { server in
+                    Button(GitLendWords.revoke(server)) {
+                        Task { await control.revokeGit(host.id, from: lent[server]!, server: server) }
+                    }
+                }
+            }
             Divider()
             Button("Remove…") { removing = host }
         } label: {
@@ -491,7 +500,15 @@ struct ControlHostsPage: View {
             : "Not joined yet · ssh tunnel down\(tunnel.problem.map { ": \($0)" } ?? "") · tried again by itself"
     }
 
+    /// Its line, and what it may use of a Mac's (#1122) on one of its own.
     private func line(_ host: DaemonAPI.ControlHost) -> String {
+        let uses = GitLendWords.uses(host) { lender in
+            lender == control.thisMacHost?.id ? nil : (control.hosts.first { $0.id == lender }?.name ?? lender.rawValue)
+        }
+        return [baseLine(host), uses].compactMap { $0 }.joined(separator: "\n")
+    }
+
+    private func baseLine(_ host: DaemonAPI.ControlHost) -> String {
         // agents-relay (T096): it runs no agents, so the rest of the line is not its.
         if host.relay != nil {
             let state = host.state == "online" ? "" : "\(host.state.capitalized) · "

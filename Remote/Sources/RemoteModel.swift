@@ -254,6 +254,8 @@ final class RemoteModel {
     /// What `hosts/list` last said, so the project list can name each host (058, frame H).
     /// Empty when this phone is not a client of a control plane.
     private(set) var controlHosts: [DaemonAPI.ControlHost] = []
+    /// Git asks answered on this device, until the control plane's list drops them (#1122).
+    private var gitAsksAnswered: Set<String> = []
     /// The host this phone's own connection reaches. Its projects are stamped `.mac`.
     private(set) var controlHome: HostID?
     /// How the control plane's Slack channel is set and stands (#1009). Nil until the control
@@ -1945,6 +1947,35 @@ final class RemoteModel {
         }
     }
 
+    /// A host's git asking to use a Mac's git access (#1122), not answered here yet. Any
+    /// client may answer it; the control plane takes the first answer.
+    var gitLendAsk: GitLendAsk? {
+        GitLendAsk.first(in: controlHosts, thisMac: nil, answered: gitAsksAnswered)
+    }
+
+    /// Allow or Don’t Allow on the ask.
+    func answerGitLend(_ ask: GitLendAsk, allowed: Bool) async {
+        gitAsksAnswered.insert(ask.id)
+        await lendGit(host: ask.host, from: ask.from, server: ask.server, allowed: allowed)
+    }
+
+    /// Said to the control plane; Settings ▸ Git access takes one back with `allowed` false.
+    func lendGit(host: HostID, from: HostID, server: String, allowed: Bool) async {
+        guard let control = controlPlane else {
+            problem = "The control plane isn’t answering, so that was not changed."
+            return
+        }
+        do {
+            _ = try await control.call(DaemonAPI.Method.hostsLendGit,
+                                       DaemonAPI.LendGit(host: host, from: from, server: server, allowed: allowed))
+            if !allowed, let index = controlHosts.firstIndex(where: { $0.id == host }) {
+                controlHosts[index].gitFrom?[server] = nil
+            }
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
     /// Read how Slack is set and stands from the control plane (#1009).
     func loadChannels() async {
         guard let control = controlPlane,
@@ -2053,6 +2084,7 @@ final class RemoteModel {
               let listed = try? await control.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlHost].self)
         else { return }
         controlHosts = listed.filter { $0.relay != true }
+        gitAsksAnswered.formIntersection(GitLendAsk.waiting(in: listed))
         controlHome = status.homeHost
         // The relay's key, from the control plane itself (T077): kept for when its address
         // cannot be reached.

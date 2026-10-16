@@ -30,6 +30,7 @@ import { scopeRoot, WatchCounts } from "./fileWatch";
 import { workflowRunsOn } from "./workflows";
 import type { WhenDone } from "./workflowSettings";
 import { keyKind, takesKey, wantedRuntime } from "./credentials";
+import { askID, firstAsk, waiting, type GitLendAsk } from "./gitLending";
 import type { Method, Params, Result } from "../protocol/methods";
 import { dropboxRefusal, dropboxRequest } from "./dropbox";
 import { goOnRequest } from "./limits";
@@ -899,11 +900,19 @@ export class Work {
   takeHosts(hosts: ControlHost[], now = Date.now()): void {
     const since: Record<string, number> = {};
     for (const host of hosts) if (host.state !== "online") since[host.id] = this.downSince.value[host.id] ?? now;
+    const still = waiting(hosts);
     batch(() => {
       this.hosts.value = hosts;
       this.downSince.value = since;
+      this.gitAsksAnswered.value = new Set([...this.gitAsksAnswered.value].filter((id) => still.has(id)));
     });
   }
+
+  /** Git asks answered on this page, until the control plane's list drops them (#1122). */
+  readonly gitAsksAnswered = signal<ReadonlySet<string>>(new Set());
+
+  /** A host's git asking to use a Mac's git access (#1122), not answered here yet. */
+  get gitLendAsk(): GitLendAsk | null { return firstAsk(this.hosts.value, this.gitAsksAnswered.value); }
 
   /** The hosts whose `hosts/start` is out now, so the strip's Start waits for it (#691). */
   readonly hostsBeingStarted = signal<readonly string[]>([]);
@@ -1593,6 +1602,30 @@ export class Store extends Work {
    * once with the host's row; the start's progress comes as `control/hostChanged`, and a refusal
    * is said in `problem`.
    */
+  /** Allow or Don’t Allow: any client may answer, and the control plane takes the first. */
+  async answerGitLend(ask: GitLendAsk, allowed: boolean): Promise<void> {
+    this.gitAsksAnswered.value = new Set([...this.gitAsksAnswered.value, askID(ask.host, ask.server)]);
+    await this.lendGit(ask.host, ask.from, ask.server, allowed);
+  }
+
+  /** Said to the control plane; Settings ▸ Git access takes one back with `allowed` false. */
+  async lendGit(host: string, from: string, server: string, allowed: boolean): Promise<void> {
+    try {
+      await this.link.call("hosts/lendGit", { host: host as HostID, from: from as HostID, server, allowed });
+      if (!allowed) {
+        this.hosts.value = this.hosts.value.map((row) => {
+          if (row.id !== host || !row.gitFrom) return row;
+          const rest = { ...row.gitFrom };
+          delete rest[server];
+          return { ...row, gitFrom: rest };
+        });
+      }
+    } catch (error) {
+      log("call.failed", error instanceof CallFailed ? error.code : undefined);
+      this.say(describe(error));
+    }
+  }
+
   async startHost(host: string): Promise<void> {
     if (this.hostsBeingStarted.value.includes(host)) return;
     this.hostsBeingStarted.value = [...this.hostsBeingStarted.value, host];

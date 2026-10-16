@@ -135,6 +135,26 @@ server's agents use Claude as you, through this Mac, whenever this Mac is awake.
 sign-in itself stays on this Mac. Click **Don't Allow** to sign Claude in on the server
 instead.
 
+### Let the server use this Mac's git access
+
+A private repository needs git access. If the server has no git credential helper of its
+own, its git asks this Mac for one, through the control plane, over https only.
+
+1. The first time the server's git needs access to a git server (for example
+   `github.com`), every window, phone and web page asks **Let devbox use this Mac's git
+   access for github.com?** Click **Allow**.
+
+   The clone, pull or push goes on. This Mac answers from its own git (the Keychain,
+   `gh auth git-credential` and the like). The credential is used for that one git command
+   and is not kept on the server or logged. A push uses the same approval.
+2. To take it back, in **Settings ▸ Control plane ▸ Hosts**, open the server's `···` menu
+   and choose **Stop Lending Git Access for github.com**. On a phone or the web page, it is
+   **Settings ▸ Git access**.
+
+Git fails at once, and says why, when this Mac is not connected or has no git access to that
+git server. A server with ssh agent forwarding, or a credential helper of its own, uses its
+own access and asks nothing.
+
 ### Add another Mac
 
 A second Mac joins the same way, with Agents Host.
@@ -161,6 +181,10 @@ droplet, a Codespace), open **Settings ▸ Control plane ▸ Providers** and cho
 Host…** beside it. Add a Server opens over ssh, with the address the provider gives already
 filled in. Once the server joins, it is linked to its workspace, so it can be started and
 stopped from Agents. See [Start workspaces from Agents](start-workspaces-from-agents.md).
+
+**New Workspace…** on a provider's card has **Clone these projects**: git URLs, one a line.
+Once the new workspace joins, it clones each one, with this Mac's git access when you allow
+it, and they appear under its heading.
 
 ## When the server is offline
 

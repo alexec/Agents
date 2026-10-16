@@ -68,6 +68,15 @@ public final class ControlUplink: @unchecked Sendable {
         for channel in open { channel.end(tellingTheControlPlane: false) }
     }
 
+    /// What this host answers the control plane on channel 0 (#1122): only `git/fill`.
+    private var controlAnswers: (@Sendable (String, JSONValue?) async throws -> JSONValue)?
+
+    /// How this host answers the control plane's own requests (#1122). Only the control plane
+    /// writes channel 0, so no client can ask these.
+    public func setControlAnswers(_ answer: @escaping @Sendable (String, JSONValue?) async throws -> JSONValue) {
+        lock.withLock { controlAnswers = answer }
+    }
+
     /// Where this host's relays listen, when it lends a sign-in (T091).
     public func setLendingPort(_ port: @escaping @Sendable (String) async -> UInt16?) {
         lock.withLock { lendingPort = port }
@@ -226,6 +235,22 @@ public final class ControlUplink: @unchecked Sendable {
         return try result.get()
     }
 
+    private func answerControl(_ id: JSONRPCID, _ method: String, _ params: JSONValue?, on transport: any LineTransport) {
+        let answer = lock.withLock { controlAnswers }
+        Task.detached {
+            let reply: JSONRPCMessage
+            do {
+                guard method == DaemonAPI.Method.gitFill, let answer else { throw JSONRPCError.methodNotFound(method) }
+                reply = .success(id: id, result: try await answer(method, params))
+            } catch let error as JSONRPCError {
+                reply = .failure(id: id, error: error)
+            } catch {
+                reply = .failure(id: id, error: JSONRPCError(code: JSONRPCError.internalError, message: "\(error)"))
+            }
+            if let line = try? JSONRPCCodec.encode(reply) { try? transport.write(line: ControlWire.channel(0, message: line)) }
+        }
+    }
+
     private func answered(_ id: Int, _ result: Result<JSONValue, JSONRPCError>) {
         lock.withLock { waitingAnswers.removeValue(forKey: id) }?.resume(returning: result)
     }
@@ -269,6 +294,11 @@ public final class ControlUplink: @unchecked Sendable {
             // Replies to `host/hello` and `control/ping`, which nothing waits on; and to
             // `tunnel/open`, whose refusal ends the wait for it.
             let decoded = try? JSONRPCCodec.decode(line: message)
+            // The control plane's own request (#1122), answered on channel 0.
+            if case .request(let id, let method, let params)? = decoded {
+                answerControl(id, method, params, on: transport)
+                return
+            }
             if case .failure(.number(let id), let error)? = decoded,
                let ref = lock.withLock({ tunnelAsks[Int(id)] }) {
                 finishTunnel(ref, .failure(error))

@@ -233,6 +233,11 @@ final class ControlSettingsModel {
                                          startWhenUsed: startWhenUsed, stopWhenIdleMinutes: stopWhenIdleMinutes))
     }
 
+    /// A host stops using a Mac's git access for one git server (#1122).
+    func revokeGit(_ host: HostID, from: HostID, server: String) async {
+        await perform(DaemonAPI.Method.hostsLendGit, DaemonAPI.LendGit(host: host, from: from, server: server, allowed: false))
+    }
+
     func unlink(_ host: HostID) async {
         await perform(DaemonAPI.Method.hostsUnlink, DaemonAPI.HostRequest(host: host))
     }
@@ -289,10 +294,12 @@ final class ControlSettingsModel {
     }
 
     /// Makes a workspace: what was made, or why not in the provider's words.
-    func makeWorkspace(_ provider: ProviderID, name: String, options: JSONValue) async -> Result<DaemonAPI.ProviderCreated, WorkspaceRefusal> {
+    func makeWorkspace(_ provider: ProviderID, name: String, options: JSONValue,
+                       clones: [String] = []) async -> Result<DaemonAPI.ProviderCreated, WorkspaceRefusal> {
         do {
             let made = try await client.call(DaemonAPI.Method.providersCreate,
-                                             DaemonAPI.ProviderCreate(id: provider, name: name, options: options),
+                                             DaemonAPI.ProviderCreate(id: provider, name: name, options: options,
+                                                                      clones: clones.isEmpty ? nil : clones),
                                              returning: DaemonAPI.ProviderCreated.self)
             if made.joining { joiningWorkspaces.insert("\(provider.rawValue)/\(made.workspace.id)") }
             await refresh()

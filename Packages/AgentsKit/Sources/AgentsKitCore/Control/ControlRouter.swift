@@ -98,6 +98,8 @@ public actor ControlRouter {
     private var keeping: Task<Void, Never>?
     /// Kept requests on their way to a host, by their delivery, until it answers.
     private var keptWaits: [UUID: CheckedContinuation<JSONRPCMessage?, Never>] = [:]
+    /// Requests of a host on its channel 0 (#1122), by their id, until it answers.
+    private var hostAsks: [String: (host: HostID, waiting: CheckedContinuation<JSONRPCMessage?, Never>)] = [:]
     /// Where each session last said the person was, keyed by the session, or by the client for
     /// a report made at another copy. Folded per surface, so a client with two sockets (two tabs
     /// of one browser, 071 R11) is active while either is: one record per client let the last
@@ -425,6 +427,7 @@ public actor ControlRouter {
         }
         if let newState { setState(newState, of: host) }
         for sessionID in bareGone { detachClient(sessionID) }
+        for (id, ask) in hostAsks where ask.host == host { endAsk(id) }
     }
 
     /// The id of a reply, or nil for anything else (a notification, or a request the host
@@ -533,7 +536,12 @@ public actor ControlRouter {
         guard let frame = try? ControlWire.readHost(line) else { return }
         switch frame {
         case .message(0, let message):
-            await channelZero(message, from: host)
+            // A git command waits on a person's answer (#1122): the host's other lines go on.
+            if message.contains("\"\(DaemonAPI.Method.gitCredential)\"") {
+                Task { await self.channelZero(message, from: host) }
+            } else {
+                await channelZero(message, from: host)
+            }
         case .message(let channel, let message):
             guard let target = hosts[host]?.channels[channel] else { return }
             guard case .session(let sessionID) = target else {
@@ -620,6 +628,12 @@ public actor ControlRouter {
 
     private func channelZero(_ message: String, from host: HostID) async {
         guard let decoded = try? JSONRPCCodec.decode(line: message) else { return }
+        switch decoded {
+        case .success(.string(let id), _), .failure(.string(let id)?, _):
+            if hostAsks[id]?.host == host { hostAsks.removeValue(forKey: id)?.waiting.resume(returning: decoded) }
+            return
+        default: break
+        }
         guard case .request(let id, let method, let params) = decoded else { return }
         let reply: JSONRPCMessage
         do {
@@ -914,6 +928,30 @@ public actor ControlRouter {
     private func write(_ line: String, to sessionID: UUID) {
         guard let session = clients[sessionID] else { return }
         do { try session.transport.write(line: line) } catch { detachClient(sessionID) }
+    }
+
+    // MARK: Requests of a host (#1122)
+
+    /// A request of a host on its channel 0, which only the control plane writes, and its
+    /// reply. Nil when the host isn't here, goes before it answers, or takes longer than
+    /// `patience`.
+    public func ask(_ host: HostID, _ method: String, params: JSONValue?, patience: Duration = .seconds(30)) async -> JSONRPCMessage? {
+        guard let session = hosts[host], session.local else { return nil }
+        let id = "ask-" + UUID().uuidString
+        guard let line = try? JSONRPCCodec.encode(.request(id: .string(id), method: method, params: params)) else { return nil }
+        let timeout = Task { [weak self] in
+            try? await Task.sleep(for: patience)
+            await self?.endAsk(id)
+        }
+        defer { timeout.cancel() }
+        return await withCheckedContinuation { waiting in
+            hostAsks[id] = (host, waiting)
+            if (try? session.transport.write(line: ControlWire.channel(0, message: line))) == nil { endAsk(id) }
+        }
+    }
+
+    private func endAsk(_ id: String) {
+        hostAsks.removeValue(forKey: id)?.waiting.resume(returning: nil)
     }
 
     // MARK: Tunnels between hosts (T091)

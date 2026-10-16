@@ -11,6 +11,29 @@ struct SignInLendAsk: Identifiable {
 }
 
 extension AppModel {
+    /// The first git ask no window here has answered yet (#1122). Any client may answer it;
+    /// the control plane takes the first answer.
+    var gitLendAsk: GitLendAsk? {
+        GitLendAsk.first(in: controlPlaneHosts ?? [], thisMac: thisMacHostID, answered: gitAsksAnswered)
+    }
+
+    /// Allow or Don’t Allow (#1122): said to the control plane, which answers the waiting git.
+    func answerGitLend(_ ask: GitLendAsk, allowed: Bool) {
+        gitAsksAnswered.insert(ask.id)
+        lendGit(host: ask.host, from: ask.from, server: ask.server, allowed: allowed)
+    }
+
+    /// Settings ▸ Control plane ▸ Hosts: a host stops using a Mac's git access for a server.
+    func lendGit(host: HostID, from: HostID, server: String, allowed: Bool) {
+        guard let control = controlPlaneClient() else { return }
+        Task {
+            defer { Task { await control.disconnect() } }
+            try? await control.connect(startIfNeeded: false, timeout: .seconds(5))
+            _ = try? await control.call(DaemonAPI.Method.hostsLendGit,
+                                        DaemonAPI.LendGit(host: host, from: from, server: server, allowed: allowed))
+        }
+    }
+
     /// A server of the control plane wants a sign-in this Mac relays (T091). Asks the
     /// person the first time; then the control plane lets the server tunnel to this Mac's
     /// host, which relays the sign-in, and the server is told where its gate goes. The

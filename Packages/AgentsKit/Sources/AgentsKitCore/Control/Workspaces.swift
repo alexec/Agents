@@ -463,10 +463,14 @@ public extension DaemonAPI {
         public var id: ProviderID
         public var name: String
         public var options: JSONValue?
-        public init(id: ProviderID, name: String, options: JSONValue? = nil) {
+        /// Git URLs the new host clones once it has joined (#1122), as File ▸ Clone Project
+        /// does, one after another. Nil or empty for none.
+        public var clones: [String]?
+        public init(id: ProviderID, name: String, options: JSONValue? = nil, clones: [String]? = nil) {
             self.id = id
             self.name = name
             self.options = options
+            self.clones = clones
         }
     }
 

@@ -346,6 +346,9 @@ struct ContentView: View {
             case .lend(let ask):
                 Button("Allow") { model.finishSignInLendAsk(ask, allowed: true) }
                 Button("Don’t Allow", role: .cancel) { model.finishSignInLendAsk(ask, allowed: false) }
+            case .lendGit(let ask):
+                Button("Allow") { model.answerGitLend(ask, allowed: true) }
+                Button("Don’t Allow", role: .cancel) { model.answerGitLend(ask, allowed: false) }
             case .problem:
                 Button("OK") {}
                     .keyboardShortcut(.defaultAction)
@@ -411,12 +414,14 @@ private struct NothingPickedPage: View {
 /// waiting on it.
 enum WindowAlert: Identifiable {
     case lend(SignInLendAsk)
+    case lendGit(GitLendAsk)
     case problem(AlertWords)
     case folderGone(FolderGoneAsk)
 
     var id: String {
         switch self {
         case .lend(let ask): "lend-\(ask.id)"
+        case .lendGit(let ask): "lend-git-\(ask.id)"
         case .problem(let words): "problem-\(words.id)"
         case .folderGone(let ask): "folder-gone-\(ask.id)"
         }
@@ -425,6 +430,7 @@ enum WindowAlert: Identifiable {
     var title: String {
         switch self {
         case .lend(let ask): "Let \(ask.label) use this Mac’s \(ask.runtimeName) sign-in?"
+        case .lendGit(let ask): ask.title
         case .problem: "Could not finish that"
         case .folderGone: "This agent’s folder isn’t there"
         }
@@ -434,6 +440,7 @@ enum WindowAlert: Identifiable {
         switch self {
         case .lend(let ask):
             "Its agents will use \(ask.runtimeName) as you, through this Mac, whenever this Mac is awake. The sign-in itself stays on this Mac. You can stop it in Settings ▸ Control plane ▸ Hosts."
+        case .lendGit(let ask): ask.message
         case .problem(let words): words.text
         case .folderGone(let ask): ask.message + " What you typed is still in the prompt."
         }
@@ -442,6 +449,7 @@ enum WindowAlert: Identifiable {
     @MainActor
     static func wanted(by model: AppModel) -> WindowAlert? {
         if let ask = model.signInLendAsk { return .lend(ask) }
+        if let ask = model.gitLendAsk { return .lendGit(ask) }
         if let ask = model.folderGone { return .folderGone(ask) }
         return model.problem.map { .problem(AlertWords(text: $0)) }
     }
@@ -454,6 +462,8 @@ enum WindowAlert: Identifiable {
         // Its buttons answer it, Escape as Don’t Allow, and only once: its answer is a
         // continuation, so nothing here answers it again.
         case .lend: break
+        // Escape is Don’t Allow, which its cancel button has said.
+        case .lendGit: break
         case .problem(let words): if model.problem == words.text { model.dismissProblem() }
         case .folderGone(let ask): if model.folderGone == ask { model.folderGone = nil }
         }
