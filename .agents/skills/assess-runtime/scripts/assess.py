@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Assess runtimes unattended (#47), on a daemon's root: start, answer, follow, score.
 
-  assess.py ROOT RUNTIME [RUNTIME …] --folder PROJECT [--minutes 20] [--json OUT] [--model M]
-  assess.py ROOT RUNTIME --folder PROJECT --follow AGENT    carry on one whose driver stopped
+  assess.py ROOT RUNTIME [RUNTIME …] [--folder PROJECT] [--minutes 20] [--json OUT] [--model M]
+  assess.py ROOT RUNTIME --follow AGENT                       carry on one whose driver stopped
 
 For each runtime, one at a time: `runtimes/assess` starts the assessing agent in PROJECT
 (which must be one of the daemon's projects). Then this answers what a person would, for
@@ -25,6 +25,8 @@ import json
 import os
 import sys
 import time
+from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "run-app", "scripts"))
@@ -70,8 +72,23 @@ def ours(client, assessor):
     return ids
 
 
+def assessment_folder(client, override=None):
+    """Use the requested project, or find this host's marked chat project."""
+    if override:
+        return os.path.abspath(override)
+    projects = client.call("projects/list", {}) or []
+    chat = next((p for p in projects if p.get("isChat")), None)
+    if not chat:
+        raise RuntimeError("This host has no chat project. Pass --folder PROJECT to choose one.")
+    folder = (chat.get("project") or {}).get("folder")
+    parsed = urlparse(folder or "")
+    if parsed.scheme != "file" or not parsed.path:
+        raise RuntimeError("The chat project did not include a local folder. Pass --folder PROJECT to choose one.")
+    return os.path.abspath(unquote(parsed.path))
+
+
 def assess(client, runtime, folder, minutes, model=None):
-    asked = {"runtimeID": runtime, "folder": "file://" + folder}
+    asked = {"runtimeID": runtime, "folder": Path(folder).as_uri()}
     if model:
         asked["model"] = model
     try:
@@ -138,7 +155,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("root")
     parser.add_argument("runtimes", nargs="+")
-    parser.add_argument("--folder", required=True)
+    parser.add_argument("--folder", help="project folder (default: this host's chat project)")
     parser.add_argument("--minutes", type=int, default=20)
     parser.add_argument("--json", help="write every result here too")
     parser.add_argument("--model", help="a model to assess on, or `default` for the runtime's own (else the cheapest)")
@@ -146,6 +163,10 @@ def main():
                         help="carry on an assessment already started (its driver stopped): RUNTIME is its runtime")
     args = parser.parse_args()
     client = Client(args.root)
+    try:
+        folder = None if args.follow else assessment_folder(client, args.folder)
+    except RuntimeError as e:
+        parser.error(str(e))
     results = []
     for runtime in args.runtimes:
         if args.follow:
@@ -153,10 +174,10 @@ def main():
             result = follow(client, runtime, args.follow, (record.get("startOptions") or {}).get("values", {}).get("model"),
                             None, args.minutes)
         else:
-            result = assess(client, runtime, os.path.abspath(args.folder), args.minutes, args.model)
+            result = assess(client, runtime, folder, args.minutes, args.model)
             if not args.model and never_started(result):
                 print(f"  {runtime}: stopped before any app tool on {result['model']}; again on its default model", flush=True)
-                result = assess(client, runtime, os.path.abspath(args.folder), args.minutes, "default")
+                result = assess(client, runtime, folder, args.minutes, "default")
         results.append(result)
         if "skipped" in result:
             print(f"\n## {runtime}: skipped\n\n{result['skipped']}\n", flush=True)

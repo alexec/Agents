@@ -41,6 +41,8 @@ public enum RuntimeAssessment {
              passesWhen: "lease_resource, list_resources and release_resource answered; granted then released on the log; nothing left held"),
         Step(id: "workflows", area: "Workflows",
              passesWhen: "manage_workflows listed them, wrote a throwaway that was left waiting for the person's OK, listed it, and removed it, leaving nothing behind"),
+        Step(id: "workspaces", area: "Workspaces",
+             passesWhen: "list_workspaces answered, or the app said this host has no workspaces"),
         Step(id: "events", area: "Events",
              passesWhen: "a second lease raised lease.granted for this agent, and the wait on it came back with it; a wait with no until_minutes was refused; cancel_wait then cleared a second wait"),
         Step(id: "ask_form", area: "Questions",
@@ -191,7 +193,7 @@ public enum RuntimeAssessment {
 
             The report is `\(reportPath)`. Its table has one row per step, in this order, with \
             the step id in the first column: `show_file`, `leases`, `workflows`, \
-            `events`, `ask_form`, `own_ask`, `helpers`, `wait`, `ending`, `worktree`, `sessions`, \
+            `workspaces`, `events`, `ask_form`, `own_ask`, `helpers`, `wait`, `ending`, `worktree`, `sessions`, \
             `scope`, `permissions`, `report`; then the result (passed, failed or not offered) \
             and the evidence: what the tool answered.
 
@@ -210,59 +212,61 @@ public enum RuntimeAssessment {
 
             then `list` again, and note what it says about `\(workflow)`; then action `remove`, \
             workflow `\(workflow)`. Change no other workflow.
-            4. `events`: `wait_for_event` with action `recent` and limit 1, and note the position \
+            4. `workspaces`: call `list_workspaces`. This is read-only. If the app says this host \
+            has no workspaces, record that exact answer; do not start, stop, make or delete one.
+            5. `events`: `wait_for_event` with action `recent` and limit 1, and note the position \
             it gives; `lease_resource` named `\(pingLease)` for 5 minutes; then `wait_for_event` \
             on `\(pingEvent)` from that position. It comes back at once, with that lease. Then \
             `release_resource` `\(pingLease)`. Then \(never) with no `until_minutes`, which is \
             refused: note what it says. Then \(never) with `until_minutes` \(longWaitMinutes); \
             when it says you are still waiting, call `cancel_wait`.
-            5. `ask_form`: `ask_form` titled "\(runtimeName) assessment" with two questions: id \
+            6. `ask_form`: `ask_form` titled "\(runtimeName) assessment" with two questions: id \
             `pick`, prompt "Pick one", options `a` (Alpha) and `b` (Beta); and id `words`, prompt \
             "Type any short phrase", with no options. Write both answers into the report exactly \
             as they came back.
-            6. `own_ask`: \(ownAsk)
-            7. `helpers`: `start_session` a helper on runtime `\(runtimeID)` with \(modelWords), the \
+            7. `own_ask`: \(ownAsk)
+            8. `helpers`: `start_session` a helper on runtime `\(runtimeID)` with \(modelWords), the \
             label `\(helperLabel)`, and the prompt "Reply with the word OK." Then call `list_sessions` with `started_by` `me`. Then call \
             `wait_for_event` with `agents` the helper's id and a message saying you are \
             waiting on the helper: that ends this turn, and you are started again when the \
             helper finishes. (If that call is refused because the helper has already \
-            finished, go straight on to step 8 in this turn.)
+            finished, go straight on to step 9 in this turn.)
 
             **Turn 2**, once the helper has finished
 
-            8. `helpers`: `archive_session` with the helper's id.
-            9. `wait`: \(never) with `until_minutes` 1. When it says \
+            9. `helpers`: `archive_session` with the helper's id.
+            10. `wait`: \(never) with `until_minutes` 1. When it says \
             you are still waiting, end your turn. You are started again when it times out. (If \
-            the call itself comes back timed out, go straight on to step 10 in this turn.)
+            the call itself comes back timed out, go straight on to step 11 in this turn.)
 
             **Turn 3**, once the wait has timed out
 
-            10. `ending`: `wait_for_event` with `until_minutes` 1 and no events, with a message \
+            11. `ending`: `wait_for_event` with `until_minutes` 1 and no events, with a message \
             saying you will check again in a minute. That ends the turn.
 
             **Turn 4**
 
-            11. `worktree`: `move_worktree` with `worktree` `\(lease)`, then end the turn, \
+            12. `worktree`: `move_worktree` with `worktree` `\(lease)`, then end the turn, \
             saying you are moving into a worktree. You are started again in it. (If `move_worktree` is not in your tools, or is refused because the project is not in a git repository, or because \
             your runtime cannot move, write `not offered` with what it said, and go straight on \
-            to step 12 in this turn.)
+            to step 13 in this turn.)
 
             **Turn 5**, in the worktree
 
-            12. `sessions`: `list_sessions`, then `read_session` with your own session's id from \
+            13. `sessions`: `list_sessions`, then `read_session` with your own session's id from \
             that list. Note whether the id and title it gives back are yours.
-            13. `scope`: with your runtime's own file-writing tool (not a shell command), write \
+            14. `scope`: with your runtime's own file-writing tool (not a shell command), write \
             the line "assess" to `\(scopePath)`. It is outside the project, so expect to be \
             asked or refused; record which, and what the answer was.
-            14. `permissions`: record whether a permission card came for that write, what it \
+            15. `permissions`: record whether a permission card came for that write, what it \
             was answered, and whether the file was written.
-            15. `move_worktree` with `leave_worktree` `remove`, then end the turn, saying \
+            16. `move_worktree` with `leave_worktree` `remove`, then end the turn, saying \
             you are moving back. You are started again in the project folder. \
-            (If you never moved, skip this and go straight on to step 16.)
+            (If you never moved, skip this and go straight on to step 17.)
 
             **Turn 6**
 
-            16. `report`: finish the report: every row filled in, and a section "What to fix" \
+            17. `report`: finish the report: every row filled in, and a section "What to fix" \
             naming each failure with its likely fix — the app, the adapter, the runtime's \
             version, or a setting. If every step passed by your own account, call `archive_session` \
             with no id and end your turn saying how many passed; otherwise end it naming the \

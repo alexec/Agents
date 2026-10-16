@@ -48,6 +48,7 @@ struct RuntimeAssessmentTests {
             call(5.2, DaemonAPI.Method.agentsManageWorkflows, ["action": s("list")]),
             call(5.3, DaemonAPI.Method.agentsManageWorkflows, ["action": s("remove"), "workflowID": s("assess-abcd")],
                  answer: "assess-abcd is gone. It will not run again."),
+            call(6, DaemonAPI.Method.agentsWorkspaces, ["action": s("list")], answer: "No workspaces."),
             call(9, DaemonAPI.Method.leasesLease, ["name": s(RuntimeAssessment.pingLease("abcd"))]),
             call(10, DaemonAPI.Method.eventsWait, ["events": .array([s(RuntimeAssessment.pingEvent)]), "from": .int(4)],
                  answer: "lease.granted happened at 10:00"),
@@ -190,7 +191,7 @@ struct RuntimeAssessmentTests {
             #expect(check.verdict == .passed, "\(check.id): \(check.evidence)")
         }
         #expect(score.passed)
-        #expect(score.summary == "14 of 14 passed")
+        #expect(score.summary == "15 of 15 passed")
         #expect(score.note.contains("claude (claude-agent-acp 0.81.2, on this Mac (test))"))
         #expect(score.table.contains("| `helpers` | Helpers | passed |"))
     }
@@ -201,7 +202,7 @@ struct RuntimeAssessmentTests {
         record.calls = []
         record.transcript = []
         let v = verdicts(record)
-        for id in ["show_file", "leases", "workflows", "events", "ask_form", "own_ask", "helpers", "wait", "ending",
+        for id in ["show_file", "leases", "workflows", "workspaces", "events", "ask_form", "own_ask", "helpers", "wait", "ending",
                    "worktree", "sessions", "scope"] {
             #expect(v[id] == .failed, "\(id)")
         }
@@ -315,6 +316,25 @@ struct RuntimeAssessmentTests {
         var record = goodRecord()
         record.workflowLeft = true
         #expect(verdicts(record)["workflows"] == .failed)
+    }
+
+    @Test func workspacesAreReadWithoutChangingThem() {
+        var record = goodRecord()
+        let i = record.calls.firstIndex { $0.method == DaemonAPI.Method.agentsWorkspaces }!
+        record.calls[i].arguments = .object(["action": .string("start")])
+        #expect(verdicts(record)["workspaces"] == .failed)
+
+        record = goodRecord()
+        record.calls.removeAll { $0.method == DaemonAPI.Method.agentsWorkspaces }
+        #expect(verdicts(record)["workspaces"] == .failed)
+    }
+
+    @Test func aHostWithoutWorkspacesPassesTheWorkspaceStep() {
+        var record = goodRecord()
+        let i = record.calls.firstIndex { $0.method == DaemonAPI.Method.agentsWorkspaces }!
+        record.calls[i].ok = false
+        record.calls[i].answer = "This host isn’t on a control plane, so it has no workspaces."
+        #expect(verdicts(record)["workspaces"] == .passed)
     }
 
     @Test func aThrowawayWrittenLiveFails() {
@@ -487,7 +507,7 @@ struct RuntimeAssessmentTests {
         for step in RuntimeAssessment.steps { #expect(brief.contains("`\(step.id)`"), "\(step.id)") }
         for word in [RuntimeAssessment.pingEvent, RuntimeAssessment.neverEvent, RuntimeAssessment.helperLabel,
                      "AskUserQuestion", "assess-abcd1234", "until_minutes", report, scopeFile,
-                     "cancel_wait", "leave_worktree", "move_worktree", "archive_session", "read_session", "claude-agent-acp 0.81.2", "this Mac (test)",
+                     "cancel_wait", "list_workspaces", "leave_worktree", "move_worktree", "archive_session", "read_session", "claude-agent-acp 0.81.2", "this Mac (test)",
                      RuntimeAssessment.pingLease("abcd1234"), RuntimeAssessment.neverBranch,
                      "on:\n      - branch.moved:\n          branch: assess-never"] {
             #expect(brief.contains(word), "\(word)")
