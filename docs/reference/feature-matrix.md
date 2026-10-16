@@ -56,11 +56,6 @@ Agents' ◐ cells, and why:
   pause until it wakes, and agents on servers keep working where nothing can reach them
   while the Mac that runs the control plane sleeps. See
   [The control plane](../explanation/control-plane.md).
-- **End-to-end encrypted relay:** Agents Host runs it when **Relay for my devices** is on.
-  It has not yet been checked on a phone away from home.
-- **Notifications:** the Mac gets them. The relay takes them to the iPhone and iPad, which
-  has not yet been checked away from home, and the web page gets none. See
-  [Phone and iPad](../explanation/phone-and-ipad.md).
 - **Spending limits:** in money or in tokens (#838), so only for runtimes that report a
   price or tokens. Cursor, Antigravity and Grok report neither, and run past every
   limit. See [Limit spending](../how-to/limit-spending.md).
@@ -187,11 +182,11 @@ Agents has none of these at all:
 | OpenAI Codex | ● | ● | ● | ● | ?⃝ | ● | 83% |
 | Pragma | ● | ● | ● | ● | ○ | ● | 83% |
 | Parallel Code | ● | ○ | ● | ● | ◐ | ● | 75% |
+| **Agents** | ○ | ● | ○ | ● | ● | ● | 67% |
 | Codeg | ● | ◐ | ◐ | ● | ○ | ● | 67% |
 | Cursor | ● | ● | ○ | ● | ○ | ● | 67% |
 | CodeAgentSwarm | ● | ◐ | ◐ | ◐ | ?⃝ | ● | 58% |
 | Warp | ● | ○ | ○ | ● | ◐ | ● | 58% |
-| **Agents** | ○ | ● | ○ | ● | ◐ | ◐ | 50% |
 | Maestro | ● | ○ | ○ | ● | ○ | ● | 50% |
 | Roamgate | ◐ | ○ | ○ | ● | ◐ | ● | 50% |
 | Threadlines | ● | ○ | ○ | ● | ● | ?⃝ | 50% |
@@ -439,9 +434,9 @@ Each app's score in every table, and overall: its points over the 49 scored feat
 
 | Rank | App | Running | Reach | Following | Reviewing | Tools | Tasks | Extensions | Organising | Overall |
 |--:|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
+| 1 | **Agents** | 92% | 67% | 100% | 90% | 50% | 89% | 70% | 83% | **82%** |
 | 1 | GitHub Copilot | 92% | 83% | 100% | 100% | 80% | 61% | 100% | 50% | **82%** |
-| 2 | **Agents** | 92% | 50% | 100% | 90% | 50% | 89% | 70% | 83% | **80%** |
-| 2 | Paseo | 100% | 100% | 71% | 90% | 60% | 61% | 60% | 100% | **80%** |
+| 3 | Paseo | 100% | 100% | 71% | 90% | 60% | 61% | 60% | 100% | **80%** |
 | 4 | Cursor | 83% | 67% | 86% | 100% | 80% | 67% | 80% | 50% | **76%** |
 | 5 | Claude Code | 67% | 83% | 79% | 80% | 70% | 67% | 80% | 67% | **73%** |
 | 5 | Nimbalyst | 83% | 83% | 86% | 70% | 70% | 50% | 70% | 83% | **73%** |
