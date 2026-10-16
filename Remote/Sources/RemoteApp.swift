@@ -99,6 +99,8 @@ struct RemoteView: View {
     @State private var sceneID = UUID()
     /// Settings ▸ Appearance ▸ Celebrations (#986), on this device.
     @AppStorage(Celebration.defaultsKey) private var celebrations = true
+    /// Settings ▸ Sidebar ▸ Home window (#1090): the sidebar of every project, or the launcher.
+    @AppStorage(HomeWindow.defaultsKey) private var home = HomeWindow.initial
 
     /// What is open over the project, in the order each was opened from the one before:
     /// a pinned page, a workflow, a conversation. The first is the detail's own page, the
@@ -130,7 +132,8 @@ struct RemoteView: View {
     var body: some View {
         @Bindable var model = model
         NavigationSplitView(preferredCompactColumn: $compactColumn) {
-            RemoteSidebar()
+            // The launcher's cards in place of the sidebar, with Launcher on (#1090).
+            if home == .launcher { RemoteLauncher() } else { RemoteSidebar() }
         } detail: {
             NavigationStack(path: pushed) {
                 Group {

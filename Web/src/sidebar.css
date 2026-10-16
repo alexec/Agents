@@ -255,3 +255,19 @@
 .with-sidebar .sidebar-head h1.alone-title { flex-basis: 100%; margin: 6px 0 2px; font-size: 1.0625rem; text-align: left; }
 .sidebar button.link.elsewhere { display: block; margin: 12px 8px; padding: 0; font-size: 0.8125rem; cursor: pointer; text-align: left; }
 .sidebar button.link.elsewhere:hover { text-decoration: underline; }
+
+/* The launcher home (#1090): cards in place of the sidebar. */
+.launcher-home .launcher, .launcher-home .launcher-page { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.launcher .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; padding: 20px; }
+.launcher .card { text-align: left; padding: 14px; border-radius: 10px; border: 1px solid var(--line, rgba(128,128,128,.3));
+  background: var(--sidebar, transparent); color: inherit; font: inherit; min-height: 64px; }
+.launcher button.card { cursor: pointer; }
+.launcher button.card:disabled { opacity: .5; cursor: default; }
+.launcher .card.needs-you.needs { border-color: orange; }
+.launcher .card h2 { font-size: 1rem; margin: 0 0 6px; }
+.launcher .card ul { list-style: none; margin: 0; padding: 0; }
+.launcher .card .session-line { display: flex; gap: 8px; width: 100%; padding: 2px 0; text-align: left; cursor: pointer; }
+.launcher .card .session-line .title { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.launcher .card .session-line .place { opacity: .6; }
+.launcher .card p button.link { margin-right: 12px; cursor: pointer; }
+.launcher-page .launcher-back { align-self: flex-start; margin: 10px 12px 0; cursor: pointer; }

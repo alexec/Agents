@@ -44,7 +44,19 @@ extension AppModel {
         let window = projectWindows[key] ?? ProjectWindowState(key: key)
         window.windows += 1
         if projectWindows[key] == nil { projectWindows[key] = window }
+        // What it was opened to show (#1090): a session from the launcher or a notification.
+        if let pick = pendingProjectPicks.removeValue(forKey: key) { window.pick = pick }
         return window
+    }
+
+    /// A session in its project's window, opened for it if it is not open (#1090): what the
+    /// launcher's cards, and a notification with Launcher on, do.
+    func openInProjectWindow(_ id: UUID) {
+        if showInProjectWindow(id) { return }
+        guard let agent = work.agent(id) else { return openAgent(id) }
+        let key = ProjectKey(host: agent.host, folder: agent.projectFolder)
+        pendingProjectPicks[key] = .session(id)
+        openProjectWindow?(key)
     }
 
     /// Its window has closed. The last one lets it go.
@@ -187,6 +199,8 @@ private struct ProjectWindowColumns: View {
         .environment(window.states)
         .environment(window.webHolders)
         .environment(\.windowProject, window.key)
+        .environment(\.windowOpen, WindowOpener(window: window))
+        .environment(\.windowPick, window.pick)
         // A file a chat links to is on the project's host, as in the main window.
         .environment(\.openURL, OpenURLAction { url in
             guard url.isFileURL else { return .systemAction }
@@ -220,18 +234,19 @@ private struct ProjectWindowColumns: View {
                 .onGeometryChange(for: Double.self) { $0.size.width } action: { window.frame.paneWidth = $0 }
                 .paperGround()
             }
+        case .workflow(let id, _):
+            WorkflowPage(workflowID: id).paperGround()
+        case .archive(let key):
+            ProjectWorkPage(page: .archive, project: key).paperGround()
         case .projectMCPServers(let key):
             MCPServersView(project: key).paperGround()
         case .pin(let path, let key):
             PinnedPage(project: key, path: path).paperGround()
-        case .project, nil:
-            // A new session in the project: the empty chat with its prompt (066).
+        default:
+            // The project itself, or nothing picked yet: a new session in it, the empty chat
+            // with its prompt (066).
             ProjectAgentsView(selection: Binding(get: { nil }, set: { id in id.map { window.pick = .session($0) } }))
                 .paperGround()
-        default:
-            // Its workflows and archive are the main window's pages for now.
-            ContentUnavailableView("Open in the main window", systemImage: "macwindow",
-                                   description: Text("This page opens in the main window."))
         }
     }
 }
@@ -361,6 +376,11 @@ private struct ProjectWindowToolbar: ToolbarContent {
 extension EnvironmentValues {
     /// The project whose own window this is (#1089); nil in the main window.
     @Entry var windowProject: ProjectKey? = nil
+    /// How a project's own window opens what is picked on its pages (#1090): a session, or
+    /// nil for the project itself. Nil in the main window, whose selection does it.
+    @Entry var windowOpen: WindowOpener? = nil
+    /// What a project's own window has picked (#1090), for its pages' lists to light.
+    @Entry var windowPick: SidebarItem? = nil
 }
 
 extension FocusedValues {
@@ -393,4 +413,18 @@ final class AgentsAppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate()
         Self.model?.openProjectWindow?(key)
     }
+}
+
+/// How a project's own window opens what its pages pick (#1090): one per window, the same
+/// while the window is, so the views that read it are not drawn again for nothing.
+@MainActor
+struct WindowOpener: Equatable {
+    let window: ProjectWindowState
+
+    /// A session, a workflow or a page in this window; nil for the project itself.
+    func callAsFunction(_ item: SidebarItem?) {
+        window.pick = item ?? .project(window.key)
+    }
+
+    nonisolated static func == (a: WindowOpener, b: WindowOpener) -> Bool { a.window === b.window }
 }

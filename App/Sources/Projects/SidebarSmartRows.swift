@@ -172,6 +172,13 @@ private struct ApprovalListRow: View {
 /// when no agent ran; Dismiss, in its menu, takes it out until it fails again.
 private struct FailedWorkflowRow: View {
     @Environment(AppModel.self) private var model
+    /// In a project's own window, how it opens what is picked (#1090).
+    @Environment(\.windowOpen) private var windowOpen
+
+    /// In this window: a project's own, or the main window's selection.
+    private func open(_ item: SidebarItem) {
+        if let windowOpen { windowOpen(item) } else { model.sidebarItem = item }
+    }
     let approval: Approval
     let project: ProjectKey
     let place: String?
@@ -182,9 +189,9 @@ private struct FailedWorkflowRow: View {
             .sidebarInk(item)
             .tag(item)
             .contextMenu {
-                Button("Open") { model.sidebarItem = item }
+                Button("Open") { open(item) }
                 if approval.agentID != nil {
-                    Button("Open Workflow") { model.sidebarItem = workflow }
+                    Button("Open Workflow") { open(workflow) }
                 }
                 if approval.actions.contains(.dismiss) {
                     Button(approval.word(for: .dismiss)) {
