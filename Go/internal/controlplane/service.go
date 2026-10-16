@@ -886,6 +886,12 @@ func (s *Service) accept(conn *Conn, webOrigin string) {
 	switch id.Kind {
 	case 'c':
 		s.router.AttachClient(client, conn, relayed)
+		// Forgotten between its ok and now (a forget at this or another copy): its socket
+		// ends at once, rather than at the 15 s backstop.
+		if s.records.Client(client.ID) == nil && s.records.WasForgotten(client.ID) {
+			s.router.ForgetClient(client.ID)
+			return
+		}
 		if err := s.methods.Admit(context.Background(), *client); err != nil {
 			s.log("store: could not note " + client.Name + " connecting: " + err.Error())
 		}

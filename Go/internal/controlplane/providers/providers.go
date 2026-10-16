@@ -175,7 +175,7 @@ type Providers struct {
 	// What each host last said about whether it is idle (US4).
 	statuses map[string]HostStatus
 	// Each linked host's stop when idle, counting down while it stays idle.
-	idleTimers map[string]*time.Timer
+	idleTimers map[string]*idleTimer
 	// Stops under way because a host was idle, by how many minutes.
 	idleStopping map[string]int
 	// "Stopped by Agents after 30 minutes idle", until it is started again.
@@ -218,7 +218,7 @@ func NewProviders(cfg Config) *Providers {
 		secrets: cfg.Secrets, timing: cfg.Timing, hooks: cfg.Hooks, log: cfg.Log,
 		providers: map[string]heldProvider{}, connections: map[string]Provider{}, listed: map[string]*listed{},
 		activities: map[string]*activity{}, problems: map[string]string{}, statuses: map[string]HostStatus{},
-		idleTimers: map[string]*time.Timer{}, idleStopping: map[string]int{}, stoppedBy: map[string]string{},
+		idleTimers: map[string]*idleTimer{}, idleStopping: map[string]int{}, stoppedBy: map[string]string{},
 		joining: map[string]*joining{}, done: make(chan struct{})}
 }
 
@@ -318,7 +318,7 @@ func (p *Providers) Stop() {
 	for _, t := range p.idleTimers {
 		t.Stop()
 	}
-	p.idleTimers = map[string]*time.Timer{}
+	p.idleTimers = map[string]*idleTimer{}
 	p.mu.Unlock()
 	for _, c := range connections {
 		c.End()
@@ -1546,6 +1546,17 @@ func (p *Providers) Heard(host string, status HostStatus) {
 	}
 }
 
+// idleTimer is one count down of a host's stop when idle. Its timer is set and stopped
+// under Providers.mu.
+type idleTimer struct{ t *time.Timer }
+
+// Stop stops the count, if it was started.
+func (i *idleTimer) Stop() {
+	if i.t != nil {
+		i.t.Stop()
+	}
+}
+
 // countIdle starts counting down a linked host's stop when idle, from now, if it is idle,
 // online and has one; otherwise it stops counting.
 func (p *Providers) countIdle(host string) {
@@ -1563,17 +1574,18 @@ func (p *Providers) countIdle(host string) {
 		return
 	}
 	minutes := *link.StopWhenIdleMinutes
-	var timer *time.Timer
-	timer = time.AfterFunc(p.timing.IdleMinute*time.Duration(minutes), func() { p.idleFor(host, minutes, timer) })
+	// The count is known by its holder, made before its timer can fire.
+	timer := &idleTimer{}
 	p.mu.Lock()
 	if old := p.idleTimers[host]; old != nil {
 		old.Stop()
 	}
 	p.idleTimers[host] = timer
+	timer.t = time.AfterFunc(p.timing.IdleMinute*time.Duration(minutes), func() { p.idleFor(host, minutes, timer) })
 	p.mu.Unlock()
 }
 
-func (p *Providers) idleFor(host string, minutes int, timer *time.Timer) {
+func (p *Providers) idleFor(host string, minutes int, timer *idleTimer) {
 	p.mu.Lock()
 	if p.idleTimers[host] != timer {
 		p.mu.Unlock()

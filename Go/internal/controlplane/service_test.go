@@ -272,6 +272,9 @@ func TestAForgottenClientIsClosedAndRefused(t *testing.T) {
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, window := p.client("Window")
 	other, phone := p.client("Phone")
+	// The phone's socket is taken just after its ok: forgotten before that, it is closed
+	// once taken (below); this waits for both, to see the sessions end.
+	p.waitFor(func() bool { return p.s.Router().Sessions() == 2 }, "both sessions")
 	call(t, window, "", "clients/forget", map[string]string{"client": other.Client})
 	p.waitFor(func() bool { return p.s.Router().Sessions() == 1 }, "the phone's session to end")
 	_, err := phone.Call(context.Background(), "", "control/status", nil)
