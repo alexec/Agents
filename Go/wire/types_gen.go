@@ -700,19 +700,20 @@ type ContinueInProjectRequest struct {
 }
 
 type ControlHost struct {
-	ID         HostID            `json:"id"`
-	Name       string            `json:"name"`
-	Platform   string            `json:"platform"`
-	Version    string            `json:"version"`
-	State      string            `json:"state"`
-	Reach      string            `json:"reach"`
-	MachineID  *string           `json:"machineID,omitzero"`
-	Relay      *bool             `json:"relay,omitzero"`
-	SignInFrom map[string]HostID `json:"signInFrom,omitzero"`
-	GitFrom    map[string]HostID `json:"gitFrom,omitzero"`
-	GitAsks    []GitAsk          `json:"gitAsks,omitzero"`
-	Tunnel     *HostTunnel       `json:"tunnel,omitzero"`
-	Workspace  *HostWorkspace    `json:"workspace,omitzero"`
+	ID             HostID            `json:"id"`
+	Name           string            `json:"name"`
+	Platform       string            `json:"platform"`
+	Version        string            `json:"version"`
+	State          string            `json:"state"`
+	Reach          string            `json:"reach"`
+	MachineID      *string           `json:"machineID,omitzero"`
+	Relay          *bool             `json:"relay,omitzero"`
+	SignInFrom     map[string]HostID `json:"signInFrom,omitzero"`
+	GitFrom        map[string]HostID `json:"gitFrom,omitzero"`
+	GitAsks        []GitAsk          `json:"gitAsks,omitzero"`
+	Tunnel         *HostTunnel       `json:"tunnel,omitzero"`
+	Workspace      *HostWorkspace    `json:"workspace,omitzero"`
+	Implementation *string           `json:"implementation,omitzero"`
 }
 
 type ControlStatus struct {
