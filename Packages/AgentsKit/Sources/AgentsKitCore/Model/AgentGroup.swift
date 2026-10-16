@@ -152,6 +152,15 @@ public extension Agent {
         state == .finished && isUnread
     }
 
+    /// Needs you, Blocked from an older daemon, or unread: one in the badge's count. The
+    /// rule `ProjectShelf` counts by and the daemon sends the phone (#1163), so the two
+    /// cannot disagree.
+    var wantsALook: Bool {
+        if showsUnread { return true }
+        let group = group()
+        return group == .needsAttention || group == .blocked
+    }
+
     /// Whether the person has looked at this conversation since its report landed.
     var reportIsSeen: Bool {
         guard let report else { return false }

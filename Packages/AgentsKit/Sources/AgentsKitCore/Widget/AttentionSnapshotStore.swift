@@ -65,22 +65,38 @@ public enum AttentionSnapshotStore {
     }
 
     /// Lay a push over the file (#1046), from the app or the notification extension.
-    /// Nothing when there is no file yet: a count made up from one push would claim to
-    /// know the rest.
+    /// With no file yet, only a push that carries the Mac's count (#1163) writes one: a
+    /// count made up from one push would claim to know the rest.
     ///
-    /// - Returns: whether it was written, so the caller reloads the widget only then.
+    /// - Returns: the snapshot written, so the caller reloads the widget and sets the
+    ///   badge only then. Nil when nothing was.
     @discardableResult
-    public static func apply(_ push: AttentionPush, into container: URL? = nil, at date: Date = Date()) -> Bool {
-        guard let next = read(from: container)?.applying(push, at: date),
-              let url = url(in: container), let data = try? JSONEncoder().encode(next) else { return false }
+    public static func apply(_ push: AttentionPush, into container: URL? = nil, at date: Date = Date()) -> AttentionSnapshot? {
+        guard let existing = read(from: container) else {
+            return push.count.flatMap { apply($0, into: container) }
+        }
+        return replace(existing.applying(push, at: date), into: container)
+    }
+
+    /// Lay the Mac's count over the file (#1163). With no file yet, it is the count and
+    /// no rows: the number is known, and whose they are is not.
+    @discardableResult
+    public static func apply(_ count: AttentionCount, into container: URL? = nil) -> AttentionSnapshot? {
+        let next = read(from: container).map { $0.applying(count) }
+            ?? AttentionSnapshot(writtenAt: count.countedAt, total: max(0, count.waiting), sessions: [])
+        return replace(next, into: container)
+    }
+
+    private static func replace(_ next: AttentionSnapshot?, into container: URL?) -> AttentionSnapshot? {
+        guard let next, let url = url(in: container), let data = try? JSONEncoder().encode(next) else { return nil }
         do {
             // The group's Library/Caches is not there until something makes it.
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
                                                     withIntermediateDirectories: true)
             try data.write(to: url, options: .atomic)
-            return true
+            return next
         } catch {
-            return false
+            return nil
         }
     }
 

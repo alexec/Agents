@@ -45,7 +45,10 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
     /// How old a snapshot may be before it has to say so (FR-017).
     public static let staleness: TimeInterval = 15 * 60
 
-    /// When the app wrote this, which is what the widget's age is measured from.
+    /// When this count was last known to be true, which is what the widget's age is
+    /// measured from: the moment the app was last live with the Mac, or the moment the
+    /// Mac counted it for a push (#1163). Not when the file was written: an app with no
+    /// link writes what it last heard, and must not call it new.
     public var writtenAt: Date
     /// Every session needing a person across the live projects.
     public var total: Int
@@ -81,8 +84,13 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
     /// Whether this replaces `existing` on disk: when it says something else, or says the
     /// same but `existing` is old enough that the widget would soon call it stale while
     /// the app is connected and knows it is still true (#175).
+    ///
+    /// Never when `existing` is newer (#1163): a push counted at the Mac after the app last
+    /// heard from it is the truth, and the app's older model must not write over it.
     public func needsWriting(over existing: AttentionSnapshot?) -> Bool {
-        guard let existing, saysTheSame(as: existing) else { return true }
+        guard let existing else { return true }
+        guard writtenAt >= existing.writtenAt else { return false }
+        guard saysTheSame(as: existing) else { return true }
         return writtenAt.timeIntervalSince(existing.writtenAt) >= Self.staleness / 3
     }
 
@@ -92,16 +100,41 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
         now.timeIntervalSince(writtenAt) > Self.staleness
     }
 
+    /// How the widget's "Updated" line says when this was last true (#1163). Always one of
+    /// the two: the time of day while it is fresh, how long ago once it is stale. Never
+    /// later than `now`, as the Mac's clock may run a little ahead of the phone's.
+    public enum Updated: Hashable, Sendable {
+        case at(Date)
+        case ago(Date)
+    }
+
+    public func updated(at now: Date = Date()) -> Updated {
+        let when = min(writtenAt, now)
+        return isStale(at: now) ? .ago(when) : .at(when)
+    }
+
     /// This snapshot with one push laid over it (#1046): what the push says before the app
     /// has caught up, written by whichever of the app and the notification extension the
-    /// push wakes. A guess until the app next writes the whole truth: an agent already
-    /// counted for an unread finish can be counted twice, and a need withdrawn that no row
-    /// names leaves the count as it is.
+    /// push wakes. The rows are a guess until the app next writes the whole truth. The
+    /// count is the truth when the push carries the Mac's (#1163); without it, an agent
+    /// already counted for an unread finish can be counted twice, and a need withdrawn
+    /// that no row names leaves the count as it is.
     ///
-    /// - Returns: nil when the push changes nothing the widget shows.
+    /// - Returns: nil when the push changes nothing the widget shows, or is older than
+    ///   what this already says.
     public func applying(_ push: AttentionPush, at date: Date = Date()) -> AttentionSnapshot? {
+        if let count = push.count, count.countedAt < writtenAt { return nil }
+        guard let next = laying(push, at: date) else {
+            return push.count.flatMap { applying($0) }
+        }
+        return push.count.flatMap { next.applying($0) } ?? next
+    }
+
+    /// The push's need on the rows, and the count guessed from it.
+    private func laying(_ push: AttentionPush, at date: Date) -> AttentionSnapshot? {
         var next = self
-        next.writtenAt = date
+        // As of the Mac's count where the push carries one, so the count lays over it.
+        next.writtenAt = push.count?.countedAt ?? date
         if push.withdrawn {
             guard let row = sessions.firstIndex(where: { $0.needToken == push.token }) else { return nil }
             next.sessions.remove(at: row)
@@ -121,6 +154,20 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
         }
         next.sessions = Array(([row] + next.sessions).prefix(Self.rowLimit))
         return next
+    }
+
+    /// This snapshot with the Mac's count laid over it (#1163): the number is the truth, as
+    /// of when it was counted. The rows are kept, newest first, but never more of them
+    /// than are waiting: which went is not said, and none is drawn for a count of zero.
+    ///
+    /// - Returns: nil when the count is older than this, or changes nothing.
+    public func applying(_ count: AttentionCount) -> AttentionSnapshot? {
+        guard count.countedAt >= writtenAt else { return nil }
+        var next = self
+        next.writtenAt = count.countedAt
+        next.total = max(0, count.waiting)
+        next.sessions = Array(sessions.prefix(next.total))
+        return next == self ? nil : next
     }
 
     /// The snapshot of what the app can see, at `date`.
@@ -175,8 +222,20 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
     }
 }
 
+/// How many sessions need the person across the hosts, as the Mac counted it (#1163):
+/// the badge's number, sent with each push so the device need not guess it.
+public struct AttentionCount: Hashable, Sendable {
+    public var waiting: Int
+    public var countedAt: Date
+
+    public init(waiting: Int, countedAt: Date) {
+        self.waiting = waiting
+        self.countedAt = countedAt
+    }
+}
+
 /// What a push about a need says, as the widget needs it (#1046): which need, whose, in
-/// what words, and whether it has gone.
+/// what words, whether it has gone, and the whole count where the push carried it.
 public struct AttentionPush: Hashable, Sendable {
     public var token: String
     public var kind: Need.Kind
@@ -185,23 +244,29 @@ public struct AttentionPush: Hashable, Sendable {
     /// The banner's words, when the envelope could be opened.
     public var headline: Headline?
     public var withdrawn: Bool
+    /// The Mac's count as the push left (#1163); nil from an older relay.
+    public var count: AttentionCount?
 
-    public init(token: String, kind: Need.Kind, agentID: UUID?, headline: Headline?, withdrawn: Bool) {
+    public init(token: String, kind: Need.Kind, agentID: UUID?, headline: Headline?, withdrawn: Bool,
+                count: AttentionCount? = nil) {
         self.token = token
         self.kind = kind
         self.agentID = agentID
         self.headline = headline
         self.withdrawn = withdrawn
+        self.count = count
     }
 
-    public init(need: NeedID, headline: Headline?, withdrawn: Bool) {
+    public init(need: NeedID, headline: Headline?, withdrawn: Bool, count: AttentionCount? = nil) {
         switch need {
-        case .permission: self.init(token: need.token, kind: .permission, agentID: nil, headline: headline, withdrawn: withdrawn)
-        case .elicitation: self.init(token: need.token, kind: .elicitation, agentID: nil, headline: headline, withdrawn: withdrawn)
+        case .permission:
+            self.init(token: need.token, kind: .permission, agentID: nil, headline: headline, withdrawn: withdrawn, count: count)
+        case .elicitation:
+            self.init(token: need.token, kind: .elicitation, agentID: nil, headline: headline, withdrawn: withdrawn, count: count)
         case .report(let agentID, _):
-            self.init(token: need.token, kind: .report, agentID: agentID, headline: headline, withdrawn: withdrawn)
+            self.init(token: need.token, kind: .report, agentID: agentID, headline: headline, withdrawn: withdrawn, count: count)
         case .guardedChange:
-            self.init(token: need.token, kind: .guardedChange, agentID: nil, headline: headline, withdrawn: withdrawn)
+            self.init(token: need.token, kind: .guardedChange, agentID: nil, headline: headline, withdrawn: withdrawn, count: count)
         }
     }
 }

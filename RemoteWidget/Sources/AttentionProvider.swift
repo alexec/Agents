@@ -28,10 +28,17 @@ struct AttentionProvider: TimelineProvider {
         completion(AttentionEntry(date: Date(), snapshot: AttentionSnapshotStore.read()))
     }
 
+    /// A second entry at the moment the number turns stale (#1163), so "Updated 14:02"
+    /// becomes "Updated 15 min ago" then and not at the next reading.
     func getTimeline(in context: Context, completion: @escaping (Timeline<AttentionEntry>) -> Void) {
         let now = Date()
-        let entry = AttentionEntry(date: now, snapshot: AttentionSnapshotStore.read())
-        completion(Timeline(entries: [entry], policy: .after(now.addingTimeInterval(15 * 60))))
+        let snapshot = AttentionSnapshotStore.read()
+        var entries = [AttentionEntry(date: now, snapshot: snapshot)]
+        if let staleAt = snapshot.map({ $0.writtenAt.addingTimeInterval(AttentionSnapshot.staleness + 1) }),
+           staleAt > now {
+            entries.append(AttentionEntry(date: staleAt, snapshot: snapshot))
+        }
+        completion(Timeline(entries: entries, policy: .after(now.addingTimeInterval(15 * 60))))
     }
 }
 
@@ -57,14 +64,4 @@ struct AttentionEntry: TimelineEntry {
     /// The rows a size draws, newest first, and how many waiting are left undrawn there.
     func rows(for size: AttentionSnapshot.Size) -> [AttentionSnapshotSession] { snapshot?.rows(for: size) ?? [] }
     func leftover(for size: AttentionSnapshot.Size) -> Int { snapshot?.leftover(for: size) ?? 0 }
-
-    /// FR-017: past a few minutes old, the number is not presented as current.
-    func age(as now: Date = Date()) -> Date? {
-        guard let writtenAt = snapshot?.writtenAt, writtenAt < now else { return nil }
-        return writtenAt
-    }
-
-    func isStale(as now: Date = Date()) -> Bool {
-        snapshot?.isStale(at: now) ?? false
-    }
 }

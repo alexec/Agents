@@ -806,6 +806,9 @@ public actor DaemonCore {
     var tellStatus: (@Sendable (JSONValue) -> Void)?
     /// What `host/status` last said, so it is said again only when it changes.
     var toldStatus: DaemonAPI.HostStatus?
+    /// The Needs you count last told the control plane (#1163), so it is said again only
+    /// when it moves.
+    var toldWaiting: Int?
     /// How this host asks its control plane something and waits (#691 US6); nil off one.
     var askControl: (@Sendable (String, JSONValue) async throws -> JSONValue)?
 
@@ -1130,6 +1133,9 @@ public actor DaemonCore {
         projectChanged(forAgentIn: agent.projectFolder)
         // And the project it left, whose counts it has just taken with it.
         if let left = before?.projectFolder, left != agent.projectFolder { projectChanged(forAgentIn: left) }
+        // The phone's Needs you count moves with this (#1163), as a finish read moves it
+        // with no change of state, and so no pass over the needs.
+        if before?.wantsALook != agent.wantsALook { reviseWaiting() }
         // Here and **not** in `move(_:on:)`, though that is the single transition
         // writer and the tidier-looking hook. An agent is created with
         // `agents[agent.id] = agent` directly in `start(_:)` before any transition

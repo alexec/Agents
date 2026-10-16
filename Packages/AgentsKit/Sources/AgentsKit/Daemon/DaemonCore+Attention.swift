@@ -381,6 +381,7 @@ extension DaemonCore {
         // whatever the next daemon is told, it is told here.
         drainWithdrawals()
         writeAttentionIfMoved()
+        reviseWaiting()
     }
 
     // MARK: Reaching a device that is not here
@@ -410,8 +411,10 @@ extension DaemonCore {
     /// every live need, and clear stale offers left at the control plane.
     func controlUplinkChanged(_ up: Bool) {
         guard up, hostsForControlPlane else { return }
-        // A control plane that just heard from this host hears whether it is idle (#691 US4).
+        // A control plane that just heard from this host hears whether it is idle (#691 US4),
+        // and how many need the person (#1163).
         toldStatus = nil
+        toldWaiting = nil
         reviseHostStatus()
         let live = Set(needs().map(\.id))
         for id in forwardedNeeds where !live.contains(id) { withdrawForwarded(id) }
@@ -424,9 +427,34 @@ extension DaemonCore {
         tellControlPlane(.withdraw(id))
     }
 
+    /// Every message carries this host's whole count as it stands (#1163), so a banner and
+    /// the badge beside it agree.
     private func tellControlPlane(_ message: DaemonAPI.AttentionNeed) {
-        guard let tellControl, let params = try? JSONValue.encoding(message) else { return }
+        guard let tellControl else { return }
+        var message = message
+        let waiting = message.waiting ?? waitingCount()
+        message.waiting = waiting
+        guard let params = try? JSONValue.encoding(message) else { return }
         tellControl(params)
+        toldWaiting = waiting
+    }
+
+    /// How many sessions here need the person: Needs you and the unread, in the live
+    /// projects, by the rule the badge counts by (`Agent.wantsALook`). What a phone's
+    /// widget and badge show for this host (#1163).
+    func waitingCount() -> Int {
+        let archived = Set(projectRecords().values.filter(\.isArchived).map(\.folder))
+        return agents.live.values.count(where: { $0.wantsALook && !archived.contains($0.projectFolder) })
+    }
+
+    /// Says the count on its own when it has moved since last said (#1163): a need met at
+    /// the Mac, or a finish read or unread, moves it with no need to offer or withdraw. On
+    /// the host-status tick and after each pass.
+    func reviseWaiting() {
+        guard hostsForControlPlane, tellControl != nil else { return }
+        let waiting = waitingCount()
+        guard waiting != toldWaiting else { return }
+        tellControlPlane(.count(waiting))
     }
 
     private func post(_ need: Need, to id: UUID, alert: Bool, at now: Date) {

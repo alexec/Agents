@@ -89,6 +89,31 @@ struct AttentionTests {
         await eventually("answering withdraws the host's offer") { messages.all.contains { $0.withdraw != nil } }
     }
 
+    /// A need met at the Mac was never offered, and moves the count all the same (#1163):
+    /// the phone's widget and badge hear it from the count alone.
+    @Test func aNeedMetAtTheMacMovesTheCountTheControlPlaneHears() async throws {
+        let (locations, work) = try temporary()
+        let core = try core(asking(), locations: locations)
+        await core.setHostsForControlPlane(true)
+        let messages = ControlMessages()
+        await core.deliverNeeds { messages.add($0) }
+        await FakeSurface(.mac).report(core, watching: nil, active: true)
+
+        let agent = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "write a file"))
+        await waitingOnUser(core, agent)
+        await eventually("the count of one was told") { messages.all.last?.waiting == 1 }
+        #expect(messages.all.allSatisfy { $0.waiting != nil }, "every message carries the count")
+
+        let permission = try #require(await core.pendingPermissionRequests().first)
+        try await core.answerPermission(.init(permissionID: permission.id, optionID: "allow"))
+        await eventually("it finished") { await core.agent(agent)?.state == .finished }
+        await core.markRead(agent)
+        let now = await core.waitingCount()
+        #expect(now == 0)
+        await eventually("the count moved without a need to say it") { messages.all.last?.waiting == 0 }
+        #expect(messages.all.last?.need == nil && messages.all.last?.withdraw == nil, "the count alone")
+    }
+
     private func mintedToken(_ launcher: FakeLauncher) async -> String {
         await eventuallySome("the runtime was handed its token") {
             let minted = MintedMCPToken.from(sessionParams: await launcher.lastAgent?.newSessionParams)

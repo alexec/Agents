@@ -70,6 +70,8 @@ public extension DaemonAPI.Method {
     static let relayDevices = "relay/devices"
     /// `RelayDelivery`: one mailbox item to seal and post.
     static let relayDeliver = "relay/deliver"
+    /// `RelayCount` (#1163): one device's Needs you count, to post as a silent push.
+    static let relayCount = "relay/count"
     /// A relay host, on its channel 0 (#824): `RelaySwitch`, itself switched on or off,
     /// as `hosts/setRelay` would. What Agents Host has it say where it has no control
     /// plane's key (Join one elsewhere). Refused from a host that runs agents.
@@ -331,25 +333,36 @@ public extension DaemonAPI {
     /// A host no longer knows devices, so it cannot seal. It sends the need and whether
     /// it should buzz; `{withdraw}` is the need being over. The control plane chooses
     /// the device and seals.
+    ///
+    /// `waiting` is the host's whole Needs you count, the badge's (#1163): carried by every
+    /// offer and withdrawal, and said on its own (`{waiting}`) when it moves with no need
+    /// to offer, so a phone hears a count that changed at the Mac. Nil from an older host.
     struct AttentionNeed: Codable, Sendable, Hashable {
         public var need: Need?
         public var headline: Headline?
         public var buzz: Bool?
         public var withdraw: NeedID?
+        public var waiting: Int?
 
-        public init(need: Need?, headline: Headline?, buzz: Bool?, withdraw: NeedID?) {
+        public init(need: Need?, headline: Headline?, buzz: Bool?, withdraw: NeedID?, waiting: Int? = nil) {
             self.need = need
             self.headline = headline
             self.buzz = buzz
             self.withdraw = withdraw
+            self.waiting = waiting
         }
 
-        public static func offer(_ need: Need, buzz: Bool) -> AttentionNeed {
-            AttentionNeed(need: need, headline: need.headline, buzz: buzz, withdraw: nil)
+        public static func offer(_ need: Need, buzz: Bool, waiting: Int? = nil) -> AttentionNeed {
+            AttentionNeed(need: need, headline: need.headline, buzz: buzz, withdraw: nil, waiting: waiting)
         }
 
-        public static func withdraw(_ id: NeedID) -> AttentionNeed {
-            AttentionNeed(need: nil, headline: nil, buzz: nil, withdraw: id)
+        public static func withdraw(_ id: NeedID, waiting: Int? = nil) -> AttentionNeed {
+            AttentionNeed(need: nil, headline: nil, buzz: nil, withdraw: id, waiting: waiting)
+        }
+
+        /// The count alone: nothing to offer or withdraw (#1163).
+        public static func count(_ waiting: Int) -> AttentionNeed {
+            AttentionNeed(need: nil, headline: nil, buzz: nil, withdraw: nil, waiting: waiting)
         }
     }
 
@@ -473,18 +486,35 @@ public extension DaemonAPI {
 
     /// `relay/deliver`: what the control plane chose (T097). The relay host seals the
     /// headline to `publicKey` and posts it for `device`; no headline is a withdrawal.
+    /// `waiting` is the count across the hosts at that moment, as `RelayCount` says it (#1163).
     struct RelayDelivery: Codable, Sendable, Hashable {
         public var needID: NeedID
         public var device: UUID
         public var publicKey: Data?
         public var headline: Headline?
         public var alert: Bool
-        public init(needID: NeedID, device: UUID, publicKey: Data? = nil, headline: Headline? = nil, alert: Bool = false) {
+        public var waiting: Int?
+        public init(needID: NeedID, device: UUID, publicKey: Data? = nil, headline: Headline? = nil, alert: Bool = false,
+                    waiting: Int? = nil) {
             self.needID = needID
             self.device = device
             self.publicKey = publicKey
             self.headline = headline
             self.alert = alert
+            self.waiting = waiting
+        }
+    }
+
+    /// `relay/count` (#1163): how many sessions need the person across the hosts, for one
+    /// device's widget and badge, posted as a silent push. Only a number: nothing to seal.
+    struct RelayCount: Codable, Sendable, Hashable {
+        public var device: UUID
+        public var waiting: Int
+        public var countedAt: Date
+        public init(device: UUID, waiting: Int, countedAt: Date) {
+            self.device = device
+            self.waiting = waiting
+            self.countedAt = countedAt
         }
     }
 }

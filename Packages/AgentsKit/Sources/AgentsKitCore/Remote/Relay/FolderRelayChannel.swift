@@ -107,6 +107,16 @@ public struct FolderMailbox: Mailbox {
         try encoder.encode(item).write(to: place.appendingPathComponent(item.needID.token.replacingOccurrences(of: ":", with: "_") + ".json"), options: .atomic)
     }
 
+    /// One device's count, as `count.json` beside its items (#1163).
+    public func post(_ count: MailboxCount) async throws {
+        let place = folder.appendingPathComponent("mailbox", isDirectory: true)
+            .appendingPathComponent(count.device.uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: place, withIntermediateDirectories: true)
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        try encoder.encode(count).write(to: place.appendingPathComponent("count.json"), options: .atomic)
+    }
+
     /// What one device finds waiting, for a walk to read back.
     public func waiting(for device: UUID) -> [MailboxItem] {
         let place = folder.appendingPathComponent("mailbox", isDirectory: true)

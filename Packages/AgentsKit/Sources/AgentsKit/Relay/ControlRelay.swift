@@ -57,6 +57,8 @@ public final class ControlRelay: @unchecked Sendable {
     private var pending = PendingPosts()
     private let retryBackoff: Backoff
     private var retrying: Task<Void, Never>?
+    /// The last count for each device (#1163), so a retry never posts an older one.
+    private var latestCount: [UUID: MailboxCount] = [:]
 
     /// Enrol with a host code, once: what the relay keeps to dial again.
     @discardableResult
@@ -262,6 +264,9 @@ public final class ControlRelay: @unchecked Sendable {
             case DaemonAPI.Method.relayDeliver:
                 guard let delivery = try? params?.decode(DaemonAPI.RelayDelivery.self) else { return }
                 await deliver(delivery)
+            case DaemonAPI.Method.relayCount:
+                guard let count = try? params?.decode(DaemonAPI.RelayCount.self) else { return }
+                await deliver(count)
             default:
                 return
             }
@@ -287,13 +292,33 @@ public final class ControlRelay: @unchecked Sendable {
             envelope = sealed
         }
         let item = MailboxItem(needID: delivery.needID, device: delivery.device, envelope: envelope,
-                               alert: delivery.alert, postedAt: Date())
+                               alert: delivery.alert, postedAt: Date(), waiting: delivery.waiting)
         do {
             try await post(item)
             log("relay: posted \(envelope == nil ? "a withdrawal" : "a need") for \(delivery.device)")
         } catch {
             log("relay: posting failed, kept to post again: \(error)")
             keepToPostAgain(item)
+        }
+    }
+
+    /// One device's Needs you count (#1163), posted in place of the last. One that fails
+    /// is posted again once, a while later, unless a newer count has come meanwhile: the
+    /// next move of the count posts it anyway.
+    public func deliver(_ count: DaemonAPI.RelayCount) async {
+        let item = MailboxCount(device: count.device, waiting: count.waiting, countedAt: count.countedAt)
+        lock.withLock { latestCount[count.device] = item }
+        do {
+            try await prepareMailbox()
+            try await mailbox.post(item)
+            log("relay: posted a count for \(count.device)")
+        } catch {
+            log("relay: posting a count failed, trying again soon: \(error)")
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(30))
+                guard let self, self.lock.withLock({ self.latestCount[count.device] == item }) else { return }
+                try? await self.mailbox.post(item)
+            }
         }
     }
 

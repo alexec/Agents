@@ -71,3 +71,55 @@ public actor NoticeDesk {
         return [DaemonAPI.RelayDelivery(needID: id, device: previous.device)]
     }
 }
+
+/// The Needs you count each host says, added up for the devices (#1163), and what each
+/// device was last told, so a device hears the count when it moves and not otherwise.
+///
+/// A host says its count with every need it offers or withdraws, and alone when it
+/// moves with neither: a need met at the Mac, a finish read. The phone's widget and
+/// badge show this number, so they move when the Mac's do.
+public actor CountDesk {
+    private var byHost: [HostID: Int] = [:]
+    private var told: [UUID: Int] = [:]
+    private var flushing = false
+
+    public init() {}
+
+    /// Every host's count, added up. Nil until a host has said one: an older host says
+    /// none, and a zero would be a claim nobody made.
+    public var total: Int? { byHost.isEmpty ? nil : byHost.values.reduce(0, +) }
+
+    /// A host's count. Returns whether the total moved.
+    @discardableResult
+    public func heard(_ host: HostID, waiting: Int) -> Bool {
+        let before = total
+        byHost[host] = max(0, waiting)
+        return total != before
+    }
+
+    /// Whether the caller is to send what is owed after a moment: one send for a burst.
+    public func startFlush() -> Bool {
+        guard !flushing else { return false }
+        flushing = true
+        return true
+    }
+
+    /// The counts owed: each device not told the total yet. Ends a flush.
+    public func owed(to devices: [UUID], now: Date = Date()) -> [DaemonAPI.RelayCount] {
+        flushing = false
+        guard let total else { return [] }
+        let owed = devices.filter { told[$0] != total }
+        for device in owed { told[device] = total }
+        return owed.map { DaemonAPI.RelayCount(device: $0, waiting: total, countedAt: now) }
+    }
+
+    /// A device told the count another way: on a need's own push.
+    public func told(_ device: UUID, _ waiting: Int) {
+        told[device] = waiting
+    }
+
+    /// A relay host came, or the devices changed: every device is owed the count again.
+    public func forgetTold() {
+        told = [:]
+    }
+}

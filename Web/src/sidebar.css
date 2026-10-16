@@ -70,6 +70,7 @@
   color: color-mix(in srgb, currentColor 50%, transparent); }
 .with-sidebar details.smart > summary .count { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 500; }
 .with-sidebar details.smart > summary .count.needs { color: var(--tint-attention); }
+.with-sidebar details.smart > summary .updated { margin-left: 0.5em; font-weight: 400; opacity: 0.6; white-space: nowrap; }
 
 /* Which project a row is in, after its title, under a group at the top (#495). */
 .with-sidebar .sidebar .place { font-size: 0.6875rem; font-weight: 400; opacity: 0.45; }
