@@ -82,6 +82,9 @@ type Request struct {
 	// Tunnel says whether the server dials back through an ssh tunnel (#610). Nil: when
 	// ssh reaches it through a bastion.
 	Tunnel *bool `json:"tunnel,omitempty"`
+	// Implementation is "go" for the Go host (#1136), a preview beside the Swift one; empty
+	// or "swift" for the Swift host, the default until Alex chooses otherwise.
+	Implementation *string `json:"implementation,omitempty"`
 }
 
 func (i *Installer) sshExecutable() string {
@@ -241,10 +244,18 @@ func (i *Installer) install(ctx context.Context, request Request, personsKnownHo
 
 	server := installer{ssh}
 	arch := binarySuffix(found.architecture)
-	binary, ok := binaryFor(arch, i.ServerFolder)
+	implementation := ""
+	if request.Implementation != nil {
+		implementation = *request.Implementation
+	}
+	binary, ok := binaryFor(arch, implementation, i.ServerFolder)
 	if arch == "" || !ok {
+		kind := "host"
+		if implementation == "go" {
+			kind = "Go host"
+		}
 		return nil, &Failure{Code: NotAllowed, Message: name + " is " + found.system + " " +
-			displayArchitecture(found.architecture) + ", which this control plane has no host for."}
+			displayArchitecture(found.architecture) + ", which this control plane has no " + kind + " for."}
 	}
 	i.progress(name, "setUp")
 	if err := server.install(ctx, binary.file, binary.sha256, true); err != nil {

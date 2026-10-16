@@ -676,3 +676,34 @@ func TestProvidersAnswerWhereTheyCanRun(t *testing.T) {
 	// A kept request's list is there, and empty.
 	call(t, w, "", "hosts/listKept", map[string]any{})
 }
+
+// A host says which language it is written in (#1134): kept from its announce and its hello,
+// and a hello from the other language on the same root replaces it, as
+// HostImplementationTests.itIsKeptFromTheHelloAndListed.
+func TestAHostsImplementationIsKeptFromItsHello(t *testing.T) {
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	box := p.host("MACHINE-2")
+	implementation := func() string {
+		var said string
+		if rec := p.s.records.Host(box.member.Host); rec != nil {
+			json.Unmarshal(rec.Extra["implementation"], &said)
+		}
+		return said
+	}
+	p.waitFor(func() bool { return implementation() == "go" }, "go from the announce")
+	hello := func(impl string) {
+		params, _ := json.Marshal(map[string]any{"version": "0.1", "platform": "linux aarch64", "machineID": "MACHINE-2",
+			"implementation": impl})
+		if _, err := p.s.methods.HostSaid(box.member.Host, "host/hello", params); err != nil {
+			t.Fatal(err)
+		}
+	}
+	hello("swift")
+	if got := implementation(); got != "swift" {
+		t.Fatalf("after a Swift hello: %q", got)
+	}
+	hello("")
+	if got := implementation(); got != "" {
+		t.Fatalf("a hello from before the field: %q", got)
+	}
+}
