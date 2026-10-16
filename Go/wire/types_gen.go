@@ -483,6 +483,46 @@ type CarriedSettingSourceLevel struct {
 	Value string `json:"_0"`
 }
 
+type CatchUpLeases struct {
+	Leases LeaseSnapshot     `json:"leases"`
+	Hosted HostedMCPSnapshot `json:"hosted"`
+	Health MCPHealthSnapshot `json:"health"`
+}
+
+// A part this host does not know is left out of CatchUpRequest.parts.
+type CatchUpPart string
+
+const (
+	CatchUpPartWorkflows  CatchUpPart = "workflows"
+	CatchUpPartPins       CatchUpPart = "pins"
+	CatchUpPartLeases     CatchUpPart = "leases"
+	CatchUpPartRuntimes   CatchUpPart = "runtimes"
+	CatchUpPartAllowances CatchUpPart = "allowances"
+	CatchUpPartModes      CatchUpPart = "modes"
+	CatchUpPartSandbox    CatchUpPart = "sandbox"
+	CatchUpPartCosts      CatchUpPart = "costs"
+)
+
+type CatchUpRequest struct {
+	Agents *ListRequest `json:"agents,omitzero"`
+	Parts  []string     `json:"parts,omitzero"`
+}
+
+type CatchUpSnapshot struct {
+	Projects     []ProjectSummary     `json:"projects"`
+	Agents       []Agent              `json:"agents"`
+	Permissions  []PermissionRequest  `json:"permissions"`
+	Elicitations []ElicitationRequest `json:"elicitations"`
+	Attention    AttentionPending     `json:"attention"`
+	Resuming     []UUID               `json:"resuming"`
+	Disk         *DiskState           `json:"disk,omitzero"`
+	StoreNotes   *StoreNotes          `json:"storeNotes,omitzero"`
+	Milestones   *Milestones          `json:"milestones,omitzero"`
+	Workflows    []WorkflowSummary    `json:"workflows,omitzero"`
+	Pins         []ProjectPins        `json:"pins,omitzero"`
+	Leases       *CatchUpLeases       `json:"leases,omitzero"`
+}
+
 type ChangeSource string
 
 const (
@@ -594,6 +634,35 @@ type ChatProjectStateArchived struct {
 
 type ChatProjectStateFailed struct {
 	Message string `json:"message"`
+}
+
+// The older autoReview reads as alwaysApprove.
+type ClientPermissionMode string
+
+const (
+	ClientPermissionModeDefault       ClientPermissionMode = "default"
+	ClientPermissionModeAlwaysApprove ClientPermissionMode = "alwaysApprove"
+)
+
+// UnmarshalJSON reads a value this build does not know as "default".
+func (v *ClientPermissionMode) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	switch ClientPermissionMode(s) {
+	case ClientPermissionModeDefault, ClientPermissionModeAlwaysApprove:
+		*v = ClientPermissionMode(s)
+	default:
+		*v = ClientPermissionModeDefault
+	}
+	return nil
+}
+
+type ClientPermissionSettings struct {
+	Cursor   ClientPermissionMode `json:"cursor"`
+	Grok     ClientPermissionMode `json:"grok"`
+	Opencode ClientPermissionMode `json:"opencode"`
 }
 
 type CloneNotification struct {
@@ -767,6 +836,11 @@ type CredentialsOffer struct {
 	SignIns       []string                      `json:"signIns,omitzero"`
 }
 
+type DaemonStatus struct {
+	TurnsInFlight int64 `json:"turnsInFlight"`
+	AgentsLive    int64 `json:"agentsLive"`
+}
+
 type DayRecap struct {
 	PrsMerged    *int64  `json:"prsMerged,omitzero"`
 	Agents       int64   `json:"agents"`
@@ -781,6 +855,11 @@ type DeclaredResource struct {
 	Holders        int64        `json:"holders"`
 	DefaultMinutes *int64       `json:"defaultMinutes,omitzero"`
 	MaximumMinutes *int64       `json:"maximumMinutes,omitzero"`
+}
+
+type DeviceBinding struct {
+	ID      *UUID `json:"id,omitzero"`
+	Pairing *bool `json:"pairing,omitzero"`
 }
 
 type DeviceKind string
@@ -2029,6 +2108,10 @@ const (
 	QuickAnswerKindReply  QuickAnswerKind = "reply"
 )
 
+type QuitRequest struct {
+	StopAgents bool `json:"stopAgents"`
+}
+
 type RateLimitInfo struct {
 	Status                *string  `json:"status,omitzero"`
 	ResetsAt              *Date    `json:"resetsAt,omitzero"`
@@ -2118,6 +2201,41 @@ type ResumingNotification struct {
 
 type ResumingResponse struct {
 	AgentIDs []UUID `json:"agentIDs"`
+}
+
+type RetentionKeepFor string
+
+const (
+	RetentionKeepForDays7   RetentionKeepFor = "days7"
+	RetentionKeepForDays14  RetentionKeepFor = "days14"
+	RetentionKeepForDays30  RetentionKeepFor = "days30"
+	RetentionKeepForDays90  RetentionKeepFor = "days90"
+	RetentionKeepForForever RetentionKeepFor = "forever"
+)
+
+// UnmarshalJSON reads a value this build does not know as "days30".
+func (v *RetentionKeepFor) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	switch RetentionKeepFor(s) {
+	case RetentionKeepForDays7, RetentionKeepForDays14, RetentionKeepForDays30, RetentionKeepForDays90, RetentionKeepForForever:
+		*v = RetentionKeepFor(s)
+	default:
+		*v = RetentionKeepForDays30
+	}
+	return nil
+}
+
+type RetentionSettings struct {
+	KeepFor RetentionKeepFor `json:"keepFor"`
+}
+
+type RetentionState struct {
+	Settings      RetentionSettings `json:"settings"`
+	ArchivedCount int64             `json:"archivedCount"`
+	ArchivedBytes int64             `json:"archivedBytes"`
 }
 
 type Runtime struct {

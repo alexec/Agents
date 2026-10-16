@@ -835,6 +835,63 @@
       }
     },
     {
+      "name": "client/catchUp",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/CatchUpRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/CatchUpSnapshot"
+        }
+      }
+    },
+    {
+      "name": "clientPermissions/state",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ClientPermissionSettings"
+        }
+      }
+    },
+    {
+      "name": "connection/bindDevice",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/DeviceBinding"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "cost/state",
       "tags": [
         {
@@ -922,6 +979,44 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/PingResponse"
+        }
+      }
+    },
+    {
+      "name": "daemon/quit",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/QuitRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "daemon/status",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/DaemonStatus"
         }
       }
     },
@@ -1300,6 +1395,25 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/LeaseSnapshot"
+        }
+      }
+    },
+    {
+      "name": "mailbox/carry",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
         }
       }
     },
@@ -2216,6 +2330,25 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "retention/state",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/RetentionState"
         }
       }
     },

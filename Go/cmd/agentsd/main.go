@@ -81,6 +81,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	d.Quit = stop // daemon/quit
 	if cl.serve {
 		// A server's settings are the person's, in their home (Daemon.swift's --serve).
 		if home, err := os.UserHomeDir(); err == nil {

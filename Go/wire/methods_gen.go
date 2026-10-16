@@ -38,10 +38,15 @@ var (
 	CallAttentionPending               = Method[Empty, AttentionPending]{"attention/pending"}
 	CallChangesFile                    = Method[ChangesFileRequest, ChangedFileDetail]{"changes/file"}
 	CallChangesList                    = Method[ChangesListRequest, ChangesList]{"changes/list"}
+	CallClientCatchUp                  = Method[CatchUpRequest, CatchUpSnapshot]{"client/catchUp"}
+	CallClientPermissionsState         = Method[Empty, ClientPermissionSettings]{"clientPermissions/state"}
+	CallConnectionBindDevice           = Method[DeviceBinding, Empty]{"connection/bindDevice"}
 	CallCostState                      = Method[Empty, CostState]{"cost/state"}
 	CallCredentialsLend                = Method[CredentialsLend, Empty]{"credentials/lend"}
 	CallCredentialsOffer               = Method[CredentialsOffer, Empty]{"credentials/offer"}
 	CallDaemonPing                     = Method[Empty, PingResponse]{"daemon/ping"}
+	CallDaemonQuit                     = Method[QuitRequest, Empty]{"daemon/quit"}
+	CallDaemonStatus                   = Method[Empty, DaemonStatus]{"daemon/status"}
 	CallDiskState                      = Method[Empty, DiskState]{"disk/state"}
 	CallDropboxPut                     = Method[DropboxPutRequest, DropboxPutResponse]{"dropbox/put"}
 	CallElicitationsAnswer             = Method[AnswerElicitationRequest, Empty]{"elicitations/answer"}
@@ -58,6 +63,7 @@ var (
 	CallFilesWatch                     = Method[FilesWatchRequest, Empty]{"files/watch"}
 	CallFilesWrite                     = Method[FilesWriteRequest, FilesWriteResponse]{"files/write"}
 	CallLeasesSnapshot                 = Method[Empty, LeaseSnapshot]{"leases/snapshot"}
+	CallMailboxCarry                   = Method[Empty, Empty]{"mailbox/carry"}
 	CallMCPHealth                      = Method[Empty, MCPHealthSnapshot]{"mcp/health"}
 	CallMCPHealthCheck                 = Method[MCPHealthCheckRequest, MCPHealthSnapshot]{"mcp/health/check"}
 	CallMCPHosted                      = Method[Empty, HostedMCPSnapshot]{"mcp/hosted"}
@@ -95,6 +101,7 @@ var (
 	CallProjectsUnarchive              = Method[ProjectRequest, ProjectSummary]{"projects/unarchive"}
 	CallProjectsUndoGuardedChange      = Method[GuardedChangeRequest, ProjectSummary]{"projects/undoGuardedChange"}
 	CallRelayOffer                     = Method[RelayOffer, Empty]{"relay/offer"}
+	CallRetentionState                 = Method[Empty, RetentionState]{"retention/state"}
 	CallRuntimesAccounts               = Method[Empty, []RuntimeAccount]{"runtimes/accounts"}
 	CallRuntimesAllowances             = Method[*string, RuntimeAllowances]{"runtimes/allowances"}
 	CallRuntimesList                   = Method[Empty, []RuntimeStatus]{"runtimes/list"}
