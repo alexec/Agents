@@ -33,6 +33,9 @@ public struct HostInstall: Sendable {
         /// Whether the server dials back through an ssh tunnel (#610). Nil: when ssh reaches
         /// it through a bastion.
         public var tunnel: Bool?
+        /// `go` for the Go host (#1136), a preview beside the Swift one; nil or `swift`
+        /// for the Swift host, the default until Alex chooses otherwise.
+        public var implementation: String?
 
         public init(destination: String, name: String? = nil, key: String? = nil, trust: String? = nil,
                     tunnel: Bool? = nil) {
@@ -142,9 +145,9 @@ public struct HostInstall: Sendable {
         }
         let installer = ServerInstaller(ssh: ssh)
         guard let arch = facts.architecture.binarySuffix,
-              let binary = ServerFiles.binary(for: arch, in: servers) else {
+              let binary = ServerFiles.binary(for: arch, implementation: request.implementation, in: servers) else {
             throw JSONRPCError(code: DaemonAPI.Failure.notAllowed,
-                               message: "\(name) is \(facts.system) \(facts.architecture.display), which this control plane has no host for.")
+                               message: "\(name) is \(facts.system) \(facts.architecture.display), which this control plane has no \(request.implementation == "go" ? "Go " : "")host for.")
         }
         await progress(name, "setUp")
         try await Self.words(keyGiven: keyGiven) { try await installer.install(binary: binary.file, sha256: binary.sha256, firstInstall: true) }

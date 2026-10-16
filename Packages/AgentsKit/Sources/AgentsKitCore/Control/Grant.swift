@@ -191,6 +191,8 @@ public struct HostRecord: Codable, Hashable, Sendable, Identifiable {
     /// The provider's workspace this host runs on, which the control plane can start and stop
     /// (#691). Nil for a host nothing can start.
     public var workspace: WorkspaceLink?
+    /// `swift` or `go`, as the host last said in `host/hello` (#1134). Nil until it says.
+    public var implementation: String?
 
     public init(id: HostID, name: String, publicKey: Data? = nil, reach: HostReach = .dialOut,
                 platform: String = "", version: String = "", installed: Bool = false,

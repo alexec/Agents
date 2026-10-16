@@ -942,9 +942,11 @@ public final class ControlService: @unchecked Sendable {
                     log("host \(announce.name) enrolled again as \(host) with the code it spent")
                     break
                 }
-                try await methods.enroll(HostRecord(id: host, name: announce.name, publicKey: announce.publicKey,
-                                                    platform: announce.platform, version: announce.version,
-                                                    machineID: announce.machineID, relay: announce.relay == true ? true : nil))
+                var enrolled = HostRecord(id: host, name: announce.name, publicKey: announce.publicKey,
+                                          platform: announce.platform, version: announce.version,
+                                          machineID: announce.machineID, relay: announce.relay == true ? true : nil)
+                enrolled.implementation = announce.implementation
+                try await methods.enroll(enrolled)
                 if announce.relay == true { await router.setRelay(host, true) }
                 // Every other copy knows it at once: a relay host must be given no channels
                 // there either, and a host must be reachable before the next re-list.

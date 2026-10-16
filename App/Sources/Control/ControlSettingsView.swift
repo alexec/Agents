@@ -487,11 +487,17 @@ struct ControlHostsPage: View {
     private func thisMacLine(_ host: DaemonAPI.ControlHost) -> String {
         let projects = model.work.projects.filter { $0.host == host.id }.count
         let working = model.work.agents.filter { $0.host == host.id && ($0.state == .running || $0.state == .starting) }.count
-        var parts = [host.platform.replacingOccurrences(of: " ", with: " · "), "Agents \(host.version)",
+        var parts = [host.platform.replacingOccurrences(of: " ", with: " · "), Self.versionWords(host),
                      count(projects, "project")]
         if working > 0 { parts.append("\(count(working, "agent")) working") }
         if host.state != "online" { parts.insert(host.state.capitalized, at: 0) }
         return parts.joined(separator: " · ")
+    }
+
+    /// "Agents 0.9 (Go)" for a host written in Go (#1134), so the one being tried is never
+    /// taken for the other; the Swift host says only its version.
+    static func versionWords(_ host: DaemonAPI.ControlHost) -> String {
+        host.implementation == "go" ? "Agents \(host.version) (Go)" : "Agents \(host.version)"
     }
 
     private func unjoinedLine(_ tunnel: DaemonAPI.HostTunnel) -> String {
@@ -517,7 +523,7 @@ struct ControlHostsPage: View {
         var parts: [String] = []
         if host.state != "online" { parts.append(host.state.capitalized) }
         if !host.platform.isEmpty { parts.append(host.platform.replacingOccurrences(of: " ", with: " · ")) }
-        if !host.version.isEmpty { parts.append("Agents \(host.version)") }
+        if !host.version.isEmpty { parts.append(Self.versionWords(host)) }
         if let workspace = host.workspace {
             // Linked (#691, L2): where it runs, and what Agents does with it, on a line of its own.
             parts.append("\(workspace.providerName): \(workspace.workspaceName)")

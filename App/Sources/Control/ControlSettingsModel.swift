@@ -410,9 +410,10 @@ final class ControlSettingsModel {
     /// key, the control plane's ssh logs in as `ssh user@host` would (#413). `tunnel`: whether
     /// it dials back through an ssh tunnel; nil leaves it to whether it is behind a bastion.
     func install(destination: String, name: String? = nil, key: String? = nil, trust: String? = nil,
-                 tunnel: Bool? = nil) async -> InstallOutcome {
+                 tunnel: Bool? = nil, implementation: String? = nil) async -> InstallOutcome {
         installStep = nil
         var params: [String: JSONValue] = ["destination": .string(destination)]
+        if let implementation { params["implementation"] = .string(implementation) }
         if let tunnel { params["tunnel"] = .bool(tunnel) }
         if let key { params["key"] = .string(key) }
         if let name, !name.isEmpty { params["name"] = .string(name) }

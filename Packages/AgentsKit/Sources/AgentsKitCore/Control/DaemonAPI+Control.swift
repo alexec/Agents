@@ -195,6 +195,8 @@ public extension DaemonAPI {
         public var tunnel: HostTunnel?
         /// The provider's workspace it runs on, which can be started and stopped (#691).
         public var workspace: HostWorkspace?
+        /// `swift` or `go`, as the host said in `host/hello` (#1134); nil when it never said.
+        public var implementation: String?
 
         public init(id: HostID, name: String, platform: String, version: String, state: String,
                     reach: String, machineID: String?, relay: Bool? = nil) {
@@ -314,10 +316,14 @@ public extension DaemonAPI {
         public var name: String?
         /// Said by `agents-relay` (T096): this host only relays, and gets no client channels.
         public var relay: Bool?
+        /// The language the host is written in, `swift` or `go` (#1134), shown beside its
+        /// version in Hosts. Nil from a host built before it was said.
+        public var implementation: String?
 
         public init(host: HostID? = nil, version: String, platform: String, machineID: String, name: String? = nil,
-                    relay: Bool? = nil) {
+                    relay: Bool? = nil, implementation: String? = nil) {
             self.relay = relay
+            self.implementation = implementation
             self.host = host
             self.version = version
             self.platform = platform
