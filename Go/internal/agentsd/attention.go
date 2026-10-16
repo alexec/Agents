@@ -87,6 +87,8 @@ func token(id wire.NeedID) string {
 		return "elicitation:" + string(*id.Elicitation)
 	case id.Report != nil:
 		return fmt.Sprintf("report:%s:%v", id.Report.AgentID, float64(id.Report.At))
+	case id.GuardedChange != nil:
+		return "guarded:" + store.FolderPath(id.GuardedChange.Folder) + ":" + id.GuardedChange.Path
 	}
 	return ""
 }
@@ -317,6 +319,32 @@ func (d *Daemon) needs() []wire.Need {
 		}
 		r := *a.Report
 		need(wire.NeedID{Report: &wire.NeedIDReport{AgentID: a.ID, At: r.At}}, &a, wire.NeedKindReport, headings[r.Outcome]+": "+r.Message, nil)
+	}
+	// A change to the app's own files, made outside it (#531): asked in the session of the
+	// agent that made it, or of the project when none did.
+	for _, p := range d.Store.Projects() {
+		folder := store.FolderPath(p.Folder)
+		if p.ArchivedAt != nil {
+			continue
+		}
+		for _, c := range d.guardedChanges(folder) {
+			id := wire.NeedID{GuardedChange: &wire.NeedIDGuardedChange{Folder: fileURL(folder, true), Path: c.Path}}
+			t := token(id)
+			raised, ok := d.raisedAt[t]
+			if !ok {
+				raised = at
+				d.raisedAt[t], d.raisedNeed[t] = raised, id
+			}
+			ids = append(ids, id)
+			title := ""
+			if c.AskedIn != nil {
+				if a := d.Store.Agent(*c.AskedIn); a != nil && a.Title != nil {
+					title = *a.Title
+				}
+			}
+			found = append(found, wire.Need{ID: id, AgentID: c.AskedIn, Folder: fileURL(folder, true), Kind: wire.NeedKindGuardedChange,
+				RaisedAt: raised, Headline: truncating(wire.Headline{H1: filepath.Base(folder), H2: title, H3: guardedHeadline(c)})})
+		}
 	}
 	// Forget the first-seen time of anything no longer outstanding.
 	live := map[string]bool{}

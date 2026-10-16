@@ -521,6 +521,8 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 		}
 	})
 	d.record(l.id, stateChanged(s, reason(why)))
+	// What the turn did to the app's own files is looked at as it ends (guardedTurnEnded).
+	d.guardedTurnEnded(l.id)
 }
 
 func firstSentence(s string) string {

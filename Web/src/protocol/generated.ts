@@ -1362,7 +1362,8 @@ export interface Need {
 export type NeedID =
   | { permission: UUID }
   | { elicitation: UUID }
-  | { report: { agentID: UUID; at: WireDate } };
+  | { report: { agentID: UUID; at: WireDate } }
+  | { guardedChange: { folder: URLString; path: string } };
 
 export type NeedKind = "permission" | "elicitation" | "report" | "guardedChange";
 

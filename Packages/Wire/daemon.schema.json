@@ -5500,6 +5500,31 @@
             "report"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "guardedChange": {
+              "type": "object",
+              "properties": {
+                "folder": {
+                  "$ref": "#/definitions/URLString"
+                },
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "folder",
+                "path"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "guardedChange"
+          ],
+          "additionalProperties": false
         }
       ],
       "description": "NeedID (Attention/Need.swift): what is being answered, one key per kind."

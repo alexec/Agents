@@ -41,6 +41,7 @@ type Daemon struct {
 	worktreeState
 	recoveryState
 	projectState
+	guardedStateHolder
 	// SettingsDir is the person's settings on this host (StoreLocations.personalSettings):
 	// <root>/settings, or $HOME/.agents/settings for a server, as the Swift host's --serve.
 	SettingsDir string

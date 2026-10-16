@@ -1762,14 +1762,20 @@ type Need struct {
 
 // NeedID (Attention/Need.swift): what is being answered, one key per kind.
 type NeedID struct {
-	Permission  *UUID         `json:"permission,omitzero"`
-	Elicitation *UUID         `json:"elicitation,omitzero"`
-	Report      *NeedIDReport `json:"report,omitzero"`
+	Permission    *UUID                `json:"permission,omitzero"`
+	Elicitation   *UUID                `json:"elicitation,omitzero"`
+	Report        *NeedIDReport        `json:"report,omitzero"`
+	GuardedChange *NeedIDGuardedChange `json:"guardedChange,omitzero"`
 }
 
 type NeedIDReport struct {
 	AgentID UUID `json:"agentID"`
 	At      Date `json:"at"`
+}
+
+type NeedIDGuardedChange struct {
+	Folder URL    `json:"folder"`
+	Path   string `json:"path"`
 }
 
 type NeedKind string
