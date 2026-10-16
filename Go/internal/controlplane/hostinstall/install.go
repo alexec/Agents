@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/alexec/agents/Go/internal/controlplane/hosttunnels"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -32,21 +33,8 @@ type Tunnels interface {
 	Add(ctx context.Context, record TunnelRecord) error
 }
 
-// TunnelRecord is HostTunnels.Record, stored as v1/tunnels/<id>.json.
-type TunnelRecord struct {
-	ID string `json:"id"`
-	// Destination is as typed: user@host, user@host:port, or a name from the ssh config.
-	Destination string `json:"destination"`
-	Name        string `json:"name"`
-	Port        int    `json:"port"`
-	// Code is the host code's id.
-	Code string  `json:"code"`
-	Host *string `json:"host,omitempty"`
-	// KnownHosts is the server's host key, as trusted at the install, in known_hosts
-	// form. Empty when the person's own known_hosts had it (#610).
-	KnownHosts string        `json:"knownHosts"`
-	Made       records.Stamp `json:"made"`
-}
+// TunnelRecord is HostTunnels.Record, stored as v1/tunnels/<id>.json: the tunnels' own.
+type TunnelRecord = hosttunnels.Record
 
 // Installer is HostInstall: hosts/install (058, US4, T072). The control plane installs
 // the host on a server the person can ssh to, once, and lets go.

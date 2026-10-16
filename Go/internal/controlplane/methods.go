@@ -237,6 +237,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			return nil, fail(noSuchHost, "No host is called %s.", request.Host)
 		}
 		m.router.ForgetHost(request.Host)
+		m.s.copies.forget(request.Host)
 		m.s.log("host " + request.Host + " removed")
 		return map[string]any{}, nil
 	case "hosts/lastHeard":
@@ -247,7 +248,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		if m.records.Host(request.Host) == nil {
 			return nil, fail(noSuchHost, "No host is called %s.", request.Host)
 		}
-		return map[string]any{"host": request.Host}, nil
+		return m.s.copies.lastHeard(request.Host), nil
 	case "channels/get":
 		return channelsUnavailable, nil
 	case "channels/set":
@@ -292,6 +293,10 @@ func (m *Methods) status(from Caller) controlStatus {
 	status.Web = m.web
 	m.mu.Unlock()
 	status.ThisMacHost = m.s.thisMacHost()
+	for _, unjoined := range m.s.tunnels.Unjoined() {
+		raw, _ := json.Marshal(unjoined)
+		status.UnjoinedTunnels = append(status.UnjoinedTunnels, raw)
+	}
 	status.ProjectDetection = settings.ProjectDetection
 	if len(status.ProjectDetection) == 0 {
 		status.ProjectDetection, _ = json.Marshal(standardDetection)
@@ -338,6 +343,9 @@ func (m *Methods) hostRow(h records.HostRecord) controlHost {
 	}
 	m.mu.Unlock()
 	sort.Slice(row.GitAsks, func(i, j int) bool { return row.GitAsks[i].Server < row.GitAsks[j].Server })
+	if tunnel := m.s.tunnels.State(h.ID); tunnel != nil {
+		row.Tunnel, _ = json.Marshal(tunnel)
+	}
 	return row
 }
 
