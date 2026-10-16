@@ -37,6 +37,7 @@ type Daemon struct {
 	settingsState
 	quitState
 	leaseState
+	attentionState
 	// SettingsDir is the person's settings on this host (StoreLocations.personalSettings):
 	// <root>/settings, or $HOME/.agents/settings for a server, as the Swift host's --serve.
 	SettingsDir string
@@ -53,6 +54,7 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 		watches: map[string]*folderWatch{}, interests: map[string][]interest{}, shells: map[shellKey]*shell{},
 		SettingsDir: filepath.Join(st.Loc.Root, "settings")}
 	d.register()
+	d.loadAttention()
 	d.watchDisk()
 	return d, nil
 }
@@ -68,6 +70,7 @@ func (d *Daemon) removeClient(c *Client) {
 	delete(d.clients, c.ID)
 	d.mu.Unlock()
 	d.forgetWatches(c)
+	d.forgetPresence(c)
 }
 
 // Broadcast sends a notification to every client.
@@ -91,6 +94,13 @@ func Broadcast[P any](d *Daemon, n wire.Notification[P], params P) {
 
 // Shutdown ends what the host runs: every runtime it started.
 func (d *Daemon) Shutdown() {
+	// Nothing more is routed or written down once the host is going.
+	d.attentionMu.Lock()
+	d.presences = nil
+	for _, t := range d.settling {
+		t.Stop()
+	}
+	d.attentionMu.Unlock()
 	d.stopAll()
 	d.stopShells()
 }

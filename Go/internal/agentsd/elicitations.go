@@ -52,6 +52,7 @@ func (l *live) Elicitation(ctx context.Context, params json.RawMessage) (string,
 	d.record(l.id, wire.TranscriptEntryKind{ElicitationAsked: &wire.TranscriptEntryKindElicitationAsked{Value: req}})
 	d.moveIf(l.id, wire.AgentStateRunning, wire.AgentStateWaitingOnUser)
 	Broadcast(d, wire.NotifyAgentElicitation, wire.ElicitationNotification{AgentID: l.id, RequestID: req.ID, Request: &req})
+	d.reconsider()
 
 	var r elicitationReply
 	select {
@@ -85,6 +86,7 @@ func (l *live) take(id wire.UUID) *pendingElicitation {
 
 func (d *Daemon) formDown(agentID, requestID wire.UUID) {
 	Broadcast(d, wire.NotifyAgentElicitation, wire.ElicitationNotification{AgentID: agentID, RequestID: requestID})
+	d.reconsider()
 }
 
 // ElicitationComplete is the runtime taking its own form down (withdrawElicitation):

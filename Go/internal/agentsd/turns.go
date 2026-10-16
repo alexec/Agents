@@ -105,6 +105,8 @@ func (d *Daemon) change(id wire.UUID, edit func(a *wire.Agent)) *wire.Agent {
 	}
 	Broadcast(d, wire.NotifyAgentChanged, *a)
 	d.projectChanged(projectFolder(a))
+	// Every place a need begins or ends moves the record (DaemonCore.move's reconsider).
+	safe.Go("reconsider", d.reconsider)
 	return a
 }
 
@@ -705,6 +707,7 @@ func (l *live) Permission(ctx context.Context, p sdk.RequestPermissionRequest) s
 	d.record(l.id, wire.TranscriptEntryKind{PermissionAsked: &wire.TranscriptEntryKindPermissionAsked{Value: req}})
 	d.setState(l.id, wire.AgentStateWaitingOnUser)
 	Broadcast(d, wire.NotifyAgentPermission, wire.PermissionNotification{AgentID: l.id, Request: &req})
+	d.reconsider()
 	var option string
 	select {
 	case option = <-pp.answer:
@@ -724,6 +727,7 @@ func (l *live) Permission(ctx context.Context, p sdk.RequestPermissionRequest) s
 	}
 	id := req.ID
 	Broadcast(d, wire.NotifyAgentPermission, wire.PermissionNotification{AgentID: l.id, RequestID: &id})
+	d.reconsider()
 	if ctx.Err() == nil {
 		d.setState(l.id, wire.AgentStateRunning)
 	}
