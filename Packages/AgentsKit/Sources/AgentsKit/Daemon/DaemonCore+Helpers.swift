@@ -178,7 +178,7 @@ extension DaemonCore {
         let mayArchive = agentsMayArchive(in: target.projectFolder)
         if mayArchive, !HelperLimit.isRunning(target, comingBack: comingBack) {
             try await archive(target.id, by: .agent(caller.id))
-            return "Archived \u{201C}\(title)\u{201D}, freeing its place; the person can bring it back. "
+            return "Archived \u{201C}\(title)\u{201D}, freeing its place; the person can unarchive it. "
                 + "This project now has \(helperPlaces(in: target.projectFolder))."
         }
         if target.archiveRequest?.isRequested == true {

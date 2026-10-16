@@ -1052,7 +1052,7 @@ struct HelperAgentTests {
         let archived = try #require(await core.agent(alpha))
         #expect(archived.state == .archived)
         #expect(archived.archivedReason == .byAgent)
-        #expect(note.hasPrefix("Archived \u{201C}Alpha\u{201D}, freeing its place; the person can bring it back."))
+        #expect(note.hasPrefix("Archived \u{201C}Alpha\u{201D}, freeing its place; the person can unarchive it."))
         #expect(note.hasSuffix(" 1 of 5 not archived."))
         #expect(try await notes(core, alpha).contains("\u{201C}Lead\u{201D} archived this agent."))
         // The only archive here, so the only `agent.archived`: by another agent.

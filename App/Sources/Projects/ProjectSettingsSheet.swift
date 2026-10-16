@@ -318,7 +318,7 @@ private struct ProjectGeneralPane: View {
                 }
                 .buttonStyle(.paper)
                 .disabled(model.hosts.isOffline(summary.host))
-                .help("Put this project away. Its sessions are kept; bring it back from Archived in the sidebar.")
+                .help("Put this project away. Its sessions are kept; unarchive it from Archived in the sidebar.")
             }
         }
     }
