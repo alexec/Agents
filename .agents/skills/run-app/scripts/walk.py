@@ -21,6 +21,10 @@
     walk.py ROOT wait TEXT [SECONDS]             until TEXT is on the window (exit 1 if not)
     walk.py ROOT gone TEXT [SECONDS]             until TEXT has left it
 
+ROOT `remote` walks the Remote in the walk simulator (#1182; `remote.sh up` first): the same
+verbs, less menu, size, fold, unfold and click; `key return|delete|escape|TEXT` types into
+the field being typed in.
+
 TEXT `=Send` is the whole label only; `#id` is an accessibility identifier. Add `--first` to
 act on the first match rather than the innermost. Everything happens in the window's own
 process: no window server, no AX server, no focus and no HID, so a locked screen does not
@@ -33,6 +37,7 @@ import base64
 import json
 import os
 import socket
+import subprocess
 import sys
 import time
 
@@ -42,13 +47,17 @@ CONTAINER = os.path.expanduser(
 
 class Walk:
     def __init__(self, root, timeout=30):
-        root = root.rstrip("/")
-        name = os.path.basename(root)
-        # Only a scratch root: the person's window has no --walk and no socket.
-        if not name.startswith("run-") or not root.startswith("/tmp/"):
-            raise SystemExit(f"walk.py walks a scratch root (/tmp/run-<slug>), not {root}")
-        target = os.path.join(CONTAINER, name, "walk.sock")
-        link = os.path.join(root, "walk.sock")
+        if root == "remote":
+            target, link, where = remote_socket(), "/tmp/agents-walk-remote.sock", "the walk simulator"
+        else:
+            root = root.rstrip("/")
+            name = os.path.basename(root)
+            # Only a scratch root: the person's window has no --walk and no socket.
+            if not name.startswith("run-") or not root.startswith("/tmp/"):
+                raise SystemExit(f"walk.py walks a scratch root (/tmp/run-<slug>) or remote, not {root}")
+            target = os.path.join(CONTAINER, name, "walk.sock")
+            link = os.path.join(root, "walk.sock")
+            where = root
         if os.path.realpath(link) != os.path.realpath(target):
             if os.path.lexists(link):
                 os.unlink(link)
@@ -62,7 +71,7 @@ class Walk:
             except OSError:
                 self.sock.close()
                 if time.time() > deadline:
-                    raise SystemExit(f"no walk socket at {target}: is the window running on {root} (a Debug build)?")
+                    raise SystemExit(f"no walk socket at {target}: is it running on {where} (a Debug build)?")
                 time.sleep(0.2)
         self.file = self.sock.makefile("rb")
 
@@ -90,6 +99,17 @@ class Walk:
             if time.time() > deadline:
                 return False
             time.sleep(0.25)
+
+
+def remote_socket():
+    """The Remote's socket, in its data container in the walk simulator (remote.sh)."""
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "remote.sh")
+    udid = subprocess.run([script, "udid"], capture_output=True, text=True, check=True).stdout.strip()
+    found = subprocess.run(["xcrun", "simctl", "get_app_container", udid, "com.alexecollins.agents.remote", "data"],
+                           capture_output=True, text=True)
+    if found.returncode != 0:
+        raise SystemExit("the Remote is not installed in the walk simulator: remote.sh up APP first")
+    return os.path.join(found.stdout.strip(), "tmp", "walk.sock")
 
 
 def main(argv):

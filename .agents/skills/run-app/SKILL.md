@@ -274,8 +274,8 @@ ioreg -n Root -d1 -a | grep -c CGSSessionScreenIsLocked
 Only the out-of-scope walks above (gestures, scroll phases, feel) wait for an unlock, with
 `wait_for_event` on `person.back` and an `until_minutes`. Nothing unlocks the Mac: macOS
 keeps synthetic keys off the lock screen, and no agent is given the password. Do not
-change the Mac's sleep or lock settings, and do not hold the display awake. iOS taps in
-the Simulator (there is no Simulator GUI on this Mac) and anything about animation or feel
+change the Mac's sleep or lock settings, and do not hold the display awake. Gestures on
+iOS (the Remote walks in the walk simulator, below) and anything about animation or feel
 are the user's, worth asking for by name once the rest is done.
 
 ## Two windows on one root
@@ -289,15 +289,40 @@ removes both.
 
 ## The Remote
 
-The Remote is built for the generic simulator only, never booted here:
+The Remote is built for the generic simulator:
 
 ```sh
 scripts/build-cache.sh xcodebuild -scheme Remote -destination 'generic/platform=iOS Simulator' \
   -derivedDataPath build/DD-sim -skipPackagePluginValidation build
 ```
 
-A fake device (`FakeDeviceLiveTests`) stands in for a phone against a scratch
-control plane; the phone's look is the user's.
+To see it, walk it in the **walk simulator** (#1182): one named simulator, "Agents Walk"
+(iPhone 17 Pro, the newest iOS), made by `remote.sh` the first time and kept. It boots with
+no Simulator GUI. Lease it as `Agents Walk simulator`. Never make another simulator, and
+never walk on the user's iPhone or iPad. The Debug Remote launched with `-walk` opens a
+walk socket in its container's `tmp/` and draws and presses itself in process, as the Mac
+window does (a locked screen does not stop it):
+
+```sh
+S=.agents/skills/run-app/scripts
+$S/remote.sh up build/DD-sim/Build/Products/Debug-iphonesimulator/Agents.app --fake  # canned daemon
+$S/walk.py remote wait "New Session"
+$S/walk.py remote press "Lay the remote out"     # a sidebar row, a button
+$S/walk.py remote set "What to say" "Push it"    # the prompt
+$S/walk.py remote key escape                     # put the keyboard away
+$S/walk.py remote scroll --by -600               # as a drag: a following transcript lets go
+$S/walk.py remote press "#BackButton"
+$S/walk.py remote shot /tmp/remote.png
+$S/remote.sh down                                # quits it and shuts the simulator down
+```
+
+`AGENTS_WALK_SIM="iPad Pro 13-inch (M5) (16GB)"` gives a kept iPad simulator of its own.
+Without `--fake` the Remote is not paired: pair it with a scratch control plane's code
+(`code --client`) through the pairing sheet. What the walk socket cannot do: the keyboard
+runs in another process, so it is drawn white (`key escape` first, for a full picture);
+`click` at a point, `menu`, `size` and `fold` are the Mac's only; swipes, long presses,
+context menus and feel stay with the user on a device. A fake device
+(`FakeDeviceLiveTests`) still stands in for a phone in tests.
 
 ## The web remote in a browser (071)
 
