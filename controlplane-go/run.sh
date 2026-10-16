@@ -66,6 +66,8 @@ if [ "$KMS" = 1 ]; then
 fi
 STORE_ENV=()
 if [ -f "$ROOT/control/store.env" ]; then while read -r l; do STORE_ENV+=("$l"); done <"$ROOT/control/store.env"; fi
+# The Linux hosts a server is given (stage 6): gohosts.sh build fills out/servers.
+[ -f "$here/out/servers/VERSION" ] && STORE_ENV+=("AGENTS_CONTROL_SERVERS=$here/out/servers")
 WEB_ARGS=()
 [ "$WEB" = 1 ] && WEB_ARGS=(--web "$REPO/Web/dist" --web-port "$WEB_PORT")
 

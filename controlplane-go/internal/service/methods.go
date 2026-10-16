@@ -161,7 +161,9 @@ func (m *Methods) answer(method string, params json.RawMessage, caller Caller) (
 		return map[string]any{}, m.forget(caller.Client, 200*time.Millisecond)
 	case "hosts/startEnroll":
 		return s.codes.Issue(ctx(), true, false, lifetime)
-	case "hosts/install", "hosts/detect", "hosts/sshHosts", "hosts/update", "hosts/checkAgain":
+	case "hosts/install":
+		return m.install(params)
+	case "hosts/detect", "hosts/sshHosts", "hosts/update", "hosts/checkAgain":
 		return nil, fail(notSupported, "This control plane cannot do that yet.")
 	case "control/setProjectDetection":
 		var req struct {

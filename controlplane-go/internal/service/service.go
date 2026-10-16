@@ -1,7 +1,7 @@
 // Package service is ControlService.swift in Go: a store, the router, the methods the
 // control plane answers itself, and a WebSocket server every client and host connects to.
 // One copy: several copies over one store (US3), handovers (R16), the relay's notices,
-// ssh installs, workspace providers and Slack are not in this spike.
+// ssh tunnels, workspace providers and Slack are not in this spike.
 package service
 
 import (
@@ -135,6 +135,7 @@ func (s *Service) Start(ctx context.Context) (int, error) {
 		}
 		go s.accept(newConn(ws, r.RemoteAddr), "")
 	})
+	s.installRoutes(mux)
 	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) { http.Error(w, "not here", http.StatusNotFound) })
 	bind := s.cfg.Bind
 	if bind == "" {

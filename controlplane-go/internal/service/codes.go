@@ -64,9 +64,8 @@ func (c *Codes) Issue(ctx context.Context, host, browser bool, life time.Duratio
 	code := &auth.Code{Host: host, ControlKey: c.Public, Secret: secret, URL: c.URL, Pin: c.Pin, Name: c.Name}
 	shown := &Shown{Text: code.Text(), Expires: records.RefDate(expires), expires: expires}
 	if host {
-		// The one line a server runs to install the host and join (T070). The install
-		// script itself is not served by this spike: see the report.
-		cmd := "curl -fsSL" + map[bool]string{true: "k", false: ""}[c.Pin != ""] + " " + c.URL + "/v1/install.sh | sh -s -- '" + shown.Text + "'"
+		// The one line a server runs to install the host and join (T070).
+		cmd := installCommand(c.URL, c.Pin, shown.Text)
 		shown.Command = &cmd
 	}
 	return shown, nil

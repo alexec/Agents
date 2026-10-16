@@ -4,7 +4,8 @@
 # ~/.agents-cpgo/root. The #1125 lane's own host on the box (~/.agents-go/root) is left
 # alone; only the runtimes it installed in ~/.agents-go/tools are shared.
 #
-#   controlplane-go/gohosts.sh build              the Go agentsd and agentsctl, from the #1125 worktree
+#   controlplane-go/gohosts.sh build              the Go agentsd and agentsctl, from the #1125 worktree,
+#                                                 and out/servers, which run.sh hands to a server that installs itself
 #   controlplane-go/gohosts.sh up [slug]          the set-up must be run.sh up <slug> --lan
 #   controlplane-go/gohosts.sh down [slug]
 set -euo pipefail
@@ -23,7 +24,12 @@ build)
   ( cd "$COPY" && GOOS=darwin ./go.sh build -o out/darwin/agentsd ./cmd/agentsd \
       && GOOS=darwin ./go.sh build -o out/darwin/agentsctl ./cmd/agentsctl \
       && ./go.sh build -trimpath -ldflags "-s -w" -o out/agentsd-linux-arm64 ./cmd/agentsd )
-  ls -l "$G/darwin" "$G/agentsd-linux-arm64" ;;
+  # What the control plane hands a server that installs itself (stage 6): /v1/servers/…
+  mkdir -p "$here/out/servers"
+  cp "$G/agentsd-linux-arm64" "$here/out/servers/agentsd-linux-aarch64"
+  shasum -a 256 "$here/out/servers/agentsd-linux-aarch64" | cut -d' ' -f1 >"$here/out/servers/agentsd-linux-aarch64.sha256"
+  echo "0.1.0-go" >"$here/out/servers/VERSION"
+  ls -l "$G/darwin" "$G/agentsd-linux-arm64" "$here/out/servers" ;;
 up)
   grep -q "https://192\|https://10\.\|https://172\." <(grep -o 'for https://[^ ]*' "/tmp/run-$SLUG/control/control.log") \
     || { echo "run.sh up $SLUG --lan first: the box can't reach 127.0.0.1" >&2; exit 1; }
