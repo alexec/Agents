@@ -74,7 +74,47 @@ func TestAnAgentsSandbox(t *testing.T) {
 	if a.SandboxOverride != nil {
 		t.Fatal(*a.SandboxOverride)
 	}
-	if e := c.callError(t, 4, "agents/answerSandbox", map[string]any{"agentID": id, "carryOn": true}); e.Code != wire.FailureNotAllowed {
+}
+
+func TestASandboxThatCouldNotStart(t *testing.T) {
+	if got := sandboxMatch("claude", "\x1b[31mError: run failed. sandbox_apply: Operation not permitted\x1b[0m\nok"); got != "sandbox_apply: Operation not permitted" {
+		t.Fatalf("%q", got)
+	}
+	if got := sandboxMatch("claude", `It said "sandbox_apply: Operation not permitted" before.`); got != "" {
+		t.Fatalf("a quote: %q", got)
+	}
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	var id wire.UUID
+	json.Unmarshal(c.call(t, 1, "agents/start", map[string]any{"runtimeID": "claude", "cwd": "file://" + t.TempDir(), "prompt": "the sandbox fails"}), &id)
+	c.until(t, "stopped with the card", ended(id, wire.AgentStateStopped))
+	a := d.Store.Agent(id)
+	if a.EndedReason == nil || *a.EndedReason != wire.EndedReasonSandboxFailed || a.PendingSandboxFailure == nil ||
+		a.PendingSandboxFailure.Detail != "sandbox_apply: Operation not permitted" || !a.PendingSandboxFailure.RecoveryOffered ||
+		a.PendingSandboxFailure.CompletedToolCalls != 0 {
+		t.Fatalf("%+v %+v", a.EndedReason, a.PendingSandboxFailure)
+	}
+	if k := kinds(d, id); !slices.Contains(k, "sandboxFailure") {
+		t.Fatal(k)
+	}
+	waitFor(t, "its turn over", func() bool {
+		l := d.live(id)
+		l.mu.Lock()
+		defer l.mu.Unlock()
+		return !l.inTurn && !l.running
+	})
+	// Carried on: off for this agent, and the person's prompt sent again.
+	var answered wire.Agent
+	json.Unmarshal(c.call(t, 2, "agents/answerSandbox", map[string]any{"agentID": id, "carryOn": true}), &answered)
+	if answered.SandboxOverride == nil || *answered.SandboxOverride != wire.SandboxChoiceOff || answered.PendingSandboxFailure != nil {
+		t.Fatalf("%+v", answered)
+	}
+	waitFor(t, "it went", func() bool { return d.Store.Agent(id).State == wire.AgentStateFinished })
+	if u := userMessages(d, id); len(u) != 2 || u[1] != "the sandbox fails" {
+		t.Fatalf("%q", u)
+	}
+	if e := c.callError(t, 3, "agents/answerSandbox", map[string]any{"agentID": id, "carryOn": false}); e.Code != wire.FailureNotAllowed {
 		t.Fatalf("%+v", e)
 	}
 }

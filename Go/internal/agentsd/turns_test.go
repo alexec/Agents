@@ -35,6 +35,8 @@ type fakeRuntime struct {
 	conn      *sdk.AgentSideConnection
 	// ready is closed once conn is set: the SDK serves before it returns the connection.
 	ready chan struct{}
+	// sandboxOff is whether session/new's _meta turned Claude's sandbox off.
+	sandboxOff bool
 }
 
 func (f *fakeRuntime) Initialize(context.Context, sdk.InitializeRequest) (sdk.InitializeResponse, error) {
@@ -52,12 +54,16 @@ func (f *fakeRuntime) ResumeSession(_ context.Context, r sdk.ResumeSessionReques
 	if r.SessionId != "fake-session" {
 		return sdk.ResumeSessionResponse{}, fmt.Errorf("no session %s", r.SessionId)
 	}
+	b, _ := json.Marshal(r.Meta)
+	f.sandboxOff = strings.Contains(string(b), `"sandbox":{"enabled":false}`)
 	return sdk.ResumeSessionResponse{}, nil
 }
 
 // NewSession in a folder called offers offers a model, and a command a moment after.
 func (f *fakeRuntime) NewSession(_ context.Context, r sdk.NewSessionRequest) (sdk.NewSessionResponse, error) {
 	var out sdk.NewSessionResponse
+	b, _ := json.Marshal(r.Meta)
+	f.sandboxOff = strings.Contains(string(b), `"sandbox":{"enabled":false}`)
 	if filepath.Base(r.Cwd) != "offers" {
 		return sdk.NewSessionResponse{SessionId: "fake-session"}, nil
 	}
@@ -89,6 +95,14 @@ func (f *fakeRuntime) Prompt(ctx context.Context, p sdk.PromptRequest) (sdk.Prom
 	if strings.Contains(text, "wait for me") {
 		<-ctx.Done()
 		return sdk.PromptResponse{StopReason: sdk.StopReasonCancelled}, nil
+	}
+	if strings.Contains(text, "sandbox fails") && !f.sandboxOff {
+		// A command whose sandbox could not be set up, as Claude's Bash says it.
+		f.conn.SessionUpdate(ctx, sdk.SessionNotification{SessionId: p.SessionId, Update: sdk.StartToolCall("call_s", "Run make",
+			sdk.WithStartKind(sdk.ToolKindExecute), sdk.WithStartStatus(sdk.ToolCallStatusCompleted),
+			sdk.WithStartContent([]sdk.ToolCallContent{sdk.ToolContent(sdk.TextBlock("sandbox_apply: Operation not permitted"))}))})
+		say("The command could not run.")
+		return sdk.PromptResponse{StopReason: sdk.StopReasonEndTurn}, nil
 	}
 	if strings.Contains(text, "a form") {
 		return f.form(ctx, p.SessionId, strings.Contains(text, "withdraw"), say)
