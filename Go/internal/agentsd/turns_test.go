@@ -3,6 +3,7 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,8 +21,9 @@ import (
 // with "wait" waits to be cancelled.
 func TestMain(m *testing.M) {
 	if os.Getenv("AGENTS_FAKE_ACP") == "1" {
-		f := &fakeRuntime{}
+		f := &fakeRuntime{ready: make(chan struct{})}
 		f.conn = sdk.NewAgentSideConnection(f, os.Stdout, os.Stdin)
+		close(f.ready)
 		<-f.conn.Done()
 		return
 	}
@@ -31,6 +33,8 @@ func TestMain(m *testing.M) {
 type fakeRuntime struct {
 	sdk.Agent // what it does not answer
 	conn      *sdk.AgentSideConnection
+	// ready is closed once conn is set: the SDK serves before it returns the connection.
+	ready chan struct{}
 }
 
 func (f *fakeRuntime) Initialize(context.Context, sdk.InitializeRequest) (sdk.InitializeResponse, error) {
@@ -45,6 +49,7 @@ func (f *fakeRuntime) SetSessionConfigOption(context.Context, sdk.SetSessionConf
 }
 
 func (f *fakeRuntime) Prompt(ctx context.Context, p sdk.PromptRequest) (sdk.PromptResponse, error) {
+	<-f.ready
 	text := ""
 	if len(p.Prompt) > 0 && p.Prompt[0].Text != nil {
 		text = p.Prompt[0].Text.Text
@@ -55,6 +60,9 @@ func (f *fakeRuntime) Prompt(ctx context.Context, p sdk.PromptRequest) (sdk.Prom
 	if strings.Contains(text, "wait") {
 		<-ctx.Done()
 		return sdk.PromptResponse{StopReason: sdk.StopReasonCancelled}, nil
+	}
+	if strings.Contains(text, "form") {
+		return f.form(ctx, p.SessionId, strings.Contains(text, "withdraw"), say)
 	}
 	f.conn.SessionUpdate(ctx, sdk.SessionNotification{SessionId: p.SessionId, Update: sdk.StartToolCall("call_1", "Write hi.txt",
 		sdk.WithStartKind(sdk.ToolKindEdit), sdk.WithStartStatus(sdk.ToolCallStatusPending))})
@@ -72,6 +80,42 @@ func (f *fakeRuntime) Prompt(ctx context.Context, p sdk.PromptRequest) (sdk.Prom
 		sdk.WithUpdateStatus(sdk.ToolCallStatusCompleted))})
 	say("I wrote hi.txt. ")
 	say("Anything else?")
+	return sdk.PromptResponse{StopReason: sdk.StopReasonEndTurn}, nil
+}
+
+// form asks which colour, and says what it heard; with withdraw, it asks for a page by
+// its own id and takes the question down itself.
+func (f *fakeRuntime) form(ctx context.Context, session sdk.SessionId, withdraw bool, say func(string)) (sdk.PromptResponse, error) {
+	req := sdk.UnstableCreateElicitationRequest{Form: &sdk.UnstableCreateElicitationForm{Mode: "form", Message: "Which colour?",
+		RequestedSchema: sdk.UnstableElicitationSchema{Type: "object", Required: []string{"colour"},
+			Properties: map[string]any{"colour": map[string]any{"type": "string", "enum": []string{"red", "blue"}}}}}}
+	if withdraw {
+		req = sdk.UnstableCreateElicitationRequest{Url: &sdk.UnstableCreateElicitationUrl{Mode: "url", Message: "Sign in",
+			ElicitationId: "e1", Url: "https://example.com/sign-in"}}
+		go func() {
+			time.Sleep(300 * time.Millisecond)
+			f.conn.UnstableCompleteElicitation(ctx, sdk.UnstableCompleteElicitationNotification{ElicitationId: "e1"})
+		}()
+	}
+	r, err := f.conn.UnstableCreateElicitation(ctx, req)
+	switch {
+	case ctx.Err() != nil: // session/cancel came first
+		return sdk.PromptResponse{StopReason: sdk.StopReasonCancelled}, nil
+	case err != nil:
+		say("No form: " + err.Error())
+	case r.Accept != nil:
+		say(fmt.Sprintf("You chose %v.", r.Accept.Content["colour"]))
+	case r.Decline != nil:
+		say("You would not say.")
+	default:
+		// Cancelled by a stop: session/cancel follows the answer.
+		select {
+		case <-ctx.Done():
+			return sdk.PromptResponse{StopReason: sdk.StopReasonCancelled}, nil
+		case <-time.After(300 * time.Millisecond):
+		}
+		say("The form was closed.")
+	}
 	return sdk.PromptResponse{StopReason: sdk.StopReasonEndTurn}, nil
 }
 
