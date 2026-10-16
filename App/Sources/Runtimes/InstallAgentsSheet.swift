@@ -155,7 +155,7 @@ struct RuntimeInstallRow: View {
 /// An agent's state as the icon beside its name: the same 18-point well and glyph size
 /// as an agent's `StatusIcon`, and the same spinner while something is under way.
 /// Only a failure is coloured; being here or not here yet is not news that needs it.
-private struct RuntimeStatusIcon: View {
+struct RuntimeStatusIcon: View {
     let availability: RuntimeAvailability
 
     var body: some View {

@@ -2,8 +2,8 @@ import AgentsKitCore
 import AppKit
 import SwiftUI
 
-/// The panes of Project Settings, in the order its rail lists them: General, then the
-/// Agent Configuration pages that Settings has too (#754). Worktrees moved to Activity
+/// The panes of Project Settings: General, then the Agent Configuration pages that Settings
+/// has too (#754), which the rail shows as one row with the pages listed in its pane (#1076). Worktrees moved to Activity
 /// (#790): they change on their own, and settings are what a person sets.
 enum ProjectSettingsPane: String, Hashable, CaseIterable, Identifiable {
     case general, overview, instructions, skills, mcp, plugins, other
@@ -60,7 +60,8 @@ struct ProjectSettingsSheet: View {
     @Binding var pane: ProjectSettingsPane?
 
     /// The smallest it can be dragged to, and where it opens the first time (#439).
-    static let size = CGSize(width: 760, height: 560)
+    /// Wide enough for the rail, Agent Configuration's page list and a page (#1076).
+    static let size = CGSize(width: 900, height: 560)
 
     /// The size it was last left at, so it opens as the person left it.
     @AppStorage("projectSettingsWidth", store: WindowDefaults.store) private var width = Double(Self.size.width)
@@ -143,31 +144,31 @@ struct ProjectSettingsSheet: View {
                 .lineLimit(1)
                 .padding(.horizontal, 10)
                 .padding(.bottom, 6)
-            paneItem(.general, waiting: !(summary?.guardedChanges ?? []).isEmpty)
+            paneItem(.general, title: ProjectSettingsPane.general.title, symbol: ProjectSettingsPane.general.symbol,
+                     lit: chosen == .general, waiting: !(summary?.guardedChanges ?? []).isEmpty)
             if isOnMac {
-                Spacer().frame(height: 10)
-                AgentConfigurationRailGroup(snapshot: snapshot, chosen: chosen.page,
-                                            waiting: waitingPlugins > 0 ? [.plugins] : [],
-                                            choose: { pane = ProjectSettingsPane($0) })
+                paneItem(chosen.page == nil ? .overview : chosen, title: SettingsPane.agentConfiguration.title,
+                         symbol: SettingsPane.agentConfiguration.symbol,
+                         lit: chosen.page != nil, waiting: waitingPlugins > 0)
             }
             Spacer()
         }
         .padding(12)
-        .frame(width: 220)
+        .frame(width: 236)
         .frame(maxHeight: .infinity)
         .background(Paper.sidebar)
     }
 
-    private func paneItem(_ each: ProjectSettingsPane, waiting: Bool) -> some View {
-        let lit = chosen == each
-        return RailButton(lit: lit, label: each.title + (waiting ? ", waiting for your OK" : ""),
-                          selected: lit, action: { pane = each }) {
+    private func paneItem(_ each: ProjectSettingsPane, title: String, symbol: String,
+                          lit: Bool, waiting: Bool) -> some View {
+        RailButton(lit: lit, label: title + (waiting ? ", waiting for your OK" : ""),
+                   selected: lit, action: { pane = each }) {
             HStack(spacing: 8) {
-                Image(systemName: each.symbol)
+                Image(systemName: symbol)
                     .frame(width: 20)
                     .foregroundStyle(lit ? AnyShapeStyle(Paper.ground) : AnyShapeStyle(.secondary))
                     .accessibilityHidden(true)
-                Text(each.title)
+                Text(title)
                     .lineLimit(1)
                 Spacer()
                 if waiting {
@@ -187,6 +188,7 @@ struct ProjectSettingsSheet: View {
         if let page = chosen.page, let folder {
             AgentConfigurationView(place: .project(folder), snapshot: snapshot,
                                    page: Binding(get: { page }, set: { pane = ProjectSettingsPane($0) }),
+                                   waiting: waitingPlugins > 0 ? [.plugins] : [],
                                    refresh: { await refreshSnapshot() })
         } else {
             ScrollView {

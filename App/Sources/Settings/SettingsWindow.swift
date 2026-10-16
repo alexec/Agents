@@ -4,16 +4,16 @@ import SwiftUI
 
 /// The Settings window (055, look/ frames A–G): one rail down the left and the chosen pane
 /// beside it. It opens at one size for every pane, so choosing another never makes the
-/// window jump, and it can be resized larger than that. Agent Configuration's pages are listed in the
-/// rail under a heading of their own rather than in a column of their own, so there is
-/// one place to choose from.
+/// window jump, and it can be resized larger than that. The rail has one row for each pane
+/// (#1076); Agent Runtimes, Agent Configuration and Control plane list their own pages in
+/// a column inside the pane.
 struct SettingsWindow: View {
     @Environment(AppModel.self) private var model
     @AppStorage("settingsPane", store: WindowDefaults.store) private var paneRaw = SettingsPane.appearance.rawValue
     @AppStorage("settingsSharedPage", store: WindowDefaults.store) private var sharedPageRaw = AgentConfigurationPage.overview.rawValue
     @AppStorage("settingsRuntimeID", store: WindowDefaults.store) private var runtimeIDRaw = RuntimeCatalog.claude.id
-    /// Agent Configuration's snapshot lives here, not in its pane, because the rail shows its
-    /// counts. Asked for when the window appears, when it is chosen, and whenever the app comes
+    /// Agent Configuration's snapshot lives here, not in its pane, so it is kept while another
+    /// pane is chosen. Asked for when the window appears, when it is chosen, and whenever the app comes
     /// back to the front, which is when an edit made elsewhere shows.
     @State private var sharedSnapshot: DaemonAPI.SharedSnapshot?
     @State private var controlPage: ControlPage = .overview
@@ -50,8 +50,7 @@ struct SettingsWindow: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            SettingsRail(pane: pane, sharedPage: sharedPage, runtimeID: runtimeID,
-                         snapshot: sharedSnapshot, controlPage: $controlPage, control: control)
+            SettingsRail(pane: pane)
             Divider()
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -113,12 +112,21 @@ struct SettingsWindow: View {
         case .sidebar: FormColumn { Form { SidebarSettingsSection() }.paperForm() }
         case .account: FormColumn { AccountSettingsView() }
         case .mac: FormColumn { MacSettingsView() }
-        case .runtimes: FormColumn { AgentRuntimesSettingsView(runtimeID: runtimeID.wrappedValue) }
+        case .runtimes:
+            HStack(spacing: 0) {
+                RuntimePageList(runtimeID: runtimeID)
+                FormColumn { AgentRuntimesSettingsView(runtimeID: runtimeID.wrappedValue) }
+            }
         case .agentConfiguration: AgentConfigurationView(place: .you, snapshot: sharedSnapshot, page: sharedPage, refresh: { await refreshShared() })
         case .spending: FormColumn { CostSettingsView() }
         case .resources: FormColumn { ResourcesSettingsView() }
         case .controlPlane:
-            if let control { ControlSettingsView(control: control, page: $controlPage) }
+            if let control {
+                HStack(spacing: 0) {
+                    ControlPageList(control: control, page: $controlPage)
+                    ControlSettingsView(control: control, page: $controlPage)
+                }
+            }
         }
     }
 
@@ -164,8 +172,8 @@ enum SettingsPane: String, Hashable, CaseIterable {
     }
 
     /// The panes about this app and this Mac (#846); the panes about agents; Agent
-    /// Configuration, drawn as a heading over its pages; the control plane, whose hosts are
-    /// the servers and whose clients are the devices (058, frame D).
+    /// Configuration; the control plane, whose hosts are the servers and whose clients are
+    /// the devices (058, frame D).
     static var groups: [[SettingsPane]] {
         [[.appearance, .sidebar, .account, .mac], [.runtimes, .spending, .resources], [.agentConfiguration], [.controlPlane]]
     }
@@ -236,14 +244,10 @@ private struct FormColumn<Content: View>: View {
 
 // MARK: - The rail
 
+/// One row for each pane (#1076). A pane with pages of its own lists them inside it, in a
+/// `PageList` beside the page, so the rail stays the same length as runtimes and pages are added.
 private struct SettingsRail: View {
-    @Environment(AppModel.self) private var model
     @Binding var pane: SettingsPane
-    @Binding var sharedPage: AgentConfigurationPage
-    @Binding var runtimeID: String
-    let snapshot: DaemonAPI.SharedSnapshot?
-    @Binding var controlPage: ControlPage
-    let control: ControlSettingsModel?
 
     var body: some View {
         // Scrolls (#1077): the rows are taller than a small window or large text leaves room for.
@@ -251,92 +255,15 @@ private struct SettingsRail: View {
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(Array(SettingsPane.groups.enumerated()), id: \.offset) { index, group in
                     if index > 0 { Spacer().frame(height: 10) }
-                    ForEach(group, id: \.self) { each in
-                        switch each {
-                        case .agentConfiguration:
-                            AgentConfigurationRailGroup(snapshot: snapshot, chosen: pane == .agentConfiguration ? sharedPage : nil,
-                                                        choose: { pane = .agentConfiguration; sharedPage = $0 })
-                        case .runtimes: runtimesGroup
-                        case .controlPlane: controlGroup
-                        default: paneItem(each)
-                        }
-                    }
+                    ForEach(group, id: \.self) { paneItem($0) }
                 }
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(width: 200)
+        .frame(width: 236)
         .frame(maxHeight: .infinity)
         .background(Paper.sidebar)
-    }
-
-    @ViewBuilder
-    private var runtimesGroup: some View {
-        HStack(spacing: 8) {
-            Image(systemName: SettingsPane.runtimes.symbol)
-                .frame(width: 20)
-                .accessibilityHidden(true)
-            Text(SettingsPane.runtimes.title)
-        }
-        .appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 2)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
-        ForEach(model.runtimes) { status in
-            let chosen = pane == .runtimes && runtimeID == status.id
-            RailButton(lit: chosen, label: status.runtime.name,
-                       selected: chosen,
-                       action: { pane = .runtimes; runtimeID = status.id }) {
-                HStack(spacing: 6) {
-                    Text(status.runtime.name)
-                    Spacer()
-                }
-                .padding(.leading, 28)
-            }
-        }
-    }
-
-    /// The control plane, drawn as Agent Configuration is: a heading always open over its pages (058).
-    @ViewBuilder
-    private var controlGroup: some View {
-        heading(.controlPlane)
-        controlItem(.overview, count: nil)
-        controlItem(.hosts, count: control?.hosts.count)
-        // Workspace providers (#691): only where the control plane can run them.
-        if control?.providersHere != false {
-            controlItem(.providers, count: control.map { $0.providers.count })
-        }
-        controlItem(.clients, count: control.map { $0.clients.count })
-    }
-
-    private func heading(_ each: SettingsPane) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: each.symbol)
-                .frame(width: 20)
-                .accessibilityHidden(true)
-            Text(each.title)
-        }
-        .appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 2)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
-    }
-
-    private func controlItem(_ target: ControlPage, count: Int?) -> some View {
-        let chosen = pane == .controlPlane && controlPage == target
-        return RailButton(lit: chosen, label: target.title + (count.map { ", \($0)" } ?? ""),
-                          selected: chosen, action: { pane = .controlPlane; controlPage = target }) {
-            HStack(spacing: 6) {
-                Text(target.title)
-                Spacer()
-                if let count { Text("\(count)").monospacedDigit()
-                        .foregroundStyle(chosen ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary)) }
-            }
-            .padding(.leading, 28)
-        }
     }
 
     private func paneItem(_ each: SettingsPane) -> some View {
@@ -348,10 +275,110 @@ private struct SettingsRail: View {
                     .frame(width: 20)
                     .foregroundStyle(lit ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
                     .accessibilityHidden(true)
-                Text(each.title)
+                Text(each.title).lineLimit(1)
                 Spacer()
             }
         }
+    }
+}
+
+/// A pane's own pages, in a column inside the pane beside the chosen page (#1076): Agent
+/// Runtimes' runtimes, Agent Configuration's pages and the control plane's. Each line is a
+/// `PageLine`.
+struct PageList<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 2) { content }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(width: 180)
+            .frame(maxHeight: .infinity)
+            Divider()
+        }
+    }
+}
+
+/// One line of a `PageList`: the page's name, then what it has to say at the end of the
+/// line (its count, a mark), which the label also says.
+struct PageLine<Trailing: View>: View {
+    let title: String
+    let lit: Bool
+    var label: String? = nil
+    let action: () -> Void
+    @ViewBuilder var trailing: Trailing
+
+    var body: some View {
+        RailButton(lit: lit, label: label ?? title, selected: lit, action: action) {
+            HStack(spacing: 6) {
+                Text(title).lineLimit(1)
+                Spacer()
+                trailing
+            }
+        }
+    }
+}
+
+extension PageLine where Trailing == PageCount {
+    init(title: String, lit: Bool, count: Int?, action: @escaping () -> Void) {
+        self.init(title: title, lit: lit, label: title + (count.map { ", \($0)" } ?? ""), action: action) {
+            PageCount(count: count, lit: lit)
+        }
+    }
+}
+
+/// A page's count at the end of its line, white on the lit line.
+struct PageCount: View {
+    let count: Int?
+    let lit: Bool
+
+    var body: some View {
+        if let count {
+            Text("\(count)").monospacedDigit()
+                .foregroundStyle(lit ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
+        }
+    }
+}
+
+/// Agent Runtimes' list (#1076): each runtime, with its status at the end of its line.
+private struct RuntimePageList: View {
+    @Environment(AppModel.self) private var model
+    @Binding var runtimeID: String
+
+    var body: some View {
+        PageList {
+            ForEach(model.runtimes) { status in
+                PageLine(title: status.runtime.name, lit: runtimeID == status.id,
+                         action: { runtimeID = status.id }) {
+                    RuntimeStatusIcon(availability: status.availability)
+                }
+            }
+        }
+    }
+}
+
+/// The control plane's pages (058, #1076). Providers only where the control plane can
+/// run them (#691).
+private struct ControlPageList: View {
+    let control: ControlSettingsModel
+    @Binding var page: ControlPage
+
+    var body: some View {
+        PageList {
+            line(.overview, count: nil)
+            line(.hosts, count: control.hosts.count)
+            if control.providersHere {
+                line(.providers, count: control.providers.count)
+            }
+            line(.clients, count: control.clients.count)
+        }
+    }
+
+    private func line(_ target: ControlPage, count: Int?) -> some View {
+        PageLine(title: target.title, lit: page == target, count: count, action: { page = target })
     }
 }
 

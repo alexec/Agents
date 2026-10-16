@@ -3,7 +3,7 @@ import AppKit
 import SwiftUI
 
 /// Settings ▸ Control plane (058, frames D–G): where it runs, the machines it reaches and
-/// the screens that reach it. One group in the rail, opening like Shared.
+/// the screens that reach it. One row in the rail; its pages are listed in the pane (#1076).
 enum ControlPage: Hashable {
     case overview, hosts, providers, clients
 

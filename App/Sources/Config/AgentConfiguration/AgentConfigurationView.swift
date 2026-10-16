@@ -7,16 +7,25 @@ import SwiftUI
 /// Settings, for a project's `.agents`. Read-only but for what each section adds: Edit
 /// opens the file in the person's editor and Reveal in Finder opens the folder.
 ///
-/// Its pages are chosen in a rail (055), which also holds the one snapshot from the daemon
-/// that feeds every page, since the rail shows their counts.
+/// Its pages are chosen in a list inside the pane, with their counts (#1076). The window
+/// holds the one snapshot from the daemon that feeds every page.
 struct AgentConfigurationView: View {
     let place: AgentsPlace
     let snapshot: DaemonAPI.SharedSnapshot?
     @Binding var page: AgentConfigurationPage
+    /// Pages with something waiting for the person's OK, such as a project's new plugin.
+    var waiting: Set<AgentConfigurationPage> = []
     /// Read the snapshot again, after something was added from a catalogue (059).
     var refresh: () async -> Void = {}
 
     var body: some View {
+        HStack(spacing: 0) {
+            AgentConfigurationPageList(snapshot: snapshot, chosen: page, waiting: waiting, choose: { page = $0 })
+            chosenPage
+        }
+    }
+
+    private var chosenPage: some View {
         Group {
             if let snapshot {
                 if !snapshot.laidOut {
@@ -46,7 +55,7 @@ struct AgentConfigurationView: View {
     }
 }
 
-/// Every page, in the order a rail lists them under the Agent Configuration heading.
+/// Every page, in the order the pane lists them.
 enum AgentConfigurationPage: String, Hashable, CaseIterable {
     case overview, instructions, skills, mcp, plugins, other
 
@@ -71,7 +80,7 @@ enum AgentConfigurationPage: String, Hashable, CaseIterable {
         }
     }
 
-    /// What its rail line counts, if anything; nil while the MCP file can't be read.
+    /// What its line counts, if anything; nil while the MCP file can't be read.
     func count(in snapshot: DaemonAPI.SharedSnapshot) -> Int? {
         switch self {
         case .overview: nil
@@ -295,31 +304,20 @@ struct SharedFact: View {
     }
 }
 
-/// The Agent Configuration heading and its pages, as both rails list them (#754). A
-/// heading, not a button: its pages are always listed under it, so none is hidden behind
-/// a click. `chosen` is nil while another pane is.
-struct AgentConfigurationRailGroup: View {
+/// Agent Configuration's pages, as a list inside its pane in Settings and in Project
+/// Settings (#754, #1076). Overview only, until the folder is laid out.
+struct AgentConfigurationPageList: View {
     let snapshot: DaemonAPI.SharedSnapshot?
-    let chosen: AgentConfigurationPage?
-    /// Pages with something waiting for the person's OK, such as a project's new plugin.
+    let chosen: AgentConfigurationPage
     var waiting: Set<AgentConfigurationPage> = []
     let choose: (AgentConfigurationPage) -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: SettingsPane.agentConfiguration.symbol)
-                .frame(width: 20)
-                .accessibilityHidden(true)
-            Text(SettingsPane.agentConfiguration.title)
-        }
-        .appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 2)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
-        ForEach(AgentConfigurationPage.allCases, id: \.self) { each in
-            if each == .overview || snapshot?.laidOut == true {
-                line(each)
+        PageList {
+            ForEach(AgentConfigurationPage.allCases, id: \.self) { each in
+                if each == .overview || snapshot?.laidOut == true {
+                    line(each)
+                }
             }
         }
     }
@@ -328,25 +326,19 @@ struct AgentConfigurationRailGroup: View {
         let lit = chosen == each
         let count = snapshot.flatMap { each.count(in: $0) }
         let warns = snapshot.map { each.warns(in: $0) } ?? false
-        return RailButton(lit: lit,
-                          label: each.title + (count.map { ", \($0)" } ?? "") + (warns ? ", needs a look" : "")
-                              + (waiting.contains(each) ? ", waiting for your OK" : ""),
-                          selected: lit, action: { choose(each) }) {
-            HStack(spacing: 6) {
-                Text(each.title)
-                Spacer()
-                if warns {
-                    Image(systemName: "exclamationmark.triangle")
-                        .foregroundStyle(lit ? .white : SharedInk.attention)
-                }
-                if waiting.contains(each) {
-                    Circle().fill(StateTint.attention.style(or: .secondary)).frame(width: 7, height: 7)
-                        .accessibilityHidden(true)
-                }
-                if let count { Text("\(count)").monospacedDigit()
-                        .foregroundStyle(lit ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary)) }
+        return PageLine(title: each.title, lit: lit,
+                        label: each.title + (count.map { ", \($0)" } ?? "") + (warns ? ", needs a look" : "")
+                            + (waiting.contains(each) ? ", waiting for your OK" : ""),
+                        action: { choose(each) }) {
+            if warns {
+                Image(systemName: "exclamationmark.triangle")
+                    .foregroundStyle(lit ? .white : SharedInk.attention)
             }
-            .padding(.leading, 28)
+            if waiting.contains(each) {
+                Circle().fill(StateTint.attention.style(or: .secondary)).frame(width: 7, height: 7)
+                    .accessibilityHidden(true)
+            }
+            PageCount(count: count, lit: lit)
         }
     }
 }
