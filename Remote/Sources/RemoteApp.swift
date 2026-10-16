@@ -97,8 +97,6 @@ struct RemoteView: View {
     @State private var showsProjectTerminal = false
     /// This scene, among the app's, for where the person is (021, #888).
     @State private var sceneID = UUID()
-    /// Settings ▸ Appearance ▸ Celebrations (#986), on this device.
-    @AppStorage(Celebration.defaultsKey) private var celebrations = true
 
     /// What is open over the project, in the order each was opened from the one before:
     /// a pinned page, a workflow, a conversation. The first is the detail's own page, the
@@ -163,9 +161,6 @@ struct RemoteView: View {
                     .padding(20)
             }
         }
-        // The Blob, in the corner, for a landed pull request (#986).
-        .celebrations(model.work.celebration, enabled: celebrations, held: model.asksOnScreen,
-                      celebrated: model.work.celebrated)
         // Something picked, here or from a banner, a widget or a start, is shown; back to
         // the list on a phone puts it down, so the same row opens it again.
         .onChange(of: model.sidebarItem) { _, item in

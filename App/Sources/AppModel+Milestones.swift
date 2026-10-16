@@ -35,11 +35,3 @@ enum MilestonesSeenStore {
         set { WindowDefaults.store.set(newValue.map { $0.sorted() }, forKey: "milestones.seen") }
     }
 }
-
-/// The Blob's celebrations (#986): the model holds the next one; the window plays it.
-extension AppModel {
-    /// A question card is on screen, so the Blob waits: the open session asks something.
-    var asksOnScreen: Bool {
-        work.permission(for: selection) != nil || work.elicitation(for: selection) != nil
-    }
-}

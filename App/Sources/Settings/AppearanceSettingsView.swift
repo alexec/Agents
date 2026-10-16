@@ -86,10 +86,9 @@ struct MacSettingsView: View {
     }
 }
 
-/// Settings ▸ Appearance: the theme and the Blob's celebrations.
+/// Settings ▸ Appearance: the theme.
 struct AppearanceSettingsView: View {
     @AppStorage(Appearance.defaultsKey, store: WindowDefaults.store) private var appearance = Appearance.system
-    @AppStorage(Celebration.defaultsKey, store: WindowDefaults.store) private var celebrations = true
 
     var body: some View {
         Section {
@@ -97,11 +96,8 @@ struct AppearanceSettingsView: View {
                 ForEach(Appearance.allCases) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented)
-            // The Blob's bounce for a landed pull request, with confetti for the day's
-            // first and a milestone (#986).
-            Toggle("Celebrations", isOn: $celebrations)
         } footer: {
-            Text("System follows your Mac, and changes with it. Celebrations: the Blob hops when a pull request lands, with confetti for the day's first and for a milestone. No sound; Reduce Motion keeps it still.")
+            Text("System follows your Mac, and changes with it.")
                 .appText(.fine)
                 .foregroundStyle(.secondary)
         }
