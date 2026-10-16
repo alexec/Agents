@@ -246,23 +246,26 @@ private struct SettingsRail: View {
     let control: ControlSettingsModel?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            ForEach(Array(SettingsPane.groups.enumerated()), id: \.offset) { index, group in
-                if index > 0 { Spacer().frame(height: 10) }
-                ForEach(group, id: \.self) { each in
-                    switch each {
-                    case .agentConfiguration:
-                        AgentConfigurationRailGroup(snapshot: snapshot, chosen: pane == .agentConfiguration ? sharedPage : nil,
-                                                    choose: { pane = .agentConfiguration; sharedPage = $0 })
-                    case .runtimes: runtimesGroup
-                    case .controlPlane: controlGroup
-                    default: paneItem(each)
+        // Scrolls (#1077): the rows are taller than a small window or large text leaves room for.
+        ScrollView(.vertical) {
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(Array(SettingsPane.groups.enumerated()), id: \.offset) { index, group in
+                    if index > 0 { Spacer().frame(height: 10) }
+                    ForEach(group, id: \.self) { each in
+                        switch each {
+                        case .agentConfiguration:
+                            AgentConfigurationRailGroup(snapshot: snapshot, chosen: pane == .agentConfiguration ? sharedPage : nil,
+                                                        choose: { pane = .agentConfiguration; sharedPage = $0 })
+                        case .runtimes: runtimesGroup
+                        case .controlPlane: controlGroup
+                        default: paneItem(each)
+                        }
                     }
                 }
             }
-            Spacer()
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(12)
         .frame(width: 200)
         .frame(maxHeight: .infinity)
         .background(Paper.sidebar)
