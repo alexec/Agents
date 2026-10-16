@@ -109,8 +109,7 @@ func (d *Daemon) register() {
 		return d.transcript(r)
 	})
 	On(d, wire.CallAgentsTurns, func(ctx context.Context, c *Client, r wire.TurnsRequest) (wire.TurnsPage, error) {
-		// No summaries yet: the window then loads the chat as one open turn.
-		return wire.TurnsPage{Turns: []wire.TurnSummary{}}, nil
+		return d.turns(r)
 	})
 }
 
