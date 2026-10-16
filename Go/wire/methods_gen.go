@@ -62,6 +62,11 @@ var (
 	CallFilesUnwatch                   = Method[FilesWatchRequest, Empty]{"files/unwatch"}
 	CallFilesWatch                     = Method[FilesWatchRequest, Empty]{"files/watch"}
 	CallFilesWrite                     = Method[FilesWriteRequest, FilesWriteResponse]{"files/write"}
+	CallLeasesEnd                      = Method[PersonEndRequest, LeaseSnapshot]{"leases/end"}
+	CallLeasesLease                    = Method[LeaseRequest, LeaseNote]{"leases/lease"}
+	CallLeasesList                     = Method[LeaseTokenRequest, LeaseNote]{"leases/list"}
+	CallLeasesRelease                  = Method[LeaseNameRequest, LeaseNote]{"leases/release"}
+	CallLeasesRemoveWaiter             = Method[PersonRemoveRequest, LeaseSnapshot]{"leases/removeWaiter"}
 	CallLeasesSnapshot                 = Method[Empty, LeaseSnapshot]{"leases/snapshot"}
 	CallMailboxCarry                   = Method[Empty, Empty]{"mailbox/carry"}
 	CallMCPHealth                      = Method[Empty, MCPHealthSnapshot]{"mcp/health"}
@@ -101,6 +106,8 @@ var (
 	CallProjectsUnarchive              = Method[ProjectRequest, ProjectSummary]{"projects/unarchive"}
 	CallProjectsUndoGuardedChange      = Method[GuardedChangeRequest, ProjectSummary]{"projects/undoGuardedChange"}
 	CallRelayOffer                     = Method[RelayOffer, Empty]{"relay/offer"}
+	CallResourcesDeclare               = Method[DeclareResourceRequest, LeaseSnapshot]{"resources/declare"}
+	CallResourcesRemove                = Method[RemoveResourceRequest, LeaseSnapshot]{"resources/remove"}
 	CallRetentionState                 = Method[Empty, RetentionState]{"retention/state"}
 	CallRuntimesAccounts               = Method[Empty, []RuntimeAccount]{"runtimes/accounts"}
 	CallRuntimesAllowances             = Method[*string, RuntimeAllowances]{"runtimes/allowances"}

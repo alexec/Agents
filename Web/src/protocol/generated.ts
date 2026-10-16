@@ -689,6 +689,11 @@ export interface DayRecap {
   longestClear: number;
 }
 
+export interface DeclareResourceRequest {
+  resource: DeclaredResource;
+  replacing?: string;
+}
+
 export interface DeclaredResource {
   name: ResourceName;
   displayName: string;
@@ -1188,9 +1193,29 @@ export interface Lease {
   warned: boolean;
 }
 
+export interface LeaseNameRequest {
+  token: string;
+  name: string;
+}
+
+export interface LeaseNote {
+  note: string;
+}
+
+export interface LeaseRequest {
+  token: string;
+  name: string;
+  minutes?: number;
+  wait?: boolean;
+}
+
 export interface LeaseSnapshot {
   resources: ResourceState[];
   at: WireDate;
+}
+
+export interface LeaseTokenRequest {
+  token: string;
 }
 
 export interface LendGit {
@@ -1385,6 +1410,16 @@ export interface PermissionRequest {
   options: PermissionOption[];
   askedAt: WireDate;
   subagent?: string;
+}
+
+export interface PersonEndRequest {
+  name: string;
+  agentID?: string;
+}
+
+export interface PersonRemoveRequest {
+  name: string;
+  agentID: string;
 }
 
 export interface Persona {
@@ -1636,6 +1671,10 @@ export interface RemovalCheck {
   blockedBy: UUID[];
   uncommitted: number;
   unmerged: boolean;
+}
+
+export interface RemoveResourceRequest {
+  name: string;
 }
 
 export interface RenameRequest {
@@ -2889,6 +2928,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   CredentialsOffer: { required: ["runtimes", "ownSignInOnly"], optional: ["notRelayed", "signIns"] },
   DaemonStatus: { required: ["turnsInFlight", "agentsLive"], optional: [] },
   DayRecap: { required: ["agents", "peakAgents", "longestClear"], optional: ["prsMerged"] },
+  DeclareResourceRequest: { required: ["resource"], optional: ["replacing"] },
   DeclaredResource: { required: ["name", "displayName", "description", "holders"], optional: ["defaultMinutes", "maximumMinutes"] },
   DeviceBinding: { required: [], optional: ["id", "pairing"] },
   DiffLine: { required: ["kind", "text"], optional: ["newLine"] },
@@ -2955,7 +2995,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   KeptRequestID: { required: ["host", "id"], optional: [] },
   LabelVocabularyRequest: { required: ["folder"], optional: [] },
   Lease: { required: ["resource", "displayName", "holder", "grantedAt", "expiresAt", "warned"], optional: [] },
+  LeaseNameRequest: { required: ["token", "name"], optional: [] },
+  LeaseNote: { required: ["note"], optional: [] },
+  LeaseRequest: { required: ["token", "name"], optional: ["minutes", "wait"] },
   LeaseSnapshot: { required: ["resources", "at"], optional: [] },
+  LeaseTokenRequest: { required: ["token"], optional: [] },
   LendGit: { required: ["host", "from", "server", "allowed"], optional: [] },
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
   ListCursor: { required: ["lastActivityAt", "id"], optional: [] },
@@ -2980,6 +3024,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PermissionNotification: { required: ["agentID"], optional: ["request", "requestID"] },
   PermissionOption: { required: ["optionID", "name", "kind"], optional: [] },
   PermissionRequest: { required: ["id", "agentID", "toolCall", "options", "askedAt"], optional: ["subagent"] },
+  PersonEndRequest: { required: ["name"], optional: ["agentID"] },
+  PersonRemoveRequest: { required: ["name", "agentID"], optional: [] },
   Persona: { required: ["id", "name", "origin", "settings"], optional: ["description", "problem"] },
   PersonasListRequest: { required: ["folder"], optional: [] },
   PinArrangeRequest: { required: ["folder", "paths"], optional: [] },
@@ -3015,6 +3061,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RelayOffer: { required: ["runtime", "socketPath", "caCertificate", "standIn"], optional: [] },
   RememberedOptionsRequest: { required: ["runtimeID", "cwd"], optional: [] },
   RemovalCheck: { required: ["blockedBy", "uncommitted", "unmerged"], optional: [] },
+  RemoveResourceRequest: { required: ["name"], optional: [] },
   RenameRequest: { required: ["agentID", "title"], optional: [] },
   ReportedEdit: { required: ["path", "newText", "toolCallID", "index", "entryIndex", "replaceAll", "at"], optional: ["oldText"] },
   ResourceState: { required: ["name", "kind", "displayName", "isGone", "line", "endingSoon"], optional: ["holds", "lease", "places", "declared"] },
