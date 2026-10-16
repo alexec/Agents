@@ -25,6 +25,7 @@ import (
 	"github.com/alexec/agents/Go/internal/buildinfo"
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/hostinstall"
+	"github.com/alexec/agents/Go/internal/controlplane/hosttunnels"
 	"github.com/alexec/agents/Go/internal/controlplane/notices"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
@@ -85,6 +86,9 @@ type Service struct {
 	desk *notices.Desk
 	// What each host last listed (#962), for hosts/lastHeard.
 	copies *hostCopies
+	// The reverse tunnels this copy holds for servers behind a bastion (#435): a single
+	// copy's, whose ssh is the person's on this machine.
+	tunnels *hosttunnels.Tunnels
 	// hosts/install, detect and sshHosts (T072, #429, #610): with the person's own ssh.
 	installer *hostinstall.Installer
 
@@ -123,11 +127,15 @@ func New(cfg Config) (*Service, error) {
 	s.methods = newMethods(s)
 	s.router.handler = s.methods
 	s.copies = newHostCopies(cfg.Store)
+	s.tunnels = hosttunnels.New(hosttunnels.Config{Store: cfg.Store, Port: cfg.Port, Log: s.log,
+		Hosts:   func(context.Context) []records.HostRecord { return s.records.Hosts() },
+		Changed: func(change hosttunnels.Changed) { s.router.BroadcastControl("control/tunnelChanged", change) }})
 	s.router.SetCopier(s.copies.take)
 	s.installer = &hostinstall.Installer{Codes: s.codes, ServerFolder: cfg.ServerFolder,
 		Progress: func(name, step string) {
 			s.router.BroadcastControl("control/installProgress", map[string]string{"name": name, "step": step})
 		},
+		Tunnels: s.tunnels,
 		KnownNames: func(context.Context) []string {
 			var names []string
 			for _, h := range s.records.Hosts() {
@@ -181,6 +189,7 @@ func (s *Service) Start(ctx context.Context) (int, error) {
 	}
 	go s.refreshEvery(15 * time.Second)
 	go s.sweepEveryHour()
+	s.tunnels.Start(0)
 	go s.watchJoinFile()
 	s.log(fmt.Sprintf("listening on %s:%d for %s", s.cfg.Bind, port, s.cfg.URL))
 	return port, nil
@@ -260,6 +269,7 @@ func (s *Service) Stop() {
 	}
 	servers := s.servers
 	s.servers = nil
+	tunnels := s.tunnels
 	sockets := s.sockets
 	s.sockets = map[*Conn]bool{}
 	s.mu.Unlock()
@@ -275,6 +285,9 @@ func (s *Service) Stop() {
 	}
 	for c := range sockets {
 		c.Close()
+	}
+	if tunnels != nil {
+		tunnels.Stop()
 	}
 }
 
@@ -655,14 +668,23 @@ func (s *Service) accept(conn *Conn, webOrigin string) {
 }
 
 // origins is every origin a member may have dialled: this copy's own, and each endpoint
-// announced (R16), in that order and once each.
+// announced (R16), in that order and once each. A copy that holds ssh tunnels also
+// answers at its loopback: a server through one dials https://127.0.0.1:<port> on its
+// own end, which is this listener (#435, #610).
 func (s *Service) origins() []string {
 	out := []string{s.origin}
+	var urls []string
 	if settings := s.records.Settings(); settings != nil {
 		for _, e := range settings.Endpoints {
-			if o, err := controllink.Origin(e.URL); err == nil && !contains(out, o) {
-				out = append(out, o)
-			}
+			urls = append(urls, e.URL)
+		}
+	}
+	if s.tunnels != nil {
+		urls = append(urls, fmt.Sprintf("https://127.0.0.1:%d", s.tunnels.Port()))
+	}
+	for _, u := range urls {
+		if o, err := controllink.Origin(u); err == nil && !contains(out, o) {
+			out = append(out, o)
 		}
 	}
 	return out

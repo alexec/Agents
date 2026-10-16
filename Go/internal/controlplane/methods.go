@@ -293,6 +293,10 @@ func (m *Methods) status(from Caller) controlStatus {
 	status.Web = m.web
 	m.mu.Unlock()
 	status.ThisMacHost = m.s.thisMacHost()
+	for _, unjoined := range m.s.tunnels.Unjoined() {
+		raw, _ := json.Marshal(unjoined)
+		status.UnjoinedTunnels = append(status.UnjoinedTunnels, raw)
+	}
 	status.ProjectDetection = settings.ProjectDetection
 	if len(status.ProjectDetection) == 0 {
 		status.ProjectDetection, _ = json.Marshal(standardDetection)
@@ -339,6 +343,9 @@ func (m *Methods) hostRow(h records.HostRecord) controlHost {
 	}
 	m.mu.Unlock()
 	sort.Slice(row.GitAsks, func(i, j int) bool { return row.GitAsks[i].Server < row.GitAsks[j].Server })
+	if tunnel := m.s.tunnels.State(h.ID); tunnel != nil {
+		row.Tunnel, _ = json.Marshal(tunnel)
+	}
 	return row
 }
 
