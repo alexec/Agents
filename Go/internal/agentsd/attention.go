@@ -42,6 +42,8 @@ type presence struct {
 	watching *wire.UUID
 	active   bool
 	heardAt  time.Time
+	// shown is PresenceReport.shownSet: what the page draws, for lean records.
+	shown map[wire.UUID]bool
 }
 
 type delivery struct {
@@ -493,7 +495,16 @@ func (d *Daemon) reportPresence(c *Client, r wire.PresenceReport) {
 		return
 	}
 	before, had := d.presences[c.ID]
-	d.presences[c.ID] = presence{watching: r.Watching, active: r.Active, heardAt: time.Now()}
+	shown := map[wire.UUID]bool{}
+	if r.Showing != nil {
+		shown[*r.Showing] = true
+	} else if r.Watching != nil {
+		shown[*r.Watching] = true
+	}
+	for _, id := range r.AlsoShowing {
+		shown[id] = true
+	}
+	d.presences[c.ID] = presence{watching: r.Watching, active: r.Active, heardAt: time.Now(), shown: shown}
 	d.attentionMu.Unlock()
 	var was *wire.UUID
 	if had && before.active {

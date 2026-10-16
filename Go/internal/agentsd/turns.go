@@ -65,7 +65,7 @@ func (d *Daemon) live(id wire.UUID) *live {
 
 func now() wire.Date { return wire.DateOf(nowFunc()) }
 
-// record appends an entry to an agent's transcript and tells every client.
+// record appends an entry to an agent's transcript and tells the clients showing it.
 func (d *Daemon) record(id wire.UUID, kind wire.TranscriptEntryKind) {
 	e := wire.TranscriptEntry{ID: store.NewUUID(), At: now(), Kind: kind}
 	n, err := d.Store.Append(id, e)
@@ -73,8 +73,7 @@ func (d *Daemon) record(id wire.UUID, kind wire.TranscriptEntryKind) {
 		log.Printf("agent %s: could not record an entry: %v", id, err)
 		return
 	}
-	index := int64(n)
-	Broadcast(d, wire.NotifyAgentEntry, wire.EntryNotification{AgentID: id, Entry: e, Index: &index})
+	d.tellEntry(id, e, n)
 }
 
 func notice(severity, title, detail string) wire.TranscriptEntryKind {
@@ -97,13 +96,14 @@ func (d *Daemon) change(id wire.UUID, edit func(a *wire.Agent)) *wire.Agent {
 	if a == nil {
 		return nil
 	}
+	before := *a
 	edit(a)
 	a.LastActivityAt = now()
 	if err := d.Store.Save(*a); err != nil {
 		log.Printf("agent %s: %v", id, err)
 		return nil
 	}
-	Broadcast(d, wire.NotifyAgentChanged, *a)
+	d.tellChanged(*a, &before)
 	d.projectChanged(projectFolder(a))
 	// Every place a need begins or ends moves the record (DaemonCore.move's reconsider).
 	safe.Go("reconsider", d.reconsider)
@@ -179,7 +179,7 @@ func (d *Daemon) start(r wire.StartRequest) (wire.UUID, error) {
 		}
 		return "", err
 	}
-	Broadcast(d, wire.NotifyAgentChanged, a)
+	d.tellChanged(a, nil)
 	d.projectChanged(projectFolder(&a))
 	if wt != nil {
 		d.record(a.ID, runtimeNote(worktreeNote(*wt)))
