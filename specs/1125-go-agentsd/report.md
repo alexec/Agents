@@ -27,6 +27,8 @@ Keep the Swift window and the Remote, and check their types against the schema i
    - `agentsd supervise`: `--detach` now starts the host under a supervisor (its pid is in `supervise.lock`). A crash (a panic's status 2, or a signal such as SIGKILL) starts the host again after 1 s, doubling to 60 s. A clean exit or SIGTERM stops both, so run-app's `stop.sh` and `devbox.sh stop` work as before.
    - Proved on the box with `DEBUG_PANIC=1 agentsd-go/devbox.sh` and `devbox.sh panic <where>`: handler, goroutine and timer panics were logged and the same pid went on serving (count 3). Two panics in an unguarded goroutine and one `kill -9` were each restarted (1 s, then 2 s). Tests: `internal/safe/safe_test.go`, `internal/daemon/safe_test.go`.
    - The supervisor is not systemd: it does not survive a container restart, and nothing starts it at boot. The install script would give systemd on a real box.
+2. **The panes nobody had seen** (see below; the walk waits for Alex to be away).
+3. **A first draft of the migration plan:** [migration.md](migration.md), for Alex to read after the test. Linux hosts first, then the control plane, then the Mac daemon; the schema-first wire comes in before all three; the Swift and Go Linux hosts live side by side by an `implementation` field in `host/hello` and a `--impl go` switch in the install script. Recounted on today's tree: 280 methods, 51 served, **229 not ported** (168 the daemon's, 61 the control plane's), in 18 areas with a rough size for each.
 
 ## Numbers
 
