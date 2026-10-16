@@ -111,9 +111,8 @@ func (d *Daemon) catchUp(r wire.CatchUpRequest) wire.CatchUpSnapshot {
 	milestones := wire.Milestones{Earned: []wire.EarnedMilestone{}}
 	s := wire.CatchUpSnapshot{Projects: d.projects(false), Agents: d.listAgents(list), Permissions: d.pendingPermissions(),
 		Elicitations: d.pendingElicitations(),
-		// Needs and their deliveries come with attention/pending.
-		Attention: wire.AttentionPending{Needs: []wire.Need{}, Deliveries: []wire.AttentionDelivery{}},
-		Resuming:  []wire.UUID{}, Disk: &disk, StoreNotes: &notes, Milestones: &milestones}
+		Attention:    d.attentionPending(),
+		Resuming:     []wire.UUID{}, Disk: &disk, StoreNotes: &notes, Milestones: &milestones}
 	for _, part := range r.Parts {
 		if part == "pins" {
 			s.Pins = []wire.ProjectPins{}
