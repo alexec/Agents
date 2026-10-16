@@ -81,6 +81,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	if cl.serve {
+		// A server's settings are the person's, in their home (Daemon.swift's --serve).
+		if home, err := os.UserHomeDir(); err == nil {
+			d.SettingsDir = filepath.Join(home, ".agents", "settings")
+		}
+	}
 	safe.Go("socket", func() {
 		if err := d.ServeSocket(ctx, loc.Socket()); err != nil && ctx.Err() == nil {
 			log.Printf("socket: %v", err)

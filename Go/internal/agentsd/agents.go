@@ -442,6 +442,11 @@ func (d *Daemon) setOption(ctx context.Context, r wire.SetOptionRequest) ([]wire
 			a.AdvertisedOptions = options
 		}
 	})
+	known := options
+	if s == nil {
+		known = a.AdvertisedOptions
+	}
+	d.rememberMode(a.RuntimeID, r.OptionID, r.Value, known)
 	d.record(a.ID, wire.TranscriptEntryKind{OptionChanged: &wire.TranscriptEntryKindOptionChanged{ID: r.OptionID, Value: r.Value}})
 	return options, nil
 }
