@@ -86,6 +86,12 @@ func (d *Daemon) recordFrom(id wire.UUID, kind wire.TranscriptEntryKind, sender 
 		return
 	}
 	d.tellEntry(id, e, n)
+	// Where the turn's time went (#852), banked when it ends.
+	if _, ok := timeMarkOf(e); ok {
+		if a := d.Store.Agent(id); a != nil {
+			d.noteTime(e, id, a.RuntimeID)
+		}
+	}
 }
 
 func notice(severity, title, detail string) wire.TranscriptEntryKind {

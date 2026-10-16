@@ -48,6 +48,7 @@ type Daemon struct {
 	allowanceBook
 	mcpBook
 	optionBook
+	timeBook
 	attentionState
 	worktreeState
 	recoveryState

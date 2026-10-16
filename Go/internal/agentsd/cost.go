@@ -434,23 +434,6 @@ func (d *Daemon) setLimits(raw json.RawMessage) (wire.CostState, error) {
 	return st, nil
 }
 
-// timeHistory is time/history: the file the host keeps, or nothing yet, saying the hour.
-func (d *Daemon) timeHistory() wire.TimeHistory {
-	var h wire.TimeHistory
-	readStore(filepath.Join(d.Store.Loc.Root, "time-history.json"), &h, "the time charts start again")
-	if h.Hours == nil {
-		h.Hours = map[string]map[string]wire.TimeBucket{}
-	}
-	if h.Days == nil {
-		h.Days = map[string]map[string]wire.TimeBucket{}
-	}
-	if h.Recap == nil {
-		h.Recap = map[string]wire.DayRecap{}
-	}
-	h.Now = hourStamp(time.Now())
-	return h
-}
-
 // milestones is milestones/state: what achievements.json says has been earned.
 func (d *Daemon) milestones() wire.Milestones {
 	var m wire.Milestones
