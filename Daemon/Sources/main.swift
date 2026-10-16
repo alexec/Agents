@@ -17,6 +17,12 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "acp-echo" {
     exit(0)
 }
 
+// `agentsd git-credential <socket> <get|store|erase>`: git's credential helper on a host a
+// Mac lends its git access to (#1122). It asks the daemon at that socket.
+if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "git-credential" {
+    exit(await GitLending.runHelper(Array(CommandLine.arguments.dropFirst(2))))
+}
+
 let commandLine = DaemonCommandLine(CommandLine.arguments)
 guard case .daemon(let serve, let detach) = commandLine.mode else { exit(2) }
 

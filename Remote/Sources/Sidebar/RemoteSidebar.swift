@@ -707,6 +707,7 @@ private struct RemoteSettings: View {
                     }
                     .paperListRow()
                 }
+                GitAccessSettingsSection()
             }
             .scrollContentBackground(.hidden)
             .background(Paper.ground)

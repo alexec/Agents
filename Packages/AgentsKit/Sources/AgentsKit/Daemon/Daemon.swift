@@ -266,6 +266,27 @@ public final class Daemon: @unchecked Sendable {
         await core.setTunnelOpener { runtime in try await uplink.openTunnel(runtime: runtime) }
     }
 
+    /// Git access lent between hosts (#1122): a Mac reads its own for the control plane; a
+    /// Linux host's git asks for it through `agentsd git-credential`, unless it has a
+    /// credential helper of its own.
+    private func lendAndBorrowGit(through uplink: ControlUplink) async {
+        uplink.setControlAnswers { _, params in
+            guard let request = try? params?.decode(DaemonAPI.GitCredentialRequest.self) else {
+                throw JSONRPCError(code: JSONRPCError.invalidParams, message: "Those parameters are not a git request.")
+            }
+            return try JSONValue.encoding(try await GitLending.fill(request))
+        }
+        #if !os(macOS)
+        if await GitLending.hostHasOwnHelper() {
+            DaemonLog.shared.write("git: this host has a credential helper of its own; no Mac's git access is used")
+            return
+        }
+        let me = URL(filePath: Bundle.main.executablePath ?? CommandLine.arguments[0]).resolvingSymlinksInPath()
+        GitLending.enable(executable: me, socket: locations.socket)
+        DaemonLog.shared.write("git: a Mac's lent git access is used through agentsd git-credential")
+        #endif
+    }
+
     /// A host of a control plane (058, T021): enrolled once with a version 2 host code,
     /// given or left in the root by Agents Host, then dialled over the WebSocket with its
     /// own key, on a Mac and on Linux alike.
@@ -331,6 +352,7 @@ public final class Daemon: @unchecked Sendable {
         await core.deliverStatus { [uplink] params in uplink.tell(DaemonAPI.Method.hostStatus, params) }
         await core.deliverControlAsks { [uplink] method, params in try await uplink.ask(method, params) }
         await lendAndBorrowSignIns(through: uplink)
+        await lendAndBorrowGit(through: uplink)
         uplink.start()
         let nudge: @Sendable (ReconnectTriggers.Reason) -> Void = { [uplink] reason in
             let nudged = uplink.goBackNow()

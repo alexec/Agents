@@ -1954,8 +1954,9 @@ public struct ProcessSessionLauncher: SessionLauncher {
                             onto base: [String: String], onServer: Bool = false) -> [String: String] {
         let own = RuntimeLaunchCatalog.launch(for: policy.runtimeID).environment(over: base, root: locations.root.path,
                                                                                                cache: locations.cacheRoot.path)
+        // The git access a Mac lends this host (#1122), under anything lent or the policy's.
         var environment = RuntimePolicyFiles(locations: locations)
-            .environment(for: policy, onto: LentEnvironment.applied(to: own))
+            .environment(for: policy, onto: LentEnvironment.applied(to: GitLending.applied(to: own)))
             .merging(policy.launchEnvironment) { _, policy in policy }
         guard onServer else { return environment }
         environment.merge(policy.serverEnvironment) { _, server in server }

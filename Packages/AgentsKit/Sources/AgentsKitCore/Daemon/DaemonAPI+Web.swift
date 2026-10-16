@@ -219,6 +219,8 @@ public extension DaemonAPI {
                 Row(Method.controlStatus, params: Empty.self, result: ControlStatus.self, kind: .controlRequest),
                 Row(Method.hostsList, params: Empty.self, result: [ControlHost].self, kind: .controlRequest),
                 Row(Method.clientsForgetSelf, params: Empty.self, result: Empty.self, kind: .controlRequest),
+                // A host using a Mac's git access (#1122): Allow, Don't Allow and Revoke.
+                Row(Method.hostsLendGit, params: LendGit.self, result: Empty.self, kind: .controlRequest),
                 // A linked host's workspace (#691): Start on the offline strip.
                 Row(Method.hostsStart, params: HostRequest.self, result: ControlHost.self, kind: .controlRequest),
                 Row(Method.hostsStop, params: HostStop.self, result: ControlHost.self, kind: .controlRequest),

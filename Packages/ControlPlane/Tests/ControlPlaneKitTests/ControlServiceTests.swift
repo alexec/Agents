@@ -54,17 +54,18 @@ struct ControlServiceTests {
     }
 
     /// A host enrolled by code, answering every call with its name and the role asked with.
-    func host(at url: URL, code: String, pin: String? = nil) async throws -> (HostID, ControlUplink) {
+    func host(at url: URL, code: String, pin: String? = nil, name: String = "devbox",
+              platform: String = "Linux arm64") async throws -> (HostID, ControlUplink) {
         let key = ControlAgreement.generate()
         let announced = try await use(code, at: url, method: DaemonAPI.Method.hostsAnnounce, params: try JSONValue.encoding(
-            DaemonAPI.HostAnnounce(publicKey: key.publicKey, name: "devbox", platform: "Linux arm64", version: "1",
+            DaemonAPI.HostAnnounce(publicKey: key.publicKey, name: name, platform: platform, version: "1",
                                    machineID: "linux-1")), pin: pin)
         let host = try #require(try announced.decode(DaemonAPI.Admitted.self).host)
         let server = DaemonServer(url: URL(fileURLWithPath: "/tmp/unused-\(UUID()).sock")) { context, method, _ in
             .success(["host": .string(host.rawValue), "method": .string(method), "role": .string(context.role.rawValue)])
         }
         let hostKey = try ControlAuth.hostKey(privateKey: key.privateKey, peer: control.publicKey, host: host)
-        let uplink = ControlUplink(server: server, hello: DaemonAPI.HostHello(host: host, version: "1", platform: "Linux arm64",
+        let uplink = ControlUplink(server: server, hello: DaemonAPI.HostHello(host: host, version: "1", platform: platform,
                                                                              machineID: "linux-1")) { [control] in
             try await join(url, .init(identity: .host(host), key: hostKey, kind: "host", controlKey: control.publicKey), pin: pin)
         }

@@ -241,8 +241,8 @@ public actor ControlMethods: ControlHandling {
         DaemonAPI.Method.ping, DaemonAPI.Method.controlStatus, DaemonAPI.Method.hostsList,
         DaemonAPI.Method.hostsStartEnroll, DaemonAPI.Method.hostsInstall, DaemonAPI.Method.hostsCheckAgain,
         DaemonAPI.Method.hostsUpdate, DaemonAPI.Method.hostsRemove, DaemonAPI.Method.hostsSetRelay,
-        DaemonAPI.Method.hostsLendSignIn, DaemonAPI.Method.hostsDetect, DaemonAPI.Method.hostsSSHHosts,
-        DaemonAPI.Method.controlSetProjectDetection, DaemonAPI.Method.clientsList, DaemonAPI.Method.clientsStartPairing, DaemonAPI.Method.clientsStopPairing,
+        DaemonAPI.Method.hostsLendSignIn, DaemonAPI.Method.hostsLendGit, DaemonAPI.Method.hostsDetect,
+        DaemonAPI.Method.hostsSSHHosts, DaemonAPI.Method.controlSetProjectDetection, DaemonAPI.Method.clientsList, DaemonAPI.Method.clientsStartPairing, DaemonAPI.Method.clientsStopPairing,
         DaemonAPI.Method.clientsSetGrant, DaemonAPI.Method.clientsForget, DaemonAPI.Method.clientsConnections,
         DaemonAPI.Method.clientsForgetSelf,
         DaemonAPI.Method.devicesList, DaemonAPI.Method.devicesStartPairing, DaemonAPI.Method.devicesStopPairing,
@@ -272,7 +272,7 @@ public actor ControlMethods: ControlHandling {
     private static let writes: Set<String> = [
         DaemonAPI.Method.hostsStartEnroll, DaemonAPI.Method.hostsInstall, DaemonAPI.Method.hostsUpdate,
         DaemonAPI.Method.hostsRemove, DaemonAPI.Method.hostsSetRelay, DaemonAPI.Method.hostsLendSignIn,
-        DaemonAPI.Method.hostsDetect, DaemonAPI.Method.controlSetProjectDetection,
+        DaemonAPI.Method.hostsLendGit, DaemonAPI.Method.hostsDetect, DaemonAPI.Method.controlSetProjectDetection,
         DaemonAPI.Method.clientsStartPairing, DaemonAPI.Method.clientsForget,
         DaemonAPI.Method.devicesStartPairing, DaemonAPI.Method.devicesForget,
         DaemonAPI.Method.channelsSet,
@@ -379,6 +379,9 @@ public actor ControlMethods: ControlHandling {
             try await records.save(record)
             await hooks.changed(ControlEvent(kind: .hostEnrolled, subject: request.host.rawValue, at: Date(),
                                              by: caller.client.uuidString))
+            return [:]
+        case DaemonAPI.Method.hostsLendGit:
+            try await lendGit(try Self.require(params, as: DaemonAPI.LendGit.self), by: caller.client.uuidString)
             return [:]
         case DaemonAPI.Method.hostsSetRelay:
             let request = try Self.require(params, as: DaemonAPI.HostRelayRequest.self)
@@ -503,6 +506,9 @@ public actor ControlMethods: ControlHandling {
                 await hooks.workspaces?.heard(host, status: status)
             }
             return [:]
+        case DaemonAPI.Method.gitCredential:
+            let request = try Self.require(params, as: DaemonAPI.GitCredentialRequest.self)
+            return try JSONValue.encoding(try await gitCredential(for: host, request))
         case DaemonAPI.Method.tunnelOpen:
             // Only to a lender an operator said yes to, for that runtime (T091).
             let request = try Self.require(params, as: DaemonAPI.TunnelOpen.self)
@@ -549,6 +555,9 @@ public actor ControlMethods: ControlHandling {
                                            state: described["state"]?.stringValue ?? "offline",
                                            reach: "dialOut", machineID: record.machineID, relay: record.relay)
         listed.signInFrom = record.signInFrom
+        listed.gitFrom = record.gitFrom
+        let asks = (gitAsks[record.id] ?? [:]).map { DaemonAPI.GitAsk(server: $0.key, from: $0.value.from) }
+        listed.gitAsks = asks.isEmpty ? nil : asks.sorted { $0.server < $1.server }
         listed.tunnel = await hooks.tunnel(record.id)
         listed.workspace = await router?.workspace(of: record.id)
         return listed
@@ -559,5 +568,127 @@ public actor ControlMethods: ControlHandling {
             throw JSONRPCError(code: JSONRPCError.invalidParams, message: "Those parameters are not a \(T.self).")
         }
         return value
+    }
+
+    // MARK: Git access lent between hosts (#1122)
+
+    /// A host's git waiting on a person's answer, by host and git server: the host whose
+    /// access it would use, and every git command waiting on the same answer.
+    private struct GitAskWaiting {
+        var from: HostID
+        var waiting: [CheckedContinuation<Bool, Never>]
+    }
+    private var gitAsks: [HostID: [String: GitAskWaiting]] = [:]
+
+    /// How long a git command waits for a person to answer before it fails.
+    private var gitAskPatience: Duration = .seconds(120)
+    /// How long the lending host has to read its own git access.
+    private let gitFillPatience: Duration = .seconds(30)
+    /// Tests only.
+    public func setGitAskPatience(_ patience: Duration) { gitAskPatience = patience }
+
+    /// `hosts/lendGit`: kept for a yes, taken back for a no; either ends a waiting ask.
+    func lendGit(_ request: DaemonAPI.LendGit, by: String) async throws {
+        guard DaemonAPI.GitCredentialRequest.isServer(request.server) else {
+            throw JSONRPCError(code: JSONRPCError.invalidParams, message: "That is not a git server.")
+        }
+        guard var record = await records.host(request.host), await records.host(request.from) != nil else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchHost, message: "No such host.")
+        }
+        var lends = record.gitFrom ?? [:]
+        lends[request.server] = request.allowed ? request.from : nil
+        record.gitFrom = lends.isEmpty ? nil : lends
+        if record != (await records.host(request.host)) { try await records.save(record) }
+        if let asked = gitAsks[request.host]?.removeValue(forKey: request.server) {
+            for one in asked.waiting { one.resume(returning: request.allowed) }
+        }
+        await hooks.changed(ControlEvent(kind: .hostEnrolled, subject: request.host.rawValue, at: Date(), by: by))
+        await sayHostChanged(request.host)
+    }
+
+    /// `git/credential` from a host's git: the lent credential, asked of the lender only for a
+    /// lend a person allowed. With none yet, every client is asked, and the command waits for
+    /// the answer. Fails at once while the lender is not connected (Alex, #1122).
+    func gitCredential(for host: HostID, _ request: DaemonAPI.GitCredentialRequest) async throws -> DaemonAPI.GitCredential {
+        guard request.protocol == "https", DaemonAPI.GitCredentialRequest.isServer(request.host) else {
+            throw JSONRPCError(code: JSONRPCError.invalidParams, message: "Only https git access is lent.")
+        }
+        let server = request.host
+        guard let record = await records.host(host) else {
+            throw JSONRPCError(code: DaemonAPI.Failure.noSuchHost, message: "No such host.")
+        }
+        var lender = record.gitFrom?[server]
+        if lender == nil {
+            guard let mac = await gitLender(for: host) else {
+                throw JSONRPCError(code: DaemonAPI.Failure.hostOffline,
+                                   message: "No Mac is connected to lend its git access for \(server); it is lent only while that Mac is connected.")
+            }
+            guard await askToLendGit(host: host, from: mac, server: server) else {
+                throw JSONRPCError(code: DaemonAPI.Failure.notPermitted,
+                                   message: "\(record.name) may not use the git access of \(await name(of: mac)) for \(server).")
+            }
+            lender = await records.host(host)?.gitFrom?[server]
+        }
+        guard let lender else {
+            throw JSONRPCError(code: DaemonAPI.Failure.notPermitted, message: "\(record.name) may not use any git access for \(server).")
+        }
+        let lenderName = await name(of: lender)
+        guard let router, await router.state(of: lender)?.isOnline == true else {
+            throw JSONRPCError(code: DaemonAPI.Failure.hostOffline,
+                               message: "\(lenderName) is not connected; its git access is lent only while it is connected.")
+        }
+        let reply = await router.ask(lender, DaemonAPI.Method.gitFill, params: try JSONValue.encoding(request),
+                                     patience: gitFillPatience)
+        switch reply {
+        case .success(_, let result)?:
+            if let credential = try? result.decode(DaemonAPI.GitCredential.self) { return credential }
+        case nil:
+            throw JSONRPCError(code: DaemonAPI.Failure.hostOffline,
+                               message: "\(lenderName) did not answer for its git access to \(server).")
+        default:
+            break
+        }
+        throw JSONRPCError(code: DaemonAPI.Failure.notPermitted, message: "\(lenderName) has no git access to \(server).")
+    }
+
+    /// The Mac whose git access a host would use: the home host if it is a Mac, else the
+    /// first connected Mac. Never the host itself, and never a relay.
+    private func gitLender(for host: HostID) async -> HostID? {
+        var macs: [HostID] = []
+        for record in await records.hosts where record.id != host && record.relay == nil
+            && record.platform.hasPrefix("macOS") {
+            if await router?.state(of: record.id)?.isOnline == true { macs.append(record.id) }
+        }
+        if let home = settings.homeHost, macs.contains(home) { return home }
+        return macs.sorted { $0.rawValue < $1.rawValue }.first
+    }
+
+    /// Every client is asked, through the host's row; true once a person allows it.
+    private func askToLendGit(host: HostID, from: HostID, server: String) async -> Bool {
+        let first = gitAsks[host]?[server] == nil
+        let patience = gitAskPatience
+        let allowed = await withCheckedContinuation { (waiting: CheckedContinuation<Bool, Never>) in
+            gitAsks[host, default: [:]][server, default: GitAskWaiting(from: from, waiting: [])].waiting.append(waiting)
+            Task { [weak self] in
+                if first { await self?.sayHostChanged(host) }
+                try? await Task.sleep(for: patience)
+                await self?.giveUpGitAsk(host: host, server: server)
+            }
+        }
+        return allowed
+    }
+
+    private func giveUpGitAsk(host: HostID, server: String) async {
+        guard let asked = gitAsks[host]?.removeValue(forKey: server) else { return }
+        for one in asked.waiting { one.resume(returning: false) }
+        await sayHostChanged(host)
+    }
+
+    private func name(of host: HostID) async -> String { await records.host(host)?.name ?? host.rawValue }
+
+    /// The host's row changed: every client lists it again.
+    private func sayHostChanged(_ host: HostID) async {
+        guard let router, let state = await router.state(of: host) else { return }
+        await router.broadcastControl(DaemonAPI.Notification.controlHostChanged, await router.described(host, state))
     }
 }

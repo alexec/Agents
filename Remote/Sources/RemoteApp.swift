@@ -180,6 +180,14 @@ struct RemoteView: View {
         }
         // A server asked for a key on a send, with no start page to ask over (#344).
         .tokenAskSheet(model, shown: model.startingIn == nil)
+        // A host's git asked to use a Mac's git access (#1122).
+        .alert(model.gitLendAsk?.title ?? "", isPresented: Binding(get: { model.gitLendAsk != nil }, set: { _ in }),
+               presenting: model.gitLendAsk) { ask in
+            Button("Allow") { Task { await model.answerGitLend(ask, allowed: true) } }
+            Button("Don’t Allow", role: .cancel) { Task { await model.answerGitLend(ask, allowed: false) } }
+        } message: { ask in
+            Text(ask.message)
+        }
         // Where this device is, told to the Mac on every change (021).
         .onChange(of: scenePhase, initial: true) { _, phase in model.scenePhase(phase, of: sceneID) }
         // A tap on the Home-screen widget (068). The one place a URL is taken from

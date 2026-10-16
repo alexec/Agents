@@ -9,10 +9,10 @@ import Testing
 // taking the host with it.
 
 extension ProviderHarness {
-    func create(_ name: String, options: JSONValue = ["size": "big"]) async throws -> DaemonAPI.ProviderCreated {
+    func create(_ name: String, options: JSONValue = ["size": "big"], clones: [String]? = nil) async throws -> DaemonAPI.ProviderCreated {
         let provider = try #require(try await call(DaemonAPI.Method.providersList)["providers"]?.decode([DaemonAPI.ProviderSummary].self).first?.id)
         return try await call(DaemonAPI.Method.providersCreate,
-                              try JSONValue.encoding(DaemonAPI.ProviderCreate(id: provider, name: name, options: options)))
+                              try JSONValue.encoding(DaemonAPI.ProviderCreate(id: provider, name: name, options: options, clones: clones)))
             .decode(DaemonAPI.ProviderCreated.self)
     }
 }
@@ -46,6 +46,23 @@ struct MakingWorkspacesTests {
             try await Task.sleep(for: .milliseconds(10))
         }
         #expect(try await h.row(joined).workspace?.workspace == "ws-build-2")
+    }
+
+    /// Clone these projects (#1122): once it has joined, each is cloned there, in order.
+    @Test func aNewWorkspaceClonesItsProjectsOnceItJoins() async throws {
+        let h = try await ProviderHarness()
+        try await h.add()
+        let urls = ["https://github.com/alexec/one.git", "git@github.com:alexec/two.git"]
+        _ = try await h.create("build-4", clones: urls + ["  "])
+        let joined = HostID(rawValue: "build004")
+        try await h.methods.enroll(HostRecord(id: joined, name: "build-4"))
+        await h.router.know(joined)
+        let (ours, theirs) = PairedTransport.pair()
+        let host = KeptHost(transport: theirs)
+        await h.router.attachHost(joined, transport: ours)
+        for _ in 0..<300 where host.requests.count < 2 { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(host.requests.map(\.method) == [DaemonAPI.Method.projectsClone, DaemonAPI.Method.projectsClone])
+        #expect(host.requests.compactMap { $0.params?["url"]?.stringValue } == urls)
     }
 
     @Test func oneThatCantRunTheFirstBootIsLeftToAddOverSSH() async throws {

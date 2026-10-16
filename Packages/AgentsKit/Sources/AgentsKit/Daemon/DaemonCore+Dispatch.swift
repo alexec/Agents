@@ -17,6 +17,8 @@ extension DaemonCore {
                        peer: Int32? = nil, role: ConnectionRole = .control,
                        vouched: Bool = false) async -> Result<JSONValue, JSONRPCError> {
         if let refusal = await tokenRefusal(params, peer: peer) { return .failure(refusal) }
+        // A lent git credential (#1122) goes only to a process on this host's own socket.
+        if method == DaemonAPI.Method.gitCredential { return await lentGitCredential(params, peer: peer) }
         // An agent's call to the app's own tools, kept as answered (#47). Read before the
         // call, which may be the last one its token is good for.
         let caller = params?["token"]?.stringValue.flatMap { appTokens[$0] }

@@ -576,6 +576,8 @@ export interface ControlHost {
   machineID?: string;
   relay?: boolean;
   signInFrom?: Record<string, HostID>;
+  gitFrom?: Record<string, HostID>;
+  gitAsks?: GitAsk[];
   tunnel?: HostTunnel;
   workspace?: HostWorkspace;
 }
@@ -934,6 +936,11 @@ export interface FolderHunk {
   lines: DiffLine[];
 }
 
+export interface GitAsk {
+  server: string;
+  from: HostID;
+}
+
 // uses: ChangesUnavailable
 /** GitView (Model/AgentChanges.swift): `{ shared: { since } }`, `{ unavailable: … }` and so on. */
 export type GitView =
@@ -1108,6 +1115,13 @@ export interface Lease {
 export interface LeaseSnapshot {
   resources: ResourceState[];
   at: WireDate;
+}
+
+export interface LendGit {
+  host: HostID;
+  from: HostID;
+  server: string;
+  allowed: boolean;
 }
 
 export interface LineMember {
@@ -2388,6 +2402,7 @@ export interface Methods {
   "files/watch": { params: FilesWatchRequest; result: Empty };
   "hosts/dropKept": { params: KeptRequestID; result: Empty };
   "hosts/lastHeard": { params: HostRequest; result: HostLastHeard };
+  "hosts/lendGit": { params: LendGit; result: Empty };
   "hosts/list": { params: Empty; result: ControlHost[] };
   "hosts/listKept": { params: Empty; result: KeptList };
   "hosts/retryKept": { params: KeptRequestID; result: Empty };
@@ -2517,6 +2532,7 @@ export const MethodTarget = {
   "files/watch": "host",
   "hosts/dropKept": "control",
   "hosts/lastHeard": "control",
+  "hosts/lendGit": "control",
   "hosts/list": "control",
   "hosts/listKept": "control",
   "hosts/retryKept": "control",
@@ -2671,7 +2687,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConfigChoiceGroup: { required: ["options"], optional: ["name", "group"] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ContinueInProjectRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
-  ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "tunnel", "workspace"] },
+  ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "gitFrom", "gitAsks", "tunnel", "workspace"] },
   ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "thisMacHost", "projectDetection", "unjoinedTunnels"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
@@ -2716,6 +2732,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FilesReadRequest: { required: ["agentID", "path"], optional: ["knownStamp"] },
   FilesWatchRequest: { required: ["agentID", "folder"], optional: [] },
   FolderHunk: { required: ["oldStart", "newStart", "noNewlineAtEnd", "lines"], optional: [] },
+  GitAsk: { required: ["server", "from"], optional: [] },
   GuardedChange: { required: ["path", "changedBy", "changedByIDs", "byGit", "since"], optional: ["digest", "askedIn"] },
   GuardedChangeReading: { required: ["path", "lines"], optional: ["digest", "approved", "current"] },
   GuardedChangeRequest: { required: ["folder", "path"], optional: ["digest"] },
@@ -2738,6 +2755,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LabelVocabularyRequest: { required: ["folder"], optional: [] },
   Lease: { required: ["resource", "displayName", "holder", "grantedAt", "expiresAt", "warned"], optional: [] },
   LeaseSnapshot: { required: ["resources", "at"], optional: [] },
+  LendGit: { required: ["host", "from", "server", "allowed"], optional: [] },
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
   ListCursor: { required: ["lastActivityAt", "id"], optional: [] },
   ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query"] },
