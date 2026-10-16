@@ -116,6 +116,8 @@ func TestAFormIsHeldAndAnswered(t *testing.T) {
 	c.call(t, 5, "elicitations/answer", map[string]any{"requestID": form.ID, "action": "accept",
 		"content": map[string]any{"colour": "blue"}})
 	c.until(t, "the end", ended(id, wire.AgentStateFinished))
+	// The record's last line follows the agent/changed that says it ended.
+	waitFor(t, "the ending recorded", func() bool { k := kinds(d, id); return len(k) > 0 && k[len(k)-1] == "stateChanged" })
 	if a := d.Store.Agent(id); a.Report == nil || a.Report.Message != "You chose blue." {
 		t.Fatalf("report %+v", a.Report)
 	}

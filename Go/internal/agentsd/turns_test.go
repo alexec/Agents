@@ -191,6 +191,8 @@ func TestATurnWithACard(t *testing.T) {
 	if a.RuntimeSessionID == nil || *a.RuntimeSessionID != "fake-session" || a.EndedReason == nil || *a.EndedReason != wire.EndedReasonEndTurn {
 		t.Fatalf("%+v", a)
 	}
+	// The record's last line follows the agent/changed that says it ended.
+	waitFor(t, "the ending recorded", func() bool { k := kinds(d, id); return len(k) > 0 && k[len(k)-1] == "stateChanged" })
 	entries, _, _ := d.Store.Transcript(id, 0)
 	var kinds []string
 	for _, e := range entries {
