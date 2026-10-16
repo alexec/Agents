@@ -173,9 +173,10 @@ func InstallCommand(url, pin, code string) string {
 
 // serverFileNames is ServerFiles.names: the only files /v1/servers/ hands out.
 var serverFileNames = func() map[string]bool {
-	names := map[string]bool{"VERSION": true}
+	names := map[string]bool{"VERSION": true, "VERSION-go": true}
 	for _, arch := range []string{"x86_64", "aarch64"} {
-		for _, program := range []string{"agentsd", "ci-watcher"} {
+		// agentsd-go (#1136): the Go host, for install.sh --impl go.
+		for _, program := range []string{"agentsd", "agentsd-go", "ci-watcher"} {
 			names[program+"-linux-"+arch] = true
 			names[program+"-linux-"+arch+".sha256"] = true
 		}

@@ -1,16 +1,26 @@
 #!/bin/sh
 # Make this machine a host of an Agents control plane (058, US4).
 #
-#   curl -fsSL [--pinnedpubkey sha256//…] https://<control plane>/v1/install.sh | sh -s -- '<host code>' [name]
+#   curl -fsSL [--pinnedpubkey sha256//…] https://<control plane>/v1/install.sh | sh -s -- '<host code>' [name] [--impl go]
 #
 # Installs the host for this user in ~/.agents-server, and starts it. It connects out to
 # the control plane; nothing needs to reach this machine. Run it again with a new code to
-# join again.
+# join again. --impl go (or AGENTS_HOST_IMPL=go) installs the Go host, a preview (#1136);
+# without it, the Swift host. Both use the same root, so a host that changes keeps its agents.
 set -eu
 
-code=${1:?say the host code the control plane showed}
-name=${2:-$(hostname)}
+code= name= impl=${AGENTS_HOST_IMPL:-swift}
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --impl) impl=${2:?say swift or go after --impl}; shift 2 ;;
+        --impl=*) impl=${1#--impl=}; shift ;;
+        *) if [ -z "$code" ]; then code=$1; elif [ -z "$name" ]; then name=$1; fi; shift ;;
+    esac
+done
+[ -n "$code" ] || { echo "Say the host code the control plane showed." >&2; exit 2; }
+name=${name:-$(hostname)}
 case "$code" in agents-control:2:h:*) ;; *) echo "That is not a host code." >&2; exit 2 ;; esac
+case "$impl" in swift) program=agentsd ;; go) program=agentsd-go ;; *) echo "--impl is swift or go." >&2; exit 2 ;; esac
 
 # The code's own fields: agents-control:2:h:-:<key>:<secret>:<url>:<pin>:<name>
 url=$(printf %s "$code" | cut -d: -f7 | sed 's/%3[Aa]/:/g; s/%2[Ff]/\//g; s/%25/%/g')
@@ -46,9 +56,9 @@ mkdir -p "$d/bin" "$d/root"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-echo "Fetching the host for $arch-linux from $url…"
-fetch "/v1/servers/agentsd-linux-$arch.sha256" "$tmp/sha256"
-fetch "/v1/servers/agentsd-linux-$arch" "$tmp/agentsd"
+echo "Fetching the host ($impl) for $arch-linux from $url…"
+fetch "/v1/servers/$program-linux-$arch.sha256" "$tmp/sha256"
+fetch "/v1/servers/$program-linux-$arch" "$tmp/agentsd"
 sha=$(tr -d ' \n' < "$tmp/sha256")
 echo "$sha  $tmp/agentsd" | sha256sum -c - >/dev/null || { echo "The download did not match its checksum." >&2; exit 1; }
 chmod 700 "$tmp/agentsd"
@@ -74,9 +84,25 @@ if [ -f "$d/root/daemon.lock" ]; then
     [ -n "$old" ] && kill "$old" 2>/dev/null || true
     sleep 1
 fi
-rm -f "$d/root/control-host.json"
-printf %s "$code" > "$d/root/control-join-code"
-chmod 600 "$d/root/control-join-code"
+# Changing between the Swift and the Go host (#1136) on a root already joined to this
+# control plane keeps its membership, so the host keeps its id; the code goes unused.
+# Otherwise, as always, the host enrols again with the new code.
+previous=$(cat "$d/impl" 2>/dev/null || echo swift)
+keep=0
+if [ "$previous" != "$impl" ] && [ -f "$d/root/control-host.json" ]; then
+    key=$(printf %s "$code" | cut -d: -f5 | tr '_-' '/+')
+    while [ $(( ${#key} % 4 )) -ne 0 ]; do key="$key="; done
+    kept=$(sed 's#\\/#/#g' "$d/root/control-host.json" | sed -n 's/.*"controlKey" *: *"\([^"]*\)".*/\1/p')
+    [ -n "$kept" ] && [ "$kept" = "$key" ] && keep=1
+fi
+printf %s "$impl" > "$d/impl"
+if [ $keep = 1 ]; then
+    echo "Changing from the $previous host to the $impl host: it keeps its place in the control plane."
+else
+    rm -f "$d/root/control-host.json"
+    printf %s "$code" > "$d/root/control-join-code"
+    chmod 600 "$d/root/control-join-code"
+fi
 
 unit="$HOME/.config/systemd/user/agents-host.service"
 if command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then

@@ -435,6 +435,7 @@ public actor ControlMethods: ControlHandling {
             record.version = hello.version
             record.platform = hello.platform
             record.machineID = hello.machineID
+            record.implementation = hello.implementation
             if let name = hello.name { record.name = name }
             // Whether a host relays is settled when it enrols (`hosts/announce`) and changed
             // only by an operator (`hosts/setRelay`). A host's own hello never makes it a
@@ -556,6 +557,7 @@ public actor ControlMethods: ControlHandling {
                                            reach: "dialOut", machineID: record.machineID, relay: record.relay)
         listed.signInFrom = record.signInFrom
         listed.gitFrom = record.gitFrom
+        listed.implementation = record.implementation
         let asks = (gitAsks[record.id] ?? [:]).map { DaemonAPI.GitAsk(server: $0.key, from: $0.value.from) }
         listed.gitAsks = asks.isEmpty ? nil : asks.sorted { $0.server < $1.server }
         listed.tunnel = await hooks.tunnel(record.id)

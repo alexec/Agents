@@ -27,3 +27,6 @@ site/
 # scripts/web.sh dist, which Agents Host's build runs first, never committed.
 Web/node_modules/
 Web/dist/
+
+# Go builds for walks and the Go host (#1136).
+Go/out/

@@ -585,6 +585,7 @@ export interface ControlHost {
   gitAsks?: GitAsk[];
   tunnel?: HostTunnel;
   workspace?: HostWorkspace;
+  implementation?: string;
 }
 
 export interface ControlStatus {
@@ -2693,7 +2694,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConfigOption: { required: ["id", "name", "type"], optional: ["description", "category", "currentValue", "options"] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ContinueInProjectRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
-  ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "gitFrom", "gitAsks", "tunnel", "workspace"] },
+  ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "gitFrom", "gitAsks", "tunnel", "workspace", "implementation"] },
   ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "thisMacHost", "projectDetection", "unjoinedTunnels"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },

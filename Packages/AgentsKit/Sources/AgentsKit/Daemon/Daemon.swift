@@ -230,7 +230,7 @@ public final class Daemon: @unchecked Sendable {
         if let control {
             let name = control.name ?? Host.current().localizedName ?? "A Mac"
             let hello = DaemonAPI.HostHello(host: .mac, version: Self.version, platform: Self.platform,
-                                            machineID: MachineID.current, name: name)
+                                            machineID: MachineID.current, name: name, implementation: "swift")
             await join(control, server: server, hello: hello)
         }
         // Last, and on purpose. Picking an agent back up starts a runtime and sends it
