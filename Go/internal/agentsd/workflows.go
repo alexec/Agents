@@ -849,6 +849,9 @@ func (d *Daemon) registerWorkflows() {
 	On(d, wire.CallWorkflowsApprove, func(ctx context.Context, c *Client, r wire.WorkflowApproveRequest) (wire.WorkflowSummary, error) {
 		return d.approveWorkflow(r, true)
 	})
+	On(d, wire.CallWorkflowsRun, func(ctx context.Context, c *Client, r wire.WorkflowRequest) (wire.WorkflowSummary, error) {
+		return d.runWorkflow(r)
+	})
 	On(d, wire.CallWorkflowsDeny, func(ctx context.Context, c *Client, r wire.WorkflowApproveRequest) (wire.WorkflowSummary, error) {
 		return d.approveWorkflow(r, false)
 	})

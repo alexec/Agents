@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -73,6 +74,8 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	d.resumeEventWaits()
 	d.resumeBlocks()
 	d.checkEveryQueue()
+	d.restoreRuns()
+	safe.Go("workflow clock", d.workflowClock)
 	d.watchDisk()
 	return d, nil
 }

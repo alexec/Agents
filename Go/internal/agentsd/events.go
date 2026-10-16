@@ -454,6 +454,7 @@ func (d *Daemon) raise(draft wire.EventDraft) wire.Event {
 	d.eventMu.Unlock()
 	d.tellEvents(&e)
 	d.matchWaits(e)
+	d.fireWorkflows(e)
 	if got := d.event(e.Position); got != nil {
 		return *got
 	}
@@ -628,7 +629,23 @@ func (d *Daemon) raiseAbout(a *wire.Agent, name, sentence string, extra map[stri
 		details[k] = v
 	}
 	d.raise(wire.EventDraft{Name: name, At: now(), Scope: projectScope(projectFolder(a)),
-		Sentence: agentName(a.Title) + " " + sentence, Details: details})
+		Sentence: agentName(a.Title) + " " + sentence, Details: details, ChainDepth: d.chainDepth(a)})
+}
+
+// chainDepth is workflowChainDepth: how deep in a chain of workflows anything fired from
+// news of this agent would be — its own run's, or the agent that started it.
+func (d *Daemon) chainDepth(a *wire.Agent) int64 {
+	for seen := map[wire.UUID]bool{}; a != nil && !seen[a.ID]; {
+		seen[a.ID] = true
+		if a.ChainDepth != nil {
+			return *a.ChainDepth
+		}
+		if a.StartedByAgent == nil {
+			return 0
+		}
+		a = d.Store.Agent(*a.StartedByAgent)
+	}
+	return 0
 }
 
 // agentName is LeaseWords.agentName.
