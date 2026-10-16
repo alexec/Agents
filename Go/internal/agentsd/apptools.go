@@ -67,6 +67,9 @@ func appToolCalls() []appTool {
 		{"show_file", (*Daemon).showFile},
 		{"suggest_next_prompt", (*Daemon).suggestNextPrompt},
 		{"ask_form", (*Daemon).askForm},
+		{"list_sessions", (*Daemon).listSessions},
+		{"read_session", (*Daemon).readSession},
+		{"message_session", (*Daemon).messageSession},
 	}
 }
 

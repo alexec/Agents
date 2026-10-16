@@ -40,6 +40,7 @@ type Daemon struct {
 	eventBook
 	appToolsState
 	eventWaitState
+	messageState
 	attentionState
 	worktreeState
 	recoveryState

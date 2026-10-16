@@ -67,7 +67,12 @@ func now() wire.Date { return wire.DateOf(nowFunc()) }
 
 // record appends an entry to an agent's transcript and tells the clients showing it.
 func (d *Daemon) record(id wire.UUID, kind wire.TranscriptEntryKind) {
-	e := wire.TranscriptEntry{ID: store.NewUUID(), At: now(), Kind: kind}
+	d.recordFrom(id, kind, nil)
+}
+
+// recordFrom is record with the agent that sent the words, for a message between agents.
+func (d *Daemon) recordFrom(id wire.UUID, kind wire.TranscriptEntryKind, sender *wire.MessageSender) {
+	e := wire.TranscriptEntry{ID: store.NewUUID(), At: now(), Kind: kind, Sender: sender}
 	n, err := d.Store.Append(id, e)
 	if err != nil {
 		log.Printf("agent %s: could not record an entry: %v", id, err)
@@ -413,7 +418,20 @@ func (l *live) turn() bool {
 	if len(bs) > 1 {
 		um.Blocks = bs
 	}
-	d.record(l.id, wire.TranscriptEntryKind{UserMessage: um})
+	d.recordFrom(l.id, wire.TranscriptEntryKind{UserMessage: um}, q.Sender)
+	// The loop guard's count: the person starts it again, another agent's message carries
+	// it on, and the app's own words leave it where it was.
+	d.messageMu.Lock()
+	if d.messageHops == nil {
+		d.messageHops = map[wire.UUID]int{}
+	}
+	switch {
+	case from == wire.PromptOriginPerson:
+		delete(d.messageHops, l.id)
+	case from == wire.PromptOriginAgent && q.Hops != nil:
+		d.messageHops[l.id] = int(*q.Hops)
+	}
+	d.messageMu.Unlock()
 	// What was suggested has been answered, taken or typed past; only by the person.
 	if from == wire.PromptOriginPerson {
 		d.change(l.id, func(a *wire.Agent) {
