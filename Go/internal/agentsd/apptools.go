@@ -64,6 +64,9 @@ func appToolCalls() []appTool {
 		{"list_resources", (*Daemon).listResources},
 		{"wait_for_event", (*Daemon).waitForEvent},
 		{"cancel_wait", (*Daemon).cancelWait},
+		{"show_file", (*Daemon).showFile},
+		{"suggest_next_prompt", (*Daemon).suggestNextPrompt},
+		{"ask_form", (*Daemon).askForm},
 	}
 }
 

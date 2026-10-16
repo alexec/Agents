@@ -45,6 +45,21 @@ func (l *live) Elicitation(ctx context.Context, params json.RawMessage) (string,
 		d.record(l.id, wire.TranscriptEntryKind{RuntimeNote: &wire.TranscriptEntryKindRuntimeNote{Value: questionWentUnanswered}})
 		return string(wire.AnswerElicitationRequestActionCancel), nil
 	}
+	r := l.holdForm(ctx, req)
+	if r.action != wire.AnswerElicitationRequestActionAccept {
+		return string(r.action), nil
+	}
+	content := map[string]any{}
+	for k, v := range r.content {
+		content[k] = value(v)
+	}
+	return string(r.action), content
+}
+
+// holdForm puts a form in front of the person and waits for the answer, the form taken
+// down, or ctx: the runtime's own questions and the app's ask_form are held the same way.
+func (l *live) holdForm(ctx context.Context, req wire.ElicitationRequest) elicitationReply {
+	d := l.d
 	pe := &pendingElicitation{req: req, reply: make(chan elicitationReply, 1)}
 	l.mu.Lock()
 	l.elicitations[req.ID] = pe
@@ -54,26 +69,17 @@ func (l *live) Elicitation(ctx context.Context, params json.RawMessage) (string,
 	Broadcast(d, wire.NotifyAgentElicitation, wire.ElicitationNotification{AgentID: l.id, RequestID: req.ID, Request: &req})
 	d.raiseAgentEvent("agent.asked_form", l.id, "is asking for a form to be filled in.", nil)
 	d.reconsider()
-
-	var r elicitationReply
 	select {
-	case r = <-pe.reply:
+	case r := <-pe.reply:
+		return r
 	case <-ctx.Done():
 		// The runtime went (closeQuestionsOfAGoneRuntime): nothing to say to it.
 		if l.take(req.ID) != nil {
 			d.record(l.id, wire.TranscriptEntryKind{RuntimeNote: &wire.TranscriptEntryKindRuntimeNote{Value: questionWentUnanswered}})
 			d.formDown(l.id, req.ID)
 		}
-		return string(wire.AnswerElicitationRequestActionCancel), nil
+		return cancelled()
 	}
-	if r.action != wire.AnswerElicitationRequestActionAccept {
-		return string(r.action), nil
-	}
-	content := map[string]any{}
-	for k, v := range r.content {
-		content[k] = value(v)
-	}
-	return string(r.action), content
 }
 
 // take removes a pending form, and is nil when it has gone already.
