@@ -66,7 +66,7 @@ extension EnvironmentValues {
 /// panes, and nothing of the main scene's sidebar. The main scene's selection is not
 /// touched by it.
 ///
-/// It follows the session: archived, it says so and offers Bring Back, as the main
+/// It follows the session: archived, it says so and offers Unarchive, as the main
 /// scene's chat does; deleted, it says that instead of showing an empty chat.
 struct PoppedChatScene: View {
     @Environment(RemoteModel.self) private var model

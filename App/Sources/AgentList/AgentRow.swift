@@ -270,7 +270,7 @@ struct AgentRow: View {
                     .disabled(isActing)
             }
             if agent.state == .archived {
-                Button("Bring Back") { Task { await model.unarchive(agent.id) } }
+                Button("Unarchive") { Task { await model.unarchive(agent.id) } }
                 // Gone for good (#398), asked first; the daemon says why not when it cannot.
                 Button("Delete…", role: .destructive) { deleting = true }
             } else {

@@ -18,7 +18,7 @@ public enum SidebarItem: Hashable, Sendable {
     /// One of the project's pinned pages (#159), by its path in the project, under the
     /// project's row and above its sessions.
     case pin(String, in: ProjectKey)
-    /// A project's archived sessions and workflows, as a page (#495), with Bring Back.
+    /// A project's archived sessions and workflows, as a page (#495), with Unarchive.
     case archive(ProjectKey)
     case spending
     /// The tokens the work used, and the token limits (#956): Cost's figures in tokens.

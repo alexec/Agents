@@ -11,7 +11,7 @@ Two ways to put an agent down, each keeping its whole conversation:
 - **Stop** ends what it is doing now. The chat stays where it is, and you can tell it what
   to do next.
 - **Archive** puts away a chat you are done with. It folds out of sight under **Archived sessions**.
-  It can be brought back.
+  It can be unarchived.
 
 An agent that has finished can also archive itself. Where that needs your approval, you approve it with one click.
 
@@ -44,8 +44,8 @@ An agent that has finished can also archive itself. Where that needs your approv
 2. If the agent worked in a worktree the app made, and everything there is committed,
    archiving also removes the worktree. See
    [Start an agent in its own worktree](start-in-a-worktree.md).
-3. To bring it back, open **Archived**, then right-click the card and choose **Bring Back**.
-   On iPhone and iPad, open **Archived**, open the chat, and choose **Bring Back** from
+3. To unarchive it, open **Archived**, then right-click the card and choose **Unarchive**.
+   On iPhone and iPad, open **Archived**, open the chat, and choose **Unarchive** from
    the **Actions** menu.
 
 **Approve archiving a chat**
@@ -65,7 +65,7 @@ partly done one stays under **Needs you**. Nothing is hidden until you approve i
    Mac's row; on the Remote and the web page it is in the row's menu and its swipe. Each
    row is approved on its own; there is no button that archives them all.
 3. To keep the chat instead, send it a prompt. That drops it. So does a later turn
-   that ends wanting you: with a question, stuck, blocked or crashed. Bringing back an
+   that ends wanting you: with a question, stuck, blocked or crashed. Unarchiving an
    archived chat does not bring the mark back.
 
 A workflow's run whose workflow allows it to archive itself, and a helper in a project
@@ -84,11 +84,11 @@ where agents may archive their helpers, are archived without your approval, if t
 | Asks for your attention | No | Never |
 | Worktree | Kept | Removed if everything in it is committed |
 | Afterwards | | Deleted after 30 days, or now with **Delete…** |
-| Comes back by | Sending a prompt | **Bring Back** |
+| Comes back by | Sending a prompt | **Unarchive** |
 
 ## Deleting archived chats
 
-An archived chat, including its labels and their owners, is kept whole and can be brought back or branched from for **30 days**.
+An archived chat, including its labels and their owners, is kept whole and can be unarchived or branched from for **30 days**.
 After that it is **deleted**: its conversation and record are removed, and nothing is left of
 it. An event or a chat that named it just says "another agent".
 
@@ -101,7 +101,7 @@ it. An event or a chat that named it just says "another agent".
 - A chat whose worktree still has changes that are not committed or merged is kept until they
   are, and **Delete…** says why it cannot go yet. So is one a workflow run still belongs to.
   One you have open is kept from the 30 days, but **Delete…** still works on it.
-- To keep a chat, bring it back.
+- To keep a chat, unarchive it.
 - To change how long, or to keep archived chats until you delete them, see **Settings ▸
   General ▸ Archived agents** in the [settings reference](../reference/settings.md).
 

@@ -5,7 +5,7 @@
 // Chosen, it opens its page in the chat's place, as the window's list does (#98). Its actions are in
 // its right-click / menu-key menu, as a session row's are (#151): Run Now, Approve or Deny on This
 // Host while it waits for its OK, Pin (#432) and, under Pinned, Move Up and Down, Turn Off or On
-// (#100), Archive or Bring Back (#260).
+// (#100), Archive or Unarchive (#260).
 import { useSignal } from "@preact/signals";
 import type { WorkflowSummary } from "../protocol/generated";
 import type { Store } from "../model/store";
@@ -65,12 +65,12 @@ export function RunNow({ store, host, summary, disabled, wide }: {
 }
 
 /** What a workflow row's menu offers, in the window's order (ProjectWorkRows.swift `WorkflowListRow`). */
-export type WorkflowAction = "open" | "bringBack" | "approve" | "deny" | "runNow" | "pin" | "unpin" | "moveUp" | "moveDown"
+export type WorkflowAction = "open" | "unarchive" | "approve" | "deny" | "runNow" | "pin" | "unpin" | "moveUp" | "moveDown"
   | "turnOff" | "turnOn" | "archive" | "delete";
 
 export function workflowActions(summary: WorkflowSummary, pinned: boolean, pinnedAt?: string[]): WorkflowAction[] {
   const actions: WorkflowAction[] = ["open"];
-  if (summary.isArchived) return [...actions, "bringBack", "delete"];
+  if (summary.isArchived) return [...actions, "unarchive", "delete"];
   if (isUnapproved(summary)) {
     if (canBeApproved(summary)) actions.push("approve");
     // Not on this host, without archiving it everywhere (#391).
@@ -86,7 +86,7 @@ export function workflowActions(summary: WorkflowSummary, pinned: boolean, pinne
 }
 
 const words: Record<WorkflowAction, string> = {
-  open: "Open", bringBack: "Bring Back", approve: "Approve", deny: "Deny on This Host", runNow: "Run Now",
+  open: "Open", unarchive: "Unarchive", approve: "Approve", deny: "Deny on This Host", runNow: "Run Now",
   pin: "Pin", unpin: "Unpin", moveUp: "Move Up", moveDown: "Move Down", turnOff: "Turn Off", turnOn: "Turn On",
   archive: "Archive", delete: "Delete…",
 };
@@ -111,7 +111,7 @@ function workflowMenu(store: Store, host: string, summary: WorkflowSummary, disa
   };
   const run: Record<WorkflowAction, () => void> = {
     open: onPick,
-    bringBack: () => void store.setWorkflowArchived(host, summary, false),
+    unarchive: () => void store.setWorkflowArchived(host, summary, false),
     approve: () => void store.approveWorkflow(host, summary),
     deny: () => void store.denyWorkflow(host, summary),
     runNow: () => void store.runWorkflow(host, summary),

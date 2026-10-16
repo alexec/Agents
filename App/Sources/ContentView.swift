@@ -231,9 +231,9 @@ struct ContentView: View {
                     Button {
                         Task { await model.unarchive(agent.id) }
                     } label: {
-                        Label("Bring Back", systemImage: "tray.and.arrow.up")
+                        Label("Unarchive", systemImage: "tray.and.arrow.up")
                     }
-                    .help("Bring this session back from the archive (⌥⌘⌫)")
+                    .help("Unarchive this session (⌥⌘⌫)")
                 } else {
                     Button {
                         Task { await model.archive(agent.id, andLeave: true) }

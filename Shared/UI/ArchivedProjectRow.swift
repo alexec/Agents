@@ -1,9 +1,9 @@
 import AgentsKitCore
 import SwiftUI
 
-/// An archived project, with when it was put away, Bring Back and Delete…: a row of the
+/// An archived project, with when it was put away, Unarchive and Delete…: a row of the
 /// sidebar's Archived projects fold on the Mac and on the Remote (#343). Named as a live
-/// project's row is, `server:Project` on a server (#677). What Bring Back does is the
+/// project's row is, `server:Project` on a server (#677). What Unarchive does is the
 /// app's: each brings the project back through its own host and opens it. Delete… is
 /// the app's too: each asks first, and deletes through its host.
 struct ArchivedProjectRow: View {
@@ -12,7 +12,7 @@ struct ArchivedProjectRow: View {
     let label: String
     /// Its host is not answering, so there is nobody to bring it back.
     var isDisabled = false
-    let bringBack: () async -> Void
+    let unarchive: () async -> Void
     /// Ask to delete it (#677). The asking and the deleting are the app's.
     let delete: () -> Void
 
@@ -27,8 +27,8 @@ struct ArchivedProjectRow: View {
                 }
             }
             Spacer()
-            Button("Bring Back") {
-                Task { await bringBack() }
+            Button("Unarchive") {
+                Task { await unarchive() }
             }
             #if os(macOS)
             .buttonStyle(.link)
@@ -40,8 +40,8 @@ struct ArchivedProjectRow: View {
             .disabled(isDisabled)
         }
         .contextMenu {
-            Button("Bring Back") {
-                Task { await bringBack() }
+            Button("Unarchive") {
+                Task { await unarchive() }
             }
             .disabled(isDisabled)
             Divider()
@@ -50,8 +50,8 @@ struct ArchivedProjectRow: View {
         }
         #if os(iOS)
         .swipeActions(edge: .leading) {
-            Button("Bring Back") {
-                Task { await bringBack() }
+            Button("Unarchive") {
+                Task { await unarchive() }
             }
             .tint(Paper.accent)
             .disabled(isDisabled)

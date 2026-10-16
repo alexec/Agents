@@ -22,7 +22,7 @@ extension WorkflowSummary {
         var lines: [WorkflowStatusLine] = []
         if isArchived {
             lines.append(WorkflowStatusLine(symbol: "archivebox",
-                                            text: "Archived — it will not run until it is brought back",
+                                            text: "Archived — it will not run until it is unarchived",
                                             detail: "Archived workflows count towards neither limit"))
         }
         if let problem = workflow.problem {

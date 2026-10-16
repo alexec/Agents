@@ -123,7 +123,7 @@
 .with-sidebar :is(details.archived, details.smart, details.activity)[open] > summary::before { content: "⌄"; }
 
 /* Archived projects (#343): a heading that folds, as the window's section, and each project in
-   secondary type, when it was put away under it, and Bring Back at its end. */
+   secondary type, when it was put away under it, and Unarchive at its end. */
 .with-sidebar :is(details.archived-projects, details.activity) > summary.sidebar-head-label { margin-left: 0; }
 .with-sidebar .row.archived-project { align-items: baseline; column-gap: 8px; padding: 4px 8px 4px 18px; cursor: default; }
 .with-sidebar .row.archived-project .title { font-weight: 400; opacity: 0.65; }

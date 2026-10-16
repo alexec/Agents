@@ -18,7 +18,7 @@ test("the status card leads with what stops it and ends with the next run", () =
 
 test("an archived one says so first and has no switch line", () => {
   const lines = w.workflowStatusLines({ ...input, isArchived: true });
-  assert.equal(lines[0].text, "Archived — it will not run until it is brought back");
+  assert.equal(lines[0].text, "Archived — it will not run until it is unarchived");
   assert.ok(!lines.some((l) => l.text.startsWith("On") || l.text.startsWith("Off")));
 });
 

@@ -40,7 +40,7 @@ extension DaemonCore {
         let name = "\u{201C}\(target.title ?? "Untitled")\u{201D}"
         guard target.id != caller.id else { throw refusedMessage("that is this session.") }
         guard target.state != .archived else {
-            throw refusedMessage("\(name) is archived. Only the person can bring it back.")
+            throw refusedMessage("\(name) is archived. Only the person can unarchive it.")
         }
         do {
             try refuseToRun(target.id)

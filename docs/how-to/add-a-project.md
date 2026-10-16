@@ -57,9 +57,9 @@ chats that need no project. See [Chat without a project](chat-without-a-project.
    The project moves under **Archived** at the bottom of the list, with when you archived
    it. Its folder, its agents and their conversations are kept, and its workflows stop
    running until it comes back.
-3. To bring it back, open **Archived** and click **Bring Back** beside the project.
+3. To unarchive it, open **Archived** and click **Unarchive** beside the project.
 
-The **chat** project can be archived too. It stays archived until you bring it back, and
+The **chat** project can be archived too. It stays archived until you unarchive it, and
 **New Chat** offers to.
 
 There is no separate way to remove a project: archive it, and delete the folder in Finder

@@ -653,7 +653,7 @@ export function workflowStatusLines(s: WorkflowSummary, now = new Date()): Statu
   const w = s.workflow;
   const lines: StatusLine[] = [];
   if (s.isArchived) {
-    lines.push({ glyph: "▣", text: "Archived — it will not run until it is brought back", detail: "Archived workflows count towards neither limit" });
+    lines.push({ glyph: "▣", text: "Archived — it will not run until it is unarchived", detail: "Archived workflows count towards neither limit" });
   }
   if (w.problem) {
     const needs = "unreadable" in w.problem;

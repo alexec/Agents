@@ -74,7 +74,7 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
     /// the project to every clone and host.
     public var enabled: Bool?
     /// Archived, from the file's `archived: true` (#125). Archive writes the line and
-    /// Bring Back takes it out; `nil` is a file that does not say, which is not archived.
+    /// Unarchive takes it out; `nil` is a file that does not say, which is not archived.
     public var archived: Bool?
     /// Machine ids allowed to run this workflow (#317). `nil` or empty is every host,
     /// which is a file that does not say. Each id is a `MachineID`: a Mac's hardware

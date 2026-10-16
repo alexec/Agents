@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// A swipe action that moves its own row: Archive and Bring Back (#74).
+/// A swipe action that moves its own row: Archive and Unarchive (#74).
 ///
 /// AppKit runs the swipe's closing animation on the row view after the button is
 /// pressed, and lays its buttons out once more when that animation ends. If the row has

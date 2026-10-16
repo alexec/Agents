@@ -128,7 +128,7 @@ now** is there.
 
 **Unpin** is in the same places. The pin is kept in the project's `.agents/pins.json`, so it
 lasts through a restart and every client sees it. Archiving a workflow unpins it, and
-bringing it back does not pin it again.
+unarchiving it does not pin it again.
 
 **Turn it off**
 
@@ -138,9 +138,9 @@ bringing it back does not pin it again.
   **Run now** still does. Switch it back on to have it run again.
 - Archive it: on the Mac, swipe the row left with two fingers, right-click it and choose
   **Archive**, or click **Archive** on its page. It stays listed under **Archived workflows** and
-  does not run until you click **Bring Back**. The file is kept.
+  does not run until you click **Unarchive**. The file is kept.
 - Both write the workflow's own file: off adds `enabled: false` and archive adds
-  `archived: true`, and turning it back on or bringing it back takes the line out. That
+  `archived: true`, and turning it back on or unarchiving it takes the line out. That
   is a change in your project you may commit, and it is how the choice reaches your other
   clones, Macs and servers. Commit it if they should have it too.
 - To remove it for good, delete its file. **Show in Finder** on the row's menu finds it.

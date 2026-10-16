@@ -59,8 +59,8 @@ between hosts.
 
 **No chat project** opens instead of a chat, with the reason:
 
-- **The chat project on this Mac is archived.** You archived it. Choose **Unarchive** to
-  bring it back and start the chat. While it is archived, the app leaves it archived.
+- **The chat project on this Mac is archived.** You archived it. Choose **Unarchive**:
+  it is unarchived and the chat starts. While it is archived, the app leaves it archived.
 - **This Mac has no personal home folder.** The copy of Agents you are running was started on
   a scratch root, which never touches your real home. Set `AGENTS_PERSONAL_HOME` for that
   copy to give it one.

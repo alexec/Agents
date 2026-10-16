@@ -215,7 +215,7 @@ struct RemoteChatView: View {
             if let agent, sizeClass == .regular {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     if agent.state == .archived {
-                        BringBackAgentButton(agent: agent)
+                        UnarchiveAgentButton(agent: agent)
                     } else {
                         PinAgentButton(agent: agent)
                         // A scene of its own stays, saying it is archived (#888).
@@ -458,7 +458,7 @@ private struct ChatMenu: View {
                 }
             } else {
                 Divider()
-                Button("Bring Back", systemImage: "tray.and.arrow.up") {
+                Button("Unarchive", systemImage: "tray.and.arrow.up") {
                     Task { await model.unarchive(agent.id) }
                 }
                 .disabled(model.isStale(agent))

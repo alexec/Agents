@@ -77,7 +77,7 @@ struct WorkflowSwitchFileTests {
         #expect(on.isEnabled && on.awaitingApproval == nil)
     }
 
-    @Test func archiveWritesTheFileAndBringBackTakesItOut() async throws {
+    @Test func archiveWritesTheFileAndUnarchiveTakesItOut() async throws {
         let (locations, work) = try temporary()
         let url = try write(text, as: "nightly", in: work)
         let core = try await core(locations)

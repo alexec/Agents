@@ -177,7 +177,7 @@ struct ProjectListView: View {
                     // None while folded, as under a folded project (#356).
                     ForEach(showsArchived ? model.archivedProjects : [], id: \.key) { summary in
                         ArchivedProjectRow(summary: summary, label: label(summary),
-                                           bringBack: { await model.unarchiveProject(summary.key) },
+                                           unarchive: { await model.unarchiveProject(summary.key) },
                                            delete: { deletingProject = summary })
                             .appText(.supporting)
                     }
@@ -622,7 +622,7 @@ struct SessionSidebarRow: View {
             // The list's own swipe, in place of the cards' hand-built one.
             .swipeActions(edge: .trailing) {
                 if agent.state == .archived {
-                    SwipeAction("Bring Back") { await model.unarchive(agent.id) }
+                    SwipeAction("Unarchive") { await model.unarchive(agent.id) }
                 } else {
                     SwipeAction("Archive", systemImage: "archivebox") {
                         await model.archive(agent.id, andLeave: true)

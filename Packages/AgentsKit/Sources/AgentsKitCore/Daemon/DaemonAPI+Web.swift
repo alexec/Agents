@@ -168,7 +168,7 @@ public extension DaemonAPI {
                 // Turn Off / Turn On (#100), as the window's and the Remote's rows have it.
                 Row(Method.workflowsEnable, params: WorkflowEnableRequest.self, result: WorkflowSummary.self,
                     kind: .hostRequest),
-                // Approve, and Archive or Bring Back, on the workflow page (#142), as the window's has them.
+                // Approve, and Archive or Unarchive, on the workflow page (#142), as the window's has them.
                 Row(Method.workflowsApprove, params: WorkflowApproveRequest.self, result: WorkflowSummary.self,
                     kind: .hostRequest),
                 // Deny on this host (#391), beside Approve.
@@ -191,7 +191,7 @@ public extension DaemonAPI {
                 Row(Method.projectsClones, params: Empty.self, result: [CloneSummary].self, kind: .hostRequest),
                 // Archive… on a project's menu (#668), as the window's project menu has it.
                 Row(Method.projectsArchive, params: ProjectRequest.self, result: ProjectSummary.self, kind: .hostRequest),
-                // Bring Back in the Archived projects fold (#343), as the window's sidebar has it.
+                // Unarchive in the Archived projects fold (#343), as the window's sidebar has it.
                 Row(Method.projectsUnarchive, params: ProjectRequest.self, result: ProjectSummary.self, kind: .hostRequest),
                 // Delete… on an archived project (#677).
                 Row(Method.projectsDelete, params: ProjectRequest.self, result: Empty.self, kind: .hostRequest),

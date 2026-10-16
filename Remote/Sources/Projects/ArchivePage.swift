@@ -6,7 +6,7 @@ import SwiftUI
 /// there now opens this, so the sidebar is never more than two levels deep (#495).
 ///
 /// The sidebar's own rows, each pushing its chat or page over this one, with their
-/// swipes and long press: Bring Back among them.
+/// swipes and long press: Unarchive among them.
 struct ArchivePage: View {
     @Environment(RemoteModel.self) private var model
     let project: ProjectKey

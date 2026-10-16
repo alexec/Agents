@@ -192,7 +192,7 @@ struct WorkflowListRow: View {
         }
         .swipeActions(edge: .trailing) {
             if summary.isArchived {
-                SwipeAction("Bring Back") { await model.setWorkflowArchived(summary, false) }
+                SwipeAction("Unarchive") { await model.setWorkflowArchived(summary, false) }
             } else {
                 SwipeAction("Archive", systemImage: "archivebox") {
                     await model.setWorkflowArchived(summary, true)
@@ -203,7 +203,7 @@ struct WorkflowListRow: View {
         .contextMenu {
             Button("Open") { open(.workflow(summary.id, in: project)) }
             if summary.isArchived {
-                Button("Bring Back") { Task { await model.setWorkflowArchived(summary, false) } }
+                Button("Unarchive") { Task { await model.setWorkflowArchived(summary, false) } }
             } else if summary.isUnapproved {
                 if summary.canBeApproved {
                     Button("Approve") { Task { await model.approveWorkflow(summary) } }

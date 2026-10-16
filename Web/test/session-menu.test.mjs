@@ -33,8 +33,8 @@ test("a session that asks to be archived offers Archive and Keep Session; there 
   assert.deepEqual(labels("asks to archive when the turn ends, running"), ["Stop", "Rename…", "Branch", "Archive"]);
 });
 
-test("archived offers Bring Back and Delete, and no Branch (#398)", () => {
-  assert.deepEqual(labels("archived"), ["Bring Back", "Delete…"]);
+test("archived offers Unarchive and Delete, and no Branch (#398)", () => {
+  assert.deepEqual(labels("archived"), ["Unarchive", "Delete…"]);
 });
 
 test("Delete asks with the window's words", () => {
@@ -46,16 +46,16 @@ test("Delete asks with the window's words", () => {
 test("given whether it is pinned, Pin or Unpin before Branch and Archive; never on archived (#180, #342)", () => {
   assert.deepEqual(sessionActions(agents["running"], false).map((a) => a.label), ["Stop", "Rename…", "Pin", "Branch", "Archive"]);
   assert.deepEqual(sessionActions(agents["done"], true).map((a) => a.label), ["Mark as Unread", "Rename…", "Unpin", "Branch", "Archive"]);
-  assert.deepEqual(sessionActions(agents["archived"], true).map((a) => a.label), ["Bring Back", "Delete…"]);
+  assert.deepEqual(sessionActions(agents["archived"], true).map((a) => a.label), ["Unarchive", "Delete…"]);
 });
 
-test("the chat's header has Pin and Archive, or Unpin, or only Bring Back when archived (#586)", () => {
+test("the chat's header has Pin and Archive, or Unpin, or only Unarchive when archived (#586)", () => {
   const header = (name, pinned) => headerActions(agents[name], pinned).map((a) => a.label);
   assert.deepEqual(header("running", false), ["Pin", "Archive"]);
   assert.deepEqual(header("done", true), ["Unpin", "Archive"]);
   const archived = Object.keys(agents).find((name) => agents[name].state === "archived");
   assert.ok(archived);
-  assert.deepEqual(header(archived, true), ["Bring Back"]);
+  assert.deepEqual(header(archived, true), ["Unarchive"]);
 });
 
 test("Rename… is offered on every session but an archived one (#751)", () => {

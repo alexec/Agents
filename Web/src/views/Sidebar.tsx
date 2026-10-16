@@ -653,9 +653,9 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
 });
 
 /**
- * An archived project, with when it was put away, Bring Back and Delete…, as the window's
+ * An archived project, with when it was put away, Unarchive and Delete…, as the window's
  * ArchivedProjectRow (#343, #677), named as its live row was: `server:Project` on a server.
- * Brought back, it is a project again and its new-session form opens.
+ * Unarchived, it is a project again and its new-session form opens.
  */
 function ArchivedProjectRow({ store, host, project, down }: {
   store: Store; host: ControlHost; project: ProjectSummary; down: boolean;
@@ -663,22 +663,22 @@ function ArchivedProjectRow({ store, host, project, down }: {
   const folder = project.project.folder;
   const archivedAt = project.project.archivedAt;
   const label = projectLabel(host, project);
-  const bringBack = async () => {
+  const unarchive = async () => {
     if (await store.unarchiveProject(host.id, folder)) go({ host: host.id, project: folder, compose: true });
   };
   const remove = () => {
     if (confirm(`${deleteProjectTitle(label)}\n\n${deleteProjectMessage}`)) void store.deleteProject(host.id, folder);
   };
   const menu: MenuItem[] = [
-    { label: "Bring Back", disabled: down, run: () => void bringBack() },
+    { label: "Unarchive", disabled: down, run: () => void unarchive() },
     { label: "Delete…", disabled: down, run: remove },
   ];
   return (
     <div class="row archived-project" title={folderPath(folder)}
       onContextMenu={(e) => openContextMenu(e, menu)} {...holdForMenu(() => menu)}>
       <span class="title">{label}</span>
-      <button class="link" disabled={down} onClick={() => void bringBack()}
-        onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu); }}>Bring Back</button>
+      <button class="link" disabled={down} onClick={() => void unarchive()}
+        onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu); }}>Unarchive</button>
       {archivedAt !== undefined && <span class="subtitle">Archived {namedRelative(fromWireDate(archivedAt))}</span>}
     </div>
   );
@@ -691,7 +691,7 @@ export function archiveProjectTitle(label: string): string {
 
 /** ProjectArchiveWords.confirmMessage. */
 export const archiveProjectMessage = "It moves to Archived projects with its sessions, and its workflows stop. "
-  + "Bring Back returns it. Its folder and files are not touched.";
+  + "Unarchive returns it. Its folder and files are not touched.";
 
 /** DeletionWords.projectConfirmTitle: "Delete “devbox:Agents”?". */
 export function deleteProjectTitle(label: string): string {

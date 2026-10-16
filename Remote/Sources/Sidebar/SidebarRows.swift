@@ -146,11 +146,11 @@ struct SidebarSessionRow: View {
                 PinAgentButton(agent: agent).tint(Paper.accent)
             }
         }
-        // Archive or Bring Back, and Mark as Read or Unread, from the trailing edge. A long
+        // Archive or Unarchive, and Mark as Read or Unread, from the trailing edge. A long
         // swipe archives, as in Mail.
         .swipeActions(edge: .trailing, allowsFullSwipe: agent.state != .archived) {
             if agent.state == .archived {
-                BringBackAgentButton(agent: agent)
+                UnarchiveAgentButton(agent: agent)
             } else {
                 ArchiveAgentButton(agent: agent).tint(.gray)
                 if agent.state == .finished {
@@ -290,7 +290,7 @@ struct SidebarWorkflowRow: View {
         }
         .swipeActions(edge: .trailing) {
             if summary.isArchived {
-                Button("Bring Back", systemImage: "arrow.uturn.backward") {
+                Button("Unarchive", systemImage: "arrow.uturn.backward") {
                     Task { await model.setWorkflowArchived(summary, false) }
                 }
             } else {
@@ -302,7 +302,7 @@ struct SidebarWorkflowRow: View {
         }
         .contextMenu {
             if summary.isArchived {
-                Button("Bring Back", systemImage: "arrow.uturn.backward") {
+                Button("Unarchive", systemImage: "arrow.uturn.backward") {
                     Task { await model.setWorkflowArchived(summary, false) }
                 }
             } else {
