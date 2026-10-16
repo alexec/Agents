@@ -3474,6 +3474,44 @@
       ],
       "additionalProperties": false
     },
+    "EventDraft": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "scope": {
+          "$ref": "#/definitions/EventScope"
+        },
+        "sentence": {
+          "type": "string"
+        },
+        "details": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "message": {
+          "type": "string"
+        },
+        "chainDepth": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "at",
+        "scope",
+        "sentence",
+        "details",
+        "chainDepth"
+      ],
+      "additionalProperties": false
+    },
     "EventGroup": {
       "type": "string",
       "enum": [
@@ -3526,6 +3564,24 @@
       "required": [
         "agentID",
         "title"
+      ],
+      "additionalProperties": false
+    },
+    "EventRaiseRequest": {
+      "type": "object",
+      "properties": {
+        "draft": {
+          "$ref": "#/definitions/EventDraft"
+        },
+        "consequences": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Consequence"
+          }
+        }
+      },
+      "required": [
+        "draft"
       ],
       "additionalProperties": false
     },
@@ -3707,6 +3763,24 @@
         "archived",
         "archiveRequested"
       ]
+    },
+    "EventsChange": {
+      "type": "object",
+      "properties": {
+        "event": {
+          "$ref": "#/definitions/Event"
+        },
+        "waiting": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WaitingAgent"
+          }
+        }
+      },
+      "required": [
+        "waiting"
+      ],
+      "additionalProperties": false
     },
     "EventsListRequest": {
       "type": "object",
@@ -7602,6 +7676,22 @@
           "additionalProperties": false
         }
       ]
+    },
+    "ServerReachabilityChange": {
+      "type": "object",
+      "properties": {
+        "server": {
+          "type": "string"
+        },
+        "online": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "server",
+        "online"
+      ],
+      "additionalProperties": false
     },
     "SessionLabel": {
       "type": "object",

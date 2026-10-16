@@ -37,6 +37,7 @@ type Daemon struct {
 	settingsState
 	quitState
 	leaseState
+	eventBook
 	attentionState
 	worktreeState
 	recoveryState
@@ -45,6 +46,8 @@ type Daemon struct {
 	// SettingsDir is the person's settings on this host (StoreLocations.personalSettings):
 	// <root>/settings, or $HOME/.agents/settings for a server, as the Swift host's --serve.
 	SettingsDir string
+	// RaiseByHand lets events/raise make an event: an unreleased build on a scratch root.
+	RaiseByHand bool
 }
 
 // New opens the root and registers every method this host serves.
@@ -59,6 +62,7 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 		SettingsDir: filepath.Join(st.Loc.Root, "settings")}
 	d.register()
 	d.loadAttention()
+	d.loadEvents()
 	d.recover()
 	d.watchDisk()
 	return d, nil
@@ -108,6 +112,7 @@ func (d *Daemon) Shutdown() {
 	d.attentionMu.Unlock()
 	d.stopAll()
 	d.clearPickUps()
+	d.stopEvents()
 	d.stopShells()
 }
 

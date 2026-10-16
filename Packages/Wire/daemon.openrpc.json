@@ -1171,6 +1171,44 @@
       }
     },
     {
+      "name": "events/raise",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/EventRaiseRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Event"
+        }
+      }
+    },
+    {
+      "name": "events/server",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ServerReachabilityChange"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Event"
+        }
+      }
+    },
+    {
       "name": "files/browse",
       "tags": [
         {
@@ -3608,6 +3646,20 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/DiskState"
+          }
+        }
+      ]
+    },
+    {
+      "name": "events/changed",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/EventsChange"
           }
         }
       ]

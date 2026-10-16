@@ -479,12 +479,12 @@ func acpBlocks(bs []wire.ContentBlock) []sdk.ContentBlock {
 
 // setState moves a running agent's state, clearing an ending and a report it had.
 func (d *Daemon) setState(id wire.UUID, s wire.AgentState) {
-	changed := false
+	changed, started := false, false
 	d.change(id, func(a *wire.Agent) {
 		if a.State == s {
 			return
 		}
-		changed = true
+		changed, started = true, a.State == wire.AgentStateStarting && s == wire.AgentStateRunning
 		a.State = s
 		a.EndedReason = nil
 		a.ArchivedReason = nil
@@ -494,6 +494,10 @@ func (d *Daemon) setState(id wire.UUID, s wire.AgentState) {
 	})
 	if changed {
 		d.record(id, stateChanged(s, nil))
+	}
+	// Its first turn has begun (042).
+	if started {
+		d.raiseAgentEvent("agent.started", id, "started working.", nil)
 	}
 }
 
@@ -521,6 +525,8 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 		}
 	})
 	d.record(l.id, stateChanged(s, reason(why)))
+	// The event after the record (042): what a waiting agent hears and what the log keeps.
+	d.raiseAgentEnding(l.id, s, reason(why))
 	// What the turn did to the app's own files is looked at as it ends (guardedTurnEnded).
 	d.guardedTurnEnded(l.id)
 }
@@ -738,6 +744,7 @@ func (l *live) Permission(ctx context.Context, p sdk.RequestPermissionRequest) s
 	d.record(l.id, wire.TranscriptEntryKind{PermissionAsked: &wire.TranscriptEntryKindPermissionAsked{Value: req}})
 	d.setState(l.id, wire.AgentStateWaitingOnUser)
 	Broadcast(d, wire.NotifyAgentPermission, wire.PermissionNotification{AgentID: l.id, Request: &req})
+	d.raiseAgentEvent("agent.asked_permission", l.id, "is asking for permission.", nil)
 	d.reconsider()
 	var option string
 	select {

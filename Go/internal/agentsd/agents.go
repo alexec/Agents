@@ -402,6 +402,7 @@ func (d *Daemon) delete(id wire.UUID) error {
 		return &Error{Code: wire.FailureCouldNotSave, Message: "The agent could not be deleted: " + err.Error()}
 	}
 	Broadcast(d, wire.NotifyAgentRemoved, wire.AgentRemovedNotification{AgentID: a.ID})
+	d.raiseAbout(a, "agent.deleted", "was deleted with its conversation.", map[string]string{"because": "person"})
 	d.projectChanged(projectFolder(a))
 	return nil
 }

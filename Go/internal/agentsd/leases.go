@@ -296,6 +296,7 @@ func leaseMinutes(from, to wire.Date) int {
 // came while it was not waiting on a call started again with the news (LeaseWords.wake).
 func (d *Daemon) settle(events []leaseEvent) {
 	for _, e := range events {
+		d.raiseLeaseEvent(e)
 		l := e.lease
 		switch {
 		case e.granted && e.waiter != nil:
