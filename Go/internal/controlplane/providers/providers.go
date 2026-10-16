@@ -1563,9 +1563,16 @@ func (p *Providers) countIdle(host string) {
 		return
 	}
 	minutes := *link.StopWhenIdleMinutes
+	// The timer is made and kept under the lock, and its function reads it under the lock,
+	// so a short idle time cannot fire before `timer` is set.
 	var timer *time.Timer
-	timer = time.AfterFunc(p.timing.IdleMinute*time.Duration(minutes), func() { p.idleFor(host, minutes, timer) })
 	p.mu.Lock()
+	timer = time.AfterFunc(p.timing.IdleMinute*time.Duration(minutes), func() {
+		p.mu.Lock()
+		t := timer
+		p.mu.Unlock()
+		p.idleFor(host, minutes, t)
+	})
 	if old := p.idleTimers[host]; old != nil {
 		old.Stop()
 	}
