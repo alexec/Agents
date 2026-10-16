@@ -4094,9 +4094,12 @@ final class AppModel {
         draftWorktreesGeneration += 1
         let generation = draftWorktreesGeneration
         guard let folder = draftCwd else { return }
-        let answer = (try? await draftHostClient.call(DaemonAPI.Method.worktreesList,
-                                             DaemonAPI.WorktreesListRequest(folder: folder),
-                                             returning: DaemonAPI.WorktreesListResponse.self))
+        // Each of the form's calls with a deadline (#1096): a reply lost on the way from a
+        // server is a failure the form asks again for, not a wait for ever.
+        let answer = (try? await draftHostClient.callWithin(StartPageAsks.patience(for: DaemonAPI.Method.worktreesList),
+                                                            DaemonAPI.Method.worktreesList,
+                                                            DaemonAPI.WorktreesListRequest(folder: folder),
+                                                            returning: DaemonAPI.WorktreesListResponse.self))
             ?? .notARepository
         guard generation == draftWorktreesGeneration else { return }
         draftWorktrees = answer
@@ -4109,9 +4112,10 @@ final class AppModel {
     /// offers none, and the choice is not drawn.
     func loadDraftPersonas() async {
         guard let folder = draftCwd else { return }
-        let listed = (try? await draftHostClient.call(DaemonAPI.Method.personasList,
-                                                         DaemonAPI.PersonasListRequest(folder: folder),
-                                                         returning: [Persona].self)) ?? []
+        let listed = (try? await draftHostClient.callWithin(StartPageAsks.patience(for: DaemonAPI.Method.personasList),
+                                                            DaemonAPI.Method.personasList,
+                                                            DaemonAPI.PersonasListRequest(folder: folder),
+                                                            returning: [Persona].self)) ?? []
         guard folder == draftCwd else { return }
         draftPersonas = listed
         if let draftPersona, !listed.contains(where: { $0.id == draftPersona && $0.problem == nil }) {
@@ -4179,10 +4183,11 @@ final class AppModel {
         letGo(draft: draftID)
         draftID = nil
         do {
-            let response = try await draftHostClient.call(DaemonAPI.Method.agentsOptions,
-                                                 DaemonAPI.OptionsRequest(runtimeID: runtimeID, cwd: cwd,
-                                                                          mcpServers: draftServers),
-                                                 returning: DaemonAPI.OptionsResponse.self)
+            let response = try await draftHostClient.callWithin(StartPageAsks.patience(for: DaemonAPI.Method.agentsOptions),
+                                                                DaemonAPI.Method.agentsOptions,
+                                                                DaemonAPI.OptionsRequest(runtimeID: runtimeID, cwd: cwd,
+                                                                                         mcpServers: draftServers),
+                                                                returning: DaemonAPI.OptionsResponse.self)
             // An answer for a folder or runtime the user has since moved away from is
             // not an answer to the question now being asked — and its runtime is one
             // nobody will talk to.

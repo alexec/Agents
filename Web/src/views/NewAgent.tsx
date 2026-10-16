@@ -107,6 +107,8 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   const personas = useSignal<Persona[]>([]);
   const persona = useSignal<string | undefined>(undefined);
   const pendingPersona = useRef<Persona | undefined>(undefined);
+  /** The project the personas came for, when they came: asked again once the host answers if not (#1096). */
+  const personasFor = useRef("");
   /** A new worktree a view named (#834), or a branch it named (#837), made the place once the folder is
    *  known to be a repository. */
   const offeredWorktree = useRef<Where | undefined>(undefined);
@@ -135,7 +137,8 @@ export function NewAgent({ store, host, folder, projectName, down }: {
     persona.value = undefined;
     pendingPersona.current = undefined;
     personas.value = [];
-    void store.personas(host, folder).then((list) => (personas.value = list));
+    personasFor.current = "";
+    askPersonas();
     void store.worktrees(host, folder).then((list) => {
       worktrees.value = (list?.worktrees ?? []).filter((w) => !w.isProjectFolder);
       branches.value = list?.branches ?? [];
@@ -153,6 +156,17 @@ export function NewAgent({ store, host, folder, projectName, down }: {
     kept.value = next;
     keepForm(storage, next);
   };
+
+  // The project's personas. One the host did not answer stays to be asked again, rather than
+  // leaving the page with no Persona row until it is opened again (#1096).
+  function askPersonas() {
+    const key = `${host}|${folderKey(folder)}`;
+    void store.personas(host, folder).then((list) => {
+      if (list === null || key !== `${host}|${folderKey(folder)}`) return;
+      personas.value = list;
+      personasFor.current = key;
+    });
+  }
 
   // A view's agents/start-agent (#834): the form filled in, and nothing started. The person
   // presses Start, or doesn't. A folder that is not a repository keeps its place.
@@ -214,6 +228,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
     const cameBack = reachable && !wasReachable.current;
     wasReachable.current = reachable;
     if (cameBack && form.peek().state !== "ready") asking.value = asking.peek() + 1;
+    if (cameBack && personasFor.current !== `${host}|${folderKey(folder)}`) askPersonas();
   }, [reachable]);
 
   // The correction to a form answered from memory.

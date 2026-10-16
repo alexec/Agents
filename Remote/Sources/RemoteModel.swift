@@ -898,6 +898,7 @@ final class RemoteModel {
     private static let startParts: Set<CatchUpPart> = [.runtimes, .allowances, .modes, .sandbox]
 
     private func openStart(in folder: URL) async {
+        startAsks.opened()
         startRefusal = nil
         startWorktree = nil
         startWorktrees = .notARepository
@@ -906,12 +907,21 @@ final class RemoteModel {
         pendingStartPersona = nil
         startPersonas = []
         Task { await loadStartPersonas(in: folder) }
+        // Each with a deadline, and waited on only when the page has no runtimes to pick
+        // from yet (#1096): one lost reply here used to hold the page on "Asking…" before
+        // it had asked anything, with nothing that would ask again.
+        let listPatience = StartPageAsks.patience(for: DaemonAPI.Method.runtimesList)
         if !startShowsParts {
             startShowsParts = true
-            await showing(Self.startParts)
+            let parts = Task {
+                await DaemonClient.$patience.withValue(listPatience) { await showing(Self.startParts) }
+            }
+            if startRuntimes.isEmpty { await parts.value }
         }
         // A server's list is not one of the parts: asked as its page opens (#977).
-        if startHost != .mac { await refreshServerRuntimes(startHost) }
+        if startHost != .mac {
+            await DaemonClient.$patience.withValue(listPatience) { await refreshServerRuntimes(startHost) }
+        }
         guard startingIn == folder else { return }
         startRuntimeID = pickedStartRuntime
         startPicked = true
@@ -943,12 +953,41 @@ final class RemoteModel {
         Task { await loadStartChoices() }
     }
 
-    /// Back in touch (#1044): a page whose choices failed, or never came, asks again, as
-    /// Try again would, rather than staying dead until the app is killed.
+    /// Back in touch (#1044): a page whose choices, personas or worktrees failed, or never
+    /// came, asks again for each, as Try again would, rather than staying dead until the
+    /// app is killed. A reply lost with the link is one that never came (#1096).
     private func reopenStartChoices() async {
-        guard startPicked, startingIn != nil, !isStarting, startChoicesState != .ready else { return }
+        guard startPicked, let folder = startingIn, !isStarting else { return }
+        let again = startAsks.toAskAgain
+        guard !again.isEmpty else { return }
+        note("start: back in touch; asking again for \(again.map(\.rawValue).sorted().joined(separator: ", "))")
+        if again.contains(.personas) { Task { await loadStartPersonas(in: folder) } }
+        if again.contains(.worktrees) { Task { await loadStartWorktrees(in: folder) } }
+        guard again.contains(.choices) else { return }
         if startRuntimeID == nil { startRuntimeID = pickedStartRuntime }
         await loadStartChoices()
+    }
+
+    /// What the page has been answered since it opened (#1096).
+    @ObservationIgnored private var startAsks = StartPageAsks()
+
+    /// One of the page's own calls (#1096): with a deadline, failed at once when the link
+    /// drops under it, and said in the log with how long it took, so a page that stays on
+    /// "Asking…" can be read from it.
+    private func askForStart<T: Decodable>(_ method: String, _ params: some Encodable & Sendable,
+                                           returning: T.Type) async throws -> T {
+        let began = ContinuousClock.now
+        note("start: \(method) sent")
+        do {
+            // Decoded here: the type's conformance may be this actor's own.
+            let answer = try await client(for: params).callWithin(StartPageAsks.patience(for: method), method, params,
+                                                                  returning: JSONValue.self).decode(T.self)
+            note("start: \(method) answered in \(ContinuousClock.now - began)")
+            return answer
+        } catch {
+            note("start: \(method) failed after \(ContinuousClock.now - began): \(error)")
+            throw error
+        }
     }
 
     /// Try again on the page: with no runtime to ask, the host's list is read again first.
@@ -981,10 +1020,18 @@ final class RemoteModel {
     /// The repository's worktrees for the page. Asked once when it opens, never polled.
     private func loadStartWorktrees(in folder: URL) async {
         let request = DaemonAPI.WorktreesListRequest(folder: folder)
-        let answer = (try? await client(for: request).call(DaemonAPI.Method.worktreesList, request,
-                                                           returning: DaemonAPI.WorktreesListResponse.self))
-            ?? .notARepository
-        guard startingIn == folder else { return }
+        startAsks.asking(.worktrees)
+        let answer: DaemonAPI.WorktreesListResponse
+        do {
+            answer = try await askForStart(DaemonAPI.Method.worktreesList, request,
+                                           returning: DaemonAPI.WorktreesListResponse.self)
+            guard startingIn == folder else { return }
+            startAsks.answered(.worktrees)
+        } catch {
+            // Not a repository until the Mac says otherwise; asked again once it answers.
+            guard startingIn == folder else { return }
+            answer = .notARepository
+        }
         startWorktrees = answer
         // A view's worktree (#834), when there is a repository to make it in.
         if let offered = offeredWorktree, offered.folder == folder {
@@ -993,12 +1040,21 @@ final class RemoteModel {
         }
     }
 
-    /// The project's personas (#760). A host too old to know the method offers none.
+    /// The project's personas (#760). A host too old to know the method offers none; one
+    /// that did not answer is asked again once it does (#1096).
     private func loadStartPersonas(in folder: URL) async {
         let request = DaemonAPI.PersonasListRequest(folder: folder)
-        let listed = (try? await client(for: request).call(DaemonAPI.Method.personasList, request,
-                                                           returning: [Persona].self)) ?? []
+        startAsks.asking(.personas)
+        let listed: [Persona]
+        do {
+            listed = try await askForStart(DaemonAPI.Method.personasList, request, returning: [Persona].self)
+        } catch let error as JSONRPCError where error.isMethodNotFound {
+            listed = []
+        } catch {
+            return
+        }
         guard startingIn == folder else { return }
+        startAsks.answered(.personas)
         startPersonas = listed
     }
 
@@ -1077,6 +1133,7 @@ final class RemoteModel {
         }
         startGeneration += 1
         let generation = startGeneration
+        startAsks.asking(.choices)
         discardStartDraft()
         startOptions = []
         startChosen = displayMirror.preferences[DisplayPreference.startChoices]?.objectValue?[runtimeID]?.objectValue ?? [:]
@@ -1085,8 +1142,8 @@ final class RemoteModel {
         do {
             // Made on the project's own host, where the agent will start (#240).
             let request = DaemonAPI.OptionsRequest(runtimeID: runtimeID, cwd: folder)
-            let response = try await client(for: request).call(DaemonAPI.Method.agentsOptions, request,
-                                                               returning: DaemonAPI.OptionsResponse.self)
+            let response = try await askForStart(DaemonAPI.Method.agentsOptions, request,
+                                                 returning: DaemonAPI.OptionsResponse.self)
             guard generation == startGeneration else { discard(draft: response.draftID, on: host); return }
             startDraftID = response.draftID
             startDraftHost = host
@@ -1125,6 +1182,7 @@ final class RemoteModel {
         }
         startChosen = kept
         startChoicesState = .ready
+        startAsks.answered(.choices)
     }
 
     private func settleStartDraft(_ notification: DaemonAPI.DraftOptionsNotification) {
@@ -1134,6 +1192,7 @@ final class RemoteModel {
             startOptions = []
             startChosen = [:]
             startChoicesState = .failed(failure)
+            startAsks.asking(.choices)
             return
         }
         showStart(notification.options)
