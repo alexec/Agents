@@ -933,9 +933,12 @@ public actor AppService {
         "title": "Ask the person a question",
         "description": """
             Ask me a question or a short form and wait for my answer. Use this when \
-            something is mine to decide — a choice between real alternatives, a missing \
-            credential, anything hard to undo — rather than guessing or ending the turn \
-            with the question in your reply.
+            something is mine to decide — anything hard to undo, spending money or \
+            making an outside account, a restart or an install, a missing credential, \
+            a choice with no clear best answer — rather than guessing or ending the \
+            turn with the question in your reply. When you would mark one answer \
+            recommended and it is easy to undo, do not ask: take it, and write \
+            `Decided: <what>, because <why>.` where I will see it.
 
             Your question reaches me wherever I am, including on my phone, and the call \
             waits until I answer, skip or cancel. Prefer your runtime's own question \

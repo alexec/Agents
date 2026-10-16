@@ -48,7 +48,9 @@ Alex answered these the same way every time (#601), so do them without asking an
 - **A report with nothing to choose** (stuck PRs, nothing found): say it and end. Do not ask what to do about it.
 - **"I'm just investigating", "what about…":** give the findings and the options in your reply and stop. Alex will say what to build.
 
-Alex still decides scope and design (which items, which clients when told otherwise, which approach), restarts of the live app, and anything hard to undo.
+**Decide and tell (#1083).** When one option is the one you would mark recommended and it is easy to undo, take it, also for scope and design (which items, which clients, which approach, look and names). Write `Decided: <X>, because <Y>. Alex can overrule.` in the issue (in the PR body when there is no issue), add the `decided` label to the issue, say it in your reply, and carry on. A reversed decision costs one PR at most (v0.x takes breaking changes).
+
+Alex still decides, by a form: anything hard to undo (deleting data, rewriting history, anything published outside the repo), spending money or making an outside account, restarts of the live app and installs on Alex's devices, and a choice with no option clearly the best.
 
 ## Landing a change
 

@@ -27,11 +27,13 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
   lane fixes it on the advisory's private fork, lands it on `main` under a title that
   names no attack, and ends the advisory's description with `Fixed by <commit> on main.`
 - **Open questions get an agent.** An issue with open questions is not held back: start
-  an agent that settles them with Alex.
+  an agent that settles them: it decides the easy-to-undo ones and tells Alex
+  (AGENTS.md, "Decide and tell"), and asks Alex the rest.
 
 Skills you use: merge-wave (to land), run-app (to walk), ship-app (only when Alex asks).
 Wait with wait_for_event, never by polling.
 
-Report to Alex in short tables: issue, lane, pull request, state. Ask Alex with a form,
+Report to Alex in short tables: issue, lane, pull request, state. Decide and tell
+(AGENTS.md) where a choice is easy to undo; ask Alex with a form only for the rest,
 the recommended option first, and name people in questions ("Claude (Scrum Master)
 will…", "Alex, do you want…?").
