@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"os"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/controlplane-go/internal/store"
 )
@@ -81,4 +83,49 @@ func TestGCPKMSIsWrittenNotRun(t *testing.T) {
 		t.Fatal("gcpkms is not linked in")
 	}
 	t.Logf("gcpkms without credentials: %v", err)
+}
+
+// A remote keeper, Vault's transit (./vault.sh up; eval "$(./vault.sh env)"), through the
+// same envelope: a copy with nothing but the store and the token opens the sealed key, and
+// another transit key refuses it. The token can encrypt and decrypt, not read the key.
+func TestVaultKeeper(t *testing.T) {
+	addr := os.Getenv("AGENTS_TEST_VAULT")
+	if addr == "" {
+		t.Skip("AGENTS_TEST_VAULT is not set (./vault.sh up)")
+	}
+	t.Setenv("VAULT_SERVER_URL", addr)
+	st := store.NewMemory()
+	made := bytes.Repeat([]byte{7}, 32)
+	first, err := ControlKey(ctx, st, "hashivault://cpgo", func() []byte { return made })
+	if err != nil || !bytes.Equal(first, made) {
+		t.Fatal(err)
+	}
+	o, _ := st.Get(ctx, Key)
+	if !strings.Contains(string(o.Data), `"keeper": "hashivault://cpgo"`) || bytes.Contains(o.Data, made) {
+		t.Fatalf("%s", o.Data)
+	}
+	// Another copy: a new keeper, no key of its own to make.
+	again, err := ControlKey(ctx, st, "hashivault://cpgo", func() []byte { t.Fatal("made a second key"); return nil })
+	if err != nil || !bytes.Equal(again, made) {
+		t.Fatal(err)
+	}
+	if _, err := ControlKey(ctx, st, "hashivault://cpgo-other", func() []byte { return nil }); err == nil {
+		t.Fatal("another transit key opened it")
+	} else {
+		t.Logf("another transit key: %v", err)
+	}
+	// A bad token is tried live (REPORT.md stage 9): gocloud's default hashivault opener
+	// reads VAULT_SERVER_URL and VAULT_SERVER_TOKEN once for each process, so a change here
+	// would not be seen.
+}
+
+// A keeper that never answers, and does not heed its context, still ends the call.
+func TestBoundedGivesUp(t *testing.T) {
+	c, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
+	defer cancel()
+	never := make(chan struct{})
+	defer close(never)
+	if _, err := bounded(c, func() ([]byte, error) { <-never; return nil, nil }); err == nil || !strings.Contains(err.Error(), "did not answer") {
+		t.Fatal(err)
+	}
 }

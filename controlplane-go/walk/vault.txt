@@ -1,0 +1,37 @@
+== copy A (53468) stopped; copy B starts on an empty home, no key file
+control.log
+2026/10/16 09:22:34.667970 agents-control[a03085c2]: listening on 0.0.0.0:53079 for https://127.0.0.1:53079
+2026/10/16 09:22:34.668051 agents-control: pin s3L1YjegaezKqg0vv4cCTdEcJtmsmtxAnEH2IcuDT_A
+host uplink connects: before 1, now 2
+2026/10/16 09:22:36.072299 agents-control[a03085c2]: host mac connected
+== copy C: the wrong transit key (cpgo-other)
+C exited
+Code: 400. Errors:
+
+* cipher: message authentication failed
+== copy D: a token that may not use the key
+D exited
+	* invalid token
+
+
+== copy E: Vault stopped
+E still running after 12s
+== copy A again
+2026/10/16 09:23:00.190736 agents-control[24cf9475]: host mac connected
+== copy E: Vault paused (docker pause cpgo-vault), with the 30 s limit
+E still running after 60s
+
+== copy C again, for the new words
+agents-control: the control key: the KMS would not unwrap the data key (sealed by hashivault://cpgo): secrets (code=Unknown): Error making API request.
+== copy A again
+== copy E again, with the KMS calls bounded
+E still running after 60s
+
+== copy A again
+2026/10/16 09:26:54.314291 agents-control[65c9550a]: host mac connected
+== copy E once more, with the keeper closed aside
+E exited after 32 s
+agents-control: the control key: the KMS would not unwrap the data key (sealed by hashivault://cpgo): the KMS did not answer: context deadline exceeded
+
+== copy A again
+2026/10/16 09:28:39.107176 agents-control[e16d0fb2]: host mac connected

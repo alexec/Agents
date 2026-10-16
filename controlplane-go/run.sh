@@ -6,6 +6,7 @@
 #   controlplane-go/run.sh up [slug] [--s3] [--kms] [--lan] [--no-window] [--no-web]
 #        --s3        the store in MinIO (./minio.sh up first), not a folder
 #        --kms       the control plane's key sealed by a local keeper (stage 4)
+#        --vault     sealed by Vault's transit key cpgo instead (stage 9; ./vault.sh up first)
 #        --lan       at this Mac's LAN address, so the agents-devbox container can join
 #        --copies    a second copy on the same store (stage 7): the host joins copy 1, the
 #                    window copy 2, and copy 2 reaches the host through copy 1
@@ -18,10 +19,10 @@ set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$here/.." && pwd)"
 cmd="${1:-up}"; shift || true
-SLUG="cpgo"; S3=0; KMS=0; LAN=0; WINDOW=1; WEB=1; COPIES=0; REST=()
+SLUG="cpgo"; S3=0; KMS=0; VAULT=0; LAN=0; WINDOW=1; WEB=1; COPIES=0; REST=()
 for a in "$@"; do
   case "$a" in
-    --s3) S3=1 ;; --kms) KMS=1 ;; --lan) LAN=1 ;; --no-window) WINDOW=0 ;; --no-web) WEB=0 ;; --copies) COPIES=1 ;;
+    --s3) S3=1 ;; --kms) KMS=1 ;; --vault) KMS=1; VAULT=1 ;; --lan) LAN=1 ;; --no-window) WINDOW=0 ;; --no-web) WEB=0 ;; --copies) COPIES=1 ;;
     --*) REST+=("$a") ;;
     *) SLUG="$a" ;;
   esac
@@ -63,7 +64,11 @@ if [ "$S3" = 1 ]; then
   printf '%s\n' "AGENTS_STORE=s3://cpgo/$SLUG" AGENTS_STORE_ENDPOINT=http://127.0.0.1:19100 AGENTS_STORE_PATH_STYLE=1 \
     AWS_ACCESS_KEY_ID=spike AWS_SECRET_ACCESS_KEY=spike-secret-key AWS_REGION=us-east-1 >"$ROOT/control/store.env"
 fi
-if [ "$KMS" = 1 ]; then
+if [ "$VAULT" = 1 ]; then
+  # A remote KMS: the copy holds a token that may use the transit key, never the key.
+  printf '%s\n' AGENTS_CONTROL_KMS=hashivault://cpgo VAULT_SERVER_URL=http://127.0.0.1:19200 \
+    "VAULT_SERVER_TOKEN=$("$here/vault.sh" token)" >>"$ROOT/control/store.env"
+elif [ "$KMS" = 1 ]; then
   # The local keeper's key, beside the sealed control key: in a real set-up it would be
   # Google Cloud KMS's (gcpkms://…), and this file would not exist.
   [ -f "$ROOT/control/kek" ] || head -c 32 /dev/urandom | base64 >"$ROOT/control/kek"

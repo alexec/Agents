@@ -11,5 +11,5 @@ net=""
 [ -n "$GO_NETWORK" ] && net="--network $GO_NETWORK"
 exec docker run --rm $net -v "$here":/src -v "$cache/gopath":/go -v "$cache/gocache":/root/.cache/go-build \
   -e CGO_ENABLED=0 -e GOOS="${GOOS:-linux}" -e GOARCH="${GOARCH:-arm64}" -e GOFLAGS="${GOFLAGS:-}" \
-  -e AGENTS_TEST_S3 -e AGENTS_STORE_ENDPOINT -e AGENTS_STORE_PATH_STYLE -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_REGION \
+  -e AGENTS_TEST_S3 -e AGENTS_STORE_ENDPOINT -e AGENTS_STORE_PATH_STYLE -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_REGION -e AGENTS_TEST_VAULT -e VAULT_SERVER_TOKEN \
   -w /src golang:1.25 go "$@"
