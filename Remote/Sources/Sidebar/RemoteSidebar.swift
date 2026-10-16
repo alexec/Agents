@@ -639,8 +639,8 @@ private extension View {
 }
 
 /// Settings (#846): Appearance and Sidebar, both kept on this device only, as the window's
-/// Settings panes of the same names and the page's Settings keep theirs. Everything else
-/// follows the Mac.
+/// Settings panes of the same names and the page's Settings keep theirs. Slack (#1009) is
+/// the control plane's. Everything else follows the Mac.
 private struct RemoteSettings: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -656,6 +656,7 @@ private struct RemoteSettings: View {
                 }
                 .paperListRow()
                 SidebarSettingsSection()
+                SlackSettingsSection()
             }
             .scrollContentBackground(.hidden)
             .background(Paper.ground)

@@ -12,7 +12,7 @@ import type {
   ChatProjectState, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, HostJoinStatus, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones, PRsLanded,
-  BuildOutputRemoved, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized,
+  BuildOutputRemoved, ChannelsSet, ChannelsState, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized,
 } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -369,6 +369,13 @@ export class Work {
     this.milestones.value = { ...this.milestones.value, [host]: milestones };
     milestonesSeen.take(milestones);
   }
+  /**
+   * Where the control plane sends agents' questions (#1009): Slack for now. Null until Settings
+   * asks with `channels/get`; then kept by `control/channelsChanged`. It never holds a token,
+   * only whether one is set.
+   */
+  readonly channels = signal<ChannelsState | null>(null);
+
   /** The control plane's machine, and how this Mac's host says its join stands (#666), from `control/status`. */
   readonly plane = signal<{ machineID: string; thisMacHost?: HostJoinStatus | undefined } | null>(null);
   /** Why this Mac's host is quiet, as the window says it (#666), or nil while it is online. */
@@ -1031,6 +1038,10 @@ export class Store extends Work {
         this.kept.value = (params as KeptList | null)?.kept ?? [];
         return;
       }
+      if (method === "control/channelsChanged") {
+        if (params) this.channels.value = params as ChannelsState;
+        return;
+      }
       if (method === "control/keptDelivered") {
         this.keptDelivered.value = params as KeptDelivered;
         return;
@@ -1084,6 +1095,22 @@ export class Store extends Work {
   private async loadKept(): Promise<void> {
     const listed = await this.link.call("hosts/listKept", {}).catch(() => null);
     this.kept.value = listed?.kept ?? [];
+  }
+
+  /** Where questions go (#1009), for Settings; a plane that can't say leaves it as it was. */
+  async loadChannels(): Promise<void> {
+    const state = await this.link.call("channels/get", {}).catch(() => null);
+    if (state) this.channels.value = state;
+  }
+
+  /**
+   * Changes only the fields given (#1009). A failure throws, with a sentence the page can show.
+   * The tokens go only on the wire: they are not logged or kept.
+   */
+  async setChannels(change: ChannelsSet): Promise<ChannelsState> {
+    const state = await this.link.call("channels/set", change);
+    this.channels.value = state;
+    return state;
   }
 
   /** The control plane's status, for this Mac's host notice; a plane that can't say leaves it as it was. */

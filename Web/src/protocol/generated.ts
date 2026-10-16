@@ -457,6 +457,14 @@ export type ChangesUnavailable =
   | { folderGone: Record<string, never> }
   | { failed: { message: string } };
 
+export interface ChannelsSet {
+  slack?: SlackSet;
+}
+
+export interface ChannelsState {
+  slack: SlackState;
+}
+
 export interface ChartHint {
   mark: ChartMark;
   x: string;
@@ -1725,6 +1733,23 @@ export interface ShownFile {
 
 export type SignInWantedReason = "notSignedIn" | "unreadable";
 
+export interface SlackSet {
+  enabled?: boolean;
+  memberID?: string;
+  appToken?: string;
+  botToken?: string;
+}
+
+export interface SlackState {
+  enabled: boolean;
+  memberID: string;
+  appTokenSet: boolean;
+  botTokenSet: boolean;
+  status: string;
+  detail?: string;
+  available: boolean;
+}
+
 export interface SlashCommand {
   name: string;
   description?: string;
@@ -2347,6 +2372,8 @@ export interface Methods {
   "attention/pending": { params: Empty; result: AttentionPending };
   "changes/file": { params: ChangesFileRequest; result: ChangedFileDetail };
   "changes/list": { params: ChangesListRequest; result: ChangesList };
+  "channels/get": { params: Empty; result: ChannelsState };
+  "channels/set": { params: ChannelsSet; result: ChannelsState };
   "clients/forgetSelf": { params: Empty; result: Empty };
   "control/status": { params: Empty; result: ControlStatus };
   "cost/state": { params: Empty; result: CostState };
@@ -2474,6 +2501,8 @@ export const MethodTarget = {
   "attention/pending": "host",
   "changes/file": "host",
   "changes/list": "host",
+  "channels/get": "control",
+  "channels/set": "control",
   "clients/forgetSelf": "control",
   "control/status": "control",
   "cost/state": "host",
@@ -2577,6 +2606,7 @@ export interface Notifications {
   "agents/draftOptions": DraftOptionsNotification;
   "attention/changed": AttentionNotification;
   "clone/changed": CloneNotification;
+  "control/channelsChanged": ChannelsState;
   "control/hostChanged": JSONValue;
   "control/keptChanged": KeptList;
   "control/keptDelivered": KeptDelivered;
@@ -2637,6 +2667,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ChangesFileRequest: { required: ["agentID", "path", "whole"], optional: [] },
   ChangesList: { required: ["files", "git", "reportsEdits"], optional: ["more"] },
   ChangesListRequest: { required: ["agentID"], optional: [] },
+  ChannelsSet: { required: [], optional: ["slack"] },
+  ChannelsState: { required: ["slack"], optional: [] },
   ChartHint: { required: ["mark", "x", "y"], optional: ["color", "title"] },
   CloneNotification: { required: ["clone", "finished"], optional: [] },
   CloneRequest: { required: ["url"], optional: [] },
@@ -2789,6 +2821,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SetUnreadRequest: { required: ["agentID", "unread"], optional: [] },
   ShowFileNotification: { required: ["agentID", "file"], optional: [] },
   ShownFile: { required: ["path"], optional: ["line", "chart"] },
+  SlackSet: { required: [], optional: ["enabled", "memberID", "appToken", "botToken"] },
+  SlackState: { required: ["enabled", "memberID", "appTokenSet", "botTokenSet", "status", "available"], optional: ["detail"] },
   SlashCommand: { required: ["name"], optional: ["description", "inputHint"] },
   StartOptions: { required: ["values", "extraArguments"], optional: [] },
   StartRequest: { required: ["runtimeID", "cwd", "prompt", "attachments", "startOptions", "additionalDirectories", "mcpServers", "labels"], optional: ["draftID", "worktree", "requestID", "sandbox", "persona", "purpose"] },

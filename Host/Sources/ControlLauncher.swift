@@ -153,6 +153,9 @@ enum ControlLauncher {
             // This Mac's host's root: the window's Settings says how its join stands (#113).
             arguments += ["--host-root", paths.hostRoot.path]
             if paths.scratch, ProcessInfo.processInfo.environment["AGENTS_HOST_BONJOUR"] != "1" { arguments.append("--no-bonjour") }
+            // The person's ~/.agents-secrets holds the channels' tokens (#1009); a scratch
+            // set-up keeps its own, in its control home.
+            if !paths.scratch { arguments += ["--secrets-home", NSHomeDirectory()] }
             // Empty, for the control plane to come back to (T127); once it has, it serves.
             if settings.receiving == true { arguments.append("--receive") }
             // Forwarding after a move survives a restart; otherwise this Mac's copy serves.

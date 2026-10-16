@@ -38,8 +38,10 @@ public enum ControlDial {
     /// A WebSocket to `url`, open and upgraded, as lines. The key exchange is the caller's
     /// (`ControlAuth.join`). `origin` is sent as a browser sends it: the web remote's
     /// listener refuses an upgrade without its own (071); tests dial it as a page would.
+    /// `ownPath` dials the URL's own path and query instead of `/v1/connect`: Slack's Socket
+    /// Mode address carries its ticket there (#1009).
     public static func connect(_ url: URL, pin: String? = nil, roots: [NIOSSLCertificate]? = nil,
-                               origin: String? = nil,
+                               origin: String? = nil, ownPath: Bool = false,
                                timeout: TimeAmount = .seconds(10)) async throws -> WebSocketLineTransport {
         guard let scheme = url.scheme?.lowercased(), let host = url.host else {
             throw Failure("\(url) is not an address to dial")
@@ -47,7 +49,7 @@ public enum ControlDial {
         let secure = scheme == "https" || scheme == "wss"
         guard secure || scheme == "http" || scheme == "ws" else { throw Failure("\(url) is not http or https") }
         let port = url.port ?? (secure ? 443 : 80)
-        let path = "/v1/connect"
+        let path = ownPath ? Self.pathAndQuery(url) : "/v1/connect"
         let context = secure ? try tlsContext(pinned: pin != nil, roots: roots) : nil
         let verify: NIOSSLCustomVerificationCallback? = pin.map { want in
             { certificates, promise in
@@ -112,6 +114,14 @@ public enum ControlDial {
         }
         defer { deadline.cancel() }
         return try await opened.futureResult.get()
+    }
+
+    /// `/link/?ticket=…`: the URL's path, `/` when it has none, and its query.
+    static func pathAndQuery(_ url: URL) -> String {
+        let parts = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        let path = parts?.percentEncodedPath ?? ""
+        let query = parts?.percentEncodedQuery.map { "?\($0)" } ?? ""
+        return (path.isEmpty ? "/" : path) + query
     }
 
     static func tlsContext(pinned: Bool, roots: [NIOSSLCertificate]?) throws -> NIOSSLContext {

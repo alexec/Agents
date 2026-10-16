@@ -59,7 +59,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
       <Problem store={store} />
       <div class="columns with-sidebar" aria-busy={down}>
         <Sidebar session={session} store={store} linkDown={down} />
-        {r.settings ? <SettingsPage />
+        {r.settings ? <SettingsPage store={store} />
           : r.activity ? <ActivityPageView store={store} page={r.activity} />
           : r.host && r.session ? <Chat store={store} host={r.host} session={r.session} down={down} />
           : r.host && r.project && project && r.workflow ? (
