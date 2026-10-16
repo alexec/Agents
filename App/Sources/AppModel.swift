@@ -3835,9 +3835,9 @@ final class AppModel {
                         try await client.call(DaemonAPI.Method.agentsTurns, DaemonAPI.TurnsRequest.opening(selection),
                                               returning: TurnsPage.self)
                     },
-                    transcript: { from in
+                    transcript: { from, limit in
                         try await client.call(DaemonAPI.Method.agentsTranscript,
-                                              DaemonAPI.TranscriptRequest(agentID: selection, from: from),
+                                              DaemonAPI.TranscriptRequest(agentID: selection, limit: limit, from: from),
                                               returning: TranscriptPage.self)
                     },
                     describe: { self.describe($0) })
@@ -3885,9 +3885,9 @@ final class AppModel {
                         try await client.call(DaemonAPI.Method.agentsTurns, DaemonAPI.TurnsRequest.opening(id),
                                               returning: TurnsPage.self)
                     },
-                    transcript: { from in
+                    transcript: { from, limit in
                         try await client.call(DaemonAPI.Method.agentsTranscript,
-                                              DaemonAPI.TranscriptRequest(agentID: id, from: from),
+                                              DaemonAPI.TranscriptRequest(agentID: id, limit: limit, from: from),
                                               returning: TranscriptPage.self)
                     },
                     describe: { self.describe($0) })

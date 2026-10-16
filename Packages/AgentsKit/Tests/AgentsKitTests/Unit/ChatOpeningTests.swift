@@ -69,7 +69,7 @@ struct ChatOpeningTests {
         var askedFrom: Int?
         let loaded = try await ChatOpening.load(
             turns: { throw Broken() },
-            transcript: { from in askedFrom = from; return self.page(["last"], firstIndex: 300) },
+            transcript: { from, _ in askedFrom = from; return self.page(["last"], firstIndex: 300) },
             describe: { _ in "the turns are unreadable" })
         #expect(askedFrom == 0)
         #expect(loaded.turnsFailure == "the turns are unreadable")
@@ -86,7 +86,7 @@ struct ChatOpeningTests {
     @Test func aHostWithoutTurnsIsNotAFailure() async throws {
         let loaded = try await ChatOpening.load(
             turns: { throw JSONRPCError.methodNotFound(DaemonAPI.Method.agentsTurns) },
-            transcript: { _ in self.page(["all"]) })
+            transcript: { _, _ in self.page(["all"]) })
         #expect(loaded.turnsFailure == nil)
     }
 
@@ -94,16 +94,75 @@ struct ChatOpeningTests {
         var askedFrom: Int?
         let loaded = try await ChatOpening.load(
             turns: { TurnsPage(turns: [], firstTurn: 3, openStart: 42) },
-            transcript: { from in askedFrom = from; return self.page(["open"], firstIndex: 42) })
+            transcript: { from, _ in askedFrom = from; return self.page(["open"], firstIndex: 42) })
         #expect(askedFrom == 42)
         #expect(loaded.turns.firstTurn == 3)
+    }
+
+    /// The page from a turn's start, as a host answers `from` and `limit`: the last
+    /// `limit` entries, none before `from`.
+    private func tail(of turn: Range<Int>, from: Int, limit: Int) -> TranscriptPage {
+        let first = max(from, turn.upperBound - limit)
+        return TranscriptPage(firstIndex: first, total: turn.upperBound,
+                              entries: (first..<turn.upperBound).map {
+                                  TranscriptEntry(kind: .agentMessage(messageID: nil, text: "\($0)"))
+                              })
+    }
+
+    /// The chat that opened on a phone mid-sentence (#1130): a turn of 42 entries, a
+    /// page of 31, and the ask and the reply's start left on the Mac. The turn comes
+    /// whole, in one more request.
+    @Test func aTurnLongerThanThePageIsTakenWhole() async throws {
+        let turn = 3342..<3384
+        var asked: [Int] = []
+        let loaded = try await ChatOpening.load(
+            limit: 31,
+            turns: { TurnsPage(turns: [], firstTurn: 12, openStart: turn.lowerBound) },
+            transcript: { from, limit in asked.append(limit); return self.tail(of: turn, from: from, limit: limit) })
+        #expect(asked == [31, 42])
+        #expect(loaded.page.firstIndex == turn.lowerBound)
+        #expect(loaded.page.entries.count == turn.count)
+    }
+
+    @Test func aTurnThatFitsIsAskedForOnce() async throws {
+        let turn = 100..<120
+        var asked: [Int] = []
+        let loaded = try await ChatOpening.load(
+            limit: 31,
+            turns: { TurnsPage(turns: [], firstTurn: 1, openStart: turn.lowerBound) },
+            transcript: { from, limit in asked.append(limit); return self.tail(of: turn, from: from, limit: limit) })
+        #expect(asked == [31])
+        #expect(loaded.page.firstIndex == turn.lowerBound)
+    }
+
+    /// Past `wholeTurn` the end of it is enough: the rest comes as the reader scrolls.
+    @Test func aVeryLongTurnStopsAtTheCeiling() async throws {
+        let turn = 0..<5_000
+        var asked: [Int] = []
+        let loaded = try await ChatOpening.load(
+            limit: 31,
+            turns: { TurnsPage(turns: [], firstTurn: 0, openStart: turn.lowerBound) },
+            transcript: { from, limit in asked.append(limit); return self.tail(of: turn, from: from, limit: limit) })
+        #expect(asked == [31, ChatOpening.wholeTurn])
+        #expect(loaded.page.entries.count == ChatOpening.wholeTurn)
+    }
+
+    /// Without turns the page is the end of the whole transcript, not a cut turn.
+    @Test func noTurnsMeansNoSecondAsk() async throws {
+        struct Broken: Error {}
+        var asked: [Int] = []
+        _ = try await ChatOpening.load(
+            limit: 31,
+            turns: { throw Broken() },
+            transcript: { from, limit in asked.append(limit); return self.tail(of: 0..<900, from: from, limit: limit) })
+        #expect(asked == [31])
     }
 
     @Test func aTranscriptThatDoesNotComeThrows() async {
         struct Lost: Error {}
         await #expect(throws: Lost.self) {
             _ = try await ChatOpening.load(turns: { TurnsPage(turns: [], firstTurn: 0, openStart: 0) },
-                                           transcript: { _ in throw Lost() })
+                                           transcript: { _, _ in throw Lost() })
         }
     }
 }

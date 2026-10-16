@@ -3755,12 +3755,13 @@ final class RemoteModel {
         let pageSize = firstPageSize
         do {
             let opening = try await ChatOpening.load(
+                limit: pageSize,
                 turns: {
                     try await client(for: turnsRequest).call(DaemonAPI.Method.agentsTurns, turnsRequest,
                                                              returning: TurnsPage.self)
                 },
-                transcript: { from in
-                    let request = DaemonAPI.TranscriptRequest(agentID: selection, limit: pageSize, from: from)
+                transcript: { from, limit in
+                    let request = DaemonAPI.TranscriptRequest(agentID: selection, limit: limit, from: from)
                     return try await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
                                                                returning: TranscriptPage.self)
                 },
@@ -4415,12 +4416,13 @@ extension RemoteModel {
         let pageSize = firstPageSize
         do {
             let opening = try await ChatOpening.load(
+                limit: pageSize,
                 turns: {
                     try await client(for: turnsRequest).call(DaemonAPI.Method.agentsTurns, turnsRequest,
                                                              returning: TurnsPage.self)
                 },
-                transcript: { from in
-                    let request = DaemonAPI.TranscriptRequest(agentID: id, limit: pageSize, from: from)
+                transcript: { from, limit in
+                    let request = DaemonAPI.TranscriptRequest(agentID: id, limit: limit, from: from)
                     return try await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
                                                                returning: TranscriptPage.self)
                 },
