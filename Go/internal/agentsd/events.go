@@ -453,6 +453,10 @@ func (d *Daemon) raise(draft wire.EventDraft) wire.Event {
 	}
 	d.eventMu.Unlock()
 	d.tellEvents(&e)
+	d.matchWaits(e)
+	if got := d.event(e.Position); got != nil {
+		return *got
+	}
 	return e
 }
 
@@ -489,10 +493,6 @@ func (d *Daemon) event(position int64) *wire.Event {
 func (d *Daemon) tellEvents(e *wire.Event) {
 	Broadcast(d, wire.NotifyEventsChanged, wire.EventsChange{Event: e, Waiting: d.waitingAgents()})
 }
-
-// waitingAgents is the Events page's Waiting now strip. Nothing on this host waits on
-// events yet: event waits come with the app's tools.
-func (d *Daemon) waitingAgents() []wire.WaitingAgent { return []wire.WaitingAgent{} }
 
 // eventGroup is EventSubject.group: the page's capsule for an event's name.
 func eventGroup(name string) (wire.EventGroup, bool) {
@@ -554,6 +554,9 @@ func (d *Daemon) eventsPage(r wire.EventsListRequest) wire.EventsPage {
 }
 
 var eventNameShape = regexp.MustCompile(`^[a-z][a-z_]*\.[a-z][a-z0-9_]*$`)
+
+// serverNameShape is EventCatalogue.isEventName: noun.verbed, whoever raises it.
+var serverNameShape = regexp.MustCompile(`^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$`)
 
 // draftProblem is EventDraft.problem: why a draft cannot be recorded, or "".
 func draftProblem(d wire.EventDraft) string {

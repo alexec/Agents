@@ -28,6 +28,9 @@ const (
 	// beside the types so a Go host can embed them.
 	AppTools   = "Packages/Wire/app-tools.json"
 	GoAppTools = "Go/wire/app-tools.json"
+	// The app's events, as Swift's EventCatalogue has them, copied in the same way.
+	Events   = "Packages/Wire/event-catalogue.json"
+	GoEvents = "Go/wire/event-catalogue.json"
 )
 
 func main() {
@@ -40,7 +43,7 @@ func main() {
 		os.Exit(1)
 	}
 	stale := false
-	for _, path := range []string{GoTypes, GoMethods, TypeScript, GoAppTools} {
+	for _, path := range []string{GoTypes, GoMethods, TypeScript, GoAppTools, GoEvents} {
 		full := filepath.Join(*root, path)
 		current, _ := os.ReadFile(full)
 		if bytes.Equal(current, []byte(files[path])) {
@@ -103,5 +106,10 @@ func generate(root string) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return map[string]string{GoTypes: types, GoMethods: methods, TypeScript: typescript(doc, rpcs), GoAppTools: string(tools)}, nil
+	events, err := read(Events)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]string{GoTypes: types, GoMethods: methods, TypeScript: typescript(doc, rpcs), GoAppTools: string(tools),
+		GoEvents: string(events)}, nil
 }

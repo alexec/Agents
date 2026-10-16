@@ -31,6 +31,7 @@ func (d *Daemon) register() {
 	d.registerProjects()
 	d.registerGuarded()
 	d.registerEvents()
+	d.registerEventWaits()
 	d.registerShells()
 	On(d, wire.CallPermissionsPending, func(ctx context.Context, c *Client, _ wire.Empty) ([]wire.PermissionRequest, error) {
 		return d.pendingPermissions(), nil
@@ -88,6 +89,7 @@ func (d *Daemon) register() {
 		}
 		d.live(r.AgentID).cancel()
 		d.dropLeases(r.AgentID, "holderStopped")
+		d.endWait(r.AgentID, "stopped", false)
 		return wire.Empty{}, nil
 	})
 	On(d, wire.CallAgentsArchive, func(ctx context.Context, c *Client, r wire.AgentRequest) (wire.Empty, error) {
@@ -261,6 +263,7 @@ func (d *Daemon) archive(id wire.UUID) error {
 		d.raiseAgentEvent("agent.archived", id, "was archived.", details)
 	}
 	d.dropLeases(id, "holderArchived")
+	d.endWait(id, "archived", false)
 	// An archived session is not kept pinned (unpinArchived).
 	if a := d.Store.Agent(id); a != nil {
 		d.unpinSession(projectFolder(a), id)

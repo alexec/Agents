@@ -39,6 +39,7 @@ type Daemon struct {
 	leaseState
 	eventBook
 	appToolsState
+	eventWaitState
 	attentionState
 	worktreeState
 	recoveryState
@@ -65,6 +66,7 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	d.loadAttention()
 	d.loadEvents()
 	d.recover()
+	d.resumeEventWaits()
 	d.watchDisk()
 	return d, nil
 }
@@ -115,6 +117,7 @@ func (d *Daemon) Shutdown() {
 	d.clearPickUps()
 	d.stopEvents()
 	d.stopAppTools()
+	d.stopEventWaits()
 	d.stopShells()
 }
 
