@@ -1,0 +1,410 @@
+package hostinstall
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"unicode"
+
+	"github.com/alexec/agents/Go/internal/controlplane/records"
+)
+
+// CodeIssuer is what HostInstall needs of ControlCodes: a one-time host code. url is
+// the address the code names: "" for the control plane's own, or the server's end of a
+// reverse tunnel (#435). The code's text goes to the server. Its id goes in a
+// TunnelRecord: its spend says which host the tunnel carries.
+type CodeIssuer interface {
+	HostCode(ctx context.Context, url string) (text, id string, err error)
+}
+
+// Tunnels is where HostTunnels goes (#435, #610): it holds a reverse tunnel for a
+// server behind a bastion. Nil where this copy holds none.
+type Tunnels interface {
+	// Port is the port on both ends: the server's loopback, and this machine's listener.
+	Port() int
+	// Add is HostTunnels.add: hold a tunnel for a server just installed, at once, so
+	// its first dial finds it.
+	Add(ctx context.Context, record TunnelRecord) error
+}
+
+// TunnelRecord is HostTunnels.Record, stored as v1/tunnels/<id>.json.
+type TunnelRecord struct {
+	ID string `json:"id"`
+	// Destination is as typed: user@host, user@host:port, or a name from the ssh config.
+	Destination string `json:"destination"`
+	Name        string `json:"name"`
+	Port        int    `json:"port"`
+	// Code is the host code's id.
+	Code string  `json:"code"`
+	Host *string `json:"host,omitempty"`
+	// KnownHosts is the server's host key, as trusted at the install, in known_hosts
+	// form. Empty when the person's own known_hosts had it (#610).
+	KnownHosts string        `json:"knownHosts"`
+	Made       records.Stamp `json:"made"`
+}
+
+// Installer is HostInstall: hosts/install (058, US4, T072). The control plane installs
+// the host on a server the person can ssh to, once, and lets go.
+//
+//   - A key in the request lives for this call only: written 0600 into a folder of its
+//     own and given to `ssh -i`. The folder is removed however the call ends. With no
+//     key, ssh logs in as `ssh user@host` would for the person (#413).
+//   - The host key is checked against the person's known_hosts first (#610). A key not
+//     there is shown (needsTrust) and trusted only when its fingerprint comes back. It
+//     goes into the install's own folder, never the person's known_hosts.
+//   - No master connection and no forward are kept (FR-018a). The host starts with a host
+//     code and enrols over its own connection out.
+//   - A server that asks for a tunnel (by default one behind a bastion) is given a code
+//     for its own loopback, and Tunnels holds a reverse tunnel there.
+type Installer struct {
+	Codes CodeIssuer
+	// ServerFolder is ServerFiles.folder: the Linux hosts to copy. "" has none.
+	ServerFolder string
+	// SSH is the ssh to run: "" is AGENTS_SSH, else DefaultSSH.
+	SSH string
+	// ConfigFile is an ssh config for tests, given with -F: "" is AGENTS_SSH_CONFIG,
+	// else the person's own ~/.ssh/config.
+	ConfigFile string
+	// Env is the environment ssh runs with, less this process's own: nil is os.Environ.
+	Env []string
+	// Progress says each step of an install: connect, checkSystem, setUp, started.
+	Progress func(name, step string)
+	// Tunnels may be nil: then a server that wants a tunnel is refused.
+	Tunnels Tunnels
+	// KnownNames are the names of the control plane's hosts, for hosts/detect and
+	// hosts/sshHosts. Nil: none.
+	KnownNames func(ctx context.Context) []string
+}
+
+// Request is HostInstall.Request: the params of hosts/install.
+type Request struct {
+	// Destination is user@host, user@host:port, or a name from the ssh config.
+	Destination string  `json:"destination"`
+	Name        *string `json:"name,omitempty"`
+	// Key is the private key's text, OpenSSH or PEM. Nil or empty: ssh's own choice.
+	Key *string `json:"key,omitempty"`
+	// Trust is the fingerprint the person was shown and trusts, on the second call.
+	Trust *string `json:"trust,omitempty"`
+	// Tunnel says whether the server dials back through an ssh tunnel (#610). Nil: when
+	// ssh reaches it through a bastion.
+	Tunnel *bool `json:"tunnel,omitempty"`
+}
+
+func (i *Installer) sshExecutable() string {
+	if i.SSH != "" {
+		return i.SSH
+	}
+	if s := os.Getenv("AGENTS_SSH"); s != "" {
+		return s
+	}
+	return DefaultSSH
+}
+
+// configFile is HostInstall.configFile: -F and a config file, or nothing for the
+// person's own.
+func (i *Installer) configFile() []string {
+	file := i.ConfigFile
+	if file == "" {
+		file = os.Getenv("AGENTS_SSH_CONFIG")
+	}
+	if file == "" {
+		return nil
+	}
+	return []string{"-F", file}
+}
+
+func (i *Installer) env(keepAgent bool) []string {
+	inherited := i.Env
+	if inherited == nil {
+		inherited = os.Environ()
+	}
+	return environment(keepAgent, inherited)
+}
+
+func (i *Installer) progress(name, step string) {
+	if i.Progress != nil {
+		i.Progress(name, step)
+	}
+}
+
+// Install is hosts/install: params is a Request. The reply is
+// {"needsTrust": fingerprint, "name"} when the host key must be shown first, or
+// {"started": true, "name", "platform", "tunnel"} once the host has started.
+func (i *Installer) Install(ctx context.Context, params json.RawMessage) (any, error) {
+	var request struct {
+		Request
+		Destination *string `json:"destination"`
+	}
+	if len(params) == 0 || json.Unmarshal(params, &request) != nil || request.Destination == nil {
+		return nil, &Failure{Code: InvalidParams, Message: "Say which server."}
+	}
+	request.Request.Destination = *request.Destination
+	return i.install(ctx, request.Request, false)
+}
+
+// Update is hosts/update. The Swift control plane does not do it yet (ControlMethods'
+// default hook), so neither does this.
+func (i *Installer) Update(ctx context.Context, host string) error { return NotHere }
+
+// CheckAgain is hosts/checkAgain. The Swift control plane does nothing for it
+// (ControlMethods' default hook), so neither does this.
+func (i *Installer) CheckAgain(ctx context.Context, host string) error { return nil }
+
+// trimSpaces is trimmingCharacters(in: .whitespaces): spaces and tabs, not newlines.
+func trimSpaces(s string) string {
+	return strings.TrimFunc(s, func(r rune) bool { return r != '\n' && r != '\r' && unicode.IsSpace(r) })
+}
+
+// install is HostInstall.run. The host key, in order (#610):
+//  1. With no fingerprint to trust, ssh logs in against the person's own known_hosts,
+//     with StrictHostKeyChecking=yes. A key there is the one they trust; a changed one
+//     is refused, as ssh refuses it.
+//  2. No key there: it is fetched and its fingerprint returned (needsTrust).
+//  3. With that fingerprint back, the key is fetched again into the install's own
+//     known_hosts, checked against it, and the install goes on with that file.
+//
+// personsKnownHosts: a server found in the ssh config (#429), which ssh has just logged
+// into that way. It never asks.
+func (i *Installer) install(ctx context.Context, request Request, personsKnownHosts bool) (any, error) {
+	if trimSpaces(request.Destination) == "" {
+		return nil, &Failure{Code: InvalidParams, Message: "Say which server."}
+	}
+	var key string
+	if request.Key != nil && strings.TrimSpace(*request.Key) != "" {
+		key = *request.Key
+	}
+	destination := trimSpaces(request.Destination)
+	name := label(destination)
+	if request.Name != nil && trimSpaces(*request.Name) != "" {
+		name = *request.Name
+	}
+
+	// One folder for everything this install touches, gone however the call ends.
+	folder, err := os.MkdirTemp("", "agents-install-")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(folder)
+	keyFile := ""
+	if key != "" {
+		keyFile = filepath.Join(folder, "key")
+		if !strings.HasSuffix(key, "\n") {
+			key += "\n"
+		}
+		if os.WriteFile(keyFile, []byte(key), 0o600) != nil {
+			return nil, &Failure{Code: InternalError, Message: "The key could not be held for the install."}
+		}
+	}
+	knownHosts := filepath.Join(folder, "known_hosts")
+	keyGiven := keyFile != ""
+	config := i.configFile()
+
+	ssh := sshCommand{executable: i.sshExecutable(), name: destination, env: i.env(!keyGiven)}
+	i.progress(name, "connect")
+	trusting := ""
+	if request.Trust != nil && !personsKnownHosts {
+		trusting = *request.Trust
+	}
+	var found *facts
+	if trusting != "" {
+		// The key shown on the first call: fetched again, and used only if it is that one.
+		ssh.options = config
+		file, fingerprint, err := fetchHostKey(ctx, ssh, folder)
+		if err != nil {
+			return nil, words(err, keyGiven)
+		}
+		defer os.Remove(file)
+		if trusting != fingerprint {
+			return map[string]any{"needsTrust": fingerprint, "name": name}, nil
+		}
+		if err := os.Rename(file, knownHosts); err != nil {
+			return nil, err
+		}
+		ssh.options = join(config, options(keyFile, knownHosts))
+		i.progress(name, "checkSystem")
+		if found, err = (installer{ssh}).probe(ctx); err != nil {
+			return nil, words(err, keyGiven)
+		}
+	} else {
+		ssh.options = join(config, options(keyFile, ""))
+		ssh.options = append(ssh.options, personsKnownHostsOptions(ctx, ssh)...)
+		i.progress(name, "checkSystem")
+		found, err = (installer{ssh}).probe(ctx)
+		if p, ok := err.(*Problem); ok && p.Kind == HostKeyUnknown && !personsKnownHosts {
+			fetching := ssh
+			fetching.options = config
+			file, fingerprint, err := fetchHostKey(ctx, fetching, folder)
+			if err != nil {
+				return nil, words(err, keyGiven)
+			}
+			os.Remove(file)
+			return map[string]any{"needsTrust": fingerprint, "name": name}, nil
+		}
+		if err != nil {
+			return nil, words(err, keyGiven)
+		}
+	}
+
+	server := installer{ssh}
+	arch := binarySuffix(found.architecture)
+	binary, ok := binaryFor(arch, i.ServerFolder)
+	if arch == "" || !ok {
+		return nil, &Failure{Code: NotAllowed, Message: name + " is " + found.system + " " +
+			displayArchitecture(found.architecture) + ", which this control plane has no host for."}
+	}
+	i.progress(name, "setUp")
+	if err := server.install(ctx, binary.file, binary.sha256, true); err != nil {
+		return nil, words(err, keyGiven)
+	}
+	if err := server.swapCurrent(ctx, binary.sha256, binary.version, "control plane"); err != nil {
+		return nil, words(err, keyGiven)
+	}
+	// The MCP servers Agents ships (#700), beside agentsd. One that fails to copy leaves
+	// the host without it, not without a host.
+	for _, shipped := range shippedFor(arch, i.ServerFolder) {
+		server.installServer(ctx, shipped.name, shipped.file, shipped.sha256)
+	}
+
+	// A host code, left in the host's root and read once, never on its command line.
+	// Through a tunnel, it names the server's end of the tunnel, which is held from now
+	// so the host's first dial finds it (#435, #610).
+	var code string
+	tunnelled := false
+	wantsTunnel := false
+	if request.Tunnel != nil {
+		wantsTunnel = *request.Tunnel
+	} else {
+		wantsTunnel = throughBastion(ctx, ssh)
+	}
+	if wantsTunnel && i.Tunnels == nil {
+		return nil, &Failure{Code: NotAllowed,
+			Message: "This control plane can’t hold an ssh tunnel: only one on your Mac can. Add the server without one."}
+	}
+	if wantsTunnel {
+		port := i.Tunnels.Port()
+		text, id, err := i.Codes.HostCode(ctx, "https://127.0.0.1:"+strconv.Itoa(port))
+		if err != nil {
+			return nil, err
+		}
+		// Empty: the person's own known_hosts had the key.
+		trusted := ""
+		if trusting != "" {
+			data, _ := os.ReadFile(knownHosts)
+			trusted = string(data)
+		}
+		record := TunnelRecord{ID: newID(), Destination: destination, Name: name, Port: port, Code: id,
+			KnownHosts: trusted, Made: records.Now()}
+		if err := i.Tunnels.Add(ctx, record); err != nil {
+			return nil, err
+		}
+		code = text
+		tunnelled = true
+	} else {
+		text, _, err := i.Codes.HostCode(ctx, "")
+		if err != nil {
+			return nil, err
+		}
+		code = text
+	}
+	if err := server.leaveJoinCode(ctx, code); err != nil {
+		return nil, words(err, keyGiven)
+	}
+	if err := server.startDaemon(ctx, "--control-network", "--host-name", name); err != nil {
+		return nil, words(err, keyGiven)
+	}
+	i.progress(name, "started")
+	// The host enrols over its own connection; control/hostChanged says when it is on.
+	return map[string]any{"started": true, "name": name,
+		"platform": found.system + " " + displayArchitecture(found.architecture), "tunnel": tunnelled}, nil
+}
+
+// newID is UUID().uuidString.lowercased(): a random version 4 UUID, in lower case.
+func newID() string {
+	var b [16]byte
+	rand.Read(b[:])
+	b[6] = b[6]&0x0f | 0x40
+	b[8] = b[8]&0x3f | 0x80
+	h := hex.EncodeToString(b[:])
+	return h[0:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:]
+}
+
+// throughBastion is HostInstall.throughBastion: whether the person's ssh config reaches
+// this server through another machine. A config ssh cannot read is taken as no bastion.
+func throughBastion(ctx context.Context, ssh sshCommand) bool {
+	out, err := ssh.run(ctx, join(ssh.options, ssh.resolveArguments()), "")
+	if err != nil || out.status != 0 {
+		return false
+	}
+	return throughBastionResolved(out.stdout)
+}
+
+// label is HostInstall.label: agents@devbox.lan:2222 is devbox.lan.
+func label(destination string) string {
+	host := destination
+	if at := strings.LastIndex(host, "@"); at >= 0 {
+		host = host[at+1:]
+	}
+	host = strings.TrimPrefix(host, "ssh://")
+	if colon := strings.Index(host, ":"); colon >= 0 {
+		host = host[:colon]
+	}
+	return host
+}
+
+// sayErrors is HostInstall.sayErrors: over a config's LogLevel quiet, which keeps even
+// "Host key verification failed" off standard error (#964).
+var sayErrors = []string{"-o", "LogLevel=error"}
+
+// options is HostInstall.options: what ssh is told besides the person's config. The
+// host key goes into the install's own known_hosts ("" is the person's). A key given
+// is the only one tried; with none, ssh offers what it would for `ssh user@host` (#413).
+func options(keyFile, knownHosts string) []string {
+	var all []string
+	if keyFile != "" {
+		all = append(all, "-i", keyFile, "-o", "IdentitiesOnly=yes", "-o", "IdentityAgent=none")
+	}
+	if knownHosts != "" {
+		all = append(all, "-o", "UserKnownHostsFile="+knownHosts, "-o", "GlobalKnownHostsFile=/dev/null")
+	}
+	all = append(all, "-o", "StrictHostKeyChecking=yes")
+	return append(all, sayErrors...)
+}
+
+// personsKnownHostsOptions is HostInstall.personsKnownHosts: the person's own
+// known_hosts, for a server whose ssh config checks against none (#514).
+func personsKnownHostsOptions(ctx context.Context, ssh sshCommand) []string {
+	out, err := ssh.run(ctx, join(ssh.options, ssh.resolveArguments()), "")
+	if err != nil || out.status != 0 {
+		return nil
+	}
+	return knownHostsOverride(out.stdout)
+}
+
+// knownHostsOverride is HostInstall.knownHostsOverride: from `ssh -G` output, ssh's
+// default known_hosts files when every one it names is /dev/null, otherwise nothing.
+// Checking a key against /dev/null always fails.
+func knownHostsOverride(resolved string) []string {
+	var files []string
+	for _, line := range lines(resolved) {
+		key, value, ok := strings.Cut(line, " ")
+		if !ok || strings.ToLower(key) != "userknownhostsfile" {
+			continue
+		}
+		files = strings.Fields(value)
+		break
+	}
+	if len(files) == 0 {
+		return nil
+	}
+	for _, f := range files {
+		if f != "/dev/null" {
+			return nil
+		}
+	}
+	return []string{"-o", "UserKnownHostsFile=~/.ssh/known_hosts ~/.ssh/known_hosts2"}
+}

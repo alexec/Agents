@@ -488,3 +488,16 @@ func answerHello(l *controllink.Lines, id controllink.Identity, key []byte, at, 
 	}
 	return auth, m.OK, controllink.Check(m.OK, expect)
 }
+
+// hosts/install is answered by the installer, in its words, through the router.
+func TestHostsInstallAnswersInItsWords(t *testing.T) {
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	_, window := p.client("Window")
+	if e := callError(t, window, "", "hosts/install", map[string]string{"destination": " "}); !strings.Contains(e, "Say which server.") {
+		t.Fatal(e)
+	}
+	if e := callError(t, window, "", "hosts/update", map[string]string{"host": "x"}); !strings.Contains(e, "-32009") {
+		t.Fatal(e)
+	}
+	call(t, window, "", "hosts/checkAgain", map[string]string{"host": "x"})
+}
