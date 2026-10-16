@@ -689,10 +689,11 @@ private extension View {
 }
 
 /// Settings (#846): Appearance and Sidebar, both kept on this device only, as the window's
-/// Settings panes of the same names and the page's Settings keep theirs. Slack (#1009) is
-/// the control plane's. Everything else follows the Mac.
+/// Settings panes of the same names and the page's Settings keep theirs. Channels (#1109),
+/// Slack (#1009) first, are the control plane's. Everything else follows the Mac.
 private struct RemoteSettings: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(RemoteModel.self) private var model
 
     var body: some View {
         NavigationStack {
@@ -706,10 +707,18 @@ private struct RemoteSettings: View {
                 }
                 .paperListRow()
                 SidebarSettingsSection()
-                SlackSettingsSection()
+                // Nil from a control plane too old to know channels: no row at all.
+                if model.slack != nil {
+                    Section {
+                        NavigationLink("Channels") { ChannelsSettingsScreen() }
+                            .appText(.supporting)
+                    }
+                    .paperListRow()
+                }
             }
             .scrollContentBackground(.hidden)
             .background(Paper.ground)
+            .task { await model.loadChannels() }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

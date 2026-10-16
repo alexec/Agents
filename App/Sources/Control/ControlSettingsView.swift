@@ -180,13 +180,7 @@ struct ControlOverviewPage: View {
                     Button("Show") { page = .clients }.buttonStyle(.link)
                 }
             }
-            // Nil from a control plane too old to know channels: no section at all.
-            if let slack = control.slack {
-                SharedSectionLabel("Slack")
-                ControlSlackCard(control: control, slack: slack)
-            }
         }
-        .task { await control.refreshChannels() }
     }
 
     private var runningLine: String {

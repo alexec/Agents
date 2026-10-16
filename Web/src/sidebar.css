@@ -170,6 +170,12 @@
   max-width: 420px; padding: 6px 8px; border-bottom: 1px solid var(--paper-rule); }
 .with-sidebar .settings-body select { font: inherit; color: inherit; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-control); }
 .with-sidebar .settings-body .hint { max-width: 420px; font-size: 0.75rem; line-height: 1.45; }
+/* Settings ▸ Channels (#1109): a row is a button that opens the channel's page; its dot is lit when connected. */
+.settings-body .channel-row { width: 100%; font: inherit; color: inherit; text-align: left; background: none; border-width: 0 0 1px; cursor: pointer; }
+.settings-body .channel-row:hover { background: var(--paper-wash); }
+.settings-body .channel-dot { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%;
+  background: var(--paper-rule); vertical-align: 1px; }
+.settings-body .channel-dot.connected { background: var(--tint-vouched); }
 .with-sidebar .event-day { font-size: 0.75rem; font-weight: 600; margin: 14px 8px 4px; opacity: 0.65; }
 .with-sidebar .event-list .event-name { font-family: var(--font-mono); font-size: 0.6875rem; }
 .with-sidebar .event-consequence { display: block; margin-left: 8px; }
