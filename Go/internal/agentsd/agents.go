@@ -57,6 +57,10 @@ func (d *Daemon) registerAgents() {
 		if a == nil {
 			return wire.Agent{}, noSuchAgent()
 		}
+		// Let go of its hold, with no prompt sent: the person sends when they are ready.
+		d.costMu.Lock()
+		delete(d.held, r.AgentID)
+		d.costMu.Unlock()
 		return *a, nil
 	})
 	On(d, wire.CallAgentsSetOption, func(ctx context.Context, c *Client, r wire.SetOptionRequest) ([]wire.ConfigOption, error) {

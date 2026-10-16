@@ -659,6 +659,7 @@ func (d *Daemon) workflowClock() {
 }
 
 func (d *Daemon) workflowTickOnce(at time.Time) {
+	d.noteDay()
 	d.workflowMu.Lock()
 	rec := d.recordsLocked()
 	var since *time.Time
