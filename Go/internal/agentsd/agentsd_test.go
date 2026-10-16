@@ -1,0 +1,154 @@
+package agentsd
+
+import (
+	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/wire"
+)
+
+// conn is a client's end of a connection, in memory.
+type conn struct {
+	in  chan string
+	out chan string
+}
+
+func newConn() *conn                    { return &conn{in: make(chan string, 64), out: make(chan string, 64)} }
+func (c *conn) Write(line string) error { c.out <- line; return nil }
+func (c *conn) In() <-chan string       { return c.in }
+func (c *conn) Close()                  {}
+func (c *conn) Device() string          { return "" }
+
+func (c *conn) call(t *testing.T, id int, method string, params any) json.RawMessage {
+	t.Helper()
+	p, _ := json.Marshal(params)
+	b, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": json.RawMessage(p)})
+	c.in <- string(b)
+	deadline := time.After(5 * time.Second)
+	for {
+		select {
+		case line := <-c.out:
+			var m message
+			json.Unmarshal([]byte(line), &m)
+			if string(m.ID) != strings.TrimSpace(string(mustJSON(id))) {
+				continue // a notification
+			}
+			if m.Error != nil {
+				t.Fatalf("%s: %v", method, m.Error)
+			}
+			return m.Result
+		case <-deadline:
+			t.Fatalf("%s: no answer", method)
+		}
+	}
+}
+
+func mustJSON(v any) []byte { b, _ := json.Marshal(v); return b }
+
+func start(t *testing.T, root string) (*Daemon, *conn) {
+	t.Helper()
+	d, err := New(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := newConn()
+	go d.Accept(c)
+	t.Cleanup(func() { close(c.in) })
+	return d, c
+}
+
+func TestPingAndAnUnknownMethod(t *testing.T) {
+	_, c := start(t, t.TempDir())
+	if r := c.call(t, 1, "daemon/ping", nil); string(r) != `{"ok":true}` {
+		t.Fatalf("ping %s", r)
+	}
+	c.in <- `{"jsonrpc":"2.0","id":2,"method":"pins/list"}`
+	if line := <-c.out; !strings.Contains(line, "-32601") {
+		t.Fatalf("%s", line)
+	}
+}
+
+func TestAPanickingHandlerAnswersAnError(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	d.handlers["boom"] = func(context.Context, *Client, json.RawMessage) (any, error) {
+		var m map[string]int
+		m["x"] = 1
+		return nil, nil
+	}
+	c.in <- `{"jsonrpc":"2.0","id":1,"method":"boom"}`
+	if line := <-c.out; !strings.Contains(line, "-32603") {
+		t.Fatalf("%s", line)
+	}
+	if r := c.call(t, 2, "daemon/ping", nil); string(r) != `{"ok":true}` {
+		t.Fatal("the host stopped serving")
+	}
+}
+
+// A root the Swift host wrote: its agent is listed with its project, and its transcript
+// pages as Swift pages it.
+func TestASwiftRootIsServed(t *testing.T) {
+	root := t.TempDir()
+	fix := filepath.Join("..", "..", "..", "Packages", "AgentsKit", "Tests", "AgentsKitTests", "Fixtures", "legacy-agent")
+	b, _ := os.ReadFile(filepath.Join(fix, "agent.json"))
+	var head struct{ ID string }
+	json.Unmarshal(b, &head)
+	dir := filepath.Join(root, "agents", strings.ToUpper(head.ID))
+	os.MkdirAll(dir, 0o755)
+	os.WriteFile(filepath.Join(dir, "agent.json"), b, 0o644)
+	tb, _ := os.ReadFile(filepath.Join(fix, "transcript.jsonl"))
+	os.WriteFile(filepath.Join(dir, "transcript.jsonl"), tb, 0o644)
+	lines := strings.Count(string(tb), "\n")
+
+	_, c := start(t, root)
+	var agents []wire.Agent
+	json.Unmarshal(c.call(t, 1, "agents/list", map[string]any{"includeArchived": true}), &agents)
+	if len(agents) != 1 || string(agents[0].ID) != strings.ToUpper(head.ID) {
+		t.Fatalf("agents %v", agents)
+	}
+	var projects []wire.ProjectSummary
+	json.Unmarshal(c.call(t, 2, "projects/list", map[string]any{"includeArchived": true}), &projects)
+	if len(projects) != 1 || projects[0].Name == "" {
+		t.Fatalf("projects %+v", projects)
+	}
+	var page wire.TranscriptPage
+	json.Unmarshal(c.call(t, 3, "agents/transcript", map[string]any{"agentID": head.ID, "limit": 10}), &page)
+	if page.Total != int64(lines) || page.FirstIndex != int64(lines-10) || len(page.Entries) != 10 {
+		t.Fatalf("page total %d first %d entries %d (lines %d)", page.Total, page.FirstIndex, len(page.Entries), lines)
+	}
+	json.Unmarshal(c.call(t, 4, "agents/transcript", map[string]any{"agentID": head.ID, "limit": 10, "before": 5}), &page)
+	if page.FirstIndex != 0 || len(page.Entries) != 5 {
+		t.Fatalf("before 5: first %d entries %d", page.FirstIndex, len(page.Entries))
+	}
+}
+
+func TestAddAProject(t *testing.T) {
+	root := t.TempDir()
+	work := filepath.Join(t.TempDir(), "hello")
+	os.Mkdir(work, 0o755)
+	d, c := start(t, root)
+	var s wire.ProjectSummary
+	json.Unmarshal(c.call(t, 1, "projects/add", map[string]any{"folder": "file://" + work}), &s)
+	if s.Name != "hello" || !s.Exists {
+		t.Fatalf("%+v", s)
+	}
+	if ps := d.Store.Projects(); len(ps) != 1 || store.FolderPath(ps[0].Folder) != mustResolve(work) {
+		t.Fatalf("records %+v", ps)
+	}
+	c.in <- `{"jsonrpc":"2.0","id":2,"method":"projects/add","params":{"folder":"file:///no/such/folder"}}`
+	for line := range c.out {
+		if strings.Contains(line, `"id":2`) {
+			if !strings.Contains(line, "-32004") {
+				t.Fatalf("%s", line)
+			}
+			break
+		}
+	}
+}
+
+func mustResolve(p string) string { r, _ := filepath.EvalSymlinks(p); return r }
