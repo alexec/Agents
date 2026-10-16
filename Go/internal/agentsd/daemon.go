@@ -16,9 +16,18 @@ type Daemon struct {
 	Store    *store.Store
 	handlers map[string]Handler
 
+	// Tunneler opens tunnels through the control plane, to a host that lends a sign-in;
+	// nil when this host has no control plane.
+	Tunneler Tunneler
+
 	mu      sync.Mutex
 	clients map[int64]*Client
 	unknown map[string]int
+	lives   map[wire.UUID]*live
+	relays  map[string]*relay
+	sent    map[wire.UUID]bool
+	// agentMu orders every read-change-save of an agent record.
+	agentMu sync.Mutex
 }
 
 // New opens the root and registers every method this host serves.
@@ -27,7 +36,8 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	if err != nil {
 		return nil, err
 	}
-	d := &Daemon{ctx: ctx, Store: st, handlers: map[string]Handler{}, clients: map[int64]*Client{}, unknown: map[string]int{}}
+	d := &Daemon{ctx: ctx, Store: st, handlers: map[string]Handler{}, clients: map[int64]*Client{}, unknown: map[string]int{},
+		lives: map[wire.UUID]*live{}, relays: map[string]*relay{}, sent: map[wire.UUID]bool{}}
 	d.register()
 	return d, nil
 }
@@ -63,5 +73,23 @@ func Broadcast[P any](d *Daemon, n wire.Notification[P], params P) {
 	}
 }
 
-// Shutdown ends what the host runs.
-func (d *Daemon) Shutdown() {}
+// Shutdown ends what the host runs: every runtime it started.
+func (d *Daemon) Shutdown() { d.stopAll() }
+
+// once is true the first time a sendID is seen: a window sends a prompt again for 30 s
+// until it hears it was taken, and it must run once.
+func (d *Daemon) once(sendID *wire.UUID) bool {
+	if sendID == nil {
+		return true
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.sent[*sendID] {
+		return false
+	}
+	if len(d.sent) > 4096 {
+		d.sent = map[wire.UUID]bool{}
+	}
+	d.sent[*sendID] = true
+	return true
+}

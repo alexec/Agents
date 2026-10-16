@@ -221,3 +221,8 @@ func (d *Daemon) ServeSocket(ctx context.Context, path string) error {
 		safe.Go("socket client", func() { d.Accept(sc) })
 	}
 }
+
+func isDir(p string) bool {
+	fi, err := os.Stat(p)
+	return err == nil && fi.IsDir()
+}
