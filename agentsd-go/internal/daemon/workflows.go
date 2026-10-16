@@ -17,6 +17,8 @@ import (
 
 	"github.com/robfig/cron/v3"
 	"gopkg.in/yaml.v3"
+
+	"github.com/alexec/agents/agentsd-go/internal/safe"
 )
 
 // Workflows (WorkflowFile.swift, DaemonCore+Workflows.swift): <project>/.agents/workflows/<id>.md,
@@ -258,11 +260,11 @@ func (d *Daemon) startWorkflows() {
 	}
 	d.wf.cron.Start()
 	d.rescanWorkflows()
-	go func() {
+	safe.Go("workflow rescan", func() {
 		for range time.Tick(15 * time.Second) {
-			d.rescanWorkflows()
+			safe.Catch("workflow rescan", d.rescanWorkflows)
 		}
-	}()
+	})
 }
 
 // rescanWorkflows reads every project's workflows; a new or changed file is told to every client.
@@ -326,7 +328,7 @@ func (d *Daemon) rescanWorkflows() {
 // schedule puts a workflow's triggers on the clock (the lock is held).
 func (d *Daemon) schedule(w *workflow) {
 	add := func(spec string, s *schedule) {
-		id, err := d.wf.cron.AddFunc(spec, func() {
+		id, err := d.wf.cron.AddFunc(spec, safe.Func("workflow "+w.ID+" "+spec, func() {
 			if s != nil && !s.matches(time.Now()) {
 				return
 			}
@@ -335,7 +337,7 @@ func (d *Daemon) schedule(w *workflow) {
 				trigger = map[string]any{"schedule": map[string]any{"_0": *s}}
 			}
 			d.fire(w.Folder, w.ID, map[string]any{"trigger": map[string]any{"_0": trigger}})
-		})
+		}))
 		if err != nil {
 			log.Printf("workflows: %s: %q: %v", w.ID, spec, err)
 			return

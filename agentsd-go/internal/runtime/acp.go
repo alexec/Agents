@@ -18,6 +18,8 @@ import (
 	"time"
 
 	acp "github.com/coder/acp-go-sdk"
+
+	"github.com/alexec/agents/agentsd-go/internal/safe"
 )
 
 // Sink is what the daemon hears from a session.
@@ -78,7 +80,7 @@ func Start(ctx context.Context, l Launch, sink Sink, mcp []acp.McpServer, meta m
 	s := &Session{cmd: cmd, stderr: stderr, done: make(chan struct{})}
 	s.client = &client{sink: sink, dir: l.Dir, terminals: map[string]*terminal{}}
 	s.conn = acp.NewClientSideConnection(s.client, stdin, stdout)
-	go func() { _ = cmd.Wait(); close(s.done) }()
+	safe.Go("runtime wait", func() { _ = cmd.Wait(); close(s.done) })
 
 	ictx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
@@ -158,7 +160,8 @@ type client struct {
 
 var _ acp.Client = (*client)(nil)
 
-func (c *client) RequestPermission(ctx context.Context, p acp.RequestPermissionRequest) (acp.RequestPermissionResponse, error) {
+func (c *client) RequestPermission(ctx context.Context, p acp.RequestPermissionRequest) (_ acp.RequestPermissionResponse, err error) {
+	defer safe.Err("acp RequestPermission", &err)
 	option := c.sink.Permission(ctx, p)
 	if option == "" {
 		return acp.RequestPermissionResponse{Outcome: acp.RequestPermissionOutcome{Cancelled: &acp.RequestPermissionOutcomeCancelled{}}}, nil
@@ -166,7 +169,8 @@ func (c *client) RequestPermission(ctx context.Context, p acp.RequestPermissionR
 	return acp.RequestPermissionResponse{Outcome: acp.RequestPermissionOutcome{Selected: &acp.RequestPermissionOutcomeSelected{OptionId: acp.PermissionOptionId(option)}}}, nil
 }
 
-func (c *client) SessionUpdate(ctx context.Context, n acp.SessionNotification) error {
+func (c *client) SessionUpdate(ctx context.Context, n acp.SessionNotification) (err error) {
+	defer safe.Err("acp SessionUpdate", &err)
 	c.sink.Update(n)
 	return nil
 }
@@ -183,7 +187,8 @@ func (c *client) inside(path string) error {
 	return nil
 }
 
-func (c *client) ReadTextFile(ctx context.Context, p acp.ReadTextFileRequest) (acp.ReadTextFileResponse, error) {
+func (c *client) ReadTextFile(ctx context.Context, p acp.ReadTextFileRequest) (_ acp.ReadTextFileResponse, err error) {
+	defer safe.Err("acp ReadTextFile", &err)
 	if err := c.inside(p.Path); err != nil {
 		return acp.ReadTextFileResponse{}, err
 	}
@@ -208,7 +213,8 @@ func (c *client) ReadTextFile(ctx context.Context, p acp.ReadTextFileRequest) (a
 	return acp.ReadTextFileResponse{Content: content}, nil
 }
 
-func (c *client) WriteTextFile(ctx context.Context, p acp.WriteTextFileRequest) (acp.WriteTextFileResponse, error) {
+func (c *client) WriteTextFile(ctx context.Context, p acp.WriteTextFileRequest) (_ acp.WriteTextFileResponse, err error) {
+	defer safe.Err("acp WriteTextFile", &err)
 	if err := c.inside(p.Path); err != nil {
 		return acp.WriteTextFileResponse{}, err
 	}
@@ -243,7 +249,8 @@ func (t *terminal) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
-func (c *client) CreateTerminal(ctx context.Context, p acp.CreateTerminalRequest) (acp.CreateTerminalResponse, error) {
+func (c *client) CreateTerminal(ctx context.Context, p acp.CreateTerminalRequest) (_ acp.CreateTerminalResponse, err error) {
+	defer safe.Err("acp CreateTerminal", &err)
 	cmd := exec.Command(p.Command, p.Args...)
 	cmd.Dir = c.dir
 	if p.Cwd != nil {
@@ -263,7 +270,7 @@ func (c *client) CreateTerminal(ctx context.Context, p acp.CreateTerminalRequest
 	if err := cmd.Start(); err != nil {
 		return acp.CreateTerminalResponse{}, err
 	}
-	go func() {
+	safe.Go("terminal wait", func() {
 		err := cmd.Wait()
 		code := 0
 		var exit *exec.ExitError
@@ -274,7 +281,8 @@ func (c *client) CreateTerminal(ctx context.Context, p acp.CreateTerminalRequest
 		t.status = &acp.TerminalExitStatus{ExitCode: &code}
 		t.mu.Unlock()
 		close(t.done)
-	}()
+	})
+
 	c.mu.Lock()
 	c.next++
 	id := fmt.Sprintf("term-%d", c.next)
@@ -294,7 +302,8 @@ func (c *client) terminal(id string) (*terminal, error) {
 	return t, nil
 }
 
-func (c *client) TerminalOutput(ctx context.Context, p acp.TerminalOutputRequest) (acp.TerminalOutputResponse, error) {
+func (c *client) TerminalOutput(ctx context.Context, p acp.TerminalOutputRequest) (_ acp.TerminalOutputResponse, err error) {
+	defer safe.Err("acp TerminalOutput", &err)
 	t, err := c.terminal(p.TerminalId)
 	if err != nil {
 		return acp.TerminalOutputResponse{}, err
@@ -304,7 +313,8 @@ func (c *client) TerminalOutput(ctx context.Context, p acp.TerminalOutputRequest
 	return acp.TerminalOutputResponse{Output: string(t.out), ExitStatus: t.status}, nil
 }
 
-func (c *client) WaitForTerminalExit(ctx context.Context, p acp.WaitForTerminalExitRequest) (acp.WaitForTerminalExitResponse, error) {
+func (c *client) WaitForTerminalExit(ctx context.Context, p acp.WaitForTerminalExitRequest) (_ acp.WaitForTerminalExitResponse, err error) {
+	defer safe.Err("acp WaitForTerminalExit", &err)
 	t, err := c.terminal(p.TerminalId)
 	if err != nil {
 		return acp.WaitForTerminalExitResponse{}, err
@@ -319,7 +329,8 @@ func (c *client) WaitForTerminalExit(ctx context.Context, p acp.WaitForTerminalE
 	return acp.WaitForTerminalExitResponse{ExitCode: t.status.ExitCode}, nil
 }
 
-func (c *client) KillTerminal(ctx context.Context, p acp.KillTerminalRequest) (acp.KillTerminalResponse, error) {
+func (c *client) KillTerminal(ctx context.Context, p acp.KillTerminalRequest) (_ acp.KillTerminalResponse, err error) {
+	defer safe.Err("acp KillTerminal", &err)
 	t, err := c.terminal(p.TerminalId)
 	if err != nil {
 		return acp.KillTerminalResponse{}, err
@@ -330,7 +341,8 @@ func (c *client) KillTerminal(ctx context.Context, p acp.KillTerminalRequest) (a
 	return acp.KillTerminalResponse{}, nil
 }
 
-func (c *client) ReleaseTerminal(ctx context.Context, p acp.ReleaseTerminalRequest) (acp.ReleaseTerminalResponse, error) {
+func (c *client) ReleaseTerminal(ctx context.Context, p acp.ReleaseTerminalRequest) (_ acp.ReleaseTerminalResponse, err error) {
+	defer safe.Err("acp ReleaseTerminal", &err)
 	_, _ = c.KillTerminal(ctx, acp.KillTerminalRequest{SessionId: p.SessionId, TerminalId: p.TerminalId})
 	c.mu.Lock()
 	delete(c.terminals, p.TerminalId)

@@ -14,6 +14,8 @@ import (
 	acp "github.com/coder/acp-go-sdk"
 
 	"github.com/alexec/agents/agentsd-go/internal/runtime"
+
+	"github.com/alexec/agents/agentsd-go/internal/safe"
 )
 
 // live is an agent with a runtime behind it.
@@ -119,8 +121,8 @@ func (d *Daemon) startAs(runtimeID, cwd, prompt string, as func(*Agent)) (string
 	}
 	a := &Agent{
 		ID: NewUUID(), RuntimeID: runtimeID, Cwd: folderURL(folderPath(cwd)), State: "starting",
-		Title:        titleFrom(prompt),
-		StartOptions: StartOptions{Values: options, ExtraArguments: []string{}},
+		Title:             titleFrom(prompt),
+		StartOptions:      StartOptions{Values: options, ExtraArguments: []string{}},
 		AdvertisedOptions: json.RawMessage("[]"), AvailableCommands: json.RawMessage("[]"),
 		CreatedAt: Now(), LastActivityAt: Now(),
 	}
@@ -148,7 +150,7 @@ func (l *live) enqueue(text string) {
 	l.running = true
 	l.mu.Unlock()
 	if start {
-		go l.run()
+		safe.Go("agent "+l.id, l.run)
 	}
 }
 
@@ -164,7 +166,11 @@ func (l *live) run() {
 		text := l.queue[0]
 		l.queue = l.queue[1:]
 		l.mu.Unlock()
-		l.turn(text)
+		if v := safe.Catch("turn of "+l.id, func() { l.turn(text) }); v != nil {
+			// The turn's own defers ran; end it so the window does not wait on it.
+			l.d.record(l.id, entry("notice", map[string]any{"_0": map[string]any{"severity": "error", "title": "The host hit a bug", "detail": fmt.Sprint(v)}}))
+			l.d.end(l.id, "stopped", "runtimeError", "")
+		}
 	}
 }
 
@@ -204,14 +210,15 @@ func (l *live) turn(text string) {
 			a.AdvertisedOptions = opts
 		}
 		d.changed(a)
-		go func() {
+		safe.Go("session watch", func() {
 			<-s.Done()
 			l.mu.Lock()
 			if l.session == s {
 				l.session = nil
 			}
 			l.mu.Unlock()
-		}()
+		})
+
 		// The start options the window chose (model, mode) go first.
 		for k, v := range a.StartOptions.Values {
 			if sv, ok := v.(string); ok && sv != "" {

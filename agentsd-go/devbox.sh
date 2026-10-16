@@ -6,14 +6,22 @@
 #   ./devbox.sh log             the host's daemon.log
 #   ./devbox.sh tools           install the pinned Claude and Codex toolsets in ~/.agents-go/tools
 #                               (nothing installs them on a control-plane host today, #1125 report)
-#   ./devbox.sh stop            stop the Go host by its lock pid
+#   ./devbox.sh stop            stop the Go host: its supervisor, then the host, by their lock pids
+#   ./devbox.sh panic <where>   force a panic (handler|goroutine|timer|bare); needs DEBUG_PANIC=1 at deploy
+# The detached host runs under `agentsd supervise`, which starts it again after a crash (#1125).
 set -e
 here=$(cd "$(dirname "$0")" && pwd)
 ssh_() { ssh -p 2222 -o UserKnownHostsFile="$HOME/.cache/agents-devbox/known_hosts" -i "$HOME/.ssh/id_ed25519" agents@127.0.0.1 "$@"; }
 scp_() { scp -q -P 2222 -o UserKnownHostsFile="$HOME/.cache/agents-devbox/known_hosts" -i "$HOME/.ssh/id_ed25519" "$@"; }
 case "$1" in
 log) ssh_ 'tail -n 80 ~/.agents-go/root/daemon.log'; exit ;;
-stop) ssh_ 'R=$HOME/.agents-go/root; [ -f $R/daemon.lock ] && kill $(cat $R/daemon.lock) 2>/dev/null; echo stopped'; exit ;;
+stop) ssh_ 'R=$HOME/.agents-go/root; for l in supervise daemon; do [ -f $R/$l.lock ] && kill $(cat $R/$l.lock) 2>/dev/null; done; echo stopped'; exit ;;
+panic) ssh_ "perl - \$HOME/.agents-go/root/daemon.sock ${2:-handler}" <<'PERL'
+use IO::Socket::UNIX; my $s = IO::Socket::UNIX->new(Peer => $ARGV[0]) or die "no socket: $!";
+my $m = $ARGV[1] eq "count" ? "debug/panics" : "debug/panic";
+print $s qq({"jsonrpc":"2.0","id":1,"method":"$m","params":{"where":"$ARGV[1]"}}\n); print scalar <$s>;
+PERL
+  exit ;;
 tools)
   t="$here/../App/Resources/toolsets"
   scp_ "$t/claude/package.json" agents@127.0.0.1:/tmp/claude-package.json
@@ -41,8 +49,8 @@ scp -q -P 2222 -o UserKnownHostsFile="$HOME/.cache/agents-devbox/known_hosts" -i
   "$here/out/agentsd-linux-arm64" agents@127.0.0.1:/home/agents/agentsd-go.new
 join=""
 if [ "$1" = join ]; then join="--control '$2'"; fi
-ssh_ "set -e; R=\$HOME/.agents-go/root; if [ -f \$R/daemon.lock ]; then kill \$(cat \$R/daemon.lock) 2>/dev/null || true; sleep 1; fi
+ssh_ "set -e; R=\$HOME/.agents-go/root; for l in supervise daemon; do if [ -f \$R/\$l.lock ]; then kill \$(cat \$R/\$l.lock) 2>/dev/null || true; fi; done; sleep 1
   mv ~/agentsd-go.new ~/agentsd-go; chmod 700 ~/agentsd-go
   [ -n \"$join\" ] && rm -f \$R/control-host.json
-  AGENTS_SANDBOX=${SANDBOX:-0} AGENTS_MACHINE_ID=go-devbox ~/agentsd-go --root \$R --serve --detach --control-network $join --host-name 'devbox (Go)'
+  AGENTS_DEBUG_PANIC=${DEBUG_PANIC:-0} AGENTS_SANDBOX=${SANDBOX:-0} AGENTS_MACHINE_ID=go-devbox ~/agentsd-go --root \$R --serve --detach --control-network $join --host-name 'devbox (Go)'
   sleep 2; tail -n 5 \$R/daemon.log"

@@ -20,6 +20,14 @@ Keep the Swift window and the Remote, and check their types against the schema i
   - Two lessons: a Go host needs `recover` around its timers and handlers, and the box needs a supervisor. The Swift host is not immune either, but it would get systemd from the install script.
 - **Not looked at:** the Workflows page for a server project, the terminal pane, the Files pane, and the permission card while it waits. They are in the test note for Alex.
 
+## Since the walk (2026-10-16, before Alex's test)
+
+1. **Robustness: one panic no longer takes the host down.**
+   - `internal/safe` wraps every goroutine, timer, cron job, RPC handler, HTTP handler and ACP client callback that the host starts (35 places). A panic is logged with its stack and counted, and the host goes on. A handler that panics answers `-32603`. A turn that panics ends `stopped`/`runtimeError` with a notice. A panic in the uplink dials again. None of `acp-go-sdk`, `go-sdk` or `robfig/cron` recover by themselves, so this has to be done in the host.
+   - `agentsd supervise`: `--detach` now starts the host under a supervisor (its pid is in `supervise.lock`). A crash (a panic's status 2, or a signal such as SIGKILL) starts the host again after 1 s, doubling to 60 s. A clean exit or SIGTERM stops both, so run-app's `stop.sh` and `devbox.sh stop` work as before.
+   - Proved on the box with `DEBUG_PANIC=1 agentsd-go/devbox.sh` and `devbox.sh panic <where>`: handler, goroutine and timer panics were logged and the same pid went on serving (count 3). Two panics in an unguarded goroutine and one `kill -9` were each restarted (1 s, then 2 s). Tests: `internal/safe/safe_test.go`, `internal/daemon/safe_test.go`.
+   - The supervisor is not systemd: it does not survive a container restart, and nothing starts it at boot. The install script would give systemd on a real box.
+
 ## Numbers
 
 | | Go `agentsd` | Swift `agentsd` |

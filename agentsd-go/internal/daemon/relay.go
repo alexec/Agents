@@ -12,6 +12,8 @@ import (
 	"sync"
 
 	"github.com/alexec/agents/agentsd-go/internal/control"
+
+	"github.com/alexec/agents/agentsd-go/internal/safe"
 )
 
 // Tunneler opens a tunnel to the host that lends a runtime's sign-in.
@@ -81,15 +83,15 @@ func (d *Daemon) offerRelay(o relayOffer) error {
 			return err
 		}
 	}
-	go func() {
+	safe.Go("relay gate", func() {
 		for {
 			c, err := ln.Accept()
 			if err != nil {
 				return
 			}
-			go d.pump(o.Runtime, c)
+			safe.Go("relay pump", func() { d.pump(o.Runtime, c) })
 		}
-	}()
+	})
 	return nil
 }
 
@@ -103,7 +105,7 @@ func (d *Daemon) pump(runtime string, c net.Conn) {
 	}
 	var once sync.Once
 	done := func() { once.Do(func() { t.Close(); c.Close() }) }
-	go func() {
+	safe.Go("relay tunnel", func() {
 		defer done()
 		for line := range t.In() {
 			var s string
@@ -118,7 +120,8 @@ func (d *Daemon) pump(runtime string, c net.Conn) {
 				return
 			}
 		}
-	}()
+	})
+
 	buf := make([]byte, 32<<10)
 	for {
 		n, err := c.Read(buf)

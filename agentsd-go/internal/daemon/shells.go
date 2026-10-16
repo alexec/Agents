@@ -12,6 +12,8 @@ import (
 	"syscall"
 
 	"github.com/creack/pty"
+
+	"github.com/alexec/agents/agentsd-go/internal/safe"
 )
 
 // shell is a person's terminal (ShellSession.swift): $SHELL -l on a pty, its output kept
@@ -60,7 +62,7 @@ func (d *Daemon) startShell(agentID string, number int, folder string, rows, col
 		return nil, &RPCError{Code: -32010, Message: "The shell would not start: " + err.Error()}
 	}
 	s := &shell{agentID: agentID, number: number, folder: folder, cmd: cmd, pty: f, started: Now(), state: liveState()}
-	go s.pump(d)
+	safe.Go("shell pump", func() { s.pump(d) })
 	return s, nil
 }
 

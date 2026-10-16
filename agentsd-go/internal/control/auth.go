@@ -66,8 +66,10 @@ func ParseCode(text string) (*Code, error) {
 // ID is what the holder of the code presents: hex of the secret's first 16 bytes.
 func (c *Code) ID() string { return hex.EncodeToString(c.Secret[:16]) }
 
-func B64URL(s string) ([]byte, error) { return base64.RawURLEncoding.DecodeString(strings.TrimRight(s, "=")) }
-func ToB64URL(b []byte) string       { return base64.RawURLEncoding.EncodeToString(b) }
+func B64URL(s string) ([]byte, error) {
+	return base64.RawURLEncoding.DecodeString(strings.TrimRight(s, "="))
+}
+func ToB64URL(b []byte) string { return base64.RawURLEncoding.EncodeToString(b) }
 
 func hkdf32(ikm, salt, info []byte) []byte {
 	if len(salt) == 0 {

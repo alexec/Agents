@@ -9,6 +9,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/alexec/agents/agentsd-go/internal/safe"
 )
 
 const clientSalt = "agents-control-client-v1"
@@ -89,7 +91,7 @@ func DialClient(ctx context.Context, m *ClientMembership) (*Session, error) {
 		return nil, err
 	}
 	s := &Session{l: l, waiting: map[int64]chan json.RawMessage{}, Notes: make(chan Note, 4096)}
-	go s.read(ctx)
+	safe.Go("client read", func() { s.read(ctx) })
 	return s, nil
 }
 

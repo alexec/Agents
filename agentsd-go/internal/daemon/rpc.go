@@ -15,6 +15,8 @@ import (
 	"sync/atomic"
 
 	"github.com/alexec/agents/agentsd-go/internal/control"
+
+	"github.com/alexec/agents/agentsd-go/internal/safe"
 )
 
 type rpcMessage struct {
@@ -84,7 +86,7 @@ func (d *Daemon) Accept(conn control.Conn) {
 		if m.Method == "" {
 			continue // a reply; nothing here asks clients anything
 		}
-		go d.dispatch(c, m)
+		safe.Go("rpc "+m.Method, func() { d.dispatch(c, m) })
 	}
 }
 
@@ -95,8 +97,8 @@ func (d *Daemon) dispatch(c *Client, m rpcMessage) {
 	if h == nil {
 		d.logUnknown(m.Method, m.Params)
 		err = notFound(m.Method)
-	} else {
-		result, err = h(d.ctx, c, m.Params)
+	} else if v := safe.Catch("rpc "+m.Method, func() { result, err = h(d.ctx, c, m.Params) }); v != nil {
+		err = &RPCError{Code: -32603, Message: fmt.Sprintf("the host hit a bug in %s: %v", m.Method, v)}
 	}
 	if m.ID == nil {
 		return // a notification
@@ -159,14 +161,15 @@ func (d *Daemon) ServeSocket(ctx context.Context, path string) error {
 		return err
 	}
 	os.Chmod(path, 0o600)
-	go func() { <-ctx.Done(); l.Close() }()
+	safe.Go("socket close", func() { <-ctx.Done(); l.Close() })
 	for {
 		c, err := l.Accept()
 		if err != nil {
 			return err
 		}
 		sc := &sockConn{c: c, w: bufio.NewWriter(c), in: make(chan string, 256)}
-		go func() {
+		safe.Go("socket read", func() {
+			defer close(sc.in)
 			r := bufio.NewReaderSize(c, 1<<20)
 			for {
 				line, err := r.ReadString('\n')
@@ -174,11 +177,10 @@ func (d *Daemon) ServeSocket(ctx context.Context, path string) error {
 					sc.in <- line[:len(line)-1]
 				}
 				if err != nil {
-					close(sc.in)
 					return
 				}
 			}
-		}()
-		go d.Accept(sc)
+		})
+		safe.Go("socket client", func() { d.Accept(sc) })
 	}
 }

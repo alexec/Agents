@@ -12,6 +12,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/alexec/agents/agentsd-go/internal/safe"
 )
 
 // Conn is one channel as a daemon client connection: lines in, lines out.
@@ -199,7 +201,7 @@ func (u *Uplink) receive(line string) {
 		if old != nil {
 			old.end(false)
 		}
-		go u.Accept(c)
+		safe.Go("channel", func() { u.Accept(c) })
 	case frame.Close:
 		u.mu.Lock()
 		c := u.channels[*frame.C]

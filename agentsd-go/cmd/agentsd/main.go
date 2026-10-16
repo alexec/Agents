@@ -14,10 +14,12 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/alexec/agents/agentsd-go/internal/control"
 	"github.com/alexec/agents/agentsd-go/internal/daemon"
 	"github.com/alexec/agents/agentsd-go/internal/demo"
+	"github.com/alexec/agents/agentsd-go/internal/safe"
 	"github.com/alexec/agents/agentsd-go/internal/sandbox"
 )
 
@@ -29,6 +31,10 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(126)
 		}
+		return
+	}
+	if len(os.Args) > 1 && os.Args[1] == "supervise" {
+		supervise(os.Args[2:])
 		return
 	}
 	if len(os.Args) > 1 && os.Args[1] == "mcp-demo" {
@@ -69,13 +75,15 @@ func main() {
 			}
 		}
 		logf, _ := os.OpenFile(filepath.Join(*root, "daemon.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
-		cmd := exec.Command(os.Args[0], args...)
+		// The detached host runs under `agentsd supervise`, which starts it again after a crash.
+		self, _ := os.Executable()
+		cmd := exec.Command(self, append([]string{"supervise"}, args...)...)
 		cmd.Stdout, cmd.Stderr = logf, logf
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 		if err := cmd.Start(); err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf("agentsd started, pid %d\n", cmd.Process.Pid)
+		fmt.Printf("agentsd started under its supervisor, pid %d\n", cmd.Process.Pid)
 		return
 	}
 	if !isTerminal() {
@@ -104,11 +112,11 @@ func main() {
 			return sandbox.Argv(self, sandbox.For(runtimeID, dir), argv)
 		}
 	}
-	go func() {
+	safe.Go("socket", func() {
 		if err := d.ServeSocket(ctx, filepath.Join(*root, "daemon.sock")); err != nil {
 			log.Printf("socket: %v", err)
 		}
-	}()
+	})
 
 	name := *hostName
 	if name == "" {
@@ -144,7 +152,12 @@ func main() {
 		up := &control.Uplink{Root: *root, Member: member, Private: private, Hello: hello, Accept: d.Accept}
 		d.SetTunneler(up)
 		d.HostID = member.Host
-		go up.Run(ctx)
+		safe.Go("uplink", func() {
+			// A panic in the uplink would leave the host up but offline: dial again.
+			for ctx.Err() == nil && safe.Catch("uplink", func() { up.Run(ctx) }) != nil {
+				time.Sleep(time.Second)
+			}
+		})
 	}
 	log.Printf("agentsd (go) %s on %s, root %s", version, platform(), *root)
 	<-ctx.Done()

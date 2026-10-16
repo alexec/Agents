@@ -13,7 +13,7 @@ type Date float64
 
 const appleEpoch = 978307200
 
-func Now() Date                { return FromTime(time.Now()) }
+func Now() Date                 { return FromTime(time.Now()) }
 func FromTime(t time.Time) Date { return Date(float64(t.UnixNano())/1e9 - appleEpoch) }
 func (d Date) Time() time.Time {
 	return time.Unix(0, int64((float64(d)+appleEpoch)*1e9))

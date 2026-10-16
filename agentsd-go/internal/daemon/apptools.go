@@ -11,6 +11,8 @@ import (
 
 	acp "github.com/coder/acp-go-sdk"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/alexec/agents/agentsd-go/internal/safe"
 )
 
 // appTools is the app's own MCP server, `agents`, served on loopback with streamable HTTP
@@ -50,7 +52,7 @@ func (d *Daemon) StartAppTools() error {
 		}
 		hosted.ServeHTTP(w, r)
 	}))
-	go http.Serve(ln, mux)
+	safe.Go("app tools", func() { http.Serve(ln, safe.Handler("app tools", mux)) })
 	d.appTools = e.serversFor
 	d.toolsPort = e.port
 	log.Printf("app tools: http://127.0.0.1:%d/mcp/agents", e.port)

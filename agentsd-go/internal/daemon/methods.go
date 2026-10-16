@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/alexec/agents/agentsd-go/internal/safe"
 )
 
 func decode[T any](params json.RawMessage) (T, error) {
@@ -37,6 +39,7 @@ func (d *Daemon) once(sendID string) bool {
 }
 
 func (d *Daemon) register() {
+	d.debugMethods()
 	d.Handle("daemon/ping", func(ctx context.Context, c *Client, p json.RawMessage) (any, error) {
 		return map[string]any{"ok": true}, nil
 	})
@@ -68,7 +71,7 @@ func (d *Daemon) register() {
 			out = append(out, *d.summary(pr))
 		}
 		// The window learns a server's workflows only from workflow/changed.
-		go func() { time.Sleep(300 * time.Millisecond); d.tellWorkflows(c) }()
+		safe.Go("tell workflows", func() { time.Sleep(300 * time.Millisecond); d.tellWorkflows(c) })
 		return out, nil
 	})
 	d.Handle("projects/add", func(ctx context.Context, c *Client, p json.RawMessage) (any, error) {
@@ -85,7 +88,7 @@ func (d *Daemon) register() {
 		s := d.summary(d.store.AddProject(folderURL(path)))
 		d.Broadcast("project/changed", s)
 		if d.wf != nil {
-			go d.rescanWorkflows()
+			safe.Go("workflow rescan", d.rescanWorkflows)
 		}
 		return s, nil
 	})
