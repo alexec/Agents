@@ -20,8 +20,8 @@ struct AllowanceBar: View {
     }
 
     private func tint(_ used: Double) -> Color {
-        if reading.spent || used >= 1 { return StateTint.failure.color ?? .red }
-        if reading.nearlySpent || used >= 0.8 { return StateTint.attention.color ?? .orange }
-        return .accentColor
+        if reading.spent || used >= 1 { return StateTint.failure.color ?? Paper.accent }
+        if reading.nearlySpent || used >= 0.8 { return StateTint.attention.color ?? Paper.accent }
+        return Paper.accent
     }
 }
