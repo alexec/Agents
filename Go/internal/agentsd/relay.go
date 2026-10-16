@@ -14,6 +14,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controllink"
 
 	"github.com/alexec/agents/Go/internal/safe"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // Tunneler opens a tunnel to the host that lends a runtime's sign-in.
@@ -31,27 +32,20 @@ type relay struct {
 	ln      net.Listener
 }
 
-type relayOffer struct {
-	Runtime       string `json:"runtime"`
-	SocketPath    string `json:"socketPath"`
-	CACertificate string `json:"caCertificate"`
-	StandIn       string `json:"standIn"`
-}
-
 func (d *Daemon) relayFor(runtime string) *relay {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return d.relays[runtime]
 }
 
-func (d *Daemon) offerRelay(o relayOffer) error {
+func (d *Daemon) offerRelay(o wire.RelayOffer) error {
 	if d.Tunneler == nil {
 		return &Error{Code: CodeServer, Message: "this host has no control plane to tunnel through"}
 	}
 	dir := filepath.Join(d.Store.Loc.Root, "runtimes")
 	os.MkdirAll(dir, 0o700)
 	ca := filepath.Join(dir, o.Runtime+"-relay-ca.pem")
-	if err := os.WriteFile(ca, []byte(o.CACertificate), 0o600); err != nil {
+	if err := os.WriteFile(ca, []byte(o.CaCertificate), 0o600); err != nil {
 		return err
 	}
 	d.mu.Lock()

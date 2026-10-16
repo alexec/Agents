@@ -393,4 +393,3 @@ func (t *tail) say() string {
 }
 
 var _ io.Writer = (*tail)(nil)
-

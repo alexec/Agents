@@ -6209,6 +6209,30 @@
       },
       "additionalProperties": false
     },
+    "RelayOffer": {
+      "type": "object",
+      "properties": {
+        "runtime": {
+          "type": "string"
+        },
+        "socketPath": {
+          "type": "string"
+        },
+        "caCertificate": {
+          "type": "string"
+        },
+        "standIn": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtime",
+        "socketPath",
+        "caCertificate",
+        "standIn"
+      ],
+      "additionalProperties": false
+    },
     "RememberedOptionsRequest": {
       "type": "object",
       "properties": {

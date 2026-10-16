@@ -43,17 +43,12 @@ func (d *Daemon) register() {
 		return d.runtimeStatuses(), nil
 	})
 	// relay/offer: a sign-in lent by another host (056, T091), from the window's lend.
-	// Not in the OpenRPC document yet.
-	d.handlers["relay/offer"] = func(ctx context.Context, c *Client, raw json.RawMessage) (any, error) {
-		var o relayOffer
-		if err := json.Unmarshal(raw, &o); err != nil || o.Runtime == "" {
-			return nil, Invalid("relay/offer: %v", err)
+	On(d, wire.CallRelayOffer, func(ctx context.Context, c *Client, o wire.RelayOffer) (wire.Empty, error) {
+		if o.Runtime == "" {
+			return wire.Empty{}, Invalid("relay/offer: no runtime")
 		}
-		if err := d.offerRelay(o); err != nil {
-			return nil, err
-		}
-		return wire.Empty{}, nil
-	}
+		return wire.Empty{}, d.offerRelay(o)
+	})
 
 	On(d, wire.CallProjectsList, func(ctx context.Context, c *Client, r wire.ProjectsListRequest) ([]wire.ProjectSummary, error) {
 		return d.projects(r.IncludeArchived), nil
