@@ -1390,6 +1390,127 @@
         }
       ]
     },
+    "CatchUpLeases": {
+      "type": "object",
+      "properties": {
+        "leases": {
+          "$ref": "#/definitions/LeaseSnapshot"
+        },
+        "hosted": {
+          "$ref": "#/definitions/HostedMCPSnapshot"
+        },
+        "health": {
+          "$ref": "#/definitions/MCPHealthSnapshot"
+        }
+      },
+      "required": [
+        "leases",
+        "hosted",
+        "health"
+      ],
+      "additionalProperties": false
+    },
+    "CatchUpPart": {
+      "type": "string",
+      "enum": [
+        "workflows",
+        "pins",
+        "leases",
+        "runtimes",
+        "allowances",
+        "modes",
+        "sandbox",
+        "costs"
+      ],
+      "description": "A part this host does not know is left out of CatchUpRequest.parts."
+    },
+    "CatchUpRequest": {
+      "type": "object",
+      "properties": {
+        "agents": {
+          "$ref": "#/definitions/ListRequest"
+        },
+        "parts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "CatchUpSnapshot": {
+      "type": "object",
+      "properties": {
+        "projects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProjectSummary"
+          }
+        },
+        "agents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Agent"
+          }
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PermissionRequest"
+          }
+        },
+        "elicitations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ElicitationRequest"
+          }
+        },
+        "attention": {
+          "$ref": "#/definitions/AttentionPending"
+        },
+        "resuming": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/UUID"
+          }
+        },
+        "disk": {
+          "$ref": "#/definitions/DiskState"
+        },
+        "storeNotes": {
+          "$ref": "#/definitions/StoreNotes"
+        },
+        "milestones": {
+          "$ref": "#/definitions/Milestones"
+        },
+        "workflows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkflowSummary"
+          }
+        },
+        "pins": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProjectPins"
+          }
+        },
+        "leases": {
+          "$ref": "#/definitions/CatchUpLeases"
+        }
+      },
+      "required": [
+        "projects",
+        "agents",
+        "permissions",
+        "elicitations",
+        "attention",
+        "resuming"
+      ],
+      "additionalProperties": false
+    },
     "ChangeSource": {
       "type": "string",
       "enum": [
@@ -1756,6 +1877,35 @@
           "additionalProperties": false
         }
       ]
+    },
+    "ClientPermissionMode": {
+      "type": "string",
+      "enum": [
+        "default",
+        "alwaysApprove"
+      ],
+      "x-fallback": "default",
+      "description": "The older autoReview reads as alwaysApprove."
+    },
+    "ClientPermissionSettings": {
+      "type": "object",
+      "properties": {
+        "cursor": {
+          "$ref": "#/definitions/ClientPermissionMode"
+        },
+        "grok": {
+          "$ref": "#/definitions/ClientPermissionMode"
+        },
+        "opencode": {
+          "$ref": "#/definitions/ClientPermissionMode"
+        }
+      },
+      "required": [
+        "cursor",
+        "grok",
+        "opencode"
+      ],
+      "additionalProperties": false
     },
     "CloneNotification": {
       "type": "object",
@@ -2424,6 +2574,22 @@
       ],
       "additionalProperties": false
     },
+    "DaemonStatus": {
+      "type": "object",
+      "properties": {
+        "turnsInFlight": {
+          "type": "integer"
+        },
+        "agentsLive": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "turnsInFlight",
+        "agentsLive"
+      ],
+      "additionalProperties": false
+    },
     "DayRecap": {
       "type": "object",
       "properties": {
@@ -2475,6 +2641,19 @@
         "description",
         "holders"
       ],
+      "additionalProperties": false
+    },
+    "DeviceBinding": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "pairing": {
+          "type": "boolean"
+        }
+      },
+      "required": [],
       "additionalProperties": false
     },
     "DeviceKind": {
@@ -6289,6 +6468,18 @@
         "reply"
       ]
     },
+    "QuitRequest": {
+      "type": "object",
+      "properties": {
+        "stopAgents": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "stopAgents"
+      ],
+      "additionalProperties": false
+    },
     "RateLimitInfo": {
       "type": "object",
       "properties": {
@@ -6577,6 +6768,49 @@
       },
       "required": [
         "agentIDs"
+      ],
+      "additionalProperties": false
+    },
+    "RetentionKeepFor": {
+      "type": "string",
+      "enum": [
+        "days7",
+        "days14",
+        "days30",
+        "days90",
+        "forever"
+      ],
+      "x-fallback": "days30"
+    },
+    "RetentionSettings": {
+      "type": "object",
+      "properties": {
+        "keepFor": {
+          "$ref": "#/definitions/RetentionKeepFor"
+        }
+      },
+      "required": [
+        "keepFor"
+      ],
+      "additionalProperties": false
+    },
+    "RetentionState": {
+      "type": "object",
+      "properties": {
+        "settings": {
+          "$ref": "#/definitions/RetentionSettings"
+        },
+        "archivedCount": {
+          "type": "integer"
+        },
+        "archivedBytes": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "settings",
+        "archivedCount",
+        "archivedBytes"
       ],
       "additionalProperties": false
     },

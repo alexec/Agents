@@ -35,6 +35,7 @@ type Daemon struct {
 	agentMu sync.Mutex
 	pinState
 	settingsState
+	quitState
 	// SettingsDir is the person's settings on this host (StoreLocations.personalSettings):
 	// <root>/settings, or $HOME/.agents/settings for a server, as the Swift host's --serve.
 	SettingsDir string
@@ -51,6 +52,7 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 		watches: map[string]*folderWatch{}, interests: map[string][]interest{}, shells: map[shellKey]*shell{},
 		SettingsDir: filepath.Join(st.Loc.Root, "settings")}
 	d.register()
+	d.watchDisk()
 	return d, nil
 }
 

@@ -415,6 +415,35 @@ export type CarriedSettingSource =
   | { closestNoLooser: Record<string, never> }
   | { person: Record<string, never> };
 
+export interface CatchUpLeases {
+  leases: LeaseSnapshot;
+  hosted: HostedMCPSnapshot;
+  health: MCPHealthSnapshot;
+}
+
+/** A part this host does not know is left out of CatchUpRequest.parts. */
+export type CatchUpPart = "workflows" | "pins" | "leases" | "runtimes" | "allowances" | "modes" | "sandbox" | "costs";
+
+export interface CatchUpRequest {
+  agents?: ListRequest;
+  parts?: string[];
+}
+
+export interface CatchUpSnapshot {
+  projects: ProjectSummary[];
+  agents: Agent[];
+  permissions: PermissionRequest[];
+  elicitations: ElicitationRequest[];
+  attention: AttentionPending;
+  resuming: UUID[];
+  disk?: DiskState;
+  storeNotes?: StoreNotes;
+  milestones?: Milestones;
+  workflows?: WorkflowSummary[];
+  pins?: ProjectPins[];
+  leases?: CatchUpLeases;
+}
+
 export type ChangeSource = "reported" | "reportedAndSeen" | "seen";
 
 export type ChangeState = "modified" | "added" | "deleted" | "binary" | "renamed" | "untracked";
@@ -487,6 +516,15 @@ export type ChatProjectState =
   | { archived: { folder: URLString } }
   | { noPersonalHome: Record<string, never> }
   | { failed: { message: string } };
+
+/** The older autoReview reads as alwaysApprove. */
+export type ClientPermissionMode = "default" | "alwaysApprove";
+
+export interface ClientPermissionSettings {
+  cursor: ClientPermissionMode;
+  grok: ClientPermissionMode;
+  opencode: ClientPermissionMode;
+}
 
 export interface CloneNotification {
   clone: CloneSummary;
@@ -639,6 +677,11 @@ export interface CredentialsOffer {
   signIns?: string[];
 }
 
+export interface DaemonStatus {
+  turnsInFlight: number;
+  agentsLive: number;
+}
+
 export interface DayRecap {
   prsMerged?: number;
   agents: number;
@@ -653,6 +696,11 @@ export interface DeclaredResource {
   holders: number;
   defaultMinutes?: number;
   maximumMinutes?: number;
+}
+
+export interface DeviceBinding {
+  id?: UUID;
+  pairing?: boolean;
 }
 
 export type DeviceKind = "iPhone" | "iPad" | "unknown";
@@ -1556,6 +1604,10 @@ export interface QuickAnswer {
 
 export type QuickAnswerKind = "choice" | "reply";
 
+export interface QuitRequest {
+  stopAgents: boolean;
+}
+
 export interface RateLimitInfo {
   status?: string;
   resetsAt?: WireDate;
@@ -1633,6 +1685,18 @@ export interface ResumingNotification {
 
 export interface ResumingResponse {
   agentIDs: UUID[];
+}
+
+export type RetentionKeepFor = "days7" | "days14" | "days30" | "days90" | "forever";
+
+export interface RetentionSettings {
+  keepFor: RetentionKeepFor;
+}
+
+export interface RetentionState {
+  settings: RetentionSettings;
+  archivedCount: number;
+  archivedBytes: number;
 }
 
 export interface Runtime {
@@ -2796,6 +2860,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BuildOutputRemoved: { required: ["removed", "freed"], optional: [] },
   CancelWaitRequest: { required: ["agentID"], optional: [] },
   CarriedSetting: { required: ["optionID", "name", "source"], optional: ["from", "to"] },
+  CatchUpLeases: { required: ["leases", "hosted", "health"], optional: [] },
+  CatchUpRequest: { required: [], optional: ["agents", "parts"] },
+  CatchUpSnapshot: { required: ["projects", "agents", "permissions", "elicitations", "attention", "resuming"], optional: ["disk", "storeNotes", "milestones", "workflows", "pins", "leases"] },
   ChangedFile: { required: ["path", "source", "state", "editCount", "beyondReported", "inProgress", "outsideFolder"], optional: ["relativePath", "added", "removed", "firstLine", "oldPath"] },
   ChangedFileDetail: { required: ["file", "edits"], optional: ["hunks", "whole"] },
   ChangesFileRequest: { required: ["agentID", "path", "whole"], optional: [] },
@@ -2804,6 +2871,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ChannelsSet: { required: [], optional: ["slack"] },
   ChannelsState: { required: ["slack"], optional: [] },
   ChartHint: { required: ["mark", "x", "y"], optional: ["color", "title"] },
+  ClientPermissionSettings: { required: ["cursor", "grok", "opencode"], optional: [] },
   CloneNotification: { required: ["clone", "finished"], optional: [] },
   CloneRequest: { required: ["url"], optional: [] },
   CloneSummary: { required: ["id", "url", "folder", "startedAt"], optional: [] },
@@ -2819,8 +2887,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   CostState: { required: ["limits", "today", "day", "tokensToday"], optional: ["note"] },
   CredentialsLend: { required: ["runtime", "kind", "secret"], optional: [] },
   CredentialsOffer: { required: ["runtimes", "ownSignInOnly"], optional: ["notRelayed", "signIns"] },
+  DaemonStatus: { required: ["turnsInFlight", "agentsLive"], optional: [] },
   DayRecap: { required: ["agents", "peakAgents", "longestClear"], optional: ["prsMerged"] },
   DeclaredResource: { required: ["name", "displayName", "description", "holders"], optional: ["defaultMinutes", "maximumMinutes"] },
+  DeviceBinding: { required: [], optional: ["id", "pairing"] },
   DiffLine: { required: ["kind", "text"], optional: ["newLine"] },
   DirectoryEntry: { required: ["url", "name", "isDirectory"], optional: ["size", "modifiedAt"] },
   DirectoryListing: { required: ["url", "entries", "omitted"], optional: [] },
@@ -2940,6 +3010,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface", "sender", "hops"] },
   QueuedStart: { required: ["labels"], optional: ["runtimeID", "permissionMode", "model", "worktree"] },
   QuickAnswer: { required: ["kind", "id", "title", "isDestructive"], optional: ["field"] },
+  QuitRequest: { required: ["stopAgents"], optional: [] },
   RateLimitInfo: { required: [], optional: ["status", "resetsAt", "rateLimitType", "utilization", "overageStatus", "overageResetsAt", "isUsingOverage", "overageInUse", "overageDisabledReason"] },
   RelayOffer: { required: ["runtime", "socketPath", "caCertificate", "standIn"], optional: [] },
   RememberedOptionsRequest: { required: ["runtimeID", "cwd"], optional: [] },
@@ -2949,6 +3020,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ResourceState: { required: ["name", "kind", "displayName", "isGone", "line", "endingSoon"], optional: ["holds", "lease", "places", "declared"] },
   ResumingNotification: { required: ["agentID", "isResuming"], optional: [] },
   ResumingResponse: { required: ["agentIDs"], optional: [] },
+  RetentionSettings: { required: ["keepFor"], optional: [] },
+  RetentionState: { required: ["settings", "archivedCount", "archivedBytes"], optional: [] },
   Runtime: { required: ["id", "name", "executable", "arguments", "installPage", "usesAppCopyOnly"], optional: ["install"] },
   RuntimeAccount: { required: ["runtimeID", "state", "authMethods", "canLogOut", "providers", "promptCapabilities", "canSteer", "checkedAt"], optional: ["currentProviderID", "signedInAs"] },
   RuntimeAllowances: { required: ["rows", "at"], optional: ["shared"] },
