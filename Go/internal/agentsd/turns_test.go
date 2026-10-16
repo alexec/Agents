@@ -203,7 +203,7 @@ func TestATurnWithACard(t *testing.T) {
 			kinds = append(kinds, name)
 		}
 	}
-	want := "userMessage stateChanged runtimeNote toolCall permissionAsked stateChanged permissionAnswered stateChanged toolCallUpdate agentMessage agentMessage stateChanged"
+	want := "runtimeNote userMessage stateChanged toolCall permissionAsked stateChanged permissionAnswered stateChanged toolCallUpdate agentMessage agentMessage stateChanged"
 	if got := strings.Join(kinds, " "); got != want {
 		t.Fatalf("transcript\n got %s\nwant %s", got, want)
 	}

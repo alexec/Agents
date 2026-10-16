@@ -20,6 +20,7 @@ func (d *Daemon) register() {
 	Quiet(d, wire.CallPresenceReport.Name, wire.CallCredentialsOffer.Name, wire.CallAgentsPrewarm.Name,
 		wire.CallAgentsDiscardDraft.Name)
 	d.registerFiles()
+	d.registerAgents()
 	d.registerShells()
 	On(d, wire.CallPermissionsPending, func(ctx context.Context, c *Client, _ wire.Empty) ([]wire.PermissionRequest, error) {
 		return d.pendingPermissions(), nil
@@ -70,19 +71,6 @@ func (d *Daemon) register() {
 	})
 	On(d, wire.CallAgentsStart, func(ctx context.Context, c *Client, r wire.StartRequest) (wire.UUID, error) {
 		return d.start(r)
-	})
-	On(d, wire.CallAgentsPrompt, func(ctx context.Context, c *Client, r wire.PromptRequest) (wire.Empty, error) {
-		a := d.Store.Agent(r.AgentID)
-		if a == nil {
-			return wire.Empty{}, &Error{Code: CodeNoSuchAgent, Message: "no agent " + string(r.AgentID)}
-		}
-		if err := d.needsSignIn(a.RuntimeID); err != nil {
-			return wire.Empty{}, err
-		}
-		if d.once(r.SendID) {
-			d.live(a.ID).enqueue(r.Text)
-		}
-		return wire.Empty{}, nil
 	})
 	On(d, wire.CallAgentsStop, func(ctx context.Context, c *Client, r wire.AgentRequest) (wire.Empty, error) {
 		if d.Store.Agent(r.AgentID) == nil {

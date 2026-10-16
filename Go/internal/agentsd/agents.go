@@ -1,0 +1,537 @@
+package agentsd
+
+import (
+	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+	"unicode/utf8"
+
+	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/wire"
+)
+
+// The rest of a chat's life, as DaemonCore serves it: prompts on a queue that is the
+// daemon's, names and labels, the archive and back, deleting, and what the runtime is
+// told to change.
+
+func noSuchAgent() error { return &Error{Code: CodeNoSuchAgent, Message: "That agent is not here."} }
+
+func (d *Daemon) registerAgents() {
+	On(d, wire.CallAgentsPrompt, func(ctx context.Context, c *Client, r wire.PromptRequest) (wire.Empty, error) {
+		return wire.Empty{}, d.prompt(r)
+	})
+	On(d, wire.CallAgentsUnqueue, func(ctx context.Context, c *Client, r wire.UnqueueRequest) (wire.Empty, error) {
+		if d.change(r.AgentID, func(a *wire.Agent) { a.QueuedPrompts = unqueued(a.QueuedPrompts, r.PromptID) }) == nil {
+			return wire.Empty{}, noSuchAgent()
+		}
+		return wire.Empty{}, nil
+	})
+	On(d, wire.CallAgentsSendNow, func(ctx context.Context, c *Client, r wire.UnqueueRequest) (wire.Empty, error) {
+		return wire.Empty{}, d.sendNow(ctx, r)
+	})
+	On(d, wire.CallAgentsRename, func(ctx context.Context, c *Client, r wire.RenameRequest) (wire.Agent, error) {
+		return d.rename(r)
+	})
+	On(d, wire.CallAgentsSetLabels, func(ctx context.Context, c *Client, r wire.SetLabelsRequest) (wire.Agent, error) {
+		return d.setLabels(r)
+	})
+	On(d, wire.CallAgentsLabelVocabulary, func(ctx context.Context, c *Client, r wire.LabelVocabularyRequest) ([]string, error) {
+		out := []string{}
+		for _, l := range vocabulary(store.FolderPath(r.Folder), d.Store.Agents()) {
+			out = append(out, l.Value)
+		}
+		return out, nil
+	})
+	On(d, wire.CallAgentsUnarchive, func(ctx context.Context, c *Client, r wire.AgentRequest) (wire.Empty, error) {
+		return wire.Empty{}, d.unarchive(r.AgentID)
+	})
+	On(d, wire.CallAgentsDelete, func(ctx context.Context, c *Client, r wire.AgentRequest) (wire.Empty, error) {
+		return wire.Empty{}, d.delete(r.AgentID)
+	})
+	On(d, wire.CallAgentsSetCeiling, func(ctx context.Context, c *Client, r wire.SetCeilingRequest) (wire.Agent, error) {
+		a := d.change(r.AgentID, func(a *wire.Agent) { a.CostCeiling, a.TokenCeiling = r.Ceiling, r.TokenCeiling })
+		if a == nil {
+			return wire.Agent{}, noSuchAgent()
+		}
+		return *a, nil
+	})
+	On(d, wire.CallAgentsSetOption, func(ctx context.Context, c *Client, r wire.SetOptionRequest) ([]wire.ConfigOption, error) {
+		return d.setOption(ctx, r)
+	})
+	On(d, wire.CallAgentsStopBackground, func(ctx context.Context, c *Client, r wire.StopBackgroundRequest) (wire.JSONValue, error) {
+		a := d.Store.Agent(r.AgentID)
+		if a == nil {
+			return nil, noSuchAgent()
+		}
+		// What runs in the background (AIR async tasks) is not followed by this host yet,
+		// so nothing is: Swift's words for an item it does not have.
+		return nil, Invalid("Nothing by that name is running.")
+	})
+	On(d, wire.CallAgentsTouchedPaths, func(ctx context.Context, c *Client, r wire.AgentRequest) ([]string, error) {
+		return d.touchedPaths(r.AgentID), nil
+	})
+	On(d, wire.CallAgentsResuming, func(ctx context.Context, c *Client, _ wire.Empty) (wire.ResumingResponse, error) {
+		// Agents being picked up after a restart; this host picks none up yet.
+		return wire.ResumingResponse{AgentIDs: []wire.UUID{}}, nil
+	})
+	On(d, wire.CallAgentsContinueInProject, func(ctx context.Context, c *Client, r wire.ContinueInProjectRequest) (wire.UUID, error) {
+		return d.continueInProject(r)
+	})
+}
+
+func unqueued(queue []wire.QueuedPrompt, id wire.UUID) []wire.QueuedPrompt {
+	out := []wire.QueuedPrompt{}
+	for _, q := range queue {
+		if q.ID != id {
+			out = append(out, q)
+		}
+	}
+	return out
+}
+
+// prompt is agents/prompt: the words go on the queue, never refused for the agent being
+// busy, and go once the agent is free.
+func (d *Daemon) prompt(r wire.PromptRequest) error {
+	a := d.Store.Agent(r.AgentID)
+	if a == nil {
+		return noSuchAgent()
+	}
+	if err := d.needsSignIn(a.RuntimeID); err != nil {
+		return err
+	}
+	if !d.once(r.SendID) {
+		return nil
+	}
+	if !isDir(store.FolderPath(a.Cwd)) {
+		return &Error{Code: wire.FailureFolderGone, Message: store.FolderPath(a.Cwd) + " is not there any more."}
+	}
+	from := r.From
+	if from == "" {
+		from = wire.PromptOriginPerson
+	}
+	if from == wire.PromptOriginPerson {
+		// The person's words take back an archive asked for and a question for after the turn.
+		d.change(a.ID, func(a *wire.Agent) { a.ArchiveRequest, a.AfterTurn = nil, nil })
+	}
+	return d.enqueue(a.ID, wire.QueuedPrompt{ID: store.NewUUID(), Text: r.Text, Attachments: r.Attachments,
+		QueuedAt: now(), From: from}, false)
+}
+
+// sendNow is DaemonCore.sendNow: a queued prompt goes at once, into the running turn
+// where the runtime takes words mid-turn, or as the next turn when none is running.
+func (d *Daemon) sendNow(ctx context.Context, r wire.UnqueueRequest) error {
+	a := d.Store.Agent(r.AgentID)
+	if a == nil {
+		return noSuchAgent()
+	}
+	var queued *wire.QueuedPrompt
+	for _, q := range a.QueuedPrompts {
+		if q.ID == r.PromptID {
+			queued = &q
+			break
+		}
+	}
+	if queued == nil {
+		return nil // gone already: it went out as the turn ended, or was taken back
+	}
+	l := d.live(a.ID)
+	l.mu.Lock()
+	s, inTurn := l.session, l.inTurn
+	l.mu.Unlock()
+	if s == nil && !isDir(store.FolderPath(a.Cwd)) {
+		return &Error{Code: wire.FailureFolderGone, Message: store.FolderPath(a.Cwd) + " is not there any more."}
+	}
+	if !inTurn || s == nil {
+		// To the front, so it goes next, with the person's words behind it.
+		d.change(a.ID, func(a *wire.Agent) {
+			a.QueuedPrompts = append([]wire.QueuedPrompt{*queued}, unqueued(a.QueuedPrompts, queued.ID)...)
+		})
+		l.kick()
+		return nil
+	}
+	if !s.SupportsSteering() {
+		return &Error{Code: wire.FailureNotSupported, Message: "This agent's runtime cannot take words in the middle of a turn."}
+	}
+	// Off the queue before the wait, so the turn ending in it does not send them twice.
+	d.change(a.ID, func(a *wire.Agent) { a.QueuedPrompts = unqueued(a.QueuedPrompts, queued.ID) })
+	bs := blocks(*queued)
+	outgoing := bs
+	if queued.Preface != nil {
+		outgoing = append([]wire.ContentBlock{textBlock(*queued.Preface)}, bs...)
+	}
+	putBack := func() {
+		d.change(a.ID, func(a *wire.Agent) { a.QueuedPrompts = append([]wire.QueuedPrompt{*queued}, a.QueuedPrompts...) })
+	}
+	outcome, err := s.Steer(ctx, acpBlocks(outgoing))
+	if err != nil {
+		putBack()
+		d.record(a.ID, runtimeNote("Could not send that now: "+err.Error()+" It is still waiting."))
+		return nil
+	}
+	switch outcome {
+	case "injected", "startedNewTurn":
+		from := queued.From
+		um := &wire.TranscriptEntryKindUserMessage{Value: queued.Text, From: &from}
+		if len(bs) > 1 {
+			um.Blocks = bs
+		}
+		d.record(a.ID, wire.TranscriptEntryKind{UserMessage: um})
+	case "promptRequired":
+		putBack()
+		l.kick()
+	default:
+		putBack()
+		d.record(a.ID, runtimeNote("Could not send that now. It is still waiting."))
+	}
+	return nil
+}
+
+func runtimeNote(text string) wire.TranscriptEntryKind {
+	return wire.TranscriptEntryKind{RuntimeNote: &wire.TranscriptEntryKindRuntimeNote{Value: text}}
+}
+
+// cleanedTitle is Agent.cleanedTitle: one line, spaces collapsed, at most 80 characters.
+func cleanedTitle(raw string) (string, bool) {
+	one := strings.Join(strings.Fields(raw), " ")
+	if one == "" {
+		return "", false
+	}
+	if utf8.RuneCountInString(one) > 80 {
+		one = string([]rune(one)[:79]) + "…"
+	}
+	return one, true
+}
+
+// rename is agents/rename (Agent.rename(to:)): the person's name, with the runtime's kept
+// aside; an empty one hands naming back to the runtime.
+func (d *Daemon) rename(r wire.RenameRequest) (wire.Agent, error) {
+	if d.Store.Agent(r.AgentID) == nil {
+		return wire.Agent{}, noSuchAgent()
+	}
+	title, ok := cleanedTitle(r.Title)
+	a := d.change(r.AgentID, func(a *wire.Agent) {
+		persons := a.TitleIsPersons != nil && *a.TitleIsPersons
+		switch {
+		case ok:
+			if !persons {
+				a.RuntimeTitle = a.Title
+			}
+			yes := true
+			a.Title, a.TitleIsPersons = &title, &yes
+		case persons:
+			a.Title, a.RuntimeTitle, a.TitleIsPersons = a.RuntimeTitle, nil, nil
+		}
+	})
+	return *a, nil
+}
+
+// MARK: labels (SessionLabelPolicy)
+
+const labelLength, labelCount = 24, 5
+
+func labelKey(v string) string { return strings.ToLower(strings.TrimSpace(v)) }
+
+func cleanedLabel(v string) (string, error) {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return "", Invalid("A label needs at least one non-space character.")
+	}
+	if utf8.RuneCountInString(v) > labelLength {
+		return "", Invalid("A label can be at most 24 characters.")
+	}
+	return v, nil
+}
+
+// changeLabels is SessionLabelPolicy.change for the person.
+func changeLabels(current []wire.SessionLabel, add, remove []string, project []wire.SessionLabel) ([]wire.SessionLabel, error) {
+	var adding, removing []string
+	for _, v := range add {
+		c, err := cleanedLabel(v)
+		if err != nil {
+			return nil, err
+		}
+		adding = append(adding, c)
+	}
+	addKeys := map[string]bool{}
+	for _, v := range adding {
+		addKeys[labelKey(v)] = true
+	}
+	for _, v := range remove {
+		c, err := cleanedLabel(v)
+		if err != nil {
+			return nil, err
+		}
+		if addKeys[labelKey(c)] {
+			return nil, Invalid("The label %s cannot be added and removed in the same change.", c)
+		}
+		removing = append(removing, c)
+	}
+	result := append([]wire.SessionLabel{}, current...)
+	for _, v := range removing {
+		for i, l := range result {
+			if labelKey(l.Value) == labelKey(v) {
+				result = append(result[:i], result[i+1:]...)
+				break
+			}
+		}
+	}
+	for _, v := range adding {
+		found := false
+		for i, l := range result {
+			if labelKey(l.Value) == labelKey(v) {
+				result[i].Owner, found = wire.SessionLabelOwnerPerson, true
+				break
+			}
+		}
+		if found {
+			continue
+		}
+		if len(result) >= labelCount {
+			return nil, Invalid("A session can have at most five labels.")
+		}
+		canonical := v
+		for _, l := range project {
+			if labelKey(l.Value) == labelKey(v) {
+				canonical = l.Value
+				break
+			}
+		}
+		result = append(result, wire.SessionLabel{Value: canonical, Owner: wire.SessionLabelOwnerPerson, AddedAt: now()})
+	}
+	return result, nil
+}
+
+// vocabulary is SessionLabelPolicy.vocabulary: every label in the project, oldest first,
+// once each.
+func vocabulary(folder string, agents []wire.Agent) []wire.SessionLabel {
+	var all []wire.SessionLabel
+	for _, a := range agents {
+		if projectFolder(&a) == folder {
+			all = append(all, a.Labels...)
+		}
+	}
+	sort.SliceStable(all, func(i, j int) bool {
+		if all[i].AddedAt != all[j].AddedAt {
+			return all[i].AddedAt < all[j].AddedAt
+		}
+		return labelKey(all[i].Value) < labelKey(all[j].Value)
+	})
+	seen := map[string]bool{}
+	var out []wire.SessionLabel
+	for _, l := range all {
+		if !seen[labelKey(l.Value)] {
+			seen[labelKey(l.Value)] = true
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+func (d *Daemon) setLabels(r wire.SetLabelsRequest) (wire.Agent, error) {
+	a := d.Store.Agent(r.AgentID)
+	if a == nil {
+		return wire.Agent{}, &Error{Code: CodeNoSuchAgent, Message: "That session no longer exists."}
+	}
+	labels, err := changeLabels(a.Labels, r.Add, r.Remove, vocabulary(projectFolder(a), d.Store.Agents()))
+	if err != nil {
+		return wire.Agent{}, err
+	}
+	return *d.change(a.ID, func(a *wire.Agent) { a.Labels = labels }), nil
+}
+
+// unarchive is the move unarchivedByUser: back to how it ended, finished for a turn that
+// ended itself and stopped otherwise; from anything but archived, nothing.
+func (d *Daemon) unarchive(id wire.UUID) error {
+	a := d.Store.Agent(id)
+	if a == nil {
+		return noSuchAgent()
+	}
+	if a.State != wire.AgentStateArchived {
+		return nil
+	}
+	next := wire.AgentStateStopped
+	if a.EndedReason != nil && *a.EndedReason == wire.EndedReasonEndTurn {
+		next = wire.AgentStateFinished
+	}
+	var said *wire.EndedReason
+	d.change(id, func(a *wire.Agent) {
+		if a.EndedReason == nil {
+			a.EndedReason, said = reason(wire.EndedReasonUnrecognised), reason(wire.EndedReasonUnrecognised)
+		}
+		if *a.EndedReason != wire.EndedReasonDaemonGone {
+			a.RestartPickUps = nil
+		}
+		unread := next == wire.AgentStateFinished
+		a.State, a.ArchivedAt, a.ArchivedReason, a.AfterTurn, a.IsUnread = next, nil, nil, nil, &unread
+	})
+	d.record(id, stateChanged(next, said))
+	return nil
+}
+
+// delete is DaemonCore.deleteNow for the person: only an archived agent, and its folder
+// and turns go from the disk.
+func (d *Daemon) delete(id wire.UUID) error {
+	a := d.Store.Agent(id)
+	if a == nil {
+		return noSuchAgent()
+	}
+	if a.State != wire.AgentStateArchived {
+		return &Error{Code: wire.FailureDeleteRefused, Message: "Only an archived session can be deleted. Archive it first."}
+	}
+	d.mu.Lock()
+	l := d.lives[a.ID]
+	delete(d.lives, a.ID)
+	d.mu.Unlock()
+	if l != nil {
+		l.cancel()
+		l.mu.Lock()
+		s := l.session
+		l.session = nil
+		l.mu.Unlock()
+		if s != nil {
+			s.Stop()
+		}
+	}
+	if err := d.Store.Delete(a.ID); err != nil {
+		return &Error{Code: wire.FailureCouldNotSave, Message: "The agent could not be deleted: " + err.Error()}
+	}
+	Broadcast(d, wire.NotifyAgentRemoved, wire.AgentRemovedNotification{AgentID: a.ID})
+	d.projectChanged(projectFolder(a))
+	return nil
+}
+
+// setOption is agents/setOption: to the live session when there is one, and kept as a
+// start option either way, recorded as optionChanged.
+func (d *Daemon) setOption(ctx context.Context, r wire.SetOptionRequest) ([]wire.ConfigOption, error) {
+	a := d.Store.Agent(r.AgentID)
+	if a == nil {
+		return nil, noSuchAgent()
+	}
+	l := d.live(a.ID)
+	l.mu.Lock()
+	s := l.session
+	l.mu.Unlock()
+	options := []wire.ConfigOption{}
+	if s != nil {
+		var v any
+		json.Unmarshal(r.Value, &v)
+		cctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+		got, err := s.SetOption(cctx, r.OptionID, v)
+		if err != nil {
+			return nil, &Error{Code: CodeServer, Message: err.Error()}
+		}
+		if opts := configOptions(got); len(opts) > 0 {
+			options = opts
+		} else {
+			options = a.AdvertisedOptions
+		}
+	}
+	d.change(a.ID, func(a *wire.Agent) {
+		values := map[string]wire.JSONValue{}
+		for k, v := range a.StartOptions.Values {
+			values[k] = v
+		}
+		values[r.OptionID] = r.Value
+		a.StartOptions.Values = values
+		if s != nil {
+			a.AdvertisedOptions = options
+		}
+	})
+	d.record(a.ID, wire.TranscriptEntryKind{OptionChanged: &wire.TranscriptEntryKindOptionChanged{ID: r.OptionID, Value: r.Value}})
+	return options, nil
+}
+
+// touchedPaths is AgentStore.touchedPaths: every path a tool call named, resolved.
+func (d *Daemon) touchedPaths(id wire.UUID) []string {
+	entries, _, _ := d.Store.Transcript(id, 0)
+	seen := map[string]bool{}
+	add := func(p string) {
+		if p == "" {
+			return
+		}
+		if r, err := filepath.EvalSymlinks(p); err == nil {
+			p = r
+		}
+		seen[filepath.Clean(p)] = true
+	}
+	for _, e := range entries {
+		var tc *wire.ToolCall
+		if e.Kind.ToolCall != nil {
+			tc = &e.Kind.ToolCall.Value
+		} else if e.Kind.ToolCallUpdate != nil {
+			tc = &e.Kind.ToolCallUpdate.Value
+		}
+		if tc == nil {
+			continue
+		}
+		for _, l := range tc.Locations {
+			add(l.Path)
+		}
+		for _, c := range tc.Content {
+			if c.Type == "diff" && c.Path != nil {
+				add(*c.Path)
+			}
+		}
+	}
+	out := []string{}
+	for p := range seen {
+		out = append(out, p)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// shortPath is MissingFolderWords.shortPath: ~ for the home folder.
+func shortPath(path string) string {
+	if len(path) > 1 {
+		path = strings.TrimSuffix(path, "/")
+	}
+	if home, _ := os.UserHomeDir(); home != "" && (path == home || strings.HasPrefix(path, home+"/")) {
+		return "~" + path[len(home):]
+	}
+	return path
+}
+
+// continueInProject starts a successor in the project folder that reads this session and
+// carries on (065), with its runtime, choices and the person's labels.
+func (d *Daemon) continueInProject(r wire.ContinueInProjectRequest) (wire.UUID, error) {
+	a := d.Store.Agent(r.AgentID)
+	if a == nil {
+		return "", noSuchAgent()
+	}
+	project := projectFolder(a)
+	if !isDir(project) {
+		return "", &Error{Code: wire.FailureFolderGone, Message: "The project folder isn't there either (" + shortPath(project) + ")."}
+	}
+	name := string(a.ID)
+	if a.Title != nil {
+		name = "“" + *a.Title + "” (" + string(a.ID) + ")"
+	}
+	prompt := "Continue the work of the session " + name + ". Its folder, " + shortPath(store.FolderPath(a.Cwd)) +
+		", is not there any more, so you are in the project folder, " + shortPath(project) +
+		", instead. Read that session with read_session to see what it did and what is left, then carry on."
+	if said := strings.TrimSpace(r.Text); said != "" {
+		prompt += "\n\n" + said
+	}
+	var labels []string
+	for _, l := range a.Labels {
+		if l.Owner == wire.SessionLabelOwnerPerson {
+			labels = append(labels, l.Value)
+		}
+	}
+	id, err := d.start(wire.StartRequest{RuntimeID: a.RuntimeID, Cwd: store.FolderURL(project), Prompt: prompt,
+		Attachments: r.Attachments, StartOptions: a.StartOptions, AdditionalDirectories: a.AdditionalDirectories,
+		McpServers: a.McpServers, RequestID: r.RequestID, Sandbox: a.SandboxOverride, Labels: labels})
+	if err != nil {
+		return "", err
+	}
+	if a.Title != nil {
+		d.change(id, func(s *wire.Agent) { s.Title, s.TitleIsPersons = a.Title, a.TitleIsPersons })
+	}
+	return id, nil
+}

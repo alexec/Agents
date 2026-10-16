@@ -128,7 +128,7 @@ func TestAFormIsHeldAndAnswered(t *testing.T) {
 		len(answered.Answers) != 1 || answered.Answers[0] != (wire.ElicitationAnswer{Question: "Which colour?", Answer: "blue"}) {
 		t.Fatalf("%+v", answered)
 	}
-	want := "userMessage stateChanged runtimeNote elicitationAsked stateChanged elicitationAnswered stateChanged agentMessage stateChanged"
+	want := "runtimeNote userMessage stateChanged elicitationAsked stateChanged elicitationAnswered stateChanged agentMessage stateChanged"
 	if got := strings.Join(kinds(d, id), " "); got != want {
 		t.Fatalf("transcript\n got %s\nwant %s", got, want)
 	}

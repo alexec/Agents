@@ -45,6 +45,7 @@ func Open(root string) (*Store, error) {
 	id, adopts := loadOrMakeRootID(loc.RootIdentity(), loc.Root)
 	s.RootID = id
 	s.projects = s.loadProjects()
+	finishDeleting(loc)
 	entries, _ := os.ReadDir(loc.Agents())
 	for _, e := range entries {
 		name := e.Name()
@@ -135,6 +136,43 @@ func refusal(a *wire.Agent) error {
 		return &Refused{fmt.Sprintf("refused to save agent %s: starting, but carrying an ending", a.ID)}
 	}
 	return nil
+}
+
+// setAsidePrefix is AgentStore.setAsidePrefix: a folder being deleted.
+const setAsidePrefix = ".deleting-"
+
+// Delete removes an agent from the disk as AgentStore.delete does: its turns, then its
+// folder, set aside first so a delete cut off is finished at the next start.
+func (s *Store) Delete(id wire.UUID) error {
+	id = wire.UUID(strings.ToUpper(string(id)))
+	s.mu.Lock()
+	delete(s.agents, id)
+	delete(s.lines, id)
+	s.mu.Unlock()
+	if err := os.Remove(s.Loc.Turns(string(id))); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	folder := s.Loc.Agent(string(id))
+	if _, err := os.Stat(folder); os.IsNotExist(err) {
+		return nil
+	}
+	aside := filepath.Join(s.Loc.Agents(), setAsidePrefix+string(id))
+	os.RemoveAll(aside)
+	if err := os.Rename(folder, aside); err != nil {
+		return err
+	}
+	return os.RemoveAll(aside)
+}
+
+// finishDeleting removes the folders a delete cut off set aside (AgentStore.finishDeleting).
+func finishDeleting(loc Locations) {
+	entries, _ := os.ReadDir(loc.Agents())
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), setAsidePrefix) {
+			log.Printf("finishing the delete of %s, cut off last time", e.Name())
+			os.RemoveAll(filepath.Join(loc.Agents(), e.Name()))
+		}
+	}
 }
 
 // Save writes a record whole, refusing one the rules forbid, as AgentStore.save does.

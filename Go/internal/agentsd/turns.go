@@ -25,7 +25,6 @@ type live struct {
 	id      wire.UUID
 	mu      sync.Mutex
 	session *acp.Session
-	queue   []string
 	running bool
 	pending map[wire.UUID]*pendingPermission
 	// elicitations is the forms it is waiting on (elicitations.go).
@@ -130,6 +129,14 @@ func (d *Daemon) start(r wire.StartRequest) (wire.UUID, error) {
 	if err := d.needsSignIn(r.RuntimeID); err != nil {
 		return "", err
 	}
+	// The same start sent again (a window retrying) is the agent it made.
+	if r.RequestID != nil {
+		for _, a := range d.Store.Agents() {
+			if a.StartRequestID != nil && *a.StartRequestID == *r.RequestID {
+				return a.ID, nil
+			}
+		}
+	}
 	values := r.StartOptions.Values
 	if values == nil {
 		values = map[string]wire.JSONValue{}
@@ -157,7 +164,10 @@ func (d *Daemon) start(r wire.StartRequest) (wire.UUID, error) {
 	}
 	Broadcast(d, wire.NotifyAgentChanged, a)
 	d.projectChanged(path)
-	d.live(a.ID).enqueue(r.Prompt)
+	if err := d.enqueue(a.ID, wire.QueuedPrompt{ID: store.NewUUID(), Text: r.Prompt, Attachments: r.Attachments,
+		QueuedAt: t, From: wire.PromptOriginPerson}, false); err != nil {
+		return "", err
+	}
 	return a.ID, nil
 }
 
@@ -169,9 +179,33 @@ func titleFrom(prompt string) string {
 	return t
 }
 
-func (l *live) enqueue(text string) {
+// enqueue keeps the words on the agent's record (QueuedPrompt), first or last, and sends
+// what is queued once the agent is free (DaemonCore.enqueue). The queue is the daemon's,
+// never the runtime's, and outlives a restart.
+func (d *Daemon) enqueue(id wire.UUID, q wire.QueuedPrompt, first bool) error {
+	if q.Attachments == nil {
+		q.Attachments = []wire.Attachment{}
+	}
+	a := d.change(id, func(a *wire.Agent) {
+		if first {
+			a.QueuedPrompts = append([]wire.QueuedPrompt{q}, a.QueuedPrompts...)
+		} else {
+			a.QueuedPrompts = append(append([]wire.QueuedPrompt{}, a.QueuedPrompts...), q)
+		}
+		if q.From == wire.PromptOriginPerson {
+			a.Report, a.OutcomeAsked = nil, nil
+		}
+	})
+	if a == nil {
+		return &Error{Code: CodeNoSuchAgent, Message: "That agent is not here."}
+	}
+	d.live(id).kick()
+	return nil
+}
+
+// kick starts the agent's turns unless they are running.
+func (l *live) kick() {
 	l.mu.Lock()
-	l.queue = append(l.queue, text)
 	start := !l.running
 	l.running = true
 	l.mu.Unlock()
@@ -180,39 +214,86 @@ func (l *live) enqueue(text string) {
 	}
 }
 
-// run takes prompts off the queue, one turn at a time.
+// nextTurn is QueuedPrompt.nextTurn and merging: the run of the person's prompts at the
+// head goes as one (#346), since what was typed later so often corrects what came first;
+// anything else goes alone.
+func nextTurn(queue []wire.QueuedPrompt) (wire.QueuedPrompt, []wire.QueuedPrompt, bool) {
+	if len(queue) == 0 {
+		return wire.QueuedPrompt{}, queue, false
+	}
+	n := 1
+	if queue[0].From == wire.PromptOriginPerson {
+		for n < len(queue) && queue[n].From == wire.PromptOriginPerson {
+			n++
+		}
+	}
+	merged := queue[0]
+	var texts, prefaces []string
+	merged.Attachments = []wire.Attachment{}
+	for _, q := range queue[:n] {
+		texts = append(texts, q.Text)
+		if q.Preface != nil {
+			prefaces = append(prefaces, *q.Preface)
+		}
+		merged.Attachments = append(merged.Attachments, q.Attachments...)
+	}
+	merged.Text = strings.Join(texts, "\n\n")
+	merged.Preface = nil
+	if len(prefaces) > 0 {
+		p := strings.Join(prefaces, "\n\n")
+		merged.Preface = &p
+	}
+	return merged, append([]wire.QueuedPrompt(nil), queue[n:]...), true
+}
+
+// blocks is QueuedPrompt.blocks: the words, then what is attached.
+func blocks(q wire.QueuedPrompt) []wire.ContentBlock {
+	out := []wire.ContentBlock{textBlock(q.Text)}
+	for _, a := range q.Attachments {
+		out = append(out, a.Block)
+	}
+	return out
+}
+
+func textBlock(text string) wire.ContentBlock {
+	return wire.ContentBlock{Type: "text", Text: &text}
+}
+
+// run sends what is queued, one turn at a time, until the queue is empty or a turn was
+// stopped: a stop leaves the queue where it is (drainQueue).
 func (l *live) run() {
 	for {
 		l.mu.Lock()
-		if len(l.queue) == 0 {
+		a := l.d.Store.Agent(l.id)
+		if a == nil || len(a.QueuedPrompts) == 0 {
 			l.running = false
 			l.mu.Unlock()
 			return
 		}
-		text := l.queue[0]
-		l.queue = l.queue[1:]
 		l.mu.Unlock()
-		if v := safe.Catch("turn of "+string(l.id), func() { l.turn(text) }); v != nil {
+		drain := false
+		if v := safe.Catch("turn of "+string(l.id), func() { drain = l.turn() }); v != nil {
 			// The turn's own defers ran; end it so the window does not wait on it.
 			l.d.record(l.id, notice("error", "The host hit a bug", fmt.Sprint(v)))
 			l.d.end(l, wire.AgentStateStopped, wire.EndedReasonRuntimeError)
 		}
+		if !drain {
+			l.mu.Lock()
+			l.running = false
+			l.mu.Unlock()
+			return
+		}
 	}
 }
 
-func (l *live) turn(text string) {
+// turn starts the runtime if it has none, then takes the next turn's words off the queue
+// and sends them: a runtime that will not start leaves them where they were. It is true
+// when what is queued behind may go next.
+func (l *live) turn() bool {
 	d := l.d
-	from := wire.PromptOriginPerson
-	d.record(l.id, wire.TranscriptEntryKind{UserMessage: &wire.TranscriptEntryKindUserMessage{Value: text, From: &from}})
-	l.mu.Lock()
-	l.lastMessageID = ""
-	l.lastMessage.Reset()
-	clear(l.toolCalls)
-	l.mu.Unlock()
-	d.setState(l.id, wire.AgentStateRunning)
 	a := d.Store.Agent(l.id)
 	if a == nil {
-		return
+		return false
 	}
 	ctx, cancel := context.WithCancel(d.ctx)
 	l.mu.Lock()
@@ -233,7 +314,7 @@ func (l *live) turn(text string) {
 		if err != nil {
 			d.record(l.id, notice("error", rt.Name+" did not start", err.Error()))
 			d.end(l, wire.AgentStateStopped, wire.EndedReasonRuntimeError)
-			return
+			return false
 		}
 		d.record(l.id, wire.TranscriptEntryKind{RuntimeNote: &wire.TranscriptEntryKindRuntimeNote{Value: "Starting " + rt.Name + "…"}})
 		s, err := acp.Start(ctx, launch, l, d.mcpServersFor(l.id), sessionMeta(a.RuntimeID))
@@ -241,7 +322,7 @@ func (l *live) turn(text string) {
 			log.Printf("agent %s: %v", l.id, err)
 			d.record(l.id, notice("error", rt.Name+" did not start", err.Error()))
 			d.end(l, wire.AgentStateStopped, wire.EndedReasonProcessDied)
-			return
+			return false
 		}
 		l.mu.Lock()
 		l.session = s
@@ -271,14 +352,40 @@ func (l *live) turn(text string) {
 			}
 		}
 	}
+	// The words, off the queue now the runtime is there to take them.
+	var q wire.QueuedPrompt
+	taken := false
+	d.change(l.id, func(a *wire.Agent) { q, a.QueuedPrompts, taken = nextTurn(a.QueuedPrompts) })
+	if !taken {
+		return false
+	}
+	bs := blocks(q)
+	from := q.From
+	if from == "" {
+		from = wire.PromptOriginPerson
+	}
+	um := &wire.TranscriptEntryKindUserMessage{Value: q.Text, From: &from}
+	if len(bs) > 1 {
+		um.Blocks = bs
+	}
+	d.record(l.id, wire.TranscriptEntryKind{UserMessage: um})
+	l.mu.Lock()
+	l.lastMessageID = ""
+	l.lastMessage.Reset()
+	clear(l.toolCalls)
+	l.mu.Unlock()
+	d.setState(l.id, wire.AgentStateRunning)
+	if q.Preface != nil {
+		bs = append([]wire.ContentBlock{textBlock(*q.Preface)}, bs...)
+	}
 	l.mu.Lock()
 	s := l.session
 	l.mu.Unlock()
-	r, err := s.Prompt(ctx, text)
+	r, err := s.Prompt(ctx, acpBlocks(bs))
 	if err != nil {
 		if ctx.Err() != nil {
 			d.end(l, wire.AgentStateStopped, wire.EndedReasonCancelled)
-			return
+			return false
 		}
 		log.Printf("agent %s: prompt: %v", l.id, err)
 		l.closeForms()
@@ -289,7 +396,7 @@ func (l *live) turn(text string) {
 		default:
 			d.end(l, wire.AgentStateStopped, wire.EndedReasonRuntimeError)
 		}
-		return
+		return true
 	}
 	if r.Usage != nil {
 		u := wire.TurnUsage{TotalTokens: int64(r.Usage.TotalTokens), InputTokens: int64(r.Usage.InputTokens), OutputTokens: int64(r.Usage.OutputTokens)}
@@ -300,7 +407,9 @@ func (l *live) turn(text string) {
 	case sdk.StopReasonEndTurn:
 		d.end(l, wire.AgentStateFinished, wire.EndedReasonEndTurn)
 	case sdk.StopReasonCancelled:
+		// A stop leaves what is queued behind it.
 		d.end(l, wire.AgentStateStopped, wire.EndedReasonCancelled)
+		return false
 	case sdk.StopReasonMaxTokens:
 		d.end(l, wire.AgentStateStopped, wire.EndedReasonMaxTokens)
 	case sdk.StopReasonMaxTurnRequests:
@@ -310,6 +419,20 @@ func (l *live) turn(text string) {
 	default:
 		d.end(l, wire.AgentStateStopped, wire.EndedReasonUnrecognised)
 	}
+	return true
+}
+
+// acpBlocks is the blocks as ACP has them: the same shape, in the SDK's types.
+func acpBlocks(bs []wire.ContentBlock) []sdk.ContentBlock {
+	out := make([]sdk.ContentBlock, 0, len(bs))
+	for _, b := range bs {
+		var c sdk.ContentBlock
+		raw, _ := json.Marshal(b)
+		if json.Unmarshal(raw, &c) == nil {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 // setState moves a running agent's state, clearing an ending and a report it had.
@@ -639,7 +762,6 @@ func (l *live) cancel() {
 	l.closeForms()
 	l.mu.Lock()
 	s, stop := l.session, l.stop
-	l.queue = nil
 	for _, pp := range l.pending {
 		select {
 		case pp.answer <- "":

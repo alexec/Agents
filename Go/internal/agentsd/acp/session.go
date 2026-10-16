@@ -119,8 +119,8 @@ func Start(ctx context.Context, l Launch, sink Sink, mcp []sdk.McpServer, meta m
 
 // Prompt sends one turn and waits for its end. The reply can overtake the last updates,
 // so the SDK's notification barrier (it orders notifications before the reply) is relied on.
-func (s *Session) Prompt(ctx context.Context, text string) (sdk.PromptResponse, error) {
-	r, err := s.conn.Prompt(ctx, sdk.PromptRequest{SessionId: s.ID, Prompt: []sdk.ContentBlock{sdk.TextBlock(text)}})
+func (s *Session) Prompt(ctx context.Context, blocks []sdk.ContentBlock) (sdk.PromptResponse, error) {
+	r, err := s.conn.Prompt(ctx, sdk.PromptRequest{SessionId: s.ID, Prompt: blocks})
 	if err != nil {
 		select {
 		case <-s.done:
@@ -133,6 +133,52 @@ func (s *Session) Prompt(ctx context.Context, text string) (sdk.PromptResponse, 
 
 func (s *Session) Cancel(ctx context.Context) error {
 	return s.conn.Cancel(ctx, sdk.CancelNotification{SessionId: s.ID})
+}
+
+// SetOption is session/set_config_option for a value of any kind, a boolean as one
+// (ACPSession.setOption), and is the options the runtime says it has now.
+func (s *Session) SetOption(ctx context.Context, id string, value any) ([]sdk.SessionConfigOption, error) {
+	var req sdk.SetSessionConfigOptionRequest
+	switch v := value.(type) {
+	case bool:
+		req.Boolean = &sdk.SetSessionConfigOptionBoolean{SessionId: s.ID, ConfigId: sdk.SessionConfigId(id), Type: "boolean", Value: v}
+	case string:
+		req.ValueId = &sdk.SetSessionConfigOptionValueId{SessionId: s.ID, ConfigId: sdk.SessionConfigId(id), Value: sdk.SessionConfigValueId(v)}
+	default:
+		return nil, fmt.Errorf("an option is a string or a boolean, not %T", value)
+	}
+	r, err := s.conn.SetSessionConfigOption(ctx, req)
+	return r.ConfigOptions, err
+}
+
+// SupportsSteering is initialize's root _meta.steering.supported: whether words can go
+// into a running turn (_session/steering).
+func (s *Session) SupportsSteering() bool {
+	steering, _ := s.Init.Meta["steering"].(map[string]any)
+	supported, _ := steering["supported"].(bool)
+	return supported
+}
+
+// Steer puts words into the running turn (ACPSession.steer), always with idleBehavior
+// promptRequired, and is what the runtime did with them: injected, startedNewTurn,
+// promptRequired, or failed for an answer that cannot be read.
+func (s *Session) Steer(ctx context.Context, blocks []sdk.ContentBlock) (string, error) {
+	raw, err := s.conn.CallExtension(ctx, "_session/steering", map[string]any{"sessionId": s.ID, "prompt": blocks,
+		"_meta": map[string]any{"steering": map[string]any{"idleBehavior": "promptRequired"}}})
+	if err != nil {
+		return "", err
+	}
+	var r struct {
+		Outcome string `json:"outcome"`
+	}
+	if json.Unmarshal(raw, &r) != nil {
+		return "failed", nil
+	}
+	switch r.Outcome {
+	case "injected", "startedNewTurn", "promptRequired":
+		return r.Outcome, nil
+	}
+	return "failed", nil
 }
 
 func (s *Session) SetConfig(ctx context.Context, id, value string) error {
