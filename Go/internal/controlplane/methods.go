@@ -464,7 +464,7 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 		}
 		return map[string]any{}, m.setRelay(ctx, hostRelayRequest{Host: host, Relay: request.Relay})
 	case "attention/need":
-		// Notices to phones go through the relay host, which comes with the relay's port.
+		m.s.heard(params)
 		return map[string]any{}, nil
 	case "host/workspaces", "host/providerDraft":
 		return nil, fail(providersNeedOneCopy, "Workspace providers need a control plane with one copy, for now.")

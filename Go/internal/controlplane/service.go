@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/alexec/agents/Go/internal/buildinfo"
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/hostinstall"
+	"github.com/alexec/agents/Go/internal/controlplane/notices"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/internal/controlplane/web"
@@ -79,6 +81,8 @@ type Service struct {
 	router  *Router
 	methods *Methods
 	started time.Time
+	// What this copy has told its relay host for each need (T097).
+	desk *notices.Desk
 	// hosts/install, detect and sshHosts (T072, #429, #610): with the person's own ssh.
 	installer *hostinstall.Installer
 
@@ -111,7 +115,7 @@ func New(cfg Config) (*Service, error) {
 		cfg.Bind = "0.0.0.0"
 	}
 	s := &Service{cfg: cfg, public: public, origin: origin, copyID: strings.ToLower(records.NewUUID()[:8]),
-		records: records.New(cfg.Store), started: time.Now(), sockets: map[*Conn]bool{}, stop: make(chan struct{})}
+		records: records.New(cfg.Store), started: time.Now(), desk: notices.NewDesk(), sockets: map[*Conn]bool{}, stop: make(chan struct{})}
 	s.codes = &Codes{Store: cfg.Store, Private: cfg.PrivateKey, Public: public, URL: cfg.URL, Pin: cfg.Pin, Name: cfg.Name}
 	s.router = NewRouter(nil, s.log)
 	s.methods = newMethods(s)
@@ -384,6 +388,49 @@ func (s *Service) tellRelayDevices() {
 	}
 	for _, relay := range relays {
 		s.router.Tell(relay, "relay/devices", map[string]any{"devices": devices})
+	}
+}
+
+// heard is a host's attention/need (R6): what to post where, told to the relay host held
+// here. With no relay host here, a need reaches only the clients connected to its host,
+// over their own channels.
+func (s *Service) heard(params json.RawMessage) {
+	var need notices.AttentionNeed
+	if json.Unmarshal(params, &need) != nil {
+		return
+	}
+	relays := s.router.RelaysHeldHere()
+	if len(relays) == 0 {
+		return
+	}
+	sort.Strings(relays)
+	relay := relays[0]
+	flags := s.router.NotifyFlags()
+	var devices []notices.Device
+	for _, c := range s.records.Clients() {
+		if !c.IsDevice() || len(c.PublicKey) == 0 {
+			continue
+		}
+		kind := notices.Unknown
+		if c.Kind == records.KindIPhone || c.Kind == records.KindIPad {
+			kind = c.Kind
+		}
+		d := notices.Device{ID: c.ID, PublicKey: c.PublicKey, Kind: kind, MayNotify: c.MayNotify}
+		if c.LastSeen != nil {
+			d.LastSeen = c.LastSeen.Time
+		}
+		if may, ok := flags[c.ID]; ok {
+			d.MayNotify = &may
+		}
+		devices = append(devices, d)
+	}
+	for _, delivery := range s.desk.Heard(need, s.router.FoldedPresences(), devices, time.Now()) {
+		s.router.Tell(relay, "relay/deliver", delivery)
+		did := "sent"
+		if delivery.Headline == nil {
+			did = "withdrew"
+		}
+		s.log(fmt.Sprintf("notice: %s %s for %s to relay %s", did, delivery.NeedID, delivery.Device, relay))
 	}
 }
 
