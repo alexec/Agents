@@ -54,6 +54,8 @@ type costBook struct {
 	limitsNote   string
 	// reader's running total of a session's cost, by currency (usage_update says a total)
 	sessionCost map[wire.UUID]map[string]float64
+	held        map[wire.UUID]bool // agents whose queue waits for a limit, told once
+	lastSeenDay string
 }
 
 func dayStamp(t time.Time) string  { return t.Local().Format("2006-01-02") }
@@ -427,6 +429,8 @@ func (d *Daemon) setLimits(raw json.RawMessage) (wire.CostState, error) {
 	st := d.costStateLocked()
 	d.costMu.Unlock()
 	Broadcast(d, wire.NotifyCostChanged, st)
+	// A limit raised lets what waited go now.
+	d.drainHeld()
 	return st, nil
 }
 

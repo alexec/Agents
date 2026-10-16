@@ -143,6 +143,9 @@ type startedBy struct {
 }
 
 func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) {
+	if err := d.startRefusal(); err != nil {
+		return "", err
+	}
 	rt := runtimeByID(r.RuntimeID)
 	if rt == nil {
 		return "", &Error{Code: CodeRuntimeNotFound, Message: "no runtime " + r.RuntimeID}
@@ -321,6 +324,13 @@ func (l *live) run() {
 			return
 		}
 		l.mu.Unlock()
+		// What is queued waits while the agent or the day is at its limit.
+		if l.d.holdsForLimit(l.id) {
+			l.mu.Lock()
+			l.running = false
+			l.mu.Unlock()
+			return
+		}
 		drain := false
 		if v := safe.Catch("turn of "+string(l.id), func() { drain = l.turn() }); v != nil {
 			// The turn's own defers ran; end it so the window does not wait on it.
@@ -509,6 +519,17 @@ func (l *live) turn() bool {
 		d.record(l.id, wire.TranscriptEntryKind{UsageRecorded: &wire.TranscriptEntryKindUsageRecorded{Value: u}})
 		// The turn's tokens on the agent, the day and the charts (finishTurn's banking).
 		d.bankTurnUsage(l.id, u)
+	}
+	// A turn that took the agent to its limit stops it there, the turn finished first.
+	if r.StopReason == sdk.StopReasonEndTurn {
+		if a := d.Store.Agent(l.id); a != nil {
+			if note := d.crossedLimit(a); note != "" {
+				d.raiseCostLimit("agent", a)
+				d.record(l.id, runtimeNote(note))
+				d.end(l, wire.AgentStateStopped, wire.EndedReasonCostLimit)
+				return false
+			}
+		}
 	}
 	switch r.StopReason {
 	case sdk.StopReasonEndTurn:
