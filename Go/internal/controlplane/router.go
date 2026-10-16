@@ -11,6 +11,7 @@ import (
 	"github.com/coder/websocket"
 
 	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/alexec/agents/Go/internal/controlplane/notices"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 )
 
@@ -1014,6 +1015,53 @@ func (r *Router) broadcastControlLocked(method string, params any) {
 			r.writeLocked(id, line)
 		}
 	}
+}
+
+// FoldedPresences is every client's presence, folded as a daemon folds its own: one per
+// surface, an active one beating a later quiet one (058, R6). A Mac's window is the Mac.
+func (r *Router) FoldedPresences() map[notices.Surface]notices.Presence {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	folded := map[notices.Surface]notices.Presence{}
+	for _, note := range r.presence {
+		surface := notices.Mac
+		if note.device {
+			surface = notices.Surface{Device: note.client}
+		}
+		p := notices.Presence{Surface: surface, Active: note.active, HeardAt: note.heardAt}
+		if note.watching != nil {
+			p.Watching = strings.ToUpper(*note.watching)
+		}
+		if held, ok := folded[surface]; ok {
+			better := p.HeardAt.After(held.HeardAt)
+			if p.Active != held.Active {
+				better = p.Active
+			}
+			if !better {
+				continue
+			}
+		}
+		folded[surface] = p
+	}
+	return folded
+}
+
+// NotifyFlags is what each device last said about showing a notification, where it said.
+func (r *Router) NotifyFlags() map[string]bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	flags := map[string]bool{}
+	at := map[string]time.Time{}
+	for _, note := range r.presence {
+		if note.mayNotify == nil {
+			continue
+		}
+		if held, ok := at[note.client]; ok && held.After(note.heardAt) {
+			continue
+		}
+		flags[note.client], at[note.client] = *note.mayNotify, note.heardAt
+	}
+	return flags
 }
 
 // MARK: Tunnels between hosts (T091)

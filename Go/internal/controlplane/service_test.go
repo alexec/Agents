@@ -501,3 +501,99 @@ func TestHostsInstallAnswersInItsWords(t *testing.T) {
 	}
 	call(t, window, "", "hosts/checkAgain", map[string]string{"host": "x"})
 }
+
+// rawHost enrols and connects a host by hand, and returns its uplink's lines: for a
+// relay host (agents-relay), whose channel 0 the test reads itself.
+func (p *plane) rawHost(name string, relay bool) (string, *controllink.Lines) {
+	ctx := context.Background()
+	code := p.code(true)
+	private := controllink.NewPrivateKey()
+	public, _ := controllink.PublicKey(private)
+	l, _, err := controllink.Join(ctx, code.URL, "", controllink.Credentials{Identity: "e:" + code.ID(),
+		Key: controllink.CodeKey(code.Secret), Kind: "host", ControlKey: code.ControlKey})
+	if err != nil {
+		p.t.Fatal(err)
+	}
+	params, _ := json.Marshal(hostAnnounce{PublicKey: public, Name: name, Platform: "macOS arm64", Version: "1",
+		MachineID: "RELAY-MAC", Relay: &relay})
+	l.Write(ctx, `{"jsonrpc":"2.0","id":1,"method":"hosts/announce","params":`+string(params)+`}`)
+	line, err := l.Read(ctx)
+	if err != nil {
+		p.t.Fatal(err)
+	}
+	l.Close()
+	var answer struct {
+		Result admitted `json:"result"`
+	}
+	json.Unmarshal([]byte(line), &answer)
+	host := answer.Result.Host
+	key, _ := controllink.HostKey(private, code.ControlKey, host)
+	l, _, err = controllink.Join(ctx, code.URL, "", controllink.Credentials{Identity: "h:" + host, Key: key,
+		Kind: "host", ControlKey: code.ControlKey})
+	if err != nil {
+		p.t.Fatal(err)
+	}
+	hello, _ := json.Marshal(hostHello{Version: "1", Platform: "macOS arm64", MachineID: "RELAY-MAC", Relay: &relay})
+	l.Write(ctx, channelFrame(0, `{"jsonrpc":"2.0","id":1,"method":"host/hello","params":`+string(hello)+`}`))
+	p.t.Cleanup(l.Close)
+	return host, l
+}
+
+// readUntil reads a host's lines until one holds want.
+func readUntil(t *testing.T, l *controllink.Lines, want string) string {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	for {
+		line, err := l.Read(ctx)
+		if err != nil {
+			t.Fatalf("no %s: %v", want, err)
+		}
+		if strings.Contains(line, want) {
+			return line
+		}
+	}
+}
+
+// A need a host raises goes to the relay host, sealed to the device the ladder picks
+// (T097): the iPhone that may notify, then taken back when the need is met.
+func TestANeedGoesToTheRelayHost(t *testing.T) {
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	relayID, relay := p.rawHost("relay mac", true)
+	if relayID == "mac" {
+		t.Fatal("a relay was made the home host")
+	}
+	box := p.host("MACHINE-2")
+	// A phone pairs and says it may notify; the relay host hears the devices.
+	m, err := controllink.PairClient(context.Background(), p.code(false), "phone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := p.s.Records().Client(m.Client)
+	client.Kind = records.KindIPhone
+	yes := true
+	client.MayNotify = &yes
+	if err := p.s.Records().SaveClient(context.Background(), *client); err != nil {
+		t.Fatal(err)
+	}
+	p.s.tellRelayDevices()
+	readUntil(t, relay, m.Client)
+	// The window was given no channel on the relay host.
+	if n := p.s.Router().Channels(relayID); n != 0 {
+		t.Fatal(n)
+	}
+
+	need := `{"need":{"id":{"permission":"E0000000-0000-4000-8000-000000000005"},"agentID":"A0000000-0000-4000-8000-000000000001",` +
+		`"folder":"file:///work","kind":"permission","raisedAt":800000000,"headline":{"h1":"work","h2":"Fix","h3":"may run"}},"buzz":true}`
+	if _, err := p.s.methods.HostSaid(box.member.Host, "attention/need", json.RawMessage(need)); err != nil {
+		t.Fatal(err)
+	}
+	line := readUntil(t, relay, "relay/deliver")
+	if !strings.Contains(line, `"device":"`+m.Client+`"`) || !strings.Contains(line, `"alert":true`) || !strings.Contains(line, `"h2":"Fix"`) {
+		t.Fatal(line)
+	}
+	p.s.methods.HostSaid(box.member.Host, "attention/need", json.RawMessage(`{"withdraw":{"permission":"E0000000-0000-4000-8000-000000000005"}}`))
+	if line := readUntil(t, relay, "relay/deliver"); strings.Contains(line, "headline") {
+		t.Fatal(line)
+	}
+}
