@@ -24,6 +24,9 @@ final class ControlSettingsModel {
     /// How each connected client reaches the control plane now (frame N). Empty from a
     /// control plane that does not say.
     private(set) var connections: [UUID: DaemonAPI.ClientConnection] = [:]
+    /// Slack (#1009), as the control plane last said it. Nil until it answers, or from a
+    /// control plane too old to know channels. It never holds a token.
+    private(set) var slack: DaemonAPI.SlackState?
     /// Said when an action was refused, in the words the control plane used.
     var problem: String?
     private(set) var isReachable = false
@@ -72,6 +75,12 @@ final class ControlSettingsModel {
                         }
                         continue
                     }
+                    if note.method == DaemonAPI.Notification.controlChannelsChanged {
+                        if let state = try? note.params?.decode(DaemonAPI.ChannelsState.self) {
+                            self.slack = state.slack
+                        }
+                        continue
+                    }
                     if note.method == DaemonAPI.Notification.controlProvidersChanged,
                        let listed = try? note.params?["providers"]?.decode([DaemonAPI.ProviderSummary].self) {
                         self.providers = listed
@@ -108,10 +117,37 @@ final class ControlSettingsModel {
                                                 returning: [DaemonAPI.ClientConnection].self)) ?? []
             connections = Dictionary(links.map { ($0.client, $0) }, uniquingKeysWith: { $1 })
             await refreshProviderList()
+            await refreshChannels()
             await linkJoined()
             isReachable = true
         } catch {
             isReachable = false
+        }
+    }
+
+    // MARK: Slack (#1009)
+
+    func refreshChannels() async {
+        do {
+            slack = try await client.call(DaemonAPI.Method.channelsGet, DaemonAPI.Empty(),
+                                          returning: DaemonAPI.ChannelsState.self).slack
+        } catch let error as JSONRPCError where error.code == JSONRPCError.methodNotFound {
+            slack = nil
+        } catch {}
+    }
+
+    /// Sends what changed. A token goes only when one was typed, and is kept nowhere here.
+    /// Nil once it is saved, or why not, in the control plane's words.
+    func saveSlack(enabled: Bool, memberID: String, appToken: String?, botToken: String?) async -> String? {
+        let change = DaemonAPI.SlackSet(enabled: enabled, memberID: memberID, appToken: appToken, botToken: botToken)
+        do {
+            slack = try await client.call(DaemonAPI.Method.channelsSet, DaemonAPI.ChannelsSet(slack: change),
+                                          returning: DaemonAPI.ChannelsState.self).slack
+            return nil
+        } catch let error as JSONRPCError {
+            return HostProblem.controlRefusal(error)
+        } catch {
+            return "The control plane can’t be reached."
         }
     }
 
